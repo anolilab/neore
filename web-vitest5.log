@@ -1,0 +1,12 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.ts:8:26). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v5.1.0 /private/tmp/claude-501/-Users-danielbannert--t3-worktrees-neore-add-project-machine-picker/2bc5412d-68f1-4a18-af42-31dbd5ae5923/scratchpad/wt-merge/apps/web
+
+
+ Test Files  6 passed (6)
+      Tests  78 passed (78)
+   Start at  12:25:30
+   Duration  4.73s (environment 66%, import 16%, tests 15%, transform 2%, worker 1%)
+

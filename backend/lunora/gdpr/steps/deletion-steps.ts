@@ -13,6 +13,7 @@ import {
     eraseThreadSuggestionsAndInvites,
 } from "../../agent/gdpr";
 import { eraseThreadPinsAndTagsForUser, erasePersistentStreamsForUser, erasePresentationsForUser } from "../../chat/gdpr";
+import { deleteFollowRowsOfUserBatch } from "../../chat/follows/functions";
 import { eraseVaultForUser } from "../../vault/gdpr";
 import { erasePromptsForUser } from "../../prompts/gdpr";
 import { eraseMemoriesForUser } from "../../memory/gdpr";
@@ -75,6 +76,14 @@ export const deleteUserSettings = internalMutation
     });
 
 // --- Thread-dependent deletions (MUST run before thread deletion) ---
+
+/** One batch of the user's follow rows on any thread (`chat/follows/functions.ts`); drained by the workflow. */
+export const deleteUserFollowRows = internalMutation
+    .input({ userId: v.string() })
+    .output(vBatchResult)
+    .mutation(async ({ args: { userId }, ctx: context }) => {
+        return { hasMore: !(await deleteFollowRowsOfUserBatch(context, userId)) };
+    });
 
 export const deleteUserThreadMetadata = internalMutation
     .input({ userId: v.string() })
@@ -152,14 +161,11 @@ export const deleteUserMemories = internalMutation
     .output(vBatchResult)
     .mutation(async ({ args: { userId }, ctx: context }) => await eraseMemoriesForUser(context, userId));
 
+/** One page of the user's projects with their rule files (`agent/gdpr.ts`). */
 export const deleteUserProjects = internalMutation
     .input({ userId: v.string() })
-    .output(v.null())
-    .mutation(async ({ args: { userId }, ctx: context }) => {
-        await eraseProjectsForUser(context, userId);
-
-        return null;
-    });
+    .output(vBatchResult)
+    .mutation(async ({ args: { userId }, ctx: context }) => await eraseProjectsForUser(context, userId));
 
 /** The user's chat-import jobs (`chat-import/gdpr.ts`). */
 export const deleteUserImportJobs = internalMutation
@@ -209,14 +215,10 @@ export const deleteAuthRecords = internalMutation
 
 // ── Browser data cleanup ────────────────────────────────────────────────
 
-/** Browser sessions, their actions and extensions (`browser/gdpr.ts`). */
+/** Browser sessions, their actions, extensions and the human-check asks, batched (`browser/gdpr.ts`). */
 export const deleteUserBrowserData = internalMutation
     .input({ userId: v.string() })
-    .output(v.null())
-    .mutation(async ({ args: { userId }, ctx: context }) => {
-        await eraseBrowserDataForUser(context, userId);
-
-        return null;
-    });
+    .output(vBatchResult)
+    .mutation(async ({ args: { userId }, ctx: context }) => await eraseBrowserDataForUser(context, userId));
 
 export { deleteParentsWithChildren } from "../batch";

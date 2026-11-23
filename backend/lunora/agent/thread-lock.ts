@@ -22,6 +22,8 @@ import { scheduleGranteeRedaction } from "../notifications/locked-redact";
 import { withdrawGuestLinksForThread } from "../chat/lib/guest-link-store";
 import { scheduleFileLinkBackfill } from "./file-link-backfill";
 import { deleteThreadSummaries } from "./thread-summaries";
+import { fileAttachInFlight, fileAttachInThread } from "./file-attach-claim";
+import { followupDispatchInFlight } from "./followup-suggestions";
 import { clearRecordedTitleAnswers, titleDispatchInFlight } from "./thread-title";
 import { passcodeHashOf, readPasscodeRow, type PasscodeRow, unlockSecret } from "./thread-passcode";
 import { requireOwnedThreadIgnoringLock } from "./thread-read-access";
@@ -115,6 +117,24 @@ export const enableThreadLock = authMutation
         // chat ever reaches a title model (`agent/thread-title.ts`). The request is answered within seconds.
         if (await titleDispatchInFlight(context, threadId)) {
             throw new LunoraError("CONFLICT", "A title is being generated for this chat. Try again in a moment.");
+        }
+
+        // A follow-up model request for this chat is being sent: the lock waits for it, so no message of a locked chat reaches a model
+        // (`agent/followup-suggestions.ts`). The request is answered within seconds.
+        if (await followupDispatchInFlight(context, threadId)) {
+            throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
+        }
+
+        // A file attach of this user is in flight: a file the attach read from this chat must not be locked out from under it
+        // (`agent/file-attach-claim.ts`). The attach holds its claim for the length of one send or edit.
+        if (await fileAttachInFlight(context, userId)) {
+            throw new LunoraError("CONFLICT", "A file is being attached to a chat. Try again in a moment.");
+        }
+
+        // An attach into THIS chat, from anyone (a collaborator's send or edit), is in flight: the lock waits for its save.
+        // Its claim is taken on this shard in the same transaction as the access check (`agent/file-attach-thread.ts`).
+        if (await fileAttachInThread(context, threadId)) {
+            throw new LunoraError("CONFLICT", "A file is being attached to this chat. Try again in a moment.");
         }
 
         if (thread.isPublic === true) {

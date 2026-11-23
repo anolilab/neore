@@ -11,6 +11,7 @@ import { showWarning } from "@/lib/toast";
 import { useChatUIStore } from "../stores/chat-ui-store";
 import type { ModelId } from "../stores/model-store";
 import { useModelStore } from "../stores/model-store";
+import { markComposerDraft } from "../utils/draft-origin";
 
 /**
  * A model a link may select: an enabled text model the app can call (`MODEL_LOOKUP` leaves out external, marketing-only rows)
@@ -130,6 +131,7 @@ export const usePromptLinkDraft = ({
             showWarning(t`Your draft is kept. The prompt from the link was not added.`);
         } else {
             setComposerText(prompt);
+            markComposerDraft("promptLink");
             pendingModelRef.current = model === undefined ? undefined : { chosen: chosenOf(useModelStore.getState()), model };
         }
 

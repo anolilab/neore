@@ -15,10 +15,12 @@
     ],
     "type": "module",
     "scripts": {
+        "prebuild": "pnpm -w run codegen:backend",
         "build": "node scripts/generate-og.mjs && vite build && node scripts/generate-sw.mjs && tsc --noEmit",
         "build-storybook": "storybook build --output-dir storybook-static",
         "cf:typegen": "wrangler types",
         "clean": "rimraf node_modules dist .eslintcache .tanstack",
+        "predev": "pnpm -w run codegen:backend",
         "dev": "vite dev --port 5173",
         "email:dev": "email dev --dir src/components/emails --port 5555",
         "generate:pwa-assets": "pwa-assets-generator",
@@ -37,7 +39,7 @@
         "test:storybook": "vitest run --config vitest.storybook.config.ts",
         "translate:auto": "node scripts/translate-catalogs.mjs",
         "translate:clean": "lingui extract --clean",
-        "translate:compile": "lingui compile",
+        "translate:compile": "node scripts/check-locale-catalogs.mjs && lingui compile",
         "translate:extract": "lingui extract"
     },
     "dependencies": {
@@ -66,9 +68,9 @@
         "@fontsource-variable/geist": "catalog:style",
         "@fontsource-variable/geist-mono": "catalog:style",
         "@hcaptcha/react-hcaptcha": "catalog:security",
-        "@json-render/core": "0.22.0",
-        "@json-render/react": "0.22.0",
-        "@json-render/shadcn": "0.22.0",
+        "@json-render/core": "0.23.2",
+        "@json-render/react": "0.23.2",
+        "@json-render/shadcn": "0.23.2",
         "@lingui/core": "catalog:i18n",
         "@lingui/detect-locale": "catalog:i18n",
         "@lingui/react": "catalog:i18n",
@@ -148,6 +150,7 @@
         "my-ua-parser": "catalog:utils",
         "nanoid": "catalog:utils",
         "next-themes": "catalog:ui",
+        "open-bot-avatar": "catalog:ui",
         "posthog-js": "catalog:analytics",
         "posthog-node": "catalog:analytics",
         "pptxgenjs": "catalog:utils",
@@ -158,6 +161,7 @@
         "react-hotkeys-hook": "catalog:utils",
         "react-qr-code": "catalog:utils",
         "remark-directive": "catalog:markdown",
+        "remark-parse": "catalog:markdown",
         "rooks": "catalog:utils",
         "shadcn": "catalog:ui",
         "slate": "catalog:editor",
@@ -249,7 +253,7 @@
         "wrangler": "catalog:build"
     },
     "engines": {
-        "node": ">=22.x"
+        "node": "^22.18.0 || >=23.6.0"
     },
     "msw": {
         "workerDirectory": [

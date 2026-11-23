@@ -23,7 +23,8 @@ import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import type { ContextHandler, TakeSteer } from "../../agent/client/types";
-import type { ResearchDepth } from "../../agent/client/create-tool";
+import type { ResearchDepth, RunTurn } from "../../agent/client/create-tool";
+import { MAX_ATTACHED_FILES } from "../../agent/file-attach-claim";
 import { lastRowOf, SUMMARY_IDLE_MS, SUMMARY_MIN_ORDER } from "../../agent/thread-summary-logic";
 import { LEFT_ORGANIZATION_MESSAGE } from "../../auth/lib/organization-policy";
 import type { MessageDoc } from "../../agent/validators";
@@ -40,12 +41,13 @@ import type { GatewayCustomProviderConfig } from "./gateway-language-model";
 import { gatewayFetch } from "../../lib/services";
 import getAgent from "./get-agent";
 import type { AutoApprovals } from "./low-risk-approval";
+import { systemContextKinds } from "./system-context-kinds";
 import { injectsUntrustedContext } from "./low-risk-approval";
 import { isRunReplaced } from "./run-epoch";
 import type { McpToolLabels } from "./mcp-tool-labels";
 import { labelMcpToolCalls } from "./mcp-tool-labels";
 import { closeMCPClients } from "./mcp-tools";
-import { mcpToolDrift, mcpToolDriftReason } from "./mcp-tool-fingerprint";
+import { mcpToolDrift, mcpToolDriftReason, mcpToolOriginDrift } from "./mcp-tool-fingerprint";
 import { scheduleRepliesUsage } from "./pause-usage";
 import {
     asRefusedWrite,
@@ -70,10 +72,13 @@ import { servesUser } from "../../lib/shard-context";
 import { runAfterOnShard } from "../../lib/shard-scheduler";
 import { shouldNoteBriefActivity } from "../../notifications/daily-brief-logic";
 import { buildKnowledgeCitations, type KnowledgeSource } from "../../knowledge/citations";
+import { EXTRACTION_USER_MESSAGE_CHARS } from "../../memory/gate";
 import type { ReplySkill } from "../../usage/activity-logic";
 import { type DispatchOrigin, stopWhenRequested } from "../../sub-agents/logic";
+import { localDayOf, resolveTimeZone } from "../../memory/reflection-logic";
 import { writeLoopStopNotice } from "../loop-stop";
 import { type LoopFinding, type RepeatedCallGuard, repeatedCallGuard } from "./repeated-call-guard";
+import { INSTRUCTION_READ_TOOL, renderInstructionList, type RunInstruction } from "../../projects/rule-files";
 
 /** Registry providers carry an `internal-` prefix the provider-keyed options do not. */
 export const INTERNAL_PREFIX_RE = /^internal-/;
@@ -301,9 +306,39 @@ export const setHeadlessRun = (ctx: object): void => {
     (ctx as { headless?: boolean }).headless = true;
 };
 
+/** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `replyKey`; the action ctx has no such field. */
+export const setRunReplyKey = (ctx: object, replyKey: string): void => {
+    (ctx as { replyKey?: string }).replyKey = replyKey;
+};
+
 /** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `startedBy`; the action ctx has no such field. */
 export const setRunStartedBy = (ctx: object, startedBy: string | undefined): void => {
     (ctx as { startedBy?: string }).startedBy = startedBy;
+};
+
+/**
+ * The agent forwards the action ctx to tools as their `ToolCtx`, which declares `runTurn`. Set only when every field is
+ * known: a run started before `/chat/start` recorded impersonation, or a snapshot written before these fields, sets none.
+ */
+export const setRunTurn = (ctx: object, turn: Partial<RunTurn> | undefined): void => {
+    const { impersonated, promptMessageId, systemContext } = turn ?? {};
+
+    (ctx as { runTurn?: RunTurn }).runTurn =
+        impersonated === undefined || promptMessageId === undefined || systemContext === undefined
+            ? undefined
+            : { impersonated, promptMessageId, systemContext };
+};
+
+/**
+ * The agent forwards the action ctx to tools as their `ToolCtx`, which declares `runToolSources`: the source of each tool
+ * the run offers, read off its permission key (`builtin:…`, `mcp:…`, `connector:…`, `device:…`), never off its name; a
+ * key with no source reads as `unknown`. A continuation passes the keys its snapshot recorded too, so a tool the step
+ * that made the call was offered still counts after it is gone; a snapshot that recorded none sets none.
+ */
+export const setRunToolSources = (ctx: object, ...permissionKeys: ReadonlyArray<Record<string, string> | undefined>): void => {
+    (ctx as { runToolSources?: ReadonlyArray<string> }).runToolSources = permissionKeys.includes(undefined)
+        ? undefined
+        : permissionKeys.flatMap((keys) => Object.values(keys ?? {}).map((key) => (key.includes(":") ? key.slice(0, key.indexOf(":")) : "unknown")));
 };
 
 /**
@@ -360,6 +395,8 @@ const MIN_MEMORY_SEARCH_WORDS = 3;
 // Japanese sentence (no spaces) as one word, so such a prompt never reached memory search.
 const WORD_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "word" });
 const MEMORY_RETRIEVAL_CACHE_TTL_MS = 60_000;
+// How long a search may run between setting the cache lifetime and writing the result.
+const RETRIEVAL_SEARCH_MARGIN_MS = 30_000;
 
 /** Word-like segments of a prompt, by the locale's rules (see {@link WORD_SEGMENTER}). */
 export const countSearchWords = (text: string): number => {
@@ -374,12 +411,28 @@ export const countSearchWords = (text: string): number => {
     return count;
 };
 
+/** The cache lives for at most a minute, and never past the user's next local midnight: a fact that expires then must not be served. */
+const retrievalCacheTtl = (timeZone: string | null | undefined): number => {
+    const now = Date.now();
+    const day = localDayOf(now, timeZone);
+    let instant = now;
+
+    // Looks a margin past the full lifetime, so a midnight hours away leaves the whole minute.
+    while (instant - now < MEMORY_RETRIEVAL_CACHE_TTL_MS + RETRIEVAL_SEARCH_MARGIN_MS && localDayOf(instant, timeZone) === day) {
+        instant += 1000;
+    }
+
+    // The lifetime is set before the search runs and the result is written after it, so a search of up to 30 s can end past midnight.
+    return Math.max(0, Math.min(MEMORY_RETRIEVAL_CACHE_TTL_MS, instant - now - RETRIEVAL_SEARCH_MARGIN_MS));
+};
+
 /** The memory block for the system prompt, and which memories went into it. */
 const retrieveMemories = async (
     ctx: ActionCtx,
     userId: string,
     searchText: string,
     botId?: string,
+    timeZone?: string | null,
 ): Promise<{ context: string | undefined; refs: RetrievedMemoryRef[] }> => {
     // A prompt of two words or fewer ("thanks", "ok", "yes") has nothing to match
     // a memory against, so it skips the embedding and the vector search.
@@ -396,11 +449,16 @@ const retrieveMemories = async (
         // from a 60 s cache. A memory deleted in that minute can still reach one
         // reply, which is the cost of skipping the embedding call.
         const memories = servesUser(userId)
-            ? await new ActionCache<{ botId?: string; searchText: string; userId: string }, RetrievedMemory[]>(undefined, {
+            ? await new ActionCache<{ botId?: string; localDay?: string; searchText: string; userId: string }, RetrievedMemory[]>(undefined, {
                   action: internal.memory.retrieve.retrieveRelevantMemories,
                   name: "memory/retrieve",
-                  ttl: MEMORY_RETRIEVAL_CACHE_TTL_MS,
-              }).fetch(ctx, { botId, searchText: searchText.trim().toLowerCase(), userId })
+                  ttl: retrievalCacheTtl(timeZone),
+              }).fetch(ctx, {
+                  botId,
+                  localDay: timeZone === undefined ? undefined : localDayOf(Date.now(), timeZone),
+                  searchText: searchText.trim().toLowerCase(),
+                  userId,
+              })
             : await callOnShard(internal.memory.retrieve.retrieveRelevantMemories, { botId, searchText, userId }, { shardKey: userId });
 
         return {
@@ -416,8 +474,14 @@ const retrieveMemories = async (
     }
 };
 
-export const retrieveMemoryContext = async (ctx: ActionCtx, userId: string, searchText: string, botId?: string): Promise<string | undefined> => {
-    const { context } = await retrieveMemories(ctx, userId, searchText, botId);
+export const retrieveMemoryContext = async (
+    ctx: ActionCtx,
+    userId: string,
+    searchText: string,
+    botId?: string,
+    timeZone?: string | null,
+): Promise<string | undefined> => {
+    const { context } = await retrieveMemories(ctx, userId, searchText, botId, timeZone);
 
     return context;
 };
@@ -440,6 +504,13 @@ const retrieveKnowledgeContext = async (
 };
 
 /**
+ * Characters of the longest context a run of `context` may append: which of its two kinds it sends is known only once its
+ * tools are built (`instruction_read` may be removed), so an Auto route, chosen before, is sized for the longer.
+ */
+export const longestContextCharacters = (context: { contextParts: string[]; contextPartsWithoutInstructions: string[] }): number =>
+    Math.max(context.contextParts.join("\n\n").length, context.contextPartsWithoutInstructions.join("\n\n").length);
+
+/**
  * The per-user context an interactive run reads before it starts: preferences
  * and personalization, the thread's settings, the user's provider keys, and the
  * extra system-prompt context — relevant memories, knowledge-base excerpts,
@@ -454,8 +525,12 @@ export const loadRunContext = async (
         /** Set only by a caller whose run was admitted by the stream gate: a locked chat's knowledge scope is empty without it. */
         admittedRun?: boolean;
         customSystemPrompt?: string;
+        /** The files the run's message attaches: the project's rule files applied by pattern match their names. */
+        fileIds?: string[];
         promptText?: string;
         researchDepth?: string;
+        /** Read the sub-agent role catalog: only a run that may hand work to one asks (a group turn does not). */
+        roleCatalog?: boolean;
         threadId: string;
         threadLanguage?: string;
         userId: string;
@@ -480,7 +555,7 @@ export const loadRunContext = async (
 
         return bot ? { ...bot, botId: settings.botId } : null;
     });
-    const [prefs, threadSettings, userProviderKeys, memoryContext, knowledgeContext, project, bot] = await Promise.all([
+    const [prefs, threadSettings, userProviderKeys, memoryContext, knowledgeContext, project, bot, roleCatalog] = await Promise.all([
         prefsPromise,
         threadSettingsPromise,
         loadUserProviderKeys(ctx, userId),
@@ -491,45 +566,48 @@ export const loadRunContext = async (
 
             const memoryBot = await botPromise;
 
-            return await retrieveMemories(ctx, userId, retrievalText, memoryBot?.botId);
+            return await retrieveMemories(ctx, userId, retrievalText, memoryBot?.botId, loaded.timezone);
         }),
         retrievalText ? retrieveKnowledgeContext(ctx, { ...(args.admittedRun && { admittedRun: true }), query: retrievalText, threadId, userId }) : undefined,
         threadSettingsPromise.then(async (settings) =>
             settings?.projectId
-                ? await ctx.runQuery(internal.projects.functions.getProjectContextForRun, { projectId: settings.projectId as Id<"projects">, userId })
+                ? await ctx.runQuery(internal.projects.functions.getProjectContextForRun, {
+                      ...(args.fileIds && args.fileIds.length > 0 && { fileIds: args.fileIds.slice(0, MAX_ATTACHED_FILES) as Id<"chatFiles">[] }),
+                      projectId: settings.projectId as Id<"projects">,
+                      userId,
+                  })
                 : null,
         ),
         botPromise,
+        // Alongside the project read, so it adds no wait of its own.
+        args.roleCatalog ? ctx.runQuery(internal.sub_agents.role_settings.getRoleCatalogForRun, { threadId, userId }) : null,
     ]);
 
     const customSystemPrompt = threadSettings?.customSystemPrompt ?? args.customSystemPrompt;
-    const contextParts: string[] = [];
+    const partsWith = (projectText: string | null | undefined): string[] =>
+        [
+            memoryContext?.context,
+            knowledgeContext?.context,
+            projectText ? `PROJECT CONTEXT:\n${projectText}` : undefined,
+            bot ? `BOT (${bot.name}) INSTRUCTIONS:\n${bot.instructions}` : undefined,
+            customSystemPrompt ? `ADDITIONAL INSTRUCTIONS:\n${customSystemPrompt}` : undefined,
+        ].filter((part): part is string => !!part);
+    const contextParts = partsWith(project?.text);
 
-    if (memoryContext?.context) {
-        contextParts.push(memoryContext.context);
-    }
-
-    if (knowledgeContext?.context) {
-        contextParts.push(knowledgeContext.context);
-    }
-
-    if (project) {
-        contextParts.push(`PROJECT CONTEXT:\n${project}`);
-    }
-
-    if (bot) {
-        contextParts.push(`BOT (${bot.name}) INSTRUCTIONS:\n${bot.instructions}`);
-    }
-
-    if (customSystemPrompt) {
-        contextParts.push(`ADDITIONAL INSTRUCTIONS:\n${customSystemPrompt}`);
-    }
+    const personalization = toPersonalization(prefs);
+    // The thread's stored instructions win over the request's (`customSystemPrompt` above).
+    const systemPromptSource = threadSettings?.customSystemPrompt === undefined ? "request" : "thread";
 
     return {
         /** The bot this chat runs as, when it resolves; its memory is written in that scope. */
         botId: bot?.botId,
-        /** Appended to the agent's instructions, in this order. */
+        /** Appended to the agent's instructions, in this order, by a run that lists the project's `auto` files. */
         contextParts,
+        /**
+         * The same parts for a run that lists none of them (`projectInstructions` unused): its project text is chosen without the
+         * list's cost (`projectRunContext`), so the list never takes room from files that run is given.
+         */
+        contextPartsWithoutInstructions: project?.textWithoutInstructions === undefined ? contextParts : partsWith(project.textWithoutInstructions),
         /** The passages behind the `[n]` citations; `afterRun` records them on the reply. */
         knowledgeSources: knowledgeContext?.sources ?? [],
         memoryEnabled: prefs.memoryEnabled,
@@ -538,19 +616,37 @@ export const loadRunContext = async (
             backupModel: prefs.backupModel,
             language: args.threadLanguage || prefs.language,
             location: prefs.location,
-            personalization: toPersonalization(prefs),
+            personalization,
             threadSummariesEnabled: prefs.threadSummariesEnabled,
             timezone: prefs.timezone,
         },
+        /**
+         * The project's `auto` rule files, from the same read: a run whose tools keep `instruction_read` over them
+         * (`buildAgentTools`) lists them after `contextParts` (`renderInstructionList`); one that does not leaves them out.
+         */
+        projectInstructions: project?.instructions ?? [],
         researchDepth: toResearchDepth(args.researchDepth),
         /** Memories injected above; `afterRun` records them on the reply. */
         retrievedMemories: memoryContext?.refs ?? [],
+        /** The sub-agent roles that have a model (`sub-agents/roles.ts`); the run adds it only while it can delegate. */
+        roleCatalog: roleCatalog ?? undefined,
+        /** One kind per piece of the system prompt above, for the saved-login verdict (`system-context-kinds.ts`). */
+        systemContext: systemContextKinds({
+            bot,
+            knowledge: Boolean(knowledgeContext?.context),
+            memories: Boolean(memoryContext?.context),
+            personalization: personalization !== undefined || Boolean(prefs.location) || Boolean(prefs.language),
+            personalizationByImpersonator: prefs.personalizationByImpersonator,
+            project: Boolean(project),
+            systemPrompt: customSystemPrompt ? systemPromptSource : undefined,
+            threadLanguage: Boolean(args.threadLanguage),
+        }),
         threadSettings,
         /** Knowledge, memory or project context is in the prompt: the quick check for low-risk tool calls never runs (`low-risk-approval.ts`). */
         untrustedContext: injectsUntrustedContext({
             knowledge: knowledgeContext?.context,
             memory: memoryContext?.context,
-            project: project ?? undefined,
+            project: [project?.text, renderInstructionList(project?.instructions ?? [])].filter(Boolean).join("\n\n") || undefined,
             threadPrompt: threadSettings?.customSystemPrompt,
         }),
         userProviderKeys,
@@ -558,6 +654,20 @@ export const loadRunContext = async (
 };
 
 export type RunContext = Awaited<ReturnType<typeof loadRunContext>>;
+
+/**
+ * The `auto` rule files of `projectId`, the project a paused run listed them from, for `userId` (`getProjectContextForRun`,
+ * with its access check): none when the run recorded no project, or the user can no longer reach it.
+ */
+const readProjectInstructions = async (ctx: ActionCtx, projectId: string | undefined, userId: string): Promise<RunInstruction[]> => {
+    if (!projectId) {
+        return [];
+    }
+
+    const project = await ctx.runQuery(internal.projects.functions.getProjectContextForRun, { projectId: projectId as Id<"projects">, userId });
+
+    return project?.instructions ?? [];
+};
 
 /** A saved tool result, cut down for memory extraction. */
 const summariseToolResults = (savedMessages: ReadonlyArray<MessageDoc>): { summary: string; toolName: string }[] => {
@@ -594,6 +704,56 @@ const summariseToolResults = (savedMessages: ReadonlyArray<MessageDoc>): { summa
     return toolResults;
 };
 
+/** A message the user sent into a running reply, and when they sent it. */
+interface SteeredText {
+    /** The saved message row the steer was delivered in (`deliverSteers`); steers delivered together share it. */
+    messageId?: string;
+    /** When the user sent it (`steerRun`), not when the run took it. */
+    sentAt: number;
+    text: string;
+}
+
+/**
+ * Where each steer starts in the prompt-and-steers text extraction reads (joined a blank line apart, each as
+ * `texts` gives it: day label included), with when it was sent and the message it was saved in, so a memory quoting it
+ * links there.
+ */
+const steerOffsets = (
+    prompt: string,
+    steered: ReadonlyArray<SteeredText>,
+    texts: ReadonlyArray<string>,
+): { at: number; from: number; messageId?: string }[] => {
+    // An empty prompt (an approval continuation extracts only its steers) leaves no separator before the first steer.
+    let from = prompt.length > 0 ? prompt.length + 2 : 0;
+
+    return steered.map((part, index) => {
+        const offset = { at: part.sentAt, from, ...(part.messageId !== undefined && { messageId: part.messageId }) };
+
+        from += (texts[index] ?? part.text).length + 2;
+
+        return offset;
+    });
+};
+
+/**
+ * The steers as memory extraction reads them: one sent on another local day than `sinceAt` (the prompt's) starts with
+ * `[sent on YYYY-MM-DD]`, so "tomorrow" in it is read against its own day (`EXTRACTION_SYSTEM_PROMPT`).
+ */
+export const labelSentDays = (
+    texts: ReadonlyArray<string>,
+    sentAt: ReadonlyArray<number> | undefined,
+    sinceAt: number | undefined,
+    timeZone: string | undefined,
+): string[] => {
+    const since = sinceAt === undefined ? undefined : localDayOf(sinceAt, timeZone);
+
+    return texts.map((text, index) => {
+        const at = sentAt?.[index];
+        const day = at === undefined ? undefined : localDayOf(at, timeZone);
+
+        return day === undefined || since === undefined || day === since ? text : `[sent on ${day}] ${text}`;
+    });
+};
 /**
  * Bookkeeping after a streamed run: the reply's timing (awaited before this
  * returns, so the action does not end with it in flight), the memories its
@@ -602,6 +762,7 @@ const summariseToolResults = (savedMessages: ReadonlyArray<MessageDoc>): { summa
  * (`memory/reflection.ts`). Billing is not here; the LLM Gateway usage webhook
  * owns it.
  */
+
 export const afterRun = async (
     ctx: Pick<ActionCtx, "runMutation" | "scheduler">,
     args: {
@@ -612,6 +773,12 @@ export const afterRun = async (
         /** From `loadRunContext`; recorded on the reply's first row as citation sources. */
         knowledgeSources?: ReadonlyArray<KnowledgeSource>;
         prompt: string;
+        /** When the user sent the prompt (its row's `_creationTime`): "tomorrow" in it is read against that day, and a memory quoting it is dated by it. */
+        promptAt?: number;
+        /** The user's message row the prompt was saved as; a memory learned from it links there. */
+        promptMessageId?: string;
+        /** The part of the prompt the user typed (`typedTextOf`): the only text a memory's quote may come from. */
+        quotablePrompt?: string;
         /** `false` when the caller records the reply's usage itself (the watchdog's close does, inside its transaction). */
         recordUsage?: boolean;
         /** From `loadRunContext`; recorded on the reply's first row, the id its UI message carries. */
@@ -619,8 +786,11 @@ export const afterRun = async (
         savedMessages: ReadonlyArray<MessageDoc> | undefined;
         /** The skill that answered, for the usage page's per-skill breakdown; absent for the plain assistant. */
         skill?: ReplySkill;
-        /** What the user sent into the reply while it ran (`createRunSteering`); memory extraction reads it with the prompt. */
-        steeredTexts?: ReadonlyArray<string>;
+        /**
+         * What the user sent into the reply while it ran, each with when they sent it (`createRunSteering`): memory extraction
+         * reads it with the prompt, and "tomorrow" in one sent after midnight means the day after.
+         */
+        steered?: ReadonlyArray<SteeredText>;
         /**
          * The replying user's `threadSummariesEnabled`. Off (the default) schedules no summary job at all; the job
          * re-checks the thread owner's own setting, which is the one that decides.
@@ -668,7 +838,7 @@ export const afterRun = async (
 
 /** Schedules every post-run job and settles once each `runAfter` has; a rejected one is in the result, not thrown. */
 const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Parameters<typeof afterRun>[1]): Promise<PromiseSettledResult<unknown>[]> => {
-    const { prompt, savedMessages = [], steeredTexts = [], threadId, userId } = args;
+    const { prompt, savedMessages = [], steered = [], threadId, userId } = args;
     const scheduled: Promise<unknown>[] = [];
 
     const firstReplyRow = savedMessages.find((m) => m.message?.role !== "user");
@@ -729,7 +899,7 @@ const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Paramet
         });
     }
 
-    if (!args.extractMemory || !prompt) {
+    if (!args.extractMemory || (!prompt && steered.length === 0)) {
         return await Promise.allSettled(scheduled);
     }
 
@@ -754,16 +924,35 @@ const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Paramet
     }
 
     const toolResults = summariseToolResults(savedMessages);
+    // Each steer as extraction reads it: one sent on another day than the prompt carries that day (`labelSentDays`).
+    const steeredTexts = labelSentDays(
+        steered.map((part) => part.text),
+        steered.map((part) => part.sentAt),
+        args.promptAt ?? args.timingStart,
+        args.timeZone,
+    );
 
     scheduled.push(
         scheduleMemory(internal.memory.extract.extractMemories, {
             ...(args.botId && { botId: args.botId }),
             assistantResponse: assistantText.slice(0, 4000),
+            // When it was said, not when the reply ended or the job runs: a reply or a pause can cross midnight.
+            messageAt: args.promptAt ?? args.timingStart ?? Date.now(),
+            ...(args.promptAt !== undefined && { promptAt: args.promptAt }),
+            ...(args.promptMessageId && { promptMessageId: args.promptMessageId }),
+            // Extraction reads only the start of the prompt, so a quote comes from there; the cap keeps a long prompt from doubling the job's payload.
+            ...(args.quotablePrompt !== undefined && { quotablePrompt: args.quotablePrompt.slice(0, 2 * EXTRACTION_USER_MESSAGE_CHARS) }),
             threadId: threadId as Id<"threads">,
+            // The timezone the message was sent in, UTC when none is set: a change before the job runs does not move its dates.
+            timeZone: resolveTimeZone(args.timeZone),
             userId,
             // A steer can carry the very fact worth keeping ("actually, I'm vegetarian"); `steeredFrom` keeps it whole when a long prompt is cut.
-            userMessage: [prompt, ...steeredTexts].join("\n\n"),
-            ...(steeredTexts.length > 0 && { steeredFrom: prompt.length + 2 }),
+            userMessage: [...(prompt ? [prompt] : []), ...steeredTexts].join("\n\n"),
+            ...(steered.length > 0 && {
+                steeredAt: Math.max(...steered.map((part) => part.sentAt)),
+                steeredFrom: prompt.length > 0 ? prompt.length + 2 : 0,
+                steers: steerOffsets(prompt, steered, steeredTexts),
+            }),
             ...(toolResults.length > 0 && { toolResults: toolResults.slice(0, 10) }),
         }),
     );
@@ -854,11 +1043,12 @@ export const memoryToCarry = (run: { botId?: string; extractMemory: boolean; pro
 export const createRunSteering = (
     ctx: Pick<ActionCtx, "runMutation">,
     run: { streamId: string; threadId: string; userId: string },
-): { steeredBefore: () => boolean; steeredTexts: () => string[]; takeSteer: TakeSteer } => {
+): { steered: () => SteeredText[]; steeredBefore: () => boolean; takeSteer: TakeSteer } => {
     let restartsDue = 0;
-    const texts: string[] = [];
+    const steered: SteeredText[] = [];
 
     return {
+        steered: () => [...steered],
         steeredBefore: () => {
             const due = restartsDue > 0;
 
@@ -868,7 +1058,6 @@ export const createRunSteering = (
 
             return due;
         },
-        steeredTexts: () => [...texts],
         takeSteer: async ({ pendingMessageId }) => {
             try {
                 const delivered = await ctx.runMutation(internal.chat.steering.deliverSteers, {
@@ -880,7 +1069,12 @@ export const createRunSteering = (
 
                 if (delivered) {
                     restartsDue += 1;
-                    texts.push(delivered.text);
+                    // One entry per steer the delivery joined, each with when the user sent it and the row it was saved in.
+                    steered.push(
+                        ...delivered.parts.map((part) => {
+                            return { ...part, messageId: delivered.messageId };
+                        }),
+                    );
                 }
 
                 return delivered;
@@ -1000,6 +1194,20 @@ export const finishRun = async (
     const run = runEpoch === undefined ? undefined : { epoch: runEpoch, streamId: streamId as Id<"persistentStreams"> };
 
     await stampSavedToolCalls(ctx, { autoApprovals, mcpLabels, run, savedMessages, userId });
+
+    // Each row the run saved is stamped with whether the run ran on the device, now: the suggestion job reads that stamp (`stampRunLocality`).
+    // Best effort, as the tool-call stamp is: a row left unstamped falls back to its endpoint's current type, and the reply is kept.
+    if (savedMessages?.length) {
+        try {
+            await ctx.runMutation(internal.agent.followup_suggestions.stampRunLocality, {
+                messageIds: savedMessages.map((m) => m._id),
+                model: snapshot.model,
+                userId,
+            });
+        } catch (error) {
+            streamLogger.warn("[AgentRun] Could not stamp the run's locality:", error);
+        }
+    }
 
     // With no step left to answer it, a request is not a pause: nothing could resume the run past it.
     const approvalIds = noStepLeft ? [] : collectApprovalRequestIds(savedMessages);
@@ -1189,6 +1397,8 @@ export const resumeApprovedRun = async (
     looped?: LoopFinding;
     messageIds?: string[];
     paused: boolean;
+    /** Whether the continuation saved an assistant row, not only tool results: what a finished reply after an approval is judged by. */
+    savedReply?: boolean;
     stopped: boolean;
     /** A sub-agent child that paused again: whether its run now waits (false: it was refused or ended, its requests closed). */
     subAgentWaits?: boolean;
@@ -1210,16 +1420,42 @@ export const resumeApprovedRun = async (
         throw new AgentRunError("left-organization", LEFT_ORGANIZATION_MESSAGE);
     }
 
+    // Where the paused run found its bot (a headless one keeps it, as its thread may not name the bot), else this thread's.
+    // A named bot must still be the owner's (`readRunToolSelection`), so one deleted or handed on meanwhile leaves no tools.
+    const storedLookup = config.botLookup ?? { threadId };
+    const botLookup = { ...storedLookup, ...(storedLookup.botId !== undefined && { ownerId: userId }) };
+
+    // A sub-agent child is rebuilt under its chain's bot's mode, as it ran (`runHeadlessAgent`); a failed read fails closed.
+    const childBotMode = subAgentChild
+        ? await ctx.runQuery(internal.bots.functions.getBotPermissionModeForRun, { ...storedLookup, userId }).catch((error: unknown) => {
+              console.warn("[agent-run] bot permission mode unavailable, using supervised", error);
+
+              return "supervised" as const;
+          })
+        : null;
+
+    // A paused run that offered `instruction_read` offers it again, over the `auto` files of the project it listed them from
+    // (`config.projectId`), read anew: never the project the thread was moved to meanwhile. A file removed since, or a
+    // project no longer reachable, is answered as not found, never an unknown tool. Built with the other tools, so the
+    // permissions that apply now still remove it.
+    const resumeInstructions = config.toolNames.includes(INSTRUCTION_READ_TOOL) ? readProjectInstructions(ctx, config.projectId, userId) : undefined;
+
+    // A run whose tools are all removed never awaits it; a failed read still fails a run that does.
+    resumeInstructions?.catch(() => undefined);
+
     const [toolResult, userProviderKeys, preferences] = await Promise.all([
         buildAgentTools(ctx, {
             ...(options.admittedRun && { admittedRun: true }),
             autoMediaEnrichment: config.autoMediaEnrichment,
+            botLookup,
             // A person just answered in the chat; a sub-agent child is still rebuilt headless below.
             deviceThreadId: threadId,
+            ...(resumeInstructions && { instructions: resumeInstructions }),
             ...(subAgentChild && {
                 headless: true,
                 headlessCanAsk: true,
                 ...(config.headlessApproved && { headlessApproved: config.headlessApproved }),
+                ...(childBotMode && { unattendedMode: childBotMode }),
             }),
             mcpProgress: toolProgressSink(ctx, streamId),
             model: config.model,
@@ -1258,10 +1494,16 @@ export const resumeApprovedRun = async (
 
         // The approval was given for the MCP tool as the paused run offered it. One that changed or went away since is not
         // run under it: the call is answered as denied with the reason, so the model can call the tool again, which asks again.
-        const drift =
+        // Nor is one whose name now stands for another server's tool (`mcpToolOriginDrift`), fingerprinted or not.
+        const offered = pending.toolName !== null && Object.hasOwn(toolResult.tools, pending.toolName);
+        const fingerprintDrift =
             approved && pending.toolName !== null
-                ? mcpToolDrift(config.mcpToolFingerprints, toolResult.mcpToolFingerprints, pending.toolName, Object.hasOwn(toolResult.tools, pending.toolName))
+                ? mcpToolDrift(config.mcpToolFingerprints, toolResult.mcpToolFingerprints, pending.toolName, offered)
                 : "unchanged";
+        const drift =
+            fingerprintDrift === "unchanged" && approved && pending.toolName !== null
+                ? mcpToolOriginDrift(config.mcpToolOrigins, toolResult.mcpToolOrigins, pending.toolName, offered)
+                : fingerprintDrift;
         let runApproved = approved && drift === "unchanged";
         let runDenyReason = drift === "unchanged" ? denyReason : mcpToolDriftReason(drift);
 
@@ -1368,7 +1610,11 @@ export const resumeApprovedRun = async (
 
         // The continuation runs as the owner; who started the turn it resumes is in the snapshot (none for a snapshot that predates it).
         setRunStartedBy(ctx, config.startedBy);
+        // And what the saved-login verdict needs of that turn: a snapshot without any of it sets none.
+        setRunTurn(ctx, { impersonated: config.impersonated, promptMessageId: config.promptMessageId, systemContext: config.systemContext });
+        setRunToolSources(ctx, config.toolPermissionKeys, toolResult.permissionKeys);
         setRunOrganizationId(ctx, config.organizationId ?? config.group?.organizationId);
+        setRunReplyKey(ctx, config.replyKey ?? streamId);
 
         const stopping = new AbortController();
         const streamTextArgs = buildRunStreamArgs({
@@ -1462,14 +1708,21 @@ export const resumeApprovedRun = async (
             const prefs = await ctx.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId });
 
             // The run that paused extracted its own prompt and steers; this one extracts the steers it took.
-            const steered = steering?.steeredTexts() ?? [];
+            const steered = steering?.steered() ?? [];
 
             await afterRun(ctx, {
                 ...(config.memory?.botId && { botId: config.memory.botId }),
                 extractMemory: extractMemory && config.memory !== undefined && prefs.memoryEnabled,
                 firstTokenTime,
-                prompt: steered.join("\n\n"),
+                // No prompt here: the steers are what this run took. `quotablePrompt: ""` (not unset) lets a quote come from
+                // them: `factEvidence` reads a steer's text only once the turn names a quotable prompt. The first steer's
+                // send time stands for the prompt's, so relative dates in each steer still read against its own day:
+                // the first is never labelled, a later one sent on another day is (`labelSentDays`).
+                prompt: "",
+                ...(steered[0] && { promptAt: steered[0].sentAt }),
+                quotablePrompt: "",
                 savedMessages,
+                steered,
                 summarizeThread: prefs.threadSummariesEnabled,
                 threadId,
                 ...(prefs.timezone && { timeZone: prefs.timezone }),
@@ -1542,6 +1795,7 @@ export const resumeApprovedRun = async (
                     ...config,
                     ...(stepsLeft !== undefined && { stepsLeft }),
                     mcpToolFingerprints: toolResult.mcpToolFingerprints,
+                    mcpToolOrigins: toolResult.mcpToolOrigins,
                     toolPermissionKeys: toolResult.permissionKeys,
                 },
                 streamId,
@@ -1573,6 +1827,7 @@ export const resumeApprovedRun = async (
             looped,
             messageIds,
             paused,
+            savedReply: (result.savedMessages ?? []).some((message) => !message.tool),
             stopped: false,
             ...(subAgentWaits !== undefined && { subAgentWaits }),
         };

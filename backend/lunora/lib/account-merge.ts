@@ -14,7 +14,8 @@
  * 2. only once EVERYTHING is copied are the guest's rows deleted
  *    ({@link deleteShardRows}) — a relation's `onDelete` cascade could
  *    otherwise remove a row before it was copied;
- * 3. `.global()` rows naming the guest are re-pointed ({@link reassignGlobalRows});
+ * 3. `.global()` rows naming the guest are re-pointed ({@link reassignGlobalRows}),
+ *    and its thread follows a page per mutation ({@link reassignThreadFollowsPage});
  * 4. once the guest's shard is empty, the guest itself is deleted
  *    (`auth/hooks.ts#deleteMergedGuest`), as the anonymous plugin does when a
  *    conversion completes in the guest's own browser. A cross-browser
@@ -33,6 +34,7 @@ import { authLogger } from "./logger";
 import { callOnShard } from "./cross-shard";
 import schema from "../schema";
 import { dropPushDevicesOf } from "../notifications/push-device-writes";
+import { mergeThreadFollowsPage } from "../chat/follows/follow-writes";
 
 /** Rows moved per round trip. */
 export const MERGE_PAGE_SIZE = 100;
@@ -57,6 +59,7 @@ export const shardLocalTables = (source: unknown = schema): string[] =>
  * {@link GLOBAL_USER_TABLES_NOT_REASSIGNED} (`account-merge.test.ts` pins it).
  */
 export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>> = {
+    botOwners: ["ownerId"],
     chatFileAccess: ["userId"],
     feedback: ["userId"],
     // Without this a guest's collection stays the guest's: the files that moved
@@ -66,9 +69,10 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     pageInvites: ["userId", "ownerId", "acceptedBy"],
     passkey: ["userId"],
     projectRepositories: ["userId"],
+    projectRuleFiles: ["userId"],
     projects: ["userId"],
-    promptHistory: ["userId"],
-    prompts: ["userId"],
+    promptHistory: ["userId", "contentBy"],
+    prompts: ["userId", "contentBy"],
     shardRoutes: ["ownerId"],
     skillRatings: ["userId"],
     skills: ["userId"],
@@ -77,7 +81,7 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     userVariableDefaults: ["userId"],
 };
 
-/** `.global()` tables with a `userId` the merge deliberately leaves alone, and why. */
+/** `.global()` tables with a `userId` the generic re-pointing loop deliberately leaves alone, and why. */
 export const GLOBAL_USER_TABLES_NOT_REASSIGNED: Readonly<Record<string, string>> = {
     account: "better-auth links the anonymous user itself",
     deviceCode: "a guest cannot approve a code, and a pending one lapses in 30 minutes",
@@ -88,6 +92,8 @@ export const GLOBAL_USER_TABLES_NOT_REASSIGNED: Readonly<Record<string, string>>
         "tied to the guest's session, which ends with the guest: the notifications module drops them, and the phone registers again under the new sign-in",
     session: "better-auth's own; the guest's sessions end with the guest",
     teamMember: "a guest joins no team",
+    threadFollows:
+        "moved by the follows module's own step (`reassignThreadFollowsPage`, a page per mutation): a row per person and thread is unique, so where the new account already follows a thread, its row wins and the guest's is dropped",
     twoFactor: "better-auth's own; a guest has no second factor",
     user: "the guest's user row itself",
 };
@@ -222,28 +228,53 @@ export const deleteShardRows = internalMutation
     });
 
 /** Re-point every `.global()` row naming the guest to the new user, and drop the guest's census row. */
+/**
+ * Global rows one `reassignGlobalRows` call moves: each is one D1 statement, and an invocation may run only so many, so a
+ * guest with more is moved over several calls (`mergeGuestInto` repeats it until `done`).
+ */
+const REASSIGN_BATCH = 200;
+
+/**
+ * Fewer rows per call for a table whose rows are large: each read row is charged whole against the call's read limit,
+ * and a rule-file row may hold up to `MAX_RULE_FILES_BYTES`.
+ */
+const REASSIGN_BATCH_BY_TABLE: Readonly<Record<string, number>> = { projectRuleFiles: 8 };
+
 export const reassignGlobalRows = internalMutation
     .input({ from: v.string(), to: v.string() })
-    .output(v.object({ reassigned: v.number() }))
+    .output(v.object({ done: v.boolean(), reassigned: v.number() }))
     .mutation(async ({ args, ctx }) => {
         const facades = ctx.db as unknown as Record<
             string,
-            { findMany: (options: { where: Record<string, string> }) => Promise<{ page: Record<string, unknown>[] }> }
+            {
+                findMany: (options: { consistency: "primary"; limit: number; where: Record<string, string> }) => Promise<{ page: Record<string, unknown>[] }>;
+            }
         >;
         let reassigned = 0;
 
         for (const [table, columns] of Object.entries(GLOBAL_USER_COLUMNS)) {
             for (const column of columns) {
-                const { page } = await facades[table]!.findMany({ where: { [column]: args.from } });
+                const room = Math.min(REASSIGN_BATCH - reassigned, REASSIGN_BATCH_BY_TABLE[table] ?? REASSIGN_BATCH);
 
-                for (const row of page) {
+                if (room <= 0) {
+                    // Primary reads: a patch moves its row out of the filter, so the next call starts where this one stopped.
+                    return { done: false, reassigned };
+                }
+
+                const { page } = await facades[table]!.findMany({ consistency: "primary", limit: room + 1, where: { [column]: args.from } });
+
+                for (const row of page.slice(0, room)) {
                     await ctx.db.patch(table as never, row._id as never, { [column]: args.to } as never);
                     reassigned += 1;
+                }
+
+                if (page.length > room) {
+                    return { done: false, reassigned };
                 }
             }
         }
 
-        // Through the notifications module's own write surface, never the generic loop above.
+        // Through each module's own write surface, never the generic loop above.
         await dropPushDevicesOf(ctx.db, args.from);
 
         const { page: census } = await ctx.db.shardActivity.findMany({ where: { shardKey: args.from } });
@@ -252,11 +283,37 @@ export const reassignGlobalRows = internalMutation
             await ctx.db.delete("shardActivity", row._id);
         }
 
-        return { reassigned };
+        return { done: true, reassigned };
     });
+
+/**
+ * One page of the guest's thread follows, moved through the follows module's own write surface. A page per mutation:
+ * a D1 read and write per row would otherwise pass the Worker's subrequest ceiling at a few hundred follows.
+ */
+export const reassignThreadFollowsPage = internalMutation
+    .input({ from: v.string(), to: v.string() })
+    .output(v.object({ hasMore: v.boolean(), moved: v.number() }))
+    .mutation(async ({ args, ctx }) => await mergeThreadFollowsPage(ctx.db, args.from, args.to));
 
 /** A caller into a named shard, as `createShardClient(...).call` is. */
 export type ShardCall = <R>(reference: { __lunoraRef: string }, args: Record<string, unknown>, shardKey: string) => Promise<R>;
+
+/** The guest's thread follows, a page per call; `drained` is false when the round cap stopped it with rows left. */
+const moveThreadFollows = async (call: ShardCall, references: MergeReferences, from: string, to: string): Promise<{ drained: boolean; moved: number }> => {
+    let moved = 0;
+
+    for (let round = 0; round < MAX_ROUNDS_PER_TABLE; round += 1) {
+        const page: { hasMore: boolean; moved: number } = await call(references.reassignFollows, { from, to }, to);
+
+        moved += page.moved;
+
+        if (!page.hasMore) {
+            return { drained: true, moved };
+        }
+    }
+
+    return { drained: false, moved };
+};
 
 /**
  * Move everything of guest `from` to user `to`. Runs where a shard client is
@@ -311,11 +368,32 @@ export const mergeGuestInto = async (call: ShardCall, references: MergeReference
         drained &&= emptied;
     }
 
-    await call(references.reassignGlobal, { from, to }, to);
+    // In batches: each call moves at most `REASSIGN_BATCH` rows, so a guest with many never hits the statement cap.
+    for (;;) {
+        const { done } = await call<{ done: boolean }>(references.reassignGlobal, { from, to }, to);
+
+        if (done) {
+            break;
+        }
+    }
+
+    const follows = await moveThreadFollows(call, references, from, to);
+
+    moved += follows.moved;
+
+    // Stopped by the round cap with follow rows left: fail the job, so its redelivery moves the rest and deletes the guest.
+    if (!follows.drained) {
+        throw new Error(`guest ${from} still has thread follows past the merge's round cap; the merge into ${to} runs again`);
+    }
 
     // Only once nothing of the guest's is left to move: a later run still needs to find it otherwise.
     if (drained) {
-        await call(references.deleteGuest, { userId: from }, from);
+        const result: { deleted: boolean; followsRemain?: boolean } = await call(references.deleteGuest, { userId: from }, from);
+
+        // A follow written under the guest's id after the last page: fail the job, so its redelivery moves it.
+        if (result.followsRemain === true) {
+            throw new Error(`guest ${from} still has thread follows; the merge into ${to} runs again`);
+        }
     }
 
     return { moved };
@@ -331,6 +409,7 @@ export interface MergeReferences {
     importRows: { __lunoraRef: string };
     list: { __lunoraRef: string };
     listIds: { __lunoraRef: string };
+    reassignFollows: { __lunoraRef: string };
     reassignGlobal: { __lunoraRef: string };
 }
 
@@ -352,6 +431,7 @@ export const runGuestMerge = internalAction
                 importRows: internal.lib.account_merge.importShardRows,
                 list: internal.lib.account_merge.listShardRowsPage,
                 listIds: internal.lib.account_merge.listShardRowIds,
+                reassignFollows: internal.lib.account_merge.reassignThreadFollowsPage,
                 reassignGlobal: internal.lib.account_merge.reassignGlobalRows,
             },
             args.from,

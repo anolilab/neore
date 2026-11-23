@@ -66,17 +66,19 @@ export type TemporaryThreadPatch = Partial<Pick<Doc<"temporaryThreads">, "skillD
 export const insertThread = async (db: Database, row: NewRow<"threads">): Promise<Id<"threads">> =>
     await db.insert("threads", { ...row, createdAt: row.createdAt ?? Date.now() });
 
-/** Remembers the runner a host thread in a personal project started on (`acp/lib/project-runner.ts`). The row is its owner's, so no other member reads it. */
+/**
+ * Remembers the runner a host thread in a personal project started on (`acp/lib/project-runner.ts`). The row is its owner's, so no
+ * other member reads it. One conditional write on the organization `project` was read with: a `.global()` read and a later write
+ * are not one transaction, and a project moved into an organization in between must not take the owner's runner along.
+ */
 export const setProjectRunnerDefault = async (
     db: Database,
     project: Doc<"projects">,
     runner: { agentKey: string; deviceId: string; folderId: string },
 ): Promise<void> => {
-    await patchRow(db, "projects", project, {
-        runnerAgentKey: runner.agentKey,
-        runnerDeviceId: runner.deviceId,
-        runnerFolderId: runner.folderId,
-        runnerKind: "host",
+    await db.patchIf("projects", project._id, {
+        patch: { runnerAgentKey: runner.agentKey, runnerDeviceId: runner.deviceId, runnerFolderId: runner.folderId, runnerKind: "host" },
+        where: { organizationId: project.organizationId ?? null },
     });
 };
 
@@ -131,6 +133,18 @@ export const patchThread = async (db: Database, threadId: Id<"threads">, fields:
     // Nothing to change writes nothing: the thread list is a live query.
     if (Object.keys(patch).length > 0) {
         await db.patch("threads", threadId, patch);
+    }
+};
+
+/**
+ * Sets the thread's pinned goal, or removes it with `undefined` (`patchRow` removes a column set to `undefined`; a patch
+ * would leave it unchanged). The caller checks the thread is its owner's.
+ */
+export const setThreadPinnedGoal = async (db: Database, threadId: Id<"threads">, pinnedGoal: Doc<"threads">["pinnedGoal"]): Promise<void> => {
+    const row = await db.get("threads", threadId);
+
+    if (row) {
+        await patchRow(db, "threads", row, { pinnedGoal });
     }
 };
 
@@ -275,4 +289,28 @@ export const deleteVectorRow = async (db: Database, vectorId: Id<VectorTableName
     if (table !== null) {
         await db.delete(table, vectorId);
     }
+};
+
+/**
+ * Marks a project changed by a save of its rule files (`projects.functions.setProjectRuleFiles`), and with
+ * `clearContext`, the legacy `context` text the save moved into the list, empties it while it is still that text, in
+ * one conditional write (`patchIf`): a `.global()` read and a later write are not one transaction, and removing the
+ * column would replace the whole row from a copy another write may have overtaken. An empty `context` reads as none
+ * everywhere. A `context` written since never reached the list, so it stays, for the next save to carry.
+ */
+export const markRuleFilesSaved = async (
+    db: Database,
+    projectId: Id<"projects">,
+    now: number,
+    { clearContext }: { clearContext?: string } = {},
+): Promise<void> => {
+    if (clearContext) {
+        const { applied, doc } = await db.patchIf("projects", projectId, { patch: { context: "", updatedAt: now }, where: { context: clearContext } });
+
+        if (applied || !doc) {
+            return;
+        }
+    }
+
+    await db.patch("projects", projectId, { updatedAt: now });
 };

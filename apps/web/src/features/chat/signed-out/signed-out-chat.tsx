@@ -224,13 +224,14 @@ export const SignedOutComposer: FC = () => {
     const setText = useChatUIStore((state) => state.setComposerText);
 
     const handleSubmit = useCallback(() => {
-        const draft = useChatUIStore.getState().composerText;
+        const { composerDraftFrom, composerText: draft } = useChatUIStore.getState();
 
         if (!draft.trim()) {
             return;
         }
 
-        holdForSignIn(draft);
+        // A picked suggestion keeps its mark through the sign-in, a redirect's reload included (`draft-origin.ts`).
+        holdForSignIn(draft, composerDraftFrom);
     }, []);
 
     return (

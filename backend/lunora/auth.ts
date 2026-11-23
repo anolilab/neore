@@ -56,13 +56,11 @@ import {
     OIDC_ISSUER,
     PUBLIC_ORIGIN,
     SITE_URL,
-    TRUSTED_EXTENSION_ORIGINS,
     SIGNUP_INVITE_ONLY,
     TURNSTILE_SECRET_KEY,
     TURNSTILE_SITE_KEY,
 } from "./env";
 import { parseOidcIssuer } from "./lib/env-validation";
-import { parseTrustedExtensionOrigins } from "./lib/extension-origins";
 import { enqueueJob } from "./lib/job-queue";
 import { authLogger } from "./lib/logger";
 import type { ApiKeyAuthApi } from "./public-api/identity";
@@ -70,9 +68,6 @@ import { API_KEY_PREFIX } from "./public-api/identity";
 import { DEFAULT_API_SCOPES } from "./public-api/scopes";
 import { INVITATION_EXPIRATION_SECONDS, MEMBERSHIP_LIMIT, ORGANIZATION_LIMIT } from "./lib/constants";
 import { routedShardNamespace } from "./lib/shard-namespace";
-
-/** Exact extension origins only; unset or malformed never means "any extension". */
-const trustedExtensionOrigins = parseTrustedExtensionOrigins(TRUSTED_EXTENSION_ORIGINS);
 
 /** The enterprise OIDC provider's id — its callback is `/api/auth/callback/oidc`. */
 export const OIDC_PROVIDER_ID = "oidc";
@@ -402,6 +397,12 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
                     },
                 }),
             }),
+            // `GET /sign-in-methods`, the verified-email rule for OAuth first
+            // sign-in and the guest refusal under the invite gate, and no passkeys for guests.
+            // Before `inviteOnly()`: since @lunora/auth alpha.268 that plugin also refuses an
+            // unverified address, as SIGN_UP_INVITE_REQUIRED; `user.create.before` hooks run in
+            // plugin order, so this one names the actual reason (OAUTH_EMAIL_UNVERIFIED) first.
+            signInMethods(resolveSignInMethods(), { inviteOnly: SIGNUP_INVITE_ONLY }),
             /**
              * Invite-only registration. Gates email sign-up (including an anonymous
              * user converting to a real account, which creates a new user) and
@@ -417,9 +418,6 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
             ...(SIGNUP_INVITE_ONLY ? [inviteOnly()] : []),
             // A guest that converts and verifies in another browser keeps its data (`auth/guest-conversion.ts`).
             ...(hooks.onGuestConverted ? [guestConversion(hooks.onGuestConverted)] : []),
-            // `GET /sign-in-methods`, the verified-email rule for OAuth first
-            // sign-in and the guest refusal under the invite gate, and no passkeys for guests.
-            signInMethods(resolveSignInMethods(), { inviteOnly: SIGNUP_INVITE_ONLY }),
             /**
              * Passkeys. Registration needs a signed-in, non-guest session
              * (`requireSession` + the guest refusal in `signInMethods`), so a
@@ -554,29 +552,18 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
         // Only the overrides: `@lunora/auth` fills `enabled: true`, `storage: "database"`
         // and its own catch-all rule, which it merges AFTER these so ours match first.
         rateLimit: { customRules: AUTH_RATE_LIMIT_CUSTOM_RULES },
+        session: {
+            additionalFields: {
+                // The app a grant's session was made for (`auth/lib/sign-in-standing.ts`): written by the code exchange
+                // through `createSession`'s override, never by a client (`input: false`).
+                clientGrant: { input: false, required: false, type: "string" },
+            },
+        },
         // Every social provider is optional — email+password always works.
         socialProviders: buildSocialProviders(),
         telemetry: { enabled: false },
-        // better-auth takes `string[]` OR `(request) => string[]` — never an array
-        // containing a function, which is what the `as unknown as string[]` cast
-        // was hiding. `matchesOriginPattern` calls `pattern.includes("*")` on each
-        // entry, so a function entry throws `pattern.includes is not a function`.
-        //
-        // It never surfaced because `.some()` short-circuits on the baseURL origin
-        // and the check is skipped entirely for requests without a cookie (so
-        // sign-up never reaches it). It fires once a caller has BOTH a session and
-        // a non-baseURL origin — i.e. the deployed split-Worker topology, on
-        // sign-out, change-password, 2FA and org mutations, as a 500 rather than a
-        // clean 403. The extension allowance never worked either.
-        trustedOrigins: (request?: { headers: Headers }): string[] => {
-            const origin = request?.headers.get("origin");
-
-            // Reflecting any `chrome-extension://` origin trusts EVERY extension
-            // the user has installed, which is not a set we control — one of them
-            // could drive authenticated auth mutations against this backend. Only
-            // the ids we ship are allowed, and an unset var allows none.
-            return origin && trustedExtensionOrigins.includes(origin) ? [origin] : [];
-        },
+        // No extension origin is trusted for a cookie session: extensions send a bearer (`src/extension-cookie.ts`).
+        trustedOrigins: [],
         user: {
             changeEmail: {
                 enabled: false,

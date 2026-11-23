@@ -92,7 +92,7 @@ export type UserPreferences = {
     hidePersonalInfo: boolean;
     lastChatId?: string;
     onboardingCompleted: boolean;
-    sendBehavior: "enter" | "shiftEnter" | "button";
+    sendBehavior: "enter" | "shiftEnter" | "modEnter" | "button";
     showTimestamps: boolean;
     soundEffects: boolean;
     /** Opt-in, this browser only: open several chats side by side (`features/chat/split`). */

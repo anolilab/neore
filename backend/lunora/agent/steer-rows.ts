@@ -30,11 +30,14 @@
  */
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import { type NotTypedMarks, userTextContent } from "../lib/not-typed-text";
 import { patchRow } from "../lib/patch";
 import { childrenOf, getThreadRow, parentOf } from "./branch-rows";
 import { addMessagesHandler } from "./messages";
 
 export interface SteerRowArgs {
+    /** Text the owner did not type (`lib/not-typed-text.ts`): the row is saved marked. */
+    notTyped?: NotTypedMarks;
     /** The run's pending row: where its next step will be saved. */
     pendingMessageId: string;
     text: string;
@@ -72,7 +75,7 @@ export const insertSteerRow = async (ctx: MutationCtx, args: SteerRowArgs): Prom
 
     const { messages } = await addMessagesHandler(ctx, {
         fromUser: true,
-        messages: [{ message: { content: args.text, role: "user" } }],
+        messages: [{ message: { content: userTextContent(args.text, args.notTyped ?? {}), role: "user" } }],
         parentMessageId: parent._id,
         threadId,
         userId: args.userId,

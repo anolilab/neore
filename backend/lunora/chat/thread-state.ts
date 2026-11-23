@@ -81,8 +81,8 @@ export const unsnoozeThread = authMutation
     });
 
 /**
- * Carries a mode onto a thread the owner just made from one of their own (a branch). Internal: the caller has checked the owner of
- * the source thread, so this writes without a second check. A thread made from a host thread has no mode and is not sent here.
+ * Carries a mode onto a thread the owner just made from one of their own (a branch), or from their bot (`bots.permissionMode`).
+ * Internal: the caller has checked the owner of the source thread or bot, so this writes without a second check. A thread made from a host thread has no mode and is not sent here.
  */
 export const copyThreadPermissionMode = internalMutation
     .input({

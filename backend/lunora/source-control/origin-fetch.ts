@@ -57,6 +57,12 @@ const messageOf = (body: string | undefined): string | undefined => {
 
 export interface HostRequestOptions {
     /**
+     * Called before each redirect this request follows, once per hop: a hop is one more request to the host (a Worker
+     * subrequest), so a caller counting its requests counts it here. A throw stops the request before the hop is sent
+     * and reaches the caller as it is.
+     */
+    beforeRedirect?: () => void;
+    /**
      * A conditional read: the ETag of the answer the caller already holds. A `304` then RESOLVES (its status is the
      * "unchanged" answer, and the host does not count it against the rate limit); without this a `304` is an error,
      * since nobody asked for it. GET only: a conditional write has no meaning here.
@@ -201,6 +207,13 @@ export const createBoundRequester = ({
             } catch {
                 throw new HostApiError("The host sent a redirect that is not a URL", 0);
             }
+
+            // Judged before the hop is charged: a redirect elsewhere is refused whatever the caller has left.
+            if (url.origin !== boundOrigin) {
+                throw new HostApiError("The request left the host's origin", 0);
+            }
+
+            options.beforeRedirect?.();
         }
     };
 };

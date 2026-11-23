@@ -23,8 +23,8 @@
         "@neore/ai": "workspace:*",
         "@neore/backend": "workspace:*",
         "@neore/chat-ui": "workspace:*",
+        "@neore/client-runtime": "workspace:*",
         "@neore/ui": "workspace:*",
-        "better-auth": "catalog:auth",
         "lucide-react": "catalog:icons",
         "react": "catalog:react",
         "react-dom": "catalog:react"
@@ -41,6 +41,7 @@
         "@types/react-dom": "catalog:types",
         "@vitejs/plugin-react": "catalog:build",
         "eslint": "catalog:lint",
+        "fake-indexeddb": "catalog:test",
         "jsdom": "catalog:test",
         "tailwindcss": "catalog:style",
         "typescript": "catalog:tsc",

@@ -28,4 +28,4 @@ export const isThreadPermissionMode = (value: unknown): value is ThreadPermissio
  * the model chose to a third party. `supervised` leaves these at their own mode. An allowlist: a built-in not named
  * here asks. A search, a lookup, or a memory query that reaches a provider (even one of the app's own, billed per request) asks.
  */
-export const BUILTIN_TOOLS_READ_ONLY: ReadonlySet<string> = new Set(["dateTime", "listLanguages"]);
+export const BUILTIN_TOOLS_READ_ONLY: ReadonlySet<string> = new Set(["dateTime", "instruction_read", "listLanguages"]);

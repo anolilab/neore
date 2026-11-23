@@ -27,6 +27,7 @@ import { decryptKey } from "../lib/encryption";
 import {
     ACP_CLAIM_LEASE_MS,
     DEVICE_SIGNATURE_WINDOW_MS,
+    isGlobalInstructionsTool,
     MAX_APP_VERSION_INPUT_LENGTH,
     MAX_DEVICE_OUTPUT_BYTES,
     MAX_DEVICE_SCOPE_PROJECTS,
@@ -34,6 +35,7 @@ import {
     MAX_MANIFEST_BYTES,
 } from "./lib/constants";
 import { isAppVersion } from "./lib/app-version";
+import { scheduleClearDeviceProjects } from "./internal";
 import { assertRoomForDevice, insertDevice } from "./lib/register";
 import { parseAcpOffers, parseManifestTools } from "./lib/manifest";
 import { filterOwnProjectIds } from "./lib/scope";
@@ -279,6 +281,10 @@ export const revokeDevice = authMutation
             await expireOpenCalls(ctx, revoked._id, "The device was removed");
             await endHostSessionsOfDevice(ctx, revoked._id, ctx.now);
             await deleteShardRoute(ctx, "device", revoked._id as string);
+            // The projects live in D1, outside this mutation's transaction, so the revoke writes none of them: a failed
+            // device delete would leave them cleared. A scheduled run clears them instead, and the scheduler call commits
+            // with the revoke, so a revoke that fails queues nothing and can be retried.
+            await scheduleClearDeviceProjects(ctx.scheduler, { machineId: revoked._id, userId });
             await ctx.db.delete("devices", revoked._id);
         }
 
@@ -689,7 +695,10 @@ export const releaseDeviceCall = authMutation
         return null;
     });
 
-/** The audit list: the caller's recent device calls, newest first, optionally for one device. */
+/**
+ * The audit list: the caller's recent device calls, newest first, optionally for one device. An impersonating admin
+ * sees no output of a call that read the person's local instruction files (`global-instructions.ts`).
+ */
 export const listDeviceCalls = authQuery
     .input({
         deviceId: v.optional(v.id("devices")),
@@ -703,7 +712,11 @@ export const listDeviceCalls = authQuery
             where: { userId: ctx.user.userId, ...(args.deviceId !== undefined && { deviceId: args.deviceId }) },
         });
 
+        const { impersonatedBy } = ctx.user;
+
         return page.map((call) => {
+            const output = impersonatedBy && isGlobalInstructionsTool(call.toolName) ? undefined : call.output;
+
             return {
                 _id: call._id as string,
                 createdAt: call.createdAt,
@@ -712,14 +725,14 @@ export const listDeviceCalls = authQuery
                 input: call.input.slice(0, OUTPUT_PREVIEW_CHARS),
                 status: call.status,
                 taintedBy: call.taintedBy,
-                threadId: call.threadId as string,
                 toolName: call.toolName,
+                ...(call.threadId !== undefined && { threadId: call.threadId as string }),
                 ...(call.claimedAt !== undefined && { claimedAt: call.claimedAt }),
                 ...(call.completedAt !== undefined && { completedAt: call.completedAt }),
                 ...(call.decision !== undefined && { decision: call.decision }),
                 ...(call.error !== undefined && { error: call.error }),
                 ...(call.exitCode !== undefined && { exitCode: call.exitCode }),
-                ...(call.output !== undefined && { output: call.output.slice(0, OUTPUT_PREVIEW_CHARS) }),
+                ...(output !== undefined && { output: output.slice(0, OUTPUT_PREVIEW_CHARS) }),
                 ...(call.truncated !== undefined && { truncated: call.truncated }),
             };
         });

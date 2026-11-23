@@ -523,9 +523,10 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::process::Command;
 
-    fn scratch(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("neore-archive-{name}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
+    use crate::test_dir::TestDir;
+
+    fn scratch(name: &str) -> TestDir {
+        let dir = TestDir::new(&format!("archive-{name}"));
         fs::create_dir_all(dir.join("root/sub")).unwrap();
         fs::write(dir.join("root/a.txt"), "hello").unwrap();
         fs::write(dir.join("root/sub/b.txt"), "x".repeat(1000)).unwrap();

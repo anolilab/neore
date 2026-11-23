@@ -129,6 +129,10 @@ before opening a pull request. Report security issues privately as described in
 - **Infrastructure**: Cloudflare Workers, D1, R2, Vectorize, Queues; deployed with Alchemy
 - **Monorepo**: pnpm workspaces with the vis task runner
 
+## Need an AI chat in your own product?
+
+Neore is built by [Daniel Bannert](https://github.com/prisis), who builds AI features and assistants for companies through Anolilab: [AI services](https://anolilab.com/services/ai-services?utm_source=github&utm_medium=readme&utm_campaign=neore).
+
 ## License
 
 This project is licensed under the **Functional Source License, Version 1.1, ALv2

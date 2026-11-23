@@ -17,10 +17,12 @@ import HierarchicalThreadList from "./hierarchical-thread-list";
 import usePersistedCollapseState from "./hooks/use-persisted-collapse-state";
 import { useThreadListPlaceholder } from "./hooks/use-thread-list-cache";
 import { useThreadListUIStore } from "./stores/thread-list-ui-store";
+import ThreadListDropZone from "./thread-list-drop-zone";
 import type { GroupType, LoadingStates } from "./types";
 
 // Lazy: a dialog opened on demand, with its icon picker and project panels.
 const ProjectFormDialog = lazy(() => import("@/features/projects/components/project-form-dialog"));
+const AddProjectDialog = lazy(() => import("@/features/projects/components/add-project-dialog"));
 
 const CHAT_THREAD_PATH_RE = new RegExp(`^/chat/(${LUNORA_ID_SOURCE})$`);
 
@@ -70,6 +72,7 @@ const ThreadList: FC = () => {
         selectedCategory,
         selectedThreadIds,
         showKeyboardHelp,
+        showAddProjectDialog,
         showProjectFormDialog,
     } = useThreadListUIStore(
         useShallow((state) => {
@@ -82,6 +85,7 @@ const ThreadList: FC = () => {
                 selectedCategory: state.selectedCategory,
                 selectedThreadIds: state.selectedThreadIds,
                 showKeyboardHelp: state.showKeyboardHelp,
+                showAddProjectDialog: state.showAddProjectDialog,
                 showProjectFormDialog: state.showProjectFormDialog,
             };
         }),
@@ -93,6 +97,9 @@ const ThreadList: FC = () => {
     const setLastSelectedIndex = useThreadListUIStore((state) => state.setLastSelectedIndex);
     const exitSelectionMode = useThreadListUIStore((state) => state.exitSelectionMode);
     const closeProjectFormDialog = useThreadListUIStore((state) => state.closeProjectFormDialog);
+    const closeAddProjectDialog = useThreadListUIStore((state) => state.closeAddProjectDialog);
+    const openCreateProjectDialog = useThreadListUIStore((state) => state.openCreateProjectDialog);
+    const hasOpenedAddProject = useHasOpened(showAddProjectDialog);
     // Mounted on first open only: a lazy dialog rendered closed still loads its chunk on first paint.
     const hasOpenedProjectForm = useHasOpened(showProjectFormDialog);
     const showManageTagsDialog = useThreadListUIStore((state) => state.showManageTagsDialog);
@@ -256,40 +263,47 @@ const ThreadList: FC = () => {
 
     return (
         <DateBoundariesProvider>
-            <div className="text-brand-black dark:text-brand-white flex flex-col items-stretch gap-1.5">
-                <HierarchicalThreadList
-                    collapsedGroups={collapsedGroups}
-                    collapsedProjects={collapsedProjects}
-                    currentThreadId={currentThreadId}
-                    expandedThreads={expandedThreads}
-                    isSearchError={isSearchError}
-                    isSearchLoading={isSearchLoading}
-                    isSelectionMode={isSelectionMode}
-                    lastSelectedIndex={lastSelectedIndex}
-                    loadingStates={loadingStates}
-                    messageSearchResults={messageSearchResults}
-                    onExitSelectionMode={exitSelectionMode}
-                    searchQuery={shownQuery}
-                    searchType={searchType}
-                    selectedCategory={selectedCategory}
-                    selectedThreadIds={selectedThreadIds}
-                    setLastSelectedIndex={setLastSelectedIndex}
-                    setLoadingStates={setLoadingStates}
-                    setSelectedThreadIds={setSelectedThreadIds}
-                    setShowKeyboardHelp={setShowKeyboardHelp}
-                    showKeyboardHelp={showKeyboardHelp}
-                    threadRelationships={threadRelationships ?? []}
-                    threadSearchResults={threadSearchResults}
-                    toggleExpanded={toggleExpanded}
-                    toggleGroupCollapsed={toggleGroupCollapsed}
-                />
-                {hasOpenedProjectForm && (
-                    <Suspense fallback={null}>
-                        <ProjectFormDialog editingProject={editingProject} onClose={closeProjectFormDialog} open={showProjectFormDialog} />
-                    </Suspense>
-                )}
-                <ManageThreadTagsDialog onOpenChange={setShowManageTagsDialog} open={showManageTagsDialog} />
-            </div>
+            <ThreadListDropZone>
+                <div className="text-brand-black dark:text-brand-white flex flex-col items-stretch gap-1.5">
+                    <HierarchicalThreadList
+                        collapsedGroups={collapsedGroups}
+                        collapsedProjects={collapsedProjects}
+                        currentThreadId={currentThreadId}
+                        expandedThreads={expandedThreads}
+                        isSearchError={isSearchError}
+                        isSearchLoading={isSearchLoading}
+                        isSelectionMode={isSelectionMode}
+                        lastSelectedIndex={lastSelectedIndex}
+                        loadingStates={loadingStates}
+                        messageSearchResults={messageSearchResults}
+                        onExitSelectionMode={exitSelectionMode}
+                        searchQuery={shownQuery}
+                        searchType={searchType}
+                        selectedCategory={selectedCategory}
+                        selectedThreadIds={selectedThreadIds}
+                        setLastSelectedIndex={setLastSelectedIndex}
+                        setLoadingStates={setLoadingStates}
+                        setSelectedThreadIds={setSelectedThreadIds}
+                        setShowKeyboardHelp={setShowKeyboardHelp}
+                        showKeyboardHelp={showKeyboardHelp}
+                        threadRelationships={threadRelationships ?? []}
+                        threadSearchResults={threadSearchResults}
+                        toggleExpanded={toggleExpanded}
+                        toggleGroupCollapsed={toggleGroupCollapsed}
+                    />
+                    {hasOpenedAddProject && (
+                        <Suspense fallback={null}>
+                            <AddProjectDialog onClose={closeAddProjectDialog} onCreateNew={openCreateProjectDialog} open={showAddProjectDialog} />
+                        </Suspense>
+                    )}
+                    {hasOpenedProjectForm && (
+                        <Suspense fallback={null}>
+                            <ProjectFormDialog editingProject={editingProject} onClose={closeProjectFormDialog} open={showProjectFormDialog} />
+                        </Suspense>
+                    )}
+                    <ManageThreadTagsDialog onOpenChange={setShowManageTagsDialog} open={showManageTagsDialog} />
+                </div>
+            </ThreadListDropZone>
         </DateBoundariesProvider>
     );
 };

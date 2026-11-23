@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
     JUMP_MAX_PAGES,
     JUMP_MAX_PAGES_WITH_POSITION,
+    messageHash,
     parseMessageHash,
+    parseMessageHashPosition,
     resolveJumpMessageId,
     shouldAnimateEntrance,
     shouldLoadOlderForJump,
@@ -111,5 +113,16 @@ describe(shouldLoadOlderForJump, () => {
 
     it("is bounded even with a position", () => {
         expect(shouldLoadOlderForJump(JUMP_MAX_PAGES_WITH_POSITION, loadedTurns(0), { order: 1 })).toBe(false);
+    });
+});
+
+describe(parseMessageHashPosition, () => {
+    it("reads the position a memory's link carries, and none from a bare message link", () => {
+        expect.assertions(4);
+
+        expect(messageHash("m1", 42, 3)).toBe("message-m1@42.3");
+        expect(parseMessageHash(`#${messageHash("m1", 42, 3)}`)).toBe("m1");
+        expect(parseMessageHashPosition("#message-m1@42.3")).toStrictEqual({ order: 42, stepOrder: 3 });
+        expect(parseMessageHashPosition("#message-m1")).toBeUndefined();
     });
 });

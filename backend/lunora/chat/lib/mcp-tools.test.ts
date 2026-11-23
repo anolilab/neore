@@ -72,23 +72,47 @@ describe("getMCPTools", () => {
         expect(Object.fromEntries(result.descriptors)).toStrictEqual({
             mcp_my_server__delete: {
                 annotations: { destructiveHint: true },
+                endpoint: "https://a.example/mcp",
                 fingerprint,
+                protocol: "http",
                 serverName: "my server",
                 toolName: "delete",
                 url: "https://a.example/mcp",
             },
             mcp_my_server__delete_2: {
                 annotations: { readOnlyHint: true },
+                endpoint: "https://b.example/mcp",
                 fingerprint,
+                protocol: "http",
                 serverName: "my_server",
                 toolName: "delete",
                 url: "https://b.example/mcp",
             },
-            mcp_my_server__list: { fingerprint, serverName: "my_server", toolName: "list", url: "https://b.example/mcp" },
+            mcp_my_server__list: {
+                endpoint: "https://b.example/mcp",
+                fingerprint,
+                protocol: "http",
+                serverName: "my_server",
+                toolName: "list",
+                url: "https://b.example/mcp",
+            },
         });
         expect((result.tools["mcp_my_server__delete_2"] as { description?: string }).description).toBe("b delete");
         // Two servers' tools of one name are told apart, so a runtime name that moves to the other server reads as changed.
         expect(result.descriptors.get("mcp_my_server__delete")?.fingerprint).not.toBe(result.descriptors.get("mcp_my_server__delete_2")?.fingerprint);
+    });
+
+    it("records a connector's endpoint and transport, but no address to trust it by", async () => {
+        const result = await getMCPTools([{ ...server("Notion", "https://c.example/mcp"), connectorSlug: "notion", protocol: "sse" }]);
+
+        expect(result.descriptors.get("mcp_Notion__run")).toStrictEqual({
+            connectorSlug: "notion",
+            endpoint: "https://c.example/mcp",
+            fingerprint: expect.stringMatching(FINGERPRINT),
+            protocol: "sse",
+            serverName: "Notion",
+            toolName: "run",
+        });
     });
 
     it("names the same servers the same way on a rebuild", async () => {

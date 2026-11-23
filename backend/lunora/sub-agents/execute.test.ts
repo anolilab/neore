@@ -154,6 +154,19 @@ describe("a worker's runs", () => {
         expect(runs[0]!.model).toBe("anthropic/claude-sonnet-4.5");
     });
 
+    it("fails a role's worker whose model can no longer run, rather than running it on another", async () => {
+        const first = await dispatch({ role: { model: "anthropic/claude-sonnet-4.5", name: "review" }, toolCallId: "call-1" });
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", first.childThreadId, { model: "no-such-model" }));
+        await execute(first._id);
+
+        expect(runs).toHaveLength(0);
+        expect(await harness.run(async (ctx: any) => await ctx.db.get("subAgentRuns", first._id))).toMatchObject({
+            error: expect.stringContaining("This worker's model (no-such-model) can no longer run sub-agents"),
+            status: "failed",
+        });
+    });
+
     it("runs a redelivered job once", async () => {
         const first = await dispatch({ toolCallId: "call-1" });
 
@@ -186,6 +199,10 @@ describe("whether a child may pause for its owner", () => {
 
         return runs.at(-1)!;
     };
+
+    it("reads its bot's mode through its lead's thread", async () => {
+        expect(await oneShot({})).toMatchObject({ modeThreadId: leadId });
+    });
 
     it("pauses a one-shot child of the owner's own turn, and withholds the dispatch tools at the depth cap", async () => {
         expect(await oneShot({})).toMatchObject({ pauseForApproval: { subAgentRunId: expect.any(String) } });

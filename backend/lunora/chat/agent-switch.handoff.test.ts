@@ -341,18 +341,27 @@ describe("a switch above the cold-start threshold", () => {
     });
 
     it("counts each summary against its own rate limit, and refuses past it before calling the model", async () => {
-        await run(async (ctx) => {
-            const limiter = createRatelimit("chat/agentSwitchSummary:free", ctx.db as never);
+        // The limit is a fixed minute, read from the clock. Freeze Date inside one minute, so a slow run cannot cross the
+        // boundary between the five counted calls and the switch, which would reset the window and let the switch through.
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(Date.UTC(2026, 0, 1, 12, 0, 30));
 
-            for (let index = 0; index < 5; index += 1) {
-                await limiter.limit(owner);
-            }
-        });
+        try {
+            await run(async (ctx) => {
+                const limiter = createRatelimit("chat/agentSwitchSummary:free", ctx.db as never);
 
-        await expect(switchTo(B, "click-1")).rejects.toMatchObject({ data: { code: "AGENT_SWITCH_RATE_LIMITED" } });
-        expect(summaryCalls).not.toHaveBeenCalled();
-        expect(await summaryClaim()).toBe(false);
-        expect(await dividers()).toHaveLength(0);
+                for (let index = 0; index < 5; index += 1) {
+                    await limiter.limit(owner);
+                }
+            });
+
+            await expect(switchTo(B, "click-1")).rejects.toMatchObject({ data: { code: "AGENT_SWITCH_RATE_LIMITED" } });
+            expect(summaryCalls).not.toHaveBeenCalled();
+            expect(await summaryClaim()).toBe(false);
+            expect(await dividers()).toHaveLength(0);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("refuses a path that moved between the plan and the write, instead of describing the wrong one", async () => {

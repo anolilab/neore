@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { BrowserActionData, BrowserActionErrors, BrowserActionResponses, GetHealthData, GetHealthResponses } from './types.gen';
+import type { BrowserActionData, BrowserActionErrors, BrowserActionResponses, BrowserLoginData, BrowserLoginErrors, BrowserLoginResponses, GetHealthData, GetHealthResponses } from './types.gen';
 
 export type SdkOptions<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -23,6 +23,18 @@ export type SdkOptions<TData extends TDataShape = TDataShape, ThrowOnError exten
  */
 export const browserAction = <ThrowOnError extends boolean = false>(options: SdkOptions<BrowserActionData, ThrowOnError>): RequestResult<BrowserActionResponses, BrowserActionErrors, ThrowOnError> => (options.client ?? client).post<BrowserActionResponses, BrowserActionErrors, ThrowOnError>({
     url: '/action',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Sign in with a saved login: open the login page and type the username and password in one call
+ */
+export const browserLogin = <ThrowOnError extends boolean = false>(options: SdkOptions<BrowserLoginData, ThrowOnError>): RequestResult<BrowserLoginResponses, BrowserLoginErrors, ThrowOnError> => (options.client ?? client).post<BrowserLoginResponses, BrowserLoginErrors, ThrowOnError>({
+    url: '/login',
     ...options,
     headers: {
         'Content-Type': 'application/json',

@@ -5,6 +5,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use device_core::test_dir::TestDir;
 use serde_json::Value;
 
 pub const VECTORS: &str = include_str!("actions.json");
@@ -100,10 +101,9 @@ pub fn sandbox() -> Sandbox {
 }
 
 /// A fresh fixture: `<scratch>/<name>/root` holds the files, and its parent is where an escape would land.
-pub fn fixture(name: &str) -> PathBuf {
+pub fn fixture(name: &str) -> (TestDir, PathBuf) {
     let parsed: Value = serde_json::from_str(VECTORS).unwrap();
-    let base = std::env::temp_dir().join(format!("neore-vectors-{name}-{}", std::process::id()));
-    let _ = fs::remove_dir_all(&base);
+    let base = TestDir::at(&format!("vectors-{name}"));
     let root = base.join("root");
 
     for (path, content) in parsed["fixture"].as_object().unwrap() {
@@ -113,7 +113,9 @@ pub fn fixture(name: &str) -> PathBuf {
         fs::write(file, content.as_str().unwrap()).unwrap();
     }
 
-    root.canonicalize().unwrap()
+    let root = root.canonicalize().unwrap();
+
+    (base, root)
 }
 
 /// What must still be true after the vectors ran: nothing escaped the shared folder, and a refused command

@@ -50,6 +50,7 @@ import {
     setDispatchOrigin,
     setHeadlessRun,
     setRunOrganizationId,
+    setRunReplyKey,
     setResearchDepth,
     stampSavedToolCalls,
     toPersonalization,
@@ -62,12 +63,14 @@ import { getMaxSteps } from "./auto-continue";
 import { gatewayFetch } from "../../lib/services";
 import getAgent from "./get-agent";
 import { closeMCPClients } from "./mcp-tools";
-import type { SearchMode } from "./tool-builder";
+import { modelSupportsTools, type SearchMode } from "./tool-builder";
 import { servesUser } from "../../lib/shard-context";
+import { resolveTimeZone } from "../../memory/reflection-logic";
 import { applyToolAllowlist, stopWhenRequested } from "../../sub-agents/logic";
 import type { ReplySkill, SavedRowLike } from "../../usage/activity-logic";
 import { replyUsageArgs } from "../../usage/activity-logic";
 import { scheduleReplyUsage } from "../../usage/schedule";
+import { INSTRUCTION_READ_TOOL, renderInstructionList, type RunInstruction } from "../../projects/rule-files";
 
 /** No tools, so no permission keys or fingerprints: typed, so the union with the built tools' maps stays a plain record. */
 const NO_PERMISSION_KEYS: Record<string, string> = {};
@@ -119,6 +122,11 @@ export interface HeadlessRunOptions {
     memory: boolean;
     model: string;
     /**
+     * The thread whose bot's mode the run's tools take, when the run starts a thread of its own: a sub-agent child's lead. A run
+     * that continues a thread reads it from that thread. Never stamped on the new thread.
+     */
+    modeThreadId?: string;
+    /**
      * Called right before the model is asked, after the model, keys, tools and thread are ready: the
      * point from which a failure means the run reached the model (and may have been billed). A caller
      * that must give something back when a run never started tells the two apart with it.
@@ -145,6 +153,12 @@ export interface HeadlessRunOptions {
     pauseForApproval?: { subAgentRunId: Id<"subAgentRuns"> };
     /** Whether the user's personalization reaches the prompt — `"none"` when someone else reads the reply. */
     personalization: "full" | "none";
+    /**
+     * The `auto` rule files of the project the run is for (`runProjectFor`), and that project: with tools, the run lists them
+     * after `system` and may read them with `instruction_read` while its tools keep that one (`buildAgentTools`); without, neither. A pause records the
+     * project, so its continuation reads that project's files.
+     */
+    projectInstructions?: { instructions: ReadonlyArray<RunInstruction>; projectId: string; systemWithoutInstructions?: string };
     /** Omitted when continuing a thread: its latest message is the prompt. */
     prompt?: string;
     /** Reasoning effort on the chat's 0-100 scale; wins over the skill's. Unset leaves it to the skill, then the model. */
@@ -266,30 +280,53 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
 
     // A run that continues a thread gets that thread's tools too (its linked pull requests); a new thread has none yet.
     const continuedThreadId = "threadId" in options.thread ? options.thread.threadId : undefined;
-    const toolResult =
-        options.tools === "headless" && allowTools
-            ? await buildAgentTools(ctx, {
-                  headless: true,
-                  ...(continuedThreadId !== undefined && { threadId: continuedThreadId }),
-                  ...(options.approvedTools && { headlessApproved: options.approvedTools }),
-                  ...(options.pauseForApproval && { headlessCanAsk: true }),
-                  model,
-                  organizationId: options.organizationId,
-                  searchMode: (skill?.config?.searchMode as SearchMode | undefined) ?? DEFAULT_HEADLESS_SEARCH_MODE,
-                  skillTools: headlessSkillTools(skill?.config, options.additionalTools, options.withheldTools),
-                  userId,
-              })
-            : {
-                  mcpClients: [],
-                  mcpLabels: {},
-                  mcpServerNames: [],
-                  mcpToolFingerprints: NO_PERMISSION_KEYS,
-                  permissionKeys: NO_PERMISSION_KEYS,
-                  requiresApproval: [],
-                  tools: {},
-              };
+    const buildsTools = options.tools === "headless" && allowTools;
+    // The bot's mode: stamped on a new thread of the bot, and the run's tools take it where it asks more. Read for the bot the run
+    // names, else for the bot of the thread it continues or of `modeThreadId`. A failed read fails closed: this run's tools, and a new
+    // thread of the bot, are supervised, so a later chat there never starts wider than the bot asks; the owner can widen the thread.
+    const modeThreadId = continuedThreadId ?? options.modeThreadId;
+    const botMode =
+        options.botId !== undefined || (buildsTools && modeThreadId !== undefined)
+            ? await ctx
+                  .runQuery(internal.bots.functions.getBotPermissionModeForRun, { botId: options.botId, threadId: modeThreadId, userId })
+                  .catch((error: unknown) => {
+                      console.warn("[headless-run] bot permission mode unavailable, using supervised", error);
+
+                      return "supervised" as const;
+                  })
+            : null;
+    const toolResult = buildsTools
+        ? await buildAgentTools(ctx, {
+              // The same bot whose mode applies: its tool selection narrows the run like a chat with it.
+              botLookup: { botId: options.botId, threadId: modeThreadId },
+              headless: true,
+              ...(continuedThreadId !== undefined && { threadId: continuedThreadId }),
+              // Only for a model that calls tools: the list without the tool would name files nothing can read.
+              ...(modelSupportsTools(model) && options.projectInstructions && { instructions: options.projectInstructions.instructions }),
+              ...(options.approvedTools && { headlessApproved: options.approvedTools }),
+              ...(options.pauseForApproval && { headlessCanAsk: true }),
+              model,
+              organizationId: options.organizationId,
+              searchMode: (skill?.config?.searchMode as SearchMode | undefined) ?? DEFAULT_HEADLESS_SEARCH_MODE,
+              skillTools: headlessSkillTools(skill?.config, options.additionalTools, options.withheldTools),
+              ...(botMode && { unattendedMode: botMode }),
+              userId,
+          })
+        : {
+              mcpClients: [],
+              mcpLabels: {},
+              mcpServerNames: [],
+              mcpToolFingerprints: NO_PERMISSION_KEYS,
+              mcpToolOrigins: {},
+              permissionKeys: NO_PERMISSION_KEYS,
+              requiresApproval: [],
+              tools: {},
+          };
     const toolAllowlist =
         options.toolAllowlist && options.toolAllowlistKeepsMcp ? [...options.toolAllowlist, ...Object.keys(toolResult.mcpLabels)] : options.toolAllowlist;
+
+    // This run's own reply (`ToolCtx.replyKey`): two runs on one continued thread are two replies.
+    const replyKey = `headless:${crypto.randomUUID()}`;
 
     try {
         setResearchDepth(ctx, "balanced");
@@ -297,6 +334,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         setChainSource(ctx, options.chainSource);
         setHeadlessRun(ctx);
         setRunOrganizationId(ctx, options.organizationId);
+        setRunReplyKey(ctx, replyKey);
 
         const existingThreadId = "threadId" in options.thread ? options.thread.threadId : undefined;
         const personal = options.personalization === "full";
@@ -304,6 +342,9 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         const backupModelId = await resolveBackupModelId(ctx, userId, prefs.backupModel, model, modelFilterRules);
         // The tools the call carries: after the allowlist, so a run it strips bare is sized for a backup that cannot call tools.
         const runTools = applyToolAllowlist(toolResult.tools, toolAllowlist);
+        // Listed only while the run still offers `instruction_read`: the cap, the bot's selection, a skill, the permissions or the
+        // allowlist may have removed it like any other tool.
+        const instructions = Object.hasOwn(runTools, INSTRUCTION_READ_TOOL) ? (options.projectInstructions?.instructions ?? []) : [];
         const agent = await getAgent(model, {
             backupModelId,
             customProvider,
@@ -321,8 +362,10 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             userProviderKeys,
         });
 
-        const memoryContext = extractMemory && prompt ? await retrieveMemoryContext(ctx, userId, prompt, options.botId) : undefined;
-        const extraParts = [options.system, memoryContext].filter((part): part is string => !!part);
+        const memoryContext = extractMemory && prompt ? await retrieveMemoryContext(ctx, userId, prompt, options.botId, prefs.timezone) : undefined;
+        // A run that lists none takes the project text chosen without the list's cost, when that differs.
+        const runSystem = (instructions.length === 0 && options.projectInstructions?.systemWithoutInstructions) || options.system;
+        const extraParts = [runSystem, renderInstructionList(instructions), memoryContext].filter((part): part is string => !!part);
         // Without extra parts the agent falls back to its own instructions.
         const system = extraParts.length > 0 ? [agent.options.instructions, ...extraParts].filter(Boolean).join("\n\n") : undefined;
         const shouldAutoContinue = options.maxSteps === undefined;
@@ -369,6 +412,11 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             // Before the run: a tool call reads `thread.botId` to find the bot's computer, and a later threaded run reads the
             // thread's organization, which went in with the insert above. A thread that already exists is never moved.
             if (options.botId) {
+                // The mode before the bot: a thread that names its bot always carries the bot's mode, like a chat started with it.
+                if (botMode) {
+                    await ctx.runMutation(internal.chat.thread_state.copyThreadPermissionMode, { mode: botMode, threadId });
+                }
+
                 await ctx.runMutation(internal.agent.threads.updateThread, {
                     patch: { botId: options.botId },
                     threadId: threadId as Id<"threads">,
@@ -400,6 +448,11 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         };
         const result = await thread.generateText(generateArgs as never, callOptions).catch(wakeOnFailure);
         const text = result.text ?? "";
+        // When the prompt was saved, which the generation does after preparing its context: "tomorrow" in it is read against that day.
+        const promptAt =
+            (result as { savedMessages?: ReadonlyArray<{ _creationTime: number; message?: { role?: string } }> }).savedMessages?.find(
+                (row) => row.message?.role === "user",
+            )?._creationTime ?? startedAt;
         // Usage heatmap + per-skill breakdown, keyed on the reply's first row so a
         // redelivered record counts once. Every round of a goal is a reply of its own. Scheduled before any write below:
         // the generation is paid for even when a later write (the pause's, the thread's) fails.
@@ -439,6 +492,10 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             // or a messenger reply's child still dispatches as that source, not as the lead.
             const snapshot: ToolRunConfig = {
                 autoMediaEnrichment: false,
+                // The bot this run was narrowed by: its thread may not name it (a continued thread is never stamped).
+                ...((options.botId !== undefined || modeThreadId !== undefined) && {
+                    botLookup: { ...(options.botId !== undefined && { botId: options.botId }), ...(modeThreadId !== undefined && { threadId: modeThreadId }) },
+                }),
                 // The continuation's own children stay on the chain, so its source's one-waiting-child limit still holds.
                 ...(options.chainSource !== undefined && { chainSource: options.chainSource }),
                 ...(options.origin !== "lead" && { dispatchOrigin: options.origin }),
@@ -446,14 +503,20 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                 mcpServerNames: toolResult.mcpServerNames,
                 // The baseline the approved call is checked against (`mcpToolDrift`): a tool changed meanwhile is refused.
                 mcpToolFingerprints: Object.fromEntries(Object.entries(toolResult.mcpToolFingerprints).filter(([name]) => Object.hasOwn(runTools, name))),
+                // Which server's tool each name stood for (`mcpToolOriginDrift`): a name that passed to another server's tool is refused.
+                mcpToolOrigins: Object.fromEntries(Object.entries(toolResult.mcpToolOrigins).filter(([name]) => Object.hasOwn(runTools, name))),
                 // The pause extracted the prompt; the continuation extracts only what is steered into it, as an interactive run's does.
                 ...(extractMemory && prompt && { memory: { ...(options.botId && { botId: options.botId }) } }),
                 model,
                 // The continuation's cap reads it when the thread has no stored organization (`readRunPermissionCap`).
                 ...(options.organizationId && { organizationId: options.organizationId }),
+                // The project the listed `auto` files came from (`resumeApprovedRun` reads that one's again).
+                ...(instructions.length > 0 && options.projectInstructions && { projectId: options.projectInstructions.projectId }),
                 ...((options.reasoningEffort ?? skill?.config?.reasoningEffort) !== undefined && {
                     reasoningEffort: options.reasoningEffort ?? skill?.config?.reasoningEffort,
                 }),
+                // The continuation keeps this run's reply key: what the run asked a person about stays asked.
+                replyKey,
                 researchDepth: "balanced",
                 searchMode: (skill?.config?.searchMode as SearchMode | undefined) ?? DEFAULT_HEADLESS_SEARCH_MODE,
                 shouldAutoContinue,
@@ -507,7 +570,10 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                 void ctx.scheduler.runAfter(0, internal.memory.extract.extractMemories, {
                     assistantResponse: answer.slice(0, 4000),
                     ...(options.botId && { botId: options.botId }),
+                    messageAt: promptAt,
                     threadId: threadId as Id<"threads">,
+                    // The timezone the run read, UTC when none is set: a change before the job runs does not move its dates.
+                    timeZone: resolveTimeZone(prefs.timezone),
                     userId,
                     userMessage: prompt,
                 });

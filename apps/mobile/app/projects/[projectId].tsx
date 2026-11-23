@@ -6,13 +6,14 @@ import { withFinally } from "@/lib/guarded";
 import { getClient } from "@/lib/lunora";
 import { useOffline, useWriteControl } from "@/offline/offline-context";
 import { isWriteBlocked, startProjectThread, writeErrorMessage } from "@/projects/projects-api";
-import { useProject, useProjectThreads } from "@/projects/use-projects";
+import { useProject, useProjectConfirm, useProjectThreads } from "@/projects/use-projects";
 
 const ProjectScreen = () => {
     const { projectId } = useLocalSearchParams<{ projectId: string }>();
     const router = useRouter();
     const { error: projectError, rows: projectRows } = useProject(projectId);
     const { error: loadError, rows: threads } = useProjectThreads(projectId);
+    const confirm = useProjectConfirm(projectId, projectRows);
     const { isOffline } = useOffline();
     // Off while offline and while the first token mint is out: the write carries the token and would be refused without one.
     const startControl = useWriteControl("start");
@@ -22,7 +23,7 @@ const ProjectScreen = () => {
     const project = projectRows?.[0];
 
     const startThread = async () => {
-        if (!project || isWriteBlocked({ busy: starting, offline: startControl.disabled })) {
+        if (!project || confirm.gone || isWriteBlocked({ busy: starting, offline: startControl.disabled })) {
             return;
         }
 
@@ -48,8 +49,9 @@ const ProjectScreen = () => {
         });
     };
 
-    const blocked = isWriteBlocked({ busy: starting, offline: startControl.disabled }) || !project;
-    const shownError = error ?? projectError ?? (projectRows?.length === 0 ? "This project is not available." : undefined) ?? loadError;
+    const blocked = isWriteBlocked({ busy: starting, offline: startControl.disabled }) || !project || confirm.gone;
+    const isUnavailable = confirm.gone || projectRows?.length === 0;
+    const shownError = error ?? projectError ?? confirm.refusal ?? (isUnavailable ? "This project is not available." : undefined) ?? loadError;
 
     return (
         <>

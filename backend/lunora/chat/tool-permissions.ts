@@ -33,9 +33,12 @@ import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { resolveThreadReadAccess } from "../agent/thread-read-access";
+import type { RunToolSelection } from "../bots/run-tool-selection";
+import { readRunToolSelection } from "../bots/run-tool-selection";
 import type { ThreadPermissionMode } from "./lib/thread-permission-mode";
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { AuthMutationCtx } from "../lib/crpc";
+import { callerSessionNotOwn } from "../auth/lib/caller-session";
 import { saveAiUserPreferences } from "../auth/lib/preference-writes";
 import { patchThread } from "../agent/table-writes";
 import { isDeviceEligibleThread } from "../devices/internal";
@@ -334,18 +337,19 @@ export const threadModeForApp = async (
     connectorAccess: { connectorSlug: string; level: "none" | "read_only" | "read_write" }[];
     mode: ThreadPermissionMode | null;
     organizationId: string | null;
+    toolSelection: RunToolSelection | null;
 }> => {
     const access = await resolveThreadReadAccess(ctx, threadId as Id<"threads">, userId);
 
     if (access?.kind !== "full" && access?.kind !== "locked") {
-        return { allowed: false, connectorAccess: [], mode: null, organizationId: null };
+        return { allowed: false, connectorAccess: [], mode: null, organizationId: null, toolSelection: null };
     }
 
     // A thread with no owner on record is not reachable through an app call: the same refusal as a thread that is not there.
     const owner = access.thread.userId;
 
     if (owner === undefined) {
-        return { allowed: false, connectorAccess: [], mode: null, organizationId: null };
+        return { allowed: false, connectorAccess: [], mode: null, organizationId: null, toolSelection: null };
     }
 
     const connectorAccess = await threadConnectorAccess(ctx, { threadId: access.thread._id, userId: owner });
@@ -357,6 +361,8 @@ export const threadModeForApp = async (
         connectorAccess,
         mode: await modeOfThread(ctx, access.thread, userId),
         organizationId: access.thread.organizationId ?? access.thread.capOrganizationId ?? null,
+        // The selection of the bot the chat runs as, read here on the thread's shard, where its bot lives too.
+        toolSelection: await readRunToolSelection(ctx, { threadId: access.thread._id }),
     };
 };
 
@@ -374,6 +380,14 @@ export const getThreadPermissionModeForApp = internalQuery
             connectorAccess: v.array(v.object({ connectorSlug: v.string(), level: vAccessLevel })),
             mode: v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"), v.null()),
             organizationId: v.union(v.string(), v.null()),
+            toolSelection: v.union(
+                v.object({
+                    ownerId: v.string(),
+                    ownerServerKeys: v.array(v.string()),
+                    selection: v.object({ allow: v.optional(v.array(v.string())), exclude: v.array(v.string()) }),
+                }),
+                v.null(),
+            ),
         }),
     )
     .query(async ({ args: { threadId, userId }, ctx }) => await threadModeForApp(ctx, threadId, userId));
@@ -907,7 +921,14 @@ export const respondToToolApproval = authMutation
     })
     .output(v.object({ alreadyResolved: v.boolean(), streamId: v.union(v.string(), v.null()) }))
     .mutation(async ({ args: { approvalId, decision, threadId, unlockProof }, ctx }) => {
-        const claim = await claimToolApproval(ctx, { approvalId, callerId: ctx.user.userId, decision, threadId, unlockProof });
+        const claim = await claimToolApproval(ctx, {
+            answeredByImpersonator: await callerSessionNotOwn(ctx),
+            approvalId,
+            callerId: ctx.user.userId,
+            decision,
+            threadId,
+            unlockProof,
+        });
 
         if (claim.kind === "already-resolved") {
             return { alreadyResolved: true, streamId: claim.streamId };

@@ -62,6 +62,10 @@ jobs:
                   enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "24.22.1"
                   skip-playwright: "true"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Extract messages"
               run: "pnpm --filter @neore/web run translate:extract"

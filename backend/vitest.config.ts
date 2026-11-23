@@ -2,6 +2,8 @@ import { fileURLToPath } from "node:url";
 
 import { configDefaults, defineConfig } from "vitest/config";
 
+import { timeSharding } from "../scripts/vitest/time-sharding";
+
 /**
  * The backend ran on Vitest defaults until it needed a stand-in for
  * `cloudflare:workers` (a workerd built-in Node cannot resolve), and then a
@@ -12,7 +14,8 @@ import { configDefaults, defineConfig } from "vitest/config";
  * hook timeout when they share the machine with the rest of the suite. They run
  * alone, after the parallel group has finished (`sequence.groupOrder`).
  */
-const SERIAL_FILES = ["lunora/admin/shard-footprint.test.ts"];
+// `browser/gdpr.test.ts` writes and reads 40 MB of typed actions to pass the transaction's 32 MiB read limit.
+const SERIAL_FILES = ["lunora/admin/shard-footprint.test.ts", "lunora/browser/gdpr.test.ts"];
 
 export default defineConfig({
     resolve: {
@@ -22,6 +25,7 @@ export default defineConfig({
         },
     },
     test: {
+        ...timeSharding(import.meta.url),
         projects: [
             {
                 extends: true,

@@ -74,10 +74,28 @@ export const truncateUserMessage = (message: string, steeredFrom?: number, limit
     }
 
     const steered = message.slice(steeredFrom, steeredFrom + limit);
-    // The prompt ends two characters before them (the blank line `afterRun` joins with).
-    const room = limit - steered.length - 2;
+    const prompt = promptCharsRead(message, steeredFrom, limit);
 
-    return room > 0 ? `${message.slice(0, Math.min(steeredFrom - 2, room))}\n\n${steered}` : steered;
+    return prompt > 0 ? `${message.slice(0, prompt)}\n\n${steered}` : steered;
+};
+
+/**
+ * How many characters of the prompt, from its start, {@link truncateUserMessage} keeps: words past them never reached
+ * the model, so no memory can have come from them (`factEvidence`).
+ */
+export const promptCharsRead = (message: string, steeredFrom?: number, limit = EXTRACTION_USER_MESSAGE_CHARS): number => {
+    if (steeredFrom === undefined) {
+        return Math.min(message.length, limit);
+    }
+
+    if (message.length <= limit) {
+        return steeredFrom;
+    }
+
+    // The prompt ends two characters before the steers (the blank line `afterRun` joins with), and gives way to them.
+    const room = limit - Math.min(message.length - steeredFrom, limit) - 2;
+
+    return room > 0 ? Math.min(steeredFrom - 2, room) : 0;
 };
 
 /**
@@ -693,6 +711,7 @@ Does <user_message> reveal a durable fact about its writer?`;
 /**
  * Stable dedup key input for one processed user statement. The question is part
  * of the key when present — otherwise one "yes" would mute every later "yes" for a day.
+ * The user's local day is part of it too: "tomorrow" sent again on another day is a new statement.
  */
-export const processedExchangeFingerprint = (userId: string, userMessage: string, assistantQuestion?: string): string =>
-    JSON.stringify({ message: userMessage.trim().replaceAll(WHITESPACE_RE, " "), question: assistantQuestion ?? null, userId });
+export const processedExchangeFingerprint = (userId: string, userMessage: string, assistantQuestion?: string, localDay?: string): string =>
+    JSON.stringify({ day: localDay ?? null, message: userMessage.trim().replaceAll(WHITESPACE_RE, " "), question: assistantQuestion ?? null, userId });

@@ -43,7 +43,7 @@ import { showInfo } from "@/lib/toast";
 import LoadMoreTrigger from "./load-more-trigger";
 import MessageItem from "./message-item";
 import type { MessagePosition } from "./message-windowing";
-import { parseMessageHash, resolveJumpMessageId, shouldAnimateEntrance, shouldLoadOlderForJump } from "./message-windowing";
+import { parseMessageHash, parseMessageHashPosition, resolveJumpMessageId, shouldAnimateEntrance, shouldLoadOlderForJump } from "./message-windowing";
 import { RateLimitPauseNotice } from "./rate-limit-pause-notice";
 import { selectStreamIdToShow, selectStreamTokenFor } from "./stream-to-show";
 import { StreamingPlaceholder, ThinkingPlaceholder } from "./streaming-placeholder";
@@ -237,8 +237,9 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     useEffect(() => {
         const readHash = (): PendingJump | undefined => {
             const messageId = parseMessageHash(globalThis.location.hash);
+            const position = parseMessageHashPosition(globalThis.location.hash);
 
-            return messageId ? { messageId, pagesLoaded: 0 } : undefined;
+            return messageId ? { messageId, pagesLoaded: 0, ...(position && { position }) } : undefined;
         };
         const handleHash = () => {
             const pending = readHash();

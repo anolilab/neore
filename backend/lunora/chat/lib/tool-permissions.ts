@@ -89,7 +89,8 @@ export const toolPermissionKey = (source: ToolSource, toolName: string, owner?: 
  * own provider key on a long sandbox run and can push to their GitHub;
  * `delegateToSubAgent` and `messageWorker` start a background run charged to their task quota —
  * so the user sees the task before anything starts. `replyToReviewComment` and `rerunFailedChecks` act on a pull request
- * as the user (`mergePullRequest` asks every time: it needs a person). Headless callers lose them
+ * as the user (`mergePullRequest` asks every time: it needs a person; so does `signInWithSavedLogin`, which types a saved
+ * password for them). Headless callers lose them
  * (`ask` degrades to `off`), which is intended — except a sub-agent's own
  * delegation, which inherits the consent its parent call was given
  * (`sub-agents/execute.ts`).
@@ -103,6 +104,7 @@ export const BUILTIN_TOOLS_ASK_BY_DEFAULT: ReadonlySet<string> = new Set([
     "replyToReviewComment",
     "requestSecret",
     "rerunFailedChecks",
+    "signInWithSavedLogin",
 ]);
 
 const SUB_AGENT_BUILTINS: ReadonlySet<string> = new Set(["delegateToSubAgent", "messageWorker"]);
@@ -181,6 +183,12 @@ export interface ToolPermissionOptions {
      * headless run inherits nothing, and `off` stays off.
      */
     timedGrants?: ToolPermissionGrants;
+    /**
+     * Headless only: the mode of the bot the run belongs to (`bots.permissionMode`). Nobody is there to widen anything, so it
+     * applies only when it asks MORE than the headless defaults: `supervised` moves a default as it does in a chat, and its
+     * `ask` then meets the headless clamp below (removed, or paused when `headlessCanAsk`). `auto` and `full` change nothing.
+     */
+    unattendedMode?: ThreadPermissionMode;
 }
 
 export interface ResolvedToolPermission {
@@ -249,8 +257,9 @@ export const resolveToolPermissionWithGrant = (
     // taken back by `supervised`, a chosen `ask` is not lifted by `full`); the thread's mode moves only the default. A
     // headless run ignores it: nobody is there, and its own clamp below decides. The organization's cap then clamps
     // whichever was chosen, so neither an override nor `full` lifts a tool above it, and everything below (grants,
-    // headless, the origin clamp) reads the clamped mode.
-    const modeForDefault = options.headless ? undefined : options.threadMode;
+    // headless, the origin clamp) reads the clamped mode. A headless run takes only a bot's `supervised` (`unattendedMode`).
+    const headlessMode = options.unattendedMode === "supervised" ? "supervised" : undefined;
+    const modeForDefault = options.headless ? headlessMode : options.threadMode;
     let chosen = clampToolPermission(
         isToolPermissionMode(override)
             ? override

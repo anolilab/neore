@@ -23,18 +23,50 @@ export const eraseBotsForUser = async (ctx: MutationCtx, userId: string): Promis
         await ctx.db.delete("bots", bot._id);
     }
 
-    return { hasMore: full(bots) };
+    // `botOwners` is global: its rows of this user are erased with the bots, deleted or not. Primary: a lagging replica
+    // could miss a fresh row and let a short page report the erasure done.
+    const owners = await ctx.db.botOwners.findMany({ consistency: "primary", limit: BATCH, where: { ownerId: userId } });
+
+    for (const row of owners.page) {
+        await ctx.db.delete("botOwners", row._id);
+    }
+
+    return { hasMore: full(bots) || full(owners.page) };
 };
 
 /** The user's bots for the GDPR export (`gdpr/workflows/export-workflow.ts`). */
+/** Owner records read per page for the export. */
+const OWNER_EXPORT_PAGE = 500;
+
 export const collectBotsForExport = internalQuery
     .input({ userId: v.string() })
-    .output(v.object({ bots: v.array(v.any()) }))
+    .output(v.object({ botOwners: v.array(v.any()), bots: v.array(v.any()) }))
     .query(async ({ args: { userId }, ctx }) => {
         const bots = await ctx.db
             .query("bots")
             .withIndex("by_userId", (q) => q.eq("userId", userId))
             .take(BATCH);
+        // The owner records outlive deleted bots (`botOwners`), so they are the user's data too: every one, page by page (a
+        // single read stops at a page). Primary, as for the erasure.
+        const botOwners: unknown[] = [];
+        let cursor: string | null = null;
 
-        return { bots };
+        for (;;) {
+            const page: { continueCursor?: string | null; isDone: boolean; page: unknown[] } = await ctx.db.botOwners.findMany({
+                consistency: "primary",
+                cursor,
+                limit: OWNER_EXPORT_PAGE,
+                where: { ownerId: userId },
+            });
+
+            botOwners.push(...page.page);
+
+            if (page.isDone || !page.continueCursor) {
+                break;
+            }
+
+            cursor = page.continueCursor;
+        }
+
+        return { botOwners, bots };
     });

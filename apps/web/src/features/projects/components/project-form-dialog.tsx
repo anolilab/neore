@@ -10,11 +10,21 @@ import { IconPicker } from "@neore/ui/components/icon-picker";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
 import LucideIconByName from "@neore/ui/components/lucide-icon-by-name";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@neore/ui/components/responsive-alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogTitle } from "@neore/ui/components/responsive-dialog";
 import { Textarea } from "@neore/ui/components/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@neore/ui/components/tooltip";
 import { useMutation } from "@tanstack/react-query";
-import { useEffect, useEffectEvent } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { toast } from "sonner";
 import * as z from "zod";
 
@@ -22,6 +32,7 @@ import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { ReasoningEffortSelector } from "@/features/chat/model-settings/reasoning-effort-selector";
 import ProjectKnowledgeCollections from "@/features/knowledge/components/project-knowledge-collections";
 import ProjectRepositories from "@/features/projects/components/project-repositories";
+import ProjectRuleFiles from "@/features/projects/components/project-rule-files";
 import ProjectUsageSummary from "@/features/projects/components/project-usage-summary";
 import PromptModelSelector from "@/features/prompts/components/prompt-model-selector";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
@@ -84,10 +95,56 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
     const crpc = useCRPC();
     const { mutateAsync: createProject } = useMutation(crpc.projects.functions.createProject.mutationOptions());
     const { mutateAsync: updateProject } = useMutation(crpc.projects.functions.updateProject.mutationOptions());
+    // Whether the rule files section holds unsaved changes: closing would drop them.
+    const ruleFilesDirty = useRef(false);
+    // Whether a rule-file save is on its way: it lands whatever happens here, so closing never offers to drop it.
+    const ruleFilesSaving = useRef(false);
+    // Asking whether to drop those changes, after a close (Cancel, Escape, outside click, the close button) while they are open.
+    const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+    // How many project saves were refused for those changes: the rule files section says why beside its Save, and focuses it.
+    const [blockedSaves, setBlockedSaves] = useState(0);
+    const [wasOpen, setWasOpen] = useState(open);
+
+    // Closed from outside while it asked: the next open starts without the question.
+    if (wasOpen !== open) {
+        setWasOpen(open);
+
+        if (!open) {
+            setConfirmingDiscard(false);
+        }
+    }
+
+    const requestClose = () => {
+        if (editingProject && ruleFilesSaving.current) {
+            toast.info(t`Your rule files are still saving.`);
+
+            return;
+        }
+
+        if (editingProject && ruleFilesDirty.current) {
+            setConfirmingDiscard(true);
+
+            return;
+        }
+
+        onClose();
+    };
 
     const form = useAppForm({
         defaultValues: getDefaultValues(editingProject),
         onSubmit: async ({ value }) => {
+            if (editingProject && ruleFilesSaving.current) {
+                toast.info(t`Your rule files are still saving.`);
+
+                return;
+            }
+
+            if (editingProject && ruleFilesDirty.current) {
+                setBlockedSaves((count) => count + 1);
+
+                return;
+            }
+
             try {
                 if (editingProject) {
                     // `patch` fields are `v.optional(...)` nested inside a `v.object`, which
@@ -95,7 +152,8 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                     // (including `organizationId`, which this dialog never edits) must be present.
                     const patch = {
                         color: value.color ?? "", // "" clears the colour on the backend
-                        context: value.context.trim() || undefined,
+                        // An existing project's instructions are its rule files, saved by their own section below.
+                        context: undefined,
                         defaultEnabledFeatures: value.defaultEnabledFeatures.length > 0 ? value.defaultEnabledFeatures : undefined,
                         defaultModel: value.defaultModel || undefined,
                         defaultReasoningEffort: value.defaultReasoningEffort,
@@ -168,7 +226,7 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
     }, [editingProject, open]);
 
     return (
-        <Dialog onOpenChange={(nextOpen) => !nextOpen && onClose()} open={open}>
+        <Dialog onOpenChange={(nextOpen) => !nextOpen && requestClose()} open={open}>
             <DialogContent className="max-h-screen max-w-2xl overflow-y-auto">
                 <form.AppForm>
                     <form
@@ -313,29 +371,32 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                                     </div>
                                 </div>
 
-                                <form.AppField name="context">
-                                    {(field) => (
-                                        <field.FormItem>
-                                            <field.FormLabel>{t`Context / Instructions`}</field.FormLabel>
-                                            <field.FormControl>
-                                                <Textarea
-                                                    autoComplete="off"
-                                                    expandable
-                                                    expandableDialogTitle={t`Project Context`}
-                                                    name="project-context"
-                                                    onBlur={field.handleBlur}
-                                                    onChange={(e) => field.handleChange(e.target.value)}
-                                                    placeholder={t`This context will be automatically added to each chat in your project. You can include instructions, background information, or any shared knowledge.`}
-                                                    value={field.state.value}
-                                                />
-                                            </field.FormControl>
-                                            <field.FormDescription>
-                                                {t`This context will be prepended to the system prompt for all chats in this project.`}
-                                            </field.FormDescription>
-                                            <field.FormMessage />
-                                        </field.FormItem>
-                                    )}
-                                </form.AppField>
+                                {/* A new project starts with one text; once saved, its instructions are edited as rule files. */}
+                                {!editingProject && (
+                                    <form.AppField name="context">
+                                        {(field) => (
+                                            <field.FormItem>
+                                                <field.FormLabel>{t`Context / Instructions`}</field.FormLabel>
+                                                <field.FormControl>
+                                                    <Textarea
+                                                        autoComplete="off"
+                                                        expandable
+                                                        expandableDialogTitle={t`Project Context`}
+                                                        name="project-context"
+                                                        onBlur={field.handleBlur}
+                                                        onChange={(e) => field.handleChange(e.target.value)}
+                                                        placeholder={t`This context will be automatically added to each chat in your project. You can include instructions, background information, or any shared knowledge.`}
+                                                        value={field.state.value}
+                                                    />
+                                                </field.FormControl>
+                                                <field.FormDescription>
+                                                    {t`This context will be prepended to the system prompt for all chats in this project.`}
+                                                </field.FormDescription>
+                                                <field.FormMessage />
+                                            </field.FormItem>
+                                        )}
+                                    </form.AppField>
+                                )}
                             </div>
 
                             <div className="bg-muted/30 space-y-4 rounded-lg border p-4">
@@ -385,13 +446,31 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                                 </div>
                             </div>
                             {/* Links, saved as they change — only a saved project has an id to link to. */}
+                            {/* Keyed: an unsaved draft for one project never stays for the next one edited. */}
+                            {editingProject && (
+                                <ProjectRuleFiles
+                                    blockedSaveRequest={blockedSaves}
+                                    key={`rule-files-${editingProject._id}`}
+                                    onDirtyChange={(dirty: boolean) => {
+                                        ruleFilesDirty.current = dirty;
+                                    }}
+                                    onSavingChange={(saving: boolean) => {
+                                        ruleFilesSaving.current = saving;
+
+                                        if (saving) {
+                                            setConfirmingDiscard(false);
+                                        }
+                                    }}
+                                    projectId={editingProject._id}
+                                />
+                            )}
                             {editingProject && <ProjectKnowledgeCollections projectId={editingProject._id} />}
                             {editingProject && <ProjectUsageSummary projectId={editingProject._id} />}
                             {/* Keyed: a draft typed for one project never stays for the next one edited. */}
                             {editingProject && <ProjectRepositories key={editingProject._id} projectId={editingProject._id} />}
                         </DialogPanel>
                         <DialogFooter>
-                            <Button onClick={onClose} type="button" variant="outline">
+                            <Button onClick={requestClose} type="button" variant="outline">
                                 {t`Cancel`}
                             </Button>
                             <form.Subscribe
@@ -417,6 +496,27 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                         </DialogFooter>
                     </form>
                 </form.AppForm>
+                <AlertDialog onOpenChange={setConfirmingDiscard} open={confirmingDiscard}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>{t`Discard rule file changes?`}</AlertDialogTitle>
+                            <AlertDialogDescription>{t`Your changes to this project's rule files are not saved. Closing drops them.`}</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>{t`Keep editing`}</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={() => {
+                                    ruleFilesDirty.current = false;
+                                    setConfirmingDiscard(false);
+                                    onClose();
+                                }}
+                                variant="destructive"
+                            >
+                                {t`Discard changes`}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </DialogContent>
         </Dialog>
     );

@@ -1,46 +1,9 @@
 /**
- * `TRUSTED_EXTENSION_ORIGINS` → the browser-extension origins the backend trusts
- * for credentialed CORS (`http.ts`) and better-auth's origin check (`auth.ts`).
- *
- * Optional: unset means the browser extension simply cannot sign in. It must
- * NEVER widen to "any extension" — trusting every installed extension would let
- * any of them drive authenticated requests — so this parses to an exact list,
- * and anything that is not one concrete extension origin (`*`, a bare scheme, a
- * web origin, a typo) is dropped with a warning rather than honoured.
+ * The redirect URIs the app-grant sign-in may deliver a code to
+ * (`auth/extension-grant.ts`). There is no extension ORIGIN list: no extension
+ * origin is trusted for a cookie session or credentialed CORS, and the Worker
+ * strips the cookie off any extension-origin request (`src/extension-cookie.ts`).
  */
-const EXTENSION_ORIGIN = /^(?:chrome-extension:\/\/[a-p]{32}|moz-extension:\/\/[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12})$/;
-
-/** Strips trailing slashes without a backtracking-prone regex. */
-const withoutTrailingSlashes = (value: string): string => {
-    let end = value.length;
-
-    while (end > 0 && value[end - 1] === "/") {
-        end -= 1;
-    }
-
-    return value.slice(0, end);
-};
-
-export const parseTrustedExtensionOrigins = (raw: string | undefined): string[] => {
-    const origins: string[] = [];
-    const entries = (raw ?? "").split(",");
-
-    for (const entry of entries) {
-        const origin = withoutTrailingSlashes(entry.trim());
-
-        if (!origin) {
-            continue;
-        }
-
-        if (EXTENSION_ORIGIN.test(origin)) {
-            origins.push(origin);
-        } else {
-            console.warn(`[env] TRUSTED_EXTENSION_ORIGINS: ignoring "${origin}" — expected chrome-extension://<32-letter id> or moz-extension://<uuid>`);
-        }
-    }
-
-    return [...new Set(origins)];
-};
 
 /**
  * A `launchWebAuthFlow` redirect URI. The browser intercepts navigation to it and
@@ -87,12 +50,36 @@ export const NATIVE_REDIRECT_URI = "neore://auth/callback";
  */
 export const MOBILE_REDIRECT_URI = "neore-mobile://auth/callback";
 
+const CHROME_EXTENSION_ID = /^(?:chrome-extension:\/\/)?(?<id>[a-p]{32})\/?$/;
+
+/**
+ * One `TRUSTED_EXTENSION_REDIRECT_URIS` entry as the URI it stands for. A Chrome
+ * extension id, bare (as `chrome://extensions` shows it) or as
+ * `chrome-extension://<id>`, is `https://<id>.chromiumapp.org/`, the URI
+ * `identity.getRedirectURL()` derives from it. `getRedirectURL()` ends in "/";
+ * a value copied without it gets one. The native callbacks stay as written.
+ */
+const normalizeRedirectUri = (entry: string): string => {
+    const uri = entry.trim();
+    const chromeId = CHROME_EXTENSION_ID.exec(uri)?.groups?.["id"];
+
+    if (chromeId) {
+        return `https://${chromeId}.chromiumapp.org/`;
+    }
+
+    if (!uri || uri === NATIVE_REDIRECT_URI || uri === MOBILE_REDIRECT_URI || uri.endsWith("/")) {
+        return uri;
+    }
+
+    return `${uri}/`;
+};
+
 /**
  * `TRUSTED_EXTENSION_REDIRECT_URIS` → the exact redirect URIs the extension
  * sign-in flow may deliver a code to.
  *
- * UNSET means the shipped Firefox add-on's URI, unlike `TRUSTED_EXTENSION_ORIGINS`
- * where unset means none. That default is safe because of who can receive it:
+ * UNSET means the shipped Firefox add-on's URI; the Chrome build's
+ * `https://<id>.chromiumapp.org/` must be listed. That default is safe because of who can receive it:
  * Firefox intercepts the URI only for the add-on whose id it derives from, AMO
  * signs one add-on per id, and a release Firefox runs only signed add-ons. The
  * one other way to hold that id is a temporary or unsigned install the user put
@@ -123,7 +110,7 @@ export const parseTrustedExtensionRedirectUris = (raw: string | undefined): stri
     const entries = trimmed.split(",");
 
     for (const entry of entries) {
-        let uri = entry.trim();
+        const uri = normalizeRedirectUri(entry);
 
         if (!uri) {
             continue;
@@ -132,11 +119,6 @@ export const parseTrustedExtensionRedirectUris = (raw: string | undefined): stri
         if (uri === NATIVE_REDIRECT_URI || uri === MOBILE_REDIRECT_URI) {
             uris.push(uri);
             continue;
-        }
-
-        // `getRedirectURL()` ends in "/"; accept the value copied without it.
-        if (!uri.endsWith("/")) {
-            uri += "/";
         }
 
         if (EXTENSION_REDIRECT_URI.test(uri)) {
@@ -149,4 +131,75 @@ export const parseTrustedExtensionRedirectUris = (raw: string | undefined): stri
     }
 
     return [...new Set(uris)];
+};
+
+/**
+ * For `pnpm dev:setup`: whether a `TRUSTED_EXTENSION_REDIRECT_URIS` value lets a
+ * Chrome build sign in, read the way the backend reads it, so a bare id or a
+ * `chrome-extension://<id>` counts as its `https://<id>.chromiumapp.org/`.
+ */
+export const listsChromeRedirect = (raw: string | undefined): boolean =>
+    parseTrustedExtensionRedirectUris(raw).some((uri) => new URL(uri).hostname.endsWith(".chromiumapp.org"));
+
+/** The entries a `TRUSTED_EXTENSION_REDIRECT_URIS` value lists, as written; unset is the default. */
+const listedRedirectUris = (raw: string | undefined): string[] => {
+    const trimmed = raw?.trim() ?? "";
+
+    if (!trimmed) {
+        return [SHIPPED_FIREFOX_REDIRECT_URI];
+    }
+
+    if (trimmed.toLowerCase() === "none") {
+        return [];
+    }
+
+    return trimmed
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+};
+
+/**
+ * For `pnpm dev:setup` (`scripts/dev-setup.js`): moves the Chrome ids of the
+ * retired `TRUSTED_EXTENSION_ORIGINS` (`chrome-extension://<id>`) into
+ * `TRUSTED_EXTENSION_REDIRECT_URIS` as `https://<id>.chromiumapp.org/`.
+ *
+ * A value replaces the default, so an unset list starts from the shipped
+ * Firefox URI, and every entry already there (the desktop or mobile callback
+ * among them) is kept. `none` stays: sign-in was switched off on purpose, so
+ * the URIs that would have moved come back as `withheld`, for the script to
+ * name. `added` is empty when nothing moved, and `value` is then the input
+ * unchanged.
+ */
+export const carryRetiredExtensionOrigins = (
+    origins: string | undefined,
+    redirectUris: string | undefined,
+): { added: string[]; value: string | undefined; withheld: string[] } => {
+    const off = redirectUris?.trim().toLowerCase() === "none";
+    const current = listedRedirectUris(redirectUris);
+    const listed = new Set(current.map((entry) => normalizeRedirectUri(entry)));
+    const added: string[] = [];
+    const entries = origins?.split(",") ?? [];
+
+    for (const entry of entries) {
+        // The retired parser stripped every trailing slash, so `chrome-extension://<id>//` was a valid entry.
+        let origin = entry.trim();
+
+        while (origin.endsWith("/")) {
+            origin = origin.slice(0, -1);
+        }
+
+        const uri = origin.startsWith("chrome-extension://") && CHROME_EXTENSION_ID.test(origin) ? normalizeRedirectUri(origin) : undefined;
+
+        if (uri && !listed.has(uri)) {
+            listed.add(uri);
+            added.push(uri);
+        }
+    }
+
+    if (off) {
+        return { added: [], value: redirectUris, withheld: added };
+    }
+
+    return { added, value: added.length > 0 ? [...current, ...added].join(",") : redirectUris, withheld: [] };
 };

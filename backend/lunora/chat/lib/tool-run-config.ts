@@ -16,6 +16,12 @@ import { vGroupRunSnapshot } from "../group/validators";
 export const vToolRunConfig = v.object({
     autoMediaEnrichment: v.boolean(),
     /**
+     * Where a headless run that paused found its bot (`headless-run.ts`): the bot it named, else the thread it took the bot's mode
+     * from. The continuation looks there again, so the bot's tool selection and mode hold for the rest of the run; a named bot
+     * that is gone, or no longer the owner's, leaves it no tools. Absent (interactive, or older) = the bot of the run's thread.
+     */
+    botLookup: v.optional(v.object({ botId: v.optional(v.string().max(MAX_LENGTH.id)), threadId: v.optional(v.string().max(MAX_LENGTH.id)) })),
+    /**
      * The task, trigger or eval whose sub-agent chain the paused child belongs to (`sub-agents/logic.ts:chainSourceKey`): the
      * continuation names it on what the child delegates, so the per-source limit holds after an answer. Absent on a snapshot
      * that predates it, or for a chat-started chain.
@@ -43,6 +49,12 @@ export const vToolRunConfig = v.object({
      * again for a nested dispatch. Absent on a snapshot that predates it, which reads as no inherited approval.
      */
     headlessApproved: v.optional(v.array(v.string())),
+    /**
+     * Whether the turn that paused is not the owner's own: sent by an admin acting as the owner or from a browser-extension
+     * sign-in (as `/chat/start` recorded it), or answered from a session `callerSessionNotOwn` rejects. Absent (a run path
+     * that records none, or an older snapshot) is not `false`: the continuation then gets no saved login.
+     */
+    impersonated: v.optional(v.boolean()),
     instructions: v.optional(v.string()),
     mcpServerNames: v.array(v.string()),
     /**
@@ -50,6 +62,11 @@ export const vToolRunConfig = v.object({
      * run an approved call whose tool's fingerprint changed or is gone. Absent on a snapshot that predates it: no check.
      */
     mcpToolFingerprints: v.optional(v.record(v.string(), v.string())),
+    /**
+     * Runtime name -> origin of each MCP tool the run offered (`mcpToolOrigin`): which server's which tool the name stood
+     * for. A continuation does not run an approved call whose name now stands for another. Absent on an older snapshot: no check.
+     */
+    mcpToolOrigins: v.optional(v.record(v.string(), v.string())),
     /**
      * Set when the run that paused fed memory extraction (it extracted its own prompt
      * and steers at the pause). The continuation then extracts only what it adds: the
@@ -59,6 +76,11 @@ export const vToolRunConfig = v.object({
     model: v.string(),
     /** The organization the paused run was started from, which caps its continuation when its thread has no stored one. */
     organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
+    /**
+     * The project whose `auto` rule files the paused run listed and offered `instruction_read` over: the continuation reads
+     * that project's files anew, with its access check, never the project the thread is in by then. Absent: no such tool.
+     */
+    projectId: v.optional(v.string().max(MAX_LENGTH.id)),
     /**
      * The prompt row the paused run answered. The continuation's stream is keyed on the approval id, so this is
      * how a goal recognises the resumed run as its own round (`chat/goals/internal.ts#runPromptId`).
@@ -90,6 +112,11 @@ export const vToolRunConfig = v.object({
      * (`sub_agents.functions.resumeRunForAnswer`, then the run's end), so the result still reaches the parent once.
      */
     subAgentRunId: v.optional(v.id("subAgentRuns")),
+    /**
+     * One kind per piece of the paused run's system prompt (`chat/lib/system-context-kinds.ts`): the continuation runs on
+     * `instructions`, the same text, so the saved-login verdict reads it from here. Absent = no answer, no login.
+     */
+    systemContext: v.optional(v.array(v.string().max(40)).max(32)),
     toolNames: v.array(v.string()),
     /**
      * Runtime tool name -> stable permission key, taken from the tools as they

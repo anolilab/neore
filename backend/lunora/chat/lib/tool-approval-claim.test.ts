@@ -46,8 +46,10 @@ let threadId: string;
 const insertMessage = async (order: number, message: unknown, tool = false) =>
     await harness.run(async (ctx: any) => await ctx.db.insert("messages", { message, order, status: "success", stepOrder: 0, threadId, tool, userId: OWNER }));
 
-const claim = async (callerId: string, decision: "always" | "approve" | "deny" = "approve", approvalId = APPROVAL_ID) =>
-    await harness.run(async (ctx: any) => await claimToolApproval(ctx, { approvalId, callerId, decision, threadId: threadId as never }));
+const claim = async (callerId: string, decision: "always" | "approve" | "deny" = "approve", approvalId = APPROVAL_ID, answeredByImpersonator = false) =>
+    await harness.run(
+        async (ctx: any) => await claimToolApproval(ctx, { answeredByImpersonator, approvalId, callerId, decision, threadId: threadId as never }),
+    );
 
 const runStatus = async () =>
     await harness.run(async (ctx: any) => {
@@ -85,6 +87,12 @@ describe("claimToolApproval", () => {
 
         expect(result).toMatchObject({ config: CONFIG, kind: "claimed", ownerId: OWNER, toolName: "mcp_Files__delete" });
         expect(await runStatus()).toStrictEqual(["approved"]);
+    });
+
+    it("marks the continuation's turn impersonated when an admin acting as the owner answers, so it unlocks no saved login", async () => {
+        const result = await claim(OWNER, "approve", APPROVAL_ID, true);
+
+        expect(result).toMatchObject({ config: { ...CONFIG, impersonated: true }, kind: "claimed" });
     });
 
     it("records a denial as denied", async () => {
@@ -185,7 +193,14 @@ describe("claimToolApproval", () => {
 
         await expect(
             harness.run(
-                async (ctx: any) => await claimToolApproval(ctx, { approvalId: APPROVAL_ID, callerId: OWNER, decision: "approve", threadId: otherThread }),
+                async (ctx: any) =>
+                    await claimToolApproval(ctx, {
+                        answeredByImpersonator: false,
+                        approvalId: APPROVAL_ID,
+                        callerId: OWNER,
+                        decision: "approve",
+                        threadId: otherThread,
+                    }),
             ),
         ).rejects.toThrow("can no longer be resumed");
     });

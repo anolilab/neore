@@ -415,7 +415,7 @@ impl DeviceState {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use crate::test_dir::TestDir;
     use std::sync::{Arc, Mutex};
 
     use super::*;
@@ -429,11 +429,9 @@ mod tests {
 
     type Events = Arc<Mutex<Vec<Event>>>;
 
-    fn state(name: &str) -> (DeviceState, PathBuf, Events) {
+    fn state(name: &str) -> (DeviceState, TestDir, Events) {
         crate::store::test_keychain::install();
-        let dir =
-            std::env::temp_dir().join(format!("neore-acp-call-{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
+        let dir = TestDir::at(&format!("acp-call-{name}"));
         std::fs::create_dir_all(&dir).unwrap();
         store::save(
             &dir.join("device.json"),
@@ -497,7 +495,7 @@ mod tests {
 
     #[test]
     fn a_valid_signature_for_an_unapproved_pair_is_refused() {
-        let (state, dir, _) = state("unapproved");
+        let (state, _dir, _) = state("unapproved");
 
         for input in [
             start_input("claude", "someone-elses-folder"),
@@ -521,13 +519,11 @@ mod tests {
             assert_eq!(result["status"], "failed");
             assert_eq!(result["error"], "refused: not approved on this computer");
         }
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn an_approved_pair_yields_a_start_with_the_path_from_the_approval() {
-        let (state, dir, _) = state("approved");
+        let (state, _dir, _) = state("approved");
         let prepared = state
             .acp_prepare(&call("acp_start", start_input("claude", "f1")))
             .unwrap();
@@ -547,13 +543,11 @@ mod tests {
             })
         );
         assert_eq!(prepared.call_id, "c1");
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_start_may_name_a_saved_session_but_only_a_valid_one() {
-        let (state, dir, _) = state("native");
+        let (state, _dir, _) = state("native");
         let mut input = start_input("claude", "f1");
 
         input["nativeSessionId"] = json!("sess_1");
@@ -600,13 +594,11 @@ mod tests {
         let prepared = state.acp_prepare(&call("acp_start", input)).unwrap();
 
         assert!(prepared.command.is_none());
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_start_may_name_a_session_to_fork_but_not_with_one_to_load() {
-        let (state, dir, _) = state("fork");
+        let (state, _dir, _) = state("fork");
         let mut input = start_input("claude", "f1");
 
         input["forkSessionId"] = json!("sess_1");
@@ -654,13 +646,11 @@ mod tests {
             .unwrap()
             .command
             .is_none());
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_start_cannot_carry_its_own_path() {
-        let (state, dir, _) = state("no-path");
+        let (state, _dir, _) = state("no-path");
         let mut input = start_input("claude", "f1");
 
         input["folderPath"] = json!("/etc");
@@ -671,13 +661,11 @@ mod tests {
             prepared.command,
             Some(AcpCommand::Start { ref folder_path, .. }) if folder_path == "/home/me/neore"
         ));
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_redelivered_call_prepares_again_because_no_nonce_is_spent() {
-        let (state, dir, _) = state("redelivery");
+        let (state, _dir, _) = state("redelivery");
         let signed = call(
             "acp_send",
             json!({ "sessionId": "s1", "turnId": "u1", "text": "hi" }),
@@ -689,13 +677,11 @@ mod tests {
             result_of(&state.acp_sign(&signed, "accepted").unwrap())["status"],
             "completed"
         );
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn commands_name_what_they_act_on_or_are_refused() {
-        let (state, dir, _) = state("malformed");
+        let (state, _dir, _) = state("malformed");
 
         for (tool, input) in [
             ("acp_cancel", json!({ "sessionId": "s1" })),
@@ -733,13 +719,11 @@ mod tests {
             assert!(prepared.command.is_none(), "{tool}");
             assert!(prepared.refusal.is_some(), "{tool}");
         }
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn an_option_change_names_a_session_a_value_and_optionally_an_option() {
-        let (state, dir, _) = state("set-config");
+        let (state, _dir, _) = state("set-config");
 
         for (input, option) in [
             (
@@ -793,13 +777,11 @@ mod tests {
 
         forged.signature = "0".repeat(64);
         assert!(state.acp_prepare(&forged).is_err());
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_cancel_keeps_the_queue_only_when_it_says_so() {
-        let (state, dir, _) = state("keep-queue");
+        let (state, _dir, _) = state("keep-queue");
 
         for (input, keep) in [
             (json!({ "sessionId": "s1", "turnId": "u1" }), false),
@@ -827,13 +809,11 @@ mod tests {
                 })
             );
         }
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_device_tool_or_a_call_for_another_device_is_not_a_command() {
-        let (state, dir, _) = state("not-a-command");
+        let (state, _dir, _) = state("not-a-command");
 
         assert!(state.acp_prepare(&call("fs_read", json!({}))).is_err());
 
@@ -856,13 +836,11 @@ mod tests {
                 json!({ "sessionId": "s1", "turnId": "u1" })
             ))
             .is_err());
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn an_unsigned_or_expired_command_is_refused() {
-        let (state, dir, _) = state("expired");
+        let (state, _dir, _) = state("expired");
         let mut forged = call("acp_cancel", json!({ "sessionId": "s1", "turnId": "u1" }));
 
         forged.signature = "0".repeat(64);
@@ -879,13 +857,11 @@ mod tests {
         );
 
         assert!(state.acp_prepare(&expired).is_err());
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn the_manifest_offers_labels_and_ids_never_a_path() {
-        let (state, dir, _) = state("offers");
+        let (state, _dir, _) = state("offers");
         let offers = state.acp_offers();
 
         assert_eq!(
@@ -895,15 +871,13 @@ mod tests {
             })]
         );
         assert!(!serde_json::to_string(&offers).unwrap().contains("/home/me"));
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_remote_answer_closes_the_local_prompt_and_a_second_one_is_already_answered() {
         use crate::acp_permission::{OfferedOption, PermissionRequest, ALREADY_ANSWERED};
 
-        let (state, dir, events) = state("remote-answer");
+        let (state, _dir, events) = state("remote-answer");
         let state = Arc::new(state);
         let waiting = Arc::clone(&state);
         let handle = std::thread::spawn(move || {
@@ -953,7 +927,5 @@ mod tests {
                 .unwrap_err(),
             ALREADY_ANSWERED
         );
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 }

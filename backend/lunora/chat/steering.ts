@@ -29,8 +29,11 @@ import { stripHiddenText } from "@neore/ai/utils";
 import { LunoraError, v } from "lunorash/server";
 
 import { internalMutation } from "../_generated/server";
+import { callerSessionMarks } from "../auth/lib/caller-session";
 import { insertSteerRow } from "../agent/steer-rows";
 import { authMutation, rateLimit } from "../lib/crpc";
+import { hasNotTypedMarks, mergeNotTypedMarks, notTypedMarksOfDraftFrom } from "../lib/not-typed-text";
+import { vDraftFrom, vNotTypedMarks } from "../lib/not-typed-text-validator";
 import { patchRow } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { queueSteer, type SteerEntry, takeQueuedSteers, withdrawQueuedSteer } from "./lib/steer-queue";
@@ -41,6 +44,8 @@ const isLive = (status: string): boolean => status === "pending" || status === "
 export const steerRun = authMutation
     .use(rateLimit("chat/steer"))
     .input({
+        /** The steer holds a composer draft the owner did not type (`lib/not-typed-text.ts`): it is delivered marked. */
+        draftFrom: v.optional(vDraftFrom),
         /**
          * The client's id for this steer. Sending the same id again queues nothing
          * more, so a call whose answer was lost can be reconciled instead of repeated.
@@ -53,7 +58,7 @@ export const steerRun = authMutation
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ steerId: v.string() }))
-    .mutation(async ({ args: { steerId: requestedId, streamId, text: rawText, threadId, unlockProof }, ctx }) => {
+    .mutation(async ({ args: { draftFrom, steerId: requestedId, streamId, text: rawText, threadId, unlockProof }, ctx }) => {
         const { userId } = ctx.user;
         // The composer strips these too; a client that skips it still sends text straight into a running reply.
         const text = stripHiddenText(rawText).text.trim();
@@ -95,13 +100,19 @@ export const steerRun = authMutation
         }
 
         const steerId = requestedId ?? ctx.newId();
-        const steers = queueSteer(stream.steers ?? [], { id: steerId, text });
+        // An admin acting as the owner, a sign-in not readable as theirs, or a browser extension's grant steers marked, as
+        // `/chat/start` saves their prompt (`callerSessionMarks`).
+        const notTyped = mergeNotTypedMarks(await callerSessionMarks(ctx), notTypedMarksOfDraftFrom(draftFrom));
+        const steers = queueSteer(stream.steers ?? [], { id: steerId, sentAt: ctx.now, text });
 
         if (!steers) {
             throw new LunoraError("TOO_MANY_REQUESTS", "Wait for the reply to take the messages already sent");
         }
 
-        await patchRow(ctx.db, "persistentStreams", stream, { steers });
+        await patchRow(ctx.db, "persistentStreams", stream, {
+            steers,
+            ...(hasNotTypedMarks(notTyped) && { notTypedSteers: [...(stream.notTypedSteers ?? []), { id: steerId, notTyped }] }),
+        });
 
         ctx.log.event("chat.steer_run", { queued: steers.filter((entry) => entry.status === "queued").length });
 
@@ -158,7 +169,18 @@ export const deliverSteers = internalMutation
         threadId: v.id("threads"),
         userId: v.string().max(MAX_LENGTH.id),
     })
-    .output(v.union(v.null(), v.object({ messageId: v.string(), text: v.string() })))
+    // `parts`: each steer taken, with when it was sent (now, for one queued before that was kept).
+    .output(
+        v.union(
+            v.null(),
+            v.object({
+                messageId: v.string(),
+                notTyped: v.optional(vNotTypedMarks),
+                parts: v.array(v.object({ sentAt: v.number(), text: v.string() })),
+                text: v.string(),
+            }),
+        ),
+    )
     .mutation(async ({ args: { pendingMessageId, streamId, threadId, userId }, ctx }) => {
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: streamId } });
 
@@ -180,7 +202,9 @@ export const deliverSteers = internalMutation
             return null;
         }
 
-        const row = await insertSteerRow(ctx, { pendingMessageId, text: taken.text, threadId, userId });
+        // One marked steer marks the one row they are all delivered as.
+        const notTyped = mergeNotTypedMarks(...(stream.notTypedSteers ?? []).filter((entry) => taken.ids.includes(entry.id)).map((entry) => entry.notTyped));
+        const row = await insertSteerRow(ctx, { notTyped, pendingMessageId, text: taken.text, threadId, userId });
 
         if (!row) {
             return null;
@@ -188,5 +212,12 @@ export const deliverSteers = internalMutation
 
         await patchRow(ctx.db, "persistentStreams", stream, { steers: taken.deliver(row.messageId, pendingMessageId) });
 
-        return { messageId: row.messageId, text: taken.text };
+        return {
+            messageId: row.messageId,
+            ...(hasNotTypedMarks(notTyped) && { notTyped }),
+            parts: taken.parts.map((part) => {
+                return { sentAt: part.sentAt ?? ctx.now, text: part.text };
+            }),
+            text: taken.text,
+        };
     });

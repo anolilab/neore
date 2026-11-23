@@ -55,11 +55,15 @@ export interface MCPToolDescriptor {
     annotations?: ToolAnnotationHints;
     /** The connector this tool came through, if any. */
     connectorSlug?: string;
+    /** Where the tool's calls go, a connector's included (`mcpToolOrigin`): unlike `url`, set for every server. */
+    endpoint: string;
     /**
      * What the tool was when listed (`mcp-tool-fingerprint.ts`): an approval continuation compares it with the server's current one.
      * Absent when it could not be hashed: a pause then does not pin the tool, and a continuation finding it absent does not run the call.
      */
     fingerprint?: string;
+    /** How the calls travel (`mcpToolOrigin`): the same address over another transport is another server. */
+    protocol: MCPServerConfig["protocol"];
     serverName: string;
     toolName: string;
     /** The saved server's address, for a server that is not a connector: two servers can share a name, so trust is keyed on the pair. */
@@ -344,6 +348,8 @@ export const getMCPTools = async (servers: MCPServerConfig[], { progress }: GetM
                     source: {
                         ...(annotations && { annotations }),
                         ...(server.connectorSlug && { connectorSlug: server.connectorSlug }),
+                        endpoint: server.url,
+                        protocol: server.protocol,
                         serverName: server.name,
                         toolName,
                         ...(!server.connectorSlug && { url: server.url }),

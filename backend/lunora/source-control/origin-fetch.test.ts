@@ -105,9 +105,21 @@ describe("createBoundRequester", () => {
     it("never sends the token to another host that a redirect names", async () => {
         const { seen, via } = transport((url) => (new URL(url).origin === ORIGIN ? redirect("https://evil.example/steal") : Response.json({})));
 
-        await expect(createBoundRequester({ origin: ORIGIN, token: "tkn", via })("/repos/o/r")).rejects.toMatchObject({ name: "HostApiError", status: 0 });
+        const hops: string[] = [];
+        // A spent budget throws its own error: the origin is judged first, so the refusal is the host's.
+        const beforeRedirect = () => {
+            hops.push("charged");
+
+            throw new Error("budget spent");
+        };
+
+        await expect(createBoundRequester({ origin: ORIGIN, token: "tkn", via })("/repos/o/r", { beforeRedirect })).rejects.toMatchObject({
+            name: "HostApiError",
+            status: 0,
+        });
 
         expect(seen.map((entry) => entry.url)).toEqual(["https://api.github.com/repos/o/r"]);
+        expect(hops).toEqual([]);
     });
 
     it.each([

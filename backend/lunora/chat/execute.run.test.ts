@@ -33,15 +33,25 @@ const { autoState, groupState, modelState, prefsState, registry, skillState, too
         autoState: { plans: [] as unknown[], requests: 0 },
         /** What `getGroupRunConfig` answers, and how often it was asked. */
         groupState: { calls: 0, config: null as unknown },
-        /** The model `getAgent` hands out; `builtAgents` counts the runs that got as far as generating. */
-        modelState: { builtAgents: 0, model: undefined as unknown },
+        /** The model `getAgent` hands out; `builtAgents` counts the runs that got as far as generating, `tools` names the last one's tools. */
+        modelState: { builtAgents: 0, model: undefined as unknown, tools: [] as string[] },
         /** Whether the agent-module preference read reports a failure. */
         prefsState: { readFailed: false },
         registry: new Map<string, unknown>(),
         /** What `resolveSkillsForRun` is asked, and its answer. */
         skillState: { answer: undefined as unknown, calls: [] as { skillSlug?: string }[] },
         /** Whether the model may use tools, and the options `buildAgentTools` was last given. */
-        toolsState: { allowTools: false, options: undefined as { untrustedContext?: Promise<boolean> | boolean } | undefined },
+        /**
+         * Whether the model may use tools, and the options `buildAgentTools` was last given.
+         * `removesInstructionRead`: the tools' own gates (the cap, a bot's selection, the permissions) removed it.
+         */
+        toolsState: {
+            allowTools: false,
+            /** The action ctx the tools were built with: the tools get it as their `ToolCtx`. */
+            ctx: undefined as { runTurn?: unknown } | undefined,
+            options: undefined as { untrustedContext?: Promise<boolean> | boolean } | undefined,
+            removesInstructionRead: false,
+        },
     };
 });
 
@@ -65,17 +75,24 @@ vi.mock("../usage/schedule", async (importOriginal) => {
 });
 
 vi.mock("./lib/agent-run", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("./lib/agent-run")>();
+
     return {
-        ...(await importOriginal<typeof import("./lib/agent-run")>()),
+        ...actual,
+        // Passed through; watched for the snapshot a pause would record.
+        finishRun: vi.fn(actual.finishRun),
         loadRunContext: vi.fn(async () => {
             return {
                 botId: undefined,
                 contextParts: [],
+                contextPartsWithoutInstructions: [],
                 knowledgeSources: [],
                 memoryEnabled: false,
                 prefs: { language: undefined, location: undefined, personalization: undefined, timezone: "Europe/Berlin" },
+                projectInstructions: [],
                 researchDepth: "balanced",
                 retrievedMemories: [],
+                systemContext: ["instructions"],
                 threadSettings: null,
                 untrustedContext: false,
                 userProviderKeys: undefined,
@@ -109,11 +126,18 @@ vi.mock("./lib/auto-model", async (importOriginal) => {
 vi.mock("./lib/agent-tools", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("./lib/agent-tools")>()),
-        buildAgentTools: vi.fn(async (_ctx: unknown, options: { untrustedContext?: Promise<boolean> | boolean }) => {
-            toolsState.options = options;
+        buildAgentTools: vi.fn(
+            async (ctx: { runTurn?: unknown }, options: { instructions?: Promise<ReadonlyArray<unknown>>; untrustedContext?: Promise<boolean> | boolean }) => {
+                toolsState.ctx = ctx;
+                toolsState.options = options;
 
-            return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} };
-        }),
+                // Offered as a candidate, kept unless the gates remove it (`agent-tools.bot-selection.test.ts`).
+                const listed = (await options.instructions) ?? [];
+                const tools = listed.length > 0 && !toolsState.removesInstructionRead ? { instruction_read: { description: "read", inputSchema: {} } } : {};
+
+                return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, repeatable: [], tools };
+            },
+        ),
     };
 });
 
@@ -123,8 +147,9 @@ vi.mock("./group/run", async (importOriginal) => {
 
 vi.mock("./lib/get-agent", () => {
     return {
-        default: async (model: string, options: { maxSteps?: number }) => {
+        default: async (model: string, options: { maxSteps?: number; tools?: Record<string, unknown> }) => {
             modelState.builtAgents += 1;
+            modelState.tools = Object.keys(options.tools ?? {});
 
             // Imported at call time: the agent client and `agent/messages` import each other.
             const { Agent } = await import("../agent/client");
@@ -143,6 +168,7 @@ vi.mock("./lib/get-agent", () => {
 const { scheduleReplyUsage } = await import("../usage/schedule");
 const { runGroupTurn } = await import("./group/run");
 const { runStreamingAgent } = await import("./execute");
+const { finishRun, loadRunContext } = await import("./lib/agent-run");
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -222,7 +248,9 @@ beforeEach(async () => {
     skillState.calls = [];
     skillState.answer = { enabledSkills: [], invocation: null };
     toolsState.allowTools = false;
+    toolsState.ctx = undefined;
     toolsState.options = undefined;
+    toolsState.removesInstructionRead = false;
 
     harness = lunoraTest(schema as never);
 
@@ -255,7 +283,9 @@ afterEach(() => {
     harness.close();
 });
 
-const run = async (extra: { model?: string; organizationId?: string; skill?: { rawArgs: string; slug: string }; userPrompt?: string } = {}) => {
+const run = async (
+    extra: { impersonated?: boolean; model?: string; organizationId?: string; skill?: { rawArgs: string; slug: string }; userPrompt?: string } = {},
+) => {
     const { model = "test-model", ...rest } = extra;
 
     return await harness.action(
@@ -316,6 +346,112 @@ describe("runStreamingAgent: a successful turn", () => {
         expect(usageArgs).toMatchObject({ date: expect.stringMatching(ISO_DATE), replyKey: expect.any(String), tokens: 8, userId: OWNER });
         // A plain turn has no invoked skill, so the usage page files it under the assistant.
         expect(usageArgs).not.toHaveProperty("skillName");
+    });
+});
+
+describe("runStreamingAgent: the turn its tools see", () => {
+    it.each([false, true])(
+        "hands the tools the turn as /chat/start recorded it (impersonated: %s), its prompt and its system prompt's kinds",
+        async (impersonated) => {
+            toolsState.allowTools = true;
+
+            await run({ impersonated });
+
+            expect(toolsState.ctx?.runTurn).toStrictEqual({
+                impersonated,
+                promptMessageId: ids.messageId,
+                systemContext: expect.arrayContaining(["instructions"]),
+            });
+        },
+    );
+
+    it("hands them no turn when the job does not say whether an admin sent it, which refuses a saved login", async () => {
+        toolsState.allowTools = true;
+
+        await run();
+
+        expect(toolsState.ctx).toBeDefined();
+        expect(toolsState.ctx?.runTurn).toBeUndefined();
+    });
+});
+
+describe("runStreamingAgent: a project's rule files read when needed", () => {
+    const instructions = [{ content: "Run the script.", description: "How to deploy", id: "d", title: "Deploy" }];
+
+    /** The run's context with the project's `auto` files, as `loadRunContext` reads them. */
+    const withInstructions = (threadSettings: { projectId: string } | null = null) => {
+        vi.mocked(loadRunContext).mockResolvedValueOnce({
+            botId: undefined,
+            contextParts: ["PROJECT CONTEXT:\nBe brief."],
+            // Chosen without the list's cost: a later file the list left no room for.
+            contextPartsWithoutInstructions: ["PROJECT CONTEXT:\nBe brief.\n\nAlso this."],
+            knowledgeSources: [],
+            memoryEnabled: false,
+            prefs: { language: undefined, location: undefined, personalization: undefined, timezone: "Europe/Berlin" },
+            projectInstructions: instructions,
+            researchDepth: "balanced",
+            retrievedMemories: [],
+            systemContext: ["instructions"],
+            threadSettings,
+            untrustedContext: true,
+            userProviderKeys: undefined,
+        } as never);
+    };
+
+    /** The tools the run's agent was built with, and the system prompt the model was called with. */
+    const firstCall = () => {
+        const [call] = (modelState.model as MockLanguageModelV3).doStreamCalls;
+        const system = call?.prompt.find((message) => message.role === "system");
+
+        return { system: typeof system?.content === "string" ? system.content : "", tools: modelState.tools };
+    };
+
+    it("lists them after the project's context and offers instruction_read over them", async () => {
+        toolsState.allowTools = true;
+        withInstructions();
+
+        await run();
+
+        const { system, tools } = firstCall();
+
+        expect(tools).toContain("instruction_read");
+        expect(system).toContain("PROJECT CONTEXT:\nBe brief.\n\nInstruction files you can read with the instruction_read tool");
+        expect(system).toContain("- Deploy (id: d): How to deploy");
+        expect(system).not.toContain("Run the script.");
+    });
+
+    it("names the project they came from in the snapshot a pause records, so its continuation reads that one's", async () => {
+        toolsState.allowTools = true;
+        withInstructions({ projectId: "project-a" });
+
+        await run();
+
+        expect(vi.mocked(finishRun).mock.calls.at(-1)?.[1].snapshot).toMatchObject({ projectId: "project-a" });
+    });
+
+    it("neither lists them nor gives up their room once the tools' own gates removed instruction_read", async () => {
+        toolsState.allowTools = true;
+        toolsState.removesInstructionRead = true;
+        withInstructions();
+
+        await run();
+
+        const { system, tools } = firstCall();
+
+        expect(tools).not.toContain("instruction_read");
+        expect(system).not.toContain("instruction_read");
+        expect(system).toContain("PROJECT CONTEXT:\nBe brief.\n\nAlso this.");
+    });
+
+    it("neither lists nor offers them to a model that takes no tools", async () => {
+        withInstructions();
+
+        await run();
+
+        const { system, tools } = firstCall();
+
+        expect(tools).not.toContain("instruction_read");
+        expect(system).not.toContain("instruction_read");
     });
 });
 

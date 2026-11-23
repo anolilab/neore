@@ -30,8 +30,10 @@ if [ -s "$code" ]; then
     xargs -0 pnpm exec oxfmt --check --no-error-on-unmatched-pattern -- <"$code" || exit 1
 fi
 if [ -s "$docs" ]; then
-    # Prettier skips a file named on the command line when .prettierignore lists it.
-    xargs -0 pnpm exec prettier --config=.prettierrc.cjs --check -- <"$docs" || exit 1
+    # Prettier skips a file named on the command line when .prettierignore lists it, and,
+    # with --no-error-on-unmatched-pattern, a symlink (a CLAUDE.md -> AGENTS.md link)
+    # instead of failing on it.
+    xargs -0 pnpm exec prettier --config=.prettierrc.cjs --check --no-error-on-unmatched-pattern -- <"$docs" || exit 1
 fi
 
 # Type check of the projects affected since the same base, with `tsrs` (TS 7.1

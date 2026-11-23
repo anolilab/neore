@@ -348,7 +348,7 @@ describe("/chat/start organization", () => {
             },
             runQuery: async (reference: { __lunoraRef: string }, args: any) => {
                 if (reference.__lunoraRef === "auth_session_organization:getSessionOrganizationForCap") {
-                    sessionsRead.push(args.sessionId);
+                    sessionsRead.push(args.viaGrant === true ? `grant:${args.sessionId}` : args.sessionId);
 
                     if (failSession) {
                         throw new Error("session read failed");
@@ -383,7 +383,8 @@ describe("/chat/start organization", () => {
         const response = await runChatStart(context, { model: A, prompt: "hi" } as never, "secret");
 
         expect(response.status).toBe(200);
-        expect(context.sessionsRead).toStrictEqual(["grant-session-1"]);
+        // Read as a grant: its session row must name one of the owner's own apps (`auth/lib/sign-in-standing.ts`).
+        expect(context.sessionsRead).toStrictEqual(["grant:grant-session-1"]);
         expect(createdThreads).toMatchObject([{ organizationId: "org-1" }]);
     });
 

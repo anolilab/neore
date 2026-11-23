@@ -2,7 +2,7 @@
  * Project operations.
  * Migrated from `@neore/backend-agent` component.
  */
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, type MutationCtx, type QueryCtx } from "../_generated/server";
@@ -24,7 +24,11 @@ import { admitOrganization } from "../lib/rls/scope";
 import { countedWorkflowFileIds } from "../workflow/images";
 import { changeRefcount } from "./files";
 import { listThreadItem } from "./threads";
-import { eraseProjectRepositories } from "../projects/gdpr";
+import { eraseProjectRepositories, eraseProjectRuleFiles, markProjectRuleFilesErasing } from "../projects/gdpr";
+import { mayEditProject } from "../projects/edit-access";
+import { forViewer } from "../projects/machine-location";
+import type { SubAgentRoles } from "../sub-agents/roles";
+import { storedRow } from "../lib/stored-row";
 
 /**
  * A workflow keeps its images and reference media as chat-file references
@@ -47,6 +51,11 @@ export const publicProject = (project: Doc<"projects">): ProjectDocument =>
     // Safe cast: optional fields are never null at runtime (only undefined).
     // The column builders generate null|T types in TypeScript only.
     project as unknown as ProjectDocument;
+
+/** Writes a project's sub-agent role overrides; the caller checked it may (`projects/functions.ts:setProjectSubAgentRole`). */
+export const writeProjectSubAgentRoles = async (db: MutationCtx["db"], project: Doc<"projects">, subAgentRoles: SubAgentRoles, now: number): Promise<void> => {
+    await patchRow(db, "projects", project, { subAgentRoles, updatedAt: now });
+};
 
 export const getProject = query
     .input({ projectId: v.id("projects") })
@@ -136,7 +145,7 @@ export const listProjectsHandler = async (
     return {
         continueCursor: projects.continueCursor,
         isDone: projects.isDone,
-        page: (projects.page as unknown as Doc<"projects">[]).map((item) => publicProject(item)),
+        page: (projects.page as unknown as Doc<"projects">[]).map((item) => publicProject(forViewer(item, identity.userId))),
     };
 };
 
@@ -168,7 +177,7 @@ export const listPinnedProjectsHandler = async (ctx: QueryCtx, args: { organizat
         });
         const pinned = projects.filter((p) => p.pinnedAt !== undefined).toSorted((a, b) => (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0));
 
-        return pinned.map((item) => publicProject(item));
+        return pinned.map((item) => publicProject(forViewer(item, identity.userId)));
     }
 
     // Membership, not just an org id: see `listProjects`.
@@ -182,7 +191,7 @@ export const listPinnedProjectsHandler = async (ctx: QueryCtx, args: { organizat
         });
         const pinned = allProjects.filter((p) => p.pinnedAt !== undefined).toSorted((a, b) => (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0));
 
-        return pinned.map((item) => publicProject(item));
+        return pinned.map((item) => publicProject(forViewer(item, identity.userId)));
     }
 
     return [];
@@ -244,12 +253,22 @@ export const updateProject = internalMutation
     .input({
         patch: v.object({ ...vProjectPatchFields }),
         projectId: v.id("projects"),
+        /**
+         * When set, the user the change is made for: refused (NOT_FOUND) unless they still own the project in this
+         * transaction, so a change checked in an earlier one cannot land after the project changed hands.
+         */
+        settingsEditorId: v.optional(v.string()),
     })
     .output(v.from(vProjectDocument))
     .mutation(async ({ args, ctx }) => {
-        const project = await ctx.db.projects.findFirst({ where: { _id: args.projectId } });
+        const project = storedRow(await ctx.db.projects.findFirst({ consistency: "primary", where: { _id: args.projectId } }));
 
         assert(project, `Project ${args.projectId} not found`);
+
+        if (args.settingsEditorId !== undefined && !mayEditProject(project, args.settingsEditorId)) {
+            throw new LunoraError("NOT_FOUND", "Project not found");
+        }
+
         // Absent keys stay as they are; an empty colour or icon is the client's
         // way of saying "remove it", which `patchRow` does for an `undefined`.
         const changes: Record<string, unknown> = { ...withoutUndefined(args.patch), updatedAt: ctx.now };
@@ -262,7 +281,12 @@ export const updateProject = internalMutation
 
         // A project that changes organization leaves its personal runner behind: on the row it would show to the organization's
         // members, and it would come back if the project moved back. An organization's default lives on each starter's settings.
-        if (args.patch.organizationId !== undefined && (args.patch.organizationId || undefined) !== (project.organizationId || undefined)) {
+        // Only when it has one: clearing a column replaces the whole row, which could carry back a value another write set since.
+        if (
+            project.runnerKind !== undefined &&
+            args.patch.organizationId !== undefined &&
+            (args.patch.organizationId || undefined) !== (project.organizationId || undefined)
+        ) {
             Object.assign(changes, { runnerAgentKey: undefined, runnerDeviceId: undefined, runnerFolderId: undefined, runnerKind: undefined });
         }
 
@@ -286,7 +310,7 @@ export const deleteProject = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const project = await ctx.db.projects.findFirst({ where: { _id: args.projectId } });
+        const project = storedRow(await ctx.db.projects.findFirst({ where: { _id: args.projectId } }));
 
         assert(project, `Project ${args.projectId} not found`);
 
@@ -308,10 +332,15 @@ export const deleteProject = internalMutation
             });
         }
 
-        // Its repositories go last before the row, so a check or thread move that fails above leaves both in place. The
+        // Its repositories go last before the row, so a check or thread move that fails above leaves them in place. The
         // delete's marker stays until the caller is done (`projects/functions.ts#deleteProject`).
         await eraseProjectRepositories(ctx, args.projectId, { keepMarker: true });
+        // Its rule files only once the row is gone: a `.global()` write does not roll back, so a delete that failed in
+        // between would leave a live project without its instructions. Marked first, so a sweep finishes an erase that
+        // fails after the row went (`sweepUnfinishedRuleFileErasures`). Nothing reads them without the project.
+        await markProjectRuleFilesErasing(ctx, args.projectId);
         await ctx.db.delete("projects", args.projectId);
+        await eraseProjectRuleFiles(ctx, args.projectId);
         await recountWorkflowImages(ctx, project.userId, project.workflowContent, undefined);
 
         return null;

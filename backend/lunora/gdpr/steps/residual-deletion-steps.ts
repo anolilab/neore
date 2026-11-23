@@ -385,9 +385,9 @@ export const deleteUserIntegrations = internalMutation
  * Workflow-builder data. By `userId` for what the user did anywhere, and by
  * project for everything attached to projects the user owns — including other
  * people's presence rows, which point at a project that is about to vanish.
- * Runs BEFORE `deleteUserProjects`, which only removes the project rows.
- * Executions and project knowledge are erased by their owners
- * (`agent/gdpr.ts`, `knowledge/gdpr.ts`).
+ * Runs BEFORE `deleteUserProjects`, which removes the project rows and then their rule files.
+ * Executions, project knowledge and repositories are erased by their owners
+ * (`agent/gdpr.ts`, `knowledge/gdpr.ts`, `projects/gdpr.ts`).
  */
 export const deleteUserWorkflowData = internalMutation
     .input({ userId: v.string() })
@@ -401,7 +401,9 @@ export const deleteUserWorkflowData = internalMutation
 
         hasMore ||= userVersions.hasMore;
 
-        // Repository rows by owner: also one whose project is already gone (a project delete that failed part way).
+        // Repository rows by owner: also one whose project is already gone (a project delete that failed part way). Not
+        // the rule files: `deleteUserProjects` erases them once the projects are gone, so a deletion stopped between the
+        // two steps leaves no live project without its rules.
         const ownRepositories = await eraseProjectRepositoriesForUser(context, userId);
 
         hasMore ||= ownRepositories.hasMore;

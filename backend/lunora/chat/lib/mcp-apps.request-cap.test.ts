@@ -97,7 +97,7 @@ describe("MCP App proxy cap read from the request", () => {
         expect(response.status).toBe(403);
         await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("organization's tool policy") });
         expect(reads).toStrictEqual([
-            { args: { sessionId: "session-1", userId: "alice" }, name: "session" },
+            { args: { sessionId: "session-1", userId: "alice", viaGrant: false }, name: "session" },
             { args: { organizationId: "org-a" }, name: "policy" },
         ]);
         expect(state.connects).toBe(0);
@@ -109,7 +109,7 @@ describe("MCP App proxy cap read from the request", () => {
 
         expect(response.status).toBe(403);
         expect(reads).toStrictEqual([
-            { args: { sessionId: "grant-1", userId: "alice" }, name: "session" },
+            { args: { sessionId: "grant-1", userId: "alice", viaGrant: true }, name: "session" },
             { args: { organizationId: "org-a" }, name: "policy" },
         ]);
     });
@@ -122,6 +122,6 @@ describe("MCP App proxy cap read from the request", () => {
 
         // Past the cap the server is looked up, and this one is not configured.
         expect(response.status).toBe(404);
-        expect(reads).toStrictEqual([{ args: { sessionId: "session-1", userId: "alice" }, name: "session" }]);
+        expect(reads).toStrictEqual([{ args: { sessionId: "session-1", userId: "alice", viaGrant: false }, name: "session" }]);
     });
 });

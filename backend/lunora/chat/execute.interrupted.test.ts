@@ -103,6 +103,7 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
             return {
                 botId: undefined,
                 contextParts: [],
+                contextPartsWithoutInstructions: [],
                 knowledgeSources: [],
                 memoryEnabled: modelState.memory,
                 prefs: {
@@ -111,8 +112,10 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
                     personalization: undefined,
                     timezone: "Europe/Berlin",
                 },
+                projectInstructions: [],
                 researchDepth: "balanced",
                 retrievedMemories: [],
+                systemContext: ["instructions"],
                 threadSettings: modelState.threadStateless ? { statelessMode: true } : null,
                 userProviderKeys: undefined,
             };
@@ -915,6 +918,36 @@ describe("a run the watchdog reads wrongly", () => {
         expect(afterRun).toHaveBeenCalledOnce();
     });
 
+    it("quotes nothing of a recovered prompt an outside agent wrote", async () => {
+        modelState.memory = true;
+        await dieAfterSavingFinalRow([{ text: "All done.", type: "text" }]);
+        const stream = await readStream();
+
+        await patchStream({ runArgs: { ...stream.runArgs, origin: "outside_agent" } });
+        await harness.action(async (ctx: any) => await ctx.runAction(watchRun, { streamId: ids.streamId as never }));
+
+        expect(afterRun).toHaveBeenCalledOnce();
+
+        const [, args] = vi.mocked(afterRun).mock.calls[0]!;
+
+        expect(args.quotablePrompt).toBeUndefined();
+        expect(args.promptMessageId).toBeUndefined();
+    });
+
+    it("quotes nothing of a recovered prompt someone else typed", async () => {
+        modelState.memory = true;
+        await dieAfterSavingFinalRow([{ text: "All done.", type: "text" }]);
+        await harness.run(async (ctx: any) => await ctx.db.patch("messages", ids.messageId, { userId: "collaborator-1" }));
+        await harness.action(async (ctx: any) => await ctx.runAction(watchRun, { streamId: ids.streamId as never }));
+
+        expect(afterRun).toHaveBeenCalledOnce();
+
+        const [, args] = vi.mocked(afterRun).mock.calls[0]!;
+
+        expect(args.quotablePrompt).toBeUndefined();
+        expect(args.promptMessageId).toBeUndefined();
+    });
+
     it("runs the after-run work of a resumed reply once, for the whole reply, and stamps the resume's own rows", async () => {
         modelState.memory = true;
         modelState.mcpLabels = { echo: { serverName: "srv", toolName: "echo" } };
@@ -1549,5 +1582,26 @@ describe("a run whose model call is aborted", () => {
 
         expect(rows.some((row) => row.status === "pending")).toBe(false);
         expect(rows.some((row) => row.role === "assistant" && row.status === "failed")).toBe(true);
+    });
+});
+
+describe("a run in a chat without memory", () => {
+    it("saves its prompt again with the marks of the saved one, so text the owner did not type stays marked", async () => {
+        const marked = [{ providerOptions: { neore: { notTyped: { draft: "promptLink" } } }, text: "Say hello", type: "text" }];
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("messages", ids.messageId as never, { message: { content: marked, role: "user" } }));
+        modelState.threadStateless = true;
+        await run();
+
+        const copies = await harness.run(async (ctx: any) => {
+            const rows = await ctx.db
+                .query("messages")
+                .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", ids.threadId))
+                .collect();
+
+            return rows.filter((row: any) => row.message?.role === "user" && String(row._id) !== ids.messageId).map((row: any) => row.message.content);
+        });
+
+        expect(copies).toStrictEqual([marked]);
     });
 });

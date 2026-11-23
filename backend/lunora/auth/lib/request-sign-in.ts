@@ -12,3 +12,7 @@ export const requestSignIn = (identity: Record<string, unknown> | null | undefin
 
     return typeof identity?.grantSessionId === "string" ? identity.grantSessionId : undefined;
 };
+
+/** Whether {@link requestSignIn} names an app's grant (`gsid`) rather than a web session: its app must then be told (`sign-in-standing.ts`). */
+export const requestSignInIsGrant = (identity: Record<string, unknown> | null | undefined): boolean =>
+    typeof identity?.sessionId !== "string" && typeof identity?.grantSessionId === "string";

@@ -224,6 +224,7 @@ const AccountSettings: FC = () => {
                             <SelectContent>
                                 <SelectItem value="enter">{t`Press Enter to send`}</SelectItem>
                                 <SelectItem value="shiftEnter">{t`Press Shift+Enter to send`}</SelectItem>
+                                <SelectItem value="modEnter">{t`Press Ctrl/Cmd+Enter to send`}</SelectItem>
                                 <SelectItem value="button">{t`Click button to send`}</SelectItem>
                             </SelectContent>
                         </Select>

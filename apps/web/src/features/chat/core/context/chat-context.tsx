@@ -22,6 +22,7 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
+import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
@@ -678,6 +679,8 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     // regenerate) asks them to sign in instead. A send keeps its draft and is held for after sign-in. Here rather than
     // in the composer, which the landing page also renders over a provider that sends nothing.
     const { mustSignIn } = useInviteOnly();
+    // An admin acting as the owner: the owner's pinned goal is not applied to their sends (`pinnedGoalAllowed`).
+    const impersonating = useImpersonating();
 
     const sendMessage = useCallback(
         async (text: string, attachments?: PendingAttachment[], options?: SendMessageOptions): Promise<SendOutcome> => {
@@ -699,10 +702,12 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                     isMountedRef,
                     kickOffMedia,
                     localTarget,
+                    lunora,
                     messagesRef,
                     model,
                     navigate,
                     newChatsTemporary,
+                    pinnedGoalAllowed: !impersonating,
                     queryClient,
                     refetchSession,
                     sendLocalTurn,
@@ -738,11 +743,13 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             );
         },
         [
+            impersonating,
             mustSignIn,
             authGate,
             threadId,
             model,
             authHeader,
+            lunora,
             navigate,
             queryClient,
             refetchSession,

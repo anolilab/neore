@@ -496,10 +496,10 @@ fn parent_from_stat(stat: &[u8]) -> Option<(u32, bool)> {
     Some((parent, !matches!(state, "Z" | "X")))
 }
 
-/// Kills `pid` if its parent is still `parent`. Through a pidfd where there is one, so the check and the signal name the
-/// same process even if `pid` is reused in between.
+/// Sends `signal` to `pid` if its parent is still `parent`. Through a pidfd where there is one, so the check and the signal name
+/// the same process even if `pid` is reused in between.
 #[cfg(target_os = "linux")]
-fn kill_child_of(pid: u32, parent: u32) {
+fn signal_child_of(pid: u32, parent: u32, signal: libc::c_int) {
     // SAFETY: plain syscalls with integer arguments and a null `siginfo`; the descriptor is closed once.
     unsafe {
         let fd = libc::syscall(libc::SYS_pidfd_open, pid as libc::pid_t, 0) as libc::c_int;
@@ -507,7 +507,7 @@ fn kill_child_of(pid: u32, parent: u32) {
 
         if fd < 0 {
             if still {
-                libc::kill(pid as libc::pid_t, libc::SIGKILL);
+                libc::kill(pid as libc::pid_t, signal);
             }
 
             return;
@@ -517,7 +517,7 @@ fn kill_child_of(pid: u32, parent: u32) {
             libc::syscall(
                 libc::SYS_pidfd_send_signal,
                 fd,
-                libc::SIGKILL,
+                signal,
                 std::ptr::null::<libc::siginfo_t>(),
                 0,
             );
@@ -577,15 +577,15 @@ fn process_parent(pid: u32) -> Option<(u32, bool)> {
     (read == size).then_some((info.pbsi_ppid, info.pbsi_status != libc::SZOMB))
 }
 
-/// Kills `pid` if its parent is still `parent`. macOS has no pidfd, so the check and the signal name `pid`, not a
+/// Sends `signal` to `pid` if its parent is still `parent`. macOS has no pidfd, so the check and the signal name `pid`, not a
 /// process: one that exits and whose pid is taken by a new process of the same parent between the two would be hit.
 /// An accepted risk: the window is two syscalls, and the parent is a stopped process of the run.
 #[cfg(target_os = "macos")]
-fn kill_child_of(pid: u32, parent: u32) {
+fn signal_child_of(pid: u32, parent: u32, signal: libc::c_int) {
     if process_parent(pid).is_some_and(|(now, _)| now == parent) {
         // SAFETY: a plain syscall with integer arguments.
         unsafe {
-            libc::kill(pid as libc::pid_t, libc::SIGKILL);
+            libc::kill(pid as libc::pid_t, signal);
         }
     }
 }
@@ -611,12 +611,22 @@ fn kill_descendants(root: u32) {
             .map(|&(pid, _, _)| pid)
             .collect();
         let mut found = false;
+        let tree = descendants_of(root, &pairs);
+
+        // Every process in the tree is stopped before any is killed. Killing a child first lets its parent run on until its own
+        // kill lands, and a parent that does so can still act: a shell whose `sleep` was killed runs its next command. A stopped
+        // process runs nothing, and its parent cannot exit to re-parent it while it is stopped, so the parent check still holds.
+        for &(pid, parent) in &tree {
+            if !dead.contains(&pid) {
+                signal_child_of(pid, parent, libc::SIGSTOP);
+            }
+        }
 
         // Children before their parents: a parent killed first re-parents its child, and the parent check then refuses it.
-        for (pid, parent) in descendants_of(root, &pairs).into_iter().rev() {
+        for (pid, parent) in tree.into_iter().rev() {
             // By parent too: one re-parented after a walk found it was not signalled, and is tried again under its new parent.
             if !dead.contains(&pid) && signalled.insert((pid, parent)) {
-                kill_child_of(pid, parent);
+                signal_child_of(pid, parent, libc::SIGKILL);
                 found = true;
             }
         }
@@ -1178,6 +1188,7 @@ pub fn end_now<'a>(terminals: impl IntoIterator<Item = &'a Terminal>, limit: Dur
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+    use crate::test_dir::TestDir;
 
     #[allow(dead_code)]
     fn tier(network: bool) -> NetworkTier {
@@ -1312,9 +1323,8 @@ mod tests {
 
     /// A shared folder and a folder next to it, both under a fresh temp dir.
     #[cfg(any(target_os = "linux", target_os = "macos"))]
-    fn folders(name: &str) -> (PathBuf, PathBuf) {
-        let base =
-            std::env::temp_dir().join(format!("neore-sandbox-{name}-{}", std::process::id()));
+    fn folders(name: &str) -> (TestDir, PathBuf, PathBuf) {
+        let base = TestDir::new(&format!("sandbox-{name}"));
         let shared = base.join("shared");
         let outside = base.join("outside");
 
@@ -1323,6 +1333,7 @@ mod tests {
         std::fs::write(outside.join("secret.txt"), "TOP-SECRET-CONTENT").unwrap();
 
         (
+            base,
             std::fs::canonicalize(shared).unwrap(),
             std::fs::canonicalize(outside).unwrap(),
         )
@@ -1363,7 +1374,7 @@ mod tests {
             return;
         }
 
-        let (shared, outside) = folders("write");
+        let (_base, shared, outside) = folders("write");
         let policy = Policy::for_roots(std::slice::from_ref(&shared), None);
         let result = run(
             &format!(
@@ -1403,8 +1414,6 @@ mod tests {
         );
         assert!(shared.join("inside.txt").exists());
         assert!(!outside.join("escaped.txt").exists());
-
-        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
     }
 
     /// The seccomp network filter reaches the real child, and only when the
@@ -1417,7 +1426,7 @@ mod tests {
             return;
         }
 
-        let (shared, _outside) = folders("seccomp");
+        let (_base, shared, _outside) = folders("seccomp");
         let filters = |network: bool| {
             let policy = Policy {
                 network: tier(network),
@@ -1442,8 +1451,6 @@ mod tests {
         };
 
         assert_eq!(filters(false), filters(true) + 1);
-
-        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
     }
 
     /// A shell that opens a TCP connection to a local listener: refused with
@@ -1458,7 +1465,7 @@ mod tests {
             return;
         };
 
-        let (shared, _outside) = folders("connect");
+        let (_base, shared, _outside) = folders("connect");
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let line = format!(
             "{bash} -c 'exec 3<>/dev/tcp/127.0.0.1/{}' && echo connected || echo refused",
@@ -1477,8 +1484,6 @@ mod tests {
 
         assert!(outcome(false).contains("refused"));
         assert!(outcome(true).contains("connected"));
-
-        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
     }
 
     /// A connected socket the parent leaves inheritable is closed in the child,
@@ -1494,7 +1499,7 @@ mod tests {
             return;
         };
 
-        let (shared, _outside) = folders("inherited");
+        let (_base, shared, _outside) = folders("inherited");
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let client = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
         let fd = client.as_raw_fd();
@@ -1522,8 +1527,6 @@ mod tests {
                 "network: {network}"
             );
         }
-
-        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
     }
 
     /// The descriptor sweep must leave the close-on-exec pipe `std` reports an
@@ -1535,15 +1538,13 @@ mod tests {
             return;
         }
 
-        let (shared, _outside) = folders("exec-error");
+        let (_base, shared, _outside) = folders("exec-error");
         let policy = Policy::for_roots(std::slice::from_ref(&shared), None);
         let mut command = Command::new("/nonexistent/neore-program");
         let _guard = super::super::sandbox::confine(&mut command, &policy).unwrap();
         let error = command.spawn().unwrap_err();
 
         assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
-
-        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
     }
 
     /// A sandboxed command inherits only the allowlisted environment, so a
@@ -1555,7 +1556,7 @@ mod tests {
             return;
         }
 
-        let (shared, _outside) = folders("env");
+        let (_base, shared, _outside) = folders("env");
         let policy = Policy::for_roots(std::slice::from_ref(&shared), None);
 
         std::env::set_var("NEORE_TEST_IPC_SOCKET", "/tmp/not-for-the-sandbox");
@@ -1571,8 +1572,6 @@ mod tests {
 
         assert!(result.output.contains("ipc=absent"), "{}", result.output);
         assert!(result.output.contains("path=set"), "{}", result.output);
-
-        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
     }
 
     /// The macOS escape routes are denied inside the sandbox. The control run,
@@ -1584,7 +1583,7 @@ mod tests {
             return;
         }
 
-        let (shared, _outside) = folders("exec");
+        let (_base, shared, _outside) = folders("exec");
         let policy = Policy::for_roots(std::slice::from_ref(&shared), None);
         let line = "/usr/bin/osascript -e 'return 1' >/dev/null 2>&1; echo osa=$?; \
                     /usr/bin/open -g -a Finder >/dev/null 2>&1; echo open=$?; \
@@ -1597,8 +1596,6 @@ mod tests {
         assert!(!sandboxed.output.contains("osa=0"), "{}", sandboxed.output);
         assert!(!sandboxed.output.contains("open=0"), "{}", sandboxed.output);
         assert!(!sandboxed.output.contains("lctl=0"), "{}", sandboxed.output);
-
-        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
     }
 
     // Only macOS enforces the network setting (see `sandbox.rs`).
@@ -1615,7 +1612,7 @@ mod tests {
             "exec 3<>/dev/tcp/127.0.0.1/{} && echo CONNECTED",
             listener.local_addr().unwrap().port()
         );
-        let (shared, _) = folders("network");
+        let (_base, shared, _) = folders("network");
         let blocked = Policy::for_roots(std::slice::from_ref(&shared), None);
         let allowed = Policy {
             network: NetworkTier::On,
@@ -1647,7 +1644,7 @@ mod tests {
         }
 
         // Stands in for $HOME: a folder the policy names as home but does not share.
-        let (shared, fake_home) = folders("home");
+        let (_base, shared, fake_home) = folders("home");
         let policy = Policy::for_roots(std::slice::from_ref(&shared), Some(&fake_home));
         let result = run(
             &format!(
@@ -1667,8 +1664,6 @@ mod tests {
             "{}",
             result.output
         );
-
-        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
     }
 
     #[test]
@@ -1738,14 +1733,15 @@ mod tests {
     }
 
     #[cfg(any(target_os = "linux", target_os = "macos"))]
-    fn terminal_policy(name: &str) -> Option<(Policy, PathBuf, PathBuf)> {
+    fn terminal_policy(name: &str) -> Option<(TestDir, Policy, PathBuf, PathBuf)> {
         if !sandbox_or_skip() {
             return None;
         }
 
-        let (shared, outside) = folders(name);
+        let (base, shared, outside) = folders(name);
 
         Some((
+            base,
             Policy::for_roots(std::slice::from_ref(&shared), None),
             shared,
             outside,
@@ -1755,7 +1751,7 @@ mod tests {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     #[test]
     fn a_terminal_output_does_not_change_once_its_end_is_reported() {
-        let Some((policy, shared, _)) = terminal_policy("sealed") else {
+        let Some((_base, policy, shared, _)) = terminal_policy("sealed") else {
             return;
         };
         // A background child keeps the pipe open past the shell's exit and writes once more later. Guard, not a repro: the
@@ -1791,7 +1787,7 @@ mod tests {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     #[test]
     fn a_terminal_returns_at_once_and_reports_its_output_and_exit_later() {
-        let Some((policy, shared, _)) = terminal_policy("term-exit") else {
+        let Some((_base, policy, shared, _)) = terminal_policy("term-exit") else {
             return;
         };
         // The command waits for a gate the test opens after `start` has returned: returning at once is then shown by the command
@@ -1821,7 +1817,7 @@ mod tests {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     #[test]
     fn a_killed_terminal_ends_with_its_group_and_says_so() {
-        let Some((policy, shared, _)) = terminal_policy("term-kill") else {
+        let Some((_base, policy, shared, _)) = terminal_policy("term-kill") else {
             return;
         };
         let terminal = Terminal::start(
@@ -1846,7 +1842,7 @@ mod tests {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     #[test]
     fn a_terminal_keeps_the_tail_of_a_long_output_and_stops_at_its_timeout() {
-        let Some((policy, shared, _)) = terminal_policy("term-tail") else {
+        let Some((_base, policy, shared, _)) = terminal_policy("term-tail") else {
             return;
         };
         let long = Terminal::start(
@@ -1928,7 +1924,7 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn a_killed_terminal_takes_down_a_descendant_that_left_its_group() {
-        let Some((policy, shared, _)) = terminal_policy("setsid") else {
+        let Some((_base, policy, shared, _)) = terminal_policy("setsid") else {
             return;
         };
         // The descendant starts its own session, and the one in the middle exits, so it is neither in the group nor a
@@ -1965,7 +1961,7 @@ mod tests {
             return;
         }
 
-        let (shared, _) = folders("setsid-run");
+        let (_base, shared, _) = folders("setsid-run");
         let policy = Policy::for_roots(std::slice::from_ref(&shared), None);
         let output = run(
             "setsid sh -c 'echo $$ > child.pid; sleep 600' >/dev/null 2>&1 & wait",
@@ -2035,7 +2031,7 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[test]
     fn a_killed_terminal_takes_down_a_descendant_that_left_its_group() {
-        let Some((policy, shared, _)) = terminal_policy("setsid") else {
+        let Some((_base, policy, shared, _)) = terminal_policy("setsid") else {
             return;
         };
         // The descendant starts its own session from a subshell, so it is not in the group. The subshell stays: macOS has no
@@ -2072,7 +2068,7 @@ mod tests {
             return;
         }
 
-        let (shared, _) = folders("setsid-run");
+        let (_base, shared, _) = folders("setsid-run");
         let policy = Policy::for_roots(std::slice::from_ref(&shared), None);
         let output = run(
             &format!("{SETSID} 'echo $$ > child.pid; sleep 600' >/dev/null 2>&1 & wait"),
@@ -2094,7 +2090,7 @@ mod tests {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     #[test]
     fn ending_terminals_now_takes_down_a_background_child_when_the_call_returns() {
-        let Some((policy, shared, _)) = terminal_policy("end-now") else {
+        let Some((_base, policy, shared, _)) = terminal_policy("end-now") else {
             return;
         };
         // The shell leaves a background child in its group, then waits on a second command, which keeps the terminal running.
@@ -2121,7 +2117,7 @@ mod tests {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     #[test]
     fn a_terminal_writes_only_inside_the_shared_folder_and_sees_the_variables_it_was_given() {
-        let Some((policy, shared, outside)) = terminal_policy("term-write") else {
+        let Some((_base, policy, shared, outside)) = terminal_policy("term-write") else {
             return;
         };
         let terminal = Terminal::start(

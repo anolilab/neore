@@ -658,6 +658,38 @@ describe("the review count", () => {
 
         expect(reviews).toMatchObject({ items: [{ body: "seen" }], total: 1 });
     });
+
+    it("puts the later of two reviews sent in the same second first, and keeps the reviewer's standing", async () => {
+        const at = "2026-01-01T00:00:00Z";
+        const request: HostRequest = async () =>
+            Response.json([
+                { author_association: "MEMBER", body: "fine", id: 10, state: "APPROVED", submitted_at: at, user: { login: "ann" } },
+                { author_association: "MEMBER", body: "on second thought", id: 11, state: "CHANGES_REQUESTED", submitted_at: at, user: { login: "ann" } },
+            ]);
+
+        const reviews = await githubDriver.listReviews(request, REF);
+
+        expect(reviews.items.map((review) => [review.body, review.authorAssociation])).toStrictEqual([
+            ["on second thought", "MEMBER"],
+            ["fine", "MEMBER"],
+        ]);
+    });
+
+    it("hands over the reviewer's id, and no name for a deleted account", async () => {
+        const at = "2026-01-01T00:00:00Z";
+        const request: HostRequest = async () =>
+            Response.json([
+                { body: "a", id: 10, state: "APPROVED", submitted_at: at, user: { id: 42, login: "ann" } },
+                { body: "b", id: 11, state: "CHANGES_REQUESTED", submitted_at: at, user: null },
+            ]);
+
+        const reviews = await githubDriver.listReviews(request, REF);
+
+        expect(reviews.items.map((review) => [review.authorId, review.authorLogin])).toStrictEqual([
+            [undefined, ""],
+            ["42", "ann"],
+        ]);
+    });
 });
 
 describe("a check log read inside a time budget", () => {

@@ -16,6 +16,7 @@ import { toUIMessages } from "../agent/ui-messages";
 import type { MessageDoc } from "../agent/validators";
 import { vThreadDocFields } from "../agent/validators";
 import { callOnShard } from "../lib/cross-shard";
+import { ensureThreadFollowDefault } from "./follows/functions";
 import { authAction, authMutation, authQuery, publicAction, rateLimit } from "../lib/crpc";
 import { rateLimitGuard, shareLinkBucket } from "../lib/rate-limiter";
 import { deleteShardRoute, setShardRoute, shardRouteOwner } from "../lib/shard-routes";
@@ -239,6 +240,10 @@ export const createThreadInvite = authMutation
             throw new LunoraError("BAD_REQUEST", "An invite already exists for this email");
         }
 
+        // Sharing makes the thread one others can post in, so the sharer follows it by default; an explicit choice is kept.
+        // Before the invite: if this write fails, no pending invite blocks a retry, and a retry re-runs it as a no-op.
+        await ensureThreadFollowDefault(context, { now: context.now, state: "on", threadId, userId });
+
         const inviteToken = generateToken();
         const expiresAt = calculateExpirationTime(expirationType, customHours);
 
@@ -412,6 +417,10 @@ export const acceptThreadInvite = authMutation
             });
         }
 
+        // A person invited to a thread follows it from the moment they accept; an explicit choice made before is kept.
+        // Written before the invite is marked accepted, so a failed write leaves the invite pending and the accept retryable.
+        await ensureThreadFollowDefault(context, { now: context.now, state: "on", threadId: invite.threadId, userId });
+
         // Mark invite as accepted
         await context.runMutation(internal.agent.sharing.updateThreadInvite, {
             acceptedAt: context.now,
@@ -456,18 +465,46 @@ export const removeThreadAccess = authMutation
             throw new LunoraError("BAD_REQUEST", "Cannot remove thread owner");
         }
 
-        const access = await context.runQuery(internal.agent.sharing.getThreadAccess, {
-            threadId,
-            userId: targetUserId,
-        });
+        // The removal holds the chat's suggestion requests back while the grant goes: a request in flight is waited for, as a delete
+        // waits for it, and none can start on the chat until the hold is released (`holdFollowupRevoke`). The grant is global, so the
+        // hold cannot share its transaction; the hold is what closes the window.
+        const revokeClaim = await context.runMutation(internal.agent.followup_suggestions.holdFollowupRevoke, { threadId });
 
-        if (access) {
-            await context.runMutation(internal.agent.sharing.deleteThreadAccess, {
-                accessId: access._id,
-            });
+        if (revokeClaim === null) {
+            throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
         }
 
-        context.log.event("chat.remove_thread_access", { removed: Boolean(access) });
+        try {
+            const access = await context.runQuery(internal.agent.sharing.getThreadAccess, {
+                threadId,
+                userId: targetUserId,
+            });
+
+            // A person who leaves the thread loses their follow row. The admin's view cannot read another person's row (owner-only
+            // RLS), so the trusted internal mutation deletes it. Before the grant: the writes commit separately, and a failed
+            // cleanup must leave the grant in place so the removal can be retried.
+            await context.runMutation(internal.chat.follows.functions.deleteFollowRowOfRemovedMember, { threadId, userId: targetUserId });
+
+            if (access) {
+                // Renewed right before the grant goes: the steps above may have taken a while, and a hold that lapsed would let a request
+                // start on the chat before the grant is deleted. A hold that cannot be renewed stops the removal.
+                if (!(await context.runMutation(internal.agent.followup_suggestions.renewFollowupRevoke, { claimedAt: revokeClaim, threadId }))) {
+                    throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
+                }
+
+                await context.runMutation(internal.agent.sharing.deleteThreadAccess, {
+                    accessId: access._id,
+                });
+            }
+
+            // Again once the grant is gone: a change the member made between the two writes wrote a row back, and with no grant
+            // `setThreadFollow`'s primary check now refuses any further one.
+            await context.runMutation(internal.chat.follows.functions.deleteFollowRowOfRemovedMember, { threadId, userId: targetUserId });
+
+            context.log.event("chat.remove_thread_access", { removed: Boolean(access) });
+        } finally {
+            await context.runMutation(internal.agent.followup_suggestions.releaseFollowupRevoke, { claimedAt: revokeClaim, threadId });
+        }
     });
 
 // Toggle thread public visibility

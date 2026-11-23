@@ -14,6 +14,7 @@ import { MAX_CONNECTORS } from "../lib/read-limits";
 import { isConnectorConfigured } from "./lib/client-config";
 import { revokeStoredGrant } from "./lib/grant-runtime";
 import { vConnectorStatus } from "./lib/validators";
+import { storedPage } from "../lib/stored-row";
 
 /**
  * What the UI may know about a connection. A `connected` row whose token has
@@ -77,7 +78,7 @@ export const listConnectorCatalog = authQuery
     )
     .query(async ({ ctx }) => {
         const [{ page: definitions }, connections] = await Promise.all([
-            ctx.db.connectorDefinitions.findMany({ limit: MAX_CONNECTORS, orderBy: [{ _creationTime: "asc" }] }),
+            ctx.db.connectorDefinitions.findMany({ limit: MAX_CONNECTORS, orderBy: [{ _creationTime: "asc" }] }).then(storedPage),
             ctx.db
                 .query("userConnectors")
                 .withIndex("by_user_and_definition", (q) => q.eq("userId", ctx.user.userId))

@@ -6,7 +6,7 @@
 import { exportJWK, generateKeyPair, type JSONWebKeySet, SignJWT } from "jose";
 import { describe, expect, it, vi } from "vitest";
 
-import { createJwksCache, JWKS_FORCED_RELOAD_INTERVAL_MS } from "./jwks-cache";
+import { createJwksCache, JWKS_FORCED_RELOAD_INTERVAL_MS, JwksUnavailableError } from "./jwks-cache";
 
 const ORIGIN = "https://api.example.test";
 
@@ -65,5 +65,54 @@ describe("createJwksCache", () => {
         clock += JWKS_FORCED_RELOAD_INTERVAL_MS;
         await expect(cache.verify(forged, { audience: ORIGIN, issuer: ORIGIN })).rejects.toThrow();
         expect(load).toHaveBeenCalledTimes(3);
+    });
+
+    it("reports a failed key read as unavailable (503), not as a bad token", async () => {
+        const key = await keyPair("known");
+        const cache = createJwksCache(async () => {
+            throw new Error("D1_ERROR: timed out");
+        });
+
+        const failure = cache.verify(await tokenFor(key), { audience: ORIGIN, issuer: ORIGIN });
+
+        await expect(failure).rejects.toBeInstanceOf(JwksUnavailableError);
+        await expect(failure).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE", status: 503 });
+    });
+
+    it("keeps reporting a rotated key's token as unavailable while the forced re-read that failed is throttled", async () => {
+        const oldKey = await keyPair("old");
+        const newKey = await keyPair("new");
+        let isDown = false;
+        const load = vi.fn(async (): Promise<JSONWebKeySet> => {
+            if (isDown) {
+                throw new Error("D1_ERROR: timed out");
+            }
+
+            return { keys: [oldKey.jwk, newKey.jwk] };
+        });
+        let clock = 1_000_000;
+        const cache = createJwksCache(load, () => clock);
+
+        // Cached with the old key only: the new key is unknown to it.
+        load.mockImplementationOnce(async () => {
+            return { keys: [oldKey.jwk] };
+        });
+        await cache.verify(await tokenFor(oldKey), { audience: ORIGIN, issuer: ORIGIN });
+
+        isDown = true;
+        const rotated = await tokenFor(newKey);
+
+        // The forced re-read fails, and so does every try inside the throttle window: an outage, not a bad token.
+        await expect(cache.verify(rotated, { audience: ORIGIN, issuer: ORIGIN })).rejects.toBeInstanceOf(JwksUnavailableError);
+        await expect(cache.verify(rotated, { audience: ORIGIN, issuer: ORIGIN })).rejects.toBeInstanceOf(JwksUnavailableError);
+        expect(load).toHaveBeenCalledTimes(2);
+
+        // Once the keys can be read again, the token verifies.
+        isDown = false;
+        clock += JWKS_FORCED_RELOAD_INTERVAL_MS;
+
+        const { payload } = await cache.verify(rotated, { audience: ORIGIN, issuer: ORIGIN });
+
+        expect(payload.sub).toBe("user-1");
     });
 });

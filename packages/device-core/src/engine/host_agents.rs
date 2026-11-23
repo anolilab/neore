@@ -453,7 +453,7 @@ impl DeviceState {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use crate::test_dir::TestDir;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Mutex;
     use std::time::Duration;
@@ -501,7 +501,7 @@ mod tests {
                 hello: Hello {
                     agents: true,
                     platform: "linux".into(),
-                    protocol: 3,
+                    protocol: crate::host::PROTOCOL_VERSION,
                     sandbox: RemoteSandbox {
                         available: true,
                         detail: "Landlock".into(),
@@ -590,12 +590,10 @@ mod tests {
     type Events = Arc<Mutex<Vec<Event>>>;
 
     /// A paired desktop and a server of the ids `test-desk` and `test-host`, connected over `link` when given.
-    fn engine(test: &str, link: Option<&Arc<Link>>) -> (DeviceState, PathBuf, Events) {
+    fn engine(test: &str, link: Option<&Arc<Link>>) -> (DeviceState, TestDir, Events) {
         test_keychain::install();
 
-        let dir =
-            std::env::temp_dir().join(format!("neore-host-agents-{test}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
+        let dir = TestDir::at(&format!("host-agents-{test}"));
         std::fs::create_dir_all(&dir).unwrap();
         store::save(
             &dir.join("device.json"),
@@ -650,7 +648,7 @@ mod tests {
 
     #[test]
     fn a_start_for_a_server_is_verified_with_its_secret_against_its_own_approvals() {
-        let (state, dir, _) = engine("prepare", None);
+        let (state, _dir, _) = engine("prepare", None);
         let (host, desk) = ("ha-prepare-host", "ha-prepare-desk");
         let prepared = state
             .acp_prepare(&call(
@@ -722,13 +720,11 @@ mod tests {
             .unwrap();
 
         assert!(unapproved.command.is_none());
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn the_result_of_a_command_for_a_server_is_signed_with_the_servers_secret() {
-        let (state, dir, _) = engine("sign", None);
+        let (state, _dir, _) = engine("sign", None);
         let signed = call(
             HOST_SECRET,
             "ha-sign-host",
@@ -750,13 +746,11 @@ mod tests {
             &result.signature
         ));
         assert!(result.payload.contains("ha-sign-host"));
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_turn_post_is_signed_with_the_secret_of_the_device_it_names_and_no_other() {
-        let (state, dir, _) = engine("turn", None);
+        let (state, _dir, _) = engine("turn", None);
         let post = |device: &str| {
             format!(r#"{{"v":1,"kind":"turn","deviceId":"{device}","threadId":"t"}}"#)
         };
@@ -773,13 +767,11 @@ mod tests {
         assert!(state
             .sign_turn(r#"{"v":1,"kind":"call","deviceId":"ha-turn-host"}"#)
             .is_err());
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_servers_manifest_carries_its_own_offers_and_not_the_computers() {
-        let (state, dir, _) = engine("manifest", Some(&Link::new()));
+        let (state, _dir, _) = engine("manifest", Some(&Link::new()));
         let signed = state.manifest_for(Some("ha-manifest-host")).unwrap();
         let manifest: Value = serde_json::from_str(&signed.payload).unwrap();
 
@@ -794,14 +786,12 @@ mod tests {
         // No path, no command line.
         assert!(!signed.payload.contains("/opt/agent"));
         assert_eq!(manifest["acpOffers"].as_array().unwrap().len(), 1);
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn an_agent_starts_only_for_an_approved_pair_on_a_connected_server() {
         let link = Link::new();
-        let (state, dir, events) = engine("start", Some(&link));
+        let (state, _dir, events) = engine("start", Some(&link));
         let host = "ha-start-host";
 
         // Not approved for that folder, not registered, and not a server of this computer: nothing is sent.
@@ -881,25 +871,21 @@ mod tests {
             [(41, b"line\n".to_vec())]
         );
         assert_eq!(link.stopped.lock().unwrap().as_slice(), [41]);
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn nothing_starts_on_a_server_this_computer_is_not_connected_to() {
-        let (state, dir, _) = engine("offline", None);
+        let (state, _dir, _) = engine("offline", None);
         let error = state
             .host_agent_start("ha-offline-host", 1, "claude", "/srv/app")
             .unwrap_err();
 
         assert!(error.contains("not connected to build-box"), "{error}");
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_servers_approvals_are_edited_for_that_server_and_inside_its_shared_folders() {
-        let (state, dir, _) = engine("update", None);
+        let (state, _dir, _) = engine("update", None);
         let host = "ha-update-host";
         let grant = |folder: &str| AcpUpdate::Grant {
             agent_key: "claude".into(),
@@ -942,13 +928,11 @@ mod tests {
         assert!(state
             .host_acp_update("ha-update-stranger", grant("/srv/app"))
             .is_err());
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_global_variable_that_changes_which_program_runs_takes_the_servers_approvals_with_it() {
-        let (state, dir, _) = engine("global-env", None);
+        let (state, _dir, _) = engine("global-env", None);
         let host = "ha-global-env-host";
         let set = |name: &str| AcpUpdate::SetEnv {
             agent_key: None,
@@ -966,13 +950,11 @@ mod tests {
         assert!(state
             .acp_host_spawn_plan(host, "claude", "/srv/app")
             .is_err());
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn claude_codes_entrypoint_never_takes_a_full_server_start_over_its_cap() {
-        let (state, dir, _) = engine("env-cap", None);
+        let (state, _dir, _) = engine("env-cap", None);
         let host = "ha-env-cap-host";
         let set = |agent_key: Option<&str>, name: String| AcpUpdate::SetEnv {
             agent_key: agent_key.map(Into::into),
@@ -994,13 +976,11 @@ mod tests {
 
         assert_eq!(plan.env.0.len(), crate::agent_host::MAX_ENV_VARS);
         assert!(!plan.env.0.contains_key("CLAUDE_CODE_ENTRYPOINT"));
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn narrowing_a_servers_shared_folders_takes_the_approvals_outside_them_away() {
-        let (state, dir, _) = engine("unshare", None);
+        let (state, _dir, _) = engine("unshare", None);
         let host = "ha-unshare-host";
         let share = |roots: &[&str]| -> crate::engine::SettingsUpdate {
             serde_json::from_value(json!({ "host": { "deviceId": host, "roots": roots } })).unwrap()
@@ -1040,7 +1020,5 @@ mod tests {
         // A folder that only shares a name prefix with a shared one is not inside it.
         state.settings_update(share(&["/srv/ap"])).unwrap();
         assert!(state.settings().hosts[0].acp_consents.is_empty());
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 }

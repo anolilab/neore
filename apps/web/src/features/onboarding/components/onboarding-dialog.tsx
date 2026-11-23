@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
-import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
+import { handOffLandingMessage } from "@/features/marketing/stores/landing-store";
 import { trackEvent } from "@/lib/analytics";
 
 import useOnboardingPlugins from "../hooks/use-onboarding-plugins";
@@ -103,10 +103,10 @@ const TemplatePicker: React.FC<{
     );
 };
 
-/** Navigate to /chat with a pre-filled prompt using the existing sessionStorage pattern. */
+/** Navigate to /chat with a template's prompt pre-filled, marked: the person picked it, they did not type it. */
 const navigateToChatWithPrompt = (prompt: string): void => {
     try {
-        sessionStorage.setItem(LANDING_MESSAGE_KEY, prompt);
+        handOffLandingMessage(prompt, "suggestion");
     } catch {
         // sessionStorage unavailable — will navigate without pre-fill
     }

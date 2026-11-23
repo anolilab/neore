@@ -3,6 +3,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-store";
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import { EMPTY_PROMPT_QUEUE, serializePromptQueue } from "@/features/chat/core/utils/prompt-queue";
@@ -202,7 +203,29 @@ describe("composer prompt queue", () => {
         await nextFrame();
         await nextFrame();
 
-        expect(chat.sendMessage).toHaveBeenCalledWith("queued", []);
+        expect(chat.sendMessage).toHaveBeenCalledWith("queued", [], { draftFrom: undefined });
+    });
+
+    it("sends a queued draft with its own not-typed mark, and leaves the next draft's mark in the composer", async () => {
+        chat.error = undefined;
+        useChatUIStore.getState().setComposerText("my next draft");
+        useChatUIStore.getState().setComposerDraftFrom("promptLink");
+        // The real send clears the composer before its first await.
+        chat.sendMessage.mockImplementationOnce(() => {
+            useChatUIStore.getState().clearComposer();
+        });
+
+        try {
+            render(<ComposerPromptQueue />);
+            act(() => {
+                usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], draftFrom: "sharedPrompt", text: "queued" });
+            });
+
+            await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", [], { draftFrom: "sharedPrompt" }));
+            expect(useChatUIStore.getState()).toMatchObject({ composerDraftFrom: "promptLink", composerText: "my next draft" });
+        } finally {
+            useChatUIStore.getState().clearComposer();
+        }
     });
 
     it("leaves an old queue put when another thread's send ends", async () => {
@@ -329,7 +352,7 @@ describe("composer prompt queue", () => {
         chat.view = "reconnecting";
         view.rerender(<ComposerPromptQueue />);
 
-        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", []));
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", [], { draftFrom: undefined }));
     });
 
     it("sends a Send next clicked offline once the network is back, though a steer withdrawal still held the queue then", async () => {
@@ -370,7 +393,7 @@ describe("composer prompt queue", () => {
 
         // The withdrawn steer goes; the held Send next waits for its reply, so two turns never run at once.
         await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(1));
-        expect(chat.sendMessage).toHaveBeenLastCalledWith("steered", []);
+        expect(chat.sendMessage).toHaveBeenLastCalledWith("steered", [], { draftFrom: undefined });
 
         chat.isStreaming = true;
         view.rerender(<ComposerPromptQueue />);
@@ -380,7 +403,7 @@ describe("composer prompt queue", () => {
         view.rerender(<ComposerPromptQueue />);
 
         await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(2));
-        expect(chat.sendMessage).toHaveBeenLastCalledWith("queued", []);
+        expect(chat.sendMessage).toHaveBeenLastCalledWith("queued", [], { draftFrom: undefined });
     });
 
     it("keeps a prompt when the network goes during its steer withdrawal, and sends it once it is back", async () => {
@@ -415,7 +438,7 @@ describe("composer prompt queue", () => {
         chat.view = "online";
         view.rerender(<ComposerPromptQueue />);
 
-        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("steered", []));
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("steered", [], { draftFrom: undefined }));
     });
 
     it("keeps a Send next asked for offline while a reply streams on reconnect, and sends it when that reply ends, even in an error", async () => {
@@ -441,7 +464,7 @@ describe("composer prompt queue", () => {
         chat.isStreaming = false;
         view.rerender(<ComposerPromptQueue />);
 
-        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", []));
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", [], { draftFrom: undefined }));
     });
 
     it("does not send a held Send next into a queue paused since, when the reply ends", async () => {
@@ -484,7 +507,7 @@ describe("composer prompt queue", () => {
         chat.view = "online";
         render(<ComposerPromptQueue />);
 
-        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", []));
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", [], { draftFrom: undefined }));
     });
 
     it("keeps a prompt when the queue is paused (Stop) while its steer withdrawal settles", async () => {
@@ -556,7 +579,7 @@ describe("composer prompt queue", () => {
         chat.saving = false;
         view.rerender(<ComposerPromptQueue />);
 
-        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("steered", []));
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("steered", [], { draftFrom: undefined }));
     });
 
     it("sends on Send next clicked while a chip removal settles, though the reply ended in an error", async () => {
@@ -587,7 +610,7 @@ describe("composer prompt queue", () => {
         });
 
         expect(chat.sendMessage).toHaveBeenCalledTimes(1);
-        expect(chat.sendMessage).toHaveBeenCalledWith("queued", []);
+        expect(chat.sendMessage).toHaveBeenCalledWith("queued", [], { draftFrom: undefined });
     });
 
     it("does not repeat a move's announcement in a later queue of the same thread", async () => {
@@ -684,7 +707,7 @@ describe("composer prompt queue", () => {
         expect(order()).toEqual(["three", "one", "two"]);
 
         fireEvent.click(screen.getByRole("button", { name: "Send next" }));
-        await vi.waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("three", []));
+        await vi.waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("three", [], { draftFrom: undefined }));
     });
 
     it("moves a dropped message to where it lands in the queue", async () => {
@@ -747,7 +770,7 @@ describe("composer prompt queue", () => {
         view.rerender(<ComposerPromptQueue />);
 
         // The queue moves on once the save has ended, which is what the waiting text promised.
-        await vi.waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", []));
+        await vi.waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", [], { draftFrom: undefined }));
     });
 
     it("does not promise a send after the save when the queue is held", () => {

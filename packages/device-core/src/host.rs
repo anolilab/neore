@@ -35,9 +35,10 @@ use crate::launch;
 use crate::outbox::Outbox;
 use crate::sandbox::{self, Support};
 
-/// 2: the `reap` request. 3: the `list`, `tar` and `cancel` requests and chunk frames. The `agent` request (S7) is
-/// announced by [`Outgoing::Hello::agents`] instead of a new number, so a host without it still connects.
-pub const PROTOCOL_VERSION: u32 = 3;
+/// 2: the `reap` request. 3: the `list`, `tar` and `cancel` requests and chunk frames. 4: the `browse` and `mkdir`
+/// requests. The `agent` request (S7) is announced by [`Outgoing::Hello::agents`] instead of a new number, so a host
+/// without it still connects.
+pub const PROTOCOL_VERSION: u32 = 4;
 /// Requests being served at once; a further one is refused, not queued behind a ten-minute command.
 const MAX_IN_FLIGHT: usize = 8;
 /// Bytes of an archive per chunk frame.
@@ -286,6 +287,48 @@ fn answered(id: u64, result: Result<Value, String>) -> Outgoing {
     }
 }
 
+/// Parameters of `browse`: an absolute folder, and the page to read after `after`.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BrowseParams {
+    #[serde(default)]
+    after: Option<String>,
+    #[serde(default)]
+    limit: Option<usize>,
+    path: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MakeDirParams {
+    path: String,
+}
+
+/// Lists the folders inside an absolute path. Not confined to the shared folders: see `fs::browse_dirs`.
+fn serve_browse(params: Value, id: u64) -> Outgoing {
+    let Ok(params) = serde_json::from_value::<BrowseParams>(params) else {
+        return refuse(id, "invalid browse params");
+    };
+    let limit = params
+        .limit
+        .unwrap_or(fs::MAX_PAGE_ENTRIES)
+        .clamp(1, fs::MAX_PAGE_ENTRIES);
+
+    answered(
+        id,
+        fs::browse_dirs(&params.path, params.after.as_deref(), limit),
+    )
+}
+
+/// Creates an absolute folder, and its missing parents. See `fs::make_dir`.
+fn serve_mkdir(params: Value, id: u64) -> Outgoing {
+    let Ok(params) = serde_json::from_value::<MakeDirParams>(params) else {
+        return refuse(id, "invalid mkdir params");
+    };
+
+    answered(id, fs::make_dir(&params.path))
+}
+
 fn serve_list(params: Value, id: u64) -> Outgoing {
     let Ok(params) = serde_json::from_value::<FilesParams>(params) else {
         return refuse(id, "invalid list params");
@@ -397,6 +440,8 @@ fn serve_request(
     match op {
         "reap" => return serve_reap(params, id, own),
         "list" => return serve_list(params, id),
+        "browse" => return serve_browse(params, id),
+        "mkdir" => return serve_mkdir(params, id),
         "tar" => {
             return match catch_unwind(AssertUnwindSafe(|| {
                 serve_tar(params, id, stream.0, stream.1)

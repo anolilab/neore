@@ -7,9 +7,8 @@ import type { HttpActionCtx } from "lunorash/server";
 import { httpAction, httpRouter } from "lunorash/server";
 
 import { HOST_UPLOAD_PATH } from "./acp/lib/constants";
-import { ENVIRONMENT, PUBLIC_ORIGIN, SITE_URL, TRUSTED_EXTENSION_ORIGINS, TURNSTILE_SECRET_KEY, TURNSTILE_SITE_KEY } from "./env";
+import { ENVIRONMENT, PUBLIC_ORIGIN, SITE_URL, TURNSTILE_SECRET_KEY, TURNSTILE_SITE_KEY } from "./env";
 import { assertEnv } from "./lib/env-validation";
-import { parseTrustedExtensionOrigins } from "./lib/extension-origins";
 import pailLogger from "./lib/hono-logger";
 import { handleSignedGet } from "./lib/signed-storage";
 import { TUS_REQUEST_HEADERS, TUS_RESPONSE_HEADERS, UPLOAD_PATH } from "./lib/upload-paths";
@@ -68,18 +67,14 @@ export const getAllowedOrigins = (): ((origin: string) => string | null) => {
     }
 
     // This Worker's own origin. Same-origin requests carry no `Origin` header, so
-    // this is for the cases that do: the browser extension's fetches and anything
-    // hitting an HTTP route directly rather than through the app's proxy.
+    // this is for the cases that do: anything hitting an HTTP route directly
+    // rather than through the app's proxy.
     if (PUBLIC_ORIGIN) {
         staticOrigins.push(PUBLIC_ORIGIN);
     }
 
-    // Only the extension ids we ship — the same list `auth.ts` trusts. This used
-    // to reflect ANY `chrome-extension://` origin, and with `credentials: true`
-    // that let every extension the user has installed read credentialed
-    // responses. An unset var allows none.
-    staticOrigins.push(...parseTrustedExtensionOrigins(TRUSTED_EXTENSION_ORIGINS));
-
+    // Never an extension origin: with `credentials: true` it could read
+    // credentialed responses, and the extension needs none (`src/extension-cookie.ts`).
     return (origin: string) => (staticOrigins.includes(origin) ? origin : null);
 };
 
@@ -225,6 +220,10 @@ app.post("/source-control/webhook/:watchId", async (c) => {
 
     return await routeWatchWebhook(c.var.lunora, c.req.raw, c.req.param("watchId"));
 });
+
+// The hand back of a page that closes while its person controls the agent's browser: a beacon, so no session. The
+// body is the claim's signed release token, which names the shard (`browser/release-http.ts`).
+app.post("/browser/release", httpAction(lazy(async () => await import("./browser/release-http"), "releaseControlHttpAction")));
 
 // A paired computer's coding-agent turn output (no CORS/session — signed with the device secret). It finds the
 // owner's shard itself (`acp/http.ts`).
