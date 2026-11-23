@@ -187,7 +187,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         // A pin write that renewed its lease before the marker may still be in flight. Its lease runs out within a minute, so the sweeps
         // below start only once none is in flight: a write that commits after a sweep would otherwise keep its pins.
         for (let round = 0; ; round += 1) {
-            const { inFlight } = (await context.step.do(
+            const { until } = (await context.step.do(
                 `pin-writes-in-flight-${String(round)}`,
                 async () =>
                     await context.run(
@@ -195,9 +195,10 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                         { userId: args.userId },
                         { dedupId: stepDedupId(scope, "pin-writes-in-flight", round) },
                     ),
-            )) as { inFlight: boolean };
+            )) as { until: number | null };
 
-            if (!inFlight) {
+            // No lease left in flight answers null; anything but a time is treated the same way.
+            if (typeof until !== "number") {
                 break;
             }
 
@@ -965,7 +966,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             async () =>
                 await context.run(
                     internal.lib.account_moves.endAccountMoveFor,
-                    { userId: args.userId },
+                    { kind: "erasing", userId: args.userId },
                     { dedupId: stepDedupId(scope, "end-account-erasure") },
                 ),
         );

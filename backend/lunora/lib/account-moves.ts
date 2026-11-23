@@ -3,9 +3,11 @@
  * (`gdpr/workflows/deletion-workflow.ts`) mark the account before they touch its pins; a pin write by a marked account is refused
  * (`chat/pins/functions.ts`). The marker is global and read on the primary, so every shard sees a move that has started.
  *
- * A pin write first renews the account's lease, and only then checks the marker. A write that passed the check can therefore not
- * commit unseen: the move waits until no lease is in flight (`pinWritesInFlight`) before it sweeps the pins. A write that renewed its
- * lease after the marker was set sees the marker and is refused.
+ * A marker belongs to the operation that wrote it: a merge ends only its own marker, so an erasure that overlaps it keeps its fence.
+ *
+ * A pin write checks the marker, renews the account's lease, and checks the marker again. A refused write renews nothing, so a marked
+ * account's retries cannot hold a move back. A write that passed the second check cannot commit unseen: the move waits until no lease
+ * is in flight (`pinWritesInFlightUntil`) before it sweeps the pins.
  */
 import { v } from "lunorash/server";
 
@@ -28,18 +30,21 @@ export const isAccountMoving = async (context: Pick<QueryCtx, "db">, userId: str
     return row !== null;
 };
 
-/** Marks the account as moving. Idempotent: a repeated call (a retry, a redelivery) leaves the first marker in place. */
+/**
+ * Marks the account as moving for one operation. Idempotent for that operation: a retry or a redelivery leaves its marker in place. Another
+ * operation's marker is left alone, so an overlapping move adds its own.
+ */
 export const beginAccountMove = async (context: Pick<MutationCtx, "db">, userId: string, kind: AccountMoveKind, now: number): Promise<void> => {
-    const existing = await context.db.accountMoves.findFirst({ consistency: "primary", where: { userId } });
+    const { page } = await context.db.accountMoves.findMany({ consistency: "primary", where: { userId } });
 
-    if (!existing) {
+    if (page.every((row) => row.kind !== kind)) {
         await context.db.insert("accountMoves", { createdAt: now, kind, userId });
     }
 };
 
 /**
- * Renews the account's lease before a pin write checks the marker, so a move that starts after the check waits for the write. The
- * account has one lease row; a second one (two first writes at once) is harmless, since the wait reads them all.
+ * Renews the account's lease. The account has one lease row; a second one (two first writes at once) is harmless, since the wait reads
+ * them all.
  */
 export const admitPinWrite = async (context: Pick<MutationCtx, "db">, userId: string, now: number): Promise<void> => {
     const expiresAt = now + PIN_WRITE_LEASE_MS;
@@ -52,22 +57,50 @@ export const admitPinWrite = async (context: Pick<MutationCtx, "db">, userId: st
     }
 };
 
-/** Whether a pin write of the account may still be in flight: one of its leases has not run out yet. */
-export const pinWritesInFlight = async (context: Pick<QueryCtx, "db">, userId: string, now: number): Promise<boolean> => {
-    const { page } = await context.db.pinWriteLeases.findMany({ consistency: "primary", where: { userId } });
+/**
+ * Admits a pin write: checks the marker, renews the lease, checks the marker again. Returns whether the account is moving, in which case
+ * the caller refuses the write. The second check closes the window where a move starts between the first check and the renewal.
+ */
+export const admitPinWriteUnlessMoving = async (context: MutationCtx, userId: string, now: number): Promise<boolean> => {
+    if (await isAccountMoving(context, userId)) {
+        return true;
+    }
 
-    return page.some((lease) => lease.expiresAt > now);
+    await admitPinWrite(context, userId, now);
+
+    return await isAccountMoving(context, userId);
 };
 
 /**
- * Removes the marker and the leases once the move is finished: the account's pins are moved or erased and its routes are gone. Both
- * name the account, so they must not outlive the move.
+ * The latest moment a pin write of the account may still be in flight, or null when none can be. A move waits until that moment (an
+ * erasure) or re-enqueues itself for it (a guest merge).
  */
-export const endAccountMove = async (context: Pick<MutationCtx, "db">, userId: string): Promise<void> => {
+export const pinWritesInFlightUntil = async (context: Pick<QueryCtx, "db">, userId: string, now: number): Promise<number | null> => {
+    const { page } = await context.db.pinWriteLeases.findMany({ consistency: "primary", where: { userId } });
+    let latest = 0;
+
+    for (const lease of page) {
+        latest = lease.expiresAt > now && lease.expiresAt > latest ? lease.expiresAt : latest;
+    }
+
+    return latest > 0 ? latest : null;
+};
+
+/**
+ * Removes the operation's marker once its move is finished. The leases go with the last marker: while another move is still running
+ * its fence holds. Both name the account, so they must not outlive the moves.
+ */
+export const endAccountMove = async (context: Pick<MutationCtx, "db">, userId: string, kind: AccountMoveKind): Promise<void> => {
     const { page: moves } = await context.db.accountMoves.findMany({ consistency: "primary", where: { userId } });
 
     for (const row of moves) {
-        await context.db.delete("accountMoves", row._id);
+        if (row.kind === kind) {
+            await context.db.delete("accountMoves", row._id);
+        }
+    }
+
+    if (moves.some((row) => row.kind !== kind)) {
+        return;
     }
 
     const { page: leases } = await context.db.pinWriteLeases.findMany({ consistency: "primary", where: { userId } });
@@ -77,25 +110,24 @@ export const endAccountMove = async (context: Pick<MutationCtx, "db">, userId: s
     }
 };
 
-/** Removes the marker and the leases, from a workflow or a job once the account's pins are moved or erased. Idempotent. */
+/** Removes the operation's marker, from a workflow or a job once its pins are moved or erased. Idempotent. */
 export const endAccountMoveFor = internalMutation
-    .input({ userId: v.string().max(MAX_LENGTH.id) })
+    .input({ kind: v.union(v.literal("erasing"), v.literal("merging")), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await endAccountMove(ctx, args.userId);
+        await endAccountMove(ctx, args.userId, args.kind);
 
         return null;
     });
 
 /**
- * Whether the account's pin writes may still be in flight. A move calls it after it sets the marker, and waits (an erasure) or fails
- * and is retried (a guest merge) while it answers yes.
+ * The latest moment the account's pin writes may still be in flight (null when none can be). A move calls it after it sets its marker.
  */
 export const pinWritesInFlightFor = internalMutation
     .input({ userId: v.string().max(MAX_LENGTH.id) })
-    .output(v.object({ inFlight: v.boolean() }))
+    .output(v.object({ until: v.union(v.number(), v.null()) }))
     .mutation(async ({ args, ctx }) => {
-        return { inFlight: await pinWritesInFlight(ctx, args.userId, ctx.now) };
+        return { until: await pinWritesInFlightUntil(ctx, args.userId, ctx.now) };
     });
 
 /** The marker, written from a workflow or a job before the account's pins are touched. */

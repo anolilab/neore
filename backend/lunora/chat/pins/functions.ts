@@ -2,7 +2,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
-import { admitPinWrite, isAccountMoving } from "../../lib/account-moves";
+import { admitPinWriteUnlessMoving } from "../../lib/account-moves";
 import { authMutation, authQuery, internalMutation, internalQuery, rateLimit } from "../../lib/crpc";
 import { MAX_LENGTH } from "../../lib/validators";
 import { systemDb } from "../../lib/rls/scope";
@@ -165,23 +165,23 @@ export const listSharedPinRoutesForExport = internalQuery
 
 /**
  * Records where the caller's pin on `threadId` lives when the caller is not the thread's owner, so the caller's export still finds
- * it once their grant is revoked. Runs on the owner's shard, where the pin is written. Returns the route this call inserted, if it did.
+ * it once their grant is revoked. Runs on the owner's shard, where the pin is written.
  */
-const recordSharedPinRoute = async (context: MutationCtx, threadId: Id<"threads">, userId: string, now: number): Promise<Id<"sharedPinRoutes"> | undefined> => {
+const recordSharedPinRoute = async (context: MutationCtx, threadId: Id<"threads">, userId: string, now: number): Promise<void> => {
     // The owner is read past row-level security: a collaborator is not the thread row's reader, so the caller's own view cannot give it.
     const thread = await systemDb(context).get("threads", threadId);
 
     if (thread?.userId === undefined || thread.userId === userId) {
-        return undefined;
+        return;
     }
 
     const existing = await context.db.sharedPinRoutes.findFirst({ consistency: "primary", where: { threadId, userId } });
 
     if (existing) {
-        return undefined;
+        return;
     }
 
-    return await context.db.insert("sharedPinRoutes", { createdAt: now, ownerId: thread.userId, threadId, userId });
+    await context.db.insert("sharedPinRoutes", { createdAt: now, ownerId: thread.userId, threadId, userId });
 };
 
 /**
@@ -293,10 +293,8 @@ export const createPin = authMutation
         // A pin is listed only through the thread's read grant (`getThreadPins`), so it is written only under that grant, locked or not.
         throwUnlessGranted(await threadGateOutcome(context, { level: "read", primary: true, threadId, unlockProof, userId }));
 
-        // The lease comes before the move check: a move that begins after this write's check waits for the write (`lib/account-moves.ts`).
-        await admitPinWrite(context, userId, now);
-
-        if (await isAccountMoving(context, userId)) {
+        // A refused write renews no lease; an admitted one holds its lease until it commits (`lib/account-moves.ts`).
+        if (await admitPinWriteUnlessMoving(context, userId, now)) {
             throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
         }
 
@@ -361,10 +359,8 @@ export const createDocumentPin = authMutation
             throw new LunoraError("BAD_REQUEST", "A document still being written cannot be pinned yet");
         }
 
-        // The lease comes before the move check: a move that begins after this write's check waits for the write (`lib/account-moves.ts`).
-        await admitPinWrite(context, userId, now);
-
-        if (await isAccountMoving(context, userId)) {
+        // A refused write renews no lease; an admitted one holds its lease until it commits (`lib/account-moves.ts`).
+        if (await admitPinWriteUnlessMoving(context, userId, now)) {
             throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
         }
 

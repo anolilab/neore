@@ -25,13 +25,14 @@
  * guest's. Re-running after a partial failure is safe: an id already on the new
  * shard is skipped, and rows already moved are gone from the old one.
  */
-import { LunoraError, v } from "lunorash/server";
+import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { mergeSkippedSteps } from "../auth/lib/setup-step-limits";
 import { authLogger } from "./logger";
 import { callOnShard } from "./cross-shard";
+import { enqueueJob } from "./job-queue";
 import schema from "../schema";
 import { dropPushDevicesOf } from "../notifications/push-device-writes";
 import { mergeThreadFollowsPage } from "../chat/follows/follow-writes";
@@ -419,11 +420,62 @@ export interface MergeReferences {
     reassignGlobal: { __lunoraRef: string };
 }
 
+/** The route reads and the batch move that the guest's pin moves need. Injected, so the order of the passes can be tested. */
+export type GuestPinMoves = {
+    listRoutes: (
+        routeUserId: string,
+        cursor: string | null,
+    ) => Promise<{ continueCursor: string | null; isDone: boolean; page: { ownerId: string; threadId: string }[] }>;
+    mergeRows: () => Promise<{ moved: number }>;
+    moveBatch: (route: { ownerId: string; threadId: string }) => Promise<{ hasMore: boolean }>;
+};
+
+/** Moves the pins of every route `routeUserId` holds, one batch per call on each route's owner shard. Each move is idempotent. */
+export const movePinsOnRoutesOf = async (moves: GuestPinMoves, routeUserId: string): Promise<void> => {
+    let cursor: string | null = null;
+    let isDone = false;
+
+    while (!isDone) {
+        const routes = await moves.listRoutes(routeUserId, cursor);
+
+        for (const route of routes.page) {
+            let more = true;
+
+            while (more) {
+                const batch = await moves.moveBatch(route);
+
+                more = batch.hasMore;
+            }
+        }
+
+        isDone = routes.isDone;
+        cursor = routes.continueCursor;
+    }
+};
+
+/**
+ * The guest's pins move before and after the rows. Before: the guest's pins on other owners' threads move while their routes still name the
+ * guest. After: a parallel merge of the owner can move a thread's shard, and so the guest's pins, between the first pass reading a route and
+ * the rows re-pointing it; the routes the surviving account holds now name the shard that holds the pins, and the second pass reaches them.
+ */
+export const moveGuestPins = async (moves: GuestPinMoves, from: string, to: string): Promise<{ moved: number }> => {
+    await movePinsOnRoutesOf(moves, from);
+
+    const result = await moves.mergeRows();
+
+    await movePinsOnRoutesOf(moves, to);
+
+    return result;
+};
+
 /**
  * The move, as a queue job on the NEW user's shard (`auth.ts` enqueues it).
  * Off the sign-up request: a guest's rows are one round trip per table and
  * page, far too long to hold the request that creates the account. Redelivery
  * is safe — see the module comment.
+ *
+ * A move that is still in flight is deferred, not failed: the job runs again once the last pin write the guest's lease covers has run
+ * out. The merging marker stays meanwhile, so no new write gets in.
  */
 export const runGuestMerge = internalAction
     .input({ from: v.string(), to: v.string() })
@@ -431,68 +483,45 @@ export const runGuestMerge = internalAction
     .action(async ({ args, ctx: context }) => {
         // The guest is marked as merging before its pins move, so a pin it writes meanwhile is refused (`lib/account-moves.ts`).
         await context.runMutation(internal.lib.account_moves.beginAccountMoveFor, { kind: "merging", userId: args.from });
-        // A pin write that renewed the guest's lease before the marker may still be in flight. The merge fails until none is, and the job
-        // is retried; the marker stays, so no new write gets in meanwhile (`lib/account-moves.ts`).
-        const { inFlight } = await context.runMutation(internal.lib.account_moves.pinWritesInFlightFor, { userId: args.from });
 
-        if (inFlight) {
-            throw new LunoraError("CONFLICT", "The guest's pin writes are still in flight; the merge is retried");
+        const { until } = await context.runMutation(internal.lib.account_moves.pinWritesInFlightFor, { userId: args.from });
+
+        if (until !== null) {
+            // One extra second for clock skew between the writer and this job, so the lease has run out when the job runs.
+            await enqueueJob(internal.lib.account_merge.runGuestMerge, args, { delayMs: Math.max(0, until - Date.now()) + 1000, shardKey: args.to });
+
+            return { moved: 0 };
         }
 
-        // Moves the pins of every route held by `routeUserId` to the new account, on each route's owner shard, one batch per call. Each
-        // move is idempotent, so a redelivery repeats it safely.
-        const reassignPinsOnRoutesOf = async (routeUserId: string): Promise<void> => {
-            let cursor: string | null = null;
-            let isDone = false;
-
-            while (!isDone) {
-                const routes: { continueCursor: string | null; isDone: boolean; page: { ownerId: string; threadId: string }[] } = await context.runQuery(
-                    internal.chat.pins.functions.listSharedPinRoutesForExport,
-                    { cursor, userId: routeUserId },
-                );
-
-                for (const route of routes.page) {
-                    let more = true;
-
-                    while (more) {
-                        const result = await callOnShard(
-                            internal.chat.pins.functions.reassignUserPinsOnThread,
-                            { from: args.from, threadId: route.threadId as never, to: args.to },
-                            { shardKey: route.ownerId },
-                        );
-
-                        more = result.hasMore;
-                    }
-                }
-
-                isDone = routes.isDone;
-                cursor = routes.continueCursor;
-            }
+        const moves: GuestPinMoves = {
+            listRoutes: async (routeUserId, cursor) =>
+                await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, { cursor, userId: routeUserId }),
+            mergeRows: async () =>
+                await mergeGuestInto(
+                    async (reference, callArgs, shardKey) => (await callOnShard(reference as never, callArgs as never, { shardKey })) as never,
+                    {
+                        deleteGuest: internal.auth.hooks.deleteMergedGuest,
+                        deleteRows: internal.lib.account_merge.deleteShardRows,
+                        importRows: internal.lib.account_merge.importShardRows,
+                        list: internal.lib.account_merge.listShardRowsPage,
+                        listIds: internal.lib.account_merge.listShardRowIds,
+                        reassignFollows: internal.lib.account_merge.reassignThreadFollowsPage,
+                        reassignGlobal: internal.lib.account_merge.reassignGlobalRows,
+                    },
+                    args.from,
+                    args.to,
+                ),
+            moveBatch: async (route) =>
+                await callOnShard(
+                    internal.chat.pins.functions.reassignUserPinsOnThread,
+                    { from: args.from, threadId: route.threadId as never, to: args.to },
+                    { shardKey: route.ownerId },
+                ),
         };
 
-        // The guest's pins on other owners' threads move while their routes still name the guest; the routes move with the guest's
-        // global rows in the merge below.
-        await reassignPinsOnRoutesOf(args.from);
+        const result = await moveGuestPins(moves, args.from, args.to);
 
-        const result = await mergeGuestInto(
-            async (reference, callArgs, shardKey) => (await callOnShard(reference as never, callArgs as never, { shardKey })) as never,
-            {
-                deleteGuest: internal.auth.hooks.deleteMergedGuest,
-                deleteRows: internal.lib.account_merge.deleteShardRows,
-                importRows: internal.lib.account_merge.importShardRows,
-                list: internal.lib.account_merge.listShardRowsPage,
-                listIds: internal.lib.account_merge.listShardRowIds,
-                reassignFollows: internal.lib.account_merge.reassignThreadFollowsPage,
-                reassignGlobal: internal.lib.account_merge.reassignGlobalRows,
-            },
-            args.from,
-            args.to,
-        );
-
-        // A parallel merge of the owner can move a thread's shard, and so the guest's pins, between the pass above reading a route and
-        // the merge re-pointing it. The routes now held by `to` name the shard that holds the pins: a second pass reaches them.
-        await reassignPinsOnRoutesOf(args.to);
-        await context.runMutation(internal.lib.account_moves.endAccountMoveFor, { userId: args.from });
+        await context.runMutation(internal.lib.account_moves.endAccountMoveFor, { kind: "merging", userId: args.from });
 
         authLogger.info(`[auth] moved ${String(result.moved)} rows from guest ${args.from} to ${args.to}`);
 

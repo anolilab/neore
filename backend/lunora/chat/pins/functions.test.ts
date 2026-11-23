@@ -498,3 +498,25 @@ describe("a pin write renews the writer's lease before its move check", () => {
         expect(leases.page).toHaveLength(1);
     });
 });
+
+describe("refused pin writes renew no lease", () => {
+    it("leaves no lease behind after repeated refused attempts from a marked account", async () => {
+        await harness.run(async (context: any) => {
+            await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId, userId: "user-collaborator" });
+            await context.db.insert("accountMoves", { createdAt: 1, kind: "erasing", userId: "user-collaborator" });
+        });
+
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            await expect(
+                as("user-collaborator").mutation(
+                    createPin as never,
+                    { messageId: `m-refused-${String(attempt)}`, messageRole: "assistant", threadId } as never,
+                ),
+            ).rejects.toThrow(MOVED_ACCOUNT_ERROR);
+        }
+
+        const leases = await harness.run(async (context: any) => await context.db.pinWriteLeases.findMany({ where: { userId: "user-collaborator" } }));
+
+        expect(leases.page).toHaveLength(0);
+    });
+});
