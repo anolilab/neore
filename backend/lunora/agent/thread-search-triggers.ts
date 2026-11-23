@@ -101,53 +101,72 @@ export const threadSearchTriggers = (t: TriggerBuilder) => {
 /** A thread's user-turn count; a thread written before the count existed has none. */
 const userTurnsOf = (thread: Record<string, unknown>): number => (typeof thread.userTurnCount === "number" ? thread.userTurnCount : 0);
 
+/** Whether a messages row is a user turn of a thread. */
+const isUserTurn = (row: { message?: { role?: unknown }; threadId?: string }): row is { message: { role: "user" }; threadId: string } =>
+    row.message?.role === "user" && row.threadId !== undefined;
+
 /**
- * The messages table's triggers for the palette's turn gate. A thread's user-turn count lives on
- * the thread row. A user turn inserted adds one. A user turn deleted takes one away, and schedules
- * a sync only when that delete takes the thread below the gate, since that is the only change that
- * clears vectors. A thread already being hard-deleted is left alone: its cleanup removes the vectors.
- * Triggers run for every writer of `messages`, so no writer keeps the count itself.
+ * Moves a thread's user-turn count by `delta`, and schedules a sync when the move crosses the gate,
+ * either way: up, a thread that just qualified gets its vectors without waiting for a reply (a fork,
+ * a messenger turn or a failed reply sets no `lastReplyAt`); down, its vectors are cleared. A thread
+ * already being hard-deleted is left alone: its cleanup removes the vectors.
+ */
+const moveUserTurns = async (context: TriggerCtx, threadId: string, delta: 1 | -1): Promise<void> => {
+    const thread = await context.db.get("threads", threadId);
+
+    if (thread === null || thread.deletingAt !== undefined || typeof thread.userId !== "string") {
+        return;
+    }
+
+    const before = userTurnsOf(thread);
+    const after = Math.max(0, before + delta);
+
+    await context.db.patch("threads", threadId, { userTurnCount: after });
+
+    if (hasEnoughTurns(before) === hasEnoughTurns(after)) {
+        return;
+    }
+
+    // `changed: []`: the sync embeds each kind with text and no vector, and clears every vector once the thread is below the gate.
+    await scheduleOrLog(
+        context,
+        (internal) => internal.agent.thread_search.syncThreadSearch,
+        { changed: [], threadId },
+        { retry: SYNC_RETRY, shardKey: thread.userId },
+    );
+};
+
+/**
+ * The messages table's triggers for the palette's turn gate. A user turn inserted adds one to the
+ * count on its thread row, a user turn deleted takes one away, and a row whose role changes to or
+ * from `user` (a pending row overwritten by `updateMessage` or an abandon) moves it too. A sync is
+ * scheduled only when the count crosses the gate (`moveUserTurns`). Triggers run for every writer of
+ * `messages`, so no writer keeps the count itself.
  */
 export const threadSearchMessageTriggers = (t: TriggerBuilder) => {
     return {
         threadSearchTurnDelete: t.afterDelete(async (context, event) => {
             const previous = event.previous as unknown as { message?: { role?: unknown }; threadId?: string };
 
-            if (previous.message?.role !== "user" || previous.threadId === undefined) {
-                return;
-            }
-
-            const thread = await context.db.get("threads", previous.threadId);
-
-            if (thread === null || thread.deletingAt !== undefined || typeof thread.userId !== "string") {
-                return;
-            }
-
-            const before = userTurnsOf(thread);
-            const after = Math.max(0, before - 1);
-
-            await context.db.patch("threads", previous.threadId, { userTurnCount: after });
-
-            if (hasEnoughTurns(before) && !hasEnoughTurns(after)) {
-                await scheduleOrLog(
-                    context,
-                    (internal) => internal.agent.thread_search.syncThreadSearch,
-                    { changed: [], threadId: previous.threadId },
-                    { retry: SYNC_RETRY, shardKey: thread.userId },
-                );
+            if (isUserTurn(previous)) {
+                await moveUserTurns(context, previous.threadId, -1);
             }
         }),
         threadSearchTurnInsert: t.afterInsert(async (context, event) => {
             const doc = event.doc as unknown as { message?: { role?: unknown }; threadId?: string };
 
-            if (doc.message?.role !== "user" || doc.threadId === undefined) {
-                return;
+            if (isUserTurn(doc)) {
+                await moveUserTurns(context, doc.threadId, 1);
             }
+        }),
+        threadSearchTurnUpdate: t.afterUpdate(async (context, event) => {
+            const previous = event.previous as unknown as { message?: { role?: unknown }; threadId?: string };
+            const doc = event.doc as unknown as { message?: { role?: unknown }; threadId?: string };
 
-            const thread = await context.db.get("threads", doc.threadId);
-
-            if (thread !== null) {
-                await context.db.patch("threads", doc.threadId, { userTurnCount: userTurnsOf(thread) + 1 });
+            if (isUserTurn(doc) && !isUserTurn(previous)) {
+                await moveUserTurns(context, doc.threadId, 1);
+            } else if (isUserTurn(previous) && !isUserTurn(doc)) {
+                await moveUserTurns(context, previous.threadId, -1);
             }
         }),
     };

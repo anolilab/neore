@@ -3,11 +3,14 @@
  * The fake gives every text the same vector, so a match is decided by the mocked
  * index, not by a real model: these tests check the wiring, not the ranking.
  */
+import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { internal } from "../_generated/internal";
+import schema from "../schema";
+import { addMessagesHandler, updateMessage } from "./messages";
 import { MEANING_MIN_CHARS } from "./thread-search-plan";
-import { runThreadSearchSync, searchThreadsByMeaningFor } from "./thread-search";
+import { runThreadSearchSync, searchThreadsByMeaningFor, visibleThreadsForSearch } from "./thread-search";
 
 const mocks = vi.hoisted(() => {
     return {
@@ -320,5 +323,66 @@ describe(searchThreadsByMeaningFor, () => {
         const ctx = makeCtx({ threadIdsForVectors: [{ threadId: "thread-pdf", vectorId: "vec-title" }] });
 
         expect(await searchThreadsByMeaningFor(ctx as never, { query: "the invoice bug", userId: "user-1" })).toEqual([]);
+    });
+});
+
+describe("visibleThreadsForSearch, with the messages triggers keeping the turn count", () => {
+    const OWNER = "owner-visible";
+
+    /** A thread with four user turns, written by the real message writer so the triggers count them. */
+    const threadWithFourTurns = async () => {
+        const harness = lunoraTest(schema as never);
+        const run = <T>(body: (ctx: any) => Promise<T>): Promise<T> => harness.run(body as never);
+        const threadId = await run(async (ctx) => await ctx.db.insert("threads", { status: "active", title: "PDF totals off by one", userId: OWNER }));
+        const messageIds: string[] = [];
+
+        for (const text of ["one", "two", "three", "four"]) {
+            const { messages } = await run(
+                async (ctx) =>
+                    await addMessagesHandler(ctx, {
+                        messages: [{ message: { content: [{ text, type: "text" }], role: "user" }, status: "success" } as never],
+                        threadId,
+                        userId: OWNER,
+                    }),
+            );
+
+            messageIds.push(String(messages[0]?._id));
+        }
+
+        const visible = async () => await run(async (ctx) => await ctx.runQuery(visibleThreadsForSearch, { threadIds: [threadId], userId: OWNER }));
+        const turns = async () =>
+            await run(async (ctx) => {
+                const thread = await ctx.db.get("threads", threadId);
+
+                return thread?.userTurnCount;
+            });
+
+        return { messageIds, run, turns, visible };
+    };
+
+    it("drops a thread a delete took back below the gate, while its vector cleanup is still queued", async () => {
+        const { messageIds, run, turns, visible } = await threadWithFourTurns();
+
+        expect(await visible()).toHaveLength(1);
+
+        await run(async (ctx) => await ctx.db.delete("messages", messageIds[3]));
+
+        expect(await turns()).toBe(3);
+        expect(await visible()).toStrictEqual([]);
+    });
+
+    it("counts a user turn overwritten as the assistant's out of the gate", async () => {
+        const { messageIds, run, turns } = await threadWithFourTurns();
+
+        // A pending row overwritten as the assistant's (an abandoned reply, `updateMessage`) is no longer a user turn.
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(updateMessage, {
+                    messageId: messageIds[3],
+                    patch: { message: { content: [{ text: "stopped", type: "text" }], role: "assistant" } },
+                }),
+        );
+
+        expect(await turns()).toBe(3);
     });
 });

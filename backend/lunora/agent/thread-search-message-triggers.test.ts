@@ -1,7 +1,8 @@
 /**
- * The messages triggers for the palette's turn gate. A user turn inserted or deleted moves the
- * thread's user-turn count. A delete schedules a sync only when it crosses the gate, on the
- * thread owner's shard. Other rows change nothing, and a thread being hard-deleted is left alone.
+ * The messages triggers for the palette's turn gate. A user turn inserted or deleted, or a row whose
+ * role changes to or from `user`, moves the thread's user-turn count. A sync is scheduled only when
+ * the count crosses the gate, either way, on the thread owner's shard. Other rows change nothing,
+ * and a thread being hard-deleted is left alone.
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -13,7 +14,11 @@ type Handler = (context: unknown, event: unknown) => Promise<void>;
 const triggers = threadSearchMessageTriggers({
     afterDelete: (handler: Handler) => handler,
     afterInsert: (handler: Handler) => handler,
-} as never) as unknown as { threadSearchTurnDelete: Handler; threadSearchTurnInsert: Handler };
+    afterUpdate: (handler: Handler) => handler,
+} as never) as unknown as { threadSearchTurnDelete: Handler; threadSearchTurnInsert: Handler; threadSearchTurnUpdate: Handler };
+
+const syncOf = { changed: [], threadId: "t1" };
+const onOwnerShard = { retry: SYNC_RETRY, shardKey: "u1" };
 
 /** A database with one thread row; `patch` is recorded. */
 const databaseWith = (thread: { deletingAt?: number; userTurnCount?: number } | null) => {
@@ -41,12 +46,48 @@ describe("threadSearchMessageTriggers", () => {
         await triggers.threadSearchTurnDelete({ db, scheduler }, { id: "m1", previous: { message: { role: "user" }, threadId: "t1" } });
 
         expect(patch).toHaveBeenCalledWith("threads", "t1", { userTurnCount: 3 });
-        expect(scheduler.runAfter).toHaveBeenCalledWith(
-            0,
-            internal.agent.thread_search.syncThreadSearch,
-            { changed: [], threadId: "t1" },
-            { retry: SYNC_RETRY, shardKey: "u1" },
+        expect(scheduler.runAfter).toHaveBeenCalledWith(0, internal.agent.thread_search.syncThreadSearch, syncOf, onOwnerShard);
+    });
+
+    it("schedules the sync when an insert takes the thread over the gate, without waiting for a reply", async () => {
+        const { db, patch } = databaseWith({ userTurnCount: 3 });
+        const scheduler = { runAfter: vi.fn(async () => "job") };
+
+        await triggers.threadSearchTurnInsert({ db, scheduler }, { doc: { message: { role: "user" }, threadId: "t1" }, id: "m1" });
+
+        expect(patch).toHaveBeenCalledWith("threads", "t1", { userTurnCount: 4 });
+        expect(scheduler.runAfter).toHaveBeenCalledWith(0, internal.agent.thread_search.syncThreadSearch, syncOf, onOwnerShard);
+    });
+
+    it("takes a user turn away when an update makes it another role, and clears the vectors below the gate", async () => {
+        const { db, patch } = databaseWith({ userTurnCount: 4 });
+        const scheduler = { runAfter: vi.fn(async () => "job") };
+
+        await triggers.threadSearchTurnUpdate(
+            { db, scheduler },
+            { doc: { message: { role: "assistant" }, threadId: "t1" }, id: "m1", previous: { message: { role: "user" }, threadId: "t1" } },
         );
+
+        expect(patch).toHaveBeenCalledWith("threads", "t1", { userTurnCount: 3 });
+        expect(scheduler.runAfter).toHaveBeenCalledWith(0, internal.agent.thread_search.syncThreadSearch, syncOf, onOwnerShard);
+    });
+
+    it("adds a user turn when an update makes a row a user turn, and leaves an update that keeps the role alone", async () => {
+        const { db, patch } = databaseWith({ userTurnCount: 1 });
+        const scheduler = { runAfter: vi.fn(async () => "job") };
+
+        await triggers.threadSearchTurnUpdate(
+            { db, scheduler },
+            { doc: { message: { role: "user" }, threadId: "t1" }, id: "m1", previous: { message: { role: "assistant" }, threadId: "t1" } },
+        );
+        await triggers.threadSearchTurnUpdate(
+            { db, scheduler },
+            { doc: { message: { role: "user" }, threadId: "t1" }, id: "m2", previous: { message: { role: "user" }, threadId: "t1" } },
+        );
+
+        expect(patch).toHaveBeenCalledOnce();
+        expect(patch).toHaveBeenCalledWith("threads", "t1", { userTurnCount: 2 });
+        expect(scheduler.runAfter).not.toHaveBeenCalled();
     });
 
     it("counts a delete that stays above the gate without scheduling anything", async () => {

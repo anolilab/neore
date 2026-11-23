@@ -402,7 +402,8 @@ export const threadIdsForVectors = internalQuery
 
 /**
  * The visible rows of the given threads, for the owner. A thread that is deleted,
- * temporary, locked or not theirs is dropped, whatever a stale vector says.
+ * temporary, locked, not theirs or back below the turn gate is dropped, whatever a
+ * stale vector says: its cleanup may still be queued.
  */
 export const visibleThreadsForSearch = internalQuery
     .input({ threadIds: v.array(v.string()), userId: v.string() })
@@ -413,7 +414,7 @@ export const visibleThreadsForSearch = internalQuery
         for (const threadId of args.threadIds) {
             const thread = (await ctx.db.get("threads", threadId as Id<"threads">)) as Doc<"threads"> | null;
 
-            if (!thread || thread.userId !== args.userId || !isSearchEligible(thread)) {
+            if (!thread || thread.userId !== args.userId || !isSearchEligible(thread) || !hasEnoughTurns(thread.userTurnCount ?? 0)) {
                 continue;
             }
 
