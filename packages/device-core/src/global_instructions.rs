@@ -595,18 +595,15 @@ fn read_text(handle: File) -> Result<String, &'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_dir::TestDir;
 
     /// A scratch folder per test, with a `home` inside it, so "outside home" is a real place.
-    fn home(name: &str) -> (PathBuf, PathBuf) {
-        let dir = std::env::temp_dir().join(format!(
-            "neore-global-instructions-{name}-{}",
-            std::process::id()
-        ));
-        let _ = fs::remove_dir_all(&dir);
+    fn home(name: &str) -> (TestDir, PathBuf) {
+        let dir = TestDir::new(&format!("global-instructions-{name}")).canonical();
         fs::create_dir_all(dir.join("home")).unwrap();
-        let dir = fs::canonicalize(dir).unwrap();
+        let home = dir.join("home");
 
-        (dir.clone(), dir.join("home"))
+        (dir, home)
     }
 
     fn put(home: &Path, relative: &str, text: &str) {

@@ -1716,6 +1716,7 @@ mod tests {
     use crate::lifecycle::Phase;
     use crate::ssh::{RemoteOutcome, RemoteSandbox};
     use crate::store::test_keychain;
+    use crate::test_dir::TestDir;
     use std::io::Write;
     use std::sync::atomic::{AtomicBool, AtomicUsize};
     use std::sync::Barrier;
@@ -1901,11 +1902,10 @@ mod tests {
 
     /// A paired desktop and its server, with the server connected over `link`. Their ids are `desk_id(name)` and
     /// `host_id(name)`.
-    fn engine(name: &str, link: &Arc<FakeLink>) -> (DeviceState, PathBuf, Arc<Mutex<Vec<Event>>>) {
+    fn engine(name: &str, link: &Arc<FakeLink>) -> (DeviceState, TestDir, Arc<Mutex<Vec<Event>>>) {
         test_keychain::install();
 
-        let dir = std::env::temp_dir().join(format!("neore-hosts-{name}-{}", std::process::id()));
-        let _ = stdfs::remove_dir_all(&dir);
+        let dir = TestDir::at(&format!("hosts-{name}"));
         stdfs::create_dir_all(&dir).unwrap();
         store::save(
             &dir.join("device.json"),
@@ -3065,7 +3065,7 @@ mod tests {
         name: &str,
         first: &Arc<FakeLink>,
         connector: impl Fn() -> Result<Arc<dyn HostLink>, ConnectError> + Send + Sync + 'static,
-    ) -> (Arc<DeviceState>, PathBuf) {
+    ) -> (Arc<DeviceState>, TestDir) {
         let (mut state, dir, _) = engine(name, first);
 
         state.ssh.connector = Some(Box::new(move |_| connector()));
@@ -3593,7 +3593,7 @@ mod tests {
     #[test]
     fn the_file_tree_asks_the_server_for_a_page_inside_the_folders_set_for_it() {
         let link = FakeLink::new(true);
-        let (state, _, _) = engine("files-list", &link);
+        let (state, _dir, _) = engine("files-list", &link);
         let page = state
             .host_files_list(&host_id("files-list"), "src", Some("m"))
             .unwrap();
@@ -3617,7 +3617,7 @@ mod tests {
     #[test]
     fn a_file_is_read_through_the_same_action_an_agent_would_run() {
         let link = FakeLink::new(true);
-        let (state, _, _) = engine("files-read", &link);
+        let (state, _dir, _) = engine("files-read", &link);
         let read = state
             .host_file_read(&host_id("files-read"), "a.txt")
             .unwrap();

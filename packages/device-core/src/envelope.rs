@@ -251,6 +251,7 @@ pub fn sign_value(secret: &str, domain: Domain, value: &Value) -> Signed {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_dir::TestDir;
     use serde_json::json;
     use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -345,11 +346,11 @@ mod tests {
         assert!(verify_call(SECRET, "dev1", &signed, 2_000, &mut nonces).is_err());
     }
 
-    fn nonce_file(name: &str) -> PathBuf {
-        let dir =
-            std::env::temp_dir().join(format!("neore-device-nonces-{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        dir.join("device-nonces.json")
+    fn nonce_file(name: &str) -> (TestDir, PathBuf) {
+        let dir = TestDir::at(&format!("device-nonces-{name}"));
+        let path = dir.join("device-nonces.json");
+
+        (dir, path)
     }
 
     static NEXT_NONCE: AtomicU64 = AtomicU64::new(0);
@@ -364,7 +365,7 @@ mod tests {
 
     #[test]
     fn a_stored_nonce_is_still_refused_after_a_restart() {
-        let path = nonce_file("reload");
+        let (_dir, path) = nonce_file("reload");
         let first = fresh_nonce();
         let second = fresh_nonce();
         let mut before = NonceSet::persisted(&path, 1_000);
@@ -374,13 +375,11 @@ mod tests {
         let mut after = NonceSet::persisted(&path, 2_000);
         assert!(!after.insert(&first, 10_000, 2_000));
         assert!(after.insert(&second, 10_000, 2_000));
-
-        let _ = std::fs::remove_dir_all(path.parent().unwrap());
     }
 
     #[test]
     fn an_expired_nonce_is_pruned_on_load() {
-        let path = nonce_file("prune");
+        let (_dir, path) = nonce_file("prune");
         let old = fresh_nonce();
         let mut before = NonceSet::persisted(&path, 1_000);
 
@@ -388,8 +387,6 @@ mod tests {
 
         let mut after = NonceSet::persisted(&path, 6_000);
         assert!(after.insert(&old, 20_000, 6_000));
-
-        let _ = std::fs::remove_dir_all(path.parent().unwrap());
     }
 
     #[test]

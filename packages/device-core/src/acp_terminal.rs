@@ -476,6 +476,7 @@ fn redacted(word: &str) -> String {
 
 #[cfg(all(test, unix))]
 mod tests {
+    use crate::test_dir::TestDir;
     use std::fs;
     use std::path::Path;
     use std::time::Duration;
@@ -485,19 +486,9 @@ mod tests {
     use crate::engine::SettingsUpdate;
 
     /// A device with one registered agent, a shared folder holding the agent's approved folder, and a folder next to it.
-    /// Removes a test's folder tree when the test ends, whether it passed or not.
-    struct Scratch(PathBuf);
-
-    impl Drop for Scratch {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
-        }
-    }
-
-    fn setup(name: &str) -> (DeviceState, PathBuf, PathBuf, PathBuf, Scratch) {
-        let dir =
-            std::env::temp_dir().join(format!("neore-acp-term-{name}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
+    /// The folder tree is removed when the test ends, whether it passed or not.
+    fn setup(name: &str) -> (DeviceState, PathBuf, PathBuf, PathBuf, TestDir) {
+        let dir = TestDir::at(&format!("acp-term-{name}"));
         let shared = dir.join("shared");
         let project = shared.join("project");
         let other = dir.join("other");
@@ -533,7 +524,7 @@ mod tests {
 
         state.settings_update(roots).unwrap();
 
-        (state, project, other, shared, Scratch(dir))
+        (state, project, other, shared, dir)
     }
 
     fn request(folder: &Path, line: &str) -> TerminalRequest {
@@ -937,7 +928,7 @@ mod tests {
             "{output}"
         );
 
-        let audit = fs::read_to_string(scratch.0.join("data/device-audit.jsonl")).unwrap();
+        let audit = fs::read_to_string(scratch.join("data/device-audit.jsonl")).unwrap();
 
         assert!(
             audit.contains("acp_terminal") && audit.contains("[redacted]"),
