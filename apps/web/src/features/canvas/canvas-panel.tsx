@@ -40,6 +40,7 @@ import { useTheme } from "next-themes";
 import type { ChangeEvent, ComponentProps, FC } from "react";
 import { lazy, memo, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import TooltipIconButton from "@/features/chat/components/tooltip-icon-button";
 import { useCanvasState } from "@/features/chat/core/stores/chat-ui-store";
 import OpenAsPageButton from "@/features/pages/components/open-as-page-button";
@@ -389,6 +390,7 @@ CanvasContent.displayName = "CanvasContent";
 
 const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
     const { t } = useLingui();
+    const { data: sessionData } = useAuthSession();
     const {
         activeDocumentId,
         canvasDirty,
@@ -709,8 +711,11 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
         return null;
     }
 
+    // Only the author saves edits (`updateDocument`): a member who can read the document sees it without the edit controls.
+    const isAuthor = !!document && document.userId === sessionData?.user?.id;
     const isEditable =
-        document?.kind === "text" || document?.kind === "code" || document?.kind === "sheet" || document?.kind === "design" || document?.kind === "image";
+        isAuthor &&
+        (document?.kind === "text" || document?.kind === "code" || document?.kind === "sheet" || document?.kind === "design" || document?.kind === "image");
     const isStreaming = document?.status === "streaming";
     const canPreviewCode = document?.kind === "code" && getPreviewLanguage(document.language) !== undefined;
     const showCodePreview = canPreviewCode && codeView === "preview" && canvasViewMode !== "history";
@@ -827,7 +832,7 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
             <CanvasAiDiffBanner onDismiss={handleBannerDismiss} onUndo={handleBannerUndo} onViewChanges={handleBannerViewChanges} visible={showAiDiffBanner} />
 
             {/* Quick action toolbar */}
-            {document && canvasEditMode === "edit" && !isStreaming && !showCodePreview && <CanvasToolbar documentKind={document.kind} />}
+            {document && isEditable && canvasEditMode === "edit" && !isStreaming && !showCodePreview && <CanvasToolbar documentKind={document.kind} />}
 
             {/* Content */}
             <div className="flex-1 overflow-auto">
@@ -845,7 +850,7 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
                     <CanvasContent
                         codePreview={showCodePreview}
                         document={document}
-                        editMode={canvasEditMode}
+                        editMode={isEditable ? canvasEditMode : "preview"}
                         isStreaming={isStreaming}
                         onCodeSave={handleCodeSave}
                         onDesignSave={handleDesignSave}
