@@ -3,7 +3,8 @@
  *
  * The POST goes through `postCheckedHttps` (`lib/egress.ts`): the host name is
  * resolved, every answer must be a public address, and the connection goes to
- * that address with the certificate checked against the host name. Redirects are
+ * those addresses in turn (the next only when one cannot be reached before the
+ * request is written) with the certificate checked against the host name. Redirects are
  * not followed, so a 3xx is a failed delivery, reported as one.
  *
  * What the answer tells the user is limited on purpose: the status code and the

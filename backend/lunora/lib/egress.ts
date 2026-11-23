@@ -447,8 +447,10 @@ const readStatus = async (socket: EgressSocket): Promise<number> => {
 };
 
 /**
- * POSTs `request.body` to `request.url` at the first checked address, and returns the status. A 3xx is returned as it is.
- * Any refusal, failure or timeout throws an `EgressError` with a code and no URL or body in the message.
+ * POSTs `request.body` to `request.url` and returns the status. A 3xx is returned as it is. The addresses are tried in the
+ * order the lookup gave them, all of them already checked: a connection that fails before the request is written in full
+ * moves on to the next one, within the same deadline. Once the request is written, a failure is final, so no receiver gets
+ * it twice. Any refusal, failure or timeout throws an `EgressError` with a code and no URL or body in the message.
  */
 export const postCheckedHttps = async (request: EgressRequest, dependencies: EgressDependencies): Promise<EgressResponse> => {
     const target = parseTarget(request.url);
@@ -462,24 +464,52 @@ export const postCheckedHttps = async (request: EgressRequest, dependencies: Egr
         await Promise.all(opened.map(async (socket) => await socket.close().catch(() => undefined)));
     };
 
-    const attempt = async (): Promise<EgressResponse> => {
-        const [address] = await resolveChecked(target.hostname, dependencies, controller.signal);
-
-        // The deadline can pass while a lookup is in flight. Cleanup has already run by then, so open nothing.
-        if (controller.signal.aborted) {
-            throw new EgressError("timeout", "The request timed out.");
-        }
-
-        const plain = dependencies.connect({ hostname: address as string, port: HTTPS_PORT }, { allowHalfOpen: false, secureTransport: "starttls" });
+    /** Opens a TLS connection to one checked address and writes the request; throws if any of that fails. */
+    const send = async (address: string): Promise<EgressSocket> => {
+        const plain = dependencies.connect({ hostname: address, port: HTTPS_PORT }, { allowHalfOpen: false, secureTransport: "starttls" });
 
         opened.push(plain);
 
+        // The certificate is checked against the URL's host name, whichever address the connection went to.
         const socket = plain.startTls({ expectedServerHostname: target.hostname });
 
         opened.push(socket);
-        await writeRequest(socket, target, request);
 
-        return { status: await readStatus(socket) };
+        try {
+            await writeRequest(socket, target, request);
+        } catch (error) {
+            void plain.close().catch(() => undefined);
+            void socket.close().catch(() => undefined);
+
+            throw error;
+        }
+
+        return socket;
+    };
+
+    const attempt = async (): Promise<EgressResponse> => {
+        const addresses = await resolveChecked(target.hostname, dependencies, controller.signal);
+        let lastError: unknown;
+
+        for (const address of addresses) {
+            // The deadline can pass while a lookup or an earlier address is in flight. Cleanup has already run by then, so open nothing.
+            if (controller.signal.aborted) {
+                throw new EgressError("timeout", "The request timed out.");
+            }
+
+            let socket: EgressSocket;
+
+            try {
+                socket = await send(address);
+            } catch (error) {
+                lastError = error;
+                continue;
+            }
+
+            return { status: await readStatus(socket) };
+        }
+
+        throw lastError;
     };
 
     // A socket failure from connect, TLS, write or read is not part of the caller's contract: it comes back as bad_response.

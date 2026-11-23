@@ -73,6 +73,47 @@ const dependencies = (fetch: EgressDependencies["fetch"], connection: FakeConnec
 
 const HOOK = "https://hooks.example.com/run?x=1";
 
+/**
+ * A `connect` that behaves per address: `unreachable` fails the handshake (the first write rejects), `reset` takes the
+ * request and then drops the connection, and a string is the response that address answers with.
+ */
+const perAddressConnect = (behaviour: Record<string, string>) => {
+    const tried: string[] = [];
+    const tls: { address: string; hostname: string }[] = [];
+    const connect = vi.fn(((address) => {
+        tried.push(address.hostname);
+
+        const mode = behaviour[address.hostname] ?? "unreachable";
+        const socket: EgressSocket = {
+            close: vi.fn(async () => {}),
+            readable:
+                mode === "reset"
+                    ? new ReadableStream<Uint8Array>({
+                          start(controller) {
+                              controller.error(new Error("connection reset"));
+                          },
+                      })
+                    : textStream(mode),
+            startTls: vi.fn(({ expectedServerHostname }) => {
+                tls.push({ address: address.hostname, hostname: expectedServerHostname });
+
+                return socket;
+            }),
+            writable: new WritableStream<Uint8Array>({
+                write() {
+                    if (mode === "unreachable") {
+                        throw new Error("connection refused");
+                    }
+                },
+            }),
+        };
+
+        return socket;
+    }) as EgressConnect);
+
+    return { connect, tls, tried };
+};
+
 describe("isPublicIPv4", () => {
     it.each([
         "0.0.0.0",
@@ -373,6 +414,74 @@ describe("postCheckedHttps", () => {
         const result = await postCheckedHttps({ body: "", headers: {}, url: HOOK }, dependencies(dnsFetch({ A: ["93.184.216.34"] }), connection));
 
         expect(result).toEqual({ status: 201 });
+    });
+
+    it("moves on to the next checked address when one cannot be reached, keeping the host name for the certificate", async () => {
+        const { connect, tls, tried } = perAddressConnect({ "2a00:1450::1": "HTTP/1.1 204 No Content\r\n\r\n" });
+
+        const result = await postCheckedHttps(
+            { body: "", headers: {}, url: HOOK },
+            { connect, fetch: dnsFetch({ A: ["93.184.216.34"], AAAA: ["2a00:1450::1"] }) },
+        );
+
+        expect(result).toEqual({ status: 204 });
+        expect(tried).toStrictEqual(["93.184.216.34", "2a00:1450::1"]);
+        expect(tls.every(({ hostname }) => hostname === "hooks.example.com")).toBe(true);
+    });
+
+    it("fails as a connection failure when no checked address can be reached", async () => {
+        const { connect, tried } = perAddressConnect({});
+
+        await expect(
+            postCheckedHttps({ body: "", headers: {}, url: HOOK }, { connect, fetch: dnsFetch({ A: ["93.184.216.34", "8.8.8.8"] }) }),
+        ).rejects.toMatchObject({ code: "bad_response" });
+        expect(tried).toStrictEqual(["93.184.216.34", "8.8.8.8"]);
+    });
+
+    it("tries no other address once the request was written, so a receiver never gets it twice", async () => {
+        const { connect, tried } = perAddressConnect({ "8.8.8.8": "HTTP/1.1 204 No Content\r\n\r\n", "93.184.216.34": "reset" });
+
+        await expect(
+            postCheckedHttps({ body: "", headers: {}, url: HOOK }, { connect, fetch: dnsFetch({ A: ["93.184.216.34", "8.8.8.8"] }) }),
+        ).rejects.toMatchObject({ code: "bad_response" });
+        expect(tried).toStrictEqual(["93.184.216.34"]);
+    });
+
+    it("opens nothing for a host with a refused address among reachable ones", async () => {
+        const { connect, tried } = perAddressConnect({ "8.8.8.8": "HTTP/1.1 204 No Content\r\n\r\n" });
+
+        await expect(
+            postCheckedHttps({ body: "", headers: {}, url: HOOK }, { connect, fetch: dnsFetch({ A: ["93.184.216.34", "10.0.0.5", "8.8.8.8"] }) }),
+        ).rejects.toMatchObject({ code: "blocked_address" });
+        expect(tried).toStrictEqual([]);
+    });
+
+    it("stops trying addresses at the deadline", async () => {
+        const { connect, tried } = perAddressConnect({});
+        // A handshake that never finishes: the deadline must end the call without moving on to another address.
+        const hangingConnect = vi.fn(((address, options) => {
+            const socket = connect(address, options);
+            const writable = new WritableStream<Uint8Array>({
+                async write() {
+                    await new Promise<never>(() => {});
+                },
+            });
+
+            return {
+                ...socket,
+                startTls: () => {
+                    return { ...socket, writable };
+                },
+            };
+        }) as EgressConnect);
+
+        await expect(
+            postCheckedHttps(
+                { body: "", headers: {}, timeoutMs: 20, url: HOOK },
+                { connect: hangingConnect, fetch: dnsFetch({ A: ["93.184.216.34", "8.8.8.8", "9.9.9.9"] }) },
+            ),
+        ).rejects.toMatchObject({ code: "timeout" });
+        expect(tried).toStrictEqual(["93.184.216.34"]);
     });
 
     it("returns the timeout even when a graceful close never finishes", async () => {

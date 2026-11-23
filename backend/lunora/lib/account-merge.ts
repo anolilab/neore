@@ -52,7 +52,7 @@ const COPIED_FOR_GUEST_ONLY = new Set([...KEEP_NEW_USERS, "runWebhooks"]);
 /** The claim scope of the store probe: a marker written on the new account's shard and looked for on the guest's. */
 export const MERGE_PROBE_SCOPE = "guest-merge-probe";
 
-/** How long the probe marker is kept; a merge reads it straight after writing it, the purge cron drops it later. */
+/** How long the probe marker is kept: far past the write-then-read of one attempt, which releases it; the purge cron drops a lost one. */
 const MERGE_PROBE_TTL_MS = 60 * 60 * 1000;
 
 /** Ephemeral bookkeeping that is not the guest's content. */
@@ -391,6 +391,36 @@ const moveThreadFollows = async (call: ShardCall, references: MergeReferences, f
 };
 
 /**
+ * Whether the guest's and the new account's shard keys serve one store: a marker written under `to` and looked for under
+ * `from`. Each attempt writes a key of its own, so a marker a crashed earlier attempt left (and which may lapse at any
+ * moment) is never what this attempt reads. A write that did not take a fresh claim, or a read that fails, throws: only a
+ * marker this attempt wrote and then missed may answer "separate", the answer that clears other users' rows.
+ */
+const probeSharedStore = async (call: ShardCall, references: MergeReferences, from: string, to: string): Promise<boolean> => {
+    const key = `${from}:${to}:${crypto.randomUUID()}`;
+    const written: unknown = await call(references.markProbe, { key, scope: MERGE_PROBE_SCOPE, ttlMs: MERGE_PROBE_TTL_MS }, to);
+
+    if (written !== true) {
+        throw new Error(`the store probe for the merge of guest ${from} into ${to} was not written; the merge runs again`);
+    }
+
+    const held: unknown = await call(references.probeHeld, { key, scope: MERGE_PROBE_SCOPE }, from);
+
+    if (typeof held !== "boolean") {
+        throw new TypeError(`the store probe for the merge of guest ${from} into ${to} gave no answer; the merge runs again`);
+    }
+
+    // The marker has done its job; the purge cron drops it if this release is lost.
+    try {
+        await call(references.releaseProbe, { key, scope: MERGE_PROBE_SCOPE }, to);
+    } catch (error) {
+        authLogger.warn(`[auth] the store probe marker for the merge of guest ${from} into ${to} was not released:`, error);
+    }
+
+    return held;
+};
+
+/**
  * Move everything of guest `from` to user `to`. Runs where a shard client is
  * available (the better-auth link hook in `auth.ts`).
  */
@@ -426,11 +456,7 @@ export const mergeGuestInto = async (call: ShardCall, references: MergeReference
     // store, another user's row there is the same row the new account's shard holds, so only the guest's rows are cleared.
     // On separate stores, every row the copy pass took now sits on the new shard too, a collaborator's row included, so the
     // guest's copy of it goes as well. Probed on every run, so a redelivered merge decides the same way.
-    const probeKey = `${from}:${to}`;
-
-    await call(references.markProbe, { key: probeKey, scope: MERGE_PROBE_SCOPE, ttlMs: MERGE_PROBE_TTL_MS }, to);
-
-    const sharedStore: boolean = await call(references.probeHeld, { key: probeKey, scope: MERGE_PROBE_SCOPE }, from);
+    const sharedStore = await probeSharedStore(call, references, from, to);
     let drained = true;
 
     for (const table of tables) {
@@ -499,6 +525,8 @@ export interface MergeReferences {
     probeHeld: { __lunoraRef: string };
     reassignFollows: { __lunoraRef: string };
     reassignGlobal: { __lunoraRef: string };
+    /** `releaseKey`, run on the new account's shard to drop the probe's marker once read. */
+    releaseProbe: { __lunoraRef: string };
 }
 
 /**
@@ -553,6 +581,7 @@ export const runGuestMerge = internalAction
                 probeHeld: internal.lib.claim_once.claimHeld,
                 reassignFollows: internal.lib.account_merge.reassignThreadFollowsPage,
                 reassignGlobal: internal.lib.account_merge.reassignGlobalRows,
+                releaseProbe: internal.lib.claim_once.releaseKey,
             },
             args.from,
             args.to,

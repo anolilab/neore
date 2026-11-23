@@ -36,9 +36,13 @@ const REFERENCES: MergeReferences = {
     probeHeld: { __lunoraRef: "lib_claim_once:claimHeld" },
     reassignFollows: ref("reassignThreadFollowsPage"),
     reassignGlobal: ref("reassignGlobalRows"),
+    releaseProbe: { __lunoraRef: "lib_claim_once:releaseKey" },
 };
 
 type Row = Record<string, unknown> & { _id: string };
+
+/** What a failed store probe throws: its own message, or the shard call's error passed through. */
+const PROBE_FAILURE = /probe|shard unavailable/;
 
 /**
  * Two shards as `shardKey → table → rows`, and a caller that plays the procedures against them. `follows` is how many
@@ -48,7 +52,18 @@ type Row = Record<string, unknown> & { _id: string };
 const fakeShards = (
     seed: Record<string, Record<string, Row[]>>,
     pageSize = 2,
-    { follows = 0, followsRemain = false, sameStore = false }: { follows?: number; followsRemain?: boolean; sameStore?: boolean } = {},
+    {
+        follows = 0,
+        followsRemain = false,
+        probe = {},
+        sameStore = false,
+    }: {
+        follows?: number;
+        followsRemain?: boolean;
+        /** Overrides of the store probe: what the marker write answers, what the read answers or throws, and markers already there. */
+        probe?: { held?: () => unknown; stale?: string[]; written?: unknown };
+        sameStore?: boolean;
+    } = {},
 ) => {
     let followsLeft = follows;
     let followPageCalls = 0;
@@ -57,6 +72,16 @@ const fakeShards = (
 
     if (sameStore) {
         shards.set("user", shards.get("guest") ?? new Map<string, Row[]>());
+    }
+
+    const probeKeys: string[] = [];
+    const releasedProbes: string[] = [];
+
+    if (probe.stale !== undefined) {
+        const store = shards.get("guest") ?? new Map<string, Row[]>();
+
+        shards.set("guest", store);
+        probes.set(store, new Set(probe.stale));
     }
 
     const reassigned: { from: string; to: string }[] = [];
@@ -80,6 +105,10 @@ const fakeShards = (
 
         switch (name) {
             case "claimHeld": {
+                if (probe.held !== undefined) {
+                    return probe.held() as never;
+                }
+
                 const store = shards.get(shardKey);
 
                 return (store !== undefined && (probes.get(store)?.has(args.key as string) ?? false)) as never;
@@ -88,6 +117,12 @@ const fakeShards = (
                 const store = shards.get(shardKey) ?? new Map<string, Row[]>();
 
                 shards.set(shardKey, store);
+                probeKeys.push(args.key as string);
+
+                if (probe.written !== undefined) {
+                    return probe.written as never;
+                }
+
                 probes.set(store, (probes.get(store) ?? new Set()).add(args.key as string));
 
                 return true as never;
@@ -156,13 +191,19 @@ const fakeShards = (
 
                 return { hasMore: followsLeft > 0, moved } as never;
             }
+            case "releaseKey": {
+                releasedProbes.push(args.key as string);
+                probes.get(shards.get(shardKey) ?? new Map())?.delete(args.key as string);
+
+                return null as never;
+            }
             default: {
                 throw new Error(`unexpected ${String(name)}`);
             }
         }
     };
 
-    return { call, deletedGuests, followPageCalls: () => followPageCalls, reassigned, shards };
+    return { call, deletedGuests, followPageCalls: () => followPageCalls, probeKeys, reassigned, releasedProbes, shards };
 };
 
 describe("rewriteOwner", () => {
@@ -313,6 +354,52 @@ describe("mergeGuestInto", () => {
             { _id: "c2", userId: "collaborator" },
             { _id: "c3", userId: "user" },
         ]);
+    });
+
+    it("probes with a key of its own on every attempt and releases it, so an earlier attempt's marker is never the one read", async () => {
+        const { call, probeKeys, releasedProbes } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } });
+
+        await mergeGuestInto(call, REFERENCES, "guest", "user");
+        await mergeGuestInto(call, REFERENCES, "guest", "user");
+
+        expect(new Set(probeKeys).size).toBe(2);
+        expect(releasedProbes).toStrictEqual(probeKeys);
+    });
+
+    it("keeps collaborators' rows when the store is shared, even with an earlier attempt's marker about to lapse", async () => {
+        // An earlier attempt's marker under the old fixed key; a retry that reused it would read whatever is left of it.
+        const { call, shards } = fakeShards({ guest: { threads: [{ _id: "c2", userId: "collaborator" }] } }, 2, {
+            probe: { stale: ["guest:user"] },
+            sameStore: true,
+        });
+
+        await mergeGuestInto(call, REFERENCES, "guest", "user");
+
+        expect(shards.get("guest")?.get("threads")).toStrictEqual([{ _id: "c2", userId: "collaborator" }]);
+    });
+
+    it.each([
+        { name: "the marker write takes no fresh claim", probe: { written: false } },
+        {
+            name: "the read fails",
+            probe: {
+                held: () => {
+                    throw new Error("shard unavailable");
+                },
+            },
+        },
+        { name: "the read gives no answer", probe: { held: () => undefined } },
+    ])("fails the merge and clears nothing when $name", async ({ probe }) => {
+        const rows: Row[] = [
+            { _id: "c1", userId: "guest" },
+            { _id: "c2", userId: "collaborator" },
+        ];
+        const { call, deletedGuests, shards } = fakeShards({ guest: { threads: rows } }, 2, { probe });
+
+        await expect(mergeGuestInto(call, REFERENCES, "guest", "user")).rejects.toThrow(PROBE_FAILURE);
+
+        expect(shards.get("guest")?.get("threads")).toStrictEqual(rows);
+        expect(deletedGuests).toStrictEqual([]);
     });
 
     it("is safe to run twice", async () => {
