@@ -22,6 +22,20 @@ const WithRevoke = ({ threadId, ...props }: Omit<ComponentProps<typeof GuestLink
     );
 };
 
+/**
+ * Finds a button and waits until it can be pressed. A disabled button has `pointer-events: none`, and a click on it
+ * throws: "Create guest link" stays off until the read is in the query cache, which can trail the mock's answer.
+ */
+const pressable = async (root: Pick<typeof screen, "findByRole">, name: string): Promise<HTMLElement> => {
+    const button = await root.findByRole("button", { name });
+
+    await waitFor(async () => {
+        await expect(button).toBeEnabled();
+    });
+
+    return button;
+};
+
 const HELD = GUEST_NOTES[0]?.text ?? "";
 /** `RevokeDeclined`'s revoke: a Cancel must never reach it. */
 const revokeCalled = fn(() => null);
@@ -71,8 +85,7 @@ export const NotesWaiting: Story = {
 export const NoLink: Story = {
     parameters: { msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ...guestLinksFixtures({ link: false })) } } },
     play: async ({ canvas }) => {
-        await lunoraAnswered(api.chat.guest_links.getGuestLink);
-        await userEvent.click(await canvas.findByRole("button", { name: "Create guest link" }));
+        await userEvent.click(await pressable(canvas, "Create guest link"));
         const field = (await canvas.findByRole("textbox", { name: "Guest link" })) as HTMLInputElement;
 
         // The token rides in the fragment, never the path or the query.
@@ -125,9 +138,9 @@ export const LockedChat: Story = {
 /** Revoking deletes the notes still waiting: the owner confirms first, then focus goes to "Create guest link". */
 export const RevokeWithWaitingNotes: Story = {
     play: async ({ canvas }) => {
-        await userEvent.click(await canvas.findByRole("button", { name: "Revoke link" }));
+        await userEvent.click(await pressable(canvas, "Revoke link"));
         await expect(await screen.findByRole("alertdialog")).toHaveTextContent("deletes the 1 guest message still waiting");
-        await userEvent.click(screen.getByRole("button", { name: "Revoke" }));
+        await userEvent.click(await pressable(screen, "Revoke"));
         await lunoraAnswered(api.chat.guest_links.revokeGuestLink);
         await waitFor(async () => {
             await expect(canvas.getByRole("button", { name: "Create guest link" })).toHaveFocus();
@@ -142,8 +155,8 @@ export const RevokeDeclined: Story = {
     },
     play: async ({ canvas }) => {
         revokeCalled.mockClear();
-        await userEvent.click(await canvas.findByRole("button", { name: "Revoke link" }));
-        await userEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+        await userEvent.click(await pressable(canvas, "Revoke link"));
+        await userEvent.click(await pressable(screen, "Cancel"));
         await waitFor(async () => {
             await expect(screen.queryByRole("alertdialog")).toBeNull();
         });
@@ -167,7 +180,7 @@ export const RevokeReplacedElsewhere: Story = {
         },
     },
     play: async ({ canvas }) => {
-        await userEvent.click(await canvas.findByRole("button", { name: "Revoke link" }));
+        await userEvent.click(await pressable(canvas, "Revoke link"));
         await expect(await screen.findByText("The guest link was replaced or has ended.")).toBeInTheDocument();
     },
 };
@@ -186,8 +199,7 @@ export const RefusalInAppWords: Story = {
         },
     },
     play: async ({ canvas }) => {
-        await lunoraAnswered(api.chat.guest_links.getGuestLink);
-        await userEvent.click(await canvas.findByRole("button", { name: "Create guest link" }));
+        await userEvent.click(await pressable(canvas, "Create guest link"));
         await expect(await screen.findByText("Guest messages from an earlier link are still waiting.")).toBeInTheDocument();
         await expect(screen.queryByText("server words")).toBeNull();
     },
