@@ -104,12 +104,16 @@ export const threadSearchTriggers = (t: TriggerBuilder) => {
             }
 
             // Archived or restored, by whatever writer: the thread's vectors carry the flag a meaning search filters on.
+            // Not logged and swallowed as the sync is: no later write queues this again (the one-time backfill may be done),
+            // so a failed schedule fails the archive or restore, and the job retries until it lands (it is idempotent).
             if (archivedChanged(event.previous as unknown as SearchRow, doc) && hasSearchVector(doc) && doc.userId !== undefined) {
-                await scheduleOrLog(
-                    context,
-                    (internal) => internal.agent.thread_vector_archived.syncThreadVectorArchived,
+                const { internal } = await import("../_generated/internal");
+
+                await context.scheduler.runAfter(
+                    0,
+                    internal.agent.thread_vector_archived.syncThreadVectorArchived,
                     { threadId: event.id },
-                    { retry: SYNC_RETRY, shardKey: doc.userId },
+                    { retry: CLEANUP_RETRY, shardKey: doc.userId },
                 );
             }
         }),

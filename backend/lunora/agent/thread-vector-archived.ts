@@ -10,7 +10,8 @@
  *   {@link syncThreadVectorArchived}, whatever wrote `status` (one thread, a bulk change, an undo, the
  *   auto-archive sweep, a task);
  * - vectors written before the flag existed: {@link sweepThreadVectorArchived}, from the shard
- *   housekeeping sweep, walks the shard's thread vectors once in {@link BACKFILL_PAGE}-row steps.
+ *   housekeeping sweep and from a meaning search, walks the shard's thread vectors once in
+ *   {@link BACKFILL_PAGE}-row steps.
  *
  * Every writer reads the thread's CURRENT status and patches only a row that differs, so each is
  * idempotent and a retry or a late run converges. A vector is patched only when it is the thread's own
@@ -23,7 +24,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
-import { claimFence, holdClaim, recordClaimResult } from "../lib/claim-once";
+import { claimFence, claimRow, recordClaimResult } from "../lib/claim-once";
 import { currentUserShard } from "../lib/shard-context";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { MAX_LENGTH } from "../lib/validators";
@@ -36,8 +37,11 @@ export const BACKFILL_PAGE = 32;
 /** How long a backfill step chain is trusted to be alive; past it, the next sweep resumes it from its saved place. */
 export const BACKFILL_LEASE_MS = 60 * 60 * 1000;
 
-/** A finished backfill's claim: effectively forever, as `AI_DISCLOSURE_CLAIM_TTL_MS`. Every later vector is written with its flag. */
-const BACKFILL_DONE_TTL_MS = 10 * 365 * 24 * 60 * 60 * 1000;
+/**
+ * The backfill's claim row never expires (as `AI_DISCLOSURE_CLAIM_TTL_MS`): the claim purge deletes expired rows, and this
+ * row holds the walk's place, so a lapsed chain must not cost it. The chain's own lease is in the place (`leaseUntil`).
+ */
+const BACKFILL_CLAIM_TTL_MS = 10 * 365 * 24 * 60 * 60 * 1000;
 
 /** Claim scope of the per-shard backfill; the key is the shard's user id. */
 export const BACKFILL_SCOPE = "thread-vector-archived";
@@ -101,10 +105,15 @@ export const syncThreadVectorArchived = internalMutation
         return null;
     });
 
-/** Where a backfill stands: the kind it walks and the cursor within it. Stored as the claim's `result`. */
-interface BackfillPlace {
+/**
+ * Where a backfill stands: the kind it walks, the cursor within it, the chain that walks it (`chain`, the fence a step
+ * checks) and until when that chain is trusted (`leaseUntil`). Stored as the claim's `result`; a finished walk stores `done`.
+ */
+export interface BackfillPlace {
+    chain?: number;
     cursor?: string;
     kind: SearchKind;
+    leaseUntil?: number;
 }
 
 const FIRST_PLACE: BackfillPlace = { kind: SEARCH_KINDS[0]! };
@@ -119,7 +128,12 @@ export const parseBackfillPlace = (result: string | undefined): BackfillPlace =>
         const parsed = JSON.parse(result) as Partial<BackfillPlace>;
 
         if (parsed.kind !== undefined && SEARCH_KINDS.includes(parsed.kind)) {
-            return { kind: parsed.kind, ...(typeof parsed.cursor === "string" && { cursor: parsed.cursor }) };
+            return {
+                kind: parsed.kind,
+                ...(typeof parsed.cursor === "string" && { cursor: parsed.cursor }),
+                ...(typeof parsed.chain === "number" && { chain: parsed.chain }),
+                ...(typeof parsed.leaseUntil === "number" && { leaseUntil: parsed.leaseUntil }),
+            };
         }
     } catch {
         // An unreadable place restarts the walk: every step is idempotent.
@@ -140,16 +154,31 @@ const nextPlace = (kind: SearchKind, page: { continueCursor: string | null; isDo
     return nextKind === undefined ? undefined : { kind: nextKind };
 };
 
-/** The claim row as stored, expired or not: an expired running claim still holds the place to resume from. */
-const backfillClaim = async (ctx: Pick<MutationCtx, "db">, userId: string) =>
-    await ctx.db
-        .query("idempotencyClaims")
-        .withIndex("by_scope_key", (q) => q.eq("scope", BACKFILL_SCOPE).eq("key", userId))
-        .first();
+/** Saves `place` under `chain` with a fresh lease and schedules the chain's next step from it. */
+const continueBackfill = async (ctx: Pick<MutationCtx, "db" | "scheduler">, userId: string, claimedAt: number, chain: number, place: BackfillPlace) => {
+    const { cursor, kind } = place;
+
+    await recordClaimResult(
+        ctx,
+        BACKFILL_SCOPE,
+        userId,
+        claimedAt,
+        JSON.stringify({ chain, kind, leaseUntil: Date.now() + BACKFILL_LEASE_MS, ...(cursor !== undefined && { cursor }) }),
+    );
+    await runAfterOnShard(
+        ctx.scheduler,
+        0,
+        internal.agent.thread_vector_archived.backfillThreadVectorArchived,
+        { chain, kind, ...(cursor !== undefined && { cursor }) },
+        userId,
+        SYNC_RETRY,
+    );
+};
 
 /**
- * Shard housekeeping: starts this shard's backfill, or resumes one whose step chain died (its lease
- * lapsed) from the place it saved. A finished or running backfill is left alone.
+ * Starts this shard's backfill, or takes over one whose step chain died (its lease lapsed) from the place it saved. A
+ * finished or running backfill is left alone. Run by the shard housekeeping sweep, and by a meaning search (a shard idle
+ * past the housekeeping horizon is not swept). One indexed read when there is nothing to do.
  */
 export const sweepThreadVectorArchived = internalMutation
     .input({})
@@ -161,40 +190,38 @@ export const sweepThreadVectorArchived = internalMutation
             return null;
         }
 
-        const existing = await backfillClaim(ctx, userId);
+        const now = Date.now();
+        const existing = await claimRow(ctx, BACKFILL_SCOPE, userId);
 
-        if (existing !== null && (existing.result === DONE || existing.expiresAt > Date.now())) {
+        if (existing?.result === DONE) {
             return null;
         }
 
         const place = parseBackfillPlace(existing?.result);
-        const claimedAt = await claimFence(ctx, BACKFILL_SCOPE, userId, { ttlMs: BACKFILL_LEASE_MS, userId });
+
+        if (place.leaseUntil !== undefined && place.leaseUntil > now) {
+            return null;
+        }
+
+        const claimedAt = existing?.claimedAt ?? (await claimFence(ctx, BACKFILL_SCOPE, userId, { ttlMs: BACKFILL_CLAIM_TTL_MS, userId }));
 
         if (claimedAt === null) {
             return null;
         }
 
-        await recordClaimResult(ctx, BACKFILL_SCOPE, userId, claimedAt, JSON.stringify(place));
-        await runAfterOnShard(
-            ctx.scheduler,
-            0,
-            internal.agent.thread_vector_archived.backfillThreadVectorArchived,
-            { claimedAt, ...place },
-            userId,
-            SYNC_RETRY,
-        );
+        // A new chain: a step of the dead one, delivered late, no longer matches and stops.
+        await continueBackfill(ctx, userId, claimedAt, now, { kind: place.kind, ...(place.cursor !== undefined && { cursor: place.cursor }) });
 
         return null;
     });
 
 /**
- * One backfill step on the current shard: up to {@link BACKFILL_PAGE} thread vectors of one kind, each
- * set to its thread's current flag, then the next step. A step whose claim was taken over (`claimedAt`
- * no longer matches) stops: another chain owns the walk.
+ * One backfill step on the current shard: up to {@link BACKFILL_PAGE} thread vectors of one kind, each set to its
+ * thread's current flag, then the next step. A step whose chain was taken over (`chain` no longer matches) stops.
  */
 export const backfillThreadVectorArchived = internalMutation
     .input({
-        claimedAt: v.number(),
+        chain: v.number(),
         cursor: v.optional(v.string().max(MAX_LENGTH.cursor)),
         kind: v.union(v.literal("title"), v.literal("summary")),
     })
@@ -206,9 +233,9 @@ export const backfillThreadVectorArchived = internalMutation
             return null;
         }
 
-        const claim = await backfillClaim(ctx, userId);
+        const claim = await claimRow(ctx, BACKFILL_SCOPE, userId);
 
-        if (claim?.claimedAt !== args.claimedAt || claim.result === DONE) {
+        if (claim === null || claim.result === DONE || parseBackfillPlace(claim.result).chain !== args.chain) {
             return null;
         }
 
@@ -228,24 +255,13 @@ export const backfillThreadVectorArchived = internalMutation
         const next = nextPlace(args.kind, page);
 
         if (next === undefined) {
-            await holdClaim(ctx, BACKFILL_SCOPE, userId, args.claimedAt, BACKFILL_DONE_TTL_MS, userId);
-            await recordClaimResult(ctx, BACKFILL_SCOPE, userId, args.claimedAt, DONE);
+            await recordClaimResult(ctx, BACKFILL_SCOPE, userId, claim.claimedAt, DONE);
 
             return null;
         }
 
-        // Stretched first: recording refuses a lapsed claim. The place is saved with the step's own writes, so a chain that
-        // dies resumes here, not at the start.
-        await holdClaim(ctx, BACKFILL_SCOPE, userId, args.claimedAt, Date.now() - args.claimedAt + BACKFILL_LEASE_MS, userId);
-        await recordClaimResult(ctx, BACKFILL_SCOPE, userId, args.claimedAt, JSON.stringify(next));
-        await runAfterOnShard(
-            ctx.scheduler,
-            0,
-            internal.agent.thread_vector_archived.backfillThreadVectorArchived,
-            { claimedAt: args.claimedAt, ...next },
-            userId,
-            SYNC_RETRY,
-        );
+        // The place is saved with the step's own writes, so a chain that dies resumes here, not at the start.
+        await continueBackfill(ctx, userId, claim.claimedAt, args.chain, next);
 
         return null;
     });

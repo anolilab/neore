@@ -72,8 +72,20 @@ describe("threadSearchTriggers", () => {
             0,
             internal.agent.thread_vector_archived.syncThreadVectorArchived,
             { threadId: "t1" },
-            { retry: SYNC_RETRY, shardKey: "u1" },
+            // Until it lands: nothing later queues this flag again once the backfill is done.
+            { retry: CLEANUP_RETRY, shardKey: "u1" },
         );
+    });
+
+    it("fails the archive when the flag update cannot be scheduled", async () => {
+        const row = { title: "Hello", titleVectorId: "v1", userId: "u1", userTurnCount: 4 };
+
+        await expect(
+            triggers.threadSearchUpdate(
+                { scheduler: failingScheduler() },
+                { doc: { ...row, status: "archived" }, id: "t1", previous: { ...row, status: "active" } },
+            ),
+        ).rejects.toThrow("scheduler down");
     });
 
     it("schedules no flag update for a thread without vectors, or a write that leaves the archive state", async () => {

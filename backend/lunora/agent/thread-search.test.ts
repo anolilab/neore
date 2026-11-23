@@ -293,6 +293,18 @@ describe(runThreadSearchSync, () => {
 });
 
 describe(searchThreadsByMeaningFor, () => {
+    it("starts the shard's archived-flag backfill, at most once per interval", async () => {
+        mocks.searchVectors.mockResolvedValue([]);
+        const ctx = makeCtx({}) as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
+        await searchThreadsByMeaningFor(ctx as never, { query: "the invoice bug", userId: "user-returning" });
+        await searchThreadsByMeaningFor(ctx as never, { query: "the invoice bug", userId: "user-returning" });
+
+        expect(ctx.runMutation.mock.calls.filter(([reference]) => reference === internal.agent.thread_vector_archived.sweepThreadVectorArchived)).toHaveLength(
+            1,
+        );
+    });
+
     it("finds 'PDF totals off by one' for 'the invoice bug' through its title vector", async () => {
         mocks.searchVectors.mockImplementation(async (_ctx, _vector, args) => (args.table === "threadTitle" ? [{ _id: "vec-title", _score: 0.82 }] : []));
         const ctx = makeCtx({

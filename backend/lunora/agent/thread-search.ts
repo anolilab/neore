@@ -473,7 +473,34 @@ export interface MeaningThread {
  * best ones. Returns `[]` for a query too short to embed, or when the model is
  * refused for the person.
  */
+/** When each shard last asked for its vector backfill from this isolate (`startArchivedBackfill`). */
+const backfillAskedAt = new Map<string, number>();
+const BACKFILL_ASK_INTERVAL_MS = 10 * 60 * 1000;
+
+/**
+ * Starts the shard's archived-flag backfill (`thread-vector-archived.ts`) if it never ran or its chain died. Housekeeping
+ * skips a shard idle past its horizon, and an RPC records no activity, so a returning user's search is what reaches it.
+ * At most once per shard per isolate per interval; best effort, a search never fails on it.
+ */
+const startArchivedBackfill = async (ctx: ActionCtx, userId: string): Promise<void> => {
+    const now = Date.now();
+
+    if (now - (backfillAskedAt.get(userId) ?? 0) < BACKFILL_ASK_INTERVAL_MS) {
+        return;
+    }
+
+    backfillAskedAt.set(userId, now);
+
+    try {
+        await ctx.runMutation(internal.agent.thread_vector_archived.sweepThreadVectorArchived, {});
+    } catch (error) {
+        console.warn("[agent/thread-search] Could not start the archived-flag backfill:", error);
+    }
+};
+
 export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { query: string; userId: string }): Promise<MeaningThread[]> => {
+    await startArchivedBackfill(ctx, args.userId);
+
     const query = args.query.trim();
 
     if (query.length < MEANING_MIN_CHARS) {

@@ -3,12 +3,14 @@
  * correction, and the per-shard backfill that pages through older vectors and resumes from its place.
  */
 import { lunoraTest } from "@lunora/testing";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { purgeExpiredClaims } from "../lib/claim-once";
 import { runInShard } from "../lib/shard-context";
 import schema from "../schema";
 import { commitThreadSearch } from "./thread-search";
 import {
+    BACKFILL_LEASE_MS,
     BACKFILL_PAGE,
     BACKFILL_SCOPE,
     backfillThreadVectorArchived,
@@ -46,25 +48,25 @@ const flagOf = async (ctx: any, id: string): Promise<boolean | undefined> => {
 };
 
 describe("syncThreadVectorArchived", () => {
-    it("sets the flag on archive and clears it on restore", async () => {
+    // Each thread starts in its final state: the harness gives triggers no scheduler, and the archive trigger's schedule
+    // now fails the write it rides on (`thread-search-triggers.test.ts` covers that schedule).
+    it.each([
+        ["archive", "archived", false, true],
+        ["restore", "active", true, false],
+    ])("sets each vector's flag to the thread's state on %s, and a retry is a no-op", async (_name, status, before, after) => {
         const flags = await run(async (ctx) => {
-            const threadId = await insertThread(ctx, "active");
-            const title = await insertVector(ctx, threadId, { archived: false });
-            const summary = await insertVector(ctx, threadId, { archived: false, table: "threadSummary" });
+            const threadId = await insertThread(ctx, status);
+            const title = await insertVector(ctx, threadId, { archived: before });
+            const summary = await insertVector(ctx, threadId, { archived: before, table: "threadSummary" });
 
-            await ctx.db.patch("threads", threadId, { status: "archived", summaryVectorId: summary, titleVectorId: title });
+            await ctx.db.patch("threads", threadId, { summaryVectorId: summary, titleVectorId: title });
             await ctx.runMutation(syncThreadVectorArchived, { threadId });
-            const archived = [await flagOf(ctx, title), await flagOf(ctx, summary)];
-
-            await ctx.db.patch("threads", threadId, { status: "active" });
-            await ctx.runMutation(syncThreadVectorArchived, { threadId });
-            // A retry after it ran is a no-op.
             await ctx.runMutation(syncThreadVectorArchived, { threadId });
 
-            return { archived, restored: await flagOf(ctx, title) };
+            return [await flagOf(ctx, title), await flagOf(ctx, summary)];
         });
 
-        expect(flags).toStrictEqual({ archived: [true, true], restored: false });
+        expect(flags).toStrictEqual([after, after]);
     });
 
     it("never writes a vector that belongs to another owner or another thread", async () => {
@@ -111,14 +113,26 @@ describe("the backfill", () => {
                     .first(),
         );
 
+    /** The saved place on the backfill's claim row. */
+    const savedPlace = async () => {
+        const row = await claim();
+
+        return parseBackfillPlace(row?.result);
+    };
+
+    /** The step the saved place schedules next. */
+    const stepArgs = (result: string | undefined) => {
+        const { chain, cursor, kind } = parseBackfillPlace(result);
+
+        return { chain: chain!, kind, ...(cursor !== undefined && { cursor }) };
+    };
+
     /** Runs the steps the sweep and each step would schedule, until the walk records `done`; returns how many ran. */
     const drive = async (): Promise<number> => {
         let steps = 0;
 
         for (let row = await claim(); row?.result !== "done"; row = await claim()) {
-            const place = parseBackfillPlace(row.result);
-
-            await run(async (ctx) => await ctx.runMutation(backfillThreadVectorArchived, { claimedAt: row.claimedAt, ...place }));
+            await run(async (ctx) => await ctx.runMutation(backfillThreadVectorArchived, stepArgs(row.result)));
             steps += 1;
             expect(steps).toBeLessThan(20);
         }
@@ -171,7 +185,7 @@ describe("the backfill", () => {
         expect(finished?.result).toBe("done");
     });
 
-    it("resumes from its saved place when its step chain died, and a stale chain stops", async () => {
+    it("resumes from its saved place after the lease lapsed and the claim purge ran, and a stale chain stops", async () => {
         await run(async (ctx) => {
             const threadId = await insertThread(ctx, "archived");
 
@@ -180,30 +194,40 @@ describe("the backfill", () => {
             }
         });
 
-        await run(async (ctx) => await ctx.runMutation(sweepThreadVectorArchived, {}));
-        const first = await claim();
+        vi.useFakeTimers({ now: new Date("2026-11-23T10:00:00Z"), toFake: ["Date"] });
 
-        await run(async (ctx) => await ctx.runMutation(backfillThreadVectorArchived, { claimedAt: first.claimedAt, ...parseBackfillPlace(first.result) }));
-        const afterFirstStep = await claim();
-        const saved = parseBackfillPlace(afterFirstStep.result);
+        try {
+            await run(async (ctx) => await ctx.runMutation(sweepThreadVectorArchived, {}));
+            const first = await claim();
+            const firstArgs = stepArgs(first.result);
 
-        expect(saved.kind).toBe("title");
-        expect(saved.cursor).toBeDefined();
+            await run(async (ctx) => await ctx.runMutation(backfillThreadVectorArchived, firstArgs));
+            const saved = await savedPlace();
 
-        // The chain died: its lease lapses, and the next sweep takes the walk over from the saved place.
-        await run(async (ctx) => await ctx.db.patch("idempotencyClaims", first._id, { expiresAt: Date.now() - 1 }));
-        await run(async (ctx) => await ctx.runMutation(sweepThreadVectorArchived, {}));
-        const resumed = await claim();
+            expect(saved.kind).toBe("title");
+            expect(saved.cursor).toBeDefined();
 
-        expect(resumed.claimedAt).not.toBe(first.claimedAt);
-        expect(parseBackfillPlace(resumed.result)).toStrictEqual(saved);
+            // The chain died before its next step; within its lease a sweep leaves it alone.
+            await run(async (ctx) => await ctx.runMutation(sweepThreadVectorArchived, {}));
+            const held = await savedPlace();
 
-        // The dead chain's next step, delivered late, does nothing.
-        await run(async (ctx) => await ctx.runMutation(backfillThreadVectorArchived, { claimedAt: first.claimedAt, ...saved }));
-        const afterLateStep = await claim();
+            expect(held.chain).toBe(firstArgs.chain);
 
-        expect(afterLateStep.claimedAt).toBe(resumed.claimedAt);
-        expect(parseBackfillPlace(afterLateStep.result)).toStrictEqual(saved);
+            // Past the lease, housekeeping purges expired claims first: the place survives it, and the sweep resumes there.
+            vi.setSystemTime(Date.now() + BACKFILL_LEASE_MS + 1);
+            await run(async (ctx) => await ctx.runMutation(purgeExpiredClaims, {}));
+            await run(async (ctx) => await ctx.runMutation(sweepThreadVectorArchived, {}));
+            const resumed = await savedPlace();
+
+            expect(resumed.chain).not.toBe(firstArgs.chain);
+            expect({ cursor: resumed.cursor, kind: resumed.kind }).toStrictEqual({ cursor: saved.cursor, kind: saved.kind });
+
+            // The dead chain's next step, delivered late, does nothing.
+            await run(async (ctx) => await ctx.runMutation(backfillThreadVectorArchived, { chain: firstArgs.chain, cursor: saved.cursor, kind: saved.kind }));
+            expect(await savedPlace()).toStrictEqual(resumed);
+        } finally {
+            vi.useRealTimers();
+        }
 
         expect(await drive()).toBe(2);
     });

@@ -92,7 +92,9 @@
   `archived`, Vectorize metadata on `embeddings-1024` only (metadata index in `alchemy.run.ts`), so a meaning
   search can filter archived threads before its top-K cut. It is a row column: Lunora's vector sync writes it
   after commit, so keeping it current is a row patch. Set at insert, corrected in `commitThreadSearch`, moved by
-  the threads update trigger on any change into or out of `archived` (every writer: bulk, undo, auto-archive),
-  and backfilled once per shard by the housekeeping sweep (place kept on an `idempotencyClaims` row). Every
+  the threads update trigger on any change into or out of `archived` (every writer: bulk, undo, auto-archive;
+  a failed schedule fails the write and the job retries forever, as nothing re-queues it), and backfilled once
+  per shard by the housekeeping sweep and by a meaning search (an idle shard is not swept). The place is kept on
+  an `idempotencyClaims` row that never expires (the claim purge would take it), the chain's lease inside it. Every
   writer reads the thread's current status, patches only the thread's own vectors of the same owner, and skips a
   thread that is gone or being deleted. Vectorize indexes a property only for vectors written after its index.
