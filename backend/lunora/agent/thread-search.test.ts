@@ -361,6 +361,13 @@ describe(searchThreadsByMeaningFor, () => {
         ]);
     });
 
+    it("rejects when the query embedding fails, so the palette can say so", async () => {
+        mocks.embedMany.mockRejectedValueOnce(new Error("gateway unavailable"));
+
+        await expect(searchThreadsByMeaningFor(makeCtx({}) as never, { query: "the invoice bug", userId: "user-1" })).rejects.toThrow("gateway unavailable");
+        expect(mocks.searchVectors).not.toHaveBeenCalled();
+    });
+
     it("answers nothing for a query too short to embed", async () => {
         const ctx = makeCtx({});
 

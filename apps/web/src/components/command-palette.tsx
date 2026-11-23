@@ -62,6 +62,7 @@ import convertShortcutToHotkeysHook from "@/features/keyboard/lib/shortcut-conve
 import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 import { useProjectList } from "@/features/projects/hooks/use-projects";
 import useDebouncedValue from "@/hooks/use-debounced-value";
+import type { ApiPath } from "@/lib/lunora/crpc";
 import { useAction, useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
@@ -95,9 +96,45 @@ const MEANING_CACHE_MS = 60_000;
 /** The longest delay setTimeout accepts; a timer capped by it re-arms when it fires (the effect reads `now`). */
 const MAX_TIMEOUT_MS = 2_147_483_647;
 
-/** Whether a mutation's arguments name a thread (`threadId`, or `threadIds` for a bulk delete). */
-const namesThread = (variables: unknown): boolean =>
-    typeof variables === "object" && variables !== null && ("threadId" in variables || "threadIds" in variables);
+interface ThreadWriteArgs {
+    status?: unknown;
+    threadId?: unknown;
+    threadIds?: unknown;
+    title?: unknown;
+}
+
+/**
+ * Whether a finished write changes what a meaning hit shows (its title, archived state or existence), told apart by the function
+ * it called (its `mutationKey`, `lunoraMutationKey`). Hiding a thread (archive, delete) matters only for a listed one; a rename,
+ * a restore from the archive or an undone delete can add a hit, so each marks the hits stale. Anything else, a sent message or a
+ * model change, keeps them, so it never pays for the embedding again.
+ */
+const changesMeaningHits = (mutationKey: ReadonlyArray<unknown> | undefined, variables: unknown, listedIds: ReadonlySet<string>): boolean => {
+    if (mutationKey?.[0] !== "lunora" || typeof variables !== "object" || variables === null) {
+        return false;
+    }
+
+    const args = variables as ThreadWriteArgs;
+    const isListed = (id: unknown): boolean => typeof id === "string" && listedIds.has(id);
+
+    switch (mutationKey[1] as ApiPath) {
+        case "chat_functions:deleteThreads": {
+            return Array.isArray(args.threadIds) && args.threadIds.some((id: unknown) => isListed(id));
+        }
+        case "chat_functions:softDeleteThread": {
+            return isListed(args.threadId);
+        }
+        case "chat_functions:undoDeleteThread": {
+            return true;
+        }
+        case "chat_functions:updateThread": {
+            return args.title !== undefined || args.status === "active" || (args.status === "archived" && isListed(args.threadId));
+        }
+        default: {
+            return false;
+        }
+    }
+};
 
 interface MessageSearchThread {
     _id: string;
@@ -217,12 +254,22 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         }
     }, [isOpen, queryClient]);
 
-    // A renamed, archived, restored or deleted thread changes the hits, wherever the edit was made: any mutation that names a thread
-    // and succeeds marks them stale. None of the thread mutations carries a key to match on, so their arguments are read.
+    // A renamed, archived, restored or deleted thread changes the hits, wherever the edit was made, so such a write marks them stale
+    // once it succeeds (`changesMeaningHits`). The listed threads are those of every meaning query still cached.
     useEffect(
         () =>
             queryClient.getMutationCache().subscribe((event) => {
-                if (event.type === "updated" && event.action.type === "success" && namesThread(event.mutation.state.variables)) {
+                if (event.type !== "updated" || event.action.type !== "success") {
+                    return;
+                }
+
+                const listedIds = new Set(
+                    queryClient
+                        .getQueriesData<{ threadId: string }[]>({ queryKey: MEANING_QUERY_KEY })
+                        .flatMap(([, hits]: [unknown, { threadId: string }[] | undefined]) => (hits ?? []).map((hit: { threadId: string }) => hit.threadId)),
+                );
+
+                if (changesMeaningHits(event.mutation.options.mutationKey, event.mutation.state.variables, listedIds)) {
                     void queryClient.invalidateQueries({ queryKey: MEANING_QUERY_KEY });
                 }
             }),
@@ -266,10 +313,12 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         gcTime: MEANING_CACHE_MS,
         queryFn: isMeaningSearchCurrent ? () => searchMeaning({ archivedOnly: scope.archived, query: debouncedSearch }) : skipToken,
         queryKey: [...MEANING_QUERY_KEY, sessionUserId, scope.archived, debouncedSearch],
+        // Each try embeds the query again, so a failure is said (below) and never retried on its own.
+        retry: false,
         staleTime: MEANING_CACHE_MS,
     });
     // Project rows show only under the Projects filter, so the list is read only then.
-    const { hasMore: hasMoreProjects, projects } = useProjectList(shouldQuery && scope.projects);
+    const { hasMore: hasMoreProjects, isError: isProjectListFailed, projects } = useProjectList(shouldQuery && scope.projects);
 
     const setLoadingStates = () => {};
     const { handleCreateBranch, handlePinThread, handleUnpinThread, updateThread } = useThreadHandlers(setLoadingStates);
@@ -755,6 +804,15 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         [isMounted, keyboardShortcuts.commandPalette, handleCommandPaletteToggle],
     );
 
+    // A read the shown rows depend on that failed, said in place of "No results found.".
+    let listFailure: string | undefined;
+
+    if (isMeaningSearchCurrent && isMeaningSearchFailed) {
+        listFailure = t`Search by meaning failed, so related threads are not listed. Try again in a moment.`;
+    } else if (projectRowsVisible(scope) && projectFilter === undefined && isProjectListFailed) {
+        listFailure = t`Your projects could not be loaded. Try again in a moment.`;
+    }
+
     return (
         <CommandDialog
             onOpenChange={(newOpen) => {
@@ -809,13 +867,13 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                                 {t`Related archived threads are picked from the closest matches across all your threads, so some may not be listed.`}
                             </p>
                         )}
-                        {/* A failed meaning search is said, so an empty or short list is not taken for "nothing related". */}
-                        {isMeaningSearchCurrent && isMeaningSearchFailed ? (
-                            <p className="text-destructive px-3 pt-2 text-xs" role="alert">
-                                {t`Search by meaning failed, so related threads are not listed. Try again in a moment.`}
-                            </p>
-                        ) : (
+                        {/* A failed read is said, so an empty or short list is not taken for "nothing there". */}
+                        {listFailure === undefined ? (
                             <CommandEmpty>{t`No results found.`}</CommandEmpty>
+                        ) : (
+                            <p className="text-destructive px-3 pt-2 text-xs" role="alert">
+                                {listFailure}
+                            </p>
                         )}
                         <CommandList>
                             {(group: Group, index: number) => (

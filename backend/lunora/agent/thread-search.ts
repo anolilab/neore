@@ -464,7 +464,8 @@ export interface MeaningThread {
  * limit, so archived candidates ranked below them still fill it. The candidates are
  * still the closest vectors overall: the vectors carry no archived flag to filter on
  * in the index, so an archived thread ranked below every candidate is not found.
- * Returns `[]` for a query too short to embed, or when the model is refused for the person.
+ * Returns `[]` for a query too short to embed, or when the model is refused for the person; rejects when the
+ * embedding fails.
  */
 export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { archivedOnly?: boolean; query: string; userId: string }): Promise<MeaningThread[]> => {
     const query = args.query.trim();
@@ -473,15 +474,9 @@ export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { archived
         return [];
     }
 
-    let queryVector: number[] | undefined;
-
-    try {
-        [queryVector] = await embedTexts(ctx, args.userId, [query.slice(0, 2000)]);
-    } catch (error) {
-        console.warn("[agent/thread-search] Query embedding failed; the palette shows title matches only:", error);
-
-        return [];
-    }
+    // A refused model embeds nothing (`[]`). Any other failure rejects, so the palette says the search failed instead of
+    // showing an empty list as "nothing related"; its title matches do not depend on this call.
+    const [queryVector] = await embedTexts(ctx, args.userId, [query.slice(0, 2000)]);
 
     if (!queryVector || queryVector.length !== SEARCH_DIMENSION) {
         return [];

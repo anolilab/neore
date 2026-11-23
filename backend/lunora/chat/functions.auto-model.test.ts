@@ -104,6 +104,17 @@ describe("updateThread on a thread with no model", () => {
         await expect(titleOf(threadId)).resolves.toBe("Renamed");
     });
 
+    it("archives it without taking the model of the chat the caller has open", async () => {
+        const threadId = await insertThread({ model: undefined });
+
+        await update(threadId, { model: "gpt-4o", status: "archived" });
+
+        const row = (await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId))) as { model?: string; status: string };
+
+        expect(row).toMatchObject({ status: "archived" });
+        expect(row.model).toBeUndefined();
+    });
+
     it("still refuses a change that writes the model", async () => {
         const threadId = await insertThread({ model: undefined });
 

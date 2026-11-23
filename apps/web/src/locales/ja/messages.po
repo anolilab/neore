@@ -2487,7 +2487,7 @@ msgstr "アクティブ日数"
 msgid "Active Sessions ({0})"
 msgstr "アクティブなセッション（{0}）"
 
-#: src/components/command-palette.tsx:642
+#: src/components/command-palette.tsx:689
 msgid "Active Threads"
 msgstr "アクティブなスレッド"
 
@@ -4345,13 +4345,13 @@ msgid "Archive the open thread, or restore it when it is archived ({0})"
 msgstr "開いているスレッドをアーカイブします。アーカイブ済みなら解除します（{0}）"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:98
-#: src/components/command-palette.tsx:582
-#: src/components/command-palette.tsx:840
+#: src/components/command-palette.tsx:629
+#: src/components/command-palette.tsx:896
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Archive thread"
 msgstr "スレッドをアーカイブ"
 
-#: src/components/command-palette.tsx:788
+#: src/components/command-palette.tsx:844
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:644
 #: src/features/sub-agents/components/worker-list.tsx:86
 #: src/features/tasks/components/goal-form-dialog.tsx:47
@@ -4363,7 +4363,7 @@ msgstr "アーカイブ済み"
 msgid "Archived for at least"
 msgstr "アーカイブ後の経過期間（以上）"
 
-#: src/components/command-palette.tsx:659
+#: src/components/command-palette.tsx:706
 msgid "Archived Threads"
 msgstr "アーカイブ済みのスレッド"
 
@@ -7056,7 +7056,7 @@ msgstr "クローンまたは新規作成…"
 #: ../../packages/ui/src/components/dialog.tsx:84
 #: ../../packages/ui/src/components/image-editor.tsx:264
 #: ../../packages/ui/src/components/sheet.tsx:75
-#: src/components/command-palette.tsx:911
+#: src/components/command-palette.tsx:967
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:835
 #: src/features/canvas/pdf-preview-panel.tsx:105
@@ -9472,7 +9472,7 @@ msgstr "API キーを作成"
 msgid "Create bot"
 msgstr "ボットを作成"
 
-#: src/components/command-palette.tsx:566
+#: src/components/command-palette.tsx:613
 #: src/features/chat/thread-list/thread-node.tsx:743
 #: src/features/chat/thread-list/thread-node.tsx:766
 msgid "Create branch"
@@ -9784,7 +9784,7 @@ msgstr "キューバ"
 msgid "Currency Conversion"
 msgstr "通貨換算"
 
-#: src/components/command-palette.tsx:836
+#: src/components/command-palette.tsx:892
 #: src/features/auth/components/settings/security/session-cell.tsx:80
 #: src/features/projects/components/move-to-project-dialog.tsx:84
 #: src/features/prompts/components/prompt-history-dialog.tsx:136
@@ -10688,8 +10688,8 @@ msgid "Delete this login?"
 msgstr "このログインを削除しますか？"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
-#: src/components/command-palette.tsx:588
-#: src/components/command-palette.tsx:864
+#: src/components/command-palette.tsx:635
+#: src/components/command-palette.tsx:920
 #: src/features/chat/thread-list/thread-node.tsx:1082
 #: src/features/chat/thread-list/thread-node.tsx:1100
 #: src/features/pages/components/page-comments-panel.tsx:188
@@ -13874,10 +13874,10 @@ msgstr "データセットを削除できませんでした"
 msgid "Failed to delete the thread. {0, plural, one {# branch was deleted.} other {# branches were deleted.}}"
 msgstr "スレッドを削除できませんでした。{0, plural, other {# 件のブランチが削除されました。}}"
 
-#: src/components/command-palette.tsx:422
-#: src/components/command-palette.tsx:430
-#: src/components/command-palette.tsx:473
-#: src/components/command-palette.tsx:480
+#: src/components/command-palette.tsx:469
+#: src/components/command-palette.tsx:477
+#: src/components/command-palette.tsx:520
+#: src/components/command-palette.tsx:527
 msgid "Failed to delete thread"
 msgstr "スレッドを削除できませんでした"
 
@@ -15077,7 +15077,7 @@ msgstr "種類でメモリを絞り込み"
 msgid "Filter path"
 msgstr "フィルターのパス"
 
-#: src/components/command-palette.tsx:768
+#: src/components/command-palette.tsx:824
 msgid "Filter results"
 msgstr "結果を絞り込む"
 
@@ -16253,7 +16253,7 @@ msgstr "ツールを切り替えずに、アイデアから完成品まで。テ
 msgid "Go to chat"
 msgstr "チャットへ移動"
 
-#: src/components/command-palette.tsx:514
+#: src/components/command-palette.tsx:561
 #: src/routes/(public)/invite/$inviteToken.tsx:70
 msgid "Go to Chat"
 msgstr "チャットへ移動"
@@ -16296,7 +16296,7 @@ msgstr "ペアリングへ移動"
 msgid "Go to previous page"
 msgstr "前のページへ"
 
-#: src/components/command-palette.tsx:520
+#: src/components/command-palette.tsx:567
 msgid "Go to Prompts"
 msgstr "プロンプトへ移動"
 
@@ -16308,7 +16308,7 @@ msgstr "返信に移動"
 msgid "Go to servers"
 msgstr "サーバーへ移動"
 
-#: src/components/command-palette.tsx:532
+#: src/components/command-palette.tsx:579
 msgid "Go to Settings"
 msgstr "設定へ移動"
 
@@ -16333,7 +16333,7 @@ msgstr "スライド {slideNumber} へ移動"
 msgid "Go to step {0}"
 msgstr "ステップ {0} へ移動"
 
-#: src/components/command-palette.tsx:526
+#: src/components/command-palette.tsx:573
 msgid "Go to Vault"
 msgstr "ボールトへ移動"
 
@@ -21115,7 +21115,7 @@ msgstr "メッセージのバージョン"
 msgid "Message..."
 msgstr "メッセージ..."
 
-#: src/components/command-palette.tsx:678
+#: src/components/command-palette.tsx:725
 #: src/features/chat/sharing/shared-thread-page.tsx:151
 #: src/features/chat/thread-list/search-bar.tsx:57
 msgid "Messages"
@@ -22192,7 +22192,7 @@ msgid "navigate"
 msgstr "移動"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:110
-#: src/components/command-palette.tsx:897
+#: src/components/command-palette.tsx:953
 msgid "Navigate"
 msgstr "移動"
 
@@ -22221,7 +22221,7 @@ msgid "Navigating to {target}..."
 msgstr "{target} に移動しています..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:132
-#: src/components/command-palette.tsx:539
+#: src/components/command-palette.tsx:586
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:68
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:59
 msgid "Navigation"
@@ -22593,7 +22593,7 @@ msgstr "新しい一時チャット"
 msgid "New Temporary Chat"
 msgstr "新しい一時チャット"
 
-#: src/components/command-palette.tsx:555
+#: src/components/command-palette.tsx:602
 msgid "New temporary thread"
 msgstr "新しい一時スレッド"
 
@@ -22601,7 +22601,7 @@ msgstr "新しい一時スレッド"
 msgid "New this week"
 msgstr "今週の新着"
 
-#: src/components/command-palette.tsx:548
+#: src/components/command-palette.tsx:595
 msgid "New thread"
 msgstr "新しいスレッド"
 
@@ -23289,7 +23289,7 @@ msgstr "結果が見つかりません"
 msgid "No results found for “{searchTerm}”"
 msgstr "“{searchTerm}” の結果が見つかりません"
 
-#: src/components/command-palette.tsx:818
+#: src/components/command-palette.tsx:870
 #: src/features/chat/thread/widgets/wolfram-widget.tsx:34
 msgid "No results found."
 msgstr "結果が見つかりません。"
@@ -24166,12 +24166,12 @@ msgstr "このチャットに書き込める人だけがブラウザーを操作
 #~ msgstr "状態で絞り込まれるのは、ここに読み込まれた {0} 件のスレッドのみです。それより古いスレッドは含まれません。"
 
 #. placeholder {0}: allThreadsData.lunora.length
-#: src/components/command-palette.tsx:800
+#: src/components/command-palette.tsx:856
 msgid "Only the {0} threads loaded here are filtered; older ones are not included."
 msgstr "ここに読み込まれた {0} 件のスレッドのみが絞り込まれます。古いスレッドは含まれません。"
 
 #. placeholder {0}: projects.length
-#: src/components/command-palette.tsx:804
+#: src/components/command-palette.tsx:860
 msgid "Only the first {0} projects are listed here."
 msgstr "ここには最初の {0} 件のプロジェクトのみが表示されます。"
 
@@ -24261,7 +24261,7 @@ msgid "Opacity"
 msgstr "不透明度"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:779
-#: src/components/command-palette.tsx:903
+#: src/components/command-palette.tsx:959
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
 #: src/features/develop/components/pull-request-view.tsx:75
@@ -26013,7 +26013,7 @@ msgid "Pin message"
 msgstr "メッセージをピン留め"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
-#: src/components/command-palette.tsx:572
+#: src/components/command-palette.tsx:619
 #: src/features/chat/thread-list/thread-node.tsx:117
 msgid "Pin thread"
 msgstr "スレッドをピン留め"
@@ -26969,12 +26969,12 @@ msgid "Project repository"
 msgstr "プロジェクトのリポジトリ"
 
 #. placeholder {0}: projectFilter.title
-#: src/components/command-palette.tsx:792
+#: src/components/command-palette.tsx:848
 msgid "Project: {0}"
 msgstr "プロジェクト: {0}"
 
-#: src/components/command-palette.tsx:621
-#: src/components/command-palette.tsx:785
+#: src/components/command-palette.tsx:668
+#: src/components/command-palette.tsx:841
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:606
 msgid "Projects"
 msgstr "プロジェクト"
@@ -28174,11 +28174,11 @@ msgstr "拒否"
 msgid "Rejecting a result in review marks the run as failed. The rejected answer stays on record."
 msgstr "レビューで結果を却下すると、実行は失敗として記録されます。却下された回答は記録に残ります。"
 
-#: src/components/command-palette.tsx:809
+#: src/components/command-palette.tsx:865
 msgid "Related archived threads are picked from the closest matches across all your threads, so some may not be listed."
 msgstr "関連するアーカイブ済みスレッドは、すべてのスレッドの中で最も近い一致から選ばれるため、表示されないものがある場合があります。"
 
-#: src/components/command-palette.tsx:702
+#: src/components/command-palette.tsx:749
 msgid "Related threads"
 msgstr "関連スレッド"
 
@@ -30025,7 +30025,7 @@ msgstr "学術論文や PDF を検索"
 msgid "Search across the entire internet"
 msgstr "インターネット全体を検索"
 
-#: src/components/command-palette.tsx:815
+#: src/components/command-palette.tsx:809
 msgid "Search by meaning failed, so related threads are not listed. Try again in a moment."
 msgstr "意味による検索に失敗したため、関連するスレッドは表示されていません。しばらくしてからもう一度お試しください。"
 
@@ -30235,7 +30235,7 @@ msgstr "スレッドを検索"
 msgid "Search threads ({focusSearchShortcut})"
 msgstr "スレッドを検索（{focusSearchShortcut}）"
 
-#: src/components/command-palette.tsx:767
+#: src/components/command-palette.tsx:823
 msgid "Search threads, navigate, or perform actions..."
 msgstr "スレッドの検索、移動、操作の実行..."
 
@@ -36196,7 +36196,7 @@ msgstr "スレッド"
 msgid "Thread"
 msgstr "スレッド"
 
-#: src/components/command-palette.tsx:597
+#: src/components/command-palette.tsx:644
 msgid "Thread Actions"
 msgstr "スレッドの操作"
 
@@ -36294,7 +36294,7 @@ msgstr "スレッド変数"
 msgid "Thread will auto-delete in {0}"
 msgstr "スレッドは {0} 後に自動削除されます"
 
-#: src/components/command-palette.tsx:770
+#: src/components/command-palette.tsx:826
 #: src/features/admin/components/admin-shard-footprint-row.tsx:125
 #: src/features/admin/components/admin-shard-footprint-row.tsx:142
 #: src/features/admin/components/admin-shard-footprint-row.tsx:163
@@ -37300,8 +37300,8 @@ msgstr "超広角、建築的"
 msgid "unarchive"
 msgstr "アーカイブ解除"
 
-#: src/components/command-palette.tsx:582
-#: src/components/command-palette.tsx:840
+#: src/components/command-palette.tsx:629
+#: src/components/command-palette.tsx:896
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Unarchive thread"
 msgstr "スレッドのアーカイブを解除"
@@ -37508,7 +37508,7 @@ msgid "Unpin memory"
 msgstr "メモリのピン留めを解除"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
-#: src/components/command-palette.tsx:572
+#: src/components/command-palette.tsx:619
 #: src/features/chat/thread-list/thread-node.tsx:117
 msgid "Unpin thread"
 msgstr "スレッドのピン留めを解除"
@@ -37576,10 +37576,10 @@ msgstr "無題"
 msgid "Untitled chat"
 msgstr "無題のチャット"
 
-#: src/components/command-palette.tsx:354
-#: src/components/command-palette.tsx:367
-#: src/components/command-palette.tsx:670
-#: src/components/command-palette.tsx:695
+#: src/components/command-palette.tsx:401
+#: src/components/command-palette.tsx:414
+#: src/components/command-palette.tsx:717
+#: src/components/command-palette.tsx:742
 #: src/features/chat/core/hooks/use-thread-manager.ts:254
 msgid "Untitled Thread"
 msgstr "無題のスレッド"
@@ -40442,6 +40442,10 @@ msgstr "あなたのプラン"
 #: src/features/auth/components/organization/billing-settings-card.tsx:148
 msgid "Your plan and credit allowance follow your subscription."
 msgstr "プランとクレジット枠はサブスクリプションに応じて決まります。"
+
+#: src/components/command-palette.tsx:811
+msgid "Your projects could not be loaded. Try again in a moment."
+msgstr "プロジェクトを読み込めませんでした。しばらくしてからもう一度お試しください。"
 
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:162
 msgid "Your rating"

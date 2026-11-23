@@ -30,6 +30,8 @@ const harness = vi.hoisted(() => {
         projects: [] as { _id: string; title: string }[],
         /** Whether the project list has more pages than the palette loaded. */
         projectsHasMore: false,
+        /** Whether the project list read fails. */
+        projectsFail: false,
         /** The signed-in account; a test may switch it. */
         userId: "user-1",
     };
@@ -121,7 +123,7 @@ vi.mock("@/lib/lunora/crpc", () => {
 vi.mock("@/features/projects/hooks/use-projects", () => {
     return {
         useProjectList: () => {
-            return { hasMore: harness.projectsHasMore, isAnswered: true, projects: harness.projects };
+            return { hasMore: harness.projectsHasMore, isAnswered: !harness.projectsFail, isError: harness.projectsFail, projects: harness.projects };
         },
     };
 });
@@ -192,6 +194,7 @@ const LOADED_ONLY = /threads loaded here are filtered;/;
 const BETA_TEXT = /beta cohort starts/;
 const FIRST_PROJECTS_ONLY = /Only the first 1 projects are listed here/;
 const MEANING_FAILED = /Search by meaning failed/;
+const PROJECTS_FAILED = /projects could not be loaded/;
 const ARCHIVED_MEANING_NOTE = /closest matches across all your threads/;
 
 /** True when `later` comes after `earlier` in document order. */
@@ -202,11 +205,10 @@ const messageQueries = () => harness.searchArgs.filter((args) => args !== skipTo
 const renderPalette = (queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })) =>
     render(createElement(QueryClientProvider, { client: queryClient }, createElement(GlobalCommandPalette)));
 
+/** Steps the fake clock past the search debounce (the meaning-search tests run on fake timers). */
 const waitPastDebounce = async () => {
     await act(async () => {
-        await new Promise<void>((resolve) => {
-            setTimeout(resolve, 400);
-        });
+        await vi.advanceTimersByTimeAsync(400);
     });
 };
 
@@ -433,6 +435,8 @@ describe("command palette state tags", () => {
 
 describe("command palette filters and meaning search", () => {
     beforeEach(() => {
+        // The debounce is stepped by hand; the clock also follows real time so Testing Library's polling still runs.
+        vi.useFakeTimers({ shouldAdvanceTime: true });
         Element.prototype.getAnimations = () => [];
         stubResizeObserver();
         harness.meaningArgs.length = 0;
@@ -448,8 +452,10 @@ describe("command palette filters and meaning search", () => {
         harness.meaningFails = false;
         harness.projects = [];
         harness.projectsHasMore = false;
+        harness.projectsFail = false;
         harness.hasMore = false;
         harness.searchArgs.length = 0;
+        vi.useRealTimers();
     });
 
     it("runs no message search under a filter, whose rows it could not show", async () => {
@@ -458,9 +464,7 @@ describe("command palette filters and meaning search", () => {
 
         fireEvent.click(screen.getByRole("button", { name: "Threads" }));
         fireEvent.change(input, { target: { value: "alpha" } });
-        await new Promise<void>((resolve) => {
-            setTimeout(resolve, 400);
-        });
+        await waitPastDebounce();
 
         expect(messageQueries()).toHaveLength(0);
     });
@@ -470,9 +474,7 @@ describe("command palette filters and meaning search", () => {
         const input = await openPalette();
 
         fireEvent.change(input, { target: { value: "a".repeat(2001) } });
-        await new Promise<void>((resolve) => {
-            setTimeout(resolve, 400);
-        });
+        await waitPastDebounce();
 
         expect(harness.meaningArgs).toHaveLength(0);
     });
@@ -491,6 +493,18 @@ describe("command palette filters and meaning search", () => {
 
         fireEvent.click(screen.getByRole("button", { name: "Projects" }));
         expect(screen.getByText(FIRST_PROJECTS_ONLY)).toBeTruthy();
+    });
+
+    it("says a failed project list failed instead of finding no projects", async () => {
+        harness.threads = [];
+        harness.projectsFail = true;
+        renderPalette();
+        await openPalette();
+
+        fireEvent.click(screen.getByRole("button", { name: "Projects" }));
+
+        expect(screen.getByRole("alert").textContent).toMatch(PROJECTS_FAILED);
+        expect(screen.queryByText("No results found.")).toBeNull();
     });
 
     it("picking a project found by its name clears the text, so the project's threads show", async () => {
@@ -548,21 +562,40 @@ describe("command palette filters and meaning search", () => {
         expect(screen.queryByText("No results found.")).toBeNull();
     });
 
-    it("asks the meaning search again once a thread is edited while the palette is open", async () => {
+    it("keeps the meaning hits when a message is sent to a thread while the palette is open", async () => {
         const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
+        harness.meaning = [{ archived: false, score: 0.82, threadId: "thread-pdf", title: "PDF totals off by one" }];
         renderPalette(queryClient);
-        const input = await openPalette();
-
-        fireEvent.change(input, { target: { value: "the invoice bug" } });
+        fireEvent.change(await openPalette(), { target: { value: "the invoice bug" } });
         await waitPastDebounce();
         expect(harness.meaningArgs).toHaveLength(1);
 
         await act(async () => {
-            await new MutationObserver(queryClient, { mutationFn: async (_variables: { threadId: string; title: string }) => undefined }).mutate({
-                threadId: "thread-pdf",
-                title: "Renamed",
-            });
+            await new MutationObserver(queryClient, {
+                mutationFn: async (_variables: { threadId: string }) => undefined,
+                mutationKey: ["lunora", "chat_guest_links:sendHeldGuestMessage"],
+            }).mutate({ threadId: "thread-pdf" });
+        });
+        await waitPastDebounce();
+
+        expect(harness.meaningArgs).toHaveLength(1);
+    });
+
+    it("asks the meaning search again once a listed thread is renamed while the palette is open", async () => {
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+        harness.meaning = [{ archived: false, score: 0.82, threadId: "thread-pdf", title: "PDF totals off by one" }];
+        renderPalette(queryClient);
+        fireEvent.change(await openPalette(), { target: { value: "the invoice bug" } });
+        await waitPastDebounce();
+        expect(harness.meaningArgs).toHaveLength(1);
+
+        await act(async () => {
+            await new MutationObserver(queryClient, {
+                mutationFn: async (_variables: { threadId: string; title: string }) => "",
+                mutationKey: ["lunora", "chat_functions:updateThread"],
+            }).mutate({ threadId: "thread-pdf", title: "Renamed" });
         });
 
         await waitFor(() => {
