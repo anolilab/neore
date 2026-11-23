@@ -11,7 +11,7 @@ import { authMutation, query, rateLimit } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
 import { assert } from "../lib/error-helpers";
 import { withoutUndefined } from "../lib/patch";
-import { requireOwnedThread } from "./thread-read-access";
+import { meetsThreadPermission, resolveThreadReadAccess } from "./thread-read-access";
 import { isLockedWithoutProof } from "./thread-passcode";
 import { throwThreadLocked } from "../lib/thread-lock";
 import { assertJsonWithinLimit, MAX_LENGTH, vJsonValue } from "../lib/validators";
@@ -21,11 +21,15 @@ const vDocumentKind = v.union(v.literal("text"), v.literal("code"), v.literal("s
 export const vDocumentDoc = v.object({
     _creationTime: v.number(),
     _id: v.string(),
+    // Whether the caller may save it: the author, with the thread's write grant. Set by `getDocument` only.
+    canEdit: v.optional(v.boolean()),
     content: v.optional(v.string()),
     contentJson: v.optional(v.any()),
     kind: vDocumentKind,
     language: v.optional(v.string()),
     messageId: v.optional(v.string()),
+    // Whether the caller owns the document's thread, so the document sits on their own shard (where a page can be made from it).
+    ownsThread: v.optional(v.boolean()),
     status: v.optional(v.union(v.literal("idle"), v.literal("streaming"))),
     threadId: v.string(),
     title: v.string(),
@@ -53,7 +57,14 @@ const publicDocument = (documentRow: Doc<"documents">): DocumentDoc => {
 };
 
 export const getDocument = query
-    .input({ documentId: v.id("documents"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
+    .input({
+        documentId: v.id("documents"),
+        // The document's thread. With it, the call routes to the thread's owner's shard and a member reads through the thread's grant.
+        // Without it (a document opened outside a chat), only the author reads it, on the caller's own shard, and only while the
+        // thread still admits the author.
+        threadId: v.optional(v.id("threads")),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+    })
     .output(v.from(v.union(vDocumentDoc, v.null())))
     .query(async ({ args, ctx }) => {
         const identity = await getAuthUserIdentity(ctx);
@@ -62,17 +73,54 @@ export const getDocument = query
             return null;
         }
 
-        const documentRow = await ctx.db.get("documents", args.documentId);
+        if (args.threadId !== undefined) {
+            // The grant is read first: it admits the thread's rows to this request. A locked thread answers THREAD_LOCKED to its
+            // owner until the proof is given.
+            const access = await resolveThreadReadAccess(ctx, args.threadId, identity.userId, args.unlockProof, { primary: true });
 
-        if (!documentRow || documentRow.userId !== identity.userId) {
+            if (access?.kind === "locked") {
+                return throwThreadLocked();
+            }
+
+            if (access?.kind !== "full" || !meetsThreadPermission(access.permission, "read")) {
+                return null;
+            }
+
+            const documentRow = await ctx.db.get("documents", args.documentId);
+
+            if (documentRow && documentRow.threadId === args.threadId) {
+                return {
+                    ...publicDocument(documentRow),
+                    canEdit: documentRow.userId === identity.userId && meetsThreadPermission(access.permission, "write"),
+                    ownsThread: access.thread.userId === identity.userId,
+                };
+            }
+
+            // A card whose chat was cloned into a branch, or made before its thread was carried, names another chat: the author reads it
+            // through the author path below, as before.
+        }
+
+        const authoredRow = await ctx.db.get("documents", args.documentId);
+
+        if (!authoredRow || authoredRow.userId !== identity.userId) {
             return null;
         }
 
-        if (await isLockedWithoutProof(ctx, documentRow.threadId, args.unlockProof)) {
+        const access = await resolveThreadReadAccess(ctx, authoredRow.threadId, identity.userId, args.unlockProof, { primary: true });
+
+        if (access?.kind === "locked") {
             return throwThreadLocked();
         }
 
-        return publicDocument(documentRow);
+        if (access?.kind !== "full" || !meetsThreadPermission(access.permission, "read")) {
+            return null;
+        }
+
+        return {
+            ...publicDocument(authoredRow),
+            canEdit: meetsThreadPermission(access.permission, "write"),
+            ownsThread: access.thread.userId === identity.userId,
+        };
     });
 
 /** Internal: a locked thread's document is skipped (null) without its proof. */
@@ -99,13 +147,16 @@ export const getDocumentsByThread = query
             return [];
         }
 
-        const thread = await ctx.db.get("threads", args.threadId);
+        // A thread's documents are readable by whoever holds its read grant, as its messages are.
+        const access = await resolveThreadReadAccess(ctx, args.threadId, identity.userId, args.unlockProof, { primary: true });
 
-        if (!thread || thread.userId !== identity.userId) {
-            return [];
+        if (access?.kind === "locked") {
+            return throwThreadLocked();
         }
 
-        await requireOwnedThread(ctx, args.threadId, identity.userId, args.unlockProof);
+        if (access?.kind !== "full" || !meetsThreadPermission(access.permission, "read")) {
+            return [];
+        }
 
         const docs = await ctx.db
             .query("documents")
@@ -176,6 +227,9 @@ export const updateDocument = authMutation
         contentJson: v.optional(vJsonValue),
         documentId: v.id("documents"),
         language: v.optional(v.string().max(MAX_LENGTH.short)),
+        // The document's thread, when the caller knows it: a document in a shared thread is stored on the thread owner's shard, and the
+        // save routes there by this id.
+        threadId: v.optional(v.id("threads")),
         title: v.optional(v.string().max(MAX_LENGTH.long)),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
@@ -193,12 +247,23 @@ export const updateDocument = authMutation
 
         assert(documentRow, `Document ${args.documentId} not found`);
 
+        // The thread id only routes the call. A card cloned into a branch or made before its thread was carried names another chat, and the
+        // checks below use the document's own thread (its lock and the author's write grant), so such a card saves as before.
+
         if (documentRow.userId !== identity.userId) {
             throw new LunoraError("FORBIDDEN", "Forbidden");
         }
 
         if (await isLockedWithoutProof(ctx, documentRow.threadId, args.unlockProof)) {
             throwThreadLocked();
+        }
+
+        // Authorship alone is not enough: a save needs the thread's write grant now, so a removed or read-only collaborator cannot write.
+        // Read from the primary: a replica still holding a revoked grant must not let the save through.
+        const access = await resolveThreadReadAccess(ctx, documentRow.threadId, identity.userId, args.unlockProof, { primary: true });
+
+        if (access?.kind !== "full" || !meetsThreadPermission(access.permission, "write")) {
+            throw new LunoraError("FORBIDDEN", "Forbidden");
         }
 
         const patch: Partial<Doc<"documents">> = {};
@@ -338,6 +403,17 @@ export const deleteDocument = internalMutation
 
         assert(documentRow, `Document ${args.documentId} not found`);
         await ctx.db.delete("documents", args.documentId);
+
+        // A document pin names the document: drop the thread's pins that name it, so none is left pointing at nothing. The pins of a
+        // thread sit on the same shard as its documents.
+        const pins = await ctx.db
+            .query("threadPins")
+            .withIndex("by_thread_and_document", (q) => q.eq("threadId", documentRow.threadId).eq("documentId", args.documentId))
+            .collect();
+
+        for (const pin of pins) {
+            await ctx.db.delete("threadPins", pin._id);
+        }
 
         return null;
     });
