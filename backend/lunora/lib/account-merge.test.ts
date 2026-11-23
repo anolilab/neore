@@ -676,6 +676,29 @@ describe("importShardRows for runWebhooks", () => {
     });
 });
 
+describe("importShardRows on an id another user's row holds", () => {
+    it("stops the merge instead of skipping the guest's row, so the clear pass cannot delete it", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                const strangerId = await context.db.insert("threads", { title: "stranger chat", userId: "stranger" });
+
+                await expect(
+                    context.runMutation(importShardRows, {
+                        from: "guest",
+                        rows: [{ _id: strangerId, title: "guest chat", userId: "guest" }],
+                        table: "threads",
+                        to: "user",
+                    }),
+                ).rejects.toThrow("already exists on the new account's shard");
+            });
+        } finally {
+            harness.close();
+        }
+    });
+});
+
 describe("a shard that holds both accounts' rows", () => {
     it("clears only the guest's threads, keeping the new account's", async () => {
         const harness = lunoraTest(schemaWithShardedTables([]) as never);

@@ -240,6 +240,17 @@ export const importShardRows = internalMutation
                 continue;
             }
 
+            // A row here under the same id is this row: the shard is shared, or an earlier pass copied it (re-owned to the new
+            // account, or a collaborator's row kept as it is). One owned by anyone else is a different row; skipping it would
+            // let the clear pass delete the guest's copy, so the merge stops before anything is cleared.
+            if (ownerField !== undefined) {
+                const existingOwner = existing[ownerField];
+
+                if (existingOwner !== args.from && existingOwner !== args.to && existingOwner !== row[ownerField]) {
+                    throw new Error(`${args.table} row ${id} already exists on the new account's shard as another user's row; the merge into ${args.to} stops`);
+                }
+            }
+
             // The guest's own row, already on this shard under its id (a shared shard): re-own it in place, so the same id is
             // never written twice. A row already re-owned has no guest field left, and is skipped. Only a row whose owner field
             // names the guest is re-owned: another field naming the guest says nothing about who owns the row.
