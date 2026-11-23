@@ -145,11 +145,19 @@ export const useParkedDraftStore = create<{ threadIds: ReadonlySet<string> }>()(
 /**
  * The chats whose stored draft has had its chance to come back into the live composer (`use-stored-drafts.ts`), or that keep none.
  * Text put in a composer from elsewhere (`composer-prefill.ts`) waits for its chat here: a composer with content takes no stored
- * draft. Replaced on each change, never mutated.
+ * draft. `restoreAfterSend` is set while an untouched prefilled message is sending: the live chat's draft comes back when the send
+ * ends (`stored-drafts.ts`), so that text waits for it too. Replaced on each change, never mutated.
  */
-export const useBoundDraftStore = create<{ owners: ReadonlySet<string> }>()(() => {
-    return { owners: new Set<string>() };
+export const useBoundDraftStore = create<{ owners: ReadonlySet<string>; restoreAfterSend: boolean }>()(() => {
+    return { owners: new Set<string>(), restoreAfterSend: false };
 });
+
+/** The live composer's stored draft is due back once the send ends (`true`), or that restore has had its chance (`false`). */
+export const setRestoreAfterSend = (pending: boolean): void => {
+    if (useBoundDraftStore.getState().restoreAfterSend !== pending) {
+        useBoundDraftStore.setState({ restoreAfterSend: pending });
+    }
+};
 
 /** Marks `owner`'s draft as settled, or no longer (its binding went away). */
 export const setDraftBound = (owner: string, bound: boolean): void => {

@@ -11,7 +11,7 @@ import { prefillComposer, resetComposerPrefillForTests, useComposerPrefill, useC
 
 beforeEach(() => {
     resetComposerPrefillForTests();
-    useBoundDraftStore.setState({ owners: new Set<string>() });
+    useBoundDraftStore.setState({ owners: new Set<string>(), restoreAfterSend: false });
 });
 
 describe(useComposerPrefill, () => {

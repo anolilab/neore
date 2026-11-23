@@ -4,8 +4,10 @@
  * Puts a prompt into one thread's composer for the person to read and send. Never sends: the composer only takes the
  * text (after what is already typed) and gets focus. Requests wait per thread, in order, for the composer of THEIR
  * thread: one made while that thread is not open is taken when it opens, a second one does not replace the first, the
- * same one twice is queued once, and another thread's composer leaves them alone. The shared thread composer takes them
- * only once its stored draft is back (`useBoundDraftStore`): text that arrived first would keep the saved draft out.
+ * same one twice is queued once, and another thread's composer leaves them alone. The shared thread composer (a comparison
+ * parent's too) takes them only once its stored draft is back (`useBoundDraftStore`), and not while an untouched prefilled
+ * message is sending: its saved draft comes back when the send ends, and text that arrived first would keep it out. Held
+ * prompts then go in after the restored draft, in order.
  */
 
 import { useEffect, useEffectEvent } from "react";
@@ -68,7 +70,8 @@ const setComposer = (threadId: string, mounted: boolean): void => {
 
 /**
  * The composer of `threadId` takes each prompt meant for it, in order; `undefined` (a new chat) takes none. With
- * `awaitStoredDraft` (the shared composer, whose draft comes back from storage), it takes them only once that draft is.
+ * `awaitStoredDraft` (the shared composer, whose draft comes back from storage), it takes them only once that draft is,
+ * and after the draft a prefilled message's send brings back.
  */
 export const useComposerPrefill = (threadId: string | undefined, onPrefill: (text: string) => void, { awaitStoredDraft = false } = {}): void => {
     const handle = useEffectEvent(onPrefill);
@@ -85,7 +88,9 @@ export const useComposerPrefill = (threadId: string | undefined, onPrefill: (tex
                 return;
             }
 
-            if (awaitStoredDraft && !useBoundDraftStore.getState().owners.has(threadId)) {
+            const bound = useBoundDraftStore.getState();
+
+            if (awaitStoredDraft && (!bound.owners.has(threadId) || bound.restoreAfterSend)) {
                 return;
             }
 

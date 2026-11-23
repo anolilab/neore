@@ -1361,6 +1361,9 @@ const ComposerInput = ({
                 })
                 .catch((error: unknown) => {
                     prefillsDuringSend.current = null;
+                    // The draft stays to send again; a send still marked as running would block that, and hold prompts back
+                    // (`composer-prefill.ts`) until a reload.
+                    useChatUIStore.getState().setIsSubmitting(false);
 
                     throw error;
                 });
@@ -1700,8 +1703,8 @@ const ComposerInput = ({
     // A prompt another part of the thread's UI wrote for this thread (`composer-prefill.ts`): added after what is typed,
     // never sent. The same prompt twice is not added twice. A comparison parent's shared composer takes one too: its send
     // fans out through `onSubmitOverride`, but the text belongs to this thread. The thread's parked draft comes back first,
-    // so a prompt taken as a pane mounts joins that draft instead of keeping it parked; the thread composer also waits for
-    // the stored draft (`awaitStoredDraft`). The person did not type the prompt, and it quotes host text: the draft is
+    // so a prompt taken as a pane mounts joins that draft instead of keeping it parked; both also wait for the stored draft
+    // (`awaitStoredDraft`): the comparison parent binds one too (`thread.tsx`). The person did not type the prompt, and it quotes host text: the draft is
     // marked as a clicked suggestion, unless it already has a mark.
     useComposerPrefill(
         !compact && threadId ? threadId : undefined,
@@ -1732,7 +1735,7 @@ const ComposerInput = ({
 
             inputAreaRef.current?.focus();
         },
-        { awaitStoredDraft: !onSubmitOverride },
+        { awaitStoredDraft: true },
     );
 
     // Handle "Upload new file" from @ popup — open file dialog

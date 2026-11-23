@@ -516,6 +516,23 @@ describe("ComposerInput fix prompts from the pull request chip", () => {
         expect(onSubmitOverride).not.toHaveBeenCalled();
     });
 
+    it("holds a prompt from a comparison parent's shared composer until the thread's stored draft is back", () => {
+        setDraftBound("thread-1", false);
+        renderComposer({ onSubmitOverride: vi.fn(async () => undefined) });
+        act(() => {
+            prefillComposer("thread-1", "Resolve conflicts with main");
+        });
+
+        // Text in the composer now would keep the saved draft out, and be stored in its place.
+        expect(useChatUIStore.getState().composerText).toBe("");
+
+        act(() => {
+            setDraftBound("thread-1", true);
+        });
+
+        expect(useChatUIStore.getState().composerText).toContain("Resolve conflicts with main");
+    });
+
     it("leaves a prompt for another thread alone", () => {
         renderComposer({ onSubmitOverride: vi.fn(async () => undefined) });
         act(() => {
