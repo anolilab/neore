@@ -444,13 +444,6 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
 
         // A click the hour's budget cannot run asks nothing: `execute` refuses it before any look, so no card is shown for it.
         if (input.action === "click" && input.selector && !(await hasBrowserActionLeft(context, userId))) {
-            // An ask-mode preread (`askAfterLook`) reads this flag: the call cannot run, so nothing is asked for it.
-            const { outcome } = options as { outcome?: { cannotRun?: boolean } };
-
-            if (outcome !== undefined) {
-                outcome.cannotRun = true;
-            }
-
             return false;
         }
 

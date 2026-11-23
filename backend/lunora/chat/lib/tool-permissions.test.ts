@@ -315,14 +315,8 @@ describe("time-boxed grants", () => {
         clock.mockRestore();
     });
 
-    it("an ask-mode preread that reports the call cannot run asks nothing; any other outcome still asks", async () => {
-        const cannotRun = vi.fn(async (_input: unknown, options: { outcome?: { cannotRun?: boolean } }) => {
-            if (options.outcome !== undefined) {
-                options.outcome.cannotRun = true;
-            }
-
-            return false;
-        });
+    it("an ask-mode call always asks, whatever its preread answers (a skipped ask would let an unapproved click run)", async () => {
+        const cannotRun = vi.fn(async () => false);
         const ordinary = vi.fn(async () => false);
         const build = (own: (...args: never[]) => unknown) => {
             const tools = { mcp_Files__delete: { execute: async () => "ok", looksBeforeAsk: true, needsApproval: own } } as unknown as ToolSet;
@@ -332,7 +326,7 @@ describe("time-boxed grants", () => {
             };
         };
 
-        expect(await build(cannotRun as never).needsApproval({}, {})).toBe(false);
+        expect(await build(cannotRun as never).needsApproval({}, {})).toBe(true);
         expect(await build(ordinary as never).needsApproval({}, {})).toBe(true);
     });
 

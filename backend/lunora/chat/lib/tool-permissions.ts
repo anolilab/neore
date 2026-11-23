@@ -348,19 +348,18 @@ const needsApprovalUnless =
  */
 const askAfterLook = (own: OwnApproval): OwnApproval =>
     async function needsApprovalAfterLook(this: unknown, input: unknown, options: NeedsApprovalOptions): Promise<boolean> {
-        // The tool can report that the call cannot run at all (no action budget left): then nothing is asked, and the call is
-        // refused when it runs. Any other outcome asks, as before.
-        const outcome: { cannotRun?: boolean } = {};
-
         try {
             if (typeof own === "function") {
-                await (own as (this: unknown, input: unknown, options: unknown) => unknown).call(this, input, { ...options, asking: true, outcome });
+                await (own as (this: unknown, input: unknown, options: unknown) => unknown).call(this, input, { ...options, asking: true });
             }
         } catch {
             // The read failed: the call still asks, and its record stays empty.
         }
 
-        return outcome.cannotRun !== true;
+        // Always asks. A call whose preread skipped the look (no action budget then) must not reach `execute` unapproved: a budget
+        // freed before `execute` would let an ordinary-looking click run that nobody approved. The approval is then refused at
+        // `execute` (no record), which fails closed.
+        return true;
     } as OwnApproval;
 
 /**
