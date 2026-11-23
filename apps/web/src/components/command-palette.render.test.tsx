@@ -191,10 +191,15 @@ const isBefore = (earlier: Node, later: Node): boolean => earlier.compareDocumen
 
 const messageQueries = () => harness.searchArgs.filter((args) => args !== skipToken);
 
-const renderPalette = () => {
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+const renderPalette = (queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })) =>
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(GlobalCommandPalette)));
 
-    return render(createElement(QueryClientProvider, { client: queryClient }, createElement(GlobalCommandPalette)));
+const waitPastDebounce = async () => {
+    await act(async () => {
+        await new Promise<void>((resolve) => {
+            setTimeout(resolve, 400);
+        });
+    });
 };
 
 /** The scroll area under the list needs a constructible observer; the setup's mock is an arrow function. */
@@ -542,7 +547,7 @@ describe("command palette filters and meaning search", () => {
 
         expect(await screen.findByText("PDF totals off by one", undefined, { timeout: 3000 })).toBeTruthy();
         expect(screen.getByText("Related threads")).toBeTruthy();
-        expect(harness.meaningArgs).toContainEqual({ query: "the invoice bug" });
+        expect(harness.meaningArgs).toContainEqual({ archivedOnly: false, query: "the invoice bug" });
     });
 
     it("lists meaning hits after the exact title matches, and does not repeat a thread the title already matched", async () => {
@@ -560,6 +565,68 @@ describe("command palette filters and meaning search", () => {
 
         expect(screen.getAllByText("Invoice export")).toHaveLength(1);
         expect(isBefore(screen.getByText("Invoice export"), meaningHit)).toBe(true);
+    });
+
+    it("picking a project keeps the Archived filter on, so the project's archived threads show", async () => {
+        harness.threads = [
+            { _id: "thread-1a", projectId: "p-billing", status: "active", title: "Refund flow" },
+            { _id: "thread-1b", projectId: "p-billing", status: "archived", title: "Old refund run" },
+        ];
+        harness.projects = [{ _id: "p-billing", title: "Billing" }];
+        renderPalette();
+        await openPalette();
+
+        fireEvent.click(screen.getByRole("button", { name: "Archived" }));
+        fireEvent.click(screen.getByRole("button", { name: "Projects" }));
+        fireEvent.click(screen.getByText("Billing"));
+
+        expect(screen.getByText("Old refund run")).toBeTruthy();
+        expect(screen.queryByText("Refund flow")).toBeNull();
+        expect(screen.getByRole("button", { name: "Archived" }).getAttribute("aria-pressed")).toBe("true");
+        expect(screen.getByRole("button", { name: "Projects" }).getAttribute("aria-pressed")).toBe("false");
+    });
+
+    it("asks the meaning search for archived threads only under the Archived filter", async () => {
+        renderPalette();
+        const input = await openPalette();
+
+        fireEvent.click(screen.getByRole("button", { name: "Archived" }));
+        fireEvent.change(input, { target: { value: "the invoice bug" } });
+        await waitPastDebounce();
+
+        expect(harness.meaningArgs).toContainEqual({ archivedOnly: true, query: "the invoice bug" });
+    });
+
+    it("does not embed a query again when the text is edited back to it, and drops the hits when the palette closes", async () => {
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+        renderPalette(queryClient);
+        const input = await openPalette();
+
+        fireEvent.change(input, { target: { value: "the invoice bug" } });
+        await waitPastDebounce();
+        fireEvent.change(input, { target: { value: "the invoice bugs" } });
+        await waitPastDebounce();
+        fireEvent.change(input, { target: { value: "the invoice bug" } });
+        await waitPastDebounce();
+
+        expect(harness.meaningArgs).toEqual([
+            { archivedOnly: false, query: "the invoice bug" },
+            { archivedOnly: false, query: "the invoice bugs" },
+        ]);
+
+        act(() => {
+            useCommandDialogStore.getState().close();
+        });
+
+        await waitFor(() => {
+            const kept = queryClient
+                .getQueryCache()
+                .findAll({ queryKey: ["command-palette", "meaning"] })
+                .filter((query) => query.state.data !== undefined);
+
+            expect(kept).toHaveLength(0);
+        });
     });
 
     it("the projects filter lists project rows only, and choosing one narrows the threads to that project", async () => {

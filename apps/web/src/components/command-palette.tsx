@@ -20,7 +20,7 @@ import { Kbd, KbdGroup } from "@neore/ui/components/kbd";
 import { Toggle } from "@neore/ui/components/toggle";
 import useIsHydrated from "@neore/ui/hooks/use-hydrated";
 import { formatShortcutForDisplay } from "@neore/ui/utils/keyboard-shortcuts";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import {
     Archive,
@@ -80,6 +80,10 @@ const MEANING_SEARCH_MIN_CHARS = 3;
 /** The longest query `searchThreadsByMeaning` accepts (`agent/thread-search.ts`); a longer one is not sent. */
 const MEANING_SEARCH_MAX_CHARS = 2000;
 const MAX_MEANING_HITS = 10;
+/** The meaning hits' key prefix, removed when the palette closes. */
+const MEANING_QUERY_KEY = ["command-palette", "meaning"] as const;
+/** How long a query's meaning hits are reused while the palette is open, so editing back to it does not embed it again. */
+const MEANING_CACHE_MS = 60_000;
 /** The longest delay setTimeout accepts; a timer capped by it re-arms when it fires (the effect reads `now`). */
 const MAX_TIMEOUT_MS = 2_147_483_647;
 
@@ -167,6 +171,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     const { keyboardShortcuts } = useKeyboardShortcuts();
     const { isOpen } = useCommandDialogState();
     const { close, setOpen } = useCommandDialogActions();
+    const queryClient = useQueryClient();
 
     const currentThreadId = useCurrentThreadId();
     const threadMetadata = useThreadMetadata();
@@ -192,6 +197,13 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         setScope(NO_PALETTE_SCOPE);
         setProjectFilter(undefined);
     }
+
+    // The meaning hits are kept a minute so editing a query back does not embed it again, but not past the open palette.
+    useEffect(() => {
+        if (!isOpen) {
+            queryClient.removeQueries({ queryKey: MEANING_QUERY_KEY });
+        }
+    }, [isOpen, queryClient]);
 
     // Message search is a full-text query: it waits for the palette to be open, for
     // two characters and for the typing to pause, and is never live (NEVER_LIVE).
@@ -227,10 +239,11 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         trimmedSearch.length <= MEANING_SEARCH_MAX_CHARS &&
         trimmedSearch === debouncedSearch;
     const { data: meaningHits } = useQuery({
-        // The hits are a user's own thread titles: they are not kept once the palette closes.
-        gcTime: 0,
-        queryFn: isMeaningSearchCurrent ? () => searchMeaning({ query: debouncedSearch }) : skipToken,
-        queryKey: ["command-palette", "meaning", sessionUserId, debouncedSearch],
+        // The hits are a user's own thread titles: kept briefly while the palette is open, removed when it closes (above).
+        gcTime: MEANING_CACHE_MS,
+        queryFn: isMeaningSearchCurrent ? () => searchMeaning({ archivedOnly: scope.archived, query: debouncedSearch }) : skipToken,
+        queryKey: [...MEANING_QUERY_KEY, sessionUserId, scope.archived, debouncedSearch],
+        staleTime: MEANING_CACHE_MS,
     });
     // Project rows show only under the Projects filter, so the list is read only then.
     const { hasMore: hasMoreProjects, projects } = useProjectList(shouldQuery && scope.projects);
@@ -574,7 +587,8 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                         label: project.title,
                         onClick: () => {
                             setProjectFilter({ id: project._id, title: project.title });
-                            setScope(NO_PALETTE_SCOPE);
+                            // Only the Projects filter is done; Threads and Archived still narrow the project's threads.
+                            setScope({ ...scope, projects: false });
                             // The text found the project; left in place it would narrow the project's threads by the project's name.
                             setSearchInput("");
                         },

@@ -460,10 +460,11 @@ export interface MeaningThread {
 /**
  * The palette's meaning search for one person: embed the query, read the nearest
  * title and summary vectors among their own, map each to its thread and keep the
- * best ones. Returns `[]` for a query too short to embed, or when the model is
- * refused for the person.
+ * best ones. With `archivedOnly`, active threads are dropped before the result
+ * limit, so archived matches ranked below them still fill it. Returns `[]` for a
+ * query too short to embed, or when the model is refused for the person.
  */
-export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { query: string; userId: string }): Promise<MeaningThread[]> => {
+export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { archivedOnly?: boolean; query: string; userId: string }): Promise<MeaningThread[]> => {
     const query = args.query.trim();
 
     if (query.length < MEANING_MIN_CHARS) {
@@ -530,6 +531,7 @@ export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { query: s
     const scoreOf = new Map(ranked.map((entry) => [entry.threadId, entry.score] as const));
 
     return rows
+        .filter((row) => args.archivedOnly !== true || row.archived)
         .map((row) => {
             return { archived: row.archived, score: scoreOf.get(row.threadId) ?? 0, threadId: row.threadId, title: row.title };
         })
@@ -539,12 +541,12 @@ export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { query: s
 
 export const searchThreadsByMeaning = authAction
     .use(rateLimit("threads/meaning"))
-    .input({ query: v.string().max(MAX_LENGTH.long) })
+    .input({ archivedOnly: v.optional(v.boolean()), query: v.string().max(MAX_LENGTH.long) })
     .output(v.array(v.object({ archived: v.boolean(), score: v.number(), threadId: v.string(), title: v.union(v.string(), v.null()) })))
     .action(async ({ args, ctx }) => {
         if (args.query.trim().length > 2000) {
             throw new LunoraError("BAD_REQUEST", "Query must be at most 2000 characters");
         }
 
-        return await searchThreadsByMeaningFor(ctx, { query: args.query, userId: ctx.user.userId });
+        return await searchThreadsByMeaningFor(ctx, { archivedOnly: args.archivedOnly, query: args.query, userId: ctx.user.userId });
     });

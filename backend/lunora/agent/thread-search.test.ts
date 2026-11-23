@@ -331,6 +331,36 @@ describe(searchThreadsByMeaningFor, () => {
         ]);
     });
 
+    it("with archivedOnly, fills the results with archived matches ranked below more active ones than the limit", async () => {
+        const active = Array.from({ length: 12 }, (_, index) => {
+            return { archived: false, threadId: `thread-active-${String(index)}`, title: `Active ${String(index)}` };
+        });
+        const hits = [
+            ...active.map((_row, index) => {
+                return { _id: `vec-active-${String(index)}`, _score: 0.95 - index * 0.001 };
+            }),
+            { _id: "vec-archived", _score: 0.6 },
+        ];
+
+        mocks.searchVectors.mockImplementation(async (_ctx, _vector, args) => (args.table === "threadTitle" ? hits : []));
+        const ctx = makeCtx({
+            threadIdsForVectors: [
+                ...active.map((row, index) => {
+                    return { threadId: row.threadId, vectorId: `vec-active-${String(index)}` };
+                }),
+                { threadId: "thread-old", vectorId: "vec-archived" },
+            ],
+            visibleThreads: [...active, { archived: true, threadId: "thread-old", title: "Old invoice run" }],
+        });
+
+        expect(await searchThreadsByMeaningFor(ctx as never, { query: "the invoice bug", userId: "user-1" })).not.toContainEqual(
+            expect.objectContaining({ threadId: "thread-old" }),
+        );
+        expect(await searchThreadsByMeaningFor(ctx as never, { archivedOnly: true, query: "the invoice bug", userId: "user-1" })).toEqual([
+            { archived: true, score: 0.6, threadId: "thread-old", title: "Old invoice run" },
+        ]);
+    });
+
     it("answers nothing for a query too short to embed", async () => {
         const ctx = makeCtx({});
 
