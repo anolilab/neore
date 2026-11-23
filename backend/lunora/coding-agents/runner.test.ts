@@ -30,7 +30,7 @@ import {
     startPullRequest,
     startRun,
 } from "./runner";
-import { fakeKey } from "./test-fixtures";
+import { fakeKey, fakeShapedKey } from "./test-fixtures";
 
 const PROVIDER_KEY = fakeKey("anthropic");
 const GITHUB_TOKEN = fakeKey("github");
@@ -284,6 +284,17 @@ describe("readSetupLogTail", () => {
 
         expect(tail).toContain("npm ERR! missing script [REDACTED]\n");
         expect(tail).not.toContain(PROVIDER_KEY);
+    });
+
+    it("redacts a key the run was not given, by its shape, when the stored key changed mid-run", async () => {
+        // `secrets` holds only the key now stored; the setup script printed the key the run started with.
+        const oldKey = fakeShapedKey("anthropic-shaped");
+        const tail = await readSetupLogTail(
+            fakeSandbox(() => ok(`npm ERR! using key ${oldKey}\n`)),
+            secrets,
+        );
+
+        expect(tail).toBe("npm ERR! using key [REDACTED]\n");
     });
 
     it("rejects a tail that exits nonzero, so the caller keeps the poll's log instead of an empty one", async () => {
