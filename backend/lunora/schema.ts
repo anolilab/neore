@@ -236,6 +236,9 @@ export const schema = defineSchema({
         autoApproveLowRisk: v.optional(v.boolean()),
         autoDetectComplexity: v.optional(v.boolean()),
         autoMediaEnrichment: v.optional(v.boolean()),
+        // How the agent's browser clicks: "page" (absent, the default) checks and clicks in the page; "pointer" clicks for real
+        // except a purchase or an approved click; "all" clicks for real after a check. Server-written (`chat_functions.setBrowserClickMode`).
+        browserClickMode: v.optional(v.union(v.literal("page"), v.literal("pointer"), v.literal("all"))),
         browserSettings: v.optional(
             v.object({ domainAllowlist: v.optional(v.array(v.string())), domainBlocklist: v.optional(v.array(v.string())), enabled: v.optional(v.boolean()) }),
         ),
@@ -526,6 +529,17 @@ export const schema = defineSchema({
         inUseHolds: v.optional(v.array(v.number())),
         lastActivityAt: v.number(),
         providerSessionId: v.optional(v.string()),
+        /**
+         * The target a purchase decision looked at, per tool call (`browser/functions.ts#recordPurchaseLook`): the approved
+         * click is checked against it, so a page that changed in between is refused. The newest few are kept.
+         */
+        // `browser` is absent on a look written before it was recorded: such a look reads as another browser, so its click is refused.
+        purchaseLooks: v.optional(v.array(v.object({ browser: v.optional(v.string()), target: v.string(), toolCallId: v.string() }))),
+        /**
+         * Tool calls whose decision target was pushed out of `purchaseLooks` before their approved click ran
+         * (`browser/functions.ts#recordPurchaseLook`): such a click is refused, never run unchecked.
+         */
+        purchaseLostCalls: v.optional(v.array(v.string())),
         /**
          * The deadlines of the browser actions in flight that began while the row read the browser as reaped (or before it
          * named one): they keep a person from taking control until they end, but keep no browser alive, so a reaped one

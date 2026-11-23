@@ -11,6 +11,7 @@
     "add-group-pause-file-ids",
     "add-headless-approved",
     "add-headless-resume-bounds",
+    "add-purchase-look-browser",
     "add-run-args-impersonated",
     "add-run-args-system-context",
     "add-steer-text-length",
@@ -3352,6 +3353,35 @@
           "optional": true,
           "unique": false
         },
+        "browserClickMode": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"all\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"page\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"pointer\""
+            }
+          ]
+        },
         "browserSettings": {
           "kind": "object",
           "nullable": false,
@@ -4766,6 +4796,50 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "purchaseLooks": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "object",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "fields": {
+              "browser": {
+                "kind": "string",
+                "nullable": false,
+                "optional": true,
+                "unique": false
+              },
+              "target": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "toolCallId": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              }
+            }
+          }
+        },
+        "purchaseLostCalls": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
         },
         "reapedHolds": {
           "kind": "array",

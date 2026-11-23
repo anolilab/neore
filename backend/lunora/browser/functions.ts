@@ -61,6 +61,85 @@ export const getBrowserDomainSettings = internalQuery
         return preferences?.browserSettings ?? {};
     });
 
+/** How the owner's agent clicks (`aiUserPreferences.browserClickMode`); absent is the default, "page". */
+export const getBrowserClickMode = internalQuery
+    .input({ userId: v.string() })
+    .output(v.union(v.literal("page"), v.literal("pointer"), v.literal("all")))
+    .query(async ({ args, ctx }) => {
+        const preferences = await ctx.db
+            .query("aiUserPreferences")
+            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+            .first();
+
+        return preferences?.browserClickMode ?? "page";
+    });
+
+/**
+ * How many purchase decision looks a session keeps. Past the cap the oldest go first, to `purchaseLostCalls`: their approved
+ * clicks are refused. An approved click takes its own look (`takePurchaseLook`), so only decisions never clicked accumulate.
+ */
+const PURCHASE_LOOKS_KEPT = 50;
+
+/** How many evicted tool calls a session remembers, so their approved clicks are refused rather than run unchecked. */
+const PURCHASE_LOST_KEPT = 200;
+
+/**
+ * The target a purchase decision looked at for one tool call, and the browser it read it on (the renderer's session id, or
+ * `NO_PROVIDER_SESSION`). Written by the decision's own look, before the person is asked; a click the person approves is checked
+ * against both, so a browser the provider replaced while they were asked is never clicked. An empty target: the decision's look
+ * could not read the target.
+ */
+export const recordPurchaseLook = internalMutation
+    .input({ browser: v.string(), sessionId: v.id("browserSessions"), target: v.string(), toolCallId: v.string() })
+    .mutation(async ({ args: { browser, sessionId, target, toolCallId }, ctx }) => {
+        const session = await ctx.db.get("browserSessions", sessionId);
+
+        if (session) {
+            const kept = (session.purchaseLooks ?? []).filter((look) => look.toolCallId !== toolCallId);
+            const all = [...kept, { browser, target, toolCallId }];
+            const evicted = all.slice(0, -PURCHASE_LOOKS_KEPT).map((look) => look.toolCallId);
+
+            await patchRow(ctx.db, "browserSessions", session, {
+                purchaseLooks: all.slice(-PURCHASE_LOOKS_KEPT),
+                purchaseLostCalls: [...(session.purchaseLostCalls ?? []), ...evicted].slice(-PURCHASE_LOST_KEPT),
+            });
+        }
+    });
+
+/**
+ * Takes the decision of one tool call, and forgets it. `target`: the element the person was shown. `unreadable`: its decision
+ * could not read one. `lost`: its target was pushed out before the click ran. `none`: no decision looked at the page (ask
+ * mode asks without a look), so the click is not checked.
+ */
+export const takePurchaseLook = internalMutation
+    .input({ sessionId: v.id("browserSessions"), toolCallId: v.string() })
+    .output(
+        v.object({
+            browser: v.optional(v.string()),
+            kind: v.union(v.literal("lost"), v.literal("none"), v.literal("target"), v.literal("unreadable")),
+            target: v.optional(v.string()),
+        }),
+    )
+    .mutation(async ({ args: { sessionId, toolCallId }, ctx }) => {
+        const session = await ctx.db.get("browserSessions", sessionId);
+
+        if (!session) {
+            return { kind: "none" as const };
+        }
+
+        const look = session.purchaseLooks?.find((entry) => entry.toolCallId === toolCallId);
+
+        if (look !== undefined) {
+            await patchRow(ctx.db, "browserSessions", session, {
+                purchaseLooks: (session.purchaseLooks ?? []).filter((entry) => entry.toolCallId !== toolCallId),
+            });
+
+            return look.target === "" ? { kind: "unreadable" as const } : { browser: look.browser, kind: "target" as const, target: look.target };
+        }
+
+        return (session.purchaseLostCalls ?? []).includes(toolCallId) ? { kind: "lost" as const } : { kind: "none" as const };
+    });
+
 export const createSession = internalMutation
     .input({
         connectUrl: v.optional(v.string()),

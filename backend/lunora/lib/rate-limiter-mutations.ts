@@ -95,6 +95,16 @@ export const refundRateLimit = internalMutation
         await createRatelimit(key, ctx.db).refund(identifier, count);
     });
 
+/**
+ * Gives back one unit a charge took from the window starting at `windowStart`, only while that window is still current (`refundLimitUnits`).
+ * A probe that charges and refunds in two steps uses this, so a refund never credits an action charged in a newer window.
+ */
+export const refundRateLimitWindow = internalMutation
+    .input({ identifier: v.string(), key: v.string(), windowStart: v.number() })
+    .mutation(async ({ args: { identifier, key, windowStart }, ctx }) => {
+        await refundLimitUnits(ctx, { count: 1, identifier, key, windowStart });
+    });
+
 export const resetRateLimit = internalMutation
     .input({
         identifier: v.string(),
