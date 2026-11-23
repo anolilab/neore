@@ -10,6 +10,12 @@
  * subrequest, and a Worker invocation has few — and returns `nextCursor`; the
  * client sums the pages. At most {@link MAX_PROJECTS} projects, with `truncated`
  * set when the organization has more.
+ *
+ * Every number the view releases is a sum of cells: one cohort's usage on one UTC day that has closed (`organizationPeriodEnd`), released
+ * only when at least {@link MIN_MEMBERS_PER_GROUP} of the cohort's members were active that day, and a project named in a cell only when
+ * that many of them used it (`releaseCells`). The cells a call reads depend only on the period's whole days, and a closed day's cell no
+ * longer changes, so two released totals (any two period starts, or the same one read later) differ by whole cells: never by one member's
+ * spend.
  */
 import { v } from "lunorash/server";
 
@@ -22,7 +28,10 @@ import { authAction, rateLimit } from "../lib/crpc";
 import { throwForbidden } from "../lib/error-helpers";
 import { systemDb } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
+import { USAGE_DAILY_RETENTION_DAYS } from "../gdpr/retention";
+import { ORGANIZATION_RECORD_LATE_MS } from "./activity-logic";
 import { COHORT_SIZE, insertContributor } from "./cohorts";
+import { deletionUnderwayOnPrimary } from "./gdpr";
 
 /** Members one call walks, at most, once the group it is in has closed: well inside a Worker invocation's subrequest budget. */
 export const MAX_MEMBERS_PER_CALL = 25;
@@ -90,22 +99,37 @@ export interface WalkPosition {
 }
 
 /**
- * Whether a full group's sums are released: not withheld (see {@link pageWithheld}), and no member read past the ledger's ceiling. A
- * truncated member is withheld with the group, so no response says which member had more rows than the read takes.
- */
-export const groupReleased = (group: ReadonlyArray<{ active: boolean; truncated?: boolean }>): boolean =>
-    !pageWithheld(group) && group.every((member) => member.truncated !== true);
-
-/**
- * Whether a group's sums (or the trailing members') are withheld: some of its members were active in the period, but fewer than
- * {@link MIN_MEMBERS_PER_GROUP}. The sum of a few active members, with the rest quiet, is one person's spend. A group where nobody was
- * active shows nothing to hide.
+ * Whether a cohort's day is withheld: some of its members were active that day, but fewer than {@link MIN_MEMBERS_PER_GROUP}. The sum of a
+ * few active members, with the rest quiet, is one person's spend. A day where nobody was active shows nothing to hide.
  */
 export const pageWithheld = (members: ReadonlyArray<{ active: boolean }>): boolean => {
     const active = members.filter((member) => member.active).length;
 
     return active > 0 && active < MIN_MEMBERS_PER_GROUP;
 };
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Added to {@link ORGANIZATION_RECORD_LATE_MS} where the view decides a day is closed: the clocks of the shards and the action may differ. */
+const ORGANIZATION_RELEASE_MARGIN_MS = 60 * 60 * 1000;
+
+/** The oldest day the view reads, in days before its last: two days inside retention, so a day being pruned is never read part-way. */
+export const MAX_PERIOD_DAYS = USAGE_DAILY_RETENTION_DAYS - 2;
+
+/**
+ * The end of the whole UTC days the view reads, in epoch ms: the start of the last day that closed at least
+ * {@link ORGANIZATION_RECORD_LATE_MS} (and a margin) ago. Today, and a day that closed more recently, are left out: a reply could still be
+ * added to them, and a total read before it and one after would differ by that reply.
+ */
+export const organizationPeriodEnd = (now: number): number =>
+    Math.floor((now - ORGANIZATION_RECORD_LATE_MS - ORGANIZATION_RELEASE_MARGIN_MS) / DAY_MS) * DAY_MS;
+
+/** The start of the period's whole UTC days: the start of the day `since` falls in, at most {@link MAX_PERIOD_DAYS} days before `until`. */
+export const organizationPeriodStart = (since: number, until: number): number =>
+    Math.min(Math.max(Math.floor(since / DAY_MS) * DAY_MS, until - MAX_PERIOD_DAYS * DAY_MS), until);
+
+/** The UTC day (days since the epoch) an instant falls in. */
+const dayOf = (at: number): number => Math.floor(at / DAY_MS);
 
 const ADMIN_ROLES = new Set(["admin", "owner"]);
 
@@ -228,70 +252,57 @@ export const organizationUsageScope = internalQuery
 const REPLY_PAGE = 500;
 const MAX_REPLY_PAGES = 20;
 
+/** One member's replies on one project on one UTC day. */
+const vDayProject = { ...vTotals, day: v.number(), projectKey: v.string() };
+
 /**
- * One member's replies per project, for the organization's projects named, from `since` (epoch ms) on; runs on the member's shard. It reads
- * the rows recorded under the organization (`usageOrganizationReplies`), so a reply keeps the organization it was recorded under: a project
- * moved in later has no rows for the replies made before it moved.
+ * One member's replies per UTC day and project, recorded under the organization in `[from, until)` (epoch ms, whole days); runs on the
+ * member's shard. It reads the rows recorded under the organization (`usageOrganizationReplies`), so a reply keeps the organization it was
+ * recorded under: a project moved in later has no rows for the replies made before it moved. Every project the rows name is returned; the
+ * walk decides which it may name (`releaseCells`).
  */
 export const memberProjectUsage = internalQuery
     .input({
-        // Whether `projectIds` is every project the organization has. Cut at `MAX_PROJECTS`, a project that is not listed is not known to
-        // have left, so its replies are not counted as removed.
+        from: v.number(),
         organizationId: v.string().max(MAX_LENGTH.id),
-        projectIds: v.array(v.string().max(MAX_LENGTH.id)),
-        projectsListed: v.boolean(),
-        since: v.number(),
+        until: v.number(),
         userId: v.string().max(MAX_LENGTH.id),
     })
     .output(
         v.object({
-            // Whether the member had any reply in the period: a page of members with few active ones is withheld (`pageWithheld`).
-            active: v.boolean(),
-            projects: v.array(v.object({ ...vTotals, projectKey: v.string() })),
-            // The replies of projects the organization no longer has: their totals, without naming the projects, so a member's personal
-            // project that left is not shown by name, while its usage keeps counting.
-            removed: v.optional(v.object(vTotals)),
+            // Per day and project, at most one entry each.
+            cells: v.array(v.object(vDayProject)),
+            // The member's account is being erased: their rows are leaving a batch at a time, so their cohort's days are withheld.
+            erasing: v.boolean(),
             truncated: v.boolean(),
         }),
     )
-    .query(async ({ args: { organizationId, projectIds, projectsListed, since, userId }, ctx }) => {
-        const wanted = new Set(projectIds);
-        const sums = new Map<string, { costMicrodollars: number; projectKey: string; replies: number; tokens: number }>();
-        const removed = { costMicrodollars: 0, replies: 0, tokens: 0 };
+    .query(async ({ args: { from, organizationId, until, userId }, ctx }) => {
+        const sums = new Map<string, { costMicrodollars: number; day: number; projectKey: string; replies: number; tokens: number }>();
         let cursor: string | null = null;
         let truncated = false;
-        let active = false;
 
         for (let pages = 1; ; pages += 1) {
-            const result: { continueCursor: string | null; isDone: boolean; page: { costMicrodollars: number; projectKey: string; tokens: number }[] } =
-                await ctx.db.usageOrganizationReplies.findMany({
-                    consistency: "primary",
-                    cursor,
-                    limit: REPLY_PAGE,
-                    where: { at: { gte: since }, organizationId, userId },
-                });
-
-            if (result.page.length > 0) {
-                active = true;
-            }
+            const result: {
+                continueCursor: string | null;
+                isDone: boolean;
+                page: { at: number; costMicrodollars: number; projectKey: string; tokens: number }[];
+            } = await ctx.db.usageOrganizationReplies.findMany({
+                consistency: "primary",
+                cursor,
+                limit: REPLY_PAGE,
+                where: { at: { gte: from, lt: until }, organizationId, userId },
+            });
 
             for (const row of result.page) {
-                if (!wanted.has(row.projectKey)) {
-                    if (projectsListed) {
-                        removed.costMicrodollars += row.costMicrodollars;
-                        removed.replies += 1;
-                        removed.tokens += row.tokens;
-                    }
-
-                    continue;
-                }
-
-                const sum = sums.get(row.projectKey) ?? { costMicrodollars: 0, projectKey: row.projectKey, replies: 0, tokens: 0 };
+                const day = dayOf(row.at);
+                const key = `${String(day)}:${row.projectKey}`;
+                const sum = sums.get(key) ?? { costMicrodollars: 0, day, projectKey: row.projectKey, replies: 0, tokens: 0 };
 
                 sum.costMicrodollars += row.costMicrodollars;
                 sum.replies += 1;
                 sum.tokens += row.tokens;
-                sums.set(row.projectKey, sum);
+                sums.set(key, sum);
             }
 
             if (result.isDone) {
@@ -306,38 +317,155 @@ export const memberProjectUsage = internalQuery
             cursor = result.continueCursor;
         }
 
-        return { active, projects: [...sums.values()], ...(removed.replies > 0 && { removed }), truncated };
+        return { cells: [...sums.values()], erasing: sums.size > 0 && (await deletionUnderwayOnPrimary(ctx, userId)), truncated };
     });
 
 /** One member's usage as the walk reads it. */
 interface MemberWalk {
-    active: boolean;
+    cells: { costMicrodollars: number; day: number; projectKey: string; replies: number; tokens: number }[];
     cohort: number;
-    projects: { costMicrodollars: number; projectKey: string; replies: number; tokens: number }[];
-    removed?: { costMicrodollars: number; replies: number; tokens: number };
+    erasing: boolean;
     truncated: boolean;
     userId: string;
 }
 
+type Totals = { costMicrodollars: number; replies: number; tokens: number };
+
+const addTo = (sum: Totals, add: Totals): void => {
+    sum.costMicrodollars += add.costMicrodollars;
+    sum.replies += add.replies;
+    sum.tokens += add.tokens;
+};
+
+const zero = (): Totals => {
+    return { costMicrodollars: 0, replies: 0, tokens: 0 };
+};
+
 /**
- * Replies, tokens and cost per project of the caller's active organization from
- * `since` (epoch ms) on, summed over one page of its members (from `afterUserId`).
- * Admins and owners only; projects with no usage are listed with zeros. Call
- * again with `nextCursor` until it is absent, and add the pages up.
+ * What the walk may release from whole cohorts' cells. A cell is one cohort's usage on one closed UTC day. In a cell:
+ *
+ * - the cell is withheld when some of the cohort's members were active that day but fewer than {@link MIN_MEMBERS_PER_GROUP}
+ *   ({@link pageWithheld}); a cohort with a member read past the ledger's ceiling, or being erased, is withheld on every day;
+ * - a project used by {@link MIN_MEMBERS_PER_GROUP} or more of its members is one bucket: named when the organization lists it, added to
+ *   `removed` when the list is whole and does not, left out (and the result truncated) when the list was cut;
+ * - every project used by fewer is folded into one `small` bucket, released only with that many members across it.
+ *
+ * Which projects a cell folds depends only on who used them that day, and a closed day no longer changes, so each bucket covers the same
+ * members whichever period or page reads it. A project that leaves the organization moves its whole bucket from its name to `removed`.
  */
+export const releaseCells = (
+    groups: ReadonlyArray<ReadonlyArray<Pick<MemberWalk, "cells" | "erasing" | "truncated">>>,
+    listed: ReadonlySet<string>,
+    projectsListed: boolean,
+): { named: Map<string, Totals>; removed: Totals; small: Totals; withheld: boolean } => {
+    const named = new Map<string, Totals>();
+    const removed = zero();
+    const small = zero();
+    let withheld = false;
+
+    for (const group of groups) {
+        if (group.some((member) => member.cells.length > 0 && (member.truncated || member.erasing))) {
+            withheld = true;
+            continue;
+        }
+
+        const days = new Map<number, Map<number, Map<string, Totals>>>();
+
+        for (const [index, member] of group.entries()) {
+            for (const cell of member.cells) {
+                const day = days.get(cell.day) ?? new Map<number, Map<string, Totals>>();
+                const projects = day.get(index) ?? new Map<string, Totals>();
+
+                projects.set(cell.projectKey, cell);
+                day.set(index, projects);
+                days.set(cell.day, day);
+            }
+        }
+
+        for (const byMember of days.values()) {
+            const activity = group.map((_, index) => {
+                return { active: byMember.has(index) };
+            });
+
+            if (pageWithheld(activity)) {
+                withheld = true;
+                continue;
+            }
+
+            const users = new Map<string, number[]>();
+
+            for (const [index, projects] of byMember) {
+                for (const projectKey of projects.keys()) {
+                    users.set(projectKey, [...(users.get(projectKey) ?? []), index]);
+                }
+            }
+
+            const cellSmall = zero();
+            const smallMembers = new Set<number>();
+
+            for (const [projectKey, members] of users) {
+                const bucket = zero();
+
+                for (const index of members) {
+                    const totals = byMember.get(index)?.get(projectKey);
+
+                    if (totals) {
+                        addTo(bucket, totals);
+                    }
+                }
+
+                if (members.length < MIN_MEMBERS_PER_GROUP) {
+                    addTo(cellSmall, bucket);
+                    members.forEach((index) => smallMembers.add(index));
+                } else if (listed.has(projectKey)) {
+                    const sum = named.get(projectKey) ?? zero();
+
+                    addTo(sum, bucket);
+                    named.set(projectKey, sum);
+                } else if (projectsListed) {
+                    addTo(removed, bucket);
+                } else {
+                    withheld = true;
+                }
+            }
+
+            if (smallMembers.size >= MIN_MEMBERS_PER_GROUP) {
+                addTo(small, cellSmall);
+            } else if (smallMembers.size > 0) {
+                withheld = true;
+            }
+        }
+    }
+
+    return { named, removed, small, withheld };
+};
+
 /** How long a page cursor opens: the walk resumes within the hour, not at any time later against a changed contributor list. */
 export const CURSOR_TTL_MS = 60 * 60 * 1000;
 
 /**
  * A page cursor: the walk's position, sealed so a caller can only resume a walk the server issued. It is bound to the organization and the
- * period (`since`) it was issued for, and it expires after {@link CURSOR_TTL_MS}. A cursor the caller makes up, takes from another
- * organization or period, or keeps past its time, does not open.
+ * period (`since`) it was issued for, carries the period's end, so every page of a walk covers the same days, and it expires after
+ * {@link CURSOR_TTL_MS}. A cursor the caller makes up, takes from another organization or period, or keeps past its time, does not open.
  */
-export const sealOrganizationCursor = async (organizationId: string, position: WalkPosition, since: number, issuedAt = Date.now()): Promise<string> =>
-    await encryptKey(JSON.stringify({ cohort: position.cohort, issuedAt, organizationId, since, userId: position.userId }), "usage-cursor");
+export const sealOrganizationCursor = async (
+    organizationId: string,
+    position: WalkPosition & { until: number },
+    since: number,
+    issuedAt = Date.now(),
+): Promise<string> =>
+    await encryptKey(
+        JSON.stringify({ cohort: position.cohort, issuedAt, organizationId, since, until: position.until, userId: position.userId }),
+        "usage-cursor",
+    );
 
-export const openOrganizationCursor = async (organizationId: string, since: number, cursor: string, now = Date.now()): Promise<WalkPosition> => {
-    let opened: { cohort?: unknown; issuedAt?: unknown; organizationId?: unknown; since?: unknown; userId?: unknown } | undefined;
+export const openOrganizationCursor = async (
+    organizationId: string,
+    since: number,
+    cursor: string,
+    now = Date.now(),
+): Promise<WalkPosition & { until: number }> => {
+    let opened: { cohort?: unknown; issuedAt?: unknown; organizationId?: unknown; since?: unknown; until?: unknown; userId?: unknown } | undefined;
 
     try {
         opened = JSON.parse(await decryptKey(cursor, "usage-cursor")) as typeof opened;
@@ -353,14 +481,20 @@ export const openOrganizationCursor = async (organizationId: string, since: numb
         opened.since !== since ||
         !fresh ||
         typeof opened.userId !== "string" ||
-        typeof opened.cohort !== "number"
+        typeof opened.cohort !== "number" ||
+        typeof opened.until !== "number"
     ) {
         return throwForbidden("The usage page is not valid; load the organization's usage again.");
     }
 
-    return { cohort: opened.cohort, userId: opened.userId };
+    return { cohort: opened.cohort, until: opened.until, userId: opened.userId };
 };
 
+/**
+ * Replies, tokens and cost per project of the caller's active organization over the whole UTC days from `since` (epoch ms) to the last
+ * closed one (`organizationPeriodEnd`), summed over one page of its cohorts. Admins and owners only. Call again with `nextCursor` until it is
+ * absent, and add the pages up.
+ */
 export const getOrganizationProjectUsage = authAction
     .use(rateLimit("usage/organization"))
     .input({ cursor: v.optional(v.string().max(MAX_LENGTH.cursor)), organizationId: v.string().max(MAX_LENGTH.id), since: v.number() })
@@ -383,8 +517,12 @@ export const getOrganizationProjectUsage = authAction
             return throwForbidden("Only organization admins can see the organization's usage.");
         }
 
-        // The walk resumes after the last member asked, in cohort order; it starts at the cursor's member, if there is one.
-        let resume: WalkPosition | undefined = cursor === undefined ? undefined : await openOrganizationCursor(organizationId, since, cursor);
+        // The walk resumes after the last member asked, in cohort order; it starts at the cursor's member, if there is one, and keeps the
+        // period's end the walk began with.
+        const opened = cursor === undefined ? undefined : await openOrganizationCursor(organizationId, since, cursor);
+        const until = opened?.until ?? organizationPeriodEnd(Date.now());
+        const from = organizationPeriodStart(since, until);
+        let resume: WalkPosition | undefined = opened === undefined ? undefined : { cohort: opened.cohort, userId: opened.userId };
         const walked: MemberWalk[] = [];
         // The project list is read once, with the call's first batch: every member of the call is then summed against the same list.
         let projects: { projectId: string; title: string }[] | undefined;
@@ -408,7 +546,6 @@ export const getOrganizationProjectUsage = authAction
                 projectsCut = scope.truncated;
             }
 
-            const projectIds = projects.map((project) => project.projectId);
             const batch = scope.members;
             let stopped = false;
 
@@ -428,14 +565,11 @@ export const getOrganizationProjectUsage = authAction
 
                 index += size;
                 // Asked even with no projects left: a member's replies to projects that left the organization still count, as `removed`.
+                // Every member is asked over the same days.
                 const results = await Promise.all(
                     chunk.map(
                         async ({ userId }) =>
-                            await callOnShard(
-                                internal.usage.organization.memberProjectUsage,
-                                { organizationId, projectIds, projectsListed: !projectsCut, since, userId },
-                                { shardKey: userId },
-                            ),
+                            await callOnShard(internal.usage.organization.memberProjectUsage, { from, organizationId, until, userId }, { shardKey: userId }),
                     ),
                 );
 
@@ -484,86 +618,28 @@ export const getOrganizationProjectUsage = authAction
             }
         }
 
-        // A cohort is shown when none of its members was active or all were; a cohort with some active members is withheld whole, and so is one
-        // smaller than a cohort (`pageWithheld`).
-        const groups = groupByCohort(walked);
-        const releasedGroups = groups.filter((group) => groupReleased(group));
-        const groupsWithheld = releasedGroups.length < groups.length;
-        const shown = releasedGroups.flat();
-        const removed = { costMicrodollars: 0, replies: 0, tokens: 0 };
-        const sums = new Map(
-            listed.map((project) => [project.projectId, { costMicrodollars: 0, projectKey: project.projectId, replies: 0, title: project.title, tokens: 0 }]),
-        );
+        // Each cohort's days are released whole or not at all (`releaseCells`).
+        const released = releaseCells(groupByCohort(walked), new Set(listed.map((project) => project.projectId)), !projectsCut);
+        const titles = new Map(listed.map((project) => [project.projectId, project.title]));
+        const named = [...released.named].flatMap(([projectKey, totals]) => {
+            const title = titles.get(projectKey);
 
-        // A project is named only with at least `MIN_MEMBERS_PER_GROUP` members in it: one member's project is that member's spend. A project
-        // below that is folded into one total, released only with that many members across it, so its usage still shows. The removed
-        // projects are one total, released on the same rule.
-        const membersPerProject = new Map<string, number>();
-
-        for (const member of shown) {
-            for (const project of member.projects) {
-                membersPerProject.set(project.projectKey, (membersPerProject.get(project.projectKey) ?? 0) + 1);
-            }
-        }
-
-        const folded = (projectKey: string): boolean => {
-            const count = membersPerProject.get(projectKey) ?? 0;
-
-            return count > 0 && count < MIN_MEMBERS_PER_GROUP;
-        };
-        const removedMembers = shown.filter((member) => member.removed !== undefined).length;
-        const removedWithheld = removedMembers > 0 && removedMembers < MIN_MEMBERS_PER_GROUP;
-        const small = { costMicrodollars: 0, replies: 0, tokens: 0 };
-        const smallMembers = new Set<number>();
-
-        for (const [index, member] of shown.entries()) {
-            for (const project of member.projects) {
-                if (folded(project.projectKey)) {
-                    small.costMicrodollars += project.costMicrodollars;
-                    small.replies += project.replies;
-                    small.tokens += project.tokens;
-                    smallMembers.add(index);
-
-                    continue;
-                }
-
-                const sum = sums.get(project.projectKey);
-
-                if (sum) {
-                    sum.costMicrodollars += project.costMicrodollars;
-                    sum.replies += project.replies;
-                    sum.tokens += project.tokens;
-                }
-            }
-
-            if (member.removed && !removedWithheld) {
-                removed.costMicrodollars += member.removed.costMicrodollars;
-                removed.replies += member.removed.replies;
-                removed.tokens += member.removed.tokens;
-            }
-        }
-
-        // The folded total is released only with `MIN_MEMBERS_PER_GROUP` members across its projects.
-        const smallReleased = smallMembers.size >= MIN_MEMBERS_PER_GROUP;
-        const smallWithheld = smallMembers.size > 0 && !smallReleased;
-        const someWithheld = removedWithheld || smallWithheld;
+            return title === undefined || totals.replies === 0 ? [] : [{ ...totals, projectKey, title }];
+        });
 
         ctx.log.event("usage.get_organization_project_usage", { members: walked.length, projects: listed.length });
 
-        const nextCursor = remaining && resume !== undefined ? await sealOrganizationCursor(organizationId, resume, since) : undefined;
         // `walked` is in cohort order, so its last member is the position the walk reached.
+        const nextCursor = remaining && resume !== undefined ? await sealOrganizationCursor(organizationId, { ...resume, until }, since) : undefined;
 
         return {
             ...(nextCursor !== undefined && { nextCursor }),
-            projects: [...sums.values()]
-                // Only projects with replies in the shown groups: a withheld group must not render every project at zero.
-                .filter((sum) => sum.replies > 0 && !folded(sum.projectKey))
-                .toSorted((a, b) => b.costMicrodollars - a.costMicrodollars || b.replies - a.replies || a.title.localeCompare(b.title)),
-            ...(smallReleased && small.replies > 0 && { small }),
-            ...(removed.replies > 0 && { removed }),
-            // A member's own truncation is never copied out: it would show that one member had more rows than the read takes. Their group is
-            // withheld instead, which says only that some group is partial.
-            truncated: projectsCut || groupsWithheld || someWithheld,
+            projects: named.toSorted((a, b) => b.costMicrodollars - a.costMicrodollars || b.replies - a.replies || a.title.localeCompare(b.title)),
+            ...(released.small.replies > 0 && { small: released.small }),
+            ...(released.removed.replies > 0 && { removed: released.removed }),
+            // A member's own truncation is never copied out: it would show that one member had more rows than the read takes. Their cohort is
+            // withheld instead, which says only that some part is missing.
+            truncated: projectsCut || released.withheld,
         };
     });
 

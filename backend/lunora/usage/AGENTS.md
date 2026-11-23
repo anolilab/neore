@@ -47,3 +47,9 @@
   under a project. Older usage, and any reply the totals backfill counted,
   shows under "No project" until the project-history backfill ships (a later
   part). Do not file a project row for a reply the live record did not count.
+- **Organization view releases whole cohort-days** — every number
+  `getOrganizationProjectUsage` returns is a sum of cells (one cohort's closed
+  UTC day), each bucket with five members (`releaseCells`). A closed day must
+  never change: an organization row is written only within
+  `ORGANIZATION_RECORD_LATE_MS` of its reply, and the view ends that long (and a
+  margin) before now. A new write to `usageOrganizationReplies` keeps both.

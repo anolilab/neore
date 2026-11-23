@@ -162,6 +162,9 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
                                 ? t`Replies, tokens and spend per project for the selected period`
                                 : t`Your organization's projects, summed over every member, for the selected period`}
                         </CardDescription>
+                        {showing === "organization" && (
+                            <p className="text-muted-foreground mt-1 text-xs">{t`Counted in whole days (UTC) once each day has ended, so today's usage shows tomorrow.`}</p>
+                        )}
                     </div>
                     {isOrganizationAdmin && (
                         <ToggleGroup

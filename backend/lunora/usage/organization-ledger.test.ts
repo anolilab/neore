@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
 import { recordReplyUsage } from "./activity";
-import { DEFAULT_SKILL_KEY } from "./activity-logic";
+import { DEFAULT_SKILL_KEY, ORGANIZATION_RECORD_LATE_MS } from "./activity-logic";
 import { eraseUsageForUser, MAX_PRUNED_ORGANIZATIONS, pruneOrganizationRepliesBefore } from "./gdpr";
 import {
     collectOrganizationRepliesForExport,
@@ -20,6 +20,8 @@ import {
 const ADMIN = "admin-1";
 const MEMBER = "member-1";
 const OWNER = "owner-1";
+
+const NOW = 10_000;
 
 let harness: ReturnType<typeof lunoraTest>;
 let replies = 0;
@@ -47,24 +49,32 @@ const record = async (projectKey: string, at: number, costMicrodollars = 100): P
     await harness.scheduler.runPending();
 };
 
-/** The member's organization totals for `projectIds` from `since` on. */
-const orgUsage = async (organizationId: string, projectIds: string[], since: number) => {
+/** The member's organization rows from `since` on, summed per project. */
+const orgUsage = async (organizationId: string, since: number) => {
     const result = (await harness.run(
-        async (ctx: any) => await ctx.runQuery(memberProjectUsage, { organizationId, projectIds, projectsListed: true, since, userId: MEMBER }),
-    )) as {
-        active: boolean;
-        projects: { costMicrodollars: number; projectKey: string; replies: number; tokens: number }[];
-        removed?: { costMicrodollars: number; replies: number; tokens: number };
-        truncated: boolean;
-    };
+        async (ctx: any) => await ctx.runQuery(memberProjectUsage, { from: since, organizationId, until: Number.MAX_SAFE_INTEGER, userId: MEMBER }),
+    )) as { cells: { costMicrodollars: number; projectKey: string; replies: number; tokens: number }[]; truncated: boolean };
+    const projects = new Map<string, { costMicrodollars: number; projectKey: string; replies: number; tokens: number }>();
 
-    // The sums and the removed total; `active` is checked where it is asked for.
-    return { projects: result.projects, ...(result.removed && { removed: result.removed }), truncated: result.truncated };
+    for (const cell of result.cells) {
+        const sum = projects.get(cell.projectKey) ?? { costMicrodollars: 0, projectKey: cell.projectKey, replies: 0, tokens: 0 };
+
+        sum.costMicrodollars += cell.costMicrodollars;
+        sum.replies += cell.replies;
+        sum.tokens += cell.tokens;
+        projects.set(cell.projectKey, sum);
+    }
+
+    return { projects: [...projects.values()], truncated: result.truncated };
 };
 
 beforeEach(() => {
     // The scheduled contributor reconcile (`reconcileOrganizationContributor`) runs on `harness.scheduler.runPending()`, by its name.
-    harness = lunoraTest(schema as never, { functions: { "usage_organization:reconcileOrganizationContributor": reconcileOrganizationContributor } } as never);
+    // The clock is just after the replies the tests record: an organization row is written only close to its reply.
+    harness = lunoraTest(
+        schema as never,
+        { functions: { "usage_organization:reconcileOrganizationContributor": reconcileOrganizationContributor }, now: NOW } as never,
+    );
     replies = 0;
 });
 
@@ -82,11 +92,11 @@ describe("the organization ledger", () => {
 
         await record(project, 1000);
 
-        expect(await orgUsage("org-1", [project], 0)).toEqual({
+        expect(await orgUsage("org-1", 0)).toEqual({
             projects: [{ costMicrodollars: 100, projectKey: project, replies: 1, tokens: 10 }],
             truncated: false,
         });
-        expect(await orgUsage("org-1", [project], 2000)).toEqual({ projects: [], truncated: false });
+        expect(await orgUsage("org-1", 2000)).toEqual({ projects: [], truncated: false });
     });
 
     it("does not show a reply made before its project moved into the organization", async () => {
@@ -102,12 +112,12 @@ describe("the organization ledger", () => {
             await ctx.db.patch("projects", project, { organizationId: "org-1" });
         });
 
-        expect(await orgUsage("org-1", [project], 0)).toEqual({ projects: [], truncated: false });
+        expect(await orgUsage("org-1", 0)).toEqual({ projects: [], truncated: false });
 
         // A reply made after the move is filed under the organization.
         await record(project, 2000);
 
-        expect(await orgUsage("org-1", [project], 0)).toEqual({
+        expect(await orgUsage("org-1", 0)).toEqual({
             projects: [{ costMicrodollars: 100, projectKey: project, replies: 1, tokens: 10 }],
             truncated: false,
         });
@@ -125,9 +135,9 @@ describe("the organization ledger", () => {
             await ctx.db.patch("projects", project, { organizationId: "org-2" });
         });
 
-        expect(await orgUsage("org-1", [], 0)).toEqual({
-            projects: [],
-            removed: { costMicrodollars: 100, replies: 1, tokens: 10 },
+        // The row keeps its project; the walk adds it to the removed total, unnamed (`releaseCells`).
+        expect(await orgUsage("org-1", 0)).toEqual({
+            projects: [{ costMicrodollars: 100, projectKey: project, replies: 1, tokens: 10 }],
             truncated: false,
         });
     });
@@ -155,10 +165,10 @@ describe("the organization ledger", () => {
         await harness.run(async (ctx: any) => await ctx.runMutation(recordReplyUsage, { ...reply, retry: true }));
         await harness.scheduler.runPending();
 
-        expect(await orgUsage("org-1", [project], 0)).toEqual({ projects: [], truncated: false });
+        expect(await orgUsage("org-1", 0)).toEqual({ projects: [], truncated: false });
     });
 
-    it("does not call a project removed when the organization's project list was cut off", async () => {
+    it("reads only the period's days, so a member's reply outside it is not in the walk's cells", async () => {
         const project = await harness.run(async (ctx: any) => {
             await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "member", userId: MEMBER });
 
@@ -166,35 +176,32 @@ describe("the organization ledger", () => {
         });
 
         await record(project, 1000);
+        const cellsBetween = async (from: number, until: number) =>
+            (
+                (await harness.run(async (ctx: any) => await ctx.runQuery(memberProjectUsage, { from, organizationId: "org-1", until, userId: MEMBER }))) as {
+                    cells: unknown[];
+                }
+            ).cells;
 
-        // The project is still the organization's, but past the cap of listed projects: it is not known to have left.
-        const cut = await harness.run(
-            async (ctx: any) =>
-                await ctx.runQuery(memberProjectUsage, { organizationId: "org-1", projectIds: [], projectsListed: false, since: 0, userId: MEMBER }),
-        );
-
-        expect(cut).toEqual({ active: true, projects: [], truncated: false });
+        expect(await cellsBetween(0, 2000)).toHaveLength(1);
+        expect(await cellsBetween(2000, 3000)).toEqual([]);
+        expect(await cellsBetween(0, 1000)).toEqual([]);
     });
 
-    it("reports whether a member had replies in the period, for the quiet-page rule", async () => {
+    it("writes no organization row for a reply recorded long after it was made, since its day may already be shown", async () => {
         const project = await harness.run(async (ctx: any) => {
             await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "member", userId: MEMBER });
 
             return await ctx.db.insert("projects", { createdAt: 1, organizationId: "org-1", title: "Team", userId: OWNER });
         });
 
-        await record(project, 1000);
-        const activeSince = async (since: number) =>
-            (await harness.run(
-                async (ctx: any) =>
-                    await ctx.runQuery(memberProjectUsage, { organizationId: "org-1", projectIds: [project], projectsListed: true, since, userId: MEMBER }),
-            )) as { active: boolean };
+        await record(project, NOW - ORGANIZATION_RECORD_LATE_MS - 1);
+        await record(project, NOW - ORGANIZATION_RECORD_LATE_MS);
 
-        const sinceZero = await activeSince(0);
-        const sinceLater = await activeSince(2000);
-
-        expect(sinceZero.active).toBe(true);
-        expect(sinceLater.active).toBe(false);
+        expect(await orgUsage("org-1", -Number.MAX_SAFE_INTEGER)).toEqual({
+            projects: [{ costMicrodollars: 100, projectKey: project, replies: 1, tokens: 10 }],
+            truncated: false,
+        });
     });
 
     it("still lists a member who has left, so their usage keeps counting", async () => {
@@ -290,7 +297,7 @@ describe("the organization ledger", () => {
         } | null;
 
         expect(pruned).toBe(1);
-        expect(await orgUsage("org-1", [project], 0)).toEqual({ projects: [], truncated: false });
+        expect(await orgUsage("org-1", 0)).toEqual({ projects: [], truncated: false });
         expect(scope?.members.map((entry: { userId: string }) => entry.userId)).not.toContain(MEMBER);
     });
 
@@ -414,6 +421,6 @@ describe("the organization ledger", () => {
         await record(project, 1000);
         await harness.run(async (ctx: any) => await eraseUsageForUser(ctx, MEMBER));
 
-        expect(await orgUsage("org-1", [project], 0)).toEqual({ projects: [], truncated: false });
+        expect(await orgUsage("org-1", 0)).toEqual({ projects: [], truncated: false });
     });
 });

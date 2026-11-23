@@ -1460,7 +1460,7 @@ msgstr "{pages, plural, one {# página} other {# páginas}}"
 msgid "{prefixed}, selected"
 msgstr "{prefixed}, seleccionado"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:238
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:241
 msgid "{project}: {spendShare} of spend"
 msgstr "{project}: {spendShare} del gasto"
 
@@ -8983,7 +8983,7 @@ msgstr "No se pudo cargar el marketplace. Inténtalo más tarde."
 msgid "Could not load the memories."
 msgstr "No se pudieron cargar los recuerdos."
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:198
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:201
 msgid "Could not load the project breakdown."
 msgstr "No se pudo cargar el desglose por proyecto."
 
@@ -9300,6 +9300,10 @@ msgstr "No se pudieron actualizar los participantes"
 #: src/features/chat/thread-list/thread-options-menu.tsx:100
 msgid "Couldn't load follow state"
 msgstr "No se pudo cargar el estado de seguimiento"
+
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:166
+msgid "Counted in whole days (UTC) once each day has ended, so today's usage shows tomorrow."
+msgstr "Se cuenta por días completos (UTC) una vez que cada día ha terminado, así que el uso de hoy aparece mañana."
 
 #: src/features/settings/lib/settings-keywords.ts:31
 msgid "country"
@@ -19944,7 +19948,7 @@ msgid "Loading triggers..."
 msgstr "Cargando disparadores..."
 
 #: src/features/projects/components/project-usage-summary.tsx:56
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:190
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:193
 msgid "Loading usage…"
 msgstr "Cargando el uso…"
 
@@ -21146,7 +21150,7 @@ msgid "Min"
 msgstr "Min"
 
 #: src/features/develop/components/inbox-list.tsx:51
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:181
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:184
 msgid "Mine"
 msgstr "Mías"
 
@@ -23181,7 +23185,7 @@ msgstr "No hay referencias seleccionadas"
 msgid "No remote MCP servers match your search."
 msgstr "Ningún servidor MCP remoto coincide con tu búsqueda."
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:202
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:205
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:85
 msgid "No replies recorded for this period."
 msgstr "No se registraron respuestas en este período."
@@ -24047,7 +24051,7 @@ msgstr "Solo las herramientas indicadas"
 msgid "Only organization owners can manage billing settings"
 msgstr "Solo los propietarios de la organización pueden gestionar la facturación"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:256
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:259
 msgid "Only part of this period is included."
 msgstr "Solo se incluye parte de este periodo."
 
@@ -24944,7 +24948,7 @@ msgstr "Ordena los modelos que marcaste como destacados en el selector de modelo
 #: src/features/auth/components/organization/organization-logo.tsx:62
 #: src/features/auth/components/organization/organization-view.tsx:64
 #: src/features/layout/lib/dashboard-page-names.ts:32
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:182
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:185
 #: src/features/settings/lib/settings-navigation.ts:110
 #: src/features/skills/components/skill-form-dialog.tsx:476
 #: src/features/skills/components/skill-item.tsx:130
@@ -26834,7 +26838,7 @@ msgstr "Progreso de {toolName}"
 
 #: src/features/projects/components/project-repo-picker.tsx:145
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:451
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:208
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:211
 #: src/features/tasks/components/task-form-dialog.tsx:427
 msgid "Project"
 msgstr "Proyecto"
@@ -28515,7 +28519,7 @@ msgstr "Repite el recorrido de bienvenida para repasar las funciones principales
 #: src/features/projects/components/project-usage-summary.tsx:38
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:150
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:252
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:209
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:212
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:92
 msgid "Replies"
 msgstr "Respuestas"
@@ -30874,7 +30878,7 @@ msgstr "Los shards que no se pudieron medir quedan fuera de los totales: {0}."
 msgid "Share"
 msgstr "Compartir"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:213
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:216
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:96
 msgid "Share of spend"
 msgstr "Proporción del gasto"
@@ -32057,7 +32061,7 @@ msgstr "Nivel rápido de Nano Banana 2 para generar texto a imagen con rapidez"
 #: src/features/projects/components/project-usage-summary.tsx:43
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:151
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:253
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:211
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:214
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:94
 msgid "Spend"
 msgstr "Gasto"
@@ -36370,7 +36374,7 @@ msgid "Token usage and cost breakdown per model for the selected period"
 msgstr "Uso de tokens y desglose de costes por modelo para el periodo seleccionado"
 
 #: src/features/projects/components/project-usage-summary.tsx:40
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:210
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:213
 #: src/features/settings/components/chat/usage-settings.tsx:319
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:93
 msgid "Tokens"
@@ -39376,7 +39380,7 @@ msgstr "Con qué identidad se hacen los commits de un pull request"
 msgid "Who answers"
 msgstr "Quién responde"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:168
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:171
 msgid "Whose usage"
 msgstr "Uso de quién"
 

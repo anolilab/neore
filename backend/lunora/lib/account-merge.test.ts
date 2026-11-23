@@ -10,6 +10,7 @@ import { deleteMergedGuest } from "../auth/hooks";
 import { FOLLOW_MERGE_PAGE_SIZE } from "../chat/follows/follow-writes";
 import { requireOwnCollectionId } from "../knowledge/documents-shared";
 import type { MergeReferences, ShardCall } from "./account-merge";
+import { ORGANIZATION_RECORD_LATE_MS } from "../usage/activity-logic";
 import { importShardRows, listShardRowIds, MERGE_PAGE_SIZE } from "./account-merge";
 import {
     GLOBAL_USER_COLUMNS,
@@ -647,5 +648,32 @@ describe("clearing the guest's settings", () => {
 
         expect(listIdCalls.find((args) => args.table === "userSettings")).toEqual({ ownedBy: "guest", table: "userSettings" });
         expect(listIdCalls.find((args) => args.table === "threads")).toEqual({ table: "threads" });
+    });
+});
+
+describe("importShardRows for the organization ledger", () => {
+    it("moves only the guest's recent organization rows, so no day the organization view may show changes", async () => {
+        const now = 10 * ORGANIZATION_RECORD_LATE_MS;
+        const harness = lunoraTest(schemaWithShardedTables(["shardActivity"]) as never, { now } as never);
+        const row = (id: string, at: number) => {
+            return { _id: id, at, costMicrodollars: 100, organizationId: "org-1", projectKey: "p", replyKey: id, tokens: 1, userId: "guest" };
+        };
+
+        try {
+            const moved = await harness.run(async (context: any) => {
+                await context.runMutation(importShardRows, {
+                    from: "guest",
+                    rows: [row("old", now - ORGANIZATION_RECORD_LATE_MS - 1), row("recent", now - ORGANIZATION_RECORD_LATE_MS)],
+                    table: "usageOrganizationReplies",
+                    to: "user",
+                });
+
+                return await context.db.query("usageOrganizationReplies").take(10);
+            });
+
+            expect(moved.map((entry: { replyKey: string }) => entry.replyKey)).toEqual(["recent"]);
+        } finally {
+            harness.close();
+        }
     });
 });

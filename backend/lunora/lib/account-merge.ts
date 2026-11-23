@@ -36,6 +36,7 @@ import { noteRetentionDueAt, noteShardDue } from "./shard-housekeeping";
 import schema from "../schema";
 import { dropPushDevicesOf } from "../notifications/push-device-writes";
 import { mergeThreadFollowsPage } from "../chat/follows/follow-writes";
+import { ORGANIZATION_RECORD_LATE_MS } from "../usage/activity-logic";
 
 /** Rows moved per round trip. */
 export const MERGE_PAGE_SIZE = 100;
@@ -203,6 +204,13 @@ export const importShardRows = internalMutation
         let imported = 0;
 
         for (const row of args.rows as Record<string, unknown>[]) {
+            // An organization ledger row is written only close to its reply (`ORGANIZATION_RECORD_LATE_MS`): an older one moved here would
+            // change a day the organization view may already show, by the guest's spend. It stays out of the view; the guest's own totals
+            // move with `usageDaily`.
+            if (args.table === "usageOrganizationReplies" && typeof row["at"] === "number" && ctx.now - row["at"] > ORGANIZATION_RECORD_LATE_MS) {
+                continue;
+            }
+
             if ((await db.get(args.table, row._id as string)) !== null) {
                 continue;
             }
