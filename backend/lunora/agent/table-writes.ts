@@ -121,6 +121,18 @@ export const patchThread = async (db: Database, threadId: Id<"threads">, fields:
 };
 
 /**
+ * Sets the thread's pinned goal, or removes it with `undefined` (`patchRow` removes a column set to `undefined`; a patch
+ * would leave it unchanged). The caller checks the thread is its owner's.
+ */
+export const setThreadPinnedGoal = async (db: Database, threadId: Id<"threads">, pinnedGoal: Doc<"threads">["pinnedGoal"]): Promise<void> => {
+    const row = await db.get("threads", threadId);
+
+    if (row) {
+        await patchRow(db, "threads", row, { pinnedGoal });
+    }
+};
+
+/**
  * Removes `awaitingInput` from a thread whose pause can no longer be answered (its approval snapshot expired). With `kind`,
  * only a pause of that kind is cleared: another kind belongs to someone else's turn on the thread.
  */
@@ -261,4 +273,28 @@ export const deleteVectorRow = async (db: Database, vectorId: Id<VectorTableName
     if (table !== null) {
         await db.delete(table, vectorId);
     }
+};
+
+/**
+ * Marks a project changed by a save of its rule files (`projects.functions.setProjectRuleFiles`), and with
+ * `clearContext`, the legacy `context` text the save moved into the list, empties it while it is still that text, in
+ * one conditional write (`patchIf`): a `.global()` read and a later write are not one transaction, and removing the
+ * column would replace the whole row from a copy another write may have overtaken. An empty `context` reads as none
+ * everywhere. A `context` written since never reached the list, so it stays, for the next save to carry.
+ */
+export const markRuleFilesSaved = async (
+    db: Database,
+    projectId: Id<"projects">,
+    now: number,
+    { clearContext }: { clearContext?: string } = {},
+): Promise<void> => {
+    if (clearContext) {
+        const { applied, doc } = await db.patchIf("projects", projectId, { patch: { context: "", updatedAt: now }, where: { context: clearContext } });
+
+        if (applied || !doc) {
+            return;
+        }
+    }
+
+    await db.patch("projects", projectId, { updatedAt: now });
 };

@@ -13,8 +13,8 @@ import env from "@/lib/env";
 import { seo } from "@/lib/seo";
 
 /**
- * Approve a browser extension that cannot share this site's cookies (the Firefox
- * build) — step 2 of the PKCE flow in `backend/lunora/auth/extension-grant.ts`.
+ * Approve a browser extension, which never shares this site's cookies (both
+ * builds) — step 2 of the PKCE flow in `backend/lunora/auth/extension-grant.ts`.
  *
  * The extension opens this page inside `identity.launchWebAuthFlow`. The user
  * signs in the normal way (`useAuthenticate` bounces to sign-in and back), then

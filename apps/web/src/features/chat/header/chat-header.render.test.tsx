@@ -84,6 +84,10 @@ vi.mock("./thread-download-button", () => {
     return { default: () => null };
 });
 
+vi.mock("@/features/chat/image-gallery/thread-images-button", () => {
+    return { default: () => null };
+});
+
 describe("ChatSiteHeader after a rename from the list", () => {
     it("shows the list's new title on the next render, after the header itself has renamed the chat", async () => {
         server.title = "Original";

@@ -865,3 +865,63 @@ describe("switching split panes", () => {
         expect(text("thread-b")).toBe("pane b");
     });
 });
+
+describe("the draft's not-typed mark", () => {
+    const mark = (): string | undefined => useChatUIStore.getState().composerDraftFrom;
+
+    it("is stored with its draft and comes back with it on a reload, however many drafts were written since", () => {
+        bindStoredDrafts("thread-old", "user-1", false);
+        type("from a link, then edited");
+        useChatUIStore.getState().setComposerDraftFrom("promptLink");
+        flushStoredDrafts();
+
+        expect(entry("thread-old")?.v).toMatchObject({ o: "promptLink", t: "from a link, then edited" });
+
+        for (let index = 0; index < 25; index += 1) {
+            vi.advanceTimersByTime(1);
+            put(`thread-${index}`, `newer ${index}`);
+        }
+
+        resetStoredDraftsForTests();
+        useChatUIStore.getState().clearComposer();
+        bindStoredDrafts("thread-old", "user-1", false);
+
+        expect(useChatUIStore.getState().composerText).toBe("from a link, then edited");
+        expect(mark()).toBe("promptLink");
+    });
+
+    it("writes a mark set after its text, and reads an unknown one as marked", () => {
+        bindStoredDrafts("thread-a", "user-1", false);
+        type("shared prompt");
+        flushStoredDrafts();
+        useChatUIStore.getState().setComposerDraftFrom("sharedPrompt");
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(entry("thread-a")?.v).toMatchObject({ o: "sharedPrompt" });
+
+        localStorage.setItem(draftKey("user-1", "thread-b"), JSON.stringify({ t: Date.now(), v: { o: "elsewhere", t: "draft" }, w: "x" }));
+        resetStoredDraftsForTests();
+        useChatUIStore.getState().clearComposer();
+        bindStoredDrafts("thread-b", "user-1", false);
+
+        expect(mark()).toBe("promptLink");
+    });
+
+    it("leaves nothing of other people's text in the browser after sign-out", () => {
+        bindStoredDrafts("thread-a", "user-1", false);
+        type("A colleague's prompt that signs in somewhere");
+        useChatUIStore.getState().setComposerDraftFrom("sharedPrompt");
+        flushStoredDrafts();
+        dropStoredDrafts("user-1");
+
+        expect(Object.keys(localStorage).filter((key) => localStorage.getItem(key)?.includes("colleague"))).toStrictEqual([]);
+    });
+
+    it("moves with a parked draft into the live composer", () => {
+        saveComposerDraft("thread-b", { composerDraftFrom: "shellLink", composerText: "shared from another app" });
+        restoreLiveComposerFor("thread-b");
+
+        expect(useChatUIStore.getState().composerText).toBe("shared from another app");
+        expect(mark()).toBe("shellLink");
+    });
+});

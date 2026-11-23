@@ -12,7 +12,7 @@ describe("pending send", () => {
     it("hands the saved message over once, in the chat it was typed in", () => {
         savePendingSend("hello", CHAT, 1000);
 
-        expect(takePendingSend(CHAT, 2000)).toBe("hello");
+        expect(takePendingSend(CHAT, 2000)).toStrictEqual({ text: "hello" });
         // A second taker (StrictMode's second effect run, another composer) gets nothing.
         expect(takePendingSend(CHAT, 2000)).toBeUndefined();
     });
@@ -23,7 +23,7 @@ describe("pending send", () => {
         expect(takePendingSend("/chat/thread-b", 2000)).toBeUndefined();
         expect(takePendingSend("/chat", 2000)).toBeUndefined();
         expect(takePendingSend("/", 2000)).toBeUndefined();
-        expect(takePendingSend(CHAT, 2000)).toBe("hello");
+        expect(takePendingSend(CHAT, 2000)).toStrictEqual({ text: "hello" });
     });
 
     it("drops a message saved 'in the future', after the clock moved back", () => {
@@ -37,7 +37,7 @@ describe("pending send", () => {
         savePendingSend("first", CHAT, 1000);
         savePendingSend("second", CHAT, 1000);
 
-        expect(takePendingSend(CHAT, 1000)).toBe("second");
+        expect(takePendingSend(CHAT, 1000)).toStrictEqual({ text: "second" });
     });
 
     it("drops a message older than the limit instead of sending it", () => {
@@ -57,6 +57,16 @@ describe("pending send", () => {
 
         expect(takePendingSend(CHAT, 1000)).toBeUndefined();
         expect(sessionStorage.getItem("neore:pending-send")).toBeNull();
+    });
+
+    it("keeps the draft's not-typed mark across the sign-in, and reads an unknown one as marked", () => {
+        savePendingSend("from a link", CHAT, 1000, "promptLink");
+
+        expect(takePendingSend(CHAT, 2000)).toStrictEqual({ draftFrom: "promptLink", text: "from a link" });
+
+        sessionStorage.setItem("neore:pending-send", JSON.stringify({ draftFrom: "somewhere", path: CHAT, savedAt: 1000, text: "hello" }));
+
+        expect(takePendingSend(CHAT, 2000)).toStrictEqual({ draftFrom: "promptLink", text: "hello" });
     });
 
     it("forgets the message when the sign-in prompt is dismissed", () => {

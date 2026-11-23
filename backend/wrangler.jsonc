@@ -211,5 +211,10 @@
             "service": "neore-backend-advisor"
         }
     ],
-    "upload_source_maps": true
+    "upload_source_maps": true,
+    "assets": {
+        "binding": "ASSETS",
+        "directory": ".lunora/studio-assets",
+        "run_worker_first": true
+    }
 }

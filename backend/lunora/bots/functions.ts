@@ -11,6 +11,7 @@ import { deleteBotConnectorAccess } from "../connectors/access";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
+import { INSTRUCTION_READ_TOOL } from "../projects/rule-files";
 import { SUB_AGENT_MAX_DEPTH } from "../sub-agents/logic";
 import { isTaskModelAllowed } from "../tasks/logic";
 import { markBotOwnerDeleted } from "./owner";
@@ -35,6 +36,7 @@ const vBot = v.object({
     createdAt: v.number(),
     description: v.optional(v.string()),
     instructions: v.string(),
+    instructionsByImpersonator: v.optional(v.literal(true)),
     model: v.string(),
     name: v.string(),
     permissionMode: v.optional(vPermissionMode),
@@ -95,7 +97,8 @@ const storedToolSelection = (selection: BotToolSelection | null): BotToolSelecti
         return undefined;
     }
 
-    const normalized = normalizeBotToolSelection(selection, new Set(listBuiltInTools().map((tool) => tool.name as string)));
+    // `instruction_read` is not in the tool list (it exists only in a run with a project's `auto` files), but an exclusion may name it.
+    const normalized = normalizeBotToolSelection(selection, new Set([...listBuiltInTools().map((tool) => tool.name as string), INSTRUCTION_READ_TOOL]));
 
     if ("error" in normalized) {
         throw new LunoraError("BAD_REQUEST", normalized.error);
@@ -109,6 +112,10 @@ const assertUsableModel = (model: string): void => {
         throw new LunoraError("INVALID_ARGUMENT", `The model '${model}' is not available for bots.`);
     }
 };
+
+/** Whether a patch changes the bot's text the system prompt carries: its name and its instructions (`chat/lib/agent-run.ts`). */
+const changesPromptText = (bot: { instructions: string; name: string }, patch: { instructions?: string; name?: string }): boolean =>
+    (patch.instructions !== undefined && patch.instructions !== bot.instructions) || (patch.name !== undefined && patch.name !== bot.name);
 
 export const listBots = authQuery.output(v.array(vBot)).query(async ({ ctx: context }) => {
     const { userId } = context.user;
@@ -161,6 +168,7 @@ export const createBot = authMutation
             createdAt: now,
             description: args.description,
             instructions: args.instructions,
+            ...(context.user.impersonatedBy && { instructionsByImpersonator: true as const }),
             model: args.model,
             name: args.name,
             ...(args.permissionMode && args.permissionMode !== DEFAULT_THREAD_PERMISSION_MODE && { permissionMode: args.permissionMode }),
@@ -248,6 +256,8 @@ export const updateBot = authMutation
             // The default is stored as no mode, as on create, so the bot keeps following the default.
             ...(permissionMode !== undefined && { permissionMode: permissionMode === DEFAULT_THREAD_PERMISSION_MODE ? undefined : permissionMode }),
             ...(toolSelection !== undefined && { toolSelection: nextSelection }),
+            // A name or instructions an admin acting as the owner changed are not the owner's words: the mark stays (`schema.ts`).
+            ...(context.user.impersonatedBy && changesPromptText(bot, rest) && { instructionsByImpersonator: true as const }),
         });
 
         context.log.event("bots.update_bot", { computerEnabled: patch.computerEnabled, toolSelectionChanged: toolSelection !== undefined });
@@ -276,6 +286,39 @@ export const updateBot = authMutation
         }
 
         return { toolSelection: nextSelection ?? null };
+    });
+
+/**
+ * The owner's review of a bot an admin wrote while acting as them: "Keep as mine" drops `instructionsByImpersonator`, so
+ * the bot's name and instructions count as the owner's own again (`chat/lib/system-context-kinds.ts`). An own edit never
+ * clears the mark; only this does, and never from an impersonated session.
+ */
+export const keepBotInstructions = authMutation
+    .use(rateLimit("bots/update"))
+    // The name and instructions the owner reviewed: a bot changed since (an admin still acting as them) is refused, never kept unseen.
+    .input({ botId: v.id("bots"), seen: v.object({ instructions: v.string().max(MAX_LENGTH.document), name: v.string().max(MAX_LENGTH.short) }) })
+    .output(v.null())
+    .mutation(async ({ args: { botId, seen }, ctx: context }) => {
+        if (context.user.impersonatedBy) {
+            throw new LunoraError("FORBIDDEN", "A bot cannot be kept as the owner's while impersonating");
+        }
+
+        const bot = await context.db.get("bots", botId as Id<"bots">);
+
+        if (!bot || bot.userId !== context.user.userId) {
+            throw new LunoraError("NOT_FOUND", "Bot not found");
+        }
+
+        if (bot.instructions !== seen.instructions || bot.name !== seen.name) {
+            throw new LunoraError("CONFLICT", "The bot changed since you looked at it. Review it again.");
+        }
+
+        if (bot.instructionsByImpersonator) {
+            await patchRow(context.db, "bots", bot, { instructionsByImpersonator: undefined });
+            context.log.event("bots.keep_bot_instructions", { botId: bot._id });
+        }
+
+        return null;
     });
 
 export const deleteBot = authMutation
@@ -335,6 +378,7 @@ export const getBotForRun = internalQuery
             v.object({
                 computerEnabled: v.boolean(),
                 instructions: v.string(),
+                instructionsByImpersonator: v.boolean(),
                 model: v.string(),
                 name: v.string(),
                 permissionMode: v.optional(vPermissionMode),
@@ -352,6 +396,7 @@ export const getBotForRun = internalQuery
         return {
             computerEnabled: bot.computerEnabled,
             instructions: bot.instructions,
+            instructionsByImpersonator: bot.instructionsByImpersonator === true,
             model: bot.model,
             name: bot.name,
             ...(bot.permissionMode && { permissionMode: bot.permissionMode }),

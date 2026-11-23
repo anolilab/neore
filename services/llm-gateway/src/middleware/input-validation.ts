@@ -57,6 +57,9 @@ interface InternalRequestBody {
     system?: unknown;
 }
 
+/** The picker's id for a reference image: `file:<id>` or `doc:<id>` (`backend/lunora/chat/reference-gate.ts`). */
+const REFERENCE_ID_PATTERN = /^(?:file|doc):[\w-]+$/u;
+
 interface ChatRequestBody {
     cinemaSettings?: unknown;
     customSystemPrompt?: unknown;
@@ -65,6 +68,7 @@ interface ChatRequestBody {
     model?: unknown;
     parentId?: unknown;
     prompt?: unknown;
+    referenceIds?: unknown;
     referenceImages?: unknown;
     streamingConfig?: unknown;
     threadId?: unknown;
@@ -235,6 +239,18 @@ export const chatInputValidationMiddleware = createMiddleware<HonoEnv>(async (c,
 
     if (referenceError) {
         return c.json({ error: referenceError }, 400);
+    }
+
+    // The picker's id for each reference image (`file:<id>` or `doc:<id>`), which the backend checks against its own rows.
+    const { referenceIds } = payload;
+
+    if (
+        referenceIds !== undefined &&
+        (!Array.isArray(referenceIds) ||
+            referenceIds.length > REFERENCE_MEDIA_CAPS.images ||
+            referenceIds.some((id) => typeof id !== "string" || !REFERENCE_ID_PATTERN.test(id)))
+    ) {
+        return c.json({ error: "Invalid referenceIds format" }, 400);
     }
 
     return next();

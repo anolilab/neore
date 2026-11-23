@@ -269,6 +269,34 @@ describe("regenerate and edit on the local path", () => {
         ]);
     });
 
+    it("saves marked a prompt the owner did not type, and an edit of it keeps the mark", async () => {
+        await seedEndpoint(OWNER, "local-browser");
+
+        const fromLink = await save(OWNER, { draftFrom: "promptLink", prompt: "hi", reply: "first answer" });
+        const byAdmin = await harness.run(
+            async (ctx: any) =>
+                await saveLocalTurnHandler(ctx, OWNER, { model: MODEL, outcome: "complete", prompt: "hi", reply: "ok" } as never, {
+                    sessionMarks: { impersonated: true },
+                }),
+        );
+        const edited = await save(OWNER, {
+            branch: { kind: "edit", messageId: fromLink.userMessageId },
+            prompt: "reworded",
+            reply: "ok",
+            threadId: fromLink.threadId,
+        });
+        const contentOf = async (id: string) => {
+            const row = await harness.run(async (ctx: any) => await ctx.db.get("messages", id));
+
+            return row.message.content;
+        };
+        const marked = (text: string, notTyped: unknown) => [{ providerOptions: { neore: { notTyped } }, text, type: "text" }];
+
+        expect(await contentOf(fromLink.userMessageId)).toStrictEqual(marked("hi", { draft: "promptLink" }));
+        expect(await contentOf(byAdmin.userMessageId)).toStrictEqual(marked("hi", { impersonated: true }));
+        expect(await contentOf(edited.userMessageId)).toStrictEqual(marked("reworded", { draft: "promptLink" }));
+    });
+
     it("keeps the guest mark and the note's id on an edit of a guest's note the owner sent on", async () => {
         await seedEndpoint(OWNER, "local-browser");
 

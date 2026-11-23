@@ -1863,6 +1863,7 @@ fn explain(target: &Target, reason: &str, stderr: &Mutex<String>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_dir::TestDir;
 
     fn target() -> Target {
         Target {
@@ -2217,8 +2218,7 @@ mod tests {
 
     #[test]
     fn a_pin_is_owner_only_and_forgetting_it_leaves_the_others() {
-        let dir = std::env::temp_dir().join(format!("neore-ssh-pin-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
+        let dir = TestDir::at("ssh-pin");
         let paths = SshPaths::under(&dir, None);
         let key = |blob: &str| HostKey {
             blob: blob.into(),

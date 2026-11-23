@@ -88,6 +88,22 @@ describe("recoverFinishedReply steers", () => {
         });
     });
 
+    it("reads a steer saved as a marked text part, as a steer the owner did not type is saved", async () => {
+        expect.assertions(1);
+
+        const marked = {
+            ...STEER_ROW,
+            message: {
+                content: [{ providerOptions: { neore: { notTyped: { draft: "promptLink" } } }, text: "use the train", type: "text" }],
+                role: "user",
+            },
+        };
+
+        await recoverFinishedReply(contextWith([marked]) as never, { ...reply, steerRowIds: ["steer-row"] });
+
+        expect(vi.mocked(afterRun).mock.calls[0]?.[1]).toMatchObject({ steered: [{ messageId: "steer-row", sentAt: 3, text: "use the train" }] });
+    });
+
     it("gives the after-run work no steers when the run took none", async () => {
         expect.assertions(1);
 

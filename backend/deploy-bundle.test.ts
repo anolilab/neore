@@ -75,6 +75,14 @@ describe("deployed Worker bundles", () => {
             return;
         }
 
+        if (name === "browser-renderer") {
+            // The shared options with kept names off: a function handed to `page.evaluate` runs in the page as its source
+            // text, where the `__name(…)` helper a kept name is wrapped in does not exist.
+            expect(options).toContain("build: { ...WORKER_BUILD, output: { ...WORKER_BUILD.output, keepNames: false } },");
+
+            return;
+        }
+
         expect(options).toContain(name === "neore-backend" ? "build: BACKEND_BUILD," : "build: WORKER_BUILD,");
     });
 

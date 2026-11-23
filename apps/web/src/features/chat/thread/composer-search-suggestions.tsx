@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
+import { markComposerDraft } from "@/features/chat/core/utils/draft-origin";
 
 import type { SearchMode, SearchSuggestion } from "./search-suggestions";
 import generateSearchSuggestions from "./search-suggestions";
@@ -55,6 +56,8 @@ const ComposerSearchSuggestions: FC = () => {
 
     const handleSuggestionClick = (suggestion: SearchSuggestion) => {
         setComposerText(suggestion.text);
+        // Picked, not typed (`draft-origin.ts`).
+        markComposerDraft("suggestion");
         setSuggestions([]);
     };
 

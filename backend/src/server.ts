@@ -11,7 +11,8 @@ import type { ExecutionContextLike, ScheduledControllerLike, ShardNamespaceLike 
 
 import type { BearerIdentity } from "./bearer-identity";
 import { identityFromBearerClaims } from "./bearer-identity";
-import { createJwksCache, type JwksCache } from "./jwks-cache.js";
+import { withoutExtensionCookie } from "./extension-cookie.js";
+import { createJwksCache, type JwksCache, JwksUnavailableError } from "./jwks-cache.js";
 import { inTimingFrame, installFetchTiming, isTimingEnabled, logTiming, timedD1 } from "./development-timing.js";
 import { env as workerEnv } from "cloudflare:workers";
 
@@ -25,8 +26,15 @@ import { ensureGlobalTables } from "../lunora/auth/lib/ensure-global-tables.js";
 import httpApp, { getAllowedOrigins } from "../lunora/http.js";
 import type { ApiKeyAuthApi } from "../lunora/public-api/identity.js";
 import { isPublicApiPath, resolveApiKeyIdentity } from "../lunora/public-api/identity.js";
-import { requestBearer, requestWsTicket } from "../lunora/lib/request-bearer.js";
-import { handleWsTicketRequest, purgeExpiredWsTickets, redeemWsTicket } from "../lunora/lib/ws-ticket.js";
+import { requestBearer } from "../lunora/lib/request-bearer.js";
+import {
+    handleWsTicketRequest,
+    purgeExpiredWsTickets,
+    resolveWsTicketIdentity,
+    WsTicketUnavailableError,
+    callerUnavailableResponse,
+    wsTicketUnavailableResponse,
+} from "../lunora/lib/ws-ticket.js";
 import { runInShard } from "../lunora/lib/shard-context.js";
 import { shardScopedSchedulerNamespace } from "../lunora/lib/shard-scheduler.js";
 import { withoutStage } from "./queue-stage.js";
@@ -214,7 +222,8 @@ const verifyBearer = async (env: Env, token: string, origin: string) => {
 /**
  * The caller's session identity: a verified bearer JWT, else the cookie session.
  * Shared by `resolveIdentity` and the ws-ticket mint, which must accept exactly
- * the callers RPC accepts.
+ * the callers RPC accepts. Throws `JwksUnavailableError` when a bearer was sent
+ * and the keys to check it could not be read.
  */
 const resolveSessionIdentity = async (env: Env, request: Request): Promise<BearerIdentity | null> => {
     // Bearer first, deliberately. The browser's `LunoraClient`
@@ -247,7 +256,24 @@ const resolveSessionIdentity = async (env: Env, request: Request): Promise<Beare
                 return identity;
             }
         } catch (error) {
-            // Expired, wrong signature, unreachable JWKS — fall through
+            // Keys that could not be read say nothing about the token: a 503, never
+            // the cookie, or a bearer-only client (extension, app) reads as signed out.
+            if (error instanceof JwksUnavailableError) {
+                const { cause } = error;
+
+                // The read's own failure, for the outage's cause; never the token.
+                console.warn(
+                    JSON.stringify({
+                        cause: cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause),
+                        message: error.message,
+                        source: "bearer-keys-unavailable",
+                    }),
+                );
+
+                throw error;
+            }
+
+            // Expired, wrong signature — fall through
             // to the cookie rather than assuming anonymous, so a stale
             // bearer does not mask a valid same-origin session. The reason is
             // logged (never the token): a rejected bearer otherwise surfaces
@@ -283,22 +309,15 @@ const resolveCallerIdentity = async (env: Env, request: Request): Promise<Caller
         });
     }
 
-    // The live-query socket's upgrade carries a single-use ticket
-    // instead of a bearer (`lib/ws-ticket.ts`): a browser cannot set
-    // headers on a `WebSocket`, and the URL is logged. A spent,
-    // expired or forged ticket falls through to the cookie, like a
-    // stale bearer does.
-    const ticket = requestWsTicket(request);
+    // The live-query socket's upgrade (and its re-authentication) carries a
+    // single-use ticket instead of a bearer (`lib/ws-ticket.ts`): a browser cannot set
+    // headers on a `WebSocket`, and the URL is logged. A refused ticket falls
+    // through to the session on the upgrade only (`resolveWsTicketIdentity`). One
+    // whose session cannot be read throws `WsTicketUnavailableError`: a 503, never an
+    // anonymous upgrade or a signed-out re-authentication.
+    const identity = await resolveWsTicketIdentity(request, env.DB, async (sessionRequest) => await resolveSessionIdentity(env, sessionRequest));
 
-    if (ticket !== undefined) {
-        const identity = await redeemWsTicket(env.DB, ticket);
-
-        if (identity) {
-            return { ...identity };
-        }
-    }
-
-    return await resolveSessionIdentity(env, request);
+    return identity ? { ...identity } : null;
 };
 
 // workerd (`lunora dev`) does not implement Durable Object jurisdictions, and the schema pins the
@@ -567,14 +586,29 @@ export { SchedulerDO } from "@lunora/scheduler";
  * (`./shard-routing.ts`). The identity resolved for that is handed to
  * `resolveIdentity` through {@link routedIdentities}, so it is not resolved
  * twice — which a single-use socket ticket could not survive anyway. A caller
- * with no identity stays on `__root__`.
+ * with no identity stays on `__root__`. A live-query ticket whose session cannot
+ * be read, or a bearer whose keys cannot be, answers a 503 here instead of a
+ * request, and the client retries.
  */
-const routeToCallerShard = async (env: Env, request: Request): Promise<Request> => {
+const routeToCallerShard = async (env: Env, request: Request): Promise<Request | Response> => {
     if (!isShardRoutedRequest(request)) {
         return request;
     }
 
-    const identity = await resolveCallerIdentity(env, request);
+    let identity: CallerIdentity;
+
+    try {
+        identity = await resolveCallerIdentity(env, request);
+    } catch (error) {
+        // Outside `app.fetch`, so the runtime's error mapping never sees it: answered here. With a code the client's replay
+        // retries (`SHARD_UNAVAILABLE`): `SERVICE_UNAVAILABLE` would settle a queued write as refused, a batch whole.
+        if (error instanceof WsTicketUnavailableError || error instanceof JwksUnavailableError) {
+            return callerUnavailableResponse();
+        }
+
+        throw error;
+    }
+
     const routed = await withCallerShard(request, identity?.userId);
 
     routedIdentities.set(routed, identity);
@@ -645,8 +679,10 @@ const withCors = (response: Response, request: Request): Response => {
 };
 
 export default {
-    async fetch(request: Request, env: Env, context: ExecutionContextLike): Promise<Response> {
+    async fetch(incoming: Request, env: Env, context: ExecutionContextLike): Promise<Response> {
         const entered = Date.now();
+        // An extension authenticates with its grant's bearer, never a cookie: `extension-cookie.ts`.
+        const request = withoutExtensionCookie(incoming);
 
         // better-auth owns `/api/auth/*`. It must be handled BEFORE the Lunora
         // worker, which would otherwise 404 those paths — Lunora only routes its
@@ -732,14 +768,27 @@ export default {
 
         // Minted here rather than as a procedure: `resolveIdentity` redeems the
         // ticket before any procedure runs, so both halves share one raw table.
-        const ticketResponse = await handleWsTicketRequest(request, env.DB, async (ticketRequest) => await resolveSessionIdentity(env, ticketRequest));
+        let ticketResponse: Response | undefined;
+
+        try {
+            ticketResponse = await handleWsTicketRequest(request, env.DB, async (ticketRequest) => await resolveSessionIdentity(env, ticketRequest));
+        } catch (error) {
+            // A bearer whose keys could not be read: retry, not a 401 that opens the socket signed out.
+            if (!(error instanceof JwksUnavailableError)) {
+                throw error;
+            }
+
+            ticketResponse = wsTicketUnavailableResponse();
+        }
 
         if (ticketResponse) {
             return withCors(ticketResponse, request);
         }
 
         if (!isTimingEnabled(env)) {
-            return withCors(await app.fetch(await routeToCallerShard(env, request), env, context), request);
+            const routed = await routeToCallerShard(env, request);
+
+            return withCors(routed instanceof Response ? routed : await app.fetch(routed, env, context), request);
         }
 
         installFetchTiming();
@@ -751,7 +800,7 @@ export default {
             const routeMs = Date.now() - entered;
 
             try {
-                return withCors(await app.fetch(routed, env, context), request);
+                return withCors(routed instanceof Response ? routed : await app.fetch(routed, env, context), request);
             } finally {
                 logTiming("worker", { method: request.method, ms: Date.now() - entered, path, routeMs });
             }

@@ -7,6 +7,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@ui/compon
 import { ScrollArea } from "@ui/components/scroll-area";
 import { ZoomableImage } from "@ui/components/zoomable-image";
 import cn from "@ui/utils/cn";
+import { saveFromUrl } from "@ui/utils/save-from-url";
 import { Download, ImageIcon, Pause, Play, VideoIcon } from "lucide-react";
 import * as React from "react";
 import { useCallback, useMemo, useState } from "react";
@@ -115,13 +116,8 @@ const MediaPreviewPanel = ({ children, className, defaultSize = 60, minSize = 30
             return;
         }
 
-        const link = document.createElement("a");
-
-        link.href = media.src;
-        link.download = `${media.type}-${media.id}`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
+        // Fetched first: a cross-origin `download` link would open the image in a tab under a random name.
+        saveFromUrl(media.src, undefined, `${media.type}-${media.id}`).catch(() => undefined);
     }, [media]);
 
     if (!media) {

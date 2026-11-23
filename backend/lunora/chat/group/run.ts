@@ -38,6 +38,7 @@ import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import type { ResearchDepth } from "../../agent/client/create-tool";
+import { MAX_ATTACHED_FILES } from "../../agent/file-attach-claim";
 import { streamLogger } from "../../lib/logger";
 import { gatewayFetch, type ServiceFetch } from "../../lib/services";
 import { defaultModelUnderRules, getUtilityModel, readsImagesAndCallsTools } from "../../lib/utility-model";
@@ -57,6 +58,7 @@ import {
     discardRunSecrets,
     setDispatchOrigin,
     setRunOrganizationId,
+    setRunReplyKey,
     setRunStartedBy,
     setResearchDepth,
     setThreadStatus,
@@ -157,6 +159,8 @@ interface TurnContext {
     baseModel: string;
     /** Memory, knowledge base, project and thread instructions — appended to each speaker's system prompt. */
     extraContext: string[];
+    /** The files the user message attaches, kept in a pause's snapshot so the turn's later speakers get the same project rules. */
+    fileIds: string[] | undefined;
     isAnonymous: boolean;
     mcpServerNames: string[] | undefined;
     organizationId: string | undefined;
@@ -302,6 +306,8 @@ const runSpeaker = async (
         setResearchDepth(ctx, turn.researchDepth);
         setDispatchOrigin(ctx, turn.origin);
         setRunStartedBy(ctx, turn.startedBy);
+        // Per reply, not per group thread: a site's check is asked about once in this reply, and again in the next.
+        setRunReplyKey(ctx, turn.replyKey);
         setRunOrganizationId(ctx, turn.permissionOrganizationId);
 
         const backupModelId = await resolveBackupModelId(ctx, turn.userId, turn.prefs.backupModel, model, modelFilterRules);
@@ -522,6 +528,8 @@ const groupSnapshot = (turn: TurnContext, skillId: string, position: QueuePositi
 
     return {
         baseModel: turn.baseModel,
+        // Within the snapshot's cap, as `loadRunContext` reads them.
+        ...(turn.fileIds && turn.fileIds.length > 0 && { fileIds: turn.fileIds.slice(0, MAX_ATTACHED_FILES) }),
         isAnonymous: turn.isAnonymous,
         ...(turn.organizationId && { organizationId: turn.organizationId }),
         queue: remaining.kind === "speakers" ? remaining.queue : remaining.steps.map((step) => step.skillId),
@@ -659,6 +667,8 @@ const loadTurnContext = async (
         baseModel: string;
         config: GroupRunConfig;
         customSystemPrompt?: string;
+        /** The files the user's message attaches: the project's rule files applied by pattern match their names. */
+        fileIds?: string[];
         isAnonymous: boolean;
         mcpServerNames?: string[];
         messageReasoningEffort?: number;
@@ -692,6 +702,7 @@ const loadTurnContext = async (
     const runContext = await loadRunContext(ctx, {
         admittedRun: true,
         customSystemPrompt: args.customSystemPrompt,
+        fileIds: args.fileIds,
         promptText: args.promptText,
         researchDepth: args.researchDepth,
         threadId,
@@ -702,7 +713,9 @@ const loadTurnContext = async (
     return {
         agentPrefs,
         baseModel: args.baseModel,
-        extraContext: runContext.contextParts,
+        // A group turn lists no `auto` files, so the list's cost never takes room from its project text.
+        extraContext: runContext.contextPartsWithoutInstructions,
+        fileIds: args.fileIds,
         isAnonymous: args.isAnonymous,
         mcpServerNames: args.mcpServerNames,
         organizationId: args.organizationId,
@@ -748,6 +761,7 @@ export const runGroupTurn = async (ctx: ActionCtx, input: GroupTurnInput, config
         baseModel: streamingConfig.model,
         config,
         customSystemPrompt: streamingConfig.customSystemPrompt,
+        fileIds: message?.fileIds,
         isAnonymous: input.isAnonymous,
         mcpServerNames: streamingConfig.mcpServerNames,
         messageReasoningEffort: streamingConfig.reasoningEffort,
@@ -907,6 +921,7 @@ export const continueGroupAfterToolApproval = async (
     const turn = await loadTurnContext(ctx, {
         baseModel: group.baseModel,
         config: groupConfig,
+        fileIds: group.fileIds,
         isAnonymous: group.isAnonymous,
         mcpServerNames: config.mcpServerNames,
         organizationId: group.organizationId,

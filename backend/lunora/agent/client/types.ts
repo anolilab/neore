@@ -20,6 +20,7 @@ import type {
 import type { api } from "../../_generated/api";
 import type { ActionCtx as LunoraActionContext, MutationCtx as LunoraMutationContext, QueryCtx as LunoraQueryContext } from "../../_generated/server";
 import type { MessageDoc, ProviderMetadata, StreamDelta, StreamMessage, ThreadDoc } from "../validators";
+import type { NotTypedMarks } from "../../lib/not-typed-text";
 import type { StreamingOptions } from "./streaming";
 
 export interface Output<_T = any, _P = any, _E = any> {
@@ -680,7 +681,7 @@ export type Options = {
 };
 
 /** See {@link Options.takeSteer}. `null` when there is nothing to deliver. */
-export type TakeSteer = (at: { pendingMessageId: string }) => Promise<{ messageId: string; text: string } | null>;
+export type TakeSteer = (at: { pendingMessageId: string }) => Promise<{ messageId: string; notTyped?: NotTypedMarks; text: string } | null>;
 
 export type SyncStreamsReturnValue = { kind: "list"; messages: StreamMessage[] } | { deltas: StreamDelta[]; kind: "deltas" } | undefined;
 

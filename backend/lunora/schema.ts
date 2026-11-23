@@ -15,7 +15,7 @@ import { defineSchema, defineTable, v } from "lunorash/server";
 
 import { vAcpAgentState, vAcpOptionResult, vAcpSessionStatus, vHostEndReason, vHostEvent, vHostState } from "./acp/validators";
 import { vAgentRef } from "./agent/agent-switch-validators";
-import { vGoalRunConfig, vGoalStatus as vThreadGoalStatus, vGoalStopReason, vGoalVerdict } from "./chat/goals/validators";
+import { vGoalRunConfig, vGoalStatus as vThreadGoalStatus, vGoalStopReason, vGoalVerdict, vPinnedGoal } from "./chat/goals/validators";
 import { vGroupChat } from "./chat/group/validators";
 import { runStreamingAgentFields } from "./chat/lib/streaming-run-args";
 import { vToolRunConfig } from "./chat/lib/tool-run-config";
@@ -44,6 +44,7 @@ import {
     vRetrievalMetrics,
 } from "./evals/validators";
 import { AUDIT_TABLES, auditTriggersFor } from "./lib/audit-triggers";
+import { vNotTypedMarks } from "./lib/not-typed-text-validator";
 import { vMemoryEvidence } from "./memory/evidence";
 import { vCapabilityReport } from "./lib/capability-report";
 import { notificationInputFields } from "./notifications/validators";
@@ -59,7 +60,15 @@ import {
     vReviewVerdict,
 } from "./source-control/validators";
 import { vSkillConfig } from "./skills/validators";
-import { vDispatchSource, vSubAgentRunMode, vSubAgentRunner, vSubAgentRunStatus, vWorkerPolicy } from "./sub-agents/validators";
+import {
+    vDispatchSource,
+    vSubAgentRoles,
+    vSubAgentRunMode,
+    vSubAgentRunner,
+    vSubAgentRunRole,
+    vSubAgentRunStatus,
+    vWorkerPolicy,
+} from "./sub-agents/validators";
 import {
     vGoalStatus,
     vTaskRunDestination,
@@ -381,6 +390,9 @@ export const schema = defineSchema({
         createdAt: v.number(),
         description: v.optional(v.string()),
         instructions: v.string(),
+        // Set when an admin acting as the owner wrote the name or instructions (both reach the system prompt), and kept:
+        // they are not the owner's words, so a run as this bot gets no saved login (`vault/site-login-turn.ts`).
+        instructionsByImpersonator: v.optional(v.literal(true)),
         model: v.string(),
         name: v.string(),
         // The mode a new chat with this bot starts in (`chat/lib/thread-permission-mode.ts`); absent = the default. A run
@@ -395,7 +407,21 @@ export const schema = defineSchema({
         .index("by_userId", ["userId"]),
 
     browserActions: defineTable({
-        action: v.union(v.literal("navigate"), v.literal("screenshot"), v.literal("click"), v.literal("type"), v.literal("extract"), v.literal("scroll")),
+        // `login`: a saved-login fill (`chat/tools/site-login-node.ts`). Its row names the site, never the username or password.
+        action: v.union(
+            v.literal("navigate"),
+            v.literal("screenshot"),
+            v.literal("click"),
+            v.literal("type"),
+            v.literal("extract"),
+            v.literal("scroll"),
+            v.literal("login"),
+        ),
+        /**
+         * A person in control of the browser did this: the session's `owner`, or a `collaborator` they shared the chat
+         * with; absent: the agent. A kind, never a user id: a collaborator's id here would outlive their account.
+         */
+        actor: v.optional(v.union(v.literal("collaborator"), v.literal("owner"))),
         durationMs: v.optional(v.number()),
         errorMessage: v.optional(v.string()),
         sessionId: v.id("browserSessions"),
@@ -421,9 +447,71 @@ export const schema = defineSchema({
         .index("by_pairingCode", ["pairingCode"])
         .index("by_extensionId", ["extensionId"]),
 
+    /**
+     * A site whose check (a human verification, a sign-in the agent cannot pass) the person was asked to clear during
+     * one reply (`run`: the reply key, `ToolCtx.replyKey`, the reply's first stream; the prompt, then the thread, for a
+     * run that sets none): asked at most once per site per reply (`browser/human-check.ts`).
+     */
+    browserHumanChecks: defineTable({
+        askedAt: v.number(),
+        /** The check was found only in the page's text: a later read too long to read cannot show it gone. */
+        inText: v.optional(v.boolean()),
+        /** The agent said a person is needed (`needs_person`, e.g. a sign-in wall) rather than a check being detected. */
+        reported: v.optional(v.boolean()),
+        /**
+         * The person's answer on the card (`browser/human-check-card.ts#resolveHumanCheck`): `done` (cleared it), `declined`
+         * (will not; the agent is told so and asks nobody about the site again in that reply). Set once, never changed.
+         */
+        resolution: v.optional(v.union(v.literal("declined"), v.literal("done"))),
+        resolvedAt: v.optional(v.number()),
+        run: v.string(),
+        /** The page's host, `""` when it had no readable URL. */
+        site: v.string(),
+        threadId: v.id("threads"),
+        /** The thread's owner, whose shard holds the row, whoever's turn asked. */
+        userId: v.string(),
+        /** The agent waited for the answer once (`wait_for_person`): a second wait on the ask returns at once. */
+        waitedAt: v.optional(v.number()),
+    })
+        .shardBy("userId")
+        // Unique: two actions of one reply that claim the same site at once insert one row, so the person is asked once.
+        .index("by_threadId_site_run", ["threadId", "site", "run"], { unique: true })
+        // An earlier reply's recent ask, for the first look after a hand back (`browser/human-check.ts#afterHandBack`).
+        .index("by_threadId_site_askedAt", ["threadId", "site", "askedAt"])
+        // The run's latest ask on any site, which the agent's `wait_for_person` waits on.
+        .index("by_threadId_run_askedAt", ["threadId", "run", "askedAt"])
+        .index("by_userId", ["userId"]),
+
     browserSessions: defineTable({
         completedAt: v.optional(v.number()),
         connectUrl: v.optional(v.string()),
+        /**
+         * A person drives the browser (`browser/live-view.ts#takeControl`): the agent's actions are refused while
+         * `until` is ahead. `by` is an opaque holder (`browser/live-view.ts#controlHolder`, a keyed hash of the session
+         * and the person), never a user id: a collaborator's id here would outlive their account. Kept after it ends,
+         * until an agent action has looked at the page the person left (told that they drove).
+         * `ended`: how the person gave it back (`browser_closed`: the renderer closed or replaced the browser they drove);
+         * absent once `until` passed is the idle timeout.
+         */
+        control: v.optional(
+            v.object({
+                by: v.string(),
+                /** New on every claim and renewal: a failed claim drops the lease only while it is still this one. */
+                claim: v.string(),
+                ended: v.optional(v.union(v.literal("browser_closed"), v.literal("handed_back"), v.literal("left"))),
+                /** A page the person asked for loads until then: the lease lasts at least as long. */
+                navigatingUntil: v.optional(v.number()),
+                /**
+                 * A renewal's mint is still running: the claim it replaces, which the view holding it keeps using until the
+                 * renewal settles (then it goes) or fails (then it is `claim` again).
+                 */
+                renewing: v.optional(v.string()),
+                /** The view under `renewing` closed (handed back or left) while the renewal mints: a failed renewal ends the lease so. */
+                renewingEnded: v.optional(v.union(v.literal("handed_back"), v.literal("left"))),
+                since: v.number(),
+                until: v.number(),
+            }),
+        ),
         currentUrl: v.optional(v.string()),
         /** When the action that wrote `currentUrl` started, so an older action finishing later does not overwrite it. */
         currentUrlStartedAt: v.optional(v.number()),
@@ -437,6 +525,12 @@ export const schema = defineSchema({
         inUseHolds: v.optional(v.array(v.number())),
         lastActivityAt: v.number(),
         providerSessionId: v.optional(v.string()),
+        /**
+         * The deadlines of the browser actions in flight that began while the row read the browser as reaped (or before it
+         * named one): they keep a person from taking control until they end, but keep no browser alive, so a reaped one
+         * is not offered while the renderer replaces it.
+         */
+        reapedHolds: v.optional(v.array(v.number())),
         source: v.optional(v.string()),
         startedAt: v.number(),
         status: v.string(),
@@ -716,7 +810,9 @@ export const schema = defineSchema({
         signature: v.string(),
         status: vDeviceCallStatus,
         taintedBy: v.array(vDeviceTaintSource),
-        threadId: v.id("threads"),
+        // Absent for the one call no chat starts: the rule-file editor's read of global instruction files
+        // (`devices/global-instructions.ts`).
+        threadId: v.optional(v.id("threads")),
         // The AI SDK tool call this row answers, so the chat can show its state.
         toolCallId: v.optional(v.string()),
         toolName: v.string(),
@@ -1186,12 +1282,22 @@ export const schema = defineSchema({
         .triggers((t) => auditTriggersFor(t, "folders", AUDIT_TABLES["folders"]!)),
 
     followupSuggestions: defineTable({
+        // False from the write until the reply's Text unit is taken: an uncharged row is never shown or read as cached. Unset on rows
+        // from before this column, which were charged before they were written.
+        charged: v.optional(v.boolean()),
         createdAt: v.number(),
         lastMessageId: v.string(),
+        // The turn's `order` the suggestions were made for. A write for an older turn is refused, so a slow run cannot replace a newer cache. Unset on rows from before this column.
+        order: v.optional(v.number()),
+        // When the reply was created: between siblings of one turn, the newer reply's suggestions win. Unset on older rows.
+        replyAt: v.optional(v.number()),
         suggestions: v.array(v.string()),
         threadId: v.string(),
         updatedAt: v.number(),
-    }).index("by_thread", ["threadId"]),
+    })
+        // One row per reply: a switched branch keeps its own suggestions, so the composer reads the reply on screen by id.
+        .index("by_thread", ["threadId"])
+        .index("by_thread_and_message", ["threadId", "lastMessageId"]),
 
     gatewayNotifications: defineTable({
         action: v.string(),
@@ -1560,6 +1666,9 @@ export const schema = defineSchema({
         error: v.optional(v.string()),
         fileIds: v.optional(v.array(v.id("chatFiles"))),
         finishReason: v.optional(v.string()),
+        // Whether the run that wrote this row ran on the device, stamped when the run finishes (`agent/followup-suggestions.ts`).
+        // Unset on rows from before the stamp, which fall back to the endpoint's current type.
+        localRun: v.optional(v.boolean()),
         message: v.optional(v.any()),
         model: v.optional(v.string()),
         order: v.number(),
@@ -1979,6 +2088,9 @@ export const schema = defineSchema({
         // How many times the run was resumed after its worker died (`interrupted.ts`); capped, the next one fails the run.
         interruptions: v.optional(v.number()),
         messageId: v.string(),
+        // The steers above holding text the run's user did not type (`lib/not-typed-text.ts`), by id: the row they are
+        // delivered as, and the run's message, carry the mark. At most one per steer (`MAX_STEERS_PER_RUN`).
+        notTypedSteers: v.optional(v.array(v.object({ id: v.string(), notTyped: vNotTypedMarks }))),
         // The run is waiting out a provider rate limit (`chat/lib/rate-limit-pause.ts`). The stream stays live
         // (pending/streaming) so a stop, the live query and the expiry sweep treat it as the run it is; `id`
         // names this pause, and exactly one resume claims it (`claimRunResume`). `run` is the job's own
@@ -2156,6 +2268,37 @@ export const schema = defineSchema({
         .index("by_user_and_url", ["userId", "url"])
         .index("by_organization_and_url", ["organizationId", "url"]),
 
+    // A project's rule files, one row per project holding the whole list in order (`projects/rule-files.ts`): kept off the
+    // project row, which every project read is charged for whole. Access follows the project's; `userId` copies its owner
+    // only so account deletion finds a row whose project is gone (`projects/rule-file-rows.ts`).
+    projectRuleFiles: defineTable({
+        // The fingerprint of the legacy `context` this list took over, "" or absent for none (`rule-files.ts#contextFingerprint`).
+        carriedContext: v.optional(v.string()),
+        // When a project delete started erasing it, 0 or absent when none: a sweep finishes one the delete left (`projects/gdpr.ts`).
+        deletingAt: v.optional(v.number()),
+        files: v.array(
+            v.object({
+                content: v.string(),
+                // An `auto` file's one-line description (`projects/rule-files.ts`).
+                description: v.optional(v.string()),
+                globs: v.optional(v.array(v.string())),
+                id: v.string(),
+                mode: v.union(v.literal("always"), v.literal("auto"), v.literal("glob")),
+                title: v.string(),
+            }),
+        ),
+        projectId: v.id("projects"),
+        updatedAt: v.number(),
+        userId: v.optional(v.string()),
+        // Counts the saves, absent before the first counted one, so a save writes only over the row it compared against
+        // (`writeProjectRuleFiles`).
+        version: v.optional(v.number()),
+    })
+        .global()
+        .index("by_project", ["projectId"], { unique: true })
+        .index("by_user", ["userId"])
+        .index("by_deleting_at", ["deletingAt"]),
+
     projects: defineTable({
         color: v.optional(v.string()),
         context: v.optional(v.string()),
@@ -2181,6 +2324,8 @@ export const schema = defineSchema({
         pinnedAt: v.optional(v.number()),
         projectType: v.optional(v.union(v.literal("chat"), v.literal("workflow"))),
         publicAccessToken: v.optional(v.string()),
+        // Per-project overrides of the owner's sub-agent roles (`sub-agents/roles.ts`).
+        subAgentRoles: v.optional(vSubAgentRoles),
         title: v.string(),
         updatedAt: v.optional(v.number()),
         userId: v.optional(v.string()),
@@ -2221,6 +2366,10 @@ export const schema = defineSchema({
     promptHistory: defineTable({
         changeType: v.string(),
         content: v.string(),
+        // Who wrote this version's words, as on `prompts` (`prompts/content-author.ts`); a restore carries it back.
+        contentBy: v.optional(v.string()),
+        contentByImpersonator: v.optional(v.boolean()),
+        contentByOthers: v.optional(v.boolean()),
         createdAt: v.number(),
         description: v.optional(v.string()),
         enabledFeatures: v.optional(v.array(v.string())),
@@ -2249,6 +2398,14 @@ export const schema = defineSchema({
 
     prompts: defineTable({
         content: v.string(),
+        // Who wrote the words (`content`, variable defaults), from the session, never from input
+        // (`prompts/content-author.ts`): an org member can edit a teammate's prompt and an impersonating admin writes
+        // under the user's id, so `userId` does not say whose words it holds. `contentBy` is the last writer;
+        // `contentByOthers` and `contentByImpersonator` are set once anyone else, or anyone impersonated, wrote part of
+        // them, and only a restore clears them. Unset on rows from before them.
+        contentBy: v.optional(v.string()),
+        contentByImpersonator: v.optional(v.boolean()),
+        contentByOthers: v.optional(v.boolean()),
         currentVersion: v.optional(v.number()),
         description: v.optional(v.string()),
         enabledFeatures: v.optional(v.array(v.string())),
@@ -2514,6 +2671,9 @@ export const schema = defineSchema({
         label: v.optional(v.string().max(80)),
         // The exact origin (`https://example.com`); a fill types only into a page of this origin.
         origin: v.string().max(255),
+        // The page with the login form, an https:// URL on `origin` without its fragment (`vault/lib/site-origin.ts#normalizeSignInUrl`).
+        // The fill opens only this page, or the site's front page when unset, never one the model picks.
+        signInUrl: v.optional(v.string().max(2048)),
         // Teammates whose threads may use the login. None: only the user's own chats (threads without a teammate).
         teammateIds: v.optional(v.array(v.id("bots"))),
         updatedAt: v.number(),
@@ -2526,6 +2686,9 @@ export const schema = defineSchema({
     session: defineTable({
         activeOrganizationId: v.optional(v.string()),
         activeTeamId: v.optional(v.string()),
+        // Which app a grant's session was made for (`auth/lib/sign-in-standing.ts#ClientGrantKind`), set only by the code
+        // exchange from the code's redirect URI; unset on a web session. A browser extension's text is not the owner's typing.
+        clientGrant: v.optional(v.string()),
         createdAt: v.number(),
         expiresAt: v.number(),
         impersonatedBy: v.optional(v.string()),
@@ -2844,6 +3007,8 @@ export const schema = defineSchema({
         resultPostedAt: v.optional(v.number()),
         // The approval id the run last resumed with (`resumeRunForAnswer`): its continuation streams under that key.
         resumedBy: v.optional(v.string()),
+        // The role the run launched with, resolved at admission (`sub-agents/roles.ts`).
+        role: v.optional(vSubAgentRunRole),
         runner: v.optional(vSubAgentRunner),
         skillSlug: v.optional(v.string()),
         startedAt: v.optional(v.number()),
@@ -3257,6 +3422,13 @@ export const schema = defineSchema({
 
     threadPins: defineTable({
         createdAt: v.number(),
+        // An image pin's place among the message's images (`kind: "image"`, `imageOrdinals` in chat-ui); a message pin has none.
+        imageIndex: v.optional(v.number()),
+        // An image pin's key, a hash of where its image is stored (`imageKeyOf` in the web app): found wherever the image now
+        // sits, which an image index alone cannot do when an earlier image is gone. No address is stored.
+        imageKey: v.optional(v.string()),
+        // What is pinned: the whole message (absent, as every pin before images), or one image of it.
+        kind: v.optional(v.union(v.literal("message"), v.literal("image"))),
         messageId: v.string(),
         messageRole: v.union(v.literal("user"), v.literal("assistant")),
         note: v.optional(v.string()),
@@ -3335,6 +3507,11 @@ export const schema = defineSchema({
         dictationLanguage: v.optional(v.string()),
         enabledFeatures: v.optional(v.array(v.string())),
         externalThreadId: v.optional(v.string()),
+        // The suggestion request in flight on this chat, and the grant removal holding requests back: a short lease on the chat's own
+        // row, so admission, the lock and the deletes read one shard's row in one transaction (`agent/followup-suggestions.ts`).
+        // `expiresAt` 0 (or in the past) is no lease.
+        followupDispatch: v.optional(v.object({ claimedAt: v.number(), expiresAt: v.number(), requestId: v.optional(v.string()) })),
+        followupRevoke: v.optional(v.object({ claimedAt: v.number(), expiresAt: v.number() })),
         // Multi-agent group chat: participants (skill ids) and who-speaks mode.
         // Written only by `chat/group/functions.ts`, which checks access.
         groupChat: v.optional(vGroupChat),
@@ -3369,6 +3546,8 @@ export const schema = defineSchema({
         // behaviour. Never set on a host thread, whose approvals keep their own rules.
         permissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
         pinnedAt: v.optional(v.number()),
+        // The goal every following message in this chat runs with, until it is cleared (`chat/goals/functions.ts`).
+        pinnedGoal: v.optional(vPinnedGoal),
         projectId: v.optional(v.id("projects")),
         publicAccessToken: v.optional(v.string()),
         reasoningEffort: v.optional(v.number()),
@@ -3465,6 +3644,9 @@ export const schema = defineSchema({
         updatedAt: v.number(),
         userId: v.string(),
         variables: v.array(v.object({ name: v.string(), value: v.string() })),
+        // The names of the values an admin acting as the user changed or added, and kept (`prompts/functions.ts#markedNames`):
+        // filled into a prompt, such a value marks the draft (`impersonated`).
+        variablesByImpersonator: v.optional(v.array(v.string())),
     })
         .shardBy("userId")
         .index("by_thread", ["threadId"])
@@ -3874,6 +4056,9 @@ export const schema = defineSchema({
         newChatsTemporary: v.optional(v.boolean()),
         nickname: v.optional(v.string()),
         onboardingCompleted: v.optional(v.boolean()),
+        // Set when an admin acting as the user wrote a personalization field that reaches the system prompt
+        // (`auth/lib/personalization.ts`), and kept: a run with it gets no saved login. Server-written only.
+        personalizationByImpersonator: v.optional(v.literal(true)),
         profession: v.optional(v.string()),
         // A run whose worker died resumes from its last saved row, up to 3 times per reply (`chat/streaming/persistent/interrupted.ts`). Absent = on.
         resumeInterruptedRuns: v.optional(v.boolean()),
@@ -3884,6 +4069,8 @@ export const schema = defineSchema({
         sendBehavior: v.optional(v.string()),
         // First-run setup steps the user skipped (`auth/setup-steps.ts`): "pair" | "ssh" | "agent". At most 8, capped by `auth/lib/setup-step-limits.ts`. Absent = none.
         setupStepsSkipped: v.optional(v.array(v.string())),
+        // A model and instructions per kind of delegated work (`sub-agents/roles.ts`).
+        subAgentRoles: v.optional(vSubAgentRoles),
         // Opt-in email when a task or trigger run finishes with a result (`notifications/task-email.ts`). Absent = off.
         taskEmailEnabled: v.optional(v.boolean()),
         temporaryChatRetentionHours: v.optional(v.number()),
@@ -3922,6 +4109,12 @@ export const schema = defineSchema({
         updatedAt: v.number(),
         userId: v.string(),
         variables: v.array(v.object({ name: v.string(), value: v.string() })),
+        // The names of the values an admin acting as the user changed or added, and kept (`prompts/functions.ts#markedNames`):
+        // filled into a prompt, such a value marks the draft (`impersonated`).
+        variablesByImpersonator: v.optional(v.array(v.string())),
+        // A fresh id from every write of the values or marks (`updatedAt` can repeat within a millisecond): a "Keep as mine"
+        // clears a mark only while it is still the one read (`clearDefaultsMark`). Absent on a row no such write has had yet.
+        writeId: v.optional(v.string()),
     })
         // `.global()`, not `.shardBy("userId")`: read across users.
         .global()

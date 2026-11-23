@@ -10,7 +10,7 @@ import type { Id } from "../_generated/dataModel";
 import { isHostRunThread } from "../acp/lib/host-thread";
 import { getFile } from "../agent/client";
 import { ATTACH_WINDOW_EXPIRED_MESSAGE, attachCountWithinCap, attachWindowOpen, isAttachWindowExpired, MAX_ATTACHED_FILES } from "../agent/file-attach-claim";
-import { requestSignIn } from "../auth/lib/request-sign-in";
+import { requestSignIn, requestSignInIsGrant } from "../auth/lib/request-sign-in";
 import { getCurrentUserInternal } from "../auth/lib/helper";
 import type { BetterAuthUser } from "../auth/lib/types";
 import { assertPaidModel } from "./lib/enabled-model";
@@ -27,12 +27,21 @@ import { THREAD_LOCKED_CODE } from "../lib/thread-lock";
 import { parseSkillCommand } from "../skills/slash-command";
 import { clampGoalEffort, GOAL_TEXT_MAX } from "./goals/shared";
 import { vGoalRunConfig } from "./goals/validators";
-import { chargeDailyLimit, type DailyLimitKind } from "./lib/daily-limit";
+import { chargeDailyLimit, type DailyLimitKind, refundDailyLimit } from "./lib/daily-limit";
 import { NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { capTitlePrompt, fileOnlyPromptPart, imagePromptPart } from "./lib/first-user-prompt";
 import type { StartTitleJob } from "./lib/start-title-jobs";
 import { mediaThreadTitle, startTitleJobs } from "./lib/start-title-jobs";
+import {
+    hasNotTypedMarks,
+    mergeNotTypedMarks,
+    type NotTypedMarks,
+    notTypedMarksOfDraftFrom,
+    notTypedMarksOfMessage,
+    parseNotTypedDraft,
+    withNotTypedMarks,
+} from "../lib/not-typed-text";
 import { documentTextPart, guestNoteIdOfMessage, guestTextPart, outsideAgentTextPart } from "./lib/attached-text";
 import { unsendableGuestText } from "./lib/guest-link-store";
 import { formatPageContextPart, parsePageContext } from "./lib/page-context";
@@ -365,6 +374,8 @@ export interface ChatStartBody {
      */
     clientMessageId?: string;
     customSystemPrompt?: string;
+    /** The composer was filled with text the owner did not type (`lib/not-typed-text.ts`): the prompt is saved marked. */
+    draftFrom?: string;
     duration?: number;
     enabledFeatures?: string[];
     fileIds?: string[];
@@ -387,6 +398,8 @@ export interface ChatStartBody {
     prompt?: string;
     quality?: string;
     reasoningEffort?: number;
+    /** One per reference image, in order: the picker's id for it, checked by `/chat/media` (`chat/reference-gate.ts`). */
+    referenceIds?: string[];
     referenceImages?: string[];
     regenerate?: boolean;
     researchDepth?: "speed" | "balanced" | "thorough";
@@ -432,6 +445,11 @@ interface ThreadAttach {
 }
 
 const noThreadAttach: ThreadAttach = { release: async () => undefined };
+
+/** What a send charged to the daily quota, so a refusal after the charge can give the unit back (`refund`). */
+interface SendCharge {
+    refund?: () => Promise<void>;
+}
 
 /**
  * Takes the attach's claim on the THREAD's shard, in the transaction that checks the thread's access and lock, so the chat's
@@ -692,6 +710,12 @@ export const runChatStart = async (
         return Response.json({ error: "GUEST_NOTE_AS_GOAL", message: "A guest's message cannot be sent as a goal." }, { status: 400 });
     }
 
+    const draftFrom = parseNotTypedDraft(body.draftFrom);
+
+    if (draftFrom === null) {
+        return Response.json({ error: "Invalid draftFrom" }, { status: 400 });
+    }
+
     // Auth: extract user from the forwarded JWT
     let user: BetterAuthUser | undefined;
 
@@ -750,25 +774,31 @@ export const runChatStart = async (
                 return threadAttach.refusal;
             }
 
+            const charge: SendCharge = {};
+
             try {
                 return await runChatStartOnShard(shardCtx, body, signingSecret, {
                     assertAttachWindow: fileAttach.assertWindow,
+                    charge,
                     origin,
                     pageContext,
                     resend,
                     user,
                     userId,
                 });
+            } catch (error) {
+                // The window closed after the charge: the unit is given back, and the send is answered as a retryable conflict.
+                if (isAttachWindowExpired(error)) {
+                    await charge.refund?.();
+
+                    return attachWindowExpiredResponse();
+                }
+
+                throw error;
             } finally {
                 await threadAttach.release();
             }
         });
-    } catch (error) {
-        if (isAttachWindowExpired(error)) {
-            return attachWindowExpiredResponse();
-        }
-
-        throw error;
     } finally {
         await fileAttach.release();
     }
@@ -794,6 +824,7 @@ const startSettingsOf = (body: ChatStartBody, pageContext: ReturnType<typeof par
         autoModel: body.autoModel,
         cinemaSettings: body.cinemaSettings,
         customSystemPrompt: body.customSystemPrompt,
+        draftFrom: body.draftFrom,
         duration: body.duration,
         enabledFeatures: body.enabledFeatures,
         goalMaxRounds: body.goal?.maxRounds,
@@ -808,6 +839,7 @@ const startSettingsOf = (body: ChatStartBody, pageContext: ReturnType<typeof par
         projectId: body.projectId,
         quality: body.quality,
         reasoningEffort: body.reasoningEffort,
+        referenceIds: body.referenceIds,
         referenceImages: body.referenceImages,
         researchDepth: body.researchDepth,
         retentionHours: body.retentionHours,
@@ -840,6 +872,7 @@ const runChatStartOnShard = async (
     signingSecret: string,
     {
         assertAttachWindow,
+        charge,
         origin,
         pageContext,
         resend,
@@ -848,6 +881,8 @@ const runChatStartOnShard = async (
     }: {
         /** Throws before a save the file attach's claim can no longer cover (`FileAttach.assertWindow`). */
         assertAttachWindow: () => void;
+        /** Filled in once the send's text is charged, so a refusal after the charge can give the unit back. */
+        charge: SendCharge;
         origin: "outside_agent" | undefined;
         pageContext: ReturnType<typeof parsePageContext>;
         /** A resend of a saved send: its files are neither checked nor read again (`isSavedResend`). */
@@ -888,7 +923,8 @@ const runChatStartOnShard = async (
     // (`gsid`, which never becomes `sessionId`, `src/bearer-identity.ts`). It places the chat in its organization, so a
     // signed-in caller with neither cannot be placed and must not read as the personal space, whose cap is `auto`. A
     // public API key caller has neither; its run is held at `ask` by its origin (`apiKeyOrigin`).
-    const signIn = requestSignIn(await context.auth.getIdentity());
+    const identity = await context.auth.getIdentity();
+    const signIn = requestSignIn(identity);
 
     if (signIn === undefined && origin !== "outside_agent") {
         return Response.json({ error: "Your sign-in could not be confirmed. Sign in again, then retry." }, { status: 401 });
@@ -902,7 +938,11 @@ const runChatStartOnShard = async (
     const placedPromise =
         signIn === undefined
             ? Promise.resolve(undefined)
-            : context.runQuery(internal.auth.session_organization.getSessionOrganizationForCap, { sessionId: signIn, userId });
+            : context.runQuery(internal.auth.session_organization.getSessionOrganizationForCap, {
+                  sessionId: signIn,
+                  userId,
+                  viaGrant: requestSignInIsGrant(identity),
+              });
     const sessionOrganizationPromise = placedPromise.then((placed) => placed?.organizationId ?? null);
 
     // A request refused before the first write never awaits these; they are only reads.
@@ -963,6 +1003,9 @@ const runChatStartOnShard = async (
     } else {
         messageContent.push(fileOnlyPromptPart());
     }
+
+    // Marked once the sign-in is read, below: the prompt text the owner may not have typed.
+    const promptPart = messageContent[0];
 
     // Page context goes in front of the typed text, like extracted documents,
     // wrapped as untrusted data (see `chat/lib/page-context.ts`). Text runs only:
@@ -1049,6 +1092,14 @@ const runChatStartOnShard = async (
 
     if (access?.isWorker) {
         return workerThreadResponse();
+    }
+
+    // A goal spends the owner's budget over several rounds, so an impersonating admin cannot start one: refused here, before
+    // the turn is saved and charged. The web app withholds the chat's pin while impersonating, so only an explicit goal lands here.
+    const placedForGoal = body.goal === undefined ? undefined : await placedPromise;
+
+    if (placedForGoal?.impersonating === true) {
+        return Response.json({ error: "A goal cannot run while impersonating." }, { status: 403 });
     }
 
     // A goal spends the owner's budget over several rounds: refuse it in a shared thread now, before the turn is saved and charged.
@@ -1138,6 +1189,7 @@ const runChatStartOnShard = async (
         numImages: body.numImages,
         quality: body.quality,
         reasoningEffort: body.reasoningEffort,
+        referenceIds: body.referenceIds,
         referenceImages: body.referenceImages,
         researchDepth: body.researchDepth,
         searchMode: body.searchMode,
@@ -1174,9 +1226,30 @@ const runChatStartOnShard = async (
     }
 
     // The sign-in check, read alongside the rest: an unconfirmed sign-in is refused here, before the first write.
-    if ((await placedPromise) === null) {
+    const placed = await placedPromise;
+
+    if (placed === null) {
         return Response.json({ error: "Your sign-in could not be confirmed. Sign in again, then retry." }, { status: 401 });
     }
+
+    // Text the owner did not type is saved marked: a draft from outside, anything an admin acting as them sends, and
+    // whatever a browser extension's grant sends (`auth/lib/sign-in-standing.ts`, from the session row, never the request).
+    // `draftFrom` was checked by `runChatStart`: only a known source reaches here.
+    const draftFrom = parseNotTypedDraft(body.draftFrom) ?? undefined;
+    const notTyped: NotTypedMarks = mergeNotTypedMarks(
+        placed?.extension === true ? { draft: "extension" } : {},
+        notTypedMarksOfDraftFrom(draftFrom),
+        placed?.impersonating === true ? { impersonated: true } : {},
+    );
+
+    const promptIndex = messageContent.indexOf(promptPart);
+
+    // The part was only ever moved by an unshift or a push, so it is there; were it not, the send must not go out unmarked.
+    if (promptIndex === -1) {
+        throw new Error("The prompt part was not found to mark");
+    }
+
+    messageContent[promptIndex] = withNotTypedMarks(promptPart, notTyped);
 
     // Rate limiting. Media prompts are charged where the paid generation actually
     // runs — `/chat/media`, which the client calls next with this prompt's id —
@@ -1244,6 +1317,10 @@ const runChatStartOnShard = async (
         const activeOrganizationId = await activeOrganizationPromise;
 
         await enqueueJob(internal.chat.execute.runStreamingAgent, {
+            // From the session read above, never the body: the saved-login verdict refuses an admin's turn by it, and a browser
+            // extension's (its prompt is marked too). A send with no sign-in session to read (an API key) records nothing,
+            // which is no answer and refuses too.
+            ...(placed !== undefined && { impersonated: placed.impersonating === true || placed.extension === true }),
             isAnonymous,
             messageId: run.messageId,
             ...(activeOrganizationId && { organizationId: activeOrganizationId }),
@@ -1497,6 +1574,15 @@ const runChatStartOnShard = async (
                 { status: 403 },
             );
         }
+
+        const { windowStart } = dailyLimit;
+
+        charge.refund = async () => {
+            await refundDailyLimit(context, user, "Text", {
+                ...(chargeKey !== undefined && { chargeKey }),
+                ...(windowStart !== undefined && { windowStart }),
+            });
+        };
     }
 
     // Create or continue thread
@@ -1582,6 +1668,7 @@ const runChatStartOnShard = async (
                     model: effectiveModel,
                     ...(body.parentId !== undefined && { parentId: body.parentId }),
                     threadId: validThreadId,
+                    userId,
                 });
             }
 
@@ -1595,6 +1682,8 @@ const runChatStartOnShard = async (
                 ...(attachmentFileIds && { metadata: { fileIds: attachmentFileIds } }),
                 promptMessageId: body.parentId,
                 threadId: validThreadId,
+                // The sender, not the thread's owner: a collaborator's prompt in a shared chat names them.
+                userId,
             });
         };
         const result = await savePrompt().catch(async (error: unknown) => {
@@ -1762,8 +1851,33 @@ const runChatStartOnShard = async (
  * `/chat/edit`. The attach's claim is taken after the thread's gate, inside `editMessageAttached`, and released here once the
  * edit has answered, so the claim covers the file reads and the save.
  */
+/**
+ * The not-typed marks (`lib/not-typed-text.ts`) of what a request's sign-in writes as `userId`: `impersonated` for an
+ * admin acting as them or a sign-in that cannot be confirmed as theirs (no session, or one gone), `extension` for a
+ * browser extension's grant or a grant whose app cannot be told (`auth/lib/sign-in-standing.ts`). Only ever restricts.
+ */
+const signInMarks = async (context: HttpActionCtx, userId: string): Promise<NotTypedMarks> => {
+    // Never throws: a failed read is a sign-in that cannot be confirmed.
+    const identity = await context.auth.getIdentity().catch(() => null);
+    const signIn = requestSignIn(identity);
+
+    if (signIn === undefined) {
+        return { impersonated: true };
+    }
+
+    const placed = await context
+        .runQuery(internal.auth.session_organization.getSessionOrganizationForCap, { sessionId: signIn, userId, viaGrant: requestSignInIsGrant(identity) })
+        .catch(() => null);
+
+    if (placed === null || placed.impersonating === true) {
+        return { impersonated: true };
+    }
+
+    return placed.extension === true ? { draft: "extension" } : {};
+};
+
 export const editMessageHttpAction = async (context: HttpActionCtx, request: Request) => {
-    const holder: { attach?: FileAttach; threadAttach?: ThreadAttach } = {};
+    const holder: { attach?: FileAttach; refundCharge?: () => Promise<void>; threadAttach?: ThreadAttach } = {};
 
     try {
         return await editMessageAttached(context, request, holder);
@@ -1773,13 +1887,30 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
     }
 };
 
-const editMessageAttached = async (context: HttpActionCtx, request: Request, holder: { attach?: FileAttach; threadAttach?: ThreadAttach }) => {
-    const { content, fileIds, messageId, unlockProof } = (await request.json()) as {
+const editMessageAttached = async (
+    context: HttpActionCtx,
+    request: Request,
+    holder: { attach?: FileAttach; refundCharge?: () => Promise<void>; threadAttach?: ThreadAttach },
+) => {
+    const {
+        content,
+        draftFrom: rawDraftFrom,
+        fileIds,
+        messageId,
+        unlockProof,
+    } = (await request.json()) as {
         content: ({ text: string; type: "text" } | { image: string; type: "image" } | { data: string; filename?: string; mimeType?: string; type: "file" })[];
+        /** As `/chat/start`'s: the edit's text holds a draft the owner did not type. */
+        draftFrom?: string;
         fileIds?: string[];
         messageId: string;
         unlockProof?: string;
     };
+    const draftFrom = parseNotTypedDraft(rawDraftFrom);
+
+    if (draftFrom === null) {
+        return Response.json({ error: "Invalid draftFrom" }, { headers: { "Content-Type": "application/json" }, status: 400 });
+    }
 
     // Validate messageId format
     if (!messageId || !isValidDocumentIdFormat(messageId)) {
@@ -1832,6 +1963,9 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
             { headers: { "Content-Type": "application/json" }, status: 401 },
         );
     }
+
+    // Read alongside the rest: whether an admin acting as the owner or a browser extension sends the edit, which marks it as not typed.
+    const signInMarksPromise = signInMarks(context, userId);
 
     try {
         // Get the message to find its thread. The thread is not known yet, so the raw row is read and the gate below decides.
@@ -1900,6 +2034,12 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
 
         // An edit of a guest's note the owner sent on is still the guest's words: it keeps the mark and the note's id.
         const guestNoteId = guestNoteIdOfMessage(message.message as Parameters<typeof guestNoteIdOfMessage>[0]);
+        // So does text the owner did not type (`lib/not-typed-text.ts`), and an admin acting as the owner marks the edit.
+        const notTyped = mergeNotTypedMarks(
+            notTypedMarksOfMessage(message.message as Parameters<typeof notTypedMarksOfMessage>[0]),
+            notTypedMarksOfDraftFrom(draftFrom),
+            await signInMarksPromise,
+        );
 
         // A stateless reply saves its prompt again from the plain text (`streamAsync`), an untagged copy of the guest's words
         // under the tagged edit: refused there, before anything is saved or charged.
@@ -2026,7 +2166,7 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
                         break;
                     }
 
-                    messageContent.push(guestNoteId === undefined ? { text, type: "text" } : guestTextPart(text, guestNoteId));
+                    messageContent.push(withNotTypedMarks(guestNoteId === undefined ? { text, type: "text" } : guestTextPart(text, guestNoteId), notTyped));
 
                     break;
                 }
@@ -2066,6 +2206,13 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
             );
         }
 
+        // Given back if the window closes before the save (the catch below).
+        const { windowStart } = editLimit;
+
+        holder.refundCharge = async () => {
+            await refundDailyLimit(context, user, "Text", { ...(windowStart !== undefined && { windowStart }) });
+        };
+
         // The edit's attachments are saved with it: refused rather than saved once the file's claim can no longer hold a lock back.
         holder.attach?.assertWindow();
 
@@ -2093,9 +2240,11 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
             {
                 customSystemPrompt: appThread?.customSystemPrompt,
                 enabledFeatures: appThread?.enabledFeatures,
+                ...(fileIds && fileIds.length > 0 && { fileIds: fileIds.slice(0, MAX_ATTACHED_FILES) as Id<"chatFiles">[] }),
                 messageId: editedMessageId,
                 model: model as string,
                 parentId: editedMessageId, // Use the edited message as parent
+                ...(hasNotTypedMarks(notTyped) && { notTyped }),
                 prompt: editedTextContent,
                 reasoningEffort: appThread?.reasoningEffort,
                 statelessMode: appThread?.statelessMode,
@@ -2123,6 +2272,8 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
         );
     } catch (error) {
         if (isAttachWindowExpired(error)) {
+            await holder.refundCharge?.();
+
             return attachWindowExpiredResponse();
         }
 
@@ -2153,6 +2304,35 @@ const MAX_IMAGES_PER_REQUEST = 4;
 /** The daily quota each media content type is charged to. */
 const MEDIA_LIMIT_KIND: Partial<Record<string, Exclude<DailyLimitKind, "Text">>> = { audio: "Audio", image: "Image", video: "Video" };
 
+/**
+ * Whether any chat a media reference sits in is refused to the caller. Each chat is read on its OWNER's shard
+ * (`threadShardFor`), where its passcode rows and messages live; the unlock proof applies to the target chat only.
+ */
+const referenceChatsRefused = async (
+    context: HttpActionCtx,
+    { chatIds, threadId, unlockProof, userId }: { chatIds: string[]; threadId: string; unlockProof: string | undefined; userId: string },
+): Promise<boolean> => {
+    for (const chatId of chatIds) {
+        const shardKey = await threadShardFor(context, userId, chatId);
+        const { readable } = await inShard(
+            context,
+            shardKey,
+            async (shardCtx) =>
+                await shardCtx.runQuery(internal.chat.reference_gate.threadReadableOnShard, {
+                    threadId: chatId,
+                    unlockProof: chatId === threadId ? unlockProof : undefined,
+                    userId,
+                }),
+        );
+
+        if (!readable) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
 export const mediaGenerationHttpAction = async (context: HttpActionCtx, request: Request) => {
     const traceId = request.headers.get("x-request-id") || crypto.randomUUID();
 
@@ -2172,6 +2352,8 @@ export const mediaGenerationHttpAction = async (context: HttpActionCtx, request:
             negativePrompt?: string;
             numImages?: number;
             quality?: "standard" | "hd";
+            /** One per reference image, in order: the picker's id for it (`chat/reference-gate.ts`). */
+            referenceIds?: string[];
             referenceImages?: string[];
             seed?: number;
             style?: string;
@@ -2240,12 +2422,7 @@ export const mediaGenerationHttpAction = async (context: HttpActionCtx, request:
         return Response.json({ error: "Message does not belong to this thread" }, { headers: { "Content-Type": "application/json" }, status: 400 });
     }
 
-    // Only the message's author may generate for it...
-    if (message.userId !== authenticatedUserId) {
-        return Response.json({ error: "Forbidden" }, { headers: { "Content-Type": "application/json" }, status: 403 });
-    }
-
-    // ...and only while they may still WRITE to the thread: authorship outlives a
+    // Only a caller who may still WRITE to the thread may generate: authorship outlives a
     // grant, so a collaborator downgraded to view (or revoked) must not start paid
     // generations that land as replies in the owner's thread. As `/chat/start`.
     const access = await context.runQuery(internal.chat.functions.gateThreadAction, {
@@ -2263,6 +2440,12 @@ export const mediaGenerationHttpAction = async (context: HttpActionCtx, request:
         return Response.json({ error: "Forbidden" }, { headers: { "Content-Type": "application/json" }, status: 403 });
     }
 
+    // ...and only the message's author or the thread's owner: a collaborator's prompt row names the
+    // collaborator, and the owner regenerates it (`/chat/start` allows only the owner to regenerate).
+    if (message.userId !== authenticatedUserId && access.ownerId !== authenticatedUserId) {
+        return Response.json({ error: "Forbidden" }, { headers: { "Content-Type": "application/json" }, status: 403 });
+    }
+
     if (access.isWorker) {
         return workerThreadResponse();
     }
@@ -2270,6 +2453,29 @@ export const mediaGenerationHttpAction = async (context: HttpActionCtx, request:
     // The reply would come from a cloud model, in a thread the desktop owns.
     if (access.hostRun) {
         return hostRunThreadResponse();
+    }
+
+    // Every reference must be the caller's own row, under its own URL, in a chat the caller may read here, checked on the caller's
+    // shard (`chat/reference-gate.ts`). A reference without its id, or with a count that differs, is refused the same way.
+    const references = streamingConfig.referenceImages ?? [];
+    const referenceIds = streamingConfig.referenceIds ?? [];
+    // Taken before the check: a lock applied after this instant refuses the job's own recheck.
+    const referenceCheckedAt = Date.now();
+
+    if (references.length > 0) {
+        const rows =
+            referenceIds.length === references.length
+                ? await context.forShard(authenticatedUserId).runQuery(internal.chat.reference_gate.gateReferenceRowsOnCallerShard, {
+                      referenceIds,
+                      referenceImages: references,
+                      userId: authenticatedUserId,
+                  })
+                : { chatIds: [], refused: true };
+        const refused = rows.refused || (await referenceChatsRefused(context, { chatIds: rows.chatIds, threadId, unlockProof, userId: authenticatedUserId }));
+
+        if (refused) {
+            return Response.json({ error: "File not found" }, { headers: { "Content-Type": "application/json" }, status: 404 });
+        }
     }
 
     // Extract config from request body (already validated above)
@@ -2330,6 +2536,9 @@ export const mediaGenerationHttpAction = async (context: HttpActionCtx, request:
                 prompt,
                 // A reply to this prompt: a regenerate lands beside the earlier reply.
                 promptMessageId: messageId as Id<"messages">,
+                // Checked again when the job runs (`chat/reference-recheck.ts`): the ids pair with the URLs by position.
+                referenceCheckedAt: references.length > 0 ? referenceCheckedAt : undefined,
+                referenceIds: references.length > 0 ? referenceIds : undefined,
                 referenceImages,
                 seed,
                 threadId,

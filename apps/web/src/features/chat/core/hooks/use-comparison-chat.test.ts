@@ -301,3 +301,28 @@ describe("useComparisonChat link before the first reply", () => {
         expect(fetch).not.toHaveBeenCalled();
     });
 });
+
+describe("useComparisonChat not-typed mark", () => {
+    const bodies = (): Record<string, unknown>[] =>
+        vi.mocked(fetch).mock.calls.map(([, init]) => JSON.parse(String((init as RequestInit | undefined)?.body)) as Record<string, unknown>);
+
+    it("names the draft's origin in every column's request, and nothing for the owner's own words", async () => {
+        const { result } = renderHook(() => useComparisonChat({ jwtToken: "jwt" }));
+
+        await act(async () => {
+            await result.current.sendComparisonMessage("from a link", ["model-a", "model-b"], undefined, "promptLink");
+        });
+
+        expect(bodies().map((body) => body.draftFrom)).toStrictEqual(["promptLink", "promptLink"]);
+
+        vi.mocked(fetch).mockClear();
+
+        await act(async () => {
+            await result.current.sendToExistingChildren("a follow-up", [{ model: "model-a", threadId: "child-a" }], undefined, "shellLink");
+            await result.current.sendToExistingChildren("my own words", [{ model: "model-a", threadId: "child-a" }]);
+        });
+
+        expect(bodies()[0]).toMatchObject({ draftFrom: "shellLink" });
+        expect(bodies()[1]).not.toHaveProperty("draftFrom");
+    });
+});

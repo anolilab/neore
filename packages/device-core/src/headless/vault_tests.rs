@@ -1,5 +1,5 @@
 use super::*;
-use crate::acp_install::commit_tests::Scratch;
+use crate::test_dir::TestDir;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -52,13 +52,8 @@ impl Keychain for FakeKeychain {
 }
 
 /// A path under the system temp folder that is removed, with whatever is in it, when the test ends.
-pub(in crate::headless) fn scratch(label: &str) -> Scratch {
-    let dir = std::env::temp_dir().join(format!("neore-host-vault-{label}-{}", std::process::id()));
-
-    let _ = fs::remove_dir_all(&dir);
-    let _ = fs::remove_file(&dir);
-
-    Scratch(dir)
+pub(in crate::headless) fn scratch(label: &str) -> TestDir {
+    TestDir::at(&format!("host-vault-{label}"))
 }
 
 const SECRET: &str = concat!(

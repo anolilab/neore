@@ -118,7 +118,12 @@ describe("a project of an organization the caller belongs to", () => {
             async (ctx: any) => await ctx.db.insert("projects", { context: "Ownerless notes", createdAt: 0, organizationId: ORG, title: "p" }),
         )) as string;
         const memberId = await join(MEMBER);
-        const read = async () => await harness.run(async (ctx: any) => await ctx.runQuery(getProjectContextForRun as never, { projectId, userId: MEMBER }));
+        const read = async () =>
+            (
+                (await harness.run(async (ctx: any) => await ctx.runQuery(getProjectContextForRun as never, { projectId, userId: MEMBER }))) as {
+                    text: string;
+                } | null
+            )?.text ?? null;
 
         await expect(create(MEMBER, projectId)).resolves.toBeDefined();
         expect(await read()).toBe("Ownerless notes");
@@ -134,7 +139,8 @@ describe("a project of an organization the caller belongs to", () => {
         await join(MEMBER);
 
         const read = async (userId: string) =>
-            await harness.run(async (ctx: any) => await ctx.runQuery(getProjectContextForRun as never, { projectId, userId }));
+            ((await harness.run(async (ctx: any) => await ctx.runQuery(getProjectContextForRun as never, { projectId, userId }))) as { text: string } | null)
+                ?.text ?? null;
 
         expect(await read(MEMBER)).toBe("Org notes");
         expect(await read(STRANGER)).toBeNull();

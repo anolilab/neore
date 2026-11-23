@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { claimKey } from "../lib/claim-once";
 import { createRatelimit } from "../lib/rate-limiter";
 import schema from "../schema";
-import { chargeDailyUnit, DAILY_CHARGE_SCOPE } from "./daily-charge";
+import { chargeDailyUnit, DAILY_CHARGE_SCOPE, dailyUnitAvailable } from "./daily-charge";
 
 const { orgs, users } = vi.hoisted(() => {
     return {
@@ -61,6 +61,56 @@ afterEach(() => {
     harness.close();
     users.clear();
     orgs.clear();
+});
+
+describe("dailyUnitAvailable", () => {
+    const available = async (userId: string, requestId?: string): Promise<boolean> =>
+        await harness.run(async (ctx: any) => await ctx.runMutation(dailyUnitAvailable, { kind: "Text", requestId, userId }));
+
+    it("says a unit is left while the quota has one, and takes none", async () => {
+        users.set("u1", {});
+
+        const before = await remaining("chat/dailyText:free", "u1");
+
+        await expect(available("u1")).resolves.toBe(true);
+        expect(await remaining("chat/dailyText:free", "u1")).toBe(before);
+    });
+
+    it("says none is left once the quota is spent", async () => {
+        users.set("u1", {});
+
+        let spent = false;
+
+        for (let attempt = 0; attempt < 500 && !spent; attempt += 1) {
+            spent = !(await charge({ kind: "Text", userId: "u1" }));
+        }
+
+        expect(spent).toBe(true);
+        await expect(available("u1")).resolves.toBe(false);
+    });
+
+    it("says a reply already charged is still available once the quota is spent, and a reply not yet charged is not", async () => {
+        users.set("u1", {});
+
+        await expect(charge({ kind: "Text", requestId: "reply-1", userId: "u1" })).resolves.toBe(true);
+
+        let spent = false;
+
+        for (let attempt = 0; attempt < 500 && !spent; attempt += 1) {
+            spent = !(await charge({ kind: "Text", userId: "u1" }));
+        }
+
+        expect(spent).toBe(true);
+        await expect(available("u1", "reply-1")).resolves.toBe(true);
+        await expect(available("u1", "reply-2")).resolves.toBe(false);
+    });
+
+    it("refuses a user who no longer exists, and exempts an admin", async () => {
+        users.set("admin", { role: "admin" });
+
+        await expect(available("gone")).resolves.toBe(false);
+        await expect(available("admin")).resolves.toBe(true);
+    });
 });
 
 describe("chargeDailyUnit", () => {

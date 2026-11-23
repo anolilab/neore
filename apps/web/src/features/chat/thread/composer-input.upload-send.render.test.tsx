@@ -64,6 +64,7 @@ vi.mock("@/features/chat/core/context/chat-context", () => {
         useChatActions: () => {
             return { cancelStream: vi.fn(), jwtToken: "", sendMessage: harness.sendMessage };
         },
+        useChatIsRunning: () => false,
         useChatIsStreaming: () => {
             return { isStreaming: harness.isStreaming, sseStreamState: null };
         },
@@ -262,7 +263,9 @@ describe("ComposerInput send during an upload", () => {
         useChatUIStore.getState().updateAttachment(id, { fileId: "file-1", progress: 100, status: "complete" });
 
         await waitFor(() => {
-            expect(harness.sendMessage).toHaveBeenCalledWith("see notes", [expect.objectContaining({ fileId: "file-1", id, status: "complete" })]);
+            expect(harness.sendMessage).toHaveBeenCalledWith("see notes", [expect.objectContaining({ fileId: "file-1", id, status: "complete" })], {
+                draftFrom: undefined,
+            });
         });
         expect(sendState()).toBe("ready");
     });
@@ -297,7 +300,9 @@ describe("ComposerInput send during an upload", () => {
         await waitFor(() => {
             expect(harness.sendMessage).toHaveBeenCalledTimes(1);
         });
-        expect(harness.sendMessage).toHaveBeenCalledWith("see notes", [expect.objectContaining({ fileId: "file-1", id, status: "complete" })]);
+        expect(harness.sendMessage).toHaveBeenCalledWith("see notes", [expect.objectContaining({ fileId: "file-1", id, status: "complete" })], {
+            draftFrom: undefined,
+        });
         expect(harness.showInfo).not.toHaveBeenCalled();
     });
 
@@ -380,7 +385,7 @@ describe("ComposerInput send during an upload", () => {
         await waitFor(() => {
             expect(harness.sendMessage).toHaveBeenCalledTimes(1);
         });
-        expect(harness.sendMessage).toHaveBeenCalledWith("", [expect.objectContaining({ fileId: "file-text", status: "complete" })]);
+        expect(harness.sendMessage).toHaveBeenCalledWith("", [expect.objectContaining({ fileId: "file-text", status: "complete" })], { draftFrom: undefined });
         expect(harness.showInfo).not.toHaveBeenCalled();
     });
 
@@ -424,6 +429,37 @@ describe("ComposerInput send during an upload", () => {
         });
     });
 
+    it.each([
+        ["more text", "see notes and more"],
+        ["the whole text deleted", ""],
+    ])("keeps the draft and sends nothing when it is edited (%s) while a conversion uploads", async (_name, edited) => {
+        let finish = (): void => {};
+
+        harness.upload.mockImplementation(
+            async ({ file }) =>
+                await new Promise((resolve) => {
+                    finish = () => resolve({ file, metadata: { fileId: "file-text" }, name: file.name });
+                }),
+        );
+
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Convert" }));
+        pressSend();
+
+        act(() => {
+            useChatUIStore.getState().setComposerText(edited);
+        });
+        act(() => {
+            finish();
+        });
+
+        await waitFor(() => {
+            expect(harness.showInfo).toHaveBeenCalledWith(editedMessage);
+        });
+        expect(useChatUIStore.getState().composerText).toBe(edited);
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+    });
+
     it("sends only once, however often send is pressed while waiting", async () => {
         const id = addUpload("uploading");
 
@@ -465,7 +501,7 @@ describe("ComposerInput send during an upload", () => {
         useChatUIStore.getState().removeAttachment(id);
         pressSend();
 
-        expect(harness.sendMessage).toHaveBeenCalledWith("see notes", []);
+        expect(harness.sendMessage).toHaveBeenCalledWith("see notes", [], { draftFrom: undefined });
     });
 
     it("ends the wait, sends nothing and says so when a file still uploading is removed", async () => {

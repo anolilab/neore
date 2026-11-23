@@ -4,7 +4,7 @@
  * - GET  /internal/admin/tier-pools           — read current snapshot
  * - POST /internal/admin/tier-pools/recompute — force recompute now (bypass cron)
  *
- * Both require HMAC + the caller's adminUserId to appear in the
+ * Both are served only to the backend's service binding (`internalAuth`), and the caller's adminUserId must appear in the
  * GATEWAY_ADMIN_USER_IDS env allowlist.
  */
 import { OpenAPIHono } from "@hono/zod-openapi";
@@ -15,29 +15,9 @@ import { internalAuth } from "../../middleware/auth.js";
 import { GATEWAY_MODELS } from "../../models.js";
 import type { PersistedPools } from "../../routing/tier-assignment.js";
 import { recomputeTierPools, TIER_POOLS_KV_KEY } from "../../routing/tier-assignment.js";
+import { requireAdmin } from "./require-admin.js";
 
 const adminTierPoolsRouter = new OpenAPIHono<HonoEnv>();
-
-const requireAdmin = (env: { GATEWAY_ADMIN_USER_IDS?: string }, adminUserId: string | undefined): { ok: true } | { ok: false; reason: string } => {
-    const allowlist = (env.GATEWAY_ADMIN_USER_IDS ?? "")
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
-
-    if (allowlist.length === 0) {
-        return { ok: false, reason: "Admin endpoints are disabled (GATEWAY_ADMIN_USER_IDS not configured)" };
-    }
-
-    if (!adminUserId) {
-        return { ok: false, reason: "Missing adminUserId" };
-    }
-
-    if (!allowlist.includes(adminUserId)) {
-        return { ok: false, reason: "User is not in admin allowlist" };
-    }
-
-    return { ok: true };
-};
 
 const responseSchema = z.record(z.string(), z.unknown());
 

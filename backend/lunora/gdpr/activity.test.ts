@@ -75,7 +75,7 @@ describe("account deletion of activity rows", () => {
 describe("collectActivityForExport", () => {
     it("exports the user's delegations with task and result, and collections — nobody else's", async () => {
         await harness.run(async (ctx: any) => {
-            await ctx.db.insert("subAgentRuns", runRow(A, 1, "succeeded"));
+            await ctx.db.insert("subAgentRuns", { ...runRow(A, 1, "succeeded"), role: { instructions: "Check auth.", model: "m", name: "review" } });
             await ctx.db.insert("knowledgeCollections", { createdAt: 0, name: "Handbook", updatedAt: 0, userId: A });
             await ctx.db.insert("knowledgeCollections", { createdAt: 0, name: "Not mine", updatedAt: 0, userId: B });
         });
@@ -83,7 +83,14 @@ describe("collectActivityForExport", () => {
         const exported = (await harness.run(async (ctx: any) => await ctx.runQuery(collectActivityForExport, { userId: A }))) as any;
 
         expect(exported.usageDaily).toBeUndefined();
-        expect(exported.subAgentRuns).toEqual([expect.objectContaining({ result: "answer", status: "succeeded", task: "task 0" })]);
+        expect(exported.subAgentRuns).toEqual([
+            expect.objectContaining({
+                result: "answer",
+                role: { instructions: "Check auth.", model: "m", name: "review" },
+                status: "succeeded",
+                task: "task 0",
+            }),
+        ]);
         expect(exported.knowledgeCollections.map((collection: { name: string }) => collection.name)).toEqual(["Handbook"]);
     });
 });

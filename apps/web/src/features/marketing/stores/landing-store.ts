@@ -6,6 +6,8 @@
  * Manages composer text, sticky bar visibility, and expanded state.
  */
 
+import type { DraftFrom } from "@neore/backend/not-typed-text";
+import { parseNotTypedDraft } from "@neore/backend/not-typed-text";
 import { create } from "zustand";
 import { devtools, subscribeWithSelector } from "zustand/middleware";
 
@@ -13,6 +15,44 @@ import { devtools, subscribeWithSelector } from "zustand/middleware";
  * SessionStorage key for landing page initial message handoff to chat
  */
 export const LANDING_MESSAGE_KEY = "landing-initial-message";
+
+/** Beside it: where the handed-off text came from when the person did not type it (`features/chat/core/utils/draft-origin.ts`). */
+export const LANDING_MESSAGE_FROM_KEY = "landing-initial-message-from";
+
+/**
+ * Hands `text` to the new chat's composer (`/chat?initialMessage=true`). `from` marks text the person did not type (forwarded
+ * messages, an onboarding template); without it a mark left by an earlier hand-off is cleared. Throws when sessionStorage is
+ * unavailable.
+ */
+export const handOffLandingMessage = (text: string, from?: DraftFrom): void => {
+    // The earlier text goes before its mark, and the new mark goes in before the new text: a write that fails part way
+    // (a full quota) leaves no text, never text without its mark.
+    sessionStorage.removeItem(LANDING_MESSAGE_KEY);
+
+    if (from === undefined) {
+        sessionStorage.removeItem(LANDING_MESSAGE_FROM_KEY);
+    } else {
+        sessionStorage.setItem(LANDING_MESSAGE_FROM_KEY, from);
+    }
+
+    sessionStorage.setItem(LANDING_MESSAGE_KEY, text);
+};
+
+/** Takes the hand-off (`handOffLandingMessage`) out of sessionStorage: its text and mark, an unknown mark read as a link's (fail closed). */
+export const takeLandingMessage = (): { from: DraftFrom | undefined; text: string } | undefined => {
+    const text = sessionStorage.getItem(LANDING_MESSAGE_KEY);
+
+    if (!text) {
+        return undefined;
+    }
+
+    const from = parseNotTypedDraft(sessionStorage.getItem(LANDING_MESSAGE_FROM_KEY) ?? undefined);
+
+    sessionStorage.removeItem(LANDING_MESSAGE_KEY);
+    sessionStorage.removeItem(LANDING_MESSAGE_FROM_KEY);
+
+    return { from: from === null ? "promptLink" : from, text };
+};
 
 interface LandingStore {
     // Composer state

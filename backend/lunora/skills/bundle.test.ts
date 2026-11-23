@@ -14,7 +14,7 @@ import { schemaWithShardedTables } from "../lib/test-schema";
 import type { Bundle, BundleItem } from "./bundle-format";
 import { buildBundleMarkdown } from "./bundle-format";
 import { isSkillUnavailable } from "./bundle";
-import { isSelectableTextModel } from "./builder-logic";
+import { isSelectableTextModel } from "@neore/ai/models";
 import { getEnabledSkillsForSystemPrompt } from "./executor";
 
 const RE_1 = /alpha-2/;

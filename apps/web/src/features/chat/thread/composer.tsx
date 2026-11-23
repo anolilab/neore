@@ -31,7 +31,6 @@ import type { FC, RefObject } from "react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
-import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import ComposerAskAside from "@/features/chat/aside/composer-ask-aside";
 import BrowserLiveView from "@/features/chat/browser-live-view/browser-live-view";
 import CompactionChip from "@/features/chat/compaction/compaction-chip";
@@ -51,6 +50,8 @@ import type {
     VideoGenerationSettings,
 } from "@/features/chat/core/stores/model-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
+import type { DraftOrigin } from "@/features/chat/core/utils/draft-origin";
+import { markPrefilledDraft } from "@/features/chat/core/utils/draft-origin";
 import { getValidThreadId } from "@/features/chat/core/utils/thread-id";
 import ComposerGoal from "@/features/chat/goal/composer-goal";
 import HostComposer from "@/features/chat/host/host-composer";
@@ -115,7 +116,7 @@ interface ComposerProps {
      * Override submit to fan-out to all child threads (used by comparison parent).
      * When set, normal sendMessage/sendComparisonMessage are bypassed.
      */
-    onSubmitOverride?: (text: string, attachments: PendingAttachment[]) => Promise<void>;
+    onSubmitOverride?: (text: string, attachments: PendingAttachment[], draftFrom?: DraftOrigin) => Promise<void>;
     /** Custom placeholder for the text input (e.g. "Ask 2 models anything...") */
     placeholder?: string;
     /** A split pane's composer remounts on every focus change, so its initial message is written once per chat. */
@@ -299,9 +300,11 @@ const ComposerInputWrapper: FC<{
     inputRef?: RefObject<ComposerInputRef | null>;
     onOpenDraw?: () => void;
     onSubmit: () => void;
-    onSubmitOverride?: (text: string, attachments: PendingAttachment[]) => Promise<void>;
+    onSubmitOverride?: (text: string, attachments: PendingAttachment[], draftFrom?: DraftOrigin) => Promise<void>;
     placeholder?: string;
-}> = ({ compact, disabled, inputRef, onOpenDraw, onSubmit, onSubmitOverride, placeholder }) => {
+    /** Whether the suggested next prompt may show here: text chats only. */
+    suggestPrompt?: boolean;
+}> = ({ compact, disabled, inputRef, onOpenDraw, onSubmit, onSubmitOverride, placeholder, suggestPrompt = true }) => {
     const cyclingPlaceholder = useCyclingPlaceholder();
 
     return (
@@ -316,6 +319,7 @@ const ComposerInputWrapper: FC<{
             onSubmitOverride={onSubmitOverride}
             placeholder={placeholder ?? cyclingPlaceholder}
             ref={inputRef}
+            suggestPrompt={suggestPrompt}
         />
     );
 };
@@ -350,7 +354,6 @@ const Composer: FC<ComposerProps> = ({
 
     // favoriteModelIds is handled by the tiptap editor internally
     useFavoriteModels();
-    const { data: userSettings } = useUserSettings();
     const { isAnonymous } = useIsAnonymous();
     const currentModel = useCurrentModel();
     const flaggedModels = useFeatureFlaggedModels();
@@ -453,7 +456,6 @@ const Composer: FC<ComposerProps> = ({
         return mode;
     }, [isNewThread, threadId, storeNewThreadMode, storeUserChangedMode, storeThreadMode, thread?.mode]);
 
-    const isEnableFollowupSuggestions = userSettings?.enableFollowupSuggestions !== false;
     const prefersReducedMotion = useReducedMotion();
 
     // Get model mode and default models (memoized together since they share the same data source)
@@ -594,6 +596,9 @@ const Composer: FC<ComposerProps> = ({
                 // Untouched, it is not stored over the chat's saved draft (`stored-drafts.ts`).
                 draftOwnership.prefill = initialMessage;
                 ui.setComposerText(initialMessage);
+
+                // A link's prefill is not the person's own words; typed text handed off clears the earlier draft's mark.
+                markPrefilledDraft(threadId, initialMessage);
             }
 
             ui.setAppliedInitialMessageKey(key);
@@ -707,9 +712,9 @@ const Composer: FC<ComposerProps> = ({
                             {!minimal && isEmpty && <ThreadWelcomeSuggestions className="-mb-5 pb-5.5" key={threadId} />}
 
                             {/* Followup suggestions - only for text mode, hide while streaming or regenerating */}
-                            {!minimal && isEnableFollowupSuggestions && !isImageModel && !isVideoModel && !isAudioModel && !isStreaming && !isSubmitting && (
-                                <ComposerFollowupSuggestions />
-                            )}
+                            {/* The owner's setting decides whether a thread has suggestions (the cache is written only when it is on), so a viewer's own
+                                setting does not hide a shared thread's panel. */}
+                            {!minimal && !isImageModel && !isVideoModel && !isAudioModel && !isStreaming && !isSubmitting && <ComposerFollowupSuggestions />}
 
                             {/* Project hint for a new thread's first message - not in a comparison fan-out, which files nothing */}
                             {!minimal && !onSubmitOverride && !isStreaming && !isSubmitting && <ComposerProjectHint />}
@@ -792,7 +797,7 @@ const Composer: FC<ComposerProps> = ({
                                 )}
                             </AnimatePresence>
                             {/* Run until done - a goal needs an account and a text message */}
-                            {composerMode === "text" && !isAnonymous && <ComposerGoal disabled={isSSEStreaming} />}
+                            {composerMode === "text" && !isAnonymous && <ComposerGoal disabled={isSSEStreaming} threadId={validThreadId} />}
                             {/* MCP server selector - only for text mode */}
                             <AnimatePresence initial={animateEntrance} mode="popLayout">
                                 {composerMode === "text" && (
@@ -854,6 +859,7 @@ const Composer: FC<ComposerProps> = ({
                         onSubmit={() => {}}
                         onSubmitOverride={onSubmitOverride}
                         placeholder={placeholder}
+                        suggestPrompt={composerMode === "text" && !minimal}
                     />
                 </ComposerBase>
             </div>

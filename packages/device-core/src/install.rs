@@ -401,13 +401,12 @@ pub fn prune(remote: &Remote, root: &Root) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_dir::TestDir;
 
     const SHA: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
-    fn temporary(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("neore-bundle-{name}-{}", std::process::id()));
-
-        let _ = fs::remove_dir_all(&dir);
+    fn temporary(name: &str) -> TestDir {
+        let dir = TestDir::at(&format!("bundle-{name}"));
         fs::create_dir_all(&dir).unwrap();
 
         dir
@@ -526,8 +525,7 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn pruning_removes_other_installed_versions_and_leaves_every_other_folder() {
-        let dir = std::env::temp_dir().join(format!("neore-prune-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
+        let dir = TestDir::at("prune");
 
         for (folder, binary) in [
             (HOST_VERSION, true),
@@ -563,8 +561,7 @@ mod tests {
         use std::io::Write;
         use std::process::Stdio;
 
-        let dir = std::env::temp_dir().join(format!("neore-upload-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
+        let dir = TestDir::at("upload");
         fs::create_dir_all(dir.join(HOST_VERSION).join("neore-host")).unwrap();
 
         let bytes = b"a host binary";

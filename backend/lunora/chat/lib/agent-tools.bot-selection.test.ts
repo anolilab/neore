@@ -31,11 +31,16 @@ const DOCS = mcpServerKey(DOCS_URL) ?? "";
 const connected = vi.hoisted(() => [] as string[][]);
 /** Of the user's connectors (gmail, slack), the ones each run set up: `null` when it set up every one. */
 const connectorsSetUp = vi.hoisted(() => [] as (string[] | null)[]);
+/** The clients each `closeMCPClients` call closed. */
+const closed = vi.hoisted(() => [] as unknown[][]);
 /** Per run, the names of the saved servers `withMcpServerGrants` may obtain a token for. */
 const signInsUsed = vi.hoisted(() => [] as string[][]);
 
 vi.mock("./mcp-tools", () => {
     return {
+        closeMCPClients: async (clients: unknown[]) => {
+            closed.push(clients);
+        },
         getMCPTools: async (servers: { name: string; url: string }[]) => {
             connected.push(servers.map((server) => server.name));
 
@@ -52,7 +57,7 @@ vi.mock("./mcp-tools", () => {
             );
 
             return {
-                clients: [],
+                clients: servers.map((server) => `client:${server.name}`),
                 descriptors,
                 errors: [],
                 tools: Object.fromEntries([...descriptors.keys()].map((name) => [name, fakeTool(name)])),
@@ -90,6 +95,10 @@ let selection: "fail" | { allow?: string[]; exclude: string[] } | null;
 let botOwner: string;
 let ownerServerKeys: string[];
 let lookups: unknown[];
+/** The organization's cap on tools (`auth_organization_policy:getPermissionCapQuery`). */
+let cap: "ask" | "auto" | "off";
+/** Per-tool overrides beyond the server tools' `auto`. */
+let overrides: Record<string, string>;
 /** Saved servers beyond docs and mail. */
 let extraServers: { enabled: boolean; name: string; protocol: string; url: string }[];
 
@@ -103,6 +112,9 @@ const ctx = () =>
                         { enabled: true, name: "mail", protocol: "http", url: MAIL_URL },
                         ...extraServers,
                     ];
+                }
+                case "auth_organization_policy:getPermissionCapQuery": {
+                    return cap;
                 }
                 case "bots_functions:getBotToolSelectionForRun": {
                     lookups.push(args);
@@ -121,7 +133,7 @@ const ctx = () =>
                 }
                 // Every server tool runs unasked, so a headless run keeps it too.
                 case "chat_tool_permissions:getToolPermissionsQuery": {
-                    return { "mcp:Docs (renamed):read": "auto", "mcp:Docs (renamed):search": "auto", "mcp:mail:send": "auto" };
+                    return { "mcp:Docs (renamed):read": "auto", "mcp:Docs (renamed):search": "auto", "mcp:mail:send": "auto", ...overrides };
                 }
                 case "source_control_pr_agent:linkedPullRequestsOfThread": {
                     return { complete: true, links: [] };
@@ -157,9 +169,12 @@ const unattendedForBot = async (): Promise<string[]> => {
 
 beforeEach(() => {
     connected.length = 0;
+    closed.length = 0;
     connectorsSetUp.length = 0;
     signInsUsed.length = 0;
     extraServers = [];
+    cap = "auto";
+    overrides = {};
     botOwner = "owner";
     ownerServerKeys = [];
     lookups = [];
@@ -301,5 +316,66 @@ describe("buildAgentTools with a bot's tool selection", () => {
 
         expect(Object.keys(tools)).toHaveLength(5);
         expect(lookups).toStrictEqual([]);
+    });
+});
+
+describe("buildAgentTools with a project's instruction files", () => {
+    const deploy = { content: "Run the deploy script.", description: "How to deploy", id: "deploy-1", title: "Deploy" };
+    const offers = async (options: Partial<Parameters<typeof buildAgentTools>[1]> = {}): Promise<boolean> => {
+        const { tools } = await buildAgentTools(ctx(), {
+            instructions: [deploy],
+            model: "m",
+            organizationId: "org-1",
+            searchMode: "web",
+            threadId: "thread-1",
+            userId: "owner",
+            ...options,
+        });
+
+        return Object.hasOwn(tools, "instruction_read");
+    };
+
+    it("offers instruction_read for listed files, and removes it as every other tool is removed", async () => {
+        expect(await offers()).toBe(true);
+        expect(await offers({ instructions: [] })).toBe(false);
+        expect(await offers({ skillTools: { disabledTools: ["instruction_read"] } })).toBe(false);
+
+        // A bot's pick of other tools keeps the project's files; only naming it, or no tools at all, removes it.
+        selection = { allow: ["webSearch"], exclude: [] };
+
+        expect(await offers()).toBe(true);
+
+        selection = { exclude: ["instruction_read"] };
+
+        expect(await offers()).toBe(false);
+
+        selection = { allow: [], exclude: [] };
+
+        expect(await offers()).toBe(false);
+
+        selection = "fail";
+
+        expect(await offers()).toBe(false);
+
+        selection = null;
+        overrides = { "builtin:instruction_read": "off" };
+
+        expect(await offers()).toBe(false);
+
+        overrides = {};
+        // Under an `ask` cap a chat asks before each read, and a headless run that cannot pause has no tools.
+        cap = "ask";
+
+        expect(await offers()).toBe(true);
+        expect(await offers({ headless: true })).toBe(false);
+
+        cap = "off";
+
+        expect(await offers()).toBe(false);
+    });
+
+    it("closes the servers it connected to when the files cannot be read, before it fails", async () => {
+        await expect(offers({ instructions: Promise.reject(new Error("read failed")) })).rejects.toThrow("read failed");
+        expect(closed).toStrictEqual([["client:Docs (renamed)", "client:mail"]]);
     });
 });

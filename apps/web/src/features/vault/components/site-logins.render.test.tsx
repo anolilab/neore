@@ -16,6 +16,7 @@ const SITE = "https://example.com";
 const USERNAME_TEXT = /ada@example\.com/u;
 const CHOSEN_BOTS_TEXT = /the bots you chose/u;
 const OWN_CHATS_TEXT = /Your own chats only/u;
+const LEAVE_EMPTY_TEXT = /Leave empty to start at the site's front page/u;
 
 const harness = vi.hoisted(() => {
     return {
@@ -24,7 +25,16 @@ const harness = vi.hoisted(() => {
         deleteSiteLogin: vi.fn(),
         // Set while an admin acts as the signed-in user: the session's `impersonatedBy` mark.
         impersonatedBy: undefined as string | undefined,
-        logins: [] as { hasPassword: true; id: string; label?: string; site: string; teammateIds: string[]; updatedAt: number; username: string }[],
+        logins: [] as {
+            hasPassword: true;
+            id: string;
+            label?: string;
+            signInUrl?: string;
+            site: string;
+            teammateIds: string[];
+            updatedAt: number;
+            username: string;
+        }[],
         loginsFailed: false,
         loginsPending: false,
         saveSiteLogin: vi.fn(),
@@ -603,6 +613,33 @@ describe("SiteLogins", () => {
         expect(harness.saveSiteLogin.mock.calls[0]?.[0]).toMatchObject({ teammateIds: ["bot-0"] });
     });
 
+    it("shows and prefills a login's sign-in page, sends it cleared as empty, and names the rule when the server refuses one", async () => {
+        const user = userEvent.setup();
+
+        harness.logins = [{ ...savedLogin(), signInUrl: `${SITE}/login` }];
+        harness.saveSiteLogin
+            .mockRejectedValueOnce(Object.assign(new Error("raw server text"), { code: "BAD_REQUEST", data: { code: "SITE_LOGIN_SIGN_IN_PAGE_REFUSED" } }))
+            .mockResolvedValue(SAVED);
+        mount();
+
+        await screen.findByText(`Sign-in page: ${SITE}/login`);
+        await user.click(screen.getByRole("button", { name: `Edit login for ${SITE}` }));
+        const field = screen.getByLabelText("Sign-in page (optional)") as HTMLInputElement;
+
+        expect(field.value).toBe(`${SITE}/login`);
+        expect(field.getAttribute("aria-describedby")).toBe(screen.getByText(LEAVE_EMPTY_TEXT).id);
+
+        await user.clear(field);
+        await user.type(field, "https://other.example/login");
+        await user.click(screen.getByRole("button", { name: "Save changes" }));
+        await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("must be an https:// address on the same site")));
+
+        await user.clear(field);
+        await user.click(screen.getByRole("button", { name: "Save changes" }));
+        await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledTimes(2));
+        expect(harness.saveSiteLogin.mock.calls[1]?.[0]).toMatchObject({ loginId: "login-1", signInUrl: "" });
+    });
+
     describe("a login changed elsewhere", () => {
         const changedElsewhere = () => Object.assign(new Error("This login was changed elsewhere"), { code: "CONFLICT", data: { code: "SITE_LOGIN_CHANGED" } });
 
@@ -659,6 +696,37 @@ describe("SiteLogins", () => {
                 teammateIds: ["bot-0"],
                 username: "grace@example.com",
             });
+        });
+
+        it("holds the sign-in page as the server stored it after a save, so a later reload takes a newer one from elsewhere", async () => {
+            const user = userEvent.setup();
+            let finishSave: (value: unknown) => void = () => {};
+            // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+            const heldSave = new Promise((resolve) => {
+                finishSave = resolve;
+            });
+
+            harness.logins = [savedLogin()];
+            harness.saveSiteLogin.mockReturnValueOnce(heldSave);
+            mount();
+
+            await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
+            await user.type(screen.getByLabelText("Sign-in page (optional)"), `${SITE}/login#top`);
+            await user.click(screen.getByRole("button", { name: "Save changes" }));
+            await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledOnce());
+            // Another field changes while the save is on its way; the server stores the page without its fragment.
+            await user.type(screen.getByLabelText("Label (optional)"), "Work");
+            finishSave({ id: "login-1", signInUrl: `${SITE}/login`, updatedAt: 2 });
+            await waitFor(() => expect(valueOf("Sign-in page (optional)")).toBe(`${SITE}/login`));
+
+            // Another tab moves the page; the next save here is refused as stale and the form reloads.
+            harness.logins = [{ ...savedLogin(), signInUrl: `${SITE}/sign-in`, updatedAt: 5 }];
+            harness.saveSiteLogin.mockRejectedValueOnce(changedElsewhere());
+            await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+            await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("changed elsewhere and has been reloaded")));
+            expect(valueOf("Sign-in page (optional)")).toBe(`${SITE}/sign-in`);
+            expect(valueOf("Label (optional)")).toBe("Work");
         });
 
         it("keeps a bot unticked here unticked after the reload", async () => {
@@ -736,6 +804,30 @@ describe("SiteLogins", () => {
 
             await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledTimes(2));
             expect(harness.saveSiteLogin.mock.calls[1]?.[0]).toMatchObject({ expectedUpdatedAt: 7 });
+        });
+
+        it("opens an edit right after its own save with what that save wrote, so a cleared page is not brought back by the older row", async () => {
+            const user = userEvent.setup();
+
+            harness.logins = [{ ...savedLogin(), label: "Work", signInUrl: `${SITE}/login` }];
+            harness.saveSiteLogin.mockResolvedValue({ id: "login-1", updatedAt: 7 });
+            mount();
+
+            await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
+            await user.clear(screen.getByLabelText("Sign-in page (optional)"));
+            await user.clear(screen.getByLabelText("Label (optional)"));
+            await user.click(screen.getByRole("button", { name: "Save changes" }));
+            await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Login updated"));
+
+            // The list has not caught up: it still shows the page and label the save just cleared.
+            await user.click(screen.getByRole("button", { name: `Edit login for ${SITE}` }));
+
+            expect(valueOf("Sign-in page (optional)")).toBe("");
+            expect(valueOf("Label (optional)")).toBe("");
+
+            await user.click(screen.getByRole("button", { name: "Save changes" }));
+            await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledTimes(2));
+            expect(harness.saveSiteLogin.mock.calls[1]?.[0]).toMatchObject({ expectedUpdatedAt: 7, signInUrl: "" });
         });
     });
 });

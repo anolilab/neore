@@ -26,6 +26,8 @@ import { toast } from "sonner";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useChatActions, useChatError, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import type { DraftOrigin } from "@/features/chat/core/utils/draft-origin";
+import { composerDraftFrom } from "@/features/chat/core/utils/draft-origin";
 import { joinTranscript } from "@/features/chat/thread/dictation/pcm";
 
 import type { ListenErrorKind, ListenSession } from "./listen";
@@ -88,13 +90,14 @@ const VoiceModeController: FC = () => {
         fail(texts[classifyListenError(error)]);
     });
 
-    const sendUtterance = useEffectEvent(async (text: string) => {
+    // `draftFrom`: the mark of the draft the utterance was joined onto (`draft-origin.ts`); the spoken words alone carry none.
+    const sendUtterance = useEffectEvent(async (text: string, draftFrom: DraftOrigin | undefined) => {
         sendVoiceModeEvent({ text, type: "UTTERANCE" });
         useVoiceModeStore.getState().setBaselineReplyId(latestAssistantId(messages));
         sentThreadRef.current = threadId ?? null;
         useChatUIStore.getState().setComposerText("");
 
-        const sent = await sendMessage(text)
+        const sent = await sendMessage(text, undefined, { draftFrom })
             .then(() => true)
             .catch((error: unknown) => {
                 fail(t`Could not send your message: ${errorText(error)}`);
@@ -161,6 +164,7 @@ const VoiceModeController: FC = () => {
         let disposed = false;
         let session: ListenSession | null = null;
         const base = useChatUIStore.getState().composerText;
+        const baseMark = composerDraftFrom();
         const detector = createUtteranceDetector({
             onTranscript: (text) => {
                 if (text) {
@@ -171,7 +175,7 @@ const VoiceModeController: FC = () => {
             },
             onUtterance: (text) => {
                 void session?.stop();
-                void sendUtterance(joinTranscript(base, text));
+                void sendUtterance(joinTranscript(base, text), baseMark);
             },
         });
 

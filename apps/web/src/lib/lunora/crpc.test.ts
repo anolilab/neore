@@ -1,6 +1,6 @@
 import { connectLiveQueries, forgetAllUnlockProofs, rememberUnlockProof } from "@neore/client-runtime";
 import type { QueryKey } from "@tanstack/react-query";
-import { QueryClient } from "@tanstack/react-query";
+import { onlineManager, QueryClient } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -10,12 +10,13 @@ import { runLunoraAction, useCRPC } from "./crpc";
 const harness = vi.hoisted(() => {
     const client = {
         action: vi.fn(),
+        canQueueOffline: vi.fn((_shardKey?: string) => true),
         getAuthToken: () => null,
-        mutation: vi.fn(),
+        mutation: vi.fn(async () => null),
         onAuthTokenChange: () => () => {},
         onIdentityChange: () => () => {},
         query: vi.fn(async (_reference: unknown, _args: unknown) => "rpc"),
-        setWsToken: () => {},
+        setWsTicket: () => {},
         subscribe: vi.fn(() => () => {}),
     };
 
@@ -30,6 +31,62 @@ vi.mock("@lunora/react", async (importOriginal) => {
 
 afterEach(() => {
     forgetAllUnlockProofs();
+    onlineManager.setOnline(true);
+    harness.client.canQueueOffline.mockReturnValue(true);
+    harness.client.mutation.mockClear();
+});
+
+describe("a mutation sent offline", () => {
+    const send = async (call?: { onlineOnly?: true }): Promise<unknown> => {
+        const { result } = renderHook(() => useCRPC());
+        const options = result.current.auth.functions.setSubAgentRole.mutationOptions(undefined, call);
+
+        return await (options.mutationFn as (args: object) => Promise<unknown>)({ config: null, role: "review" });
+    };
+
+    it("goes to the client at once when the client can queue it", async () => {
+        onlineManager.setOnline(false);
+
+        await send();
+
+        expect(harness.client.mutation).toHaveBeenCalledTimes(1);
+    });
+
+    it("waits for the network when the client cannot queue it yet", async () => {
+        onlineManager.setOnline(false);
+        harness.client.canQueueOffline.mockReturnValue(false);
+
+        const sent = send();
+
+        await Promise.resolve();
+        expect(harness.client.mutation).not.toHaveBeenCalled();
+
+        onlineManager.setOnline(true);
+        await sent;
+
+        expect(harness.client.mutation).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not wait for a sensitive mutation, which the client refuses offline", async () => {
+        onlineManager.setOnline(false);
+        harness.client.canQueueOffline.mockReturnValue(false);
+
+        const { result } = renderHook(() => useCRPC());
+        const options = result.current.chat.request_secret.answerSecretRequest.mutationOptions();
+
+        await (options.mutationFn as (args: object) => Promise<unknown>)({});
+
+        expect(harness.client.mutation).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not wait when the call asks to fail offline", async () => {
+        onlineManager.setOnline(false);
+        harness.client.canQueueOffline.mockReturnValue(false);
+
+        await send({ onlineOnly: true });
+
+        expect(harness.client.mutation).toHaveBeenCalledTimes(1);
+    });
 });
 
 describe("ApiPath (the type NEVER_LIVE is keyed by)", () => {

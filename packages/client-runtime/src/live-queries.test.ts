@@ -60,7 +60,7 @@ const createClient = () => {
                     listener(next);
                 }
             },
-            setWsToken: vi.fn(),
+            setWsTicket: vi.fn(),
             subscribe: vi.fn((reference: never, args: never, onData: OnData, options?: { onError?: OnError }) => {
                 const subscription: FakeSubscription = {
                     args,
@@ -319,7 +319,7 @@ describe(LiveQueryManager, () => {
     });
 
     it("hands the socket a provider that mints a ticket for the current token, never the token itself", async () => {
-        const provider = fake.client.setWsToken.mock.calls[0]![0] as () => Promise<string | undefined>;
+        const provider = fake.client.setWsTicket.mock.calls[0]![0] as () => Promise<string | undefined>;
 
         await expect(provider()).resolves.toBeUndefined();
         expect(mintWsTicket).not.toHaveBeenCalled();
@@ -333,7 +333,7 @@ describe(LiveQueryManager, () => {
     it("mints a fresh ticket on every (re)connect", async () => {
         fake.setToken(jwt("user-1"));
 
-        const provider = fake.client.setWsToken.mock.calls.at(-1)![0] as () => Promise<string | undefined>;
+        const provider = fake.client.setWsTicket.mock.calls.at(-1)![0] as () => Promise<string | undefined>;
 
         await provider();
         await provider();
@@ -345,26 +345,26 @@ describe(LiveQueryManager, () => {
         fake.setToken(jwt("user-1"));
         mintWsTicket.mockRejectedValueOnce(new Error("ws-ticket: 503"));
 
-        const provider = fake.client.setWsToken.mock.calls.at(-1)![0] as () => Promise<string | undefined>;
+        const provider = fake.client.setWsTicket.mock.calls.at(-1)![0] as () => Promise<string | undefined>;
 
         await expect(provider()).rejects.toThrow("503");
     });
 
     it("reconnects the socket when the token's subject changes, not on a refresh", () => {
-        expect(fake.client.setWsToken).toHaveBeenCalledTimes(1);
+        expect(fake.client.setWsTicket).toHaveBeenCalledTimes(1);
 
         fake.setToken(jwt("user-1"));
 
-        expect(fake.client.setWsToken).toHaveBeenCalledTimes(2);
+        expect(fake.client.setWsTicket).toHaveBeenCalledTimes(2);
 
         fake.setToken(jwt("user-1", 2));
 
-        expect(fake.client.setWsToken).toHaveBeenCalledTimes(2);
+        expect(fake.client.setWsTicket).toHaveBeenCalledTimes(2);
 
         fake.setToken(jwt("user-2"));
         fake.setToken(null);
 
-        expect(fake.client.setWsToken).toHaveBeenCalledTimes(4);
+        expect(fake.client.setWsTicket).toHaveBeenCalledTimes(4);
     });
 
     it("drops the thread list when another account's token lands, not on the server-rendered first token or a refresh", () => {
@@ -564,7 +564,7 @@ describe(LiveQueryManager, () => {
         // The sockets are swapped before the read subscribes again: no new subscription exists yet when they close.
         const subscriptionsAtSwap: number[] = [];
 
-        fake.client.setWsToken.mockImplementation(() => {
+        fake.client.setWsTicket.mockImplementation(() => {
             subscriptionsAtSwap.push(fake.subscriptions.length);
         });
         fake.setToken(jwt("bob"));
@@ -630,13 +630,13 @@ describe(LiveQueryManager, () => {
         const threadKey = key("chat_functions:getThread", { threadId: "t1" });
 
         queryClient.setQueryData(threadKey, { title: "cookie user's" });
-        const reconnects = fake.client.setWsToken.mock.calls.length;
+        const reconnects = fake.client.setWsTicket.mock.calls.length;
 
         fake.changeIdentity();
 
         expect(queryClient.getQueryData(threadKey)).toBeUndefined();
         // The sockets reconnect under the current cookie before the reads subscribe again.
-        expect(fake.client.setWsToken).toHaveBeenCalledTimes(reconnects + 1);
+        expect(fake.client.setWsTicket).toHaveBeenCalledTimes(reconnects + 1);
 
         // With a token the subject decides: Lunora reports a refresh without a user id as an identity change too.
         fake.setToken(jwt("alice"));
