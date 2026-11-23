@@ -146,7 +146,12 @@ export const listSharedPinRoutesForExport = internalQuery
     )
     .query(async ({ args, ctx: context }) => {
         // One bounded page per call: the export reads the next page until the last, so no result carries every route at once.
-        const result = await context.db.sharedPinRoutes.findMany({ cursor: args.cursor ?? undefined, limit: PIN_EXPORT_PAGE, where: { userId: args.userId } });
+        const result = await context.db.sharedPinRoutes.findMany({
+            consistency: "primary",
+            cursor: args.cursor ?? undefined,
+            limit: PIN_EXPORT_PAGE,
+            where: { userId: args.userId },
+        });
 
         return {
             continueCursor: result.continueCursor ?? null,

@@ -17,7 +17,7 @@ const eraseSharedPinRoutesFor = async (ctx: MutationCtx, userId: string): Promis
         let cursor: string | undefined;
 
         do {
-            const { continueCursor, isDone, page } = await ctx.db.sharedPinRoutes.findMany({ cursor, limit: 500, where });
+            const { continueCursor, isDone, page } = await ctx.db.sharedPinRoutes.findMany({ consistency: "primary", cursor, limit: 500, where });
 
             for (const route of page) {
                 await ctx.db.delete("sharedPinRoutes", route._id);
