@@ -95,7 +95,8 @@ const perThread = (streaming?: string) => [
             }) as never,
     ),
     lunora(api.chat.functions.getThreadUIMessages, ({ threadId }) => pageOf(ownedAll(MESSAGES[threadId] ?? CONVERSATION)) as never),
-    lunora(api.agent.documents.getDocument, () => ownedBy(LAUNCH_NOTES)),
+    // The server says whether the signed-in author may save (`canEdit`); the story's author may, so the editor shows.
+    lunora(api.agent.documents.getDocument, () => Object.assign(ownedBy(LAUNCH_NOTES), { canEdit: true })),
     lunora(api.agent.documents.updateDocument, documentUpdate),
     lunora(api.chat.streaming.getActiveStreamForThread, ({ threadId }) =>
         streaming !== undefined && threadId === streaming ? ({ streamId: STREAM_ID } as never) : null,
