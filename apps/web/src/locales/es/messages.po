@@ -1672,15 +1672,15 @@ msgstr "N.º 1 en OpenRouter por uso de tokens"
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, one {# favorito} other {# favoritos}}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:240
+#: src/features/settings/components/chat/agent-settings.tsx:309
 msgid "+ Data Source: ~2,700 tokens (+100)"
 msgstr "+ Fuente de datos: ~2.700 tokens (+100)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:239
+#: src/features/settings/components/chat/agent-settings.tsx:308
 msgid "+ Knowledge: ~2,600 tokens (+100)"
 msgstr "+ Conocimiento: ~2.600 tokens (+100)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:238
+#: src/features/settings/components/chat/agent-settings.tsx:307
 msgid "+ Task Planning: ~2,500 tokens (+200)"
 msgstr "+ Planificación de tareas: ~2.500 tokens (+200)"
 
@@ -3198,11 +3198,11 @@ msgstr "Respuestas del agente"
 msgid "Agent builder"
 msgstr "Creador de agentes"
 
-#: src/features/settings/components/chat/agent-settings.tsx:67
+#: src/features/settings/components/chat/agent-settings.tsx:110
 msgid "Agent Capabilities"
 msgstr "Capacidades del agente"
 
-#: src/features/settings/components/chat/agent-settings.tsx:84
+#: src/features/settings/components/chat/agent-settings.tsx:127
 #: src/features/settings/lib/settings-keywords.ts:56
 #: src/features/settings/lib/settings-keywords.ts:57
 #: src/features/settings/lib/settings-keywords.ts:58
@@ -3214,7 +3214,7 @@ msgstr "Módulos del agente"
 msgid "Agent options"
 msgstr "Opciones del agente"
 
-#: src/features/settings/components/chat/agent-settings.tsx:58
+#: src/features/settings/components/chat/agent-settings.tsx:101
 msgid "Agent settings updated"
 msgstr "Configuración del agente actualizada"
 
@@ -4173,7 +4173,7 @@ msgstr "Aplica un estilo artístico a cualquier imagen"
 msgid "Apply artistic style"
 msgstr "Aplicar estilo artístico"
 
-#: src/features/settings/components/chat/agent-settings.tsx:115
+#: src/features/settings/components/chat/agent-settings.tsx:158
 msgid "Apply best practices, patterns, and domain-specific guidelines. Enhances responses with expert knowledge and proven approaches."
 msgstr "Aplica buenas prácticas, patrones y pautas específicas del dominio. Enriquece las respuestas con conocimiento experto y enfoques probados."
 
@@ -4747,7 +4747,7 @@ msgstr "auto"
 msgid "Auto"
 msgstr "Auto"
 
-#: src/features/settings/components/chat/agent-settings.tsx:152
+#: src/features/settings/components/chat/agent-settings.tsx:195
 #: src/features/settings/lib/settings-keywords.ts:59
 msgid "Auto Media Enrichment"
 msgstr "Enriquecimiento multimedia automático"
@@ -4773,7 +4773,7 @@ msgstr "Eliminación automática activa"
 msgid "Auto-detect"
 msgstr "Detección automática"
 
-#: src/features/settings/components/chat/agent-settings.tsx:177
+#: src/features/settings/components/chat/agent-settings.tsx:220
 #: src/features/settings/lib/settings-keywords.ts:60
 msgid "Auto-Detect Task Complexity"
 msgstr "Detectar automáticamente la complejidad de la tarea"
@@ -4848,15 +4848,15 @@ msgstr "Seguimiento automático del estado de los proveedores con el patrón cir
 msgid "Automatic query classification (Simple/Standard/Complex/Reasoning) routes each request to the optimal model. Health-aware fallback with circuit breaker pattern ensures 99.9% uptime."
 msgstr "La clasificación automática de consultas (Simple/Estándar/Compleja/Razonamiento) dirige cada solicitud al modelo óptimo. El respaldo según el estado, con el patrón circuit breaker, garantiza un 99,9 % de disponibilidad."
 
-#: src/features/settings/components/chat/agent-settings.tsx:180
+#: src/features/settings/components/chat/agent-settings.tsx:223
 msgid "Automatically enable appropriate modules based on detected task type. Simplifies usage by intelligently activating features when needed."
 msgstr "Activa automáticamente los módulos adecuados según el tipo de tarea detectado. Simplifica el uso activando funciones de forma inteligente cuando hacen falta."
 
-#: src/features/settings/components/chat/agent-settings.tsx:171
+#: src/features/settings/components/chat/agent-settings.tsx:214
 msgid "Automatically enable modules based on task complexity"
 msgstr "Activa automáticamente módulos según la complejidad de la tarea"
 
-#: src/features/settings/components/chat/agent-settings.tsx:155
+#: src/features/settings/components/chat/agent-settings.tsx:198
 msgid "Automatically include relevant images and videos alongside text responses when using search modes."
 msgstr "Incluye automáticamente imágenes y videos relevantes junto a las respuestas de texto al usar los modos de búsqueda."
 
@@ -4868,7 +4868,7 @@ msgstr "Ejecutar la limpieza automáticamente según la configuración"
 msgid "automation"
 msgstr "automatización"
 
-#: src/features/settings/components/chat/agent-settings.tsx:170
+#: src/features/settings/components/chat/agent-settings.tsx:213
 #: src/features/settings/lib/settings-keywords.ts:60
 #: src/features/skills/components/skill-form-dialog.tsx:119
 #: src/features/workflow/components/gallery/gallery-card.tsx:26
@@ -5106,7 +5106,7 @@ msgstr "Bloqueos"
 msgid "Base"
 msgstr "Base"
 
-#: src/features/settings/components/chat/agent-settings.tsx:237
+#: src/features/settings/components/chat/agent-settings.tsx:306
 msgid "Base (agent loop only): ~2,300 tokens"
 msgstr "Base (solo bucle del agente): ~2.300 tokens"
 
@@ -5554,7 +5554,7 @@ msgstr "Brave: si las solicitudes fallan, baja los Shields para este sitio."
 msgid "Brazil"
 msgstr "Brasil"
 
-#: src/features/settings/components/chat/agent-settings.tsx:95
+#: src/features/settings/components/chat/agent-settings.tsx:138
 msgid "Break down complex tasks into numbered steps with progress tracking. Ideal for multi-step projects and development tasks."
 msgstr "Divide las tareas complejas en pasos numerados con seguimiento del progreso. Ideal para proyectos de varios pasos y tareas de desarrollo."
 
@@ -5628,6 +5628,14 @@ msgstr "La acción del navegador falló"
 #: src/features/marketing/components/tutorials-page.tsx:113
 msgid "Browser Automation"
 msgstr "Automatización del navegador"
+
+#: src/features/settings/components/chat/agent-settings.tsx:84
+msgid "Browser click settings updated"
+msgstr "Configuración de clics del navegador actualizada"
+
+#: src/features/settings/components/chat/agent-settings.tsx:275
+msgid "Browser Clicks"
+msgstr "Clics del navegador"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:828
 msgid "Browser error"
@@ -6561,6 +6569,10 @@ msgstr "Casilla"
 msgid "Checked"
 msgstr "Comprobado"
 
+#: src/features/settings/components/chat/agent-settings.tsx:61
+msgid "Checked in the page (recommended)"
+msgstr "Comprobado en la página (recomendado)"
+
 #: src/features/skills/components/skill-builder-review.tsx:251
 msgid "Checked integrations are offered for setup after you save. Nothing connects until you confirm it there."
 msgstr "Las integraciones marcadas se ofrecen para configurar después de guardar. Nada se conecta hasta que lo confirmes allí."
@@ -7251,7 +7263,7 @@ msgstr "Programación"
 msgid "Coding agent log"
 msgstr "Registro del agente de programación"
 
-#: src/features/settings/components/chat/agent-settings.tsx:198
+#: src/features/settings/components/chat/agent-settings.tsx:241
 msgid "Coding Agent Pull Requests"
 msgstr "Pull requests de agentes de programación"
 
@@ -7524,7 +7536,7 @@ msgstr "diseño comercial"
 msgid "Commercial projects demanding the absolute best image quality from Black Forest Labs"
 msgstr "Proyectos comerciales que exigen la mejor calidad de imagen de Black Forest Labs"
 
-#: src/features/settings/components/chat/agent-settings.tsx:205
+#: src/features/settings/components/chat/agent-settings.tsx:248
 msgid "Commit as me"
 msgstr "Hacer commit como yo"
 
@@ -7532,7 +7544,7 @@ msgstr "Hacer commit como yo"
 msgid "Commits"
 msgstr "Commits"
 
-#: src/features/settings/components/chat/agent-settings.tsx:208
+#: src/features/settings/components/chat/agent-settings.tsx:251
 msgid "Commits are made under your name and email, with Neore Agent listed as co-author. Off keeps the agent as the author, and so does an account without a name or a verified email."
 msgstr "Los commits se hacen con tu nombre y tu correo electrónico, y Neore Agent figura como coautor. Si está desactivado, el autor sigue siendo el agente, y también si la cuenta no tiene nombre o un correo verificado."
 
@@ -7821,7 +7833,7 @@ msgstr "Condición (expresión de JavaScript)"
 msgid "Conditional branching"
 msgstr "Ramificación condicional"
 
-#: src/features/settings/components/chat/agent-settings.tsx:68
+#: src/features/settings/components/chat/agent-settings.tsx:111
 msgid "Configure advanced AI agent modules for enhanced task execution"
 msgstr "Configura módulos avanzados del agente de IA para ejecutar mejor las tareas"
 
@@ -10066,7 +10078,7 @@ msgstr "Cuadrícula de datos"
 msgid "Data Protection Officer"
 msgstr "Delegado de protección de datos"
 
-#: src/features/settings/components/chat/agent-settings.tsx:132
+#: src/features/settings/components/chat/agent-settings.tsx:175
 #: src/features/settings/lib/settings-keywords.ts:58
 msgid "Data Source Module"
 msgstr "Módulo de fuentes de datos"
@@ -12437,7 +12449,7 @@ msgstr "Activa o desactiva modelos para controlar cuáles aparecen en el selecto
 msgid "Enable skills in Settings to add them as participants."
 msgstr "Activa habilidades en Configuración para añadirlas como participantes."
 
-#: src/features/settings/components/chat/agent-settings.tsx:85
+#: src/features/settings/components/chat/agent-settings.tsx:128
 msgid "Enable specialized modules to enhance AI capabilities"
 msgstr "Activa módulos especializados para ampliar las capacidades de la IA"
 
@@ -12987,7 +12999,7 @@ msgstr "Coste estimado"
 msgid "Estimated provider cost {display}, billed to your own API key"
 msgstr "Coste estimado del proveedor {display}, cobrado a tu propia clave de API"
 
-#: src/features/settings/components/chat/agent-settings.tsx:233
+#: src/features/settings/components/chat/agent-settings.tsx:302
 msgid "Estimated token cost per conversation"
 msgstr "Coste estimado en tokens por conversación"
 
@@ -13049,6 +13061,10 @@ msgstr "Cada chat y ejecución programada de este bot recibe solo estas herramie
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:446
 msgid "Every chat, unless its project sets the role."
 msgstr "Todos los chats, salvo que su proyecto defina el rol."
+
+#: src/features/settings/components/chat/agent-settings.tsx:70
+#~ msgid "Every click is checked, then made for real. A page can change a button between the check and the press, so a purchase click may not be checked."
+#~ msgstr "Cada clic se comprueba y luego se realiza de verdad. Una página puede cambiar un botón entre la comprobación y la pulsación, así que un clic de compra podría no comprobarse."
 
 #: src/features/tasks/components/task-form-dialog.tsx:126
 msgid "Every day at 09:00 UTC"
@@ -14273,13 +14289,17 @@ msgstr "No se pudo desvincular la cuenta"
 msgid "Failed to unpin thread"
 msgstr "No se pudo desfijar la conversación"
 
-#: src/features/settings/components/chat/agent-settings.tsx:55
+#: src/features/settings/components/chat/agent-settings.tsx:98
 msgid "Failed to update agent settings"
 msgstr "No se pudo actualizar la configuración del agente"
 
 #: src/features/settings/components/chat/default-models-settings.tsx:158
 msgid "Failed to update backup model"
 msgstr "No se pudo actualizar el modelo de respaldo"
+
+#: src/features/settings/components/chat/agent-settings.tsx:80
+msgid "Failed to update browser click settings"
+msgstr "No se pudo actualizar la configuración de clics del navegador"
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:73
 msgid "Failed to update configuration"
@@ -14346,7 +14366,7 @@ msgstr "No se pudo actualizar el prompt"
 msgid "Failed to update provider"
 msgstr "No se pudo actualizar el proveedor"
 
-#: src/features/settings/components/chat/agent-settings.tsx:37
+#: src/features/settings/components/chat/agent-settings.tsx:49
 msgid "Failed to update pull request settings"
 msgstr "No se pudieron actualizar los ajustes de pull requests"
 
@@ -17294,6 +17314,10 @@ msgstr "Cuántas veces reintenta el agente con los comentarios del verificador a
 msgid "How should titles be written?"
 msgstr "¿Cómo deben escribirse los títulos?"
 
+#: src/features/settings/components/chat/agent-settings.tsx:276
+msgid "How the agent's browser presses buttons and links"
+msgstr "Cómo el navegador del agente pulsa botones y enlaces"
+
 #: src/features/develop/components/merge-panel.tsx:149
 msgid "How to merge"
 msgstr "Cómo fusionar"
@@ -18851,7 +18875,7 @@ msgstr "Colecciones de conocimiento"
 msgid "Knowledge files to search"
 msgstr "Archivos de conocimiento para buscar"
 
-#: src/features/settings/components/chat/agent-settings.tsx:112
+#: src/features/settings/components/chat/agent-settings.tsx:155
 #: src/features/settings/lib/settings-keywords.ts:57
 msgid "Knowledge Module"
 msgstr "Módulo de conocimiento"
@@ -20029,7 +20053,7 @@ msgstr "Cargando tus servidores, conectores y ordenadores…"
 #: src/features/changelog/components/changelog-panel.tsx:109
 #: src/features/chat/split/chat-split-view.tsx:245
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:874
-#: src/features/settings/components/chat/agent-settings.tsx:47
+#: src/features/settings/components/chat/agent-settings.tsx:90
 #: src/features/settings/components/chat/api-keys-settings.tsx:462
 #: src/features/settings/components/chat/custom-providers-settings.tsx:343
 #: src/features/settings/components/chat/default-models-settings.tsx:185
@@ -23652,7 +23676,7 @@ msgstr "Nota para la próxima ejecución (opcional)"
 msgid "Note for: {0}"
 msgstr "Nota para: {0}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:243
+#: src/features/settings/components/chat/agent-settings.tsx:312
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "Nota: los módulos se aplican por conversación, no por mensaje. Activa solo los módulos que necesites para optimizar el uso de tokens."
 
@@ -24992,6 +25016,22 @@ msgstr "Naranja"
 #: src/features/settings/components/chat/favorite-models-settings.tsx:120
 msgid "Order the models you starred in the model picker and give them your own names. A nickname shows in the picker, the composer and on replies."
 msgstr "Ordena los modelos que marcaste como destacados en el selector de modelos y ponles tus propios nombres. Un apodo aparece en el selector, en el compositor y en las respuestas."
+
+#: src/features/settings/components/chat/agent-settings.tsx:65
+msgid "Ordinary buttons and links are checked, then clicked for real, so popups and real-click checks work. A page can change one in the moment between that check and the press, and that press is not checked again, so an ordinary button can become a purchase unseen. Purchases you approve are still checked in the page."
+msgstr "Los botones y enlaces normales se comprueban y luego se pulsan de verdad, para que funcionen las ventanas emergentes y las comprobaciones con clic real. Una página puede cambiar uno en el momento entre esa comprobación y la pulsación, y esa pulsación no se vuelve a comprobar, así que un botón normal puede convertirse en una compra sin que se note. Las compras que apruebas se siguen comprobando en la página."
+
+#: src/features/settings/components/chat/agent-settings.tsx:65
+#~ msgid "Ordinary buttons and links are checked, then clicked for real, so popups and real-click checks work. A page can still change one in the moment between that check and the press. Purchases and approved clicks stay checked in the page."
+#~ msgstr "Los botones y enlaces ordinarios se comprueban y luego se pulsan de verdad, así que las ventanas emergentes y las comprobaciones de clic real funcionan. Una página todavía puede cambiar uno en el momento entre la comprobación y la pulsación. Las compras y los clics aprobados siguen comprobándose en la página."
+
+#: src/features/settings/components/chat/agent-settings.tsx:65
+#~ msgid "Ordinary buttons and links get real clicks, so popups and real-click checks work. Purchases and approved clicks stay checked in the page."
+#~ msgstr "Los botones y enlaces ordinarios reciben clics reales, así que las ventanas emergentes y las comprobaciones de clic real funcionan. Las compras y los clics aprobados siguen comprobándose en la página."
+
+#: src/features/settings/components/chat/agent-settings.tsx:70
+msgid "Ordinary clicks are checked, then made for real. A page can change an ordinary button between the check and the press, so it can become a purchase unseen. Purchases you approve are still checked in the page."
+msgstr "Los clics normales se comprueban y luego se ejecutan de verdad. Una página puede cambiar un botón normal entre la comprobación y el clic, así que puede convertirse en una compra sin que se note. Las compras que apruebas se siguen comprobando en la página."
 
 #: src/features/auth/components/organization/organization-logo.tsx:62
 #: src/features/auth/components/organization/organization-view.tsx:64
@@ -27219,7 +27259,7 @@ msgstr "Pull request fusionada"
 msgid "Pull request opened"
 msgstr "Pull request abierta"
 
-#: src/features/settings/components/chat/agent-settings.tsx:41
+#: src/features/settings/components/chat/agent-settings.tsx:53
 msgid "Pull request settings updated"
 msgstr "Ajustes de pull requests actualizados"
 
@@ -27614,6 +27654,14 @@ msgstr "Listo para fusionar"
 #: src/features/marketing/use-cases/use-case-page.tsx:72
 msgid "Ready to try it? Start a chat for free."
 msgstr "¿Quieres probarlo? Inicia un chat gratis."
+
+#: src/features/settings/components/chat/agent-settings.tsx:71
+msgid "Real clicks for everything"
+msgstr "Clics reales para todo"
+
+#: src/features/settings/components/chat/agent-settings.tsx:66
+msgid "Real clicks, purchases checked in the page"
+msgstr "Clics reales; compras comprobadas en la página"
 
 #: src/features/marketing/components/gateway-landing-page.tsx:124
 msgid "Real-time analytics"
@@ -28996,7 +29044,7 @@ msgstr "reintentar"
 #: src/features/devices/components/devices-settings.tsx:240
 #: src/features/local-models/components/ollama-model-manager.tsx:188
 #: src/features/onboarding/components/setup-checklist.tsx:238
-#: src/features/settings/components/chat/agent-settings.tsx:224
+#: src/features/settings/components/chat/agent-settings.tsx:267
 #: src/features/settings/components/chat/bot-tool-selection.tsx:495
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:490
 #: src/features/tasks/components/task-detail-dialog.tsx:108
@@ -31863,7 +31911,7 @@ msgstr "Algo salió mal por nuestra parte. Inténtalo de nuevo en un momento."
 msgid "Something went wrong. Nothing was changed. Try again."
 msgstr "Algo salió mal. No se cambió nada. Inténtalo de nuevo."
 
-#: src/features/settings/components/chat/agent-settings.tsx:220
+#: src/features/settings/components/chat/agent-settings.tsx:263
 #: src/features/skills/components/skill-list.tsx:255
 msgid "Something went wrong. Try again."
 msgstr "Algo salió mal. Inténtalo de nuevo."
@@ -33644,7 +33692,7 @@ msgstr "Lista de tareas"
 msgid "Task needs your review: {title}"
 msgstr "La tarea necesita tu revisión: {title}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:92
+#: src/features/settings/components/chat/agent-settings.tsx:135
 #: src/features/settings/lib/settings-keywords.ts:56
 msgid "Task Planning Module"
 msgstr "Módulo de planificación de tareas"
@@ -34325,7 +34373,7 @@ msgstr "El agente está trabajando. Puedes enviarlos cuando termine."
 msgid "The agent keeps the facts you share and uses them in later chats, such as your preferred units or the project you are on. You can see, edit, pin or delete the memories listed in settings."
 msgstr "El agente guarda los datos que compartes y los usa en chats posteriores, como tus unidades preferidas o el proyecto en el que estás. Puedes ver, editar, fijar o borrar los recuerdos listados en los ajustes."
 
-#: src/features/settings/components/chat/agent-settings.tsx:75
+#: src/features/settings/components/chat/agent-settings.tsx:118
 msgid "The agent loop is always enabled for systematic task execution. These settings control additional specialized modules that enhance the AI's capabilities for specific task types."
 msgstr "El bucle del agente está siempre activado para ejecutar las tareas de forma sistemática. Estos ajustes controlan módulos especializados adicionales que amplían las capacidades de la IA para tipos de tareas concretos."
 
@@ -34954,6 +35002,10 @@ msgstr "El llavero del sistema operativo"
 #: src/features/pages/components/page-agent-dialog.tsx:64
 msgid "The page agent could not edit this page"
 msgstr "El agente de página no pudo editar esta página"
+
+#: src/features/settings/components/chat/agent-settings.tsx:60
+msgid "The page is checked and clicked in one step, so nothing can change between them. Hover and press handlers respond. Popups and checks that need a real click may not work."
+msgstr "La página se comprueba y se pulsa en un solo paso, así que nada puede cambiar entre ambos. Responden los manejadores del paso del ratón y de la pulsación. Las ventanas emergentes y las comprobaciones que requieren un clic real podrían no funcionar."
 
 #: src/features/pages/components/page-kept-draft.tsx:46
 msgid "The page now shows the other version. Copy anything you want to keep from yours."
@@ -36427,7 +36479,7 @@ msgstr "token"
 msgid "Token budget"
 msgstr "Presupuesto de tokens"
 
-#: src/features/settings/components/chat/agent-settings.tsx:232
+#: src/features/settings/components/chat/agent-settings.tsx:301
 msgid "Token Cost Impact"
 msgstr "Impacto en el coste de tokens"
 
@@ -38174,7 +38226,7 @@ msgstr "Uzbekistán"
 msgid "Valid JSON"
 msgstr "JSON válido"
 
-#: src/features/settings/components/chat/agent-settings.tsx:135
+#: src/features/settings/components/chat/agent-settings.tsx:178
 msgid "Validate data quality and prioritize authoritative sources. Essential for research tasks and fact-checking."
 msgstr "Valida la calidad de los datos y prioriza las fuentes fiables. Imprescindible para tareas de investigación y verificación de datos."
 
@@ -39437,7 +39489,7 @@ msgstr "¿Qué modelos de IA se incluyen?"
 msgid "Which providers are supported?"
 msgstr "¿Qué proveedores son compatibles?"
 
-#: src/features/settings/components/chat/agent-settings.tsx:199
+#: src/features/settings/components/chat/agent-settings.tsx:242
 msgid "Who a pull request's commits are made as"
 msgstr "Con qué identidad se hacen los commits de un pull request"
 
