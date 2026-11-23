@@ -8,7 +8,10 @@ import { internalMutation } from "../_generated/server";
 
 const BATCH = 200;
 
-/** Deletes up to `BATCH` of the user's events per call. Idempotent on retry. */
+/**
+ * Deletes up to `BATCH` of the user's events per call, then, once none are left, the user's sequence watermark. Idempotent on
+ * retry.
+ */
 export const deleteUserMcpEvents = internalMutation
     .input({ userId: v.string() })
     .output(v.object({ hasMore: v.boolean() }))
@@ -19,5 +22,15 @@ export const deleteUserMcpEvents = internalMutation
             await ctx.db.delete("mcpEvents", row._id);
         }
 
-        return { hasMore: page.length >= BATCH };
+        if (page.length >= BATCH) {
+            return { hasMore: true };
+        }
+
+        const { page: watermarks } = await ctx.db.mcpEventWatermarks.findMany({ where: { userId } });
+
+        for (const row of watermarks) {
+            await ctx.db.delete("mcpEventWatermarks", row._id);
+        }
+
+        return { hasMore: false };
     });

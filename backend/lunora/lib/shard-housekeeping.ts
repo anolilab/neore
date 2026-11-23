@@ -60,6 +60,9 @@ interface Sweep {
     ref: FunctionReference<"mutation", {}, unknown>;
 }
 
+/** Events-log prune batches one housekeeping run may delete (`pruneMcpEvents` deletes 200 per call). */
+const MCP_EVENT_PRUNE_ROUNDS = 10;
+
 /**
  * The sweeps a housekeeping run performs on one shard — the per-user half of
  * `crons.ts`. A function, so the references resolve at use, not at import.
@@ -78,8 +81,6 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "cleanupStaleWorkflowPresence", ref: internal.workflow.presence.cleanupStalePresence },
     { name: "reapLapsedClaims", ref: internal.lib.claim_once.reapLapsedClaims },
     { name: "purgeIdempotencyClaims", ref: internal.lib.claim_once.purgeExpiredClaims },
-    // The Events log's seven-day window (`public-api/events-log.ts`): older events go, the newest row of each log stays.
-    { name: "pruneMcpEvents", ref: internal.public_api.events.pruneMcpEvents },
     // Rate-limit rows charged on this shard, past every limit's window (`lib/rate-limit-sweep.ts`).
     { name: "sweepExpiredRateLimits", ref: internal.lib.rate_limit_sweep.sweepExpiredRateLimits },
     { name: "deleteExpiredTemporaryChats", ref: internal.crons.deleteExpiredTemporaryChats },
@@ -476,6 +477,21 @@ export const runShardHousekeeping = internalAction
             } catch (error) {
                 failed.push(sweep.name);
                 cronsLogger.error(`[housekeeping] ${sweep.name} failed:`, error);
+            }
+        }
+
+        // The Events log's seven-day window (`public-api/events.ts`): one batch per call, so a backlog takes several calls, up to a
+        // bounded number per run. The rest waits for the next run.
+        for (let round = 0; round < MCP_EVENT_PRUNE_ROUNDS; round += 1) {
+            const pruned = await ctx.runMutation(internal.public_api.events.pruneMcpEvents, {}).catch((error: unknown) => {
+                failed.push("pruneMcpEvents");
+                cronsLogger.error("[housekeeping] pruneMcpEvents failed:", error);
+
+                return { hasMore: false };
+            });
+
+            if (!pruned.hasMore) {
+                break;
             }
         }
 
