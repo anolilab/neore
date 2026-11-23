@@ -64,17 +64,19 @@ const guideProjectOf = async (
     }
 
     const listing = await ownProjectIdsListingRepo(ctx, userId, repo, device.projectIds);
+    let oldest: StoredRow<Doc<"projects">> | undefined;
 
     for (const projectId of listing) {
         // The same check the start makes: the caller's client never names this project, the repository does.
         const project = await writableProject(ctx, projectId, userId, { primary: true });
 
-        if (project) {
-            return { project };
+        // By the project's age, not the repository entry's: an older project may have listed the repository later.
+        if (project && (oldest === undefined || project._creationTime < oldest._creationTime)) {
+            oldest = project;
         }
     }
 
-    return null;
+    return oldest ? { project: oldest } : null;
 };
 
 const vUnavailable = v.object({

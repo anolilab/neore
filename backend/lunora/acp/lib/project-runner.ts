@@ -186,8 +186,11 @@ export const rememberProjectRunner = async (
         return;
     }
 
-    // Re-recording a project moves it to the end, so the entries at the front are the ones used longest ago.
-    const others = Object.entries(settings?.projectRunnerDefaults ?? {}).filter(([key]) => key !== project._id);
+    // Oldest thread first (an entry without `threadAt` before any), so the entries at the front are the ones used longest ago:
+    // a recording that lands late for an older thread never pushes out the default of a project used more recently.
+    const others = Object.entries(settings?.projectRunnerDefaults ?? {})
+        .filter(([key]) => key !== project._id)
+        .toSorted(([, a], [, b]) => (a.threadAt ?? 0) - (b.threadAt ?? 0));
     const roomy = others.length < MAX_PROJECT_RUNNER_DEFAULTS ? others : await entriesWithRoom(ctx, userId, others);
     const kept = roomy.slice(-(MAX_PROJECT_RUNNER_DEFAULTS - 1));
     // Read again just before the write, from the primary: a move that landed since the first read (the project row is a

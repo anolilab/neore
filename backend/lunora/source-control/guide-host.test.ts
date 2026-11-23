@@ -258,6 +258,22 @@ describe("beginHostGuide", () => {
             expect(thread).toMatchObject({ _id: started.threadId, projectId });
         });
 
+        it("files the guide under the oldest such project, even when it listed the repository after a newer one", async () => {
+            const deviceId = await pairedDevice(ownerId);
+            const older = await insertProject("Older");
+            const newer = await insertProject("Newer");
+
+            await addRepo(newer);
+            await addRepo(older);
+            await limitTo(deviceId, [newer, older]);
+
+            const started = await begin(deviceId);
+            const [thread] = await rows("threads");
+
+            expect(started).toMatchObject({ status: "started" });
+            expect(thread).toMatchObject({ _id: started.threadId, projectId: older });
+        });
+
         it("is out of scope, not busy, and writes nothing, when none of the computer's projects lists this repository", async () => {
             const deviceId = await pairedDevice(ownerId);
             const projectId = await insertProject("Hello");

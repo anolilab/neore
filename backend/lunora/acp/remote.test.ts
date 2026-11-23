@@ -1112,9 +1112,11 @@ describe("a project remembers its runner", () => {
 
         await run(async (ctx) => {
             const others: [string, unknown][] = [];
+            // Recorded from threads started after the live entry's, so it stays the oldest of the live ones.
+            const later = { ...runner, threadAt: Date.now() + 1000 };
 
             for (let index = 0; index < 199 - unusable.length; index += 1) {
-                others.push([(await ctx.db.insert("projects", { createdAt: 0, organizationId: "org-a", title: "Live", userId: ownerId })) as string, runner]);
+                others.push([(await ctx.db.insert("projects", { createdAt: 0, organizationId: "org-a", title: "Live", userId: ownerId })) as string, later]);
             }
 
             const settings = await ctx.db.userSettings.findFirst({ where: { userId: ownerId } });
@@ -1156,7 +1158,9 @@ describe("a project remembers its runner", () => {
         await startOpened(oldest, device, "tap-c0");
 
         // 191 live projects after the oldest, then 8 deleted ones: the record is at the cap, and no deleted one is among the oldest.
+        // They come first in the stored object but from threads started later: the order is the threads', not the writes'.
         await run(async (ctx) => {
+            const later = { ...runner, threadAt: Date.now() + 1000 };
             const live: string[] = [];
             const gone: string[] = [];
 
@@ -1178,7 +1182,7 @@ describe("a project remembers its runner", () => {
                 "userSettings",
                 settings?._id as never,
                 {
-                    projectRunnerDefaults: { ...settings?.projectRunnerDefaults, ...Object.fromEntries([...live, ...gone].map((id) => [id, runner])) },
+                    projectRunnerDefaults: { ...Object.fromEntries([...live, ...gone].map((id) => [id, later])), ...settings?.projectRunnerDefaults },
                 } as never,
             );
         });
