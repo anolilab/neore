@@ -61,6 +61,8 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
     const inputId = useId();
     const listId = useId();
     const listRef = useRef<HTMLDivElement>(null);
+    // The arrow keys are read only by the input: a refused click hands focus back to it.
+    const inputRef = useRef<HTMLInputElement>(null);
     const pickingRef = useRef(false);
     // A pick still checking when the search closes is dropped: the composer it was meant for may be locked or showing another chat.
     const mountedRef = useRef(true);
@@ -103,6 +105,9 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
     // the same search again first, and a prompt that is no longer in it is not put in the composer.
     const pick = async (prompt: PickedPrompt & { messageId: string }) => {
         if (searched === "" || !settled || pickingRef.current) {
+            // A click focuses its row; the arrow keys work only from the input.
+            inputRef.current?.focus();
+
             return;
         }
 
@@ -120,12 +125,19 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
 
         if (outcome.kind === "found") {
             onPick({ ...(prompt.draftFrom !== undefined && { draftFrom: prompt.draftFrom }), text: prompt.text });
-        } else if (outcome.kind === "gone") {
+
+            return;
+        }
+
+        if (outcome.kind === "gone") {
             queryClient.setQueryData(options.queryKey, outcome.fresh);
             setPickNotice("gone");
         } else {
             setPickNotice("failed");
         }
+
+        // A clicked row took focus, and a refused one may have left the list with it.
+        inputRef.current?.focus();
     };
 
     const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -239,6 +251,7 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
                     }}
                     onKeyDown={onKeyDown}
                     placeholder={t`Search sent prompts`}
+                    ref={inputRef}
                     role="combobox"
                     type="search"
                     value={query}

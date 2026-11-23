@@ -3558,7 +3558,7 @@ export const searchSentPrompts = authQuery
                 }
             }
 
-            // A temporary chat is a thread with an expiry marker (`temporaryThreads`, not policed by row-level security).
+            // A temporary chat is a thread with an expiry marker (`temporaryThreads`, owner-policed), read here only for the caller's own threads.
             const candidates = [...titles.keys()] as Id<"threads">[];
             const markers = await Promise.all(
                 candidates.map((threadId) =>

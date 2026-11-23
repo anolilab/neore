@@ -618,6 +618,9 @@ const ComposerInput = ({
 
             if (draft.trim() === "") {
                 setText(prompt);
+                // The prompt is the whole draft now, so it carries its own mark: none for the person's own words, whatever
+                // the blank draft held before (`noteSavedPrompt` treats a saved prompt that replaced the draft the same way).
+                useChatUIStore.getState().setComposerDraftFrom(draftFrom);
             } else {
                 const addition = `\n${prompt}`;
                 const editor = inputAreaRef.current?.getEditor();
@@ -635,12 +638,12 @@ const ComposerInput = ({
                 if (!appendedInEditor) {
                     setText(`${draft}${addition}`);
                 }
-            }
 
-            // A prompt saved as not typed by the person goes out marked again, as an ArrowUp recall does. An admin's writing
-            // (`impersonated`) replaces a weaker mark the draft already has.
-            if (draftFrom !== undefined && (composerDraftFrom() === undefined || draftFrom === "impersonated")) {
-                markComposerDraft(draftFrom);
+                // A prompt saved as not typed by the person goes out marked again, as an ArrowUp recall does. An admin's writing
+                // (`impersonated`) replaces a weaker mark the draft already has; the person's own prompt keeps the draft's mark.
+                if (draftFrom !== undefined && (composerDraftFrom() === undefined || draftFrom === "impersonated")) {
+                    markComposerDraft(draftFrom);
+                }
             }
 
             setPromptSearchThread(null);

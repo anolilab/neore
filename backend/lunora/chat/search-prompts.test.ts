@@ -549,6 +549,32 @@ describe("searchSentPrompts", () => {
         }
     });
 
+    it("finds a prompt by its typed words when a long attached document comes before them", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const { addMessagesHandler } = await import("../agent/messages");
+            const messageId = await harness.run(async (context: any) => {
+                const thread = await insertThread(context, { title: "Manual", userId: OWNER });
+                // Past the index's 1,000 terms: the document is saved ahead of the typed words, as `/chat/start` saves it.
+                const manual = documentTextPart("manual.txt", Array.from({ length: 1500 }, (_, index) => `page${String(index)}`).join(" "));
+                const { messages } = await addMessagesHandler(context, {
+                    messages: [{ message: { content: [manual, { text: "translate the lighthouse chapter", type: "text" }], role: "user" } }],
+                    threadId: thread,
+                    userId: OWNER,
+                } as never);
+
+                return messages[0]?._id;
+            });
+
+            const prompts = await search(harness, "lighthouse");
+
+            expect(prompts.map((prompt) => [prompt.messageId, prompt.text])).toEqual([[messageId, "translate the lighthouse chapter"]]);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("lists a prompt copied into a branch once, and keeps a not-typed prompt's mark", async () => {
         const harness = lunoraTest(schema as never);
 

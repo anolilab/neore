@@ -234,6 +234,27 @@ describe("ComposerInput prompt search", () => {
         expect(useChatUIStore.getState().composerDraftFrom).toBe("impersonated");
     });
 
+    it("drops a blank draft's mark when the person's own prompt replaces it, and keeps a typed draft's", () => {
+        useChatUIStore.getState().setComposerText(" ".repeat(3));
+        markComposerDraft("suggestion");
+        harness.pickedMark = undefined;
+        renderComposer();
+        openSearch();
+        fireEvent.click(screen.getByRole("button", { name: "Pick" }));
+
+        expect(useChatUIStore.getState().composerText).toBe("deploy a preview");
+        expect(useChatUIStore.getState().composerDraftFrom).toBeUndefined();
+
+        // Added below words that came from a suggestion, the person's prompt leaves those words marked.
+        useChatUIStore.getState().setComposerText("check this");
+        markComposerDraft("suggestion");
+        openSearch();
+        fireEvent.click(screen.getByRole("button", { name: "Pick" }));
+
+        expect(useChatUIStore.getState().composerText).toBe("check this\ndeploy a preview");
+        expect(useChatUIStore.getState().composerDraftFrom).toBe("suggestion");
+    });
+
     it("does not offer the search while a comparison send locks the composer", () => {
         harness.comparisonLoading = true;
         renderComposer();

@@ -14,6 +14,7 @@ import type {
 } from "@ai-sdk/provider-utils";
 import type { ModelMessage, TextPart, UIDataTypes, UIMessagePart, UITools } from "ai";
 
+import { isAttachedLine } from "../chat/lib/attached-text";
 import type { Message, MessageContentParts } from "./validators";
 
 /**
@@ -82,6 +83,21 @@ export const extractText = (message: Message | ModelMessage) => {
     }
 
     return undefined;
+};
+
+/**
+ * The search copy of a message: the `text` column the message index reads. The index keeps only a row's first 1,000 terms,
+ * and `/chat/start` saves an attached document ahead of the typed prompt, so a user message's attached document or page goes
+ * after the person's own words here. Every other message reads as {@link extractText}.
+ */
+export const searchText = (message: Message | ModelMessage): string | undefined => {
+    if (message.role !== "user" || typeof message.content === "string") {
+        return extractText(message);
+    }
+
+    const attached = (part: (typeof message.content)[number]): boolean => part.type === "text" && isAttachedLine(part.text);
+
+    return joinText([...message.content.filter((part) => !attached(part)), ...message.content.filter((part) => attached(part))]);
 };
 
 /**

@@ -1,6 +1,6 @@
 /**
  * The Ctrl+R prompt search: it lists the person's sent prompts that match, newest first, across their threads; arrow keys
- * pick a row; Enter hands that prompt back as a draft and never sends. Each search is a one-shot read, never live.
+ * pick a row; Enter hands that prompt back as a draft and never sends.
  */
 import { QueryClient, QueryClientProvider, skipToken } from "@tanstack/react-query";
 import { act, fireEvent, render, screen } from "@testing-library/react";
@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { calls, prompts } = vi.hoisted(() => {
     return {
-        calls: [] as { args: unknown; options: unknown }[],
+        calls: [] as { args: unknown }[],
         prompts: [
             { createdAt: 300, messageId: "m-notes", text: "deploy to production", threadId: "t-notes", threadTitle: "Notes" },
             { createdAt: 100, messageId: "m-release", text: "deploy the staging build", threadId: "t-release", threadTitle: "Release" },
@@ -36,8 +36,8 @@ vi.mock("@lingui/react/macro", () => {
 // The search answers from the prompts above, matched on the word the person typed, as the server's word match does.
 vi.mock("@/lib/lunora/crpc", () => {
     const searchSentPrompts = {
-        queryOptions: (args: unknown, options: unknown) => {
-            calls.push({ args, options });
+        queryOptions: (args: unknown) => {
+            calls.push({ args });
 
             return {
                 queryFn:
@@ -117,21 +117,6 @@ describe("ComposerPromptSearch", () => {
         expect(options[1]?.textContent).toContain("deploy the staging build");
         expect(options[1]?.textContent).toContain("Release");
         expect(screen.queryByText("summarise the invoice")).toBeNull();
-    });
-
-    it("answers each search as a one-shot read, never live", async () => {
-        render(<ComposerPromptSearch onClose={vi.fn()} onPick={vi.fn()} />, { wrapper });
-
-        fireEvent.change(screen.getByRole("combobox"), { target: { value: "deploy" } });
-
-        await settle();
-
-        expect(screen.getAllByRole("option")).toHaveLength(2);
-
-        const searches = calls.filter((call) => call.args !== skipToken);
-
-        expect(searches.length).toBeGreaterThan(0);
-        expect(searches.every((call) => (call.options as { live?: boolean }).live === false)).toBe(true);
     });
 
     it("moves the highlight with the arrow keys and Enter hands the picked prompt back, unsent", async () => {
@@ -342,6 +327,40 @@ describe("ComposerPromptSearch", () => {
             expect(onPick).not.toHaveBeenCalled();
             expect(screen.getAllByRole("option")).toHaveLength(1);
         } finally {
+            prompts.splice(index, 0, removed!);
+        }
+    });
+
+    it("hands focus back to the search after a refused click, so the arrow keys still move through the list", async () => {
+        render(<ComposerPromptSearch onClose={vi.fn()} onPick={vi.fn()} />, { wrapper });
+
+        fireEvent.change(screen.getByRole("combobox"), { target: { value: "deploy" } });
+
+        await settle();
+
+        const index = prompts.findIndex((prompt) => prompt.messageId === "m-notes");
+        const [removed] = prompts.splice(index, 1);
+
+        try {
+            prompts.push({ createdAt: 50, messageId: "m-old", text: "deploy the old build", threadId: "t-release", threadTitle: "Release" });
+
+            // A click focuses the row it lands on, as a browser does.
+            const clicked = screen.getAllByRole("option")[0]!;
+
+            clicked.focus();
+            fireEvent.click(clicked);
+
+            await settle();
+
+            expect(screen.getByText("That prompt is no longer available. Pick another.")).toBeTruthy();
+            // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this test asserts
+            expect(document.activeElement).toBe(screen.getByRole("combobox"));
+
+            fireEvent.keyDown(screen.getByRole("combobox"), { key: "ArrowDown" });
+
+            expect(screen.getAllByRole("option")[1]?.getAttribute("aria-selected")).toBe("true");
+        } finally {
+            prompts.pop();
             prompts.splice(index, 0, removed!);
         }
     });

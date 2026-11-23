@@ -17,7 +17,7 @@ import { requireOwnedThread } from "./thread-read-access";
 import type { VectorTableName } from "./vector/tables";
 import { isLockedWithoutProof } from "./thread-passcode";
 import { type ReplyContent, rewriteReplyText } from "./reply-edit";
-import { extractText } from "./shared";
+import { searchText } from "./shared";
 import type { Message } from "./validators";
 import { vMessage } from "./validators";
 import { patchRow } from "../lib/patch";
@@ -436,7 +436,7 @@ export const editAssistantReplyHandler = async (
         const patch: { embeddingId?: undefined; message: Message; text?: string } = { message };
 
         if (row.text !== undefined) {
-            patch.text = extractText(message);
+            patch.text = searchText(message);
         }
 
         // The stored vector embeds the old text, so it would surface the old reply in search.

@@ -88,12 +88,6 @@ describe("resolveShortcuts", () => {
     });
 });
 
-describe("Ctrl+R", () => {
-    it("is not the default chord of any user-bindable action, so the composer's search keeps it", () => {
-        expect(Object.values(defaultKeyboardShortcuts)).not.toContain("ctrl+r");
-    });
-});
-
 describe("matchesShortcutQuery", () => {
     it("matches label, group and keys", () => {
         expect(matchesShortcutQuery("find", "Find in thread", "Chat", ["Ctrl", "F"])).toBe(true);

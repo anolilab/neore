@@ -23,7 +23,7 @@ import { mergedStream, stream } from "../lib/streams";
 // Not through the `./client` barrel: it re-exports this module, so importing
 // it here is a cycle, and whichever side loads first sees the other's
 // validators as `undefined` at `.output(v.from(...))`.
-import { DEFAULT_MESSAGE_RANGE, DEFAULT_RECENT_MESSAGES, extractText, isTool, sorted } from "./shared";
+import { DEFAULT_MESSAGE_RANGE, DEFAULT_RECENT_MESSAGES, isTool, searchText, sorted } from "./shared";
 import {
     type Message,
     type MessageDoc,
@@ -311,7 +311,7 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
             embeddingId,
             error: isFail ? error : message.error,
             status: isFail ? "failed" : (message.status ?? "success"),
-            text: hideFromUserIdSearch ? undefined : extractText(message.message),
+            text: hideFromUserIdSearch ? undefined : searchText(message.message),
             tool: isTool(message.message),
             userId,
             // Not `satisfies Omit<WithoutSystemFields<Doc<"messages">>, …>`.
@@ -596,7 +596,7 @@ export const updateMessage = internalMutation
         if (args.patch.message !== undefined) {
             patch.message = args.patch.message;
             patch.tool = isTool(args.patch.message);
-            patch.text = extractText(args.patch.message);
+            patch.text = searchText(args.patch.message);
         }
 
         if (args.patch.status === "failed") {
