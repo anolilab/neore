@@ -279,7 +279,9 @@ export function readTarget(
                     }
                 }
 
+                // Past the cap the rest of the drawn text is not read: the read is cut short, so it counts as truncated (the gate asks).
                 if (generatedLength > options.max) {
+                    isScanCapped = true;
                     break;
                 }
             }

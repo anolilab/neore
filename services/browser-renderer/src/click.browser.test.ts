@@ -320,6 +320,20 @@ describe("readTarget in a page", () => {
         expect(await wasClicked(page)).toBe(false);
     });
 
+    it("generated text past the cap truncates the read, even when the repeated text was deduplicated", async () => {
+        const repeated = "a".repeat(8000);
+
+        await pageWith(
+            page,
+            `<style>.a::before { content: "${repeated}" } .b::before { content: "Buy now" }</style><button id="go"><span class="a"></span><span class="a"></span><span class="b"></span></button>`,
+        );
+        const element = await page.$("#go");
+
+        const read = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        expect(read.labelTruncated).toBe(true);
+    });
+
     it("a label reference to a subtree past the budget truncates the read, so the gate asks", async () => {
         await pageWith(page, `<button id="go" aria-labelledby="big"><span>x</span></button><div id="big">${"<span>a</span>".repeat(2500)}</div>`);
         const element = await page.$("#go");
