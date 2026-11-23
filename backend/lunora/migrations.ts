@@ -349,6 +349,10 @@ export const addPurchaseLookBrowser = defineMigration({
  * The runner walks each shard on its own, `batchSize` rows per batch, and records its cursor after every batch, so a run
  * stopped by a batch cap or a failure resumes where it left off. A batch is one read of 32 rows and one rewrite per
  * changed row. There is no `down`: a rollback cannot tell a filled row from one a write stamped after this ran.
+ *
+ * Nothing runs it on deploy: run `lunora migrate up backfill-message-typed-text --prod --yes --url <worker>` after the
+ * deploy (listed with the other required backfills in `alchemy.run.ts`). Until it has run, the prompt search finds only
+ * prompts sent after the deploy.
  */
 export const backfillMessageTypedText = defineMigration({
     batchSize: 32,

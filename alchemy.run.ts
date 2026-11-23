@@ -441,7 +441,9 @@ const GatewayCacheKv = Cloudflare.KV.Namespace("llm-gateway-cache", { title: sta
 // --url <worker>` run after the deploy, one per backfill id. The agent-options backfills in
 // `backend/lunora/migrations.ts` are two: `drop-agent-option-fields`, then
 // `session-options-to-session-state`. Without those runs, stored sessions keep the removed
-// `agentOptions` fields and stored chunks keep the removed `session_options` event.
+// `agentOptions` fields and stored chunks keep the removed `session_options` event. The
+// prompt-search backfill is one: `backfill-message-typed-text`. Without that run, the
+// composer's prompt search (Ctrl+R) finds only prompts sent after the deploy.
 const BackendDatabase = Cloudflare.D1.Database("neore-backend-db", { jurisdiction: dataJurisdiction, name: named("neore-backend") });
 
 const BackendFiles = Cloudflare.R2.Bucket("neore-backend-files", {
