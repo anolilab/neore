@@ -154,6 +154,12 @@ describe("humanCheckSite", () => {
         expect(humanCheckSite("not a url")).toBe("");
         expect(humanCheckSite(undefined)).toBe("");
     });
+
+    it("names one site for the fully-qualified spelling of a host, its case and its IDN form", () => {
+        expect(humanCheckSite("https://shop.example./x")).toBe("shop.example");
+        expect(humanCheckSite("https://SHOP.example../x")).toBe("shop.example");
+        expect(humanCheckSite("https://bücher.example./")).toBe(humanCheckSite("https://xn--bcher-kva.example/"));
+    });
 });
 
 describe("humanCheckLadder", () => {
@@ -259,6 +265,16 @@ describe("humanCheckLadder", () => {
         expect(dependencies.claimAsk).not.toHaveBeenCalled();
         expect(result).toMatchObject({ humanCheck: { site: "shop.example.com", status: "already_asked" }, success: false });
         expect(result.error).toMatch(ALREADY_ASKED_NOTE);
+    });
+
+    it("step 2: a block on `shop.example.` and one on `shop.example` are one site, asked about once", async () => {
+        const dotted = { ...CHECK_PAGE, url: "https://shop.example./a" };
+        const plain = { ...CHECK_PAGE, url: "https://SHOP.example/b" };
+        const { asked, dependencies } = dependenciesFor([dotted]);
+
+        await expect(humanCheckLadder(dotted, dependencies)).resolves.toMatchObject({ humanCheck: { site: "shop.example", status: "asked" } });
+        await expect(humanCheckLadder(plain, dependencies)).resolves.toMatchObject({ humanCheck: { site: "shop.example", status: "already_asked" } });
+        expect(asked).toEqual(new Set(["shop.example"]));
     });
 
     it("step 2: another site in the same run is asked about on its own", async () => {

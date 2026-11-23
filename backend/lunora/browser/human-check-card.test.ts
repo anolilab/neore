@@ -324,6 +324,29 @@ describe("the browser result", () => {
         });
         expect(runAction).not.toHaveBeenCalled();
     });
+
+    it.each(["https://shop.example./x", "https://SHOP.example/x", "https://shop.example../x"])(
+        "opens no page on %s once the person declined shop.example",
+        async (url) => {
+            const checkId = (await claim("r1", "shop.example"))!;
+
+            await resolve(OWNER, checkId, "declined");
+
+            const runAction = vi.fn(async () => {
+                return { success: true, url };
+            });
+            const tool = { ...browserTool, ctx: { ...(context() as object), replyKey: "r1", runAction, threadId, userId: OWNER } } as unknown as {
+                execute: (input: { action: string; url?: string }, options: unknown) => Promise<unknown>;
+            };
+
+            await expect(tool.execute({ action: "navigate", url }, { messages: [], toolCallId: "call-1" })).resolves.toStrictEqual({
+                error: humanCheckMessages.answerDeclined("shop.example"),
+                humanCheck: { site: "shop.example", status: "declined" },
+                success: false,
+            });
+            expect(runAction).not.toHaveBeenCalled();
+        },
+    );
 });
 
 describe("wait_for_person", () => {
