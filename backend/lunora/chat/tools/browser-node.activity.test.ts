@@ -840,7 +840,9 @@ describe("a browser a person took control of", () => {
 
     it("in ask mode a click's decision look keeps its target, so the approved click is checked against it", async () => {
         await addSession(NOW - 1000);
-        renderer.mockResolvedValue(answered({ content: "Next", label: "Next", success: true, target: "T-ask", url: "https://example.com/a" }));
+        renderer.mockResolvedValue(
+            answered({ content: "Next", label: "Next", sessionId: "s-1", success: true, target: "T-ask", url: "https://example.com/a" }),
+        );
 
         await harness.action(
             async (ctx: any) =>
@@ -943,7 +945,9 @@ describe("a browser a person took control of", () => {
 
     it("an approved click is checked against the target its decision look recorded, and one with no record is refused", async () => {
         await addSession(NOW - 1000);
-        renderer.mockResolvedValueOnce(answered({ content: "Pay now", label: "Pay now", success: true, target: "T-1", url: "https://example.com/cart" }));
+        renderer.mockResolvedValueOnce(
+            answered({ content: "Pay now", label: "Pay now", sessionId: "s-1", success: true, target: "T-1", url: "https://example.com/cart" }),
+        );
 
         await harness.action(
             async (ctx: any) =>
@@ -988,6 +992,44 @@ describe("a browser a person took control of", () => {
             ),
         ).resolves.toEqual({ error: APPROVED_TARGET_UNKNOWN, success: false });
         expect(renderer).toHaveBeenCalledTimes(2);
+    });
+
+    it("an approved click on a browser the provider replaced after the look is refused, and nothing is clicked", async () => {
+        await addSession(NOW - 1000);
+        renderer.mockResolvedValueOnce(
+            answered({ content: "Pay now", label: "Pay now", sessionId: "s-1", success: true, target: "T-1", url: "https://example.com/cart" }),
+        );
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(executeBrowserAction, {
+                    action: "extract",
+                    approvalLook: true,
+                    decisionCallId: "call-replaced",
+                    selector: "#pay",
+                    threadId,
+                    userId: OWNER,
+                    userTier: "premium",
+                }),
+        );
+        // The provider replaced the browser while the person was asked: the row now names another one.
+        await harness.run(async (ctx: any) => await ctx.db.patch("browserSessions", sessionId, { providerSessionId: "s-2" }));
+
+        const callsBefore = renderer.mock.calls.length;
+        const refused = await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(executeBrowserAction, {
+                    action: "click",
+                    approvedCallId: "call-replaced",
+                    selector: "#pay",
+                    threadId,
+                    userId: OWNER,
+                    userTier: "premium",
+                }),
+        );
+
+        expect(refused).toEqual({ error: APPROVED_TARGET_UNKNOWN, success: false });
+        expect(renderer.mock.calls).toHaveLength(callsBefore);
     });
 
     it("a click's mode reaches the renderer unchanged", async () => {

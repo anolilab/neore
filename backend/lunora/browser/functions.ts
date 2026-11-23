@@ -84,17 +84,19 @@ const PURCHASE_LOOKS_KEPT = 50;
 const PURCHASE_LOST_KEPT = 200;
 
 /**
- * The target a purchase decision looked at for one tool call. Written by the decision's own look, before the person is asked;
- * a click the person approves is checked against it. An empty target: the decision's look could not read the target.
+ * The target a purchase decision looked at for one tool call, and the browser it read it on (the renderer's session id, or
+ * `NO_PROVIDER_SESSION`). Written by the decision's own look, before the person is asked; a click the person approves is checked
+ * against both, so a browser the provider replaced while they were asked is never clicked. An empty target: the decision's look
+ * could not read the target.
  */
 export const recordPurchaseLook = internalMutation
-    .input({ sessionId: v.id("browserSessions"), target: v.string(), toolCallId: v.string() })
-    .mutation(async ({ args: { sessionId, target, toolCallId }, ctx }) => {
+    .input({ browser: v.string(), sessionId: v.id("browserSessions"), target: v.string(), toolCallId: v.string() })
+    .mutation(async ({ args: { browser, sessionId, target, toolCallId }, ctx }) => {
         const session = await ctx.db.get("browserSessions", sessionId);
 
         if (session) {
             const kept = (session.purchaseLooks ?? []).filter((look) => look.toolCallId !== toolCallId);
-            const all = [...kept, { target, toolCallId }];
+            const all = [...kept, { browser, target, toolCallId }];
             const evicted = all.slice(0, -PURCHASE_LOOKS_KEPT).map((look) => look.toolCallId);
 
             await patchRow(ctx.db, "browserSessions", session, {
@@ -113,6 +115,7 @@ export const takePurchaseLook = internalMutation
     .input({ sessionId: v.id("browserSessions"), toolCallId: v.string() })
     .output(
         v.object({
+            browser: v.optional(v.string()),
             kind: v.union(v.literal("lost"), v.literal("none"), v.literal("target"), v.literal("unreadable")),
             target: v.optional(v.string()),
         }),
@@ -131,7 +134,7 @@ export const takePurchaseLook = internalMutation
                 purchaseLooks: (session.purchaseLooks ?? []).filter((entry) => entry.toolCallId !== toolCallId),
             });
 
-            return look.target === "" ? { kind: "unreadable" as const } : { kind: "target" as const, target: look.target };
+            return look.target === "" ? { kind: "unreadable" as const } : { browser: look.browser, kind: "target" as const, target: look.target };
         }
 
         return (session.purchaseLostCalls ?? []).includes(toolCallId) ? { kind: "lost" as const } : { kind: "none" as const };

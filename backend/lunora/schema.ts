@@ -532,7 +532,8 @@ export const schema = defineSchema({
          * The target a purchase decision looked at, per tool call (`browser/functions.ts#recordPurchaseLook`): the approved
          * click is checked against it, so a page that changed in between is refused. The newest few are kept.
          */
-        purchaseLooks: v.optional(v.array(v.object({ target: v.string(), toolCallId: v.string() }))),
+        // `browser` is absent on a look written before it was recorded: such a look reads as another browser, so its click is refused.
+        purchaseLooks: v.optional(v.array(v.object({ browser: v.optional(v.string()), target: v.string(), toolCallId: v.string() }))),
         /**
          * Tool calls whose decision target was pushed out of `purchaseLooks` before their approved click ran
          * (`browser/functions.ts#recordPurchaseLook`): such a click is refused, never run unchecked.

@@ -195,7 +195,10 @@ export const executeBrowserAction = internalAction
                 if (action === "click" && args.approvedCallId !== undefined && !looksFirst) {
                     const taken = await ctx.runMutation(internal.browser.functions.takePurchaseLook, { sessionId, toolCallId: args.approvedCallId });
 
-                    if (taken.kind !== "target" || taken.target === undefined) {
+                    // The look read the page on the browser the approval names: a click sent to another browser (the provider replaced
+                    // this one while the person was asked, or the look predates the record) is refused, since the target the person saw
+                    // is not known to be on that browser.
+                    if (taken.kind !== "target" || taken.target === undefined || taken.browser !== (cfSessionId ?? NO_PROVIDER_SESSION)) {
                         await ctx.runMutation(internal.browser.functions.endSessionUse, held);
                         await refund();
 
@@ -364,6 +367,7 @@ export const executeBrowserAction = internalAction
                 // An ordinary look keeps nothing: its click is not approved, so there is no record to clear later.
                 if (args.decisionCallId !== undefined && (args.askDecision === true || purchaseTargetNeedsApproval(result as ClickTargetLook))) {
                     await ctx.runMutation(internal.browser.functions.recordPurchaseLook, {
+                        browser: result.sessionId ?? cfSessionId ?? NO_PROVIDER_SESSION,
                         sessionId,
                         target: result.success === true && result.target !== undefined ? result.target : "",
                         toolCallId: args.decisionCallId,
@@ -436,7 +440,12 @@ export const executeBrowserAction = internalAction
                 // rather than run unchecked. (The check fails closed; the record is replaced by the next decision's look.)
                 if (args.decisionCallId !== undefined && decisionSession !== undefined) {
                     await ctx
-                        .runMutation(internal.browser.functions.recordPurchaseLook, { sessionId: decisionSession, target: "", toolCallId: args.decisionCallId })
+                        .runMutation(internal.browser.functions.recordPurchaseLook, {
+                            browser: NO_PROVIDER_SESSION,
+                            sessionId: decisionSession,
+                            target: "",
+                            toolCallId: args.decisionCallId,
+                        })
                         .catch(() => undefined);
                 }
 

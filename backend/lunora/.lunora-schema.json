@@ -11,6 +11,7 @@
     "add-group-pause-file-ids",
     "add-headless-approved",
     "add-headless-resume-bounds",
+    "add-purchase-look-browser",
     "add-run-args-impersonated",
     "add-run-args-system-context",
     "add-steer-text-length",
@@ -4806,6 +4807,12 @@
             "optional": false,
             "unique": false,
             "fields": {
+              "browser": {
+                "kind": "string",
+                "nullable": false,
+                "optional": true,
+                "unique": false
+              },
               "target": {
                 "kind": "string",
                 "nullable": false,
