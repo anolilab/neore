@@ -195,8 +195,13 @@ const hasBrowserActionLeft = async (context: ToolContext, userId: string): Promi
     const key = `browser/action:${context.userTier ?? "free"}`;
     const probe = await context.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { identifier: userId, key });
 
-    if (probe.ok) {
-        await context.runMutation(internal.lib.rate_limiter_mutations.refundRateLimit, { identifier: userId, key });
+    // Given back to the window it was charged in, not the current one: an hour may roll over between the two steps.
+    if (probe.ok && probe.windowStart !== undefined) {
+        await context.runMutation(internal.lib.rate_limiter_mutations.refundRateLimitWindow, {
+            identifier: userId,
+            key,
+            windowStart: probe.windowStart,
+        });
     }
 
     return probe.ok;

@@ -189,7 +189,9 @@ describe("the approval an approved tool call runs with", () => {
 
 describe("a selector that matches nothing", () => {
     it("asks nothing: the click fails at once", async () => {
-        const missing = vi.fn(async () => ({ error: "Element not found: #gone", success: false, target: undefined }));
+        const missing = vi.fn(async () => {
+            return { error: "Element not found: #gone", success: false, target: undefined };
+        });
 
         await expect(browserActionNeedsPurchaseApproval({ action: "click", selector: "#gone" }, missing)).resolves.toBe(false);
     });
