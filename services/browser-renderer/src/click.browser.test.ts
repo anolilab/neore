@@ -209,6 +209,37 @@ describe("readTarget in a page", () => {
         expect(after.target).not.toBe(before.target);
     });
 
+    it("a link whose destination a handler moves, with its propagation stopped, is refused and does not navigate", async () => {
+        await pageWith(page, `<a id="go" href="/cart/confirm">Buy now</a>`);
+        const element = await page.$("#go");
+        const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        await page.evaluate(() => {
+            document.querySelector("#go")!.addEventListener("click", (event) => {
+                event.stopPropagation();
+                document.querySelector("#go")!.setAttribute("href", "/elsewhere");
+            });
+        });
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.refused).toBe("moved");
+        // No event marks a navigation that never starts: a short wait is how the absence shows.
+        // eslint-disable-next-line sonarjs/no-fixed-wait-in-tests
+        await page.waitForTimeout(300);
+        expect(page.url()).toBe("https://shop.example/cart");
+    });
+
+    it("a link whose destination does not move navigates as it always did", async () => {
+        await pageWith(page, `<a id="go" href="/cart/confirm">Buy now</a>`);
+        const element = await page.$("#go");
+        const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.refused).toBeUndefined();
+        await page.waitForURL("https://shop.example/cart/confirm");
+    });
+
     it("a click on a child of a disabled button is refused and nothing is clicked", async () => {
         await pageWith(page, `<button id="buy" disabled><span id="label" onclick="window.clicked = true">Buy</span></button>`);
         const element = await page.$("#label");

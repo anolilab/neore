@@ -478,6 +478,22 @@ export function readTarget(
                 },
                 { capture: true, signal: stop.signal },
             );
+            // A link's navigation has no submit event. Where the page has the Navigation API, its `navigate` event is the same kind of
+            // boundary: it runs before the navigation, outside the page's event propagation, and canceling it stops the navigation.
+            const { navigation } = clickScope as typeof clickScope & { navigation?: EventTarget };
+
+            navigation?.addEventListener(
+                "navigate",
+                (event) => {
+                    if (destinationsOf() === destinations) {
+                        return;
+                    }
+
+                    isMoved = true;
+                    event.preventDefault();
+                },
+                { signal: stop.signal },
+            );
             control.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, composed: true }));
             stop.abort();
 
