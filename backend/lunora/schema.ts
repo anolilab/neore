@@ -713,6 +713,8 @@ export const schema = defineSchema({
         sandboxId: v.optional(v.string()),
         // The step a `setup-failed` run stopped at and the capped, redacted end of its log, kept for "Fix setup".
         setupFailure: v.optional(v.object({ logTail: v.string(), step: v.string() })),
+        // On a fix run: the failed run it repairs, so its finish notification can link where that run was started.
+        setupFixOf: v.optional(v.id("codingAgentRuns")),
         // The newest "Fix setup" run started from this one; every attempt is in `setupFixRunIds`, oldest first.
         setupFixRunId: v.optional(v.id("codingAgentRuns")),
         setupFixRunIds: v.optional(v.array(v.id("codingAgentRuns"))),

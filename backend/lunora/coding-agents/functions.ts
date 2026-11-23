@@ -101,6 +101,9 @@ export const isPullRequestStale = (run: Pick<RunDoc, "prStartedAt" | "prStatus" 
 /** A fix run that ended without finishing: the failed step may be tried again from the original run. */
 const RETRYABLE_FIX_STATUSES = new Set<RunDoc["status"]>(["cancelled", "failed"]);
 
+/** Fix attempts one failed run keeps: each one is a sandbox run, and the run view shows every attempt. */
+const MAX_SETUP_FIX_ATTEMPTS = 10;
+
 /** The fixable setup step a failed run stopped at, whether or not a fix run has been started for it. */
 const failedSetupStep = (run: Pick<RunDoc, "setupFailure" | "status">) => {
     const step = run.setupFailure?.step;
@@ -322,6 +325,7 @@ interface NewRun {
     openPr: boolean;
     prompt: string;
     repoUrl: string;
+    setupFixOf?: Id<"codingAgentRuns">;
     taskId?: Id<"tasks">;
     taskRunId?: Id<"taskRuns">;
     threadId?: string;
@@ -373,6 +377,7 @@ const insertRun = async (ctx: MutationCtx, args: NewRun): Promise<{ error: strin
         openPr: args.openPr,
         prompt,
         repoUrl,
+        setupFixOf: args.setupFixOf,
         status: "queued",
         taskId: args.taskId,
         taskRunId: args.taskRunId,
@@ -427,6 +432,10 @@ export const startSetupFix = authMutation
             return { error: "This run cannot start a setup fix." };
         }
 
+        if ((run.setupFixRunIds?.length ?? 0) >= MAX_SETUP_FIX_ATTEMPTS) {
+            return { error: `This run already has ${String(MAX_SETUP_FIX_ATTEMPTS)} setup fix attempts; start a new run instead.` };
+        }
+
         // A fix in a chat that is gone, not the caller's, or locked would run with no place to show its result.
         if (run.threadId !== undefined) {
             const thread = await ctx.db.get("threads", run.threadId as Id<"threads">);
@@ -449,6 +458,7 @@ export const startSetupFix = authMutation
             openPr: run.openPr,
             prompt: args.prompt,
             repoUrl: run.repoUrl,
+            setupFixOf: run._id,
             ...(run.threadId !== undefined && { threadId: run.threadId }),
             userId: ctx.user.userId,
         });
@@ -552,6 +562,13 @@ const notifyCodingAgentRun = async (
         link = `/chat/${run.threadId}`;
     } else if (run.taskId) {
         link = "/tasks";
+    } else if (run.setupFixOf) {
+        // A fix has no task of its own; it belongs where the failed run was started.
+        const failed = await ctx.db.get("codingAgentRuns", run.setupFixOf);
+
+        if (failed?.taskId) {
+            link = "/tasks";
+        }
     }
 
     await notifyQuietly(ctx, {

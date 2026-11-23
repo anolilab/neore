@@ -5750,6 +5750,13 @@
             }
           }
         },
+        "setupFixOf": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "codingAgentRuns"
+        },
         "setupFixRunId": {
           "kind": "id",
           "nullable": false,
