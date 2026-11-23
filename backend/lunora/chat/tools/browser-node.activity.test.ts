@@ -1032,6 +1032,55 @@ describe("a browser a person took control of", () => {
         expect(renderer.mock.calls).toHaveLength(callsBefore);
     });
 
+    it("a renderer's not-run answer keeps an approved click's target, so its retry is still checked against it", async () => {
+        await addSession(NOW - 1000);
+        renderer.mockResolvedValueOnce(
+            answered({ content: "Pay now", label: "Pay now", sessionId: "s-1", success: true, target: "T-409", url: "https://example.com/cart" }),
+        );
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(executeBrowserAction, {
+                    action: "extract",
+                    approvalLook: true,
+                    decisionCallId: "call-409",
+                    selector: "#pay",
+                    threadId,
+                    userId: OWNER,
+                    userTier: "premium",
+                }),
+        );
+
+        // The renderer answers busy: nothing ran.
+        renderer.mockResolvedValueOnce({ data: { error: "busy", success: false }, error: { error: "busy" }, response: { ok: false, status: 409 } });
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(executeBrowserAction, {
+                    action: "click",
+                    approvedCallId: "call-409",
+                    selector: "#pay",
+                    threadId,
+                    userId: OWNER,
+                    userTier: "premium",
+                }),
+        );
+
+        // The retry with the same approval is checked against the target the person was shown, not refused as unknown.
+        renderer.mockResolvedValueOnce(answered({ clickedSelector: "#pay", success: true, url: "https://example.com/paid" }));
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(executeBrowserAction, {
+                    action: "click",
+                    approvedCallId: "call-409",
+                    selector: "#pay",
+                    threadId,
+                    userId: OWNER,
+                    userTier: "premium",
+                }),
+        );
+
+        expect(renderer.mock.calls[2]?.[0]).toMatchObject({ body: { action: "click", expectTarget: "T-409" } });
+    });
+
     it("a click's mode reaches the renderer unchanged", async () => {
         await addSession(NOW - 1000);
         renderer.mockResolvedValueOnce(answered({ clickedSelector: "#more", success: true, url: "https://example.com/cart" }));

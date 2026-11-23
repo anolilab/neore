@@ -1672,15 +1672,15 @@ msgstr "Nº 1 no OpenRouter em uso de tokens"
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, one {# favorito} other {# favoritos}}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:310
+#: src/features/settings/components/chat/agent-settings.tsx:309
 msgid "+ Data Source: ~2,700 tokens (+100)"
 msgstr "+ Fonte de dados: ~2.700 tokens (+100)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:309
+#: src/features/settings/components/chat/agent-settings.tsx:308
 msgid "+ Knowledge: ~2,600 tokens (+100)"
 msgstr "+ Conhecimento: ~2.600 tokens (+100)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:308
+#: src/features/settings/components/chat/agent-settings.tsx:307
 msgid "+ Task Planning: ~2,500 tokens (+200)"
 msgstr "+ Planejamento de tarefas: ~2.500 tokens (+200)"
 
@@ -5102,7 +5102,7 @@ msgstr "Banimentos"
 msgid "Base"
 msgstr "Base"
 
-#: src/features/settings/components/chat/agent-settings.tsx:307
+#: src/features/settings/components/chat/agent-settings.tsx:306
 msgid "Base (agent loop only): ~2,300 tokens"
 msgstr "Base (apenas o loop do agente): ~2.300 tokens"
 
@@ -12990,7 +12990,7 @@ msgstr "Custo estimado"
 msgid "Estimated provider cost {display}, billed to your own API key"
 msgstr "Custo estimado do provedor {display}, cobrado na sua própria chave de API"
 
-#: src/features/settings/components/chat/agent-settings.tsx:303
+#: src/features/settings/components/chat/agent-settings.tsx:302
 msgid "Estimated token cost per conversation"
 msgstr "Custo estimado em tokens por conversa"
 
@@ -23655,7 +23655,7 @@ msgstr "Observação para a próxima execução (opcional)"
 msgid "Note for: {0}"
 msgstr "Nota para: {0}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:313
+#: src/features/settings/components/chat/agent-settings.tsx:312
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "Observação: os módulos são aplicados por conversa, não por mensagem. Ative apenas os módulos de que você precisa para otimizar o uso de tokens."
 
@@ -24997,8 +24997,12 @@ msgid "Order the models you starred in the model picker and give them your own n
 msgstr "Ordene os modelos que você favoritou no seletor de modelos e dê a eles seus próprios nomes. Um apelido aparece no seletor, no compositor e nas respostas."
 
 #: src/features/settings/components/chat/agent-settings.tsx:65
-msgid "Ordinary buttons and links are checked, then clicked for real, so popups and real-click checks work. A page can still change one in the moment between that check and the press. Purchases and approved clicks stay checked in the page."
-msgstr "Botões e links comuns são verificados e depois clicados a sério, por isso pop-ups e verificações de clique real funcionam. Uma página ainda pode mudar um deles no momento entre a verificação e a pressão. Compras e cliques aprovados continuam verificados na página."
+msgid "Ordinary buttons and links are checked, then clicked for real, so popups and real-click checks work. A page can change one in the moment between that check and the press, and that press is not checked again, so an ordinary button can become a purchase unseen. Purchases you approve are still checked in the page."
+msgstr "Botões e links comuns são verificados e depois clicados de verdade, para que pop-ups e verificações que exigem clique real funcionem. Uma página pode alterar um deles no momento entre essa verificação e o clique, e esse clique não é verificado de novo, então um botão comum pode virar uma compra sem ser visto. As compras que você aprova continuam verificadas na página."
+
+#: src/features/settings/components/chat/agent-settings.tsx:65
+#~ msgid "Ordinary buttons and links are checked, then clicked for real, so popups and real-click checks work. A page can still change one in the moment between that check and the press. Purchases and approved clicks stay checked in the page."
+#~ msgstr "Botões e links comuns são verificados e depois clicados a sério, por isso pop-ups e verificações de clique real funcionam. Uma página ainda pode mudar um deles no momento entre a verificação e a pressão. Compras e cliques aprovados continuam verificados na página."
 
 #: src/features/settings/components/chat/agent-settings.tsx:65
 #~ msgid "Ordinary buttons and links get real clicks, so popups and real-click checks work. Purchases and approved clicks stay checked in the page."
@@ -36442,7 +36446,7 @@ msgstr "token"
 msgid "Token budget"
 msgstr "Orçamento de tokens"
 
-#: src/features/settings/components/chat/agent-settings.tsx:302
+#: src/features/settings/components/chat/agent-settings.tsx:301
 msgid "Token Cost Impact"
 msgstr "Impacto no custo de tokens"
 

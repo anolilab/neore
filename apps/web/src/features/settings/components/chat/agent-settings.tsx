@@ -62,7 +62,7 @@ const AgentSettings: FC = () => {
             mode: "page",
         },
         {
-            description: t`Ordinary buttons and links are checked, then clicked for real, so popups and real-click checks work. A page can still change one in the moment between that check and the press. Purchases and approved clicks stay checked in the page.`,
+            description: t`Ordinary buttons and links are checked, then clicked for real, so popups and real-click checks work. A page can change one in the moment between that check and the press, and that press is not checked again, so an ordinary button can become a purchase unseen. Purchases you approve are still checked in the page.`,
             label: t`Real clicks, purchases checked in the page`,
             mode: "pointer",
         },
@@ -284,9 +284,8 @@ const AgentSettings: FC = () => {
                             value={toBrowserClickMode(aiPreferences?.browserClickMode)}
                         >
                             {browserClickModeOptions.map((option) => (
-                                // eslint-disable-next-line jsx-a11y/label-has-associated-control -- the label wraps the Base UI control, which renders the input
-                                <label className="flex cursor-pointer items-start gap-3" key={option.mode}>
-                                    <RadioGroupItem className="mt-0.5" value={option.mode} />
+                                <label className="flex cursor-pointer items-start gap-3" htmlFor={`browser-click-mode-${option.mode}`} key={option.mode}>
+                                    <RadioGroupItem className="mt-0.5" id={`browser-click-mode-${option.mode}`} value={option.mode} />
                                     <span className="min-w-0 flex-1 space-y-1">
                                         <span className="block font-medium">{option.label}</span>
                                         <span className="text-muted-foreground block text-sm">{option.description}</span>

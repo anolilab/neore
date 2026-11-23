@@ -151,6 +151,12 @@ export function readTarget(
                     if (labelled instanceof HTMLInputElement && ["button", "reset", "submit"].includes(labelled.type)) {
                         names.push(labelled.value);
                     }
+
+                    // The rendered text of the control the label activates: a label that reads "Proceed" can activate a button that says "Pay".
+                    if (labelled instanceof HTMLElement) {
+                        // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- rendered text on purpose, as for the control itself
+                        names.push(labelled.innerText);
+                    }
                 }
 
                 // The rendered text of the control and of the element it lands on: a child with ordinary text can sit beside a purchase
@@ -297,7 +303,23 @@ export function readTarget(
             const isSubscribeLike = names.some((part) => options.subscribe.test(part.trim()));
             // A name found by two sources (the control's own aria-label is read in both the nodes and the scan) counts once: it would
             // otherwise use up the cap twice.
-            const joined = [...new Set(names.filter(Boolean))].join(" ");
+            // The joined name is built within the cap: a name past it is cut, so a long text node costs no more than the cap, and the
+            // read is marked truncated (the gate asks) rather than hashed whole.
+            let joined = "";
+
+            const distinct = new Set(names.filter(Boolean));
+
+            for (const part of distinct) {
+                const piece = joined === "" ? part : ` ${part}`;
+
+                if (joined.length + piece.length > options.max) {
+                    joined += piece.slice(0, options.max + 1 - joined.length);
+                    break;
+                }
+
+                joined += piece;
+            }
+
             const label = joined.slice(0, options.max);
             // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- the shown text on purpose: textContent keeps hidden descendants
             const shown = control instanceof HTMLElement ? control.innerText : (control.textContent ?? "");
@@ -359,8 +381,18 @@ export function readTarget(
                         const isSubmitValued =
                             submitter instanceof HTMLButtonElement ||
                             (submitter instanceof HTMLInputElement && ["button", "image", "reset", "submit"].includes(submitter.type));
+                        // The effective target and encoding are part of it too: a change to either after approval changes what the submit sends.
                         const kind =
-                            submitter === null ? "" : [submitter.type, submitter.name, isSubmitValued ? submitter.value : "", submitter.formMethod].join("#");
+                            submitter === null
+                                ? ""
+                                : [
+                                      submitter.type,
+                                      submitter.name,
+                                      isSubmitValued ? submitter.value : "",
+                                      submitter.formMethod,
+                                      submitter.formEnctype,
+                                      submitter.formTarget,
+                                  ].join("#");
 
                         destinations += `${link}|${formTarget}|${kind}|`;
                     }
@@ -401,7 +433,16 @@ export function readTarget(
                     return false;
                 }
             });
-            const formUrl = new URL(formAction, document.URL);
+            // The address the control's submit posts to: its own `formaction` when it has one (a submit button can send the order elsewhere
+            // than its form does), else the form's. The control is the one a click on this element activates.
+            const reached = control.closest("button, input, label, a");
+            const reachedControl = reached instanceof HTMLLabelElement ? reached.control : reached;
+            const submitAddress =
+                (reachedControl instanceof HTMLButtonElement || reachedControl instanceof HTMLInputElement) &&
+                Element.prototype.hasAttribute.call(reachedControl, "formaction")
+                    ? reachedControl.formAction
+                    : formAction;
+            const formUrl = new URL(submitAddress, document.URL);
             const isPaymentPost = formUrl.origin !== new URL(document.URL).origin && options.payment.test(formUrl.hostname);
             const isCardFields = hasCardFields || isPaymentFrame || isPaymentPost;
             // The address's path words, not the whole address: "cart" is a page's word, "cartoon" or a host name containing it is not.
@@ -437,12 +478,12 @@ export function readTarget(
                     ? ""
                     : [
                           String([...document.forms].indexOf(activatedForm)),
-                          activatedForm.id,
+                          Element.prototype.getAttribute.call(activatedForm, "id") ?? "",
                           // The resolved address, through the native getter: a `<base>` change moves the destination with the attribute unchanged.
                           formActionGetter === undefined ? "" : String(formActionGetter.call(activatedForm)),
-                          activatedForm.getAttribute("method") ?? "",
-                          activatedForm.getAttribute("enctype") ?? "",
-                          activatedForm.getAttribute("target") ?? "",
+                          Element.prototype.getAttribute.call(activatedForm, "method") ?? "",
+                          Element.prototype.getAttribute.call(activatedForm, "enctype") ?? "",
+                          Element.prototype.getAttribute.call(activatedForm, "target") ?? "",
                       ].join("\u{1}");
             const activatedKey = [
                 activatable instanceof HTMLLabelElement ? (activatable.getAttribute("for") ?? "") : "",
@@ -467,14 +508,14 @@ export function readTarget(
             const canonical = [
                 document.URL,
                 steps.join(">"),
-                joined,
+                label,
                 shown,
                 destinations,
                 String(isCheckout),
                 String(isSubmitLike),
                 String(isSubscribeLike),
                 activatedKey,
-                String(isScanCapped || isReferenceCapped),
+                String(isScanCapped || isReferenceCapped || joined.length > options.max),
             ].join("\u{0}");
 
             // SHA-256 of the canonical string, computed here, in the page, with no `await`: a digest the page could only await would
@@ -662,7 +703,7 @@ export function readTarget(
 
             if (isSubmitter && submitter !== null && ownForm !== null) {
                 for (const name of ["action", "method", "enctype", "target"]) {
-                    approved.push([ownForm, name, ownForm.getAttribute(name)]);
+                    approved.push([ownForm, name, Element.prototype.getAttribute.call(ownForm, name)]);
                 }
 
                 for (const name of ["formaction", "formmethod", "formenctype", "formtarget"]) {
@@ -678,11 +719,11 @@ export function readTarget(
                     }
 
                     for (const [element, name, value] of approved) {
-                        pageValues.push([element, name, element.getAttribute(name)]);
-                        element.removeAttribute(name);
+                        pageValues.push([element, name, Element.prototype.getAttribute.call(element, name)]);
+                        Element.prototype.removeAttribute.call(element, name);
 
                         if (value !== null) {
-                            element.setAttribute(name, value);
+                            Element.prototype.setAttribute.call(element, name, value);
                         }
                     }
                 },
@@ -739,10 +780,10 @@ export function readTarget(
 
                 // The browser read the submission's destination during the click: the page's own values come back now.
                 for (const [element, name, value] of pageValues) {
-                    element.removeAttribute(name);
+                    Element.prototype.removeAttribute.call(element, name);
 
                     if (value !== null) {
-                        element.setAttribute(name, value);
+                        Element.prototype.setAttribute.call(element, name, value);
                     }
                 }
             }

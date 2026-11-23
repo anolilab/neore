@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import type { Browser, Page } from "playwright";
 import { chromium } from "playwright";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { readTarget, TARGET_READ_OPTIONS } from "./target-read";
 
@@ -33,6 +33,10 @@ describe("readTarget in a page", () => {
 
     beforeEach(async () => {
         page = await browser.newPage();
+    });
+
+    afterEach(async () => {
+        await page.close();
     });
 
     afterAll(async () => {

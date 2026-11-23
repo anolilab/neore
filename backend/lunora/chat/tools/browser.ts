@@ -350,6 +350,11 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
             if (first.targetChanged === true && step.approvedCallId === undefined && step.expectTarget !== undefined && input.selector !== undefined) {
                 const again = await run({ action: "extract", approvalLook: true, selector: input.selector });
 
+                // A look that failed (a person took control since the mismatch) returns its own error, as the first look does.
+                if (again.error !== undefined) {
+                    return { error: again.error, success: false };
+                }
+
                 if (again.target === undefined || purchaseTargetNeedsApproval(again as ClickTargetLook)) {
                     return { error: CLICK_NEEDS_APPROVAL, success: false };
                 }

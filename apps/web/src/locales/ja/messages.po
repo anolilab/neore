@@ -1672,15 +1672,15 @@ msgstr "トークン使用量で OpenRouter 第 1 位"
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, other {お気に入り # 件}}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:310
+#: src/features/settings/components/chat/agent-settings.tsx:309
 msgid "+ Data Source: ~2,700 tokens (+100)"
 msgstr "+ データソース: 約 2,700 トークン（+100）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:309
+#: src/features/settings/components/chat/agent-settings.tsx:308
 msgid "+ Knowledge: ~2,600 tokens (+100)"
 msgstr "+ ナレッジ: 約 2,600 トークン（+100）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:308
+#: src/features/settings/components/chat/agent-settings.tsx:307
 msgid "+ Task Planning: ~2,500 tokens (+200)"
 msgstr "+ タスク計画: 約 2,500 トークン（+200）"
 
@@ -5102,7 +5102,7 @@ msgstr "利用停止"
 msgid "Base"
 msgstr "ベース"
 
-#: src/features/settings/components/chat/agent-settings.tsx:307
+#: src/features/settings/components/chat/agent-settings.tsx:306
 msgid "Base (agent loop only): ~2,300 tokens"
 msgstr "ベース（エージェントループのみ）: 約 2,300 トークン"
 
@@ -12990,7 +12990,7 @@ msgstr "推定コスト"
 msgid "Estimated provider cost {display}, billed to your own API key"
 msgstr "推定プロバイダーコスト {display}（ご自身の API キーに課金）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:303
+#: src/features/settings/components/chat/agent-settings.tsx:302
 msgid "Estimated token cost per conversation"
 msgstr "会話あたりの推定トークンコスト"
 
@@ -23655,7 +23655,7 @@ msgstr "次回の実行へのメモ（任意）"
 msgid "Note for: {0}"
 msgstr "メモ: {0}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:313
+#: src/features/settings/components/chat/agent-settings.tsx:312
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "注: モジュールはメッセージ単位ではなく会話単位で適用されます。トークン使用量を最適化するため、必要なモジュールだけを有効にしてください。"
 
@@ -24997,8 +24997,12 @@ msgid "Order the models you starred in the model picker and give them your own n
 msgstr "モデルピッカーでスターを付けたモデルを並べ替え、自分用の名前を付けられます。ニックネームは、ピッカー、コンポーザー、返信に表示されます。"
 
 #: src/features/settings/components/chat/agent-settings.tsx:65
-msgid "Ordinary buttons and links are checked, then clicked for real, so popups and real-click checks work. A page can still change one in the moment between that check and the press. Purchases and approved clicks stay checked in the page."
-msgstr "通常のボタンとリンクは確認してから実際にクリックするため、ポップアップや実クリックの確認が動作します。確認と押下の間の一瞬に、ページがそれを変更することはあります。購入と承認済みのクリックはページ内で確認されます。"
+msgid "Ordinary buttons and links are checked, then clicked for real, so popups and real-click checks work. A page can change one in the moment between that check and the press, and that press is not checked again, so an ordinary button can become a purchase unseen. Purchases you approve are still checked in the page."
+msgstr "通常のボタンとリンクは確認されたあとに実際にクリックされるため、ポップアップや実クリックを必要とする確認が機能します。ページは確認と押下の間の一瞬に要素を変更でき、その押下は再確認されないため、通常のボタンが気づかれないまま購入ボタンに変わる可能性があります。承認した購入は引き続きページ内で確認されます。"
+
+#: src/features/settings/components/chat/agent-settings.tsx:65
+#~ msgid "Ordinary buttons and links are checked, then clicked for real, so popups and real-click checks work. A page can still change one in the moment between that check and the press. Purchases and approved clicks stay checked in the page."
+#~ msgstr "通常のボタンとリンクは確認してから実際にクリックするため、ポップアップや実クリックの確認が動作します。確認と押下の間の一瞬に、ページがそれを変更することはあります。購入と承認済みのクリックはページ内で確認されます。"
 
 #: src/features/settings/components/chat/agent-settings.tsx:65
 #~ msgid "Ordinary buttons and links get real clicks, so popups and real-click checks work. Purchases and approved clicks stay checked in the page."
@@ -36442,7 +36446,7 @@ msgstr "トークン"
 msgid "Token budget"
 msgstr "トークン予算"
 
-#: src/features/settings/components/chat/agent-settings.tsx:302
+#: src/features/settings/components/chat/agent-settings.tsx:301
 msgid "Token Cost Impact"
 msgstr "トークンコストへの影響"
 

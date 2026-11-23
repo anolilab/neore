@@ -1672,15 +1672,15 @@ msgstr "OpenRouter token 用量排名第一"
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, other {# 个收藏}}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:310
+#: src/features/settings/components/chat/agent-settings.tsx:309
 msgid "+ Data Source: ~2,700 tokens (+100)"
 msgstr "+ 数据源：约 2,700 个 token（+100）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:309
+#: src/features/settings/components/chat/agent-settings.tsx:308
 msgid "+ Knowledge: ~2,600 tokens (+100)"
 msgstr "+ 知识：约 2,600 个 token（+100）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:308
+#: src/features/settings/components/chat/agent-settings.tsx:307
 msgid "+ Task Planning: ~2,500 tokens (+200)"
 msgstr "+ 任务规划：约 2,500 个 token（+200）"
 
@@ -5102,7 +5102,7 @@ msgstr "封禁"
 msgid "Base"
 msgstr "基础"
 
-#: src/features/settings/components/chat/agent-settings.tsx:307
+#: src/features/settings/components/chat/agent-settings.tsx:306
 msgid "Base (agent loop only): ~2,300 tokens"
 msgstr "基础（仅智能体循环）：约 2,300 个 token"
 
@@ -12990,7 +12990,7 @@ msgstr "预估费用"
 msgid "Estimated provider cost {display}, billed to your own API key"
 msgstr "预估提供商费用 {display}，计入你自己的 API 密钥"
 
-#: src/features/settings/components/chat/agent-settings.tsx:303
+#: src/features/settings/components/chat/agent-settings.tsx:302
 msgid "Estimated token cost per conversation"
 msgstr "每次对话的预估 token 成本"
 
@@ -23655,7 +23655,7 @@ msgstr "给下次运行的备注（可选）"
 msgid "Note for: {0}"
 msgstr "备注：{0}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:313
+#: src/features/settings/components/chat/agent-settings.tsx:312
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "注意：模块按对话而非按消息应用。仅启用你需要的模块以优化 token 用量。"
 
@@ -24997,8 +24997,12 @@ msgid "Order the models you starred in the model picker and give them your own n
 msgstr "为你在模型选择器中加星标的模型排序，并为它们起自己的名字。昵称会显示在选择器、输入框和回复中。"
 
 #: src/features/settings/components/chat/agent-settings.tsx:65
-msgid "Ordinary buttons and links are checked, then clicked for real, so popups and real-click checks work. A page can still change one in the moment between that check and the press. Purchases and approved clicks stay checked in the page."
-msgstr "普通按钮和链接会先检查，再真实点击，因此弹窗和真实点击检查可以正常工作。页面仍可能在检查与按下之间的瞬间更改其中一个。购买和已批准的点击仍在页面内检查。"
+msgid "Ordinary buttons and links are checked, then clicked for real, so popups and real-click checks work. A page can change one in the moment between that check and the press, and that press is not checked again, so an ordinary button can become a purchase unseen. Purchases you approve are still checked in the page."
+msgstr "普通按钮和链接会先被检查，然后真实点击，因此弹窗和需要真实点击的检查可以正常工作。页面可能在检查与按下之间的那一刻改变其中某个元素，而该次按下不会再次检查，因此普通按钮可能在不知情的情况下变成购买按钮。你批准的购买仍会在页面中检查。"
+
+#: src/features/settings/components/chat/agent-settings.tsx:65
+#~ msgid "Ordinary buttons and links are checked, then clicked for real, so popups and real-click checks work. A page can still change one in the moment between that check and the press. Purchases and approved clicks stay checked in the page."
+#~ msgstr "普通按钮和链接会先检查，再真实点击，因此弹窗和真实点击检查可以正常工作。页面仍可能在检查与按下之间的瞬间更改其中一个。购买和已批准的点击仍在页面内检查。"
 
 #: src/features/settings/components/chat/agent-settings.tsx:65
 #~ msgid "Ordinary buttons and links get real clicks, so popups and real-click checks work. Purchases and approved clicks stay checked in the page."
@@ -36442,7 +36446,7 @@ msgstr "token"
 msgid "Token budget"
 msgstr "token 预算"
 
-#: src/features/settings/components/chat/agent-settings.tsx:302
+#: src/features/settings/components/chat/agent-settings.tsx:301
 msgid "Token Cost Impact"
 msgstr "Token 成本影响"
 

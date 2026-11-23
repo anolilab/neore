@@ -315,19 +315,17 @@ describe("time-boxed grants", () => {
         clock.mockRestore();
     });
 
-    it("an ask-mode call always asks, whatever its preread answers (a skipped ask would let an unapproved click run)", async () => {
-        const cannotRun = vi.fn(async () => false);
-        const ordinary = vi.fn(async () => false);
-        const build = (own: (...args: never[]) => unknown) => {
-            const tools = { mcp_Files__delete: { execute: async () => "ok", looksBeforeAsk: true, needsApproval: own } } as unknown as ToolSet;
-
-            return applyToolPermissions(tools, () => mcp, { [mcp.key]: "ask" }).tools.mcp_Files__delete as unknown as {
-                needsApproval: (input: unknown, options: object) => Promise<boolean>;
-            };
+    it("an ask-mode call runs its preread with asking set, and always asks (a skipped ask would let an unapproved click run)", async () => {
+        // One preread that answers no: the wrapper must still ask, and must have run the preread for this call.
+        const preread = vi.fn(async () => false);
+        const tools = { mcp_Files__delete: { execute: async () => "ok", looksBeforeAsk: true, needsApproval: preread } } as unknown as ToolSet;
+        const { tools: built } = applyToolPermissions(tools, () => mcp, { [mcp.key]: "ask" });
+        const { needsApproval } = built.mcp_Files__delete as unknown as {
+            needsApproval: (input: unknown, options: object) => Promise<boolean>;
         };
 
-        expect(await build(cannotRun as never).needsApproval({}, {})).toBe(true);
-        expect(await build(ordinary as never).needsApproval({}, {})).toBe(true);
+        expect(await needsApproval({}, { toolCallId: "call-7" })).toBe(true);
+        expect(preread).toHaveBeenCalledWith({}, expect.objectContaining({ asking: true, toolCallId: "call-7" }));
     });
 
     it("never lifts a tool's own approval check, whatever the grant says", async () => {

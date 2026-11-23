@@ -311,6 +311,19 @@ export const executeBrowserAction = internalAction
                     await ctx.runMutation(internal.browser.functions.endSessionUse, held);
                     await refund();
 
+                    // Nothing ran, so an approved click keeps the target it was checked against: its retry with the same approval is
+                    // still checked, rather than refused as unknown. (A click that did run keeps its record consumed.)
+                    if (args.approvedCallId !== undefined && approvedTarget !== undefined) {
+                        await ctx
+                            .runMutation(internal.browser.functions.recordPurchaseLook, {
+                                browser: cfSessionId ?? NO_PROVIDER_SESSION,
+                                sessionId,
+                                target: approvedTarget,
+                                toolCallId: args.approvedCallId,
+                            })
+                            .catch(() => undefined);
+                    }
+
                     const busy = { error: BROWSER_BUSY_SIGNING_IN, success: false };
 
                     return returned === undefined ? busy : handedBackResult(busy, returned);
