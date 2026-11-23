@@ -2198,7 +2198,7 @@ msgstr "実行がロックされたチャットやリンクで共有されたチ
 msgid "A run's thread is filed in this project. Moving the task to another project starts a new thread."
 msgstr "実行のスレッドはこのプロジェクトに保存されます。タスクを別のプロジェクトに移動すると、新しいスレッドが始まります。"
 
-#: src/features/settings/components/chat/bots-settings.tsx:436
+#: src/features/settings/components/chat/bots-settings.tsx:438
 msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 msgstr "チャット間でボットが保持するサンドボックス。アイドル時は一時停止され、一時停止中は課金されません。"
 
@@ -2250,8 +2250,8 @@ msgstr "同じツールを追加と無効化の両方に指定することはで
 msgid "A tool that needs your approval pauses the turn with a card. Only the owner answers, and the queued speakers continue afterwards."
 msgstr "承認が必要なツールは、カードを表示してターンを一時停止します。回答できるのは所有者だけで、その後にキューに入っている発言者が続きます。"
 
-#: src/features/settings/components/chat/bots-settings.tsx:220
-#: src/features/settings/components/chat/bots-settings.tsx:272
+#: src/features/settings/components/chat/bots-settings.tsx:222
+#: src/features/settings/components/chat/bots-settings.tsx:274
 msgid "A tool you typed was not added. Add it or clear the field first."
 msgstr "入力したツールが追加されていません。先に追加するか、入力欄を空にしてください。"
 
@@ -2306,7 +2306,7 @@ msgstr "{0} について（新しいタブで開きます）"
 msgid "about me"
 msgstr "自己紹介"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:213
+#: src/features/settings/components/personalization/personalization-settings.tsx:225
 #: src/features/settings/lib/settings-keywords.ts:87
 #: src/features/settings/lib/settings-keywords.ts:88
 #: src/features/settings/lib/settings-keywords.ts:89
@@ -2831,7 +2831,7 @@ msgstr "スターを付ける"
 msgid "Add to thread"
 msgstr "スレッドに追加"
 
-#: src/features/prompts/components/thread-variables-config.tsx:195
+#: src/features/prompts/components/thread-variables-config.tsx:208
 msgid "Add variable"
 msgstr "変数を追加"
 
@@ -4730,7 +4730,7 @@ msgstr "自動"
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:65
 #: src/features/chat/thread/media-gallery-view.tsx:509
-#: src/features/settings/components/chat/bots-settings.tsx:131
+#: src/features/settings/components/chat/bots-settings.tsx:132
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Auto"
 msgstr "自動"
@@ -5442,11 +5442,11 @@ msgstr "ボスニア語"
 msgid "Bosnian (Bosnia)"
 msgstr "ボスニア語（ボスニア）"
 
-#: src/features/settings/components/chat/bots-settings.tsx:240
+#: src/features/settings/components/chat/bots-settings.tsx:242
 msgid "Bot created"
 msgstr "ボットを作成しました"
 
-#: src/features/settings/components/chat/bots-settings.tsx:362
+#: src/features/settings/components/chat/bots-settings.tsx:364
 msgid "Bot deleted"
 msgstr "ボットを削除しました"
 
@@ -6023,7 +6023,7 @@ msgstr "カナダ"
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:194
 #: src/features/prompts/components/variable-fill-dialog.tsx:185
 #: src/features/settings/components/chat/api-keys-settings.tsx:439
-#: src/features/settings/components/chat/bots-settings.tsx:549
+#: src/features/settings/components/chat/bots-settings.tsx:565
 #: src/features/settings/components/chat/custom-providers-settings.tsx:638
 #: src/features/settings/components/chat/mcp/server-form.tsx:334
 #: src/features/settings/components/chat/native-providers-settings.tsx:709
@@ -6058,7 +6058,7 @@ msgstr "キャンセル"
 msgid "Cancel deep work"
 msgstr "ディープワークをキャンセル"
 
-#: src/features/settings/components/privacy/data-export.tsx:108
+#: src/features/settings/components/privacy/data-export.tsx:112
 msgid "Cancel Export"
 msgstr "エクスポートをキャンセル"
 
@@ -6097,7 +6097,7 @@ msgstr "キャンセル済み"
 msgid "Cancelled on this computer."
 msgstr "このコンピューターでキャンセルされました。"
 
-#: src/features/settings/components/privacy/data-export.tsx:108
+#: src/features/settings/components/privacy/data-export.tsx:112
 msgid "Cancelling..."
 msgstr "キャンセルしています..."
 
@@ -6315,6 +6315,10 @@ msgstr "組織の一意の識別子を変更します"
 msgid "Changed"
 msgstr "変更あり"
 
+#: src/features/admin/components/changed-by-admin-mark.tsx:66
+msgid "Changed by an admin"
+msgstr "管理者が変更しました"
+
 #: src/features/skills/components/skill-builder-diff.tsx:44
 msgid "Changes from the last refinement"
 msgstr "前回の改善からの変更点"
@@ -6383,7 +6387,7 @@ msgstr "チャット"
 #: src/features/layout/components/workspace-switch.tsx:47
 #: src/features/layout/lib/dashboard-page-names.ts:20
 #: src/features/settings/components/account/account-settings.tsx:341
-#: src/features/settings/components/chat/bots-settings.tsx:499
+#: src/features/settings/components/chat/bots-settings.tsx:515
 #: src/features/settings/lib/settings-keywords.ts:33
 #: src/features/settings/lib/settings-navigation.ts:100
 msgid "Chat"
@@ -7784,7 +7788,7 @@ msgstr "コンテキストを圧縮しています..."
 
 #: src/features/auth/components/device-code-parts.tsx:76
 #: src/features/projects/components/computer-rule-file-import.tsx:502
-#: src/features/settings/components/chat/bots-settings.tsx:435
+#: src/features/settings/components/chat/bots-settings.tsx:437
 msgid "Computer"
 msgstr "コンピュータ"
 
@@ -7845,7 +7849,7 @@ msgstr "匿名ユーザーのクリーンアップのしきい値とバッチ上
 msgid "Configure UI preferences and display options."
 msgstr "UI の設定と表示オプションを構成します。"
 
-#: src/features/prompts/components/thread-variables-config.tsx:181
+#: src/features/prompts/components/thread-variables-config.tsx:194
 msgid "Configure variable values for this thread. These values will replace {VARIABLE_PLACEHOLDER} placeholders when you use prompts."
 msgstr "このスレッドの変数の値を設定します。プロンプトを使うときに {VARIABLE_PLACEHOLDER} プレースホルダーがこれらの値に置き換えられます。"
 
@@ -8804,7 +8808,7 @@ msgstr "Autoを変更できませんでした。もう一度お試しくださ�
 msgid "Could not change push notifications. Try again."
 msgstr "プッシュ通知を変更できませんでした。もう一度お試しください。"
 
-#: src/features/settings/components/chat/bots-settings.tsx:262
+#: src/features/settings/components/chat/bots-settings.tsx:264
 msgid "Could not change the bot's permission mode."
 msgstr "ボットの権限モードを変更できませんでした。"
 
@@ -8834,7 +8838,7 @@ msgstr "会話の圧縮に失敗しました。もう一度お試しください
 msgid "Could not confirm that {0} was started again. Check on {hostLabel} before you try again."
 msgstr "{0} が再開されたことを確認できませんでした。もう一度試す前に {hostLabel} を確認してください。"
 
-#: src/features/settings/components/chat/bots-settings.tsx:325
+#: src/features/settings/components/chat/bots-settings.tsx:327
 msgid "Could not confirm that the bot's tools were saved. Check them and try again."
 msgstr "ボットのツールが保存されたか確認できませんでした。内容を確認して、もう一度お試しください。"
 
@@ -8893,7 +8897,7 @@ msgstr "コピーできませんでした。テキストを選択してくださ
 msgid "Could not create a collection for this import. Try again."
 msgstr "このインポート用のコレクションを作成できませんでした。もう一度お試しください。"
 
-#: src/features/settings/components/chat/bots-settings.tsx:242
+#: src/features/settings/components/chat/bots-settings.tsx:244
 msgid "Could not create the bot."
 msgstr "ボットを作成できませんでした。"
 
@@ -8906,7 +8910,7 @@ msgstr "グループチャットを作成できませんでした"
 msgid "Could not create the page"
 msgstr "ページを作成できませんでした"
 
-#: src/features/settings/components/chat/bots-settings.tsx:364
+#: src/features/settings/components/chat/bots-settings.tsx:366
 msgid "Could not delete the bot."
 msgstr "ボットを削除できませんでした。"
 
@@ -8941,6 +8945,10 @@ msgstr "下書きを生成できませんでした。もう一度お試しくだ
 #: src/features/workflow/hooks/use-workflow-transfer.ts:82
 msgid "Could not import the workflow"
 msgstr "ワークフローをインポートできませんでした"
+
+#: src/features/admin/components/changed-by-admin-mark.tsx:58
+msgid "Could not keep this as yours. Try again."
+msgstr "自分のものとして保持できませんでした。もう一度お試しください。"
 
 #: src/features/develop/components/thread-pull-requests.tsx:149
 msgid "Could not link. Try again."
@@ -9147,7 +9155,7 @@ msgstr "再試行できませんでした。もう一度お試しください。
 msgid "Could not save that choice. Try again."
 msgstr "その選択を保存できませんでした。もう一度お試しください。"
 
-#: src/features/settings/components/chat/bots-settings.tsx:317
+#: src/features/settings/components/chat/bots-settings.tsx:319
 msgid "Could not save the bot's tools. Its tools are unchanged."
 msgstr "ボットのツールを保存できませんでした。ツールは変更されていません。"
 
@@ -9223,7 +9231,7 @@ msgstr "サインアウトできませんでした"
 msgid "Could not snooze the thread. Please try again."
 msgstr "スレッドをスヌーズできませんでした。もう一度お試しください。"
 
-#: src/features/settings/components/chat/bots-settings.tsx:252
+#: src/features/settings/components/chat/bots-settings.tsx:254
 msgid "Could not start a chat with this bot."
 msgstr "このボットとのチャットを開始できませんでした。"
 
@@ -9418,7 +9426,7 @@ msgstr "アカウントへのプログラムによるアクセス用の API キ�
 msgid "Create API Key"
 msgstr "API キーを作成"
 
-#: src/features/settings/components/chat/bots-settings.tsx:446
+#: src/features/settings/components/chat/bots-settings.tsx:448
 msgid "Create bot"
 msgstr "ボットを作成"
 
@@ -9583,8 +9591,8 @@ msgstr "作成日：{createdAt}"
 msgid "Creates a single-use link, valid for 7 days. Whoever opens it signed in gets access."
 msgstr "7 日間有効な 1 回限りのリンクを作成します。サインインした状態で開いた人がアクセス権を得ます。"
 
-#: src/features/settings/components/chat/bots-settings.tsx:446
-#: src/features/settings/components/chat/bots-settings.tsx:449
+#: src/features/settings/components/chat/bots-settings.tsx:448
+#: src/features/settings/components/chat/bots-settings.tsx:451
 msgid "Creating bot…"
 msgstr "ボットを作成中…"
 
@@ -9819,8 +9827,8 @@ msgstr "カスタム指示"
 msgid "Custom instructions"
 msgstr "カスタム指示"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:274
-#: src/features/settings/components/personalization/personalization-settings.tsx:289
+#: src/features/settings/components/personalization/personalization-settings.tsx:310
+#: src/features/settings/components/personalization/personalization-settings.tsx:325
 #: src/features/settings/lib/settings-keywords.ts:93
 msgid "Custom Instructions"
 msgstr "カスタム指示"
@@ -9849,7 +9857,7 @@ msgstr "カスタムスタイル"
 msgid "Custom System Prompt"
 msgstr "カスタムシステムプロンプト"
 
-#: src/features/settings/components/chat/bots-settings.tsx:468
+#: src/features/settings/components/chat/bots-settings.tsx:471
 msgid "Custom tools"
 msgstr "カスタムツール"
 
@@ -10011,7 +10019,7 @@ msgstr "データと分析"
 msgid "Data Access Summary"
 msgstr "データアクセスの概要"
 
-#: src/features/settings/components/privacy/data-export.tsx:95
+#: src/features/settings/components/privacy/data-export.tsx:99
 #: src/features/settings/lib/settings-keywords.ts:106
 msgid "Data Export"
 msgstr "データのエクスポート"
@@ -10326,7 +10334,7 @@ msgstr "既定の音声"
 msgid "Define default values and descriptions for variables used in your prompt. These help others understand what values to provide."
 msgstr "プロンプトで使う変数の既定値と説明を定義します。他の人がどんな値を入力すればよいか理解しやすくなります。"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:274
+#: src/features/settings/components/personalization/personalization-settings.tsx:310
 msgid "Define how you want the AI to respond. These instructions apply to all conversations."
 msgstr "AI にどのように応答してほしいかを定義します。これらの指示はすべての会話に適用されます。"
 
@@ -10372,8 +10380,8 @@ msgstr "委任された{0}の作業はこのモデルで実行されます。"
 #: src/features/prompts/components/prompt-list-view.tsx:227
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:751
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:890
-#: src/features/settings/components/chat/bots-settings.tsx:508
-#: src/features/settings/components/chat/bots-settings.tsx:562
+#: src/features/settings/components/chat/bots-settings.tsx:524
+#: src/features/settings/components/chat/bots-settings.tsx:578
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:343
 #: src/features/settings/components/chat/trigger-settings.tsx:1096
 #: src/features/skills/components/skill-list.tsx:311
@@ -10401,7 +10409,7 @@ msgstr "「{pendingDeleteTitle}」を削除しますか？"
 #. placeholder {0}: model.name
 #. placeholder {0}: server.name
 #: src/features/local-models/components/ollama-model-manager.tsx:265
-#: src/features/settings/components/chat/bots-settings.tsx:502
+#: src/features/settings/components/chat/bots-settings.tsx:518
 #: src/features/settings/components/chat/mcp/server-list.tsx:171
 #: src/features/skills/components/skill-item.tsx:190
 msgid "Delete {0}"
@@ -10415,7 +10423,7 @@ msgstr "{0} 人のユーザーを削除"
 #. placeholder {0}: deleting.name
 #. placeholder {0}: pendingDelete?.name ?? ""
 #: src/features/local-models/components/ollama-model-manager.tsx:342
-#: src/features/settings/components/chat/bots-settings.tsx:572
+#: src/features/settings/components/chat/bots-settings.tsx:588
 msgid "Delete {0}?"
 msgstr "{0} を削除しますか？"
 
@@ -10899,7 +10907,7 @@ msgstr "ワークフローを説明してください...例：「テキストか
 #: src/features/prompts/components/prompt-list-view.tsx:117
 #: src/features/prompts/components/prompt-list-view.tsx:120
 #: src/features/prompts/components/variable-definitions.tsx:122
-#: src/features/settings/components/chat/bots-settings.tsx:385
+#: src/features/settings/components/chat/bots-settings.tsx:387
 #: src/features/skills/components/bundle-import-dialog.tsx:115
 #: src/features/skills/components/bundle-import-dialog.tsx:148
 #: src/features/skills/components/skill-builder-diff.tsx:28
@@ -11448,7 +11456,7 @@ msgstr "{fileName} をダウンロード"
 msgid "Download {name} ({size})"
 msgstr "{name} をダウンロード（{size}）"
 
-#: src/features/settings/components/privacy/data-export.tsx:94
+#: src/features/settings/components/privacy/data-export.tsx:98
 msgid "Download a copy of all your personal data in JSON format (GDPR Article 20 - Right to Data Portability)"
 msgstr "すべての個人データのコピーを JSON 形式でダウンロードします（GDPR 第 20 条 - データポータビリティの権利）"
 
@@ -11477,7 +11485,7 @@ msgstr "コンテンツをダウンロード"
 msgid "Download document"
 msgstr "ドキュメントをダウンロード"
 
-#: src/features/settings/components/privacy/data-export.tsx:152
+#: src/features/settings/components/privacy/data-export.tsx:158
 msgid "Download Export"
 msgstr "エクスポートをダウンロード"
 
@@ -11517,7 +11525,7 @@ msgstr "PDF をダウンロード"
 msgid "Download PNG"
 msgstr "PNG をダウンロード"
 
-#: src/features/settings/components/privacy/data-export.tsx:62
+#: src/features/settings/components/privacy/data-export.tsx:66
 msgid "Download started"
 msgstr "ダウンロードを開始しました"
 
@@ -11770,7 +11778,7 @@ msgstr "例：もっと簡潔に、Markdown 出力を必須に、安全ルール
 msgid "e.g., Make it stricter about JSON output, add a code example..."
 msgstr "例：JSON 出力をより厳密に、コード例を追加..."
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:237
+#: src/features/settings/components/personalization/personalization-settings.tsx:273
 msgid "e.g., Product Designer, Software Developer"
 msgstr "例：プロダクトデザイナー、ソフトウェア開発者"
 
@@ -12695,7 +12703,7 @@ msgstr "Enter で送信、Shift+Enter で改行。"
 msgid "Enter URL..."
 msgstr "URL を入力..."
 
-#: src/features/prompts/components/thread-variables-config.tsx:239
+#: src/features/prompts/components/thread-variables-config.tsx:267
 #: src/features/prompts/components/variable-fill-dialog.tsx:162
 msgid "Enter value..."
 msgstr "値を入力..."
@@ -12712,7 +12720,7 @@ msgstr "現在のパスワードを入力してください"
 msgid "Enter your current password and choose a new one"
 msgstr "現在のパスワードを入力し、新しいパスワードを設定してください"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:294
+#: src/features/settings/components/personalization/personalization-settings.tsx:330
 msgid "Enter your custom instructions..."
 msgstr "カスタム指示を入力..."
 
@@ -12778,7 +12786,7 @@ msgstr "新しいメールアドレスを下に入力してください"
 msgid "Enter your new password below"
 msgstr "新しいパスワードを下に入力してください"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:229
+#: src/features/settings/components/personalization/personalization-settings.tsx:265
 msgid "Enter your nickname"
 msgstr "ニックネームを入力"
 
@@ -12801,7 +12809,7 @@ msgstr "二要素認証を無効にするにはパスワードを入力してく
 msgid "Enter your password to enable two-factor authentication"
 msgstr "二要素認証を有効にするにはパスワードを入力してください"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:248
+#: src/features/settings/components/personalization/personalization-settings.tsx:284
 msgid "Enter your profession"
 msgstr "職業を入力"
 
@@ -12809,7 +12817,7 @@ msgstr "職業を入力"
 msgid "Enter your prompt content here... Use {VARIABLE_PLACEHOLDER} for dynamic content."
 msgstr "プロンプトの内容をここに入力してください... 動的な内容には {VARIABLE_PLACEHOLDER} を使用します。"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:320
+#: src/features/settings/components/personalization/personalization-settings.tsx:356
 msgid "Enter your title instructions..."
 msgstr "タイトルの指示を入力..."
 
@@ -13001,7 +13009,7 @@ msgstr "イベント終了日"
 msgid "Every 6 hours"
 msgstr "6 時間ごと"
 
-#: src/features/settings/components/chat/bots-settings.tsx:527
+#: src/features/settings/components/chat/bots-settings.tsx:543
 msgid "Every chat and scheduled run of this bot gets only these tools. Your tool permissions still apply."
 msgstr "このボットのすべてのチャットとスケジュール実行はこれらのツールのみを使います。ツールの権限設定は引き続き適用されます。"
 
@@ -13374,7 +13382,7 @@ msgid "Expires in {remainingTime}"
 msgstr "{remainingTime} 後に期限切れ"
 
 #. placeholder {0}: formatDate(exportStatus.expiresAt, i18n.locale)
-#: src/features/settings/components/privacy/data-export.tsx:116
+#: src/features/settings/components/privacy/data-export.tsx:120
 msgid "Expires on {0}"
 msgstr "{0} に期限切れ"
 
@@ -13431,7 +13439,7 @@ msgstr "SKILL.md としてエクスポート"
 msgid "Export bundle"
 msgstr "バンドルをエクスポート"
 
-#: src/features/settings/components/privacy/data-export.tsx:75
+#: src/features/settings/components/privacy/data-export.tsx:79
 msgid "Export cancelled"
 msgstr "エクスポートをキャンセルしました"
 
@@ -13439,11 +13447,11 @@ msgstr "エクスポートをキャンセルしました"
 msgid "Export chat"
 msgstr "チャットをエクスポート"
 
-#: src/features/settings/components/privacy/data-export.tsx:122
+#: src/features/settings/components/privacy/data-export.tsx:126
 msgid "Export failed"
 msgstr "エクスポートに失敗しました"
 
-#: src/features/settings/components/privacy/data-export.tsx:138
+#: src/features/settings/components/privacy/data-export.tsx:144
 msgid "Export incomplete"
 msgstr "エクスポートが不完全です"
 
@@ -13452,11 +13460,11 @@ msgstr "エクスポートが不完全です"
 msgid "Export presentation"
 msgstr "プレゼンテーションをエクスポート"
 
-#: src/features/settings/components/privacy/data-export.tsx:115
+#: src/features/settings/components/privacy/data-export.tsx:119
 msgid "Export ready!"
 msgstr "エクスポートの準備ができました！"
 
-#: src/features/settings/components/privacy/data-export.tsx:47
+#: src/features/settings/components/privacy/data-export.tsx:51
 msgid "Export request submitted. You will receive an email when it's ready."
 msgstr "エクスポートのリクエストを送信しました。準備ができたらメールでお知らせします。"
 
@@ -13661,7 +13669,7 @@ msgstr "ファイルを添付できませんでした"
 msgid "Failed to ban user"
 msgstr "ユーザーを利用停止にできませんでした"
 
-#: src/features/settings/components/privacy/data-export.tsx:77
+#: src/features/settings/components/privacy/data-export.tsx:81
 msgid "Failed to cancel export"
 msgstr "エクスポートをキャンセルできませんでした"
 
@@ -13858,7 +13866,7 @@ msgstr "コネクタを切断できませんでした"
 msgid "Failed to dismiss the digest"
 msgstr "ダイジェストを閉じられませんでした"
 
-#: src/features/settings/components/privacy/data-export.tsx:65
+#: src/features/settings/components/privacy/data-export.tsx:69
 msgid "Failed to download export"
 msgstr "エクスポートをダウンロードできませんでした"
 
@@ -14055,7 +14063,7 @@ msgstr "タグの名前を変更できませんでした"
 msgid "Failed to reorder tags"
 msgstr "タグを並べ替えられませんでした"
 
-#: src/features/settings/components/privacy/data-export.tsx:49
+#: src/features/settings/components/privacy/data-export.tsx:53
 msgid "Failed to request export"
 msgstr "エクスポートをリクエストできませんでした"
 
@@ -14147,8 +14155,8 @@ msgstr "評価を保存できませんでした"
 #: src/features/settings/components/account/account-settings.tsx:141
 #: src/features/settings/components/account/account-settings.tsx:149
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:40
-#: src/features/settings/components/personalization/personalization-settings.tsx:113
-#: src/features/settings/components/personalization/personalization-settings.tsx:190
+#: src/features/settings/components/personalization/personalization-settings.tsx:118
+#: src/features/settings/components/personalization/personalization-settings.tsx:202
 msgid "Failed to save settings"
 msgstr "設定を保存できませんでした"
 
@@ -14170,7 +14178,7 @@ msgstr "ケースを保存できませんでした"
 msgid "Failed to save the dataset"
 msgstr "データセットを保存できませんでした"
 
-#: src/features/prompts/components/thread-variables-config.tsx:154
+#: src/features/prompts/components/thread-variables-config.tsx:167
 msgid "Failed to save variables"
 msgstr "変数を保存できませんでした"
 
@@ -15277,11 +15285,11 @@ msgstr "会話やメッセージを含む詳細な情報については、デー
 msgid "For each message from you, the chat decides who answers. A routed or mentioned turn has at most three speakers."
 msgstr "あなたのメッセージごとに、チャットが回答者を決めます。ルーティングまたはメンションされたターンの発言者は最大 3 人です。"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:285
+#: src/features/settings/components/personalization/personalization-settings.tsx:321
 msgid "For example: \"Focus on Python best practices\", \"Maintain a professional tone\", or \"Always cite sources for key conclusions\"."
 msgstr "例：「Python のベストプラクティスを重視する」「プロフェッショナルなトーンを保つ」「重要な結論には必ず出典を示す」。"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:311
+#: src/features/settings/components/personalization/personalization-settings.tsx:347
 msgid "For example: \"Keep titles under four words\", \"Write titles in German\", or \"Start with a verb\"."
 msgstr "例：「タイトルは 4 語以内にする」「タイトルはドイツ語で書く」「動詞で始める」。"
 
@@ -15692,7 +15700,7 @@ msgstr "フル 1080p の高精細動画出力"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
 #: src/features/chat/thread/composer-permission-mode.tsx:42
-#: src/features/settings/components/chat/bots-settings.tsx:132
+#: src/features/settings/components/chat/bots-settings.tsx:133
 msgid "Full access"
 msgstr "フルアクセス"
 
@@ -16770,7 +16778,7 @@ msgstr "ハンズフリーの音声を更新しました"
 msgid "Happens on"
 msgstr "日付"
 
-#: src/features/settings/components/chat/bots-settings.tsx:467
+#: src/features/settings/components/chat/bots-settings.tsx:470
 msgid "Has a computer"
 msgstr "コンピュータあり"
 
@@ -16839,7 +16847,7 @@ msgstr "新しいチームに自己紹介するビジネスメールを書くの
 msgid "Help me write a professional email to my manager"
 msgstr "上司宛てのビジネスメールを書くのを手伝って"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:212
+#: src/features/settings/components/personalization/personalization-settings.tsx:224
 msgid "Help the AI understand you better by sharing some information about yourself. This information is used to personalize responses across all tasks."
 msgstr "あなたについての情報を共有して、AI があなたをより理解できるようにしましょう。この情報は、すべてのタスクで応答をパーソナライズするために使われます。"
 
@@ -17224,7 +17232,7 @@ msgstr "一時チャットが自動削除されるまでの保持期間です。
 msgid "How often the agent retries with the verifier's feedback before asking you to review."
 msgstr "レビューを依頼する前に、エージェントが検証役のフィードバックをもとに再試行する回数です。"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:310
+#: src/features/settings/components/personalization/personalization-settings.tsx:346
 #: src/features/settings/lib/settings-keywords.ts:95
 msgid "How should titles be written?"
 msgstr "タイトルはどのように書きますか？"
@@ -17237,7 +17245,7 @@ msgstr "マージ方法"
 msgid "How Triggers Work"
 msgstr "トリガーの仕組み"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:278
+#: src/features/settings/components/personalization/personalization-settings.tsx:314
 #: src/features/settings/lib/settings-keywords.ts:92
 msgid "How would you like the AI to respond?"
 msgstr "AI にどのように応答してほしいですか？"
@@ -18150,7 +18158,7 @@ msgid "instructions"
 msgstr "指示"
 
 #: src/features/projects/components/project-rule-files.tsx:347
-#: src/features/settings/components/chat/bots-settings.tsx:395
+#: src/features/settings/components/chat/bots-settings.tsx:397
 #: src/features/skills/components/bundle-import-dialog.tsx:116
 #: src/features/skills/components/bundle-import-dialog.tsx:150
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:155
@@ -18646,6 +18654,10 @@ msgstr "カザフスタン"
 msgid "Keep accepting the old secret for 24 hours"
 msgstr "古いシークレットを 24 時間引き続き受け付ける"
 
+#: src/features/admin/components/changed-by-admin-mark.tsx:78
+msgid "Keep as mine"
+msgstr "自分のものとして保持"
+
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1009
 msgid "Keep control"
 msgstr "操作を続ける"
@@ -18689,6 +18701,10 @@ msgstr "履歴をすべて保持する"
 #: src/features/chat/core/utils/language-utilities.ts:370
 msgid "Kenya"
 msgstr "ケニア"
+
+#: src/features/admin/components/changed-by-admin-mark.tsx:56
+msgid "Kept as yours"
+msgstr "自分のものとして保持しました"
 
 #: src/features/devices/components/devices-settings.tsx:495
 msgid "Key file (optional, absolute path)"
@@ -18916,6 +18932,11 @@ msgstr "言語"
 #: src/features/settings/lib/settings-keywords.ts:32
 msgid "Language & Localization"
 msgstr "言語と地域"
+
+#. placeholder {0}: userSettings.language
+#: src/features/settings/components/personalization/personalization-settings.tsx:248
+msgid "Language: {0}"
+msgstr "言語: {0}"
 
 #: src/features/chat/core/utils/language-utilities.ts:282
 msgid "Lao"
@@ -19971,7 +19992,7 @@ msgstr "読み込んでいます..."
 #: src/features/chat/thread/request-secret-prompt.tsx:478
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
-#: src/features/settings/components/chat/bots-settings.tsx:457
+#: src/features/settings/components/chat/bots-settings.tsx:459
 #: src/features/settings/components/personalization/memory-item.tsx:129
 #: src/routes/auth/extension.tsx:68
 msgid "Loading…"
@@ -20010,6 +20031,11 @@ msgstr "所在地"
 #: src/features/settings/components/account/account-settings.tsx:299
 msgid "Location updated"
 msgstr "所在地を更新しました"
+
+#. placeholder {0}: userSettings.location
+#: src/features/settings/components/personalization/personalization-settings.tsx:249
+msgid "Location: {0}"
+msgstr "場所: {0}"
 
 #: src/features/chat/thread-list/thread-node.tsx:893
 msgid "Lock chat"
@@ -21322,7 +21348,7 @@ msgstr "モード:"
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
-#: src/features/settings/components/chat/bots-settings.tsx:405
+#: src/features/settings/components/chat/bots-settings.tsx:407
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:278
 #: src/features/settings/components/chat/usage-settings.tsx:317
 #: src/features/tasks/components/task-form-dialog.tsx:407
@@ -21574,8 +21600,8 @@ msgstr "Workers AI 上で動く Moonshot のマルチモーダル Kimi K2.5"
 msgid "More"
 msgstr "多い"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:255
-#: src/features/settings/components/personalization/personalization-settings.tsx:259
+#: src/features/settings/components/personalization/personalization-settings.tsx:291
+#: src/features/settings/components/personalization/personalization-settings.tsx:295
 #: src/features/settings/lib/settings-keywords.ts:89
 msgid "More About You"
 msgstr "あなたについての詳細"
@@ -21935,7 +21961,7 @@ msgstr "名前"
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
 #: src/features/prompts/components/prompt-list-view.tsx:98
 #: src/features/prompts/components/prompt-list-view.tsx:101
-#: src/features/settings/components/chat/bots-settings.tsx:375
+#: src/features/settings/components/chat/bots-settings.tsx:377
 #: src/features/settings/components/chat/custom-providers-settings.tsx:494
 #: src/features/settings/components/chat/mcp/server-form.tsx:194
 #: src/features/settings/components/chat/native-providers-settings.tsx:507
@@ -21952,6 +21978,11 @@ msgstr "名前"
 #: src/components/model-picker/model-picker.tsx:1303
 msgid "Name (A to Z)"
 msgstr "名前（A から Z）"
+
+#. placeholder {0}: bot.name
+#: src/features/settings/components/chat/bots-settings.tsx:474
+msgid "Name and instructions of {0}"
+msgstr "{0} の名前と指示"
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:74
 msgid "Name and prompt are required"
@@ -22317,7 +22348,7 @@ msgstr "新規"
 msgid "New Azure Bots are single-tenant: set the Teams Tenant ID key, or replies cannot authenticate."
 msgstr "新しい Azure Bot はシングルテナントです。Teams Tenant ID キーを設定しないと、返信を認証できません。"
 
-#: src/features/settings/components/chat/bots-settings.tsx:373
+#: src/features/settings/components/chat/bots-settings.tsx:375
 msgid "New bot"
 msgstr "新規ボット"
 
@@ -22362,7 +22393,7 @@ msgstr "新しいチャットは永続で開始"
 msgid "New chats start temporary"
 msgstr "新しいチャットは一時で開始"
 
-#: src/features/settings/components/chat/bots-settings.tsx:260
+#: src/features/settings/components/chat/bots-settings.tsx:262
 msgid "New chats with this bot start in the chosen mode"
 msgstr "このボットとの新しいチャットは選択したモードで始まります"
 
@@ -22380,7 +22411,7 @@ msgstr "新しいコンテキスト"
 msgid "New dataset"
 msgstr "新しいデータセット"
 
-#: src/features/settings/components/privacy/data-export.tsx:158
+#: src/features/settings/components/privacy/data-export.tsx:164
 msgid "New Export"
 msgstr "新しいエクスポート"
 
@@ -22631,7 +22662,7 @@ msgid "Nicaragua"
 msgstr "ニカラグア"
 
 #: src/features/settings/components/chat/favorite-models-settings.tsx:53
-#: src/features/settings/components/personalization/personalization-settings.tsx:217
+#: src/features/settings/components/personalization/personalization-settings.tsx:253
 #: src/features/settings/lib/settings-keywords.ts:87
 msgid "Nickname"
 msgstr "ニックネーム"
@@ -22689,7 +22720,7 @@ msgstr "監査ログが見つかりません"
 msgid "No bot"
 msgstr "ボットなし"
 
-#: src/features/settings/components/chat/bots-settings.tsx:460
+#: src/features/settings/components/chat/bots-settings.tsx:462
 msgid "No bots yet."
 msgstr "ボットはまだありません。"
 
@@ -23325,7 +23356,7 @@ msgstr "ユーザーが見つかりません"
 msgid "No users found matching \"{search}\""
 msgstr "「{search}」に一致するユーザーは見つかりませんでした"
 
-#: src/features/prompts/components/thread-variables-config.tsx:248
+#: src/features/prompts/components/thread-variables-config.tsx:276
 msgid "No variables configured. Add variables to customize prompt content for this thread."
 msgstr "変数が設定されていません。変数を追加して、このスレッドのプロンプト内容をカスタマイズしましょう。"
 
@@ -23847,7 +23878,7 @@ msgstr "オンデマンドの Web スクレイピングとデータ抽出レシ�
 msgid "On-premise option"
 msgstr "オンプレミス対応"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:341
+#: src/features/settings/components/personalization/personalization-settings.tsx:377
 #: src/features/settings/lib/settings-keywords.ts:97
 msgid "Onboarding"
 msgstr "オンボーディング"
@@ -23868,7 +23899,7 @@ msgstr "オンボーディングの進捗"
 msgid "Onboarding steps"
 msgstr "オンボーディングの手順"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:346
+#: src/features/settings/components/personalization/personalization-settings.tsx:382
 msgid "Onboarding will restart on your next visit to chat."
 msgstr "次回チャットを開いたときにオンボーディングが再開されます。"
 
@@ -24769,11 +24800,11 @@ msgstr "最適化のスタイル"
 #: src/features/chat/sidebar/thread-sidebar.tsx:180
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:227
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:218
-#: src/features/settings/components/personalization/personalization-settings.tsx:281
+#: src/features/settings/components/personalization/personalization-settings.tsx:317
 msgid "Optimize"
 msgstr "最適化"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:335
+#: src/features/settings/components/personalization/personalization-settings.tsx:371
 msgid "Optimize custom instructions"
 msgstr "カスタム指示を最適化"
 
@@ -25657,12 +25688,12 @@ msgid "Permission Level"
 msgstr "権限レベル"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:89
-#: src/features/settings/components/chat/bots-settings.tsx:413
+#: src/features/settings/components/chat/bots-settings.tsx:415
 msgid "Permission mode"
 msgstr "権限モード"
 
 #. placeholder {0}: bot.name
-#: src/features/settings/components/chat/bots-settings.tsx:472
+#: src/features/settings/components/chat/bots-settings.tsx:488
 msgid "Permission mode for {0}"
 msgstr "{0} の権限モード"
 
@@ -26287,7 +26318,7 @@ msgstr "リクエストを準備中…"
 msgid "Preparing the import…"
 msgstr "インポートを準備しています…"
 
-#: src/features/settings/components/privacy/data-export.tsx:152
+#: src/features/settings/components/privacy/data-export.tsx:158
 msgid "Preparing..."
 msgstr "準備しています..."
 
@@ -26466,7 +26497,7 @@ msgstr "前へ"
 msgid "Previous branch"
 msgstr "前のブランチ"
 
-#: src/features/settings/components/privacy/data-export.tsx:132
+#: src/features/settings/components/privacy/data-export.tsx:138
 msgid "Previous export was cancelled"
 msgstr "前回のエクスポートはキャンセルされました"
 
@@ -26655,7 +26686,7 @@ msgstr "音声入力を処理しています"
 #: src/features/chat/header/temporary-chat-dropdown.tsx:211
 #: src/features/chat/thread-list/thread-node.tsx:114
 #: src/features/chat/thread-list/thread-node.tsx:122
-#: src/features/settings/components/privacy/data-export.tsx:101
+#: src/features/settings/components/privacy/data-export.tsx:105
 msgid "Processing..."
 msgstr "処理しています..."
 
@@ -26696,7 +26727,7 @@ msgstr "リップシンクとフォーリー付き、最大 50 FPS の本番品�
 msgid "Productivity"
 msgstr "生産性"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:236
+#: src/features/settings/components/personalization/personalization-settings.tsx:272
 #: src/features/settings/lib/settings-keywords.ts:88
 msgid "Profession"
 msgstr "職業"
@@ -27236,7 +27267,7 @@ msgstr "キュー内のメッセージは、返信が終わると順番に送信
 msgid "Queued messages: {queuedTotal}"
 msgstr "待機中のメッセージ: {queuedTotal}"
 
-#: src/features/prompts/components/thread-variables-config.tsx:202
+#: src/features/prompts/components/thread-variables-config.tsx:215
 msgid "Quick Add"
 msgstr "クイック追加"
 
@@ -28157,7 +28188,7 @@ msgstr "「{0}」を削除しますか？"
 #. placeholder {0}: provider.name
 #: src/features/chat/group/group-participant-bar.tsx:210
 #: src/features/chat/thread/ask-user-prompt.tsx:287
-#: src/features/prompts/components/thread-variables-config.tsx:232
+#: src/features/prompts/components/thread-variables-config.tsx:245
 #: src/features/settings/components/chat/custom-providers-settings.tsx:408
 #: src/features/settings/components/chat/native-providers-settings.tsx:439
 msgid "Remove {0}"
@@ -28457,11 +28488,11 @@ msgstr "繰り返し（{0} UTC）"
 msgid "Replace"
 msgstr "置換"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:352
+#: src/features/settings/components/personalization/personalization-settings.tsx:388
 msgid "Replay Onboarding"
 msgstr "オンボーディングを再生"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:341
+#: src/features/settings/components/personalization/personalization-settings.tsx:377
 msgid "Replay the welcome tour to review the core features of Neore."
 msgstr "ウェルカムツアーを再生して、Neore の主な機能を確認します。"
 
@@ -28556,7 +28587,7 @@ msgstr "変更をリクエスト"
 msgid "Request count"
 msgstr "リクエスト数"
 
-#: src/features/settings/components/privacy/data-export.tsx:146
+#: src/features/settings/components/privacy/data-export.tsx:152
 msgid "Request Data Export"
 msgstr "データのエクスポートをリクエスト"
 
@@ -28581,8 +28612,8 @@ msgstr "モデルごとのリクエスト量、コスト、エラー数"
 msgid "Requested permissions"
 msgstr "要求された権限"
 
-#: src/features/settings/components/privacy/data-export.tsx:125
-#: src/features/settings/components/privacy/data-export.tsx:146
+#: src/features/settings/components/privacy/data-export.tsx:130
+#: src/features/settings/components/privacy/data-export.tsx:152
 msgid "Requesting..."
 msgstr "リクエストしています..."
 
@@ -28903,7 +28934,7 @@ msgstr "再試行"
 msgid "Retry"
 msgstr "再試行"
 
-#: src/features/settings/components/privacy/data-export.tsx:125
+#: src/features/settings/components/privacy/data-export.tsx:130
 msgid "Retry Export"
 msgstr "エクスポートを再試行"
 
@@ -29603,6 +29634,10 @@ msgstr "ログインを保存"
 msgid "Save or discard your rule file changes first."
 msgstr "先にルールファイルの変更を保存または破棄してください。"
 
+#: src/features/admin/components/changed-by-admin-mark.tsx:82
+msgid "Save or undo your change first."
+msgstr "先に変更を保存するか元に戻してください。"
+
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:243
 msgid "Save preset"
 msgstr "プリセットを保存"
@@ -29627,11 +29662,11 @@ msgstr "スキルを保存"
 msgid "Save these backup codes in a safe place. You can use them to access your account if you lose your two-factor authentication device."
 msgstr "これらのバックアップコードを安全な場所に保存してください。二要素認証のデバイスを紛失した場合に、アカウントへのアクセスに使えます。"
 
-#: src/features/settings/components/chat/bots-settings.tsx:552
+#: src/features/settings/components/chat/bots-settings.tsx:568
 msgid "Save tools"
 msgstr "ツールを保存"
 
-#: src/features/prompts/components/thread-variables-config.tsx:263
+#: src/features/prompts/components/thread-variables-config.tsx:291
 msgid "Save Variables"
 msgstr "変数を保存"
 
@@ -29668,6 +29703,10 @@ msgstr "保存しました。アシスタントはこの返信で 1 回だけ使
 msgid "Saved as preset"
 msgstr "プリセットとして保存しました"
 
+#: src/features/admin/components/changed-by-admin-mark.tsx:68
+msgid "Saved logins stay off for it until you keep it as yours."
+msgstr "自分のものとして保持するまで、保存済みのログインは使われません。"
+
 #: src/features/marketing/use-cases/visuals/memory-visual.tsx:16
 msgid "Saved memories"
 msgstr "保存されたメモリ"
@@ -29681,8 +29720,8 @@ msgstr "{hostLabel} に保存しました。"
 msgid "Saved to \"{0}\""
 msgstr "「{0}」に保存しました"
 
-#: src/features/settings/components/chat/bots-settings.tsx:552
-#: src/features/settings/components/chat/bots-settings.tsx:555
+#: src/features/settings/components/chat/bots-settings.tsx:568
+#: src/features/settings/components/chat/bots-settings.tsx:571
 msgid "Saving tools…"
 msgstr "ツールを保存中…"
 
@@ -29691,7 +29730,7 @@ msgstr "ツールを保存中…"
 #: src/features/projects/components/project-form-dialog.tsx:491
 #: src/features/projects/components/project-rule-files.tsx:1018
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
-#: src/features/prompts/components/thread-variables-config.tsx:258
+#: src/features/prompts/components/thread-variables-config.tsx:286
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
 #: src/features/settings/components/chat/custom-providers-settings.tsx:641
 #: src/features/settings/components/chat/native-providers-settings.tsx:712
@@ -30757,8 +30796,8 @@ msgstr "トリガーを設定して、スケジュール、Webhook、または�
 msgid "Settings"
 msgstr "設定"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:111
-#: src/features/settings/components/personalization/personalization-settings.tsx:186
+#: src/features/settings/components/personalization/personalization-settings.tsx:116
+#: src/features/settings/components/personalization/personalization-settings.tsx:198
 msgid "Settings saved"
 msgstr "設定を保存しました"
 
@@ -33176,7 +33215,7 @@ msgid "Superior understanding of complex visual concepts"
 msgstr "複雑な視覚的コンセプトへの優れた理解"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:43
-#: src/features/settings/components/chat/bots-settings.tsx:133
+#: src/features/settings/components/chat/bots-settings.tsx:134
 msgid "Supervised"
 msgstr "監督付き"
 
@@ -33686,7 +33725,7 @@ msgstr "望遠"
 msgid "Telephoto, elegant distance"
 msgstr "望遠、エレガントな距離感"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:305
+#: src/features/settings/components/personalization/personalization-settings.tsx:341
 msgid "Tell the AI how to word the titles it gives new conversations. This adds to the default title style."
 msgstr "新しい会話に付けるタイトルの表現方法を AI に伝えます。デフォルトのタイトルスタイルに追加されます。"
 
@@ -33698,7 +33737,7 @@ msgstr "アシスタントに何をすべきかを具体的に伝えてくださ
 msgid "Tell us about an idea or a problem. You can paste or drop screenshots too."
 msgstr "アイデアや問題を教えてください。スクリーンショットを貼り付けたり、ドロップしたりすることもできます。"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:264
+#: src/features/settings/components/personalization/personalization-settings.tsx:300
 msgid "Tell us about yourself..."
 msgstr "あなたについて教えてください..."
 
@@ -34283,7 +34322,7 @@ msgstr "アシスタントがシークレットを求めています"
 msgid "The assistant needs a secret"
 msgstr "アシスタントにシークレットが必要です"
 
-#: src/features/settings/components/chat/bots-settings.tsx:563
+#: src/features/settings/components/chat/bots-settings.tsx:579
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr "ボットとそのコンピュータは削除されます。チャットは通常のチャットとして残ります。"
 
@@ -34295,7 +34334,7 @@ msgstr "ボットは許可したツールのみを使います。何も許可し
 msgid "The bot sets the model for this chat."
 msgstr "このチャットのモデルはボットが設定します。"
 
-#: src/features/settings/components/chat/bots-settings.tsx:351
+#: src/features/settings/components/chat/bots-settings.tsx:353
 msgid "The bot's tools were saved"
 msgstr "ボットのツールを保存しました"
 
@@ -34484,7 +34523,7 @@ msgstr "エディターの準備がまだできていません"
 msgid "The endpoint listed no models — add model ids by hand"
 msgstr "エンドポイントにモデルがありません — モデル ID を手動で追加してください"
 
-#: src/features/settings/components/privacy/data-export.tsx:139
+#: src/features/settings/components/privacy/data-export.tsx:145
 msgid "The export file was not generated. Please request a new export."
 msgstr "エクスポートファイルが生成されませんでした。新しいエクスポートをリクエストしてください。"
 
@@ -34752,7 +34791,7 @@ msgstr "MCP レジストリは現在利用できません。代わりに人気�
 msgid "The message could not be sent. Check your connection and try again."
 msgstr "メッセージを送信できませんでした。接続を確認して、もう一度お試しください。"
 
-#: src/features/settings/components/chat/bots-settings.tsx:415
+#: src/features/settings/components/chat/bots-settings.tsx:417
 msgid "The mode each new chat with this bot starts in. You can still change it per chat. Scheduled runs use it only when it asks more."
 msgstr "このボットとの新しいチャットが開始するモードです。チャットごとに変更することもできます。スケジュール実行では、確認がより多く求められる場合にのみ使用されます。"
 
@@ -35264,11 +35303,11 @@ msgstr "この操作は元に戻せません。組織と関連するすべての
 msgid "This agent cannot resume its own session, so the conversation was handed over"
 msgstr "このエージェントは自身のセッションを再開できないため、会話を引き継ぎました"
 
-#: src/features/settings/components/chat/bots-settings.tsx:296
+#: src/features/settings/components/chat/bots-settings.tsx:298
 msgid "This bot's tools were changed elsewhere. Close this dialog and open it again to see them."
 msgstr "このボットのツールは別の場所で変更されました。このダイアログを閉じて、もう一度開くと確認できます。"
 
-#: src/features/settings/components/chat/bots-settings.tsx:310
+#: src/features/settings/components/chat/bots-settings.tsx:312
 msgid "This bot's tools were changed elsewhere. They are shown as saved now; make your change again."
 msgstr "このボットのツールは別の場所で変更されました。保存済みの内容を表示しています。もう一度変更してください。"
 
@@ -36061,7 +36100,7 @@ msgstr "スレッドの要約"
 msgid "thread titles"
 msgstr "スレッドのタイトル"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:306
+#: src/features/settings/components/personalization/personalization-settings.tsx:342
 #: src/features/settings/lib/settings-keywords.ts:95
 msgid "Thread Titles"
 msgstr "スレッドのタイトル"
@@ -36074,7 +36113,7 @@ msgstr "スレッドのピン留めを解除しました"
 msgid "Thread unsnoozed"
 msgstr "スレッドのスヌーズを解除しました"
 
-#: src/features/prompts/components/thread-variables-config.tsx:175
+#: src/features/prompts/components/thread-variables-config.tsx:188
 msgid "Thread Variables"
 msgstr "スレッド変数"
 
@@ -36430,7 +36469,7 @@ msgid "Tool results of 64 KB or more, in threads idle at least {0} days"
 msgstr "{0} 日以上非アクティブなスレッド内の 64 KB 以上のツール結果"
 
 #: src/features/settings/components/chat/bot-tool-selection.tsx:467
-#: src/features/settings/components/chat/bots-settings.tsx:496
+#: src/features/settings/components/chat/bots-settings.tsx:512
 #: src/features/settings/components/chat/custom-providers-settings.tsx:373
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:134
 #: src/features/skills/components/skill-form-dialog.tsx:408
@@ -36440,8 +36479,8 @@ msgstr "ツール"
 
 #. placeholder {0}: bot.name
 #. placeholder {0}: editingTools?.name ?? ""
-#: src/features/settings/components/chat/bots-settings.tsx:478
-#: src/features/settings/components/chat/bots-settings.tsx:526
+#: src/features/settings/components/chat/bots-settings.tsx:494
+#: src/features/settings/components/chat/bots-settings.tsx:542
 msgid "Tools for {0}"
 msgstr "{0} のツール"
 
@@ -38059,11 +38098,11 @@ msgid "Vancouver"
 msgstr "バンクーバー"
 
 #. placeholder {0}: variable.name
-#: src/features/prompts/components/thread-variables-config.tsx:123
+#: src/features/prompts/components/thread-variables-config.tsx:136
 msgid "Variable \"{0}\" already exists"
 msgstr "変数「{0}」は既に存在します"
 
-#: src/features/prompts/components/thread-variables-config.tsx:109
+#: src/features/prompts/components/thread-variables-config.tsx:122
 msgid "Variable \"{sanitized}\" already exists"
 msgstr "変数「{sanitized}」は既に存在します"
 
@@ -38071,7 +38110,7 @@ msgstr "変数「{sanitized}」は既に存在します"
 msgid "Variable focal length"
 msgstr "可変焦点距離"
 
-#: src/features/prompts/components/thread-variables-config.tsx:192
+#: src/features/prompts/components/thread-variables-config.tsx:205
 msgid "Variable name..."
 msgstr "変数名..."
 
@@ -38088,11 +38127,11 @@ msgstr "変数"
 msgid "Variables ({0})"
 msgstr "変数（{0}）"
 
-#: src/features/prompts/components/thread-variables-config.tsx:151
+#: src/features/prompts/components/thread-variables-config.tsx:164
 msgid "Variables saved"
 msgstr "変数を保存しました"
 
-#: src/features/prompts/components/thread-variables-config.tsx:102
+#: src/features/prompts/components/thread-variables-config.tsx:115
 msgid "Variables starting with \"context.\" or \"user.\" are system-managed and cannot be edited"
 msgstr "「context.」または「user.」で始まる変数はシステムで管理されており、編集できません"
 
@@ -39137,7 +39176,7 @@ msgstr "エージェントに何を変更してほしいですか？"
 msgid "What should the agent do?"
 msgstr "エージェントに何をさせますか？"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:218
+#: src/features/settings/components/personalization/personalization-settings.tsx:254
 msgid "What should the AI call you?"
 msgstr "AI にどう呼んでほしいですか？"
 
@@ -39971,11 +40010,11 @@ msgstr "API キーを作成しました。再表示できないため、今す�
 msgid "Your Azure OpenAI resource: endpoint, API version and deployment names."
 msgstr "Azure OpenAI リソース：エンドポイント、API バージョン、デプロイメント名。"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:256
+#: src/features/settings/components/personalization/personalization-settings.tsx:292
 msgid "Your background, preferences, or location to help the AI understand you better"
 msgstr "AI があなたをより理解できるよう、経歴、好み、所在地などを入力してください"
 
-#: src/features/settings/components/chat/bots-settings.tsx:454
+#: src/features/settings/components/chat/bots-settings.tsx:456
 msgid "Your bots"
 msgstr "自分のボット"
 
@@ -40077,7 +40116,7 @@ msgstr "アカウントの表示名"
 msgid "Your draft is kept. The prompt from the link was not added."
 msgstr "下書きは保持されています。リンクのプロンプトは追加されませんでした。"
 
-#: src/features/settings/components/privacy/data-export.tsx:164
+#: src/features/settings/components/privacy/data-export.tsx:174
 msgid "Your export will include: profile, settings, conversations, files metadata, prompts, and usage history. The download link expires in 7 days."
 msgstr "エクスポートには、プロフィール、設定、会話、ファイルのメタデータ、プロンプト、利用履歴が含まれます。ダウンロードリンクの有効期限は 7 日間です。"
 
@@ -40209,6 +40248,10 @@ msgstr "ご自身の OpenAI キー。OpenAI のモデルに使用され、Codex 
 #: src/features/pages/components/pages-sidebar.tsx:215
 msgid "Your pages"
 msgstr "自分のページ"
+
+#: src/features/settings/components/personalization/personalization-settings.tsx:233
+msgid "Your personalization"
+msgstr "あなたのパーソナライズ"
 
 #: src/features/billing/components/personal-plan-card.tsx:22
 msgid "Your plan"

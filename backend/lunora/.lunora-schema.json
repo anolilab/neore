@@ -33361,6 +33361,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "writeId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
