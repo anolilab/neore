@@ -56,7 +56,16 @@ const seed = async (userId: string, actions: number, targetBytes = 0): Promise<v
             });
         }
 
-        await ctx.db.insert("browserHumanChecks", { askedAt: 30, inText: true, run: "run-1", site: `${userId}.example.com`, threadId, userId });
+        await ctx.db.insert("browserHumanChecks", {
+            askedAt: 30,
+            inText: true,
+            resolution: "done",
+            resolvedAt: 31,
+            run: "run-1",
+            site: `${userId}.example.com`,
+            threadId,
+            userId,
+        });
         await ctx.db.insert("browserExtensions", {
             browserInfo: "Chrome 140",
             extensionId: `ext-${userId}`,
@@ -117,7 +126,9 @@ describe("browser data in the GDPR export", () => {
                 timestamp: 100,
             }),
         );
-        expect(result.humanChecks).toEqual([expect.objectContaining({ askedAt: 30, inText: true, site: "user-a.example.com" })]);
+        expect(result.humanChecks).toEqual([
+            expect.objectContaining({ askedAt: 30, inText: true, resolution: "done", resolvedAt: 31, site: "user-a.example.com" }),
+        ]);
         expect(result.extensions).toEqual([expect.objectContaining({ browserInfo: "Chrome 140", extensionId: "ext-user-a", pairedAt: 40, status: "paired" })]);
     });
 

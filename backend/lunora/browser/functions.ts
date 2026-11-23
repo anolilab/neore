@@ -397,9 +397,10 @@ export const wasHumanCheckAsked = internalQuery
     });
 
 /**
- * The person is asked about `site` once per run: `true` for the first ask, which records it, `false` when another
- * action of the run asked already. Insert-if-absent on the unique key, with no read first: of two claims at once, the
- * insert that loses answers `false`. The row names the thread's owner, whose shard holds it, whoever's turn asked (a
+ * The person is asked about `site` once per run: the new ask's id for the first ask, which records it, `null` when
+ * another action of the run asked already (also one the person declined: a later reply may ask again, as the person
+ * can ask the agent to try once more). Insert-if-absent on the unique key: of two claims at once, the insert that
+ * loses answers `null`. The row names the thread's owner, whose shard holds it, whoever's turn asked (a
  * collaborator's id there would outlive their account and escape the owner's erasure); a thread with no owner names
  * the shard it lives on. A thread that is gone asks nobody.
  * A report on a site the run already asked about (a sign-in wall after a check) marks that ask `reported`: what the
@@ -407,12 +408,12 @@ export const wasHumanCheckAsked = internalQuery
  */
 export const claimHumanCheckAsk = internalMutation
     .input({ inText: v.optional(v.boolean()), reported: v.optional(v.boolean()), run: v.string(), site: v.string(), threadId: v.id("threads") })
-    .output(v.boolean())
+    .output(v.union(v.null(), v.id("browserHumanChecks")))
     .mutation(async ({ args: { inText, reported, run, site, threadId }, ctx }) => {
         const thread = await ctx.db.get("threads", threadId);
 
         if (!thread) {
-            return false;
+            return null;
         }
 
         if (reported === true) {
@@ -426,12 +427,12 @@ export const claimHumanCheckAsk = internalMutation
                     await ctx.db.patch("browserHumanChecks", asked._id, { reported: true });
                 }
 
-                return false;
+                return null;
             }
         }
 
         try {
-            await ctx.db.insert("browserHumanChecks", {
+            return await ctx.db.insert("browserHumanChecks", {
                 askedAt: ctx.now,
                 ...(inText === true && reported !== true && { inText }),
                 ...(reported === true && { reported }),
@@ -444,13 +445,65 @@ export const claimHumanCheckAsk = internalMutation
             });
         } catch (error) {
             if (isUniqueViolation(error)) {
-                return false;
+                return null;
             }
 
             throw error;
         }
+    });
 
-        return true;
+/** The run's ask on `site`, else the run's latest ask since `askedSince`. */
+const runAsk = async (db: QueryCtx["db"], threadId: Id<"threads">, run: string, site: string | undefined, askedSince: number) => {
+    if (site !== undefined) {
+        return await db
+            .query("browserHumanChecks")
+            .withIndex("by_threadId_site_run", (q) => q.eq("threadId", threadId).eq("site", site).eq("run", run))
+            .first();
+    }
+
+    return await db
+        .query("browserHumanChecks")
+        .withIndex("by_threadId_run_askedAt", (q) => q.eq("threadId", threadId).eq("run", run).gte("askedAt", askedSince))
+        .order("desc")
+        .first();
+};
+
+const vAnswer = v.union(v.null(), v.object({ answer: v.union(v.literal("declined"), v.literal("done"), v.literal("open")), site: v.string() }));
+
+/**
+ * The person's answer on the card for an ask of the run `run`: on `site`, else its latest since `askedSince`. `null`: no
+ * such ask; `open`: not answered yet.
+ */
+export const humanCheckAnswer = internalQuery
+    .input({ askedSince: v.number(), run: v.string(), site: v.optional(v.string()), threadId: v.id("threads") })
+    .output(vAnswer)
+    .query(async ({ args: { askedSince, run, site, threadId }, ctx }) => {
+        const row = await runAsk(ctx.db, threadId, run, site, askedSince);
+
+        return row === null ? null : { answer: row.resolution ?? "open", site: row.site };
+    });
+
+/**
+ * The start of `wait_for_person` on the run's latest ask: its answer, and `waited` when the agent already waited on it
+ * (it is not waited on again). Records the wait on the ask.
+ */
+export const beginHumanCheckWait = internalMutation
+    .input({ askedSince: v.number(), run: v.string(), threadId: v.id("threads") })
+    .output(
+        v.union(v.null(), v.object({ answer: v.union(v.literal("declined"), v.literal("done"), v.literal("open")), site: v.string(), waited: v.boolean() })),
+    )
+    .mutation(async ({ args: { askedSince, run, threadId }, ctx }) => {
+        const row = await runAsk(ctx.db, threadId, run, undefined, askedSince);
+
+        if (row === null) {
+            return null;
+        }
+
+        if (row.waitedAt === undefined && row.resolution === undefined) {
+            await ctx.db.patch("browserHumanChecks", row._id, { waitedAt: ctx.now });
+        }
+
+        return { answer: row.resolution ?? "open", site: row.site, waited: row.waitedAt !== undefined };
     });
 
 // ── Browser Extension Functions (Phase 2) ───────────────────────────────
