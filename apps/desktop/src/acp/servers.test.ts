@@ -146,27 +146,23 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-    for (const child of children.values()) {
-        child.killNow();
-    }
+    try {
+        for (const child of children.values()) {
+            child.killNow();
+        }
 
-    await Promise.all(Array.from(children.values(), async (child) => await child.exited));
+        await Promise.all(Array.from(children.values(), async (child) => await child.exited));
 
-    // An agent's end is recorded in the server's turn file under the scratch folder; that write must land before the
-    // folder is removed, or it makes the folder again.
-    await Promise.all(
-        created.map(async (servers) => {
-            try {
-                await servers.posterForEnd(SERVER).persisted();
-            } catch {
-                // A server the test removed or unpaired has no runtime left to write.
-            }
-
+        // Each server's running turns are written to a file under the scratch folder, and a write recreates the folder.
+        // `stop()` cancels the state flushes still queued; the writes already under way are awaited before the removal.
+        for (const servers of created) {
             servers.stop();
-        }),
-    );
+        }
 
-    scratch.dispose();
+        await Promise.all(created.map(async (servers) => await servers.persisted()));
+    } finally {
+        scratch.dispose();
+    }
 });
 
 describe("coding agents on a server", () => {
