@@ -31,6 +31,17 @@ const vRunWebhookView = v.object({
     url: v.optional(v.string()),
 });
 
+/**
+ * Nothing that holds or uses the signing secret runs while an admin acts as the owner: a save or a rotation hands the
+ * secret back, and a test signs with it, so either would let the admin keep or use a credential with no impersonation
+ * mark (`backend/lunora/auth/AGENTS.md`). The read returns no secret and stays open.
+ */
+const refuseImpersonation = (impersonatedBy: string | null | undefined): void => {
+    if (impersonatedBy) {
+        throw new LunoraError("FORBIDDEN", "The run webhook cannot be changed or tested while impersonating.");
+    }
+};
+
 /** The user's row, if any. Reads are bounded by the one-row-per-user rule. */
 const ownRow = async (ctx: Pick<QueryCtx, "db">, userId: string): Promise<Doc<"runWebhooks"> | null> => {
     const { page } = await ctx.db.runWebhooks.findMany({ limit: 1, where: { userId } });
@@ -70,8 +81,9 @@ export const saveRunWebhook = authMutation
     .use(rateLimit("runWebhooks/update"))
     .output(v.object({ secret: v.optional(v.string()) }))
     .mutation(async ({ args, ctx: context }) => {
-        const { userId } = context.user;
+        const { impersonatedBy, userId } = context.user;
 
+        refuseImpersonation(impersonatedBy);
         assertOwnShard(userId);
 
         const problem = runWebhookUrlProblem(args.url);
@@ -113,6 +125,7 @@ export const rotateRunWebhookSecret = authMutation
     .use(rateLimit("runWebhooks/update"))
     .output(v.object({ secret: v.string() }))
     .mutation(async ({ ctx: context }) => {
+        refuseImpersonation(context.user.impersonatedBy);
         assertOwnShard(context.user.userId);
 
         const existing = await ownRow(context, context.user.userId);
@@ -151,8 +164,9 @@ export const sendRunWebhookTest = authAction
     .input({})
     .output(vDeliveryResult)
     .action(async ({ ctx: context }) => {
-        const { userId } = context.user;
+        const { impersonatedBy, userId } = context.user;
 
+        refuseImpersonation(impersonatedBy);
         assertOwnShard(userId);
 
         const row = await context.runQuery(internal.run_webhooks.functions.getRunWebhookInternal, { userId });

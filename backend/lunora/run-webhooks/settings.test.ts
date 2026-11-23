@@ -13,6 +13,7 @@ import { collectRunWebhookForExport, deleteUserRunWebhooks } from "./gdpr";
 
 const SECRET_PREFIX = /^whsec_/u;
 const OWN_ACCOUNT_ONLY = /own account only/u;
+const IMPERSONATING = /while impersonating/u;
 const URL = "https://hooks.example.com/neore";
 
 const signedIn = async (harness: ReturnType<typeof lunoraTest>) =>
@@ -128,6 +129,80 @@ describe("the run webhook stays on its owner's own shard", () => {
                 expect(await as.query(getRunWebhook as never, {} as never)).toStrictEqual({ configured: false, enabled: false });
             });
             expect(await exported(harness, identity.userId)).toMatchObject([{ enabled: true, url: URL }]);
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+describe("the run webhook while an admin impersonates the owner", () => {
+    /** A second session on the same user, made by an admin's impersonation. */
+    const impersonating = async (harness: ReturnType<typeof lunoraTest>, userId: string) =>
+        (await harness.run(
+            async (context: any) =>
+                await context.db.insert("session", {
+                    createdAt: 0,
+                    expiresAt: Date.now() + 86_400_000,
+                    impersonatedBy: "admin-1",
+                    token: "impersonated-session-token",
+                    updatedAt: 0,
+                    userId,
+                }),
+        )) as string;
+
+    const rows = async (harness: ReturnType<typeof lunoraTest>) =>
+        (await harness.run(async (context: any) => {
+            const { page } = await context.db.runWebhooks.findMany({ limit: 10 });
+
+            return page;
+        })) as {
+            enabled: boolean;
+            secretCiphertext: string;
+            updatedAt: number;
+            url: string;
+        }[];
+
+    it("refuses a first save: no row is made and no secret is returned", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const identity = await signedIn(harness);
+            const admin = harness.withIdentity({ sessionId: await impersonating(harness, identity.userId), userId: identity.userId } as never);
+
+            await runInShard(identity.userId, async () => {
+                await expect(admin.mutation(saveRunWebhook as never, { enabled: true, url: URL } as never)).rejects.toMatchObject({ code: "FORBIDDEN" });
+                await expect(admin.mutation(rotateRunWebhookSecret as never, {} as never)).rejects.toThrow(IMPERSONATING);
+                expect(await rows(harness)).toStrictEqual([]);
+            });
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("refuses a save and a rotation of the owner's webhook and leaves its URL, switch and secret as they were", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const identity = await signedIn(harness);
+            const owner = harness.withIdentity(identity as never);
+            const admin = harness.withIdentity({ sessionId: await impersonating(harness, identity.userId), userId: identity.userId } as never);
+
+            await runInShard(identity.userId, async () => {
+                await owner.mutation(saveRunWebhook as never, { enabled: true, url: URL } as never);
+
+                const before = await rows(harness);
+
+                await expect(
+                    admin.mutation(saveRunWebhook as never, { enabled: false, url: "https://hooks.example.com/admin" } as never),
+                ).rejects.toMatchObject({
+                    code: "FORBIDDEN",
+                });
+                await expect(admin.mutation(rotateRunWebhookSecret as never, {} as never)).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+                expect(await rows(harness)).toStrictEqual(before);
+                // The read returns no secret, so it stays open to the admin.
+                expect(await admin.query(getRunWebhook as never, {} as never)).toStrictEqual({ configured: true, enabled: true, url: URL });
+            });
         } finally {
             harness.close();
         }
