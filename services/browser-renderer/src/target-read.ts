@@ -577,8 +577,8 @@ export function readTarget(
             refused = "covered";
         } else {
             // The page's handlers run during the click. A destination one of them moved is refused at the boundary where it would
-            // be used: a click (the window's bubble phase), a form's submission (a capture listener, which no handler can skip), and a
-            // link's navigation (the Navigation API, where the page has it). A canceled boundary activates nothing.
+            // be used: a click (the window's bubble phase), a form's submission (its destination is set back to the approved one, below),
+            // and a link's navigation (the Navigation API, where the page has it). A canceled boundary activates nothing.
             const stop = new AbortController();
             let isMoved = false;
             const clickScope = globalThis;
@@ -595,46 +595,46 @@ export function readTarget(
                 },
                 { signal: stop.signal },
             );
-            // A form the click submits: after the page's own submit handlers (the last listener of the bubble phase), the renderer submits
-            // it to the destination the check approved, rather than leaving the browser to read the form's action as it is now. A
-            // handler that cancelled the submission (a single-page form) keeps it cancelled. Known limit: a page that stops the submit
-            // event's propagation before it reaches the window is submitted by the browser, to whatever destination it set.
+            // A form the click submits: the browser submits it itself, as a submit button's click does, reading the form's and the
+            // submitter's destination attributes when it does. Those attributes are read here, at the check's approval, and the
+            // window's submit listener (the last of the bubble phase) sets them back before the submission, so a page handler that
+            // moved one is not submitted there. A handler that cancelled the submission keeps it cancelled. Known limit: a page that
+            // stops the submit event's propagation before it reaches the window, or adds a window listener during the click after
+            // this one, is submitted to whatever destination it set.
             const submitter = control instanceof HTMLButtonElement || control instanceof HTMLInputElement ? control : null;
             const isSubmitter =
                 submitter !== null && (submitter instanceof HTMLButtonElement ? submitter.type === "submit" : ["image", "submit"].includes(submitter.type));
             const ownForm = isSubmitter && submitter !== null ? submitter.form : null;
-            let approvedAction = "";
+            // The approved attributes (null when absent): the form's destination and the submitter's own overrides.
+            const approved: [Element, string, string | null][] = [];
+            // The page's values, as they were when the submit listener set the approved ones: put back once the click is dispatched.
+            const pageValues: [Element, string, string | null][] = [];
 
             if (isSubmitter && submitter !== null && ownForm !== null) {
-                // A submitter without its own formaction reads the document address; the form's own resolved action is the destination then.
-                approvedAction = submitter.hasAttribute("formaction")
-                    ? submitter.formAction
-                    : String(Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, "action")?.get?.call(ownForm) ?? "");
+                for (const name of ["action", "method", "enctype", "target"]) {
+                    approved.push([ownForm, name, ownForm.getAttribute(name)]);
+                }
+
+                for (const name of ["formaction", "formmethod", "formenctype", "formtarget"]) {
+                    approved.push([submitter, name, submitter.getAttribute(name)]);
+                }
             }
 
             clickScope.addEventListener(
                 "submit",
                 (event) => {
-                    if (ownForm === null || submitter === null || event.target !== ownForm || event.defaultPrevented) {
+                    if (approved.length === 0 || event.target !== ownForm || event.defaultPrevented) {
                         return;
                     }
 
-                    event.preventDefault();
-                    ownForm.setAttribute("action", approvedAction);
+                    for (const [element, name, value] of approved) {
+                        pageValues.push([element, name, element.getAttribute(name)]);
+                        element.removeAttribute(name);
 
-                    // The submitter's name and value go with the form, as the browser would send them. `submit()` runs no submit event.
-                    const sent = submitter.name === "" ? null : document.createElement("input");
-
-                    if (sent !== null) {
-                        sent.type = "hidden";
-                        sent.name = submitter.name;
-                        sent.value = submitter.value;
-                        // eslint-disable-next-line unicorn/prefer-dom-node-append -- the Workers types give Element#append the HTMLRewriter signature, so appendChild is the call that typechecks
-                        ownForm.appendChild(sent);
+                        if (value !== null) {
+                            element.setAttribute(name, value);
+                        }
                     }
-
-                    HTMLFormElement.prototype.submit.call(ownForm);
-                    sent?.remove();
                 },
                 { signal: stop.signal },
             );
@@ -686,6 +686,15 @@ export function readTarget(
             } else {
                 control.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, composed: true }));
                 isClicked = true;
+
+                // The browser read the submission's destination during the click: the page's own values come back now.
+                for (const [element, name, value] of pageValues) {
+                    element.removeAttribute(name);
+
+                    if (value !== null) {
+                        element.setAttribute(name, value);
+                    }
+                }
             }
 
             stop.abort();

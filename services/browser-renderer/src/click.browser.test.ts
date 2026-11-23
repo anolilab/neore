@@ -449,4 +449,42 @@ describe("readTarget in a page", () => {
         await page.waitForURL("**/cart/confirm**", { timeout: 3000 });
         expect(page.url()).not.toContain("/elsewhere");
     });
+
+    it("a page handler that moves the submitter's own action and method does not change an approved submission", async () => {
+        await pageWith(
+            page,
+            `<form id="order" action="/cart/confirm" method="post"><input name="qty" value="2"><button id="pay" type="submit" formaction="/cart/pay" formmethod="get">Pay now</button></form><script>document.addEventListener("submit", () => { const pay = document.getElementById("pay"); pay.setAttribute("formaction", "/elsewhere"); pay.setAttribute("formmethod", "post"); });</script>`,
+        );
+        const element = await page.$("#pay");
+        const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.refused).toBeUndefined();
+        // The approved submitter sends a GET to its own address: the query carries the field, and nothing was posted elsewhere.
+        await page.waitForURL("**/cart/pay?qty=2", { timeout: 3000 });
+        expect(page.url()).not.toContain("/elsewhere");
+    });
+
+    it("a submit listener a click handler adds, after the renderer's, can still cancel an approved submission", async () => {
+        await pageWith(
+            page,
+            `<form id="order" action="/cart/confirm"><button id="pay" type="submit" onclick="window.addEventListener('submit', (event) => { event.preventDefault(); document.body.dataset.cancelled = 'true'; })">Pay now</button></form>`,
+        );
+        const element = await page.$("#pay");
+        const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.clicked).toBe(true);
+        await page.waitForFunction(() => document.body.dataset.cancelled === "true", undefined, { timeout: 3000 });
+        // A submission the listener did not cancel would start within the same task; a short beat lets a navigation show itself.
+        await page.evaluate(async () => {
+            await new Promise((resolve) => {
+                setTimeout(resolve, 300);
+            });
+        });
+        expect(page.url()).toContain("/cart");
+        expect(page.url()).not.toContain("/cart/confirm");
+    });
 });
