@@ -629,6 +629,7 @@ export function readTarget(
                         sent.type = "hidden";
                         sent.name = submitter.name;
                         sent.value = submitter.value;
+                        // eslint-disable-next-line unicorn/prefer-dom-node-append -- the Workers types give Element#append the HTMLRewriter signature, so appendChild is the call that typechecks
                         ownForm.appendChild(sent);
                     }
 
