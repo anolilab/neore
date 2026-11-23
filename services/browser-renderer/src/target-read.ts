@@ -629,7 +629,7 @@ export function readTarget(
                         sent.type = "hidden";
                         sent.name = submitter.name;
                         sent.value = submitter.value;
-                        ownForm.append(sent);
+                        ownForm.appendChild(sent);
                     }
 
                     HTMLFormElement.prototype.submit.call(ownForm);
