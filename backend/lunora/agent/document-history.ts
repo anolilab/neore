@@ -31,7 +31,12 @@ const historyDocument = async (
 
         const row = await ctx.db.get("documents", args.documentId);
 
-        return row && row.threadId === args.threadId ? row : null;
+        if (row && row.threadId === args.threadId) {
+            return row;
+        }
+
+        // A card from a branched chat, or from before its thread was carried, names another chat: the author path below reads it, as the
+        // document read does.
     }
 
     const row = await ctx.db.get("documents", args.documentId);

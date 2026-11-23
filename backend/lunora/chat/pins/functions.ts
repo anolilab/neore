@@ -226,9 +226,17 @@ export const reassignUserPinsOnThread = internalMutation
                           .query("threadPins")
                           .withIndex("by_user_and_document", (q) => q.eq("userId", args.to).eq("documentId", documentId))
                           .take(1);
-            const alreadyPinned = sameDocument.length > 0;
+            const [kept] = sameDocument;
 
-            if (alreadyPinned) {
+            if (kept) {
+                // The account keeps its one pin, and the guest's note is not lost with the duplicate: both notes are kept, in order.
+                const notes = [kept.note, pin.note].filter((note): note is string => typeof note === "string" && note.length > 0);
+                const merged = notes.join("\n\n");
+
+                if (merged !== (kept.note ?? "")) {
+                    await context.db.patch("threadPins", kept._id, { note: merged, updatedAt: context.now });
+                }
+
                 await context.db.delete("threadPins", pin._id);
             } else {
                 await context.db.patch("threadPins", pin._id, { userId: args.to });
