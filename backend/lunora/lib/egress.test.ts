@@ -3,7 +3,7 @@
  * live path (a real connect and a real certificate check) is not covered here and must be checked on a dev run.
  */
 /* eslint-disable sonarjs/no-hardcoded-ip -- the addresses under test are literals: private, reserved and public ones */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { EgressConnect, EgressDependencies, EgressSocket } from "./egress";
 import { addressTimeoutMs, EgressError, isCloudflareAddress, isPublicIPv4, isPublicIPv6, postCheckedHttps } from "./egress";
@@ -607,10 +607,91 @@ describe("postCheckedHttps", () => {
     });
 
     it("never gives one address more than the time left before the deadline", () => {
-        expect(addressTimeoutMs(10_000, 10_000)).toBe(3334);
-        expect(addressTimeoutMs(10_000, 1200)).toBe(1200);
-        expect(addressTimeoutMs(10_000, 0)).toBe(0);
-        expect(addressTimeoutMs(10_000, -5)).toBe(0);
+        expect(addressTimeoutMs(10_000, 10_000, true)).toBe(3334);
+        expect(addressTimeoutMs(10_000, 1200, true)).toBe(1200);
+        expect(addressTimeoutMs(10_000, 0, true)).toBe(0);
+        expect(addressTimeoutMs(10_000, -5, true)).toBe(0);
+    });
+
+    it("gives the last address all the time left before the deadline", () => {
+        expect(addressTimeoutMs(10_000, 10_000, false)).toBe(10_000);
+        expect(addressTimeoutMs(10_000, 6666, false)).toBe(6666);
+        expect(addressTimeoutMs(10_000, -5, false)).toBe(0);
+    });
+
+    describe("with a slow receiver", () => {
+        beforeEach(() => {
+            vi.useFakeTimers();
+        });
+
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        /** Wraps `connect` so the TLS setup of `slowAddress` takes `tlsMs`, and every address in `silent` never connects. */
+        const slowConnect = (connect: EgressConnect, slowAddress: string, tlsMs: number, silent: string[] = []): EgressConnect =>
+            vi.fn(((address, options) => {
+                const socket = connect(address, options);
+
+                if (silent.includes(address.hostname)) {
+                    return { ...socket, opened: new Promise<never>(() => {}) };
+                }
+
+                if (address.hostname !== slowAddress) {
+                    return socket;
+                }
+
+                return {
+                    ...socket,
+                    startTls: (tlsOptions: { expectedServerHostname: string }) => {
+                        const tlsSocket = socket.startTls(tlsOptions);
+
+                        return {
+                            ...tlsSocket,
+                            opened: new Promise<void>((resolve) => {
+                                setTimeout(resolve, tlsMs);
+                            }),
+                        };
+                    },
+                };
+            }) as EgressConnect);
+
+        it("waits for a single address whose connection and TLS setup take 5 seconds", async () => {
+            const { connect, tried } = perAddressConnect({ "93.184.216.34": "HTTP/1.1 204 No Content\r\n\r\n" });
+            const result = postCheckedHttps(
+                { body: "", headers: {}, url: HOOK },
+                { connect: slowConnect(connect, "93.184.216.34", 5000), fetch: dnsFetch({ A: ["93.184.216.34"] }) },
+            );
+
+            await vi.advanceTimersByTimeAsync(5000);
+
+            await expect(result).resolves.toEqual({ status: 204 });
+            expect(tried).toStrictEqual(["93.184.216.34"]);
+        });
+
+        it("moves on from a silent first address after its share and gives the last one the rest", async () => {
+            const { connect, tried } = perAddressConnect({ "8.8.8.8": "HTTP/1.1 204 No Content\r\n\r\n" });
+            const result = postCheckedHttps(
+                { body: "", headers: {}, url: HOOK },
+                {
+                    connect: slowConnect(connect, "8.8.8.8", 5000, ["93.184.216.34"]),
+                    fetch: dnsFetch({ A: ["93.184.216.34", "8.8.8.8"] }),
+                },
+            );
+
+            result.catch(() => undefined);
+
+            await vi.advanceTimersByTimeAsync(3333);
+            expect(tried).toStrictEqual(["93.184.216.34"]);
+
+            await vi.advanceTimersByTimeAsync(1);
+            expect(tried).toStrictEqual(["93.184.216.34", "8.8.8.8"]);
+
+            // 5 s of TLS setup is more than a third of the deadline, but the last address has the 6.6 s left.
+            await vi.advanceTimersByTimeAsync(5000);
+
+            await expect(result).resolves.toEqual({ status: 204 });
+        });
     });
 
     it("returns the timeout even when a graceful close never finishes", async () => {

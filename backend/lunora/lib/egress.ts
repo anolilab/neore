@@ -452,10 +452,12 @@ const readStatus = async (socket: EgressSocket): Promise<number> => {
 const ADDRESS_SHARE = 3;
 
 /**
- * How long one address may take to connect and finish TLS setup: a third of the whole deadline, never more than the time
- * left before it, so an address that drops packets leaves time for the next one.
+ * How long one address may take to connect and finish TLS setup. An address with another one after it gets a third of the
+ * whole deadline, so one that drops packets leaves time for the next; the last address gets all the time left. Never more
+ * than the time left before the deadline.
  */
-export const addressTimeoutMs = (timeoutMs: number, remainingMs: number): number => Math.max(0, Math.min(Math.ceil(timeoutMs / ADDRESS_SHARE), remainingMs));
+export const addressTimeoutMs = (timeoutMs: number, remainingMs: number, hasNext: boolean): number =>
+    Math.max(0, hasNext ? Math.min(Math.ceil(timeoutMs / ADDRESS_SHARE), remainingMs) : remainingMs);
 
 /**
  * The errors raised when one address did not finish its connection and TLS setup in its share of the deadline. Plain
@@ -467,8 +469,8 @@ const addressTimeouts = new WeakSet<Error>();
  * POSTs `request.body` to `request.url` and returns the status. A 3xx is returned as it is. The addresses are tried in the
  * order the lookup gave them, all of them already checked: a connection or TLS setup that fails, before any byte of the
  * request is written, closes that address's sockets and moves on to the next one, within the same deadline. Each address
- * gets at most `addressTimeoutMs` for its connection and TLS setup, so one that never answers does not use the whole
- * deadline. Once writing has begun, a failure is final, even one on the first write: bytes may already have reached the
+ * with another one after it gets at most `addressTimeoutMs` for its connection and TLS setup, so one that never answers does
+ * not use the whole deadline; the last one gets all the time left. Once writing has begun, a failure is final, even one on the first write: bytes may already have reached the
  * receiver, so no receiver gets the request twice. Any refusal, failure or timeout throws an `EgressError` with a code and no URL or body in the
  * message.
  */
@@ -495,7 +497,7 @@ export const postCheckedHttps = async (request: EgressRequest, dependencies: Egr
      * Opens a TLS connection to one checked address and waits until it is up; nothing is written yet. On any failure, this
      * address's sockets are closed before the error is thrown, so a later address never runs beside an open one.
      */
-    const open = async (address: string): Promise<EgressSocket> => {
+    const open = async (address: string, hasNext: boolean): Promise<EgressSocket> => {
         const sockets: EgressSocket[] = [];
         let addressTimer: ReturnType<typeof setTimeout> | undefined;
         const limit = new Promise<never>((_resolve, reject) => {
@@ -506,7 +508,7 @@ export const postCheckedHttps = async (request: EgressRequest, dependencies: Egr
                     addressTimeouts.add(error);
                     reject(error);
                 },
-                addressTimeoutMs(timeoutMs, startedAt + timeoutMs - Date.now()),
+                addressTimeoutMs(timeoutMs, startedAt + timeoutMs - Date.now(), hasNext),
             );
         });
 
@@ -546,13 +548,13 @@ export const postCheckedHttps = async (request: EgressRequest, dependencies: Egr
         const addresses = await resolveChecked(target.hostname, dependencies, controller.signal);
         let lastError: unknown;
 
-        for (const address of addresses) {
+        for (const [index, address] of addresses.entries()) {
             assertInTime();
 
             let socket: EgressSocket;
 
             try {
-                socket = await open(address);
+                socket = await open(address, index < addresses.length - 1);
             } catch (error) {
                 if (error instanceof EgressError) {
                     throw error;
