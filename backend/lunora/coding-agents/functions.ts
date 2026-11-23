@@ -443,6 +443,15 @@ export const startSetupFix = authMutation
             return { error: `This run already has ${String(MAX_SETUP_FIX_ATTEMPTS)} setup fix attempts; start a new run instead.` };
         }
 
+        // A fix for a task that is gone, or not the caller's, would run with no task to show its result in.
+        if (run.taskId !== undefined) {
+            const task = await ctx.db.get("tasks", run.taskId as Id<"tasks">);
+
+            if (!task || task.userId !== ctx.user.userId) {
+                return { error: "The task this run came from was deleted, so the fix's result could not be shown there." };
+            }
+        }
+
         // A fix in a chat that is gone, not the caller's, or locked would run with no place to show its result.
         if (run.threadId !== undefined) {
             const thread = await ctx.db.get("threads", run.threadId as Id<"threads">);
