@@ -148,8 +148,12 @@ const CodingAgentRunView: FC<CodingAgentRunViewProps> = ({ className, run }) => 
     const { data: fixRun } = useQuery(crpc.coding_agents.functions.getRun.queryOptions(run.setupFixRunId ? { runId: run.setupFixRunId } : skipToken));
     // A retry is offered once the linked fix run has ended without finishing; the server checks again when it starts.
     const fixRunEnded = fixRun?.status === "failed" || fixRun?.status === "cancelled";
-    // Every "Fix setup" attempt under this run, oldest first, each its own live query: an earlier attempt stays reachable after a retry.
-    const attempts = useQueries({ queries: run.setupFixRunIds.map((runId) => crpc.coding_agents.functions.getRun.queryOptions({ runId })) });
+    // Earlier "Fix setup" attempts have ended (a retry starts only after the newest one ended), so each is read once rather than
+    // kept live: live subscriptions are capped per socket, and a long retry history would use them all up. The newest is `fixRun`.
+    const earlierIds = run.setupFixRunIds.slice(0, -1);
+    const earlierAttempts = useQueries({
+        queries: earlierIds.map((runId) => crpc.coding_agents.functions.getRun.queryOptions({ runId }, { live: false })),
+    });
 
     const openPullRequest = () => {
         createPr.mutate(
@@ -262,11 +266,12 @@ const CodingAgentRunView: FC<CodingAgentRunViewProps> = ({ className, run }) => 
                 )}
             </div>
 
-            {run.setupFixRunIds.map((runId, index) => {
-                const attempt = attempts[index]?.data;
+            {earlierIds.map((runId, index) => {
+                const attempt = earlierAttempts[index]?.data;
 
                 return attempt ? <CodingAgentRunView className="mb-0 max-w-none" key={runId} run={attempt} /> : null;
             })}
+            {fixRun && <CodingAgentRunView className="mb-0 max-w-none" run={fixRun} />}
         </section>
     );
 };
