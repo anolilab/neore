@@ -423,7 +423,7 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
     const { data: document } = useQuery({
         ...crpc.agent.documents.getDocument.queryOptions({
             documentId: activeDocumentId as Id<"documents">,
-            threadId: canvasThreadId ? (canvasThreadId as Id<"threads">) : undefined,
+            threadId: (canvasThreadId || undefined) as Id<"threads"> | undefined,
         }),
         enabled: !!activeDocumentId && isCanvasOpen,
     });
