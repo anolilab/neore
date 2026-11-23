@@ -3658,6 +3658,25 @@ export const schema = defineSchema({
         // The home dashboard's "needs you" (`home/overview.ts`).
         .index("by_userId_status_createdAt", ["userId", "status", "createdAt"]),
 
+    /**
+     * The Events log (`public-api/events-log.ts`): one row per run end and approval request, read by `events/poll`. `seq` is
+     * one past the user's highest; `eventId` is stable per upstream event; `data` is the payload as JSON text. Kept seven days
+     * (`RETENTION_MS`), but never the highest row, so the sequence does not restart.
+     */
+    mcpEvents: defineTable({
+        createdAt: v.number(),
+        data: v.string(),
+        eventId: v.string(),
+        name: v.string(),
+        seq: v.number(),
+        timestamp: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId_seq", ["userId", "seq"])
+        .index("by_userId_eventId", ["userId", "eventId"])
+        .index("by_createdAt", ["createdAt"]),
+
     triggerExecutions: defineTable({
         completedAt: v.optional(v.number()),
         error: v.optional(v.string()),

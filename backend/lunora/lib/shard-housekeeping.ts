@@ -78,6 +78,8 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "cleanupStaleWorkflowPresence", ref: internal.workflow.presence.cleanupStalePresence },
     { name: "reapLapsedClaims", ref: internal.lib.claim_once.reapLapsedClaims },
     { name: "purgeIdempotencyClaims", ref: internal.lib.claim_once.purgeExpiredClaims },
+    // The Events log's seven-day window (`public-api/events-log.ts`): older events go, the newest row of each log stays.
+    { name: "pruneMcpEvents", ref: internal.public_api.events.pruneMcpEvents },
     // Rate-limit rows charged on this shard, past every limit's window (`lib/rate-limit-sweep.ts`).
     { name: "sweepExpiredRateLimits", ref: internal.lib.rate_limit_sweep.sweepExpiredRateLimits },
     { name: "deleteExpiredTemporaryChats", ref: internal.crons.deleteExpiredTemporaryChats },

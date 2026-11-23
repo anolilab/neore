@@ -406,6 +406,15 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 ),
         );
         await drain(
+            "delete-user-mcp-events",
+            async (round) =>
+                await context.run(
+                    internal.public_api.gdpr.deleteUserMcpEvents,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-mcp-events", round) },
+                ),
+        );
+        await drain(
             "delete-user-pages",
             async (round) =>
                 await context.run(internal.pages.gdpr.deleteUserPages, { userId: args.userId }, { dedupId: stepDedupId(scope, "delete-user-pages", round) }),
