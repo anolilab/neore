@@ -211,6 +211,72 @@ describe("beginHostGuide", () => {
         expect(thread).toMatchObject({ _id: started.threadId, organizationId: "org-b" });
     });
 
+    describe("on a computer limited to some projects", () => {
+        const insertProject = async (title: string, userId = ownerId): Promise<string> =>
+            (await run(async (ctx) => await ctx.db.insert("projects", { createdAt: 0, title, userId }))) as string;
+        const addRepo = async (projectId: string, userId = ownerId): Promise<void> => {
+            await run(async (ctx) => await ctx.db.insert("projectRepositories", { createdAt: 0, projectId, url: "https://github.com/octo/hello.git", userId }));
+        };
+        const limitTo = async (deviceId: string, projectIds: string[]): Promise<void> => {
+            await run(async (ctx) => await ctx.db.patch("devices", deviceId, { projectIds }));
+        };
+
+        it("files the guide under the computer's project that lists this repository", async () => {
+            const deviceId = await pairedDevice(ownerId);
+            const elsewhere = await insertProject("Elsewhere");
+            const projectId = await insertProject("Hello");
+
+            // A project that lists the repository but is out of the computer's scope is passed over.
+            await addRepo(elsewhere);
+            await addRepo(projectId);
+            await limitTo(deviceId, [projectId]);
+
+            const started = await begin(deviceId);
+            const [thread] = await rows("threads");
+
+            expect(started).toMatchObject({ status: "started" });
+            expect(thread).toMatchObject({ _id: started.threadId, projectId });
+        });
+
+        it("is out of scope, not busy, and writes nothing, when none of the computer's projects lists this repository", async () => {
+            const deviceId = await pairedDevice(ownerId);
+            const projectId = await insertProject("Hello");
+            const other = await insertProject("Other");
+
+            await addRepo(other);
+            await limitTo(deviceId, [projectId]);
+
+            await expect(begin(deviceId)).resolves.toEqual({ reason: "out_of_scope", status: "unavailable" });
+            await nothingLeftBehind();
+        });
+
+        it("never files under another person's project, even one the computer's scope names", async () => {
+            const stranger = (await run(
+                async (ctx) => await ctx.db.insert("user", { createdAt: 0, email: "o@example.com", emailVerified: true, name: "O", updatedAt: 0 }),
+            )) as string;
+            const deviceId = await pairedDevice(ownerId);
+            const theirs = await insertProject("Theirs", stranger);
+
+            await addRepo(theirs, stranger);
+            await limitTo(deviceId, [theirs]);
+
+            await expect(begin(deviceId)).resolves.toEqual({ reason: "out_of_scope", status: "unavailable" });
+            await nothingLeftBehind();
+        });
+
+        it("files the guide under no project on a computer offered in any chat, as before", async () => {
+            const deviceId = await pairedDevice(ownerId);
+
+            await addRepo(await insertProject("Hello"));
+
+            const started = await begin(deviceId);
+            const [thread] = await rows("threads");
+
+            expect(started).toMatchObject({ status: "started" });
+            expect(thread?.projectId).toBeUndefined();
+        });
+    });
+
     it("runs one guide at a time for a pull request", async () => {
         const deviceId = await pairedDevice(ownerId);
 

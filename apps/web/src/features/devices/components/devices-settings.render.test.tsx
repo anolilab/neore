@@ -3,7 +3,7 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 
@@ -35,6 +35,17 @@ vi.mock("sonner", () => {
 
 vi.mock("./device-scope", () => {
     return { default: () => null };
+});
+
+const { projectList, startCalls } = vi.hoisted(() => {
+    return {
+        projectList: { isAnswered: true, projects: [] as { _id: string; title: string }[] },
+        startCalls: [] as unknown[],
+    };
+});
+
+vi.mock("@/features/projects/hooks/use-projects", () => {
+    return { useProjectList: () => projectList };
 });
 
 const { bridge } = vi.hoisted(() => {
@@ -80,7 +91,13 @@ vi.mock("@/lib/lunora/crpc", () => {
                     remote: {
                         startHostSession: {
                             mutationOptions: () => {
-                                return { mutationFn: vi.fn(async () => null) };
+                                return {
+                                    mutationFn: vi.fn(async (input: unknown) => {
+                                        startCalls.push(input);
+
+                                        return { started: true };
+                                    }),
+                                };
                             },
                         },
                     },
@@ -122,6 +139,91 @@ describe("<StartAgents>", () => {
 
         expect(button.disabled).toBe(false);
         expect(button.getAttribute("aria-describedby")).toBeNull();
+    });
+});
+
+describe("<StartAgents> on a computer limited to some projects", () => {
+    const renderLimited = (projectIds: string[] | undefined, projects: { _id: string; title: string }[]) => {
+        projectList.isAnswered = true;
+        projectList.projects = projects;
+        startCalls.length = 0;
+
+        return render(
+            <QueryClientProvider client={new QueryClient()}>
+                <StartAgents device={{ ...device, projectIds } as never} online />
+            </QueryClientProvider>,
+        );
+    };
+    const startButton = () => screen.getByRole("button", { name: "Start Claude in app" }) as HTMLButtonElement;
+
+    it("starts in the one allowed project without asking", async () => {
+        renderLimited(
+            ["p1"],
+            [
+                { _id: "p1", title: "Billing" },
+                { _id: "p2", title: "Elsewhere" },
+            ],
+        );
+
+        expect(screen.queryByRole("combobox")).toBeNull();
+        expect(screen.getByText("Starts in Billing, the one project this computer may be used in.")).toBeTruthy();
+        expect(startButton().disabled).toBe(false);
+
+        await userEvent.click(startButton());
+        await waitFor(() => expect(startCalls).toHaveLength(1));
+        expect(startCalls[0]).toMatchObject({ deviceId: "d1", folderId: "f1", projectId: "p1" });
+    });
+
+    it("asks which of several allowed projects, and starts only once one is chosen", async () => {
+        renderLimited(
+            ["p1", "p2"],
+            [
+                { _id: "p1", title: "Billing" },
+                { _id: "p2", title: "Search" },
+                { _id: "p3", title: "Not allowed" },
+            ],
+        );
+
+        const picker = screen.getByRole("combobox", { name: "Project" });
+
+        expect(
+            within(picker)
+                .getAllByRole("option")
+                .map((option) => option.textContent),
+        ).toEqual(["Choose a project", "Billing", "Search"]);
+        expect(startButton().disabled).toBe(true);
+        expect(startButton().getAttribute("aria-describedby")).toBe(
+            screen.getByText("This computer may only be used in some projects. Choose the project to start the agent in.").id,
+        );
+
+        await userEvent.selectOptions(picker, "p2");
+
+        expect(startButton().disabled).toBe(false);
+        await userEvent.click(startButton());
+        await waitFor(() => expect(startCalls).toHaveLength(1));
+        expect(startCalls[0]).toMatchObject({ projectId: "p2" });
+    });
+
+    it("cannot start, and says why, when none of the allowed projects is available", () => {
+        renderLimited(["gone"], [{ _id: "p1", title: "Billing" }]);
+
+        expect(screen.queryByRole("combobox")).toBeNull();
+        expect(startButton().disabled).toBe(true);
+        expect(startButton().getAttribute("aria-describedby")).toBe(
+            screen.getByText("This computer may only be used in some projects, and none of them is available to you. Change where it is offered below.").id,
+        );
+    });
+
+    it("starts with no project on a computer offered in any chat", async () => {
+        renderLimited(undefined, [{ _id: "p1", title: "Billing" }]);
+
+        expect(screen.queryByRole("combobox")).toBeNull();
+        expect(startButton().disabled).toBe(false);
+        expect(startButton().getAttribute("aria-describedby")).toBeNull();
+
+        await userEvent.click(startButton());
+        await waitFor(() => expect(startCalls).toHaveLength(1));
+        expect(startCalls[0]).not.toHaveProperty("projectId");
     });
 });
 

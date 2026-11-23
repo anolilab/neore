@@ -904,6 +904,32 @@ const REPO_LOOKUP_LIMIT = MAX_PROJECT_REPOSITORIES;
 const MEMBERSHIP_PAGES = 10;
 
 /**
+ * The caller's OWN projects that list `repo` (any form `normalizeRepoUrl` takes), oldest first; none for one it
+ * refuses. Only ids: the caller decides each project with `writableProject`. What a start made outside a project, such as
+ * a pull-request guide, files its thread under on a computer limited to some projects (`source-control/guide-host.ts`).
+ */
+export const ownProjectIdsListingRepo = async (context: QueryCtx, userId: string, repo: string): Promise<Id<"projects">[]> => {
+    let url: string;
+
+    try {
+        url = normalizeRepoUrl(repo);
+    } catch {
+        return [];
+    }
+
+    const { page } = storedPage(
+        await context.db.projectRepositories.findMany({
+            consistency: "primary",
+            limit: REPO_LOOKUP_LIMIT,
+            orderBy: [{ _creationTime: "asc" }],
+            where: { url, userId },
+        }),
+    );
+
+    return page.filter((row) => isRepoRow(row)).map((row) => row.projectId);
+};
+
+/**
  * The oldest project the caller can read that lists this repository, or `null`: a run picker reopened on a saved run
  * shows the project its repository came from (a coding-agent task stores the URL, not the project). Only the caller's
  * own rows and those of the organizations they belong to (any of them, not only the active one) are read, each

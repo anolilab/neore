@@ -25,7 +25,7 @@ import { isHostRunThread } from "./lib/host-thread";
 import { hostOrganizationRefusal } from "./lib/organization-cap";
 import { sessionOfThread } from "./lib/sessions";
 import { projectRunnerOf, runnerStillOffered } from "./lib/project-runner";
-import { offerOf, startFailureMessage, webSessionId } from "./lib/start";
+import { HOST_START_OUT_OF_SCOPE, offerOf, startFailureMessage, webSessionId } from "./lib/start";
 import { openHostSession } from "./lib/start-session";
 import { readableProject, writableProject } from "../projects/functions";
 import { fitsIdBytes, vPendingPermission } from "./validators";
@@ -165,6 +165,7 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
             project
                 ? "That computer is not allowed in this project. Change which projects it may be used in, in its settings."
                 : "That computer may only be used in some projects. Start the agent from one of them, or change this in its settings.",
+            { data: { code: HOST_START_OUT_OF_SCOPE } },
         );
     }
 

@@ -77,6 +77,7 @@ const { applyHostEvents, recordOpenedRunner } = await import("./ingest");
 const { createAcpCall, createAcpCancelCall } = await import("../devices/lib/acp-call");
 const calls = await import("./calls");
 const remote = await import("./remote");
+const { isOutOfScopeStart } = await import("./lib/start");
 const send = await import("./send");
 const { getHostSession } = await import("./functions");
 const streaming = await import("../chat/streaming/index");
@@ -103,6 +104,7 @@ const NOT_FOUND = /not found/u;
 const ANOTHER_PROJECT = /another project/u;
 const NOT_IN_PROJECT = /not allowed in this project/u;
 const SOME_PROJECTS_ONLY = /only be used in some projects/u;
+const ACCESS_DENIED = /access denied/u;
 
 const OFFER = { agentKey: "claude", agentLabel: "Claude Code", folderId: "f1", folderLabel: "neore" };
 const SESSION_OPEN = { ...OFFER, kind: "session_open" };
@@ -1722,6 +1724,61 @@ describe("a project remembers its runner", () => {
 
         await expect(start("tap-np1")).rejects.toThrow(SOME_PROJECTS_ONLY);
         expect(await rows("acpSessions")).toHaveLength(1);
+    });
+
+    it("marks a start refused for the computer's project scope, so a caller tells it from a busy computer", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const otherId = await insertProject({ title: "Other", userId: ownerId });
+        const refusal = async (start: Promise<unknown>): Promise<unknown> => {
+            try {
+                await start;
+
+                return null;
+            } catch (error) {
+                return error;
+            }
+        };
+
+        await run(async (ctx) => await ctx.db.patch("devices", device.deviceId as never, { projectIds: [projectId] }));
+
+        const withoutProject = await refusal(
+            as(ownerId).mutation(
+                remote.startHostSession as never,
+                { agentKey: "claude", clientId: "tap-oc1", deviceId: device.deviceId, folderId: "f1" } as never,
+            ),
+        );
+        const otherProject = await refusal(startIn(otherId, device, "tap-oc2"));
+
+        expect(isOutOfScopeStart(withoutProject)).toBe(true);
+        expect(isOutOfScopeStart(otherProject)).toBe(true);
+        expect(await rows("acpSessions")).toEqual([]);
+    });
+
+    it("starts in a project the limited computer is allowed in, filed under that project", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+
+        await run(async (ctx) => await ctx.db.patch("devices", device.deviceId as never, { projectIds: [projectId] }));
+
+        const started = (await startIn(projectId, device, "tap-ok1")) as { started: boolean; threadId: string };
+        const [thread] = await rows("threads", { _id: started.threadId });
+
+        expect(started.started).toBe(true);
+        expect(thread).toMatchObject({ projectId, runner: "host" });
+    });
+
+    it("refuses another person's project even when the computer's scope names it", async () => {
+        const device = await pairedDevice(ownerId);
+        const stranger = (await run(
+            async (ctx) => await ctx.db.insert("user", { createdAt: 0, email: "x@example.com", emailVerified: true, name: "X", updatedAt: 0 }),
+        )) as string;
+        const theirs = await insertProject({ userId: stranger });
+
+        await run(async (ctx) => await ctx.db.patch("devices", device.deviceId as never, { projectIds: [theirs] }));
+
+        await expect(startIn(theirs, device, "tap-st1")).rejects.toThrow(ACCESS_DENIED);
+        expect(await rows("acpSessions")).toEqual([]);
     });
 
     it("refuses a retry naming a project for a start claimed before claims recorded their project", async () => {

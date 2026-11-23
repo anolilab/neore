@@ -105,6 +105,7 @@ const GuideTab = ({
             const unavailable = {
                 busy: t`That computer is busy. Try again in a moment.`,
                 offline: t`That computer is not online.`,
+                out_of_scope: t`That computer may only be used in some projects, and none of them lists this repository. Add the repository to one of them, or change where the computer is offered in its settings.`,
                 outdated: t`The Neore app on that computer is out of date. Update it, then try again.`,
                 rate_limited: rateLimited,
                 session_ended: t`That agent session has ended.`,
