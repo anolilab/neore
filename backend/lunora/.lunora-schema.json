@@ -29068,6 +29068,13 @@
           ],
           "unique": false
         },
+        "by_thread_and_document": {
+          "fields": [
+            "threadId",
+            "documentId"
+          ],
+          "unique": false
+        },
         "by_user_and_document": {
           "fields": [
             "userId",

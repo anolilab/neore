@@ -3448,6 +3448,7 @@ export const schema = defineSchema({
     })
         .shardBy("userId")
         .index("by_thread", ["threadId"])
+        .index("by_thread_and_document", ["threadId", "documentId"])
         .index("by_user_and_thread", ["userId", "threadId"])
         // One document pin per person and document, so pinning the same document again finds it.
         .index("by_user_and_document", ["userId", "documentId"])

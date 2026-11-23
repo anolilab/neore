@@ -386,23 +386,13 @@ export const deleteDocument = internalMutation
 
         // A document pin names the document: drop the thread's pins that name it, so none is left pointing at nothing. The pins of a
         // thread sit on the same shard as its documents.
-        let cursor: string | null = null;
-        let isDone = false;
+        const pins = await ctx.db
+            .query("threadPins")
+            .withIndex("by_thread_and_document", (q) => q.eq("threadId", documentRow.threadId).eq("documentId", args.documentId))
+            .collect();
 
-        while (!isDone) {
-            const result = await ctx.db
-                .query("threadPins")
-                .withIndex("by_thread", (q) => q.eq("threadId", documentRow.threadId))
-                .paginate({ cursor, numItems: 500 });
-
-            for (const pin of result.page) {
-                if (pin.documentId === args.documentId) {
-                    await ctx.db.delete("threadPins", pin._id);
-                }
-            }
-
-            isDone = result.isDone;
-            cursor = result.continueCursor;
+        for (const pin of pins) {
+            await ctx.db.delete("threadPins", pin._id);
         }
 
         return null;
