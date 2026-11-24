@@ -2,6 +2,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
+import { admitPinWriteUnlessMoving } from "../../lib/account-moves";
 import { authMutation, authQuery, internalMutation, internalQuery, rateLimit } from "../../lib/crpc";
 import { MAX_LENGTH } from "../../lib/validators";
 import { systemDb } from "../../lib/rls/scope";
@@ -176,9 +177,29 @@ const recordSharedPinRoute = async (context: MutationCtx, threadId: Id<"threads"
 
     const existing = await context.db.sharedPinRoutes.findFirst({ consistency: "primary", where: { threadId, userId } });
 
-    if (!existing) {
-        await context.db.insert("sharedPinRoutes", { createdAt: now, ownerId: thread.userId, threadId, userId });
+    if (existing) {
+        return;
     }
+
+    await context.db.insert("sharedPinRoutes", { createdAt: now, ownerId: thread.userId, threadId, userId });
+};
+
+/**
+ * Writes a pin with its route. The route is a global row, outside this shard's transaction, so it is written BEFORE the pin: a
+ * committed pin always has its route (erasure after a revoked grant finds the pin through it). A failed pin write leaves its route
+ * behind on purpose. Removing it could race a concurrent writer that found the same route and is about to commit its own pin; a
+ * route with no pin is harmless (every reader skips it), and account and thread deletion remove it.
+ */
+export const withSharedPinRoute = async <T>(
+    context: MutationCtx,
+    threadId: Id<"threads">,
+    userId: string,
+    now: number,
+    write: () => Promise<T>,
+): Promise<T> => {
+    await recordSharedPinRoute(context, threadId, userId, now);
+
+    return await write();
 };
 
 /**
@@ -272,20 +293,30 @@ export const createPin = authMutation
         // A pin is listed only through the thread's read grant (`getThreadPins`), so it is written only under that grant, locked or not.
         throwUnlessGranted(await threadGateOutcome(context, { level: "read", primary: true, threadId, unlockProof, userId }));
 
-        const pinId = await context.db.insert("threadPins", {
-            createdAt: now,
-            // A message pin is stored as before (no kind), so old and new rows read the same.
-            ...(kind === "image" && { imageIndex, kind }),
-            ...(kind === "image" && imageKey !== undefined && { imageKey }),
-            messageId,
-            messageRole,
-            selectedText,
-            threadId: threadId as Id<"threads">,
-            updatedAt: now,
-            userId,
-        });
+        // A refused write renews no lease; an admitted one holds its lease until it commits (`lib/account-moves.ts`).
+        if (await admitPinWriteUnlessMoving(context, userId, now)) {
+            throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
+        }
 
-        await recordSharedPinRoute(context, threadId as Id<"threads">, userId, now);
+        const pinId = await withSharedPinRoute(
+            context,
+            threadId as Id<"threads">,
+            userId,
+            now,
+            async () =>
+                await context.db.insert("threadPins", {
+                    createdAt: now,
+                    // A message pin is stored as before (no kind), so old and new rows read the same.
+                    ...(kind === "image" && { imageIndex, kind }),
+                    ...(kind === "image" && imageKey !== undefined && { imageKey }),
+                    messageId,
+                    messageRole,
+                    selectedText,
+                    threadId: threadId as Id<"threads">,
+                    updatedAt: now,
+                    userId,
+                }),
+        );
 
         context.log.event("chat.create_pin", { hasSelectedText: selectedText !== undefined, kind: kind ?? "message", messageRole });
 
@@ -328,6 +359,7 @@ export const createDocumentPin = authMutation
             throw new LunoraError("BAD_REQUEST", "A document still being written cannot be pinned yet");
         }
 
+        // A pin that already exists is returned as it is: no write, so no lease is renewed for it.
         const [existing] = await context.db
             .query("threadPins")
             .withIndex("by_user_and_document", (q) => q.eq("userId", userId).eq("documentId", document._id))
@@ -337,21 +369,31 @@ export const createDocumentPin = authMutation
             return existing._id;
         }
 
-        const pinId = await context.db.insert("threadPins", {
-            createdAt: now,
-            documentId: document._id,
-            documentKind: document.kind,
-            kind: "document",
-            messageId: document.messageId,
-            // Documents are made by the assistant, so the quoted message is an assistant message.
-            messageRole: "assistant",
-            selectedText: document.title,
-            threadId: threadId as Id<"threads">,
-            updatedAt: now,
-            userId,
-        });
+        // A refused write renews no lease; an admitted one holds its lease until it commits (`lib/account-moves.ts`).
+        if (await admitPinWriteUnlessMoving(context, userId, now)) {
+            throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
+        }
 
-        await recordSharedPinRoute(context, threadId as Id<"threads">, userId, now);
+        const pinId = await withSharedPinRoute(
+            context,
+            threadId as Id<"threads">,
+            userId,
+            now,
+            async () =>
+                await context.db.insert("threadPins", {
+                    createdAt: now,
+                    documentId: document._id,
+                    documentKind: document.kind,
+                    kind: "document",
+                    messageId: document.messageId,
+                    // Documents are made by the assistant, so the quoted message is an assistant message.
+                    messageRole: "assistant",
+                    selectedText: document.title,
+                    threadId: threadId as Id<"threads">,
+                    updatedAt: now,
+                    userId,
+                }),
+        );
 
         context.log.event("chat.create_document_pin", { documentKind: document.kind });
 

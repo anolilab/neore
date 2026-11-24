@@ -451,6 +451,7 @@ const replayingContext = (
                     inStep = false;
                 }
             },
+            sleep: async () => undefined,
         },
     };
 };
@@ -535,7 +536,7 @@ describe("account deletion workflow: usage exports", () => {
         const purges = runs().filter((entry) => isPurge(entry.ref));
 
         expect(purges.map((entry) => entry.args["force"])).toStrictEqual([false, false, false]);
-        expect(sleeps).toStrictEqual(["1 minute", "1 minute"]);
+        expect(sleeps).toStrictEqual(["2 minutes", "1 minute", "1 minute"]);
         expect(completionIndex()).toBeGreaterThan(-1);
         // Completion is recorded only after the final purge, so the request is never complete while a purge is still pending.
         const lastPurgeAt = trace.findLastIndex((entry) => entry.kind === "run" && isPurge(entry.ref));
@@ -581,8 +582,27 @@ describe("account deletion workflow: usage exports", () => {
 
         expect(purges).toHaveLength(121);
         expect(purges.at(-1)?.args["force"]).toBe(true);
-        expect(sleeps).toHaveLength(120);
-        expect(sleeps.every((duration) => duration === "1 minute")).toBe(true);
+        expect(sleeps.filter((duration) => duration === "1 minute")).toHaveLength(120);
+        expect(sleeps.filter((duration) => duration === "2 minutes")).toHaveLength(1);
         expect(completionIndex()).toBeGreaterThan(-1);
+    });
+});
+
+describe("account deletion workflow: the owner-shard sweep", () => {
+    it("sweeps the owner shards, waits the grace period, sweeps again, and only then drains the routes", async () => {
+        await execute();
+
+        const names = stepNames();
+        const first = names.indexOf("erase-pins-on-owner-shards");
+        const grace = names.indexOf("erase-pins-grace");
+        const again = names.indexOf("erase-pins-on-owner-shards-again");
+        const drain = names.indexOf("delete-user-shared-pin-routes");
+
+        // Each step runs once, in this order: a pin that commits after the first sweep is found by the second, while its route still exists.
+        expect([first, grace, again, drain].every((index) => index >= 0)).toBe(true);
+        expect(first).toBeLessThan(grace);
+        expect(grace).toBeLessThan(again);
+        expect(again).toBeLessThan(drain);
+        expect(sleeps).toContain("2 minutes");
     });
 });
