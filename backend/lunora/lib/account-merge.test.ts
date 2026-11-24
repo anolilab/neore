@@ -32,6 +32,7 @@ import {
     MERGE_GENERATION_SCOPE,
     MERGE_LEASE_CALLS,
     MERGE_LEASE_SCOPE,
+    MERGE_STOP_CALLS,
     MERGE_PAGE_SIZE,
     MERGE_PROGRESS_SCOPE,
     MERGE_STALL_MS,
@@ -613,7 +614,91 @@ describe("mergeGuestInto", () => {
         expect(shards.get("user")?.get("messages")).toStrictEqual([{ _id: "m1", threadId: "t1", userId: "user" }]);
         expect(shards.get("guest")?.get("threads")).toStrictEqual([]);
         expect(shards.get("guest")?.get("messages")).toStrictEqual([]);
-        expect(reassigned).toStrictEqual([{ from: "guest", to: "user" }]);
+        // The `global` step, then its re-check right before the guest's deletion.
+        expect(reassigned).toStrictEqual([
+            { from: "guest", to: "user" },
+            { from: "guest", to: "user" },
+        ]);
+    });
+
+    it("keeps the guest and goes back to the global step for a project the guest made after that step", async () => {
+        const shards = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } });
+        let reassigns = 0;
+        const call: ShardCall = async (reference, args, shardKey) => {
+            const result: unknown = await shards.call(reference, args, shardKey);
+
+            // The second re-point is the guest step's re-check: a project written under the guest's id since the first.
+            if (reference.__lunoraRef.endsWith(":reassignGlobalRows")) {
+                reassigns += 1;
+            }
+
+            if (reference.__lunoraRef.endsWith(":reassignGlobalRows") && reassigns === 2) {
+                return { done: true, reassigned: 1 } as never;
+            }
+
+            return result as never;
+        };
+
+        await mergeToEnd(call, "guest", "user");
+
+        expect(shards.calls.filter((name) => name === "reassignGlobalRows" || name === "deleteMergedGuest")).toStrictEqual([
+            "reassignGlobalRows",
+            "reassignGlobalRows",
+            // Back in the `global` step, then its re-check again, which finds nothing: only now is the guest deleted.
+            "reassignGlobalRows",
+            "reassignGlobalRows",
+            "deleteMergedGuest",
+        ]);
+        expect(shards.deletedGuests).toHaveLength(1);
+    });
+
+    it("keeps a run that stops the merge on its last step call within its cross-shard call budget", async () => {
+        // In the first table the copy reads, so every step of the run is a two-call copy step.
+        const first = shardLocalTables()[0]!;
+        const rows = Array.from({ length: 80 }, (_, index) => {
+            return { _id: `r${String(index)}`, userId: "guest" };
+        });
+        let worst = 0;
+
+        // Every alignment of the run's steps (one to three contributor steps), stopped by an erasure at each import.
+        for (let handOvers = 1; handOvers <= 3; handOvers += 1) {
+            for (let stopAt = 1; stopAt <= 20; stopAt += 1) {
+                const shards = fakeShards({ guest: { [first]: rows } });
+                let total = 0;
+                let contributorCalls = 0;
+                let imports = 0;
+                const call: ShardCall = async (reference, args, shardKey) => {
+                    const name = reference.__lunoraRef.split(":", 2)[1];
+
+                    total += 1;
+
+                    if (name === "handOverOrganizationContributors") {
+                        contributorCalls += 1;
+
+                        return { done: contributorCalls >= handOvers, fenced: false } as never;
+                    }
+
+                    if (name === "importShardRows") {
+                        imports += 1;
+                    }
+
+                    if (name === "importShardRows" && imports === stopAt) {
+                        return { erasing: true, fenced: false, held: 0, imported: 0, present: [] } as never;
+                    }
+
+                    return await shards.call(reference, args, shardKey);
+                };
+
+                const { stopped } = await mergeGuestInto(call, REFERENCES, "guest", "user", { budget: MERGE_CALLS_PER_RUN });
+
+                if (stopped === true) {
+                    worst = Math.max(worst, total);
+                }
+            }
+        }
+
+        expect(worst).toBeGreaterThan(0);
+        expect(worst).toBeLessThanOrEqual(MERGE_CALLS_PER_RUN);
     });
 
     it("hands the guest's organization contributor entries over before it copies a row, so the copy knows where ledger rows belong", async () => {
@@ -722,7 +807,7 @@ describe("mergeGuestInto", () => {
             "guest",
             "user",
             // The run's own calls and one step of the costliest phase (the second pin pass's four calls), so every step fits.
-            { budget: MERGE_LEASE_CALLS + 4 },
+            { budget: MERGE_LEASE_CALLS + MERGE_STOP_CALLS + 4 },
         );
 
         // Five pages of two, each read once: no run starts the table over.
@@ -871,7 +956,7 @@ describe("mergeGuestInto", () => {
         });
 
         // A small budget, so the pin step spans runs and every later run is a resumed one.
-        const { runs } = await mergeToEnd(call, "guest", "user", { budget: MERGE_LEASE_CALLS + 4 });
+        const { runs } = await mergeToEnd(call, "guest", "user", { budget: MERGE_LEASE_CALLS + MERGE_STOP_CALLS + 4 });
 
         expect(runs.length).toBeGreaterThan(1);
         expect(pinRows.every((pin) => pin.userId === "user")).toBe(true);
@@ -913,7 +998,7 @@ describe("mergeGuestInto", () => {
 
         const resume: MergeProgress = { cursor: null, moved: 0, phase: "repins", run: 1, table: "" };
         // The lease calls and two of the pass's steps (two calls each): it stops inside the second route.
-        const { next } = await mergeGuestInto(call, REFERENCES, "guest", "user", { budget: MERGE_LEASE_CALLS + 4, resume });
+        const { next } = await mergeGuestInto(call, REFERENCES, "guest", "user", { budget: MERGE_LEASE_CALLS + MERGE_STOP_CALLS + 4, resume });
 
         expect(next).toMatchObject({ phase: "repins", route: 1, routeThread: "shared-2" });
     });
@@ -1718,6 +1803,38 @@ describe("importShardRows for userSettings", () => {
         expect(rows[0]).toMatchObject({ language: "de-DE", setupStepsSkipped: ["agent"] });
     });
 
+    it("never adds back at the clear a guest step the account resumed after the copy carried it, and adds one skipped since", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const steps = await harness.run(async (context: any) => {
+                const own = await context.db.insert("userSettings", { setupStepsSkipped: ["pair"], userId: "user" });
+                const { generation } = await context.runMutation(acquireMergeLease, { from: "guest", to: "user" });
+                const guestRow = { _id: "g1", setupStepsSkipped: ["ssh"], userId: "guest" };
+
+                await context.runMutation(importShardRows, { from: "guest", generation, rows: [guestRow], table: "userSettings", to: "user" });
+                // The account resumes the carried step; then the guest skips another before the clear imports its row again.
+                await context.db.patch("userSettings", own, { setupStepsSkipped: ["pair"] });
+                await context.runMutation(importShardRows, {
+                    clearing: true,
+                    from: "guest",
+                    generation,
+                    rows: [{ ...guestRow, setupStepsSkipped: ["ssh", "agent"] }],
+                    table: "userSettings",
+                    to: "user",
+                });
+
+                const stored = await context.db.get("userSettings", own);
+
+                return stored.setupStepsSkipped;
+            });
+
+            expect(steps).toStrictEqual(["agent", "pair"]);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("leaves the new account's settings alone when the guest skipped nothing", async () => {
         const rows = await run([{ _id: "g1", language: "fr-FR", userId: "guest" }], { language: "de-DE", userId: "user" });
 
@@ -1950,6 +2067,46 @@ describe("mergeGuestInto across two real shards", () => {
             await mergeToEnd(merge.call, "guest", "user");
 
             expect(await merge.threadsOn("user")).toStrictEqual([{ _id: id, title: "edited during the merge", userId: "user" }]);
+            expect(await merge.threadsOn("guest")).toStrictEqual([]);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("takes back the copy of a row the guest deletes right after the reconcile found it still on the guest's shard", async () => {
+        const merge = twoShards();
+
+        try {
+            const id = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("deleted late")))) as string;
+            let clearReads = 0;
+            let deletedAfterCheck = false;
+            const call: ShardCall = async (reference, args, shardKey) => {
+                const name = reference.__lunoraRef.split(":", 2)[1]!;
+
+                // The clear's first read of threads misses the row: the reconcile then finds it still on the guest's shard.
+                if (name === "listShardRowsToClear" && args.table === "threads") {
+                    clearReads += 1;
+
+                    if (clearReads === 1) {
+                        return { digests: [], rows: [] } as never;
+                    }
+                }
+
+                const result: unknown = await merge.call(reference, args, shardKey);
+
+                if (name === "listRowsMissingOnGuest" && args.table === "threads" && !deletedAfterCheck) {
+                    expect(result).toStrictEqual([]);
+                    deletedAfterCheck = true;
+                    await merge.shards.guest.run(async (context: any) => await context.db.delete("threads", id));
+                }
+
+                return result as never;
+            };
+
+            await mergeToEnd(call, "guest", "user");
+
+            expect(deletedAfterCheck).toBe(true);
+            expect(await merge.threadsOn("user")).toStrictEqual([]);
             expect(await merge.threadsOn("guest")).toStrictEqual([]);
         } finally {
             merge.close();
@@ -2338,7 +2495,7 @@ describe("mergeGuestInto across two real shards", () => {
                 await merge.lapseLease();
                 await merge.shards.guest.run(async (context: any) => await context.db.patch("threads", id, { title: "edited during the merge", updatedAt: 2 }));
                 ({ next: newer } = await mergeGuestInto(merge.call, REFERENCES, "guest", "user", {
-                    budget: MERGE_LEASE_CALLS + 4,
+                    budget: MERGE_LEASE_CALLS + MERGE_STOP_CALLS + 4,
                     resume: { cursor: null, moved: 0, phase: "clear", run: 1, table: "threads" },
                 }));
             });
@@ -2643,7 +2800,7 @@ describe("mergeGuestInto across two real shards", () => {
                 await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("kept")));
 
                 // A first run saves where it stopped (run 1); a delivery that meets the cap there stops the merge for good.
-                const { next } = await mergeGuestInto(merge.call, REFERENCES, "guest", "user", { budget: MERGE_LEASE_CALLS + 2 });
+                const { next } = await mergeGuestInto(merge.call, REFERENCES, "guest", "user", { budget: MERGE_LEASE_CALLS + MERGE_STOP_CALLS + 2 });
 
                 expect(next?.run).toBe(1);
                 await expect(mergeGuestInto(merge.call, REFERENCES, "guest", "user", { maxRuns: 1 })).rejects.toThrow("did not finish in 1 runs");
@@ -2764,7 +2921,7 @@ describe("mergeGuestInto across two real shards", () => {
                 );
 
                 // A run moves part of the merge and queues its successor; the new account's erasure then finishes.
-                const { next } = await mergeGuestInto(merge.call, REFERENCES, "guest", "user", { budget: MERGE_LEASE_CALLS + 3 });
+                const { next } = await mergeGuestInto(merge.call, REFERENCES, "guest", "user", { budget: MERGE_LEASE_CALLS + MERGE_STOP_CALLS + 3 });
 
                 expect(next).not.toBeNull();
 
@@ -3284,7 +3441,7 @@ describe("a merge's end past the fence", () => {
 
             // A continuation from a stale progress, one markers page per run: the phase is the markers', whatever it says.
             const { runs } = await mergeToEnd(call, "guest", "user", {
-                budget: MERGE_LEASE_CALLS + 1,
+                budget: MERGE_LEASE_CALLS + MERGE_STOP_CALLS + 1,
                 resume: { cursor: null, moved: 0, phase: "copy", run: 3, table: "threads" },
             });
 

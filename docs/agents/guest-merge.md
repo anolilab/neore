@@ -62,6 +62,24 @@ drop stays within the D1 budget), asks the guest's shard which of those without 
 stays, the marker stays. Three calls a step, its cursor the last marker key, safe to run again. The records go with the
 markers (`dropImportMarkersPage`) and count for `mergeCleanupPending`.
 
+A reconcile page that finds an uncleared copy's row still on the guest's shard sends the merge back to that table's
+clear instead of moving on: the clear reads the row again (and records it), or finds the table empty and the next
+reconcile finds the row gone, so a guest deletion after the absence check still takes the copy back.
+
+The `guest` step calls `reassignGlobalRows` again before `deleteMergedGuest` (a second call, so the deletion keeps its
+own D1 budget): a `.global()` row the guest wrote after the `global` step (a project made meanwhile) is moved there, and
+when it moved any (or is not done) the merge goes back to the `global` step and keeps the guest until the next pass
+finds nothing. The two calls run on two shards, so a row written between them is still possible; it is the same
+narrow window every pre-deletion check has.
+
+The guest's skipped setup steps are added to the new account's `userSettings` once: `guest-merge-carried-steps` (new
+account's shard, keyed by the guest, tagged with the account) records the steps carried, and a later import (the clear's)
+adds only steps the guest skipped since, so one the account resumed meanwhile stays resumed. It goes with the last
+page of import markers.
+
+A run's steps get `MERGE_CALLS_PER_RUN - MERGE_LEASE_CALLS - MERGE_STOP_CALLS` calls: a step that stops the merge on
+the last of them still leaves room for the `abandonPinsLeft` call after the lease is given back.
+
 `auth/hooks.ts#deleteMergedGuest` reads the guest's `user` row from the primary: a replica that has not seen it yet
 would pass for the anonymous plugin's deletion and the guest would stay.
 

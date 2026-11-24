@@ -473,16 +473,35 @@ export const listShardRowsToClear = internalQuery
     });
 
 /**
- * The new account keeps its own `userSettings` row, but the guest's skipped first-run steps are a choice the guest made
- * and would otherwise vanish on sign-up: they are added to the new row's list and nothing else of it changes.
+ * The claim scope of the guest's skipped first-run steps a merge has already added to the new account's list, on the NEW
+ * account's shard, keyed by the guest's id, `result` the steps as JSON. Both the copy and the clear import the guest's
+ * `userSettings` row: without it the clear would add back a step the account resumed after the copy. Tagged with the new
+ * account, so its erasure takes it; never by time, and gone with the merge's last page of import markers.
  */
-const carrySetupSteps = async (ctx: { db: unknown }, guestRows: Record<string, unknown>[], from: string, to: string): Promise<void> => {
+export const MERGE_CARRIED_STEPS_SCOPE = "guest-merge-carried-steps";
+
+/**
+ * The new account keeps its own `userSettings` row, but the guest's skipped first-run steps are a choice the guest made
+ * and would otherwise vanish on sign-up: they are added to the new row's list and nothing else of it changes. Each step
+ * is added once ({@link MERGE_CARRIED_STEPS_SCOPE}): a later import adds only the steps the guest skipped since, so one
+ * the account resumed meanwhile stays resumed.
+ */
+const carrySetupSteps = async (ctx: Pick<MutationCtx, "db">, guestRows: Record<string, unknown>[], from: string, to: string, now: number): Promise<void> => {
     // Only the converting guest's own row: a page may hold other rows, and their choices are not this account's.
     const skipped = guestRows.flatMap((row) => (row.userId === from && Array.isArray(row.setupStepsSkipped) ? (row.setupStepsSkipped as string[]) : []));
+    const record = await storedClaim(ctx.db, MERGE_CARRIED_STEPS_SCOPE, from);
+    const carried = JSON.parse(record?.result ?? "[]") as string[];
+    const fresh = skipped.filter((step, index) => !carried.includes(step) && skipped.indexOf(step) === index);
 
-    if (skipped.length === 0) {
+    if (fresh.length === 0) {
         return;
     }
+
+    await writeClaim(ctx.db, MERGE_CARRIED_STEPS_SCOPE, from, now, {
+        expiresAt: IMPORT_MARKER_EXPIRES_AT,
+        result: JSON.stringify([...carried, ...fresh]),
+        userId: to,
+    });
 
     // By userId, through the table's index: the new account's row is found wherever it sits, never by scanning a page of rows.
     const settings = (ctx.db as { userSettings: { findFirst: (options: { where: { userId: string } }) => Promise<Record<string, unknown> | null> } })
@@ -492,10 +511,10 @@ const carrySetupSteps = async (ctx: { db: unknown }, guestRows: Record<string, u
 
     if (existing) {
         await db.patch("userSettings", existing._id as string, {
-            setupStepsSkipped: mergeSkippedSteps(skipped, existing.setupStepsSkipped as string[] | undefined),
+            setupStepsSkipped: mergeSkippedSteps(fresh, existing.setupStepsSkipped as string[] | undefined),
         });
     } else {
-        await db.insert("userSettings", { setupStepsSkipped: mergeSkippedSteps(skipped, undefined), userId: to }, { allowExplicitId: false });
+        await db.insert("userSettings", { setupStepsSkipped: mergeSkippedSteps(fresh, undefined), userId: to }, { allowExplicitId: false });
     }
 };
 
@@ -600,6 +619,13 @@ export const MERGE_LEASE_MS = 5 * 60 * 1000;
  * two accounts ({@link beginMergeRun}), give the lease back.
  */
 export const MERGE_LEASE_CALLS = 4;
+
+/**
+ * The call a run that stops the merge makes after it gives the lease back: its guest's pins-left signal is marked
+ * abandoned ({@link abandonPinsLeft}). Kept back from the steps, so a step that stops the merge on the run's last step
+ * call still ends within its budget.
+ */
+export const MERGE_STOP_CALLS = 1;
 
 /** The fields of {@link MergeProgress}, spread into each validator that takes one. */
 const vMergeProgressFields = {
@@ -1282,7 +1308,7 @@ export const importShardRows = internalMutation
         }
 
         if (args.table === "userSettings") {
-            await carrySetupSteps(ctx, rows, args.from, args.to);
+            await carrySetupSteps(ctx, rows, args.from, args.to, now);
 
             return { fenced: false, held: 0, imported: 0, present: ids };
         }
@@ -1464,7 +1490,14 @@ export const dropImportMarkersPage = internalMutation
             (await releaseClaimsWithPrefix(ctx, MERGE_CLEARED_SCOPE, `${args.from}:`));
 
         if (!hasMore) {
-            // The merge is over: its account-move markers go with the last page, so they end exactly when it does.
+            // The merge is over: its account-move markers go with the last page, so they end exactly when it does. Fenced,
+            // no import carries a setup step again.
+            const carried = await storedClaim(ctx.db, MERGE_CARRIED_STEPS_SCOPE, args.from);
+
+            if (carried !== null) {
+                await ctx.db.delete("idempotencyClaims", carried._id);
+            }
+
             await endImporting(ctx, args.from, args.to, now);
             await endAccountMove(ctx, args.from, "merging");
         }
@@ -2165,7 +2198,7 @@ const STEP_CALLS: Readonly<Record<MergePhase, number>> = {
     copy: 2,
     follows: 1,
     global: 2,
-    guest: 1,
+    guest: 2,
     markers: 1,
     pins: 3,
     reconcile: 3,
@@ -2386,7 +2419,32 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
     },
     // Only now: every table was copied, then cleared to empty, so nothing of the guest's is left to move.
     guest: async (context, state) => {
-        const { call, from, generation, references, tables } = context;
+        const { call, from, generation, references, tables, to } = context;
+
+        // A `.global()` row the guest wrote after the `global` step (a project made meanwhile) still names the guest: moved
+        // here before the guest goes, and then the merge goes back to that step, the guest kept until it is done again.
+        state.calls -= 1;
+        const global: { done: boolean; erasing?: boolean; fenced?: boolean; reassigned: number } = await call(
+            references.reassignGlobal,
+            { from, generation, to },
+            to,
+        );
+
+        if (global.erasing === true) {
+            return stoppedByErasure(state);
+        }
+
+        if (global.fenced === true) {
+            state.superseded = true;
+
+            return true;
+        }
+
+        if (!global.done || global.reassigned > 0) {
+            enter(state, "global");
+
+            return false;
+        }
 
         state.calls -= 1;
         const result: {
@@ -2491,10 +2549,13 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
 
         state.calls -= 1;
         const { ids, next }: { ids: string[]; next: string | null } = await call(references.listUncleared, { after: state.cursor, from, table }, to);
+        let present = false;
 
         if (ids.length > 0) {
             state.calls -= 1;
             const missing: string[] = await call(references.missingOnGuest, { from, ids, table }, from);
+
+            present = missing.length < ids.length;
 
             if (missing.length > 0) {
                 state.calls -= 1;
@@ -2508,7 +2569,12 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
             }
         }
 
-        if (next === null) {
+        // A row still on the guest's shard came back after the clear emptied the table: the clear reads it again, so a
+        // deletion of it after this check is seen there (the table empty again, the next reconcile finds it gone).
+        if (present) {
+            state.phase = "clear";
+            state.cursor = null;
+        } else if (next === null) {
             state.phase = "clear";
             nextTable(state, tables, "global");
         } else {
@@ -2692,7 +2758,7 @@ export const mergeGuestInto = async (
     // A table no longer in the schema (a deploy between runs): its phase starts over, which is safe for both.
     const index = resume === undefined ? 0 : Math.max(0, tables.indexOf(resume.table));
     const state: MergeState = {
-        calls: budget - MERGE_LEASE_CALLS,
+        calls: budget - MERGE_LEASE_CALLS - MERGE_STOP_CALLS,
         cursor: resume !== undefined && tables[index] === resume.table ? resume.cursor : null,
         deferMs: null,
         index,
