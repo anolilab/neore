@@ -126,7 +126,12 @@ Users can request a complete export of all their personal data in JSON format. T
 1. **Profile Data** - User account information
 2. **Settings** - User preferences and AI settings
 3. **Conversations** - All threads and messages
-4. **Files** - File metadata (actual files stored separately)
+4. **Files** - Vault file and folder metadata, and the chat files of the user (uploads and generated images): the files behind their
+   grants and the files their messages still name, metadata only, the bytes are not exported (`agent/export-pages.ts`, read by
+   `agent/gdpr.ts#collectGrantedChatFileIdsForExport`, the thread and message walk, and `chatFileMetadataForExport`). The section is held
+   to 8 MiB as written; past it the rest are left out and the section says so. Its reads take what the sections before it left of the
+   action's read budget (`chatFilesReadBudget`), and past that the section is cut and flagged too. A chat link alone is not exported: a
+   link outlives the message that named the file
 5. **Prompts** - Saved prompts and history
 6. **Usage History** - AI usage tracking events
 7. **Browser** - Browser sessions (started, status, last page, the extension that drove it), their actions (action, target, time, success),
@@ -420,22 +425,23 @@ GDPR Article 12 requires requests to be fulfilled within 30 days. The cron job:
 
 The following tables contain user personal data and are included in exports/deletions:
 
-| Table               | Location    | Data Type                    |
-| ------------------- | ----------- | ---------------------------- |
-| `user`              | Better Auth | Profile (name, email, image) |
-| `account`           | Better Auth | Auth providers, tokens       |
-| `session`           | Better Auth | Active sessions              |
-| `userSettings`      | `schema.ts` | Preferences, shortcuts       |
-| `aiUserPreferences` | `schema.ts` | AI settings, encrypted keys  |
-| `threads`           | `schema.ts` | Chat conversations           |
-| `messages`          | `schema.ts` | Chat messages                |
-| `files`             | `schema.ts` | Uploaded files               |
-| `folders`           | `schema.ts` | Folder structure             |
-| `prompts`           | `schema.ts` | Saved prompts                |
-| `promptHistory`     | `schema.ts` | Prompt versions              |
-| `threadAccess`      | `schema.ts` | Shared thread permissions    |
-| `threadInvites`     | `schema.ts` | Thread sharing invites       |
-| `browser*` tables   | `schema.ts` | Browser sessions and use     |
+| Table               | Location    | Data Type                                                      |
+| ------------------- | ----------- | -------------------------------------------------------------- |
+| `user`              | Better Auth | Profile (name, email, image)                                   |
+| `account`           | Better Auth | Auth providers, tokens                                         |
+| `session`           | Better Auth | Active sessions                                                |
+| `userSettings`      | `schema.ts` | Preferences, shortcuts                                         |
+| `aiUserPreferences` | `schema.ts` | AI settings, encrypted keys                                    |
+| `threads`           | `schema.ts` | Chat conversations                                             |
+| `messages`          | `schema.ts` | Chat messages                                                  |
+| `files`             | `schema.ts` | Uploaded files                                                 |
+| `chatFileAccess`    | `schema.ts` | Chat files held (uploads, generated images), metadata exported |
+| `folders`           | `schema.ts` | Folder structure                                               |
+| `prompts`           | `schema.ts` | Saved prompts                                                  |
+| `promptHistory`     | `schema.ts` | Prompt versions                                                |
+| `threadAccess`      | `schema.ts` | Shared thread permissions                                      |
+| `threadInvites`     | `schema.ts` | Thread sharing invites                                         |
+| `browser*` tables   | `schema.ts` | Browser sessions and use                                       |
 
 **Not in exports or deletions, by design: `wsTicket`** (raw D1, `lib/ws-ticket.ts`).
 Each row is a live-query socket ticket: a SHA-256 hash, a user id, a session id
