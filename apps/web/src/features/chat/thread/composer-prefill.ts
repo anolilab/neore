@@ -7,14 +7,16 @@
  * same one twice is queued once, and another thread's composer leaves them alone. The shared thread composer (a comparison
  * parent's too) takes them only once its stored draft is back (`useBoundDraftStore`), and not while an untouched prefilled
  * message of THAT thread is sending: its saved draft comes back when the send ends, and text that arrived first would keep it
- * out. Another thread's send holds nothing. Held
- * prompts then go in after the restored draft, in order.
+ * out. Nor while any send of that thread is starting (`send-in-flight.ts`): a failed one hands its text back to an empty
+ * composer only, so a prompt that went in first would cost the person their message. Another thread's send holds nothing.
+ * Held prompts then go in after the restored draft or the returned text, in order.
  */
 
 import { useEffect, useEffectEvent } from "react";
 import { create } from "zustand";
 
 import type { ThreadLoad } from "@/features/chat/core/context/thread-load";
+import { isSendStarting, subscribeSendStarting } from "@/features/chat/core/utils/send-in-flight";
 import { useBoundDraftStore } from "@/features/chat/split/composer-drafts";
 
 interface PrefillState {
@@ -81,7 +83,7 @@ const setComposer = (threadId: string, mounted: boolean): void => {
 /**
  * The composer of `threadId` takes each prompt meant for it, in order; `undefined` (a new chat) takes none. With
  * `awaitStoredDraft` (the shared composer, whose draft comes back from storage), it takes them only once that draft is,
- * and after the draft a prefilled message's send brings back.
+ * and after the draft a prefilled message's send brings back. Any composer holds them while a send of its thread is starting.
  */
 export const useComposerPrefill = (threadId: string | undefined, onPrefill: (text: string) => void, { awaitStoredDraft = false } = {}): void => {
     const handle = useEffectEvent(onPrefill);
@@ -95,6 +97,11 @@ export const useComposerPrefill = (threadId: string | undefined, onPrefill: (tex
 
         const drain = (): void => {
             if (usePrefillStore.getState().pending[threadId] === undefined) {
+                return;
+            }
+
+            // A failed send gives its text back only to an empty composer: the prompt goes in after it, once the send has ended.
+            if (isSendStarting(threadId)) {
                 return;
             }
 
@@ -113,10 +120,16 @@ export const useComposerPrefill = (threadId: string | undefined, onPrefill: (tex
 
         const stopPending = usePrefillStore.subscribe(drain);
         const stopBound = awaitStoredDraft ? useBoundDraftStore.subscribe(drain) : undefined;
+        const stopSend = subscribeSendStarting((ended) => {
+            if (ended.threadId === threadId) {
+                drain();
+            }
+        });
 
         return () => {
             stopPending();
             stopBound?.();
+            stopSend();
             setComposer(threadId, false);
         };
     }, [awaitStoredDraft, threadId]);

@@ -91,6 +91,9 @@ export const catchUpPrompt = ({
         `9. Whether the steps finished or you stopped at any step after step 3, delete the refs this run fetched: ${refs.map((ref) => `\`git update-ref -d ${ref}\``).join(", ")}.`;
 
     if (!headInBaseRepository) {
+        // Named for this run: a branch a former run left for the person to carry to the fork never stops this one.
+        const local = `pr-${pull}-${run}`;
+
         return [
             `The branch ${headBranch} of ${repository}#${pull} comes from a fork and is behind ${baseBranch}. Rebase it here; it is not pushed, since origin is not where that branch lives.`,
             whereToRun,
@@ -98,10 +101,10 @@ export const catchUpPrompt = ({
             checkOrigin,
             checkClean,
             `3. Fetch by name, which also works in a clone of one branch: ${fetchBaseAndPull}.`,
-            // Branches are shared by every linked worktree: a pr-<n> checked out in another one already exists here too.
-            `4. Run \`git switch -c pr-${pull} ${pullRef}\` (if a branch pr-${pull} already exists, ${stopAfterFetch}).`,
+            // Branches are shared by every linked worktree: one checked out in another already exists here too.
+            `4. Run \`git switch -c ${local} ${pullRef}\` (if a branch ${local} already exists, ${stopAfterFetch}).`,
             ...finish,
-            `8. Only once step 7 passed and \`git status --porcelain\` prints nothing: leave the rebased commits on pr-${pull} and say so, for the person to bring to the fork. Do not push to any branch or remote.`,
+            `8. Only once step 7 passed and \`git status --porcelain\` prints nothing: leave the rebased commits on ${local} and say so, naming that branch, for the person to bring to the fork. Do not push to any branch or remote.`,
             cleanUp([base, pullRef]),
         ].join("\n");
     }
@@ -122,7 +125,8 @@ export const catchUpPrompt = ({
         `3. Fetch by name, which also works in a clone of one branch: \`git fetch origin +refs/heads/${headBranch}:${head}\`, ${fetchBaseAndPull}.`,
         `4. If \`git rev-parse ${head}\` differs from \`git rev-parse ${pullRef}\`, ${stopAfterFetch}: origin's ${headBranch} is not this pull request's head right now. Otherwise record the commit \`git rev-parse ${pullRef}\` printed and say it: step 8 leases on that commit. ${checkOtherWorktree} Otherwise run \`git switch --no-guess ${headBranch}\` (\`git switch -c ${headBranch} ${head}\` when there is no local branch of that name), then \`git merge --ff-only ${head}\`. If that fails, or \`git rev-parse HEAD\` then differs from \`git rev-parse ${head}\`, the local branch has commits origin does not: ${stopAfterFetch}.`,
         ...finish,
-        `8. Only once step 7 passed and \`git status --porcelain\` prints nothing, push only this pull request's branch: \`git push --no-follow-tags --force-with-lease=refs/heads/${headBranch}:${leaseCommit} origin HEAD:refs/heads/${headBranch}\`, writing the commit you recorded in step 4 in place of ${leaseCommit}. If this environment cannot push or the push is refused, leave the rebased commits in place and say so. Do not push to any other branch or remote.`,
+        // The base can move during the rebase and the checks: a push onto the base fetched in step 3 would leave the branch behind again.
+        `8. Only once step 7 passed and \`git status --porcelain\` prints nothing, run \`git fetch origin +refs/heads/${baseBranch}:${base}\` again. If \`git merge-base --is-ancestor ${base} HEAD\` fails, the base moved: go back to step 5 once. If it has moved again when you are back here, do not push: leave the rebased commits in place and say that another Catch up is needed; ${stopAfterFetch}. Otherwise push only this pull request's branch: \`git push --no-follow-tags --force-with-lease=refs/heads/${headBranch}:${leaseCommit} origin HEAD:refs/heads/${headBranch}\`, writing the commit you recorded in step 4 in place of ${leaseCommit}. If this environment cannot push or the push is refused, leave the rebased commits in place and say so. Do not push to any other branch or remote.`,
         cleanUp([head, base, pullRef]),
     ].join("\n");
 };

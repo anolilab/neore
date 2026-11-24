@@ -30,7 +30,17 @@ import ThreadPullRequestCatchUp from "./thread-pull-request-catch-up";
 const MAX_STATUS_READS = 5;
 
 /** One linked pull request: its link, and what blocks it. The link takes focus when a read removes the focused chip. */
-const LinkedPullRequest = ({ link, readStatus, threadId }: { link: PullRequestAddress; readStatus: boolean; threadId: string }) => {
+const LinkedPullRequest = ({
+    isRunning,
+    link,
+    readStatus,
+    threadId,
+}: {
+    isRunning: boolean;
+    link: PullRequestAddress;
+    readStatus: boolean;
+    threadId: string;
+}) => {
     const { t } = useLingui();
     const linkRef = useRef<HTMLAnchorElement>(null);
 
@@ -49,7 +59,7 @@ const LinkedPullRequest = ({ link, readStatus, threadId }: { link: PullRequestAd
                 </span>
             </Link>
             {readStatus && <PullRequestFixes address={{ number: link.number, repository: link.repository }} returnFocusTo={linkRef} threadId={threadId} />}
-            {readStatus && <ThreadPullRequestCatchUp link={link} threadId={threadId} />}
+            {readStatus && <ThreadPullRequestCatchUp isRunning={isRunning} link={link} threadId={threadId} />}
         </li>
     );
 };
@@ -71,7 +81,7 @@ type AttachStatus =
  * shows what blocks it with an action that writes a fix prompt into the composer, and a dialog links more by hand. Only the thread's owner sees it, and the list is asked for after first paint, so the header does
  * not add to the queries that wait for it.
  */
-const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
+const ThreadPullRequests = ({ isRunning = false, threadId }: { isRunning?: boolean; threadId: string | undefined }) => {
     const { t } = useLingui();
     const dialogId = useId();
     const ready = useAfterFirstPaint();
@@ -207,7 +217,13 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
             {(links.data ?? []).length > 0 && (
                 <ul className="flex flex-wrap items-center gap-2">
                     {(links.data ?? []).map((link, index) => (
-                        <LinkedPullRequest key={`${link.repository}#${link.number}`} link={link} readStatus={index < MAX_STATUS_READS} threadId={threadId} />
+                        <LinkedPullRequest
+                            isRunning={isRunning}
+                            key={`${link.repository}#${link.number}`}
+                            link={link}
+                            readStatus={index < MAX_STATUS_READS}
+                            threadId={threadId}
+                        />
                     ))}
                 </ul>
             )}

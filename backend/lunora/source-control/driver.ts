@@ -22,7 +22,6 @@ import type {
     MergedPullRequest,
     MergeMethod,
     MergeRequest,
-    MergeRevision,
     MergeStatus,
     PullRequestDetail,
     PullRequestEdit,
@@ -66,11 +65,7 @@ export interface HostDriver {
      * create whose answer was lost and is retried records the pull request the host holds instead of opening another.
      */
     findOpenPullRequest?: (request: HostRequest, input: { head: string; repository: string }) => Promise<CreatedPullRequest | undefined>;
-    /**
-     * With `expected`, a pull request whose base or head is no longer that revision is answered `unknown`: its
-     * mergeability is the host's word on another revision, not on the one the caller asked about.
-     */
-    getMergeStatus: (request: HostRequest, ref: PullRequestRef, expected?: MergeRevision) => Promise<MergeStatus>;
+    getMergeStatus: (request: HostRequest, ref: PullRequestRef) => Promise<MergeStatus>;
     getPullRequest: (request: HostRequest, ref: PullRequestRef) => Promise<PullRequestDetail>;
     /** The request headers the host's API wants, besides the token. */
     readonly headers: Record<string, string>;

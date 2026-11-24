@@ -27,14 +27,12 @@ type Feedback = { kind: "error"; text: string } | { kind: "success"; text: strin
  */
 const MergePanel = ({
     address,
-    baseBranch,
     capabilities,
     headSha,
     hostLabel,
     requestNoun,
 }: {
     address: PullRequestAddress;
-    baseBranch: string;
     capabilities: HostCapabilityReportInput;
     headSha: string;
     hostLabel: string;
@@ -45,7 +43,7 @@ const MergePanel = ({
     const messages = useReviewMessages(hostLabel);
     const canMerge = isHostCapabilityAvailable(capabilities, "merge.now");
     const canAutoMerge = isHostCapabilityAvailable(capabilities, "merge.auto");
-    const status = useMergeStatus(address, canMerge || canAutoMerge, { baseBranch, headSha });
+    const status = useMergeStatus(address, canMerge || canAutoMerge);
     const actions = useChecksAndMergeActions(address);
     const [chosen, setChosen] = useState<MergeMethod | null>(null);
     const [pending, setPending] = useState<Pending | null>(null);

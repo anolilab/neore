@@ -8,9 +8,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import MergePanel from "./merge-panel";
 
-const { autoMerge, mergeStatus, status } = vi.hoisted(() => {
+const { autoMerge, status } = vi.hoisted(() => {
     return {
-        mergeStatus: vi.fn(),
         autoMerge: {
             mutateAsync: vi.fn(async () => {
                 return { status: "ok" };
@@ -49,11 +48,7 @@ vi.mock("../lib/use-merge", () => {
         useChecksAndMergeActions: () => {
             return { autoMerge: { ...autoMerge, isPending: false }, merge: { isPending: false, mutateAsync: vi.fn() } };
         },
-        useMergeStatus: (...args: unknown[]) => {
-            mergeStatus(...args);
-
-            return status.current;
-        },
+        useMergeStatus: () => status.current,
     };
 });
 
@@ -81,7 +76,6 @@ const renderPanel = () =>
     render(
         <MergePanel
             address={{ number: 7, repository: "octo/hello" }}
-            baseBranch="main"
             capabilities={capabilities}
             headSha={"a".repeat(40)}
             hostLabel="GitHub"
@@ -101,14 +95,6 @@ describe("MergePanel with no merge method allowed", () => {
 
         expect(screen.getByText(UNKNOWN_METHODS)).toBeTruthy();
         expect(screen.queryByRole("button")).toBeNull();
-    });
-
-    it("reads mergeability for the pull request's base and head, the read Catch up shares", () => {
-        ready({});
-
-        renderPanel();
-
-        expect(mergeStatus).toHaveBeenCalledWith({ number: 7, repository: "octo/hello" }, true, { baseBranch: "main", headSha: "a".repeat(40) });
     });
 
     it("still turns auto-merge off when it is on", async () => {

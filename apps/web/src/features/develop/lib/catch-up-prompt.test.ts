@@ -9,6 +9,9 @@ const LAST_STEP = /^9\. /u;
 
 const RUN_TAG = /^[\da-f]{8}$/u;
 
+/** The fork branch without a run tag, as a former run named it. */
+const BARE_FORK_BRANCH = /\bpr-42\b(?!-)/u;
+
 const CLEAN_CHECK =
     "2. Run `git status --porcelain`. If it prints anything, stop without switching branches or changing any ref, and tell the person to commit or stash their work first.";
 
@@ -102,10 +105,13 @@ describe(catchUpPrompt, () => {
 
         expect(prompt).toContain("comes from a fork");
         expect(prompt).toContain("both are octo/hello on git.example");
-        expectCleanCheckFirst(prompt, "`git switch -c pr-42 refs/neore/pull-42-a1b2c3d4-head`");
+        expectCleanCheckFirst(prompt, "`git switch -c pr-42-a1b2c3d4 refs/neore/pull-42-a1b2c3d4-head`");
         expect(prompt).toContain("`git fetch origin +refs/heads/release/2.0:refs/neore/pull-42-a1b2c3d4-base`");
         expect(prompt).toContain("`git fetch origin +refs/pull/42/head:refs/neore/pull-42-a1b2c3d4-head`");
-        expect(prompt).toContain("`git switch -c pr-42 refs/neore/pull-42-a1b2c3d4-head` (if a branch pr-42 already exists, do step 9, then stop and say so)");
+        expect(prompt).toContain(
+            "`git switch -c pr-42-a1b2c3d4 refs/neore/pull-42-a1b2c3d4-head` (if a branch pr-42-a1b2c3d4 already exists, do step 9, then stop and say so)",
+        );
+        expect(prompt).toContain("leave the rebased commits on pr-42-a1b2c3d4 and say so, naming that branch, for the person to bring to the fork.");
         expect(prompt).toContain("`git rebase refs/neore/pull-42-a1b2c3d4-base`");
         // Origin's branch of the head's name is never fetched, switched to or compared: it may be another branch entirely.
         expect(prompt).not.toContain("refs/heads/feat/x");
@@ -127,11 +133,30 @@ describe(catchUpPrompt, () => {
         expect(prompt.indexOf("`git worktree list --porcelain`")).toBeLessThan(prompt.indexOf("`git switch --no-guess feat/x`"));
     });
 
-    it("for a fork, needs no worktree check: a pr-<n> checked out in another worktree already exists, and the switch stops", () => {
+    it("for a fork, needs no worktree check: a branch checked out in another worktree already exists, and the switch stops", () => {
         const prompt = catchUpPrompt({ ...PULL, headInBaseRepository: false });
 
         expect(prompt).not.toContain("git worktree");
-        expect(prompt).toContain("(if a branch pr-42 already exists, do step 9, then stop and say so)");
+        expect(prompt).toContain("(if a branch pr-42-a1b2c3d4 already exists, do step 9, then stop and say so)");
+    });
+
+    it("for a fork, makes a branch of this run's own, so the branch a former run left for the person does not stop the next", () => {
+        const first = catchUpPrompt({ ...PULL, headInBaseRepository: false });
+        const next = catchUpPrompt({ ...PULL, headInBaseRepository: false, run: "0f0f0f0f" });
+
+        expect(first).toContain("`git switch -c pr-42-a1b2c3d4 ");
+        expect(next).toContain("`git switch -c pr-42-0f0f0f0f ");
+        expect(next).not.toContain("pr-42-a1b2c3d4");
+        expect(next).not.toMatch(BARE_FORK_BRANCH);
+    });
+
+    it("for a head in the base repository, fetches the base again before the push, and does not push onto a base that keeps moving", () => {
+        const prompt = catchUpPrompt({ ...PULL, headInBaseRepository: true });
+        const recheck =
+            "8. Only once step 7 passed and `git status --porcelain` prints nothing, run `git fetch origin +refs/heads/release/2.0:refs/neore/pull-42-a1b2c3d4-base` again. If `git merge-base --is-ancestor refs/neore/pull-42-a1b2c3d4-base HEAD` fails, the base moved: go back to step 5 once. If it has moved again when you are back here, do not push: leave the rebased commits in place and say that another Catch up is needed; do step 9, then stop and say so. Otherwise push only this pull request's branch:";
+
+        expect(prompt).toContain(recheck);
+        expect(prompt.indexOf(recheck)).toBeLessThan(prompt.indexOf("`git push"));
     });
 
     it("for a head named like the pull request's own ref, still pushes only that branch and keeps the pull request's head apart", () => {
@@ -155,7 +180,13 @@ describe(catchUpRunId, () => {
         const fetched = (run: string): string[] =>
             [...catchUpPrompt({ ...PULL, headInBaseRepository: true, run }).matchAll(/`git fetch origin \+[^:`]+:([^`]+)`/gu)].map((match) => match[1] ?? "");
 
-        expect(fetched("a1b2c3d4")).toEqual(["refs/neore/pull-42-a1b2c3d4-branch", "refs/neore/pull-42-a1b2c3d4-base", "refs/neore/pull-42-a1b2c3d4-head"]);
+        // The base is fetched again before the push (step 8), into the same ref.
+        expect(fetched("a1b2c3d4")).toEqual([
+            "refs/neore/pull-42-a1b2c3d4-branch",
+            "refs/neore/pull-42-a1b2c3d4-base",
+            "refs/neore/pull-42-a1b2c3d4-head",
+            "refs/neore/pull-42-a1b2c3d4-base",
+        ]);
         expect(fetched("0f0f0f0f").filter((ref) => fetched("a1b2c3d4").includes(ref))).toEqual([]);
     });
 });

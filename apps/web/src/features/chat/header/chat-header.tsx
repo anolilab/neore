@@ -175,7 +175,7 @@ const ChatSiteHeader: FC<{ threadId?: string }> = ({ threadId }) => {
                     </Badge>
                 )}
                 <GroupParticipantBar isRunning={threadData?.status === "running"} threadId={validThreadId} />
-                <ThreadPullRequests key={validThreadId} threadId={validThreadId} />
+                <ThreadPullRequests isRunning={threadData?.status === "running"} key={validThreadId} threadId={validThreadId} />
             </div>
         </SiteHeader>
     );

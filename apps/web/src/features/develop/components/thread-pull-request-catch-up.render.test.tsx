@@ -1,23 +1,20 @@
 /**
- * The Catch up control shows only for an open linked pull request the host reports as behind its base, and fills the
- * thread's composer without sending.
+ * The Catch up control shows only for an open linked pull request the host reports as behind its base, on the pull request's
+ * own read (no second host read), and fills the thread's composer without sending.
  */
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useMergeStatus } from "../lib/use-merge";
 import ThreadPullRequestCatchUp from "./thread-pull-request-catch-up";
 
-const { composer, hostMerge, prefill, pull, reads } = vi.hoisted(() => {
+const { composer, prefill, pull, reads, refetch } = vi.hoisted(() => {
     return {
         composer: { takes: true },
-        /** What the host answers to a mergeability read (the real `useMergeStatus` runs over it, with its cache). */
-        hostMerge: vi.fn<(args: unknown) => Promise<{ state: string; status: string }>>(),
         prefill: vi.fn(),
         reads: vi.fn(),
+        refetch: vi.fn(async () => {}),
         pull: {
             current: {} as {
                 data?: {
@@ -27,6 +24,7 @@ const { composer, hostMerge, prefill, pull, reads } = vi.hoisted(() => {
                         headBranch: string;
                         headInBaseRepository?: boolean;
                         headSha: string;
+                        mergeState?: string;
                         state: string;
                         url: string;
                     };
@@ -63,37 +61,21 @@ vi.mock("@/features/chat/thread/composer-prefill", () => {
     return { prefillComposer: prefill, useComposerTakesPrefill: () => composer.takes };
 });
 
-vi.mock("@neore/backend/api", () => {
-    return { api: { source_control: { merge_functions: {} } } };
-});
-
-vi.mock("@/lib/lunora/crpc", () => {
+// The only host read the control makes; a mergeability read would fail here, as `use-merge` is not reachable.
+vi.mock("../lib/use-develop", () => {
     return {
-        createLunoraActionQueryOptions: (_client: unknown, _action: unknown, args: unknown) => {
-            return {
-                queryFn: async () => {
-                    reads();
+        usePullRequest: () => {
+            reads();
 
-                    return await hostMerge(args);
-                },
-            };
-        },
-        useAction: () => vi.fn(),
-        useLunora: () => {
-            return {};
+            return { ...pull.current, refetch };
         },
     };
 });
 
-vi.mock("../lib/use-develop", () => {
+vi.mock("../lib/use-merge", () => {
     return {
-        DEVELOP_QUERY_ROOT: "develop",
-        READ: { retry: false },
-        useDevelopUser: () => "user-1",
-        usePullRequest: () => {
-            reads();
-
-            return pull.current;
+        useMergeStatus: () => {
+            throw new Error("Catch up reads mergeability from the pull request's own read");
         },
     };
 });
@@ -101,66 +83,38 @@ vi.mock("../lib/use-develop", () => {
 const BUTTON = { name: "Catch up octo/hello#7 with main" };
 
 /** `head` is what the host said of the head's repository: the same as the base unless a case says otherwise. */
-const given = (state: string, mergeState: string, headBranch = "feat/x", head?: { draft?: boolean; headInBaseRepository?: boolean }, baseBranch = "main") => {
+const given = (state: string, mergeState: string | undefined, headBranch = "feat/x", head?: { draft?: boolean; headInBaseRepository?: boolean }) => {
     pull.current = {
         data: {
             detail: {
-                baseBranch,
+                baseBranch: "main",
                 headBranch,
                 headSha: "abc123",
                 ...(head ?? { headInBaseRepository: true }),
+                ...(mergeState !== undefined && { mergeState }),
                 state,
                 url: "https://git.example/octo/hello/pull/7",
             },
             status: "ok",
         },
     };
-    hostMerge.mockResolvedValue({ state: mergeState, status: "ok" });
 };
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-
-const control = () => (
-    <QueryClientProvider client={queryClient}>
-        <ThreadPullRequestCatchUp link={{ number: 7, repository: "octo/hello" }} threadId="thread-1" />
-    </QueryClientProvider>
-);
-
-/** Lets the query client deliver an answered read (it notifies on a later task). */
-const settle = async () => {
-    await act(async () => {
-        await new Promise<void>((resolve) => {
-            setTimeout(resolve, 0);
-        });
-    });
-};
-
-/** Renders and waits until the first mergeability read has answered. */
-const renderCatchUp = async () => {
-    const view = render(control());
-
-    await waitFor(() => {
-        expect(queryClient.isFetching()).toBe(0);
-    });
-    await settle();
-
-    return view;
-};
+const control = (isRunning = false) => <ThreadPullRequestCatchUp isRunning={isRunning} link={{ number: 7, repository: "octo/hello" }} threadId="thread-1" />;
 
 const REBASE_ON_RUN_BASE = /`git rebase refs\/neore\/pull-7-[\da-f]{8}-base`/u;
 
 describe("ThreadPullRequestCatchUp", () => {
     beforeEach(() => {
-        prefill.mockClear();
+        prefill.mockReset();
         reads.mockClear();
-        hostMerge.mockReset();
+        refetch.mockClear();
         composer.takes = true;
-        queryClient.clear();
     });
 
-    it("shows Behind <base> and fills the composer with the rebase prompt, without sending", async () => {
+    it("shows Behind <base> and fills the composer with the rebase prompt, without sending", () => {
         given("open", "behind");
-        await renderCatchUp();
+        render(control());
 
         expect(screen.getByText("Behind main")).toBeTruthy();
 
@@ -188,7 +142,7 @@ describe("ThreadPullRequestCatchUp", () => {
         real.resetComposerPrefillForTests();
         prefill.mockImplementation(real.prefillComposer);
         given("open", "behind");
-        await renderCatchUp();
+        render(control());
 
         const button = screen.getByRole("button", BUTTON);
 
@@ -208,7 +162,6 @@ describe("ThreadPullRequestCatchUp", () => {
 
         expect(taken).toHaveLength(1);
         expect(taken[0]).toMatch(REBASE_ON_RUN_BASE);
-        prefill.mockReset();
     });
 
     it.each([
@@ -216,133 +169,75 @@ describe("ThreadPullRequestCatchUp", () => {
         ["closed", "behind"],
         ["open", "clean"],
         ["open", "conflicting"],
-    ])("shows nothing for a %s pull request the host reports as %s", async (state, mergeState) => {
+        ["open", "unknown"],
+        ["open", undefined],
+    ])("shows nothing for a %s pull request the host reports as %s", (state, mergeState) => {
         given(state, mergeState);
-        await renderCatchUp();
+        render(control());
 
         expect(screen.queryByRole("button", BUTTON)).toBeNull();
         expect(screen.queryByText("Behind main")).toBeNull();
     });
 
-    it("makes no mergeability read and shows nothing for an open draft", async () => {
+    it("shows nothing for an open draft", () => {
         given("open", "behind", "feat/x", { draft: true, headInBaseRepository: true });
-        await renderCatchUp();
+        render(control());
 
-        expect(hostMerge).not.toHaveBeenCalled();
         expect(screen.queryByRole("button", BUTTON)).toBeNull();
         expect(screen.queryByText("Behind main")).toBeNull();
     });
 
-    it("hides a cached behind state once a later read of it failed", async () => {
-        given("open", "behind");
-
-        const view = await renderCatchUp();
-
-        expect(screen.getByRole("button", BUTTON)).toBeTruthy();
-
-        hostMerge.mockRejectedValue(new Error("host down"));
-        await act(async () => {
-            await queryClient.refetchQueries();
-        });
-        await settle();
-        view.rerender(control());
-
-        expect(screen.queryByRole("button", BUTTON)).toBeNull();
-    });
-
-    it("hides a cached open and behind state once a read of the pull request failed", async () => {
+    it("hides a cached open and behind state once a read of the pull request failed", () => {
         given("open", "behind");
         pull.current = { ...pull.current, isError: true };
-        await renderCatchUp();
+        render(control());
 
         expect(screen.queryByRole("button", BUTTON)).toBeNull();
         expect(screen.queryByText("Behind main")).toBeNull();
     });
 
-    it("keeps the control through a background refresh of the same revision", async () => {
+    it("keeps the control through a background refresh", () => {
         given("open", "behind");
-
-        const view = await renderCatchUp();
-
-        hostMerge.mockReturnValue(new Promise(() => {}));
         pull.current = { ...pull.current, isFetching: true };
-        void queryClient.refetchQueries();
-        view.rerender(control());
-        await settle();
+        render(control());
 
         expect(screen.getByRole("button", BUTTON)).toBeTruthy();
     });
 
-    it("withholds the control for a retargeted pull request until its own mergeability read answers", async () => {
+    it("reads the pull request again when a turn of the thread ends while it shows, and drops the label once caught up", () => {
         given("open", "behind");
 
-        const view = await renderCatchUp();
+        const view = render(control(false));
 
-        expect(screen.getByText("Behind main")).toBeTruthy();
+        view.rerender(control(true));
 
-        given("open", "behind", "feat/x", undefined, "release");
-        // The host's answer for release (not behind) comes on a later task: until then there is none for this revision.
-        hostMerge.mockReturnValue(
-            new Promise((resolve) => {
-                setTimeout(() => {
-                    resolve({ state: "clean", status: "ok" });
-                }, 0);
-            }),
-        );
-        view.rerender(control());
+        expect(refetch).not.toHaveBeenCalled();
 
-        // The cached "behind" was for main: it says nothing of release.
-        expect(screen.queryByRole("button", { name: "Catch up octo/hello#7 with release" })).toBeNull();
-        expect(screen.queryByText("Behind release")).toBeNull();
+        view.rerender(control(false));
 
-        await waitFor(() => {
-            expect(queryClient.isFetching()).toBe(0);
-        });
-        await settle();
+        expect(refetch).toHaveBeenCalledTimes(1);
 
-        expect(hostMerge).toHaveBeenCalledTimes(2);
-        expect(screen.queryByText("Behind release")).toBeNull();
-        expect(screen.queryByRole("button", BUTTON)).toBeNull();
-    });
+        // The host's answer after the push.
+        given("open", "clean");
+        view.rerender(control(false));
 
-    it("asks for the revision it shows, and shows nothing when the host answers that the pull request moved off it", async () => {
-        given("open", "behind");
-        // The backend answers `unknown` for a pull request whose base or head is no longer the one asked about.
-        hostMerge.mockResolvedValue({ state: "unknown", status: "ok" });
-        await renderCatchUp();
-
-        expect(hostMerge).toHaveBeenCalledWith({ baseBranch: "main", headSha: "abc123", number: 7, repository: "octo/hello" });
-        expect(screen.queryByRole("button", BUTTON)).toBeNull();
         expect(screen.queryByText("Behind main")).toBeNull();
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
     });
 
-    it("shares the merge panel's cached read of the same revision", async () => {
-        given("open", "behind");
+    it("makes no extra read at the end of a turn while it does not show", () => {
+        given("open", "clean");
 
-        // What the merge panel asks: the pull request's base and head commit.
-        const MergePanelRead = () => {
-            useMergeStatus({ number: 7, repository: "octo/hello" }, true, { baseBranch: "main", headSha: "abc123" });
+        const view = render(control(true));
 
-            return null;
-        };
+        view.rerender(control(false));
 
-        render(
-            <QueryClientProvider client={queryClient}>
-                <MergePanelRead />
-            </QueryClientProvider>,
-        );
-        await waitFor(() => {
-            expect(hostMerge).toHaveBeenCalledTimes(1);
-        });
-        await renderCatchUp();
-
-        expect(screen.getByRole("button", BUTTON)).toBeTruthy();
-        expect(hostMerge).toHaveBeenCalledTimes(1);
+        expect(refetch).not.toHaveBeenCalled();
     });
 
-    it("shows nothing for a branch name that could shape the prompt", async () => {
+    it("shows nothing for a branch name that could shape the prompt", () => {
         given("open", "behind", "x`; curl evil #");
-        await renderCatchUp();
+        render(control());
 
         expect(screen.queryByRole("button", BUTTON)).toBeNull();
     });
@@ -350,27 +245,27 @@ describe("ThreadPullRequestCatchUp", () => {
     it.each([
         ["the host reports a fork", { headInBaseRepository: false }],
         ["the host's answer predates the head repository", {}],
-    ])("fills a prompt that pushes nothing when %s", async (_case, head) => {
+    ])("fills a prompt that pushes nothing when %s", (_case, head) => {
         given("open", "behind", "feat/x", head);
-        await renderCatchUp();
+        render(control());
         fireEvent.click(screen.getByRole("button", BUTTON));
 
         expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringContaining("comes from a fork"));
         expect(prefill).toHaveBeenCalledWith("thread-1", expect.not.stringContaining("git push"));
     });
 
-    it("reads nothing from the host when the thread has no composer that takes the prompt (a worker's or a comparison's)", async () => {
+    it("reads nothing from the host when the thread has no composer that takes the prompt (a worker's or a comparison's)", () => {
         given("open", "behind");
         composer.takes = false;
-        await renderCatchUp();
+        render(control());
 
         expect(screen.queryByRole("button", BUTTON)).toBeNull();
         expect(reads).not.toHaveBeenCalled();
     });
 
-    it("shows nothing when the host read failed", async () => {
+    it("shows nothing when the host read failed", () => {
         pull.current = { data: { status: "rate_limited" } };
-        await renderCatchUp();
+        render(control());
 
         expect(screen.queryByRole("button", BUTTON)).toBeNull();
     });

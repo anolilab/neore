@@ -3,36 +3,51 @@
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
-import { useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { prefillComposer, useComposerTakesPrefill } from "@/features/chat/thread/composer-prefill";
 
 import { catchUpPrompt, catchUpRunId, hostOfPullRequestUrl, isPlainBranchName, isPlainRepo } from "../lib/catch-up-prompt";
 import { usePullRequest } from "../lib/use-develop";
-import { useMergeStatus } from "../lib/use-merge";
 
 /**
  * Shows "Behind <base>" and a Catch up button beside an open linked pull request whose branch is behind its base. The button puts a
- * rebase prompt in this thread's composer and sends nothing. Reads the same cached queries as Develop: the pull request
- * (open, and its base), then the host's mergeability for that base and head commit once it is open, so a retargeted or
- * pushed pull request is never paired with the answer for its earlier revision. Shows nothing while there is no answer for
- * the current revision, on a failure (a failed refresh too: a cached "behind" is not known to hold), or once the pull
- * request is merged or closed; a draft is not offered Catch up and makes no mergeability read (the host reports a draft as
- * `draft`, never `behind`). A background refresh that has not failed keeps it, so it does not flicker. Nor for a branch
- * name that is not plain enough to put in a command. Whether the prompt pushes is the host's word on the head's
- * repository, never a guess from names or commits: a fork's branch is not pushed.
+ * rebase prompt in this thread's composer and sends nothing. Reads only the pull request, the same cached query as Develop: its
+ * state, base, head and the host's mergeability (`mergeState`) all come from that one host response, so they always describe
+ * the same revision and no second read is made. Shows only when the host's overall state is `behind`: the host gives one state,
+ * and a pull request it reports as blocked or unstable gets no Catch up even when its branch is also behind. Shows nothing while
+ * there is no answer, on a failure (a failed refresh too: a cached "behind" is not known to hold), or once the pull request is
+ * merged or closed; a draft is not offered Catch up (the host reports a draft as `draft`, never `behind`). A background refresh
+ * that has not failed keeps it, so it does not flicker. While it shows, the end of an agent turn in this thread reads the pull
+ * request again: that turn may have pushed the caught-up branch. Nor for a branch name that is not plain enough to put in a
+ * command. Whether the prompt pushes is the host's word on the head's repository, never a guess from names or commits: a
+ * fork's branch is not pushed.
  */
-const CatchUpControl = ({ link, threadId }: { link: { number: number; repository: string }; threadId: string }) => {
+const CatchUpControl = ({ isRunning, link, threadId }: { isRunning: boolean; link: { number: number; repository: string }; threadId: string }) => {
     const { t } = useLingui();
     // One run per mounted control: a second click makes the same prompt, and the composer adds the same text only once.
     const [run] = useState(catchUpRunId);
     const address = { number: link.number, repository: link.repository };
     const pull = usePullRequest(address);
     const detail = pull.data?.status === "ok" ? pull.data.detail : undefined;
-    const open = detail?.state === "open" && !detail.draft;
-    const merge = useMergeStatus(address, open, detail === undefined ? undefined : { baseBranch: detail.baseBranch, headSha: detail.headSha });
+    const behind = detail?.state === "open" && !detail.draft && detail.mergeState === "behind";
+    const reread = useEffectEvent(() => {
+        if (behind) {
+            void pull.refetch();
+        }
+    });
+    const wasRunning = useRef(isRunning);
 
-    if (pull.isError || merge.isError || !open || merge.data?.status !== "ok" || merge.data.state !== "behind") {
+    // A turn that ended may have pushed the rebased branch (or merged or closed the pull request): one read, only while it shows.
+    useEffect(() => {
+        if (wasRunning.current && !isRunning) {
+            reread();
+        }
+
+        wasRunning.current = isRunning;
+    }, [isRunning]);
+
+    if (pull.isError || !behind) {
         return null;
     }
 
@@ -95,7 +110,7 @@ type CatchUpProps = Parameters<typeof CatchUpControl>[0];
  * Mounts the control, and with it its host reads, only where the thread has a composer on the page that takes the prompt
  * (`useComposerPrefill`): a split pane without focus, or a thread whose composer is not shown, reads nothing.
  */
-const ThreadPullRequestCatchUp = ({ link, threadId }: CatchUpProps) =>
-    useComposerTakesPrefill(threadId) ? <CatchUpControl link={link} threadId={threadId} /> : null;
+const ThreadPullRequestCatchUp = ({ isRunning, link, threadId }: CatchUpProps) =>
+    useComposerTakesPrefill(threadId) ? <CatchUpControl isRunning={isRunning} link={link} threadId={threadId} /> : null;
 
 export default ThreadPullRequestCatchUp;

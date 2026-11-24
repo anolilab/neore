@@ -33,7 +33,6 @@ import type {
     MergeMethod,
     MergeRequest,
     MergeState,
-    MergeRevision,
     MergeStatus,
     PullRequestDetail,
     PullRequestEdit,
@@ -1492,12 +1491,10 @@ const mergeSettingsSchema = z.object({
 
 const mergeabilitySchema = z.object({
     auto_merge: z.unknown().nullable().optional(),
-    base: z.object({ ref: z.string() }).optional(),
-    head: z.object({ sha: z.string() }).optional(),
     mergeable_state: z.string().optional(),
 });
 
-const getMergeStatus = async (request: HostRequest, ref: PullRequestRef, expected?: MergeRevision): Promise<MergeStatus> => {
+const getMergeStatus = async (request: HostRequest, ref: PullRequestRef): Promise<MergeStatus> => {
     const repo = repoPath(ref);
     const settings = parse(mergeSettingsSchema, await readJson(await request(repo)));
     const pull = parse(mergeabilitySchema, await readJson(await request(`${repo}/pulls/${ref.number}`)));
@@ -1506,14 +1503,12 @@ const getMergeStatus = async (request: HostRequest, ref: PullRequestRef, expecte
         ["squash", settings.allow_squash_merge],
         ["rebase", settings.allow_rebase_merge],
     ];
-    const moved = expected !== undefined && (pull.base?.ref !== expected.baseBranch || pull.head?.sha !== expected.headSha);
 
     return {
         autoMergeAllowed: settings.allow_auto_merge === true,
         autoMergeEnabled: pull.auto_merge != null,
         methods: allowed.flatMap(([method, on]) => (on === true ? [method] : [])),
-        // The host's word is on the revision it holds now: for another base or head than the one asked about, it says nothing of that one.
-        state: moved ? "unknown" : (MERGE_STATES[pull.mergeable_state ?? ""] ?? "unknown"),
+        state: MERGE_STATES[pull.mergeable_state ?? ""] ?? "unknown",
     };
 };
 

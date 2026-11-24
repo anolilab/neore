@@ -5,6 +5,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { clearSendStarting, markSendStarting } from "@/features/chat/core/utils/send-in-flight";
 import { setDraftBound, setRestoreAfterSend, useBoundDraftStore } from "@/features/chat/split/composer-drafts";
 
 import { prefillComposer, prefillThreadOf, resetComposerPrefillForTests, useComposerPrefill, useComposerTakesPrefill } from "./composer-prefill";
@@ -103,6 +104,43 @@ describe(useComposerPrefill, () => {
         act(() => setRestoreAfterSend(undefined));
 
         expect(takenByA.mock.calls).toStrictEqual([["catch up a"]]);
+    });
+
+    it("holds a prompt while a send of its thread is starting, so a failed send's text comes back first", () => {
+        // The composer as the store keeps it: a failed send's text comes back only to an empty one, and a prompt goes after it.
+        const composer = { text: "" };
+        const takenByA = vi.fn((text: string) => {
+            composer.text = composer.text === "" ? text : `${composer.text}\n\n${text}`;
+        });
+        const takenByB = vi.fn();
+
+        act(() => {
+            setDraftBound("thread-a", true);
+            setDraftBound("thread-b", true);
+        });
+        renderHook(() => useComposerPrefill("thread-a", takenByA, { awaitStoredDraft: true }));
+        renderHook(() => useComposerPrefill("thread-b", takenByB, { awaitStoredDraft: true }));
+
+        markSendStarting("thread-a");
+
+        try {
+            act(() => {
+                prefillComposer("thread-a", "catch up a");
+                prefillComposer("thread-b", "catch up b");
+            });
+
+            expect(takenByA).not.toHaveBeenCalled();
+            expect(takenByB.mock.calls).toStrictEqual([["catch up b"]]);
+
+            // The request failed: its text is handed back to the still empty composer before the send ends.
+            if (composer.text === "") {
+                composer.text = "my message";
+            }
+        } finally {
+            act(() => clearSendStarting("thread-a"));
+        }
+
+        expect(composer.text).toBe("my message\n\ncatch up a");
     });
 
     it("tells a control whether its thread has a composer that takes prompts", () => {
