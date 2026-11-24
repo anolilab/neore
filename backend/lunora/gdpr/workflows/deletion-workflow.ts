@@ -229,7 +229,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     { userId: args.userId },
                     { dedupId: stepDedupId(scope, "erase-pins-on-owner-shards") },
                 ),
-        )) as { owners: string[] };
+        )) as { owners: string[] } | null;
 
         // Owner shards named by a route are fenced before their sweep and stay fenced until the routes are drained (see below). A pin write on a
         // fenced shard is refused in its own transaction, and a write that committed before its fence is swept. So a pin on a known owner
@@ -245,7 +245,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     { userId: args.userId },
                     { dedupId: stepDedupId(scope, "erase-pins-on-owner-shards-again") },
                 ),
-        )) as { owners: string[] };
+        )) as { owners: string[] } | null;
 
         await context.step.do(
             "delete-user-thread-metadata",
@@ -282,7 +282,9 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
 
         // The owner shards stay fenced until no route names them: a pin write that commits on one of them while a route is left is refused.
         // They are lifted now, from the owners both sweeps fenced (`gdpr/steps.ts#releasePinFences`).
-        const owners = [...new Set([...firstSweep.owners, ...secondSweep.owners])];
+        // A null result was persisted by an earlier build, which did not report its owners. Its fences stay on that build's owner shards; they
+        // are keyed to this account, which is being erased, so nothing else is refused by them.
+        const owners = [...new Set([...(firstSweep?.owners ?? []), ...(secondSweep?.owners ?? [])])];
 
         await context.step.do(
             "release-pin-fences",
