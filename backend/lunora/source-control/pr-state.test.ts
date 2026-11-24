@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { internal } from "../_generated/internal";
 import { runInShard } from "../lib/shard-context";
 import schema from "../schema";
-import { PR_STATE_MAX_AGE_MS, dispatchLinkedPullRequestChecks, recordLinkState, scheduleArchiveAfterClose } from "./pr-state";
+import { PR_STATE_MAX_AGE_MS, dispatchLinkedPullRequestChecks, recordLinkState, rereadRelinkedLink, scheduleArchiveAfterClose } from "./pr-state";
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -204,6 +204,41 @@ describe("dispatchLinkedPullRequestChecks paging", () => {
         });
 
         expect(dispatched).toBe(1);
+    });
+});
+
+describe("rereadRelinkedLink", () => {
+    const seedLink = (state: "open" | "closed" | "merged", stateCheckedAt: number) =>
+        harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Thread", updatedAt: 1, userId: OWNER });
+            const linkId = await ctx.db.insert("pullRequestThreads", {
+                ...NOW_LINK,
+                number: 3,
+                repository: "acme/app",
+                state,
+                stateCheckedAt,
+                threadId,
+                userId: OWNER,
+            });
+            const link = await ctx.db.get("pullRequestThreads", linkId);
+
+            await rereadRelinkedLink(ctx, link);
+
+            return await ctx.db.get("pullRequestThreads", linkId);
+        });
+
+    it("sets a closed link open and unread, so the next sweep reads the host again", async () => {
+        const link = await seedLink("closed", 500);
+
+        expect(link.state).toBe("open");
+        expect(link.stateCheckedAt).toBe(0);
+    });
+
+    it("leaves an open link's state as it was", async () => {
+        const link = await seedLink("open", 500);
+
+        expect(link.state).toBe("open");
+        expect(link.stateCheckedAt).toBe(500);
     });
 });
 

@@ -61,6 +61,16 @@ const candidateOf = (thread: {
     };
 };
 
+/**
+ * A person linked a pull request again on purpose: a link the refresh recorded closed or merged is set open and unread
+ * (`stateCheckedAt` 0), so the next sweep reads the host again and the chat is kept until that answer comes.
+ */
+export const rereadRelinkedLink = async (ctx: MutationCtx, link: Doc<"pullRequestThreads">): Promise<void> => {
+    if (link.state === "closed" || link.state === "merged") {
+        await ctx.db.patch("pullRequestThreads", link._id, { state: "open", stateCheckedAt: 0 });
+    }
+};
+
 const vState = v.union(v.literal("open"), v.literal("closed"), v.literal("merged"));
 
 /**

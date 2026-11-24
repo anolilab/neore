@@ -21,6 +21,7 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import { GITHUB_WEB_ORIGIN, splitGithubRepo } from "./drivers/github";
+import { rereadRelinkedLink } from "./pr-state";
 
 /** Threads kept per pull request: a list, not a history. The newest are the ones anyone is working in. */
 export const MAX_THREADS_PER_PULL_REQUEST = 50;
@@ -160,6 +161,7 @@ export const startWorkOnPullRequest = authMutation
         }
 
         if (attached) {
+            await rereadRelinkedLink(ctx, attached);
             ctx.log.event("source_control.start_work_on_pull_request", { clearedDeadLinks: deadAttached.length, created: false });
 
             return { created: false, threadId: attached.threadId };

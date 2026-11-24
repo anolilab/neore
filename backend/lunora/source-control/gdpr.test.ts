@@ -311,6 +311,29 @@ describe("pull request / thread links in GDPR flows", () => {
         expect(links[0]).toMatchObject({ kind: "opened", repository: "o/r", title: "mine" });
     });
 
+    it("exports each link's stored pull-request state and when it was read", async () => {
+        await harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { createdBy: A, mode: "text", status: "active", title: "mine", updatedAt: 1, userId: A });
+
+            await ctx.db.insert("pullRequestThreads", {
+                createdAt: 1,
+                kind: "opened",
+                number: 1,
+                repository: "o/r",
+                state: "closed",
+                stateCheckedAt: 500,
+                threadId,
+                title: "mine",
+                url: "https://github.com/o/r/pull/1",
+                userId: A,
+            });
+        });
+
+        const { links } = await harness.run(async (ctx: any) => await ctx.runQuery(collectPullRequestThreadsForExport as never, { userId: A } as never));
+
+        expect(links).toStrictEqual([expect.objectContaining({ state: "closed", stateCheckedAt: 500 })]);
+    });
+
     it("erases them in batches, only the user's own", async () => {
         await link(A, MANY);
         await link(B, 3);

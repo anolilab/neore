@@ -194,7 +194,13 @@ export const archiveClosedLinkChat = internalMutation
             return false;
         }
 
-        return await archiveThreadIfDue(ctx, args.threadId, autoArchiveCutoff(ctx.now, days));
+        const archived = await archiveThreadIfDue(ctx, args.threadId, autoArchiveCutoff(ctx.now, days));
+
+        if (archived) {
+            ctx.log.event("chat.auto_archive", { archived: 1, reason: "pull_request_closed" });
+        }
+
+        return archived;
     });
 
 const runAutoArchivePass = async (ctx: MutationCtx, cursor: string | null): Promise<void> => {
