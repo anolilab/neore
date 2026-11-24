@@ -11,9 +11,10 @@
  */
 import { internal } from "../../_generated/internal";
 import type { ToolCtx as ToolContext } from "../../agent/client";
+import { RATE_LIMIT_CONFIGS } from "../../lib/rate-limiter";
 import { toolsLogger } from "../../lib/logger";
 import { readRunPlan } from "../lib/agent-run";
-import { chargeDailyLimit } from "../lib/daily-limit";
+import { chargeDailyLimit, dailyLimitKeyOf, dailyLimitTierOf, isPlatformAdmin } from "../lib/daily-limit";
 
 export const DAILY_IMAGE_LIMIT_REACHED = "DAILY_IMAGE_LIMIT_REACHED";
 export const IMAGE_QUOTA_UNAVAILABLE = "IMAGE_QUOTA_UNAVAILABLE";
@@ -21,6 +22,15 @@ export const IMAGE_QUOTA_UNAVAILABLE = "IMAGE_QUOTA_UNAVAILABLE";
 export type ImageQuotaCode = typeof DAILY_IMAGE_LIMIT_REACHED | typeof IMAGE_QUOTA_UNAVAILABLE;
 
 export type ImageQuotaResult = { ok: true } | { code: ImageQuotaCode; message: string; ok: false; retryAfter?: number };
+
+const limitReached = (retryAfter?: number): ImageQuotaResult => {
+    return {
+        code: DAILY_IMAGE_LIMIT_REACHED,
+        message: `${DAILY_IMAGE_LIMIT_REACHED}: the daily image limit is reached. Generated and edited images share it; try again after it resets.`,
+        ok: false,
+        retryAfter,
+    };
+};
 
 /**
  * Charges `count` images to `userId`'s daily image allowance. Call it after the request is validated and before the provider
@@ -32,25 +42,25 @@ export const takeImageQuota = async (context: ToolContext, userId: string, count
             context.runQuery(internal.auth.functions.getUserAuthFlagsQuery, { userId }),
             readRunPlan(context, userId, context.organizationId),
         ]);
-        const charge = await chargeDailyLimit(
-            context,
-            { _id: userId, isAnonymous: flags.isAnonymous, plan: plan.plan, role: plan.isAdmin ? "admin" : flags.role },
-            "Image",
-            count,
-        );
+        const user = { _id: userId, isAnonymous: flags.isAnonymous, plan: plan.plan, role: plan.isAdmin ? "admin" : flags.role };
+
+        // A request bigger than the whole bucket can never fit, and the limiter throws on it instead of refusing it, so it is
+        // refused here, uncharged, rather than reported as a failed check.
+        const key = isPlatformAdmin(user) ? undefined : dailyLimitKeyOf("Image", dailyLimitTierOf(user));
+
+        if (key !== undefined && count > RATE_LIMIT_CONFIGS[key].rate) {
+            return limitReached();
+        }
+
+        const charge = await chargeDailyLimit(context, user, "Image", count);
 
         if (charge.ok) {
             return { ok: true };
         }
 
-        return {
-            code: DAILY_IMAGE_LIMIT_REACHED,
-            message: `${DAILY_IMAGE_LIMIT_REACHED}: the daily image limit is reached. Generated and edited images share it; try again after it resets.`,
-            ok: false,
-            retryAfter: charge.retryAfter,
-        };
+        return limitReached(charge.retryAfter);
     } catch (error) {
-        toolsLogger.error(`[IMAGE_QUOTA] Could not check the daily image limit: ${error instanceof Error ? error.message : String(error)}`);
+        toolsLogger.error("[IMAGE_QUOTA] Could not check the daily image limit:", error);
 
         return {
             code: IMAGE_QUOTA_UNAVAILABLE,

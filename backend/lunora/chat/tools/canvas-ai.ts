@@ -99,14 +99,12 @@ For generate_element, add the result as a FabricImage object in the canvas JSON 
                 };
             }
 
-            // For canvas-wide operations, use the document's PNG preview
-            // The preview is stored in the document's content field as a data URL
-            const documentRow = await context.runMutation(internal.agent.documents.updateDocumentInternal, {
-                documentId: documentId as Id<"documents">,
-                messageId: context.messageId,
-            });
+            // For canvas-wide operations, use the document's PNG preview. The preview is stored in the document's content field as a data URL.
+            // Read first: the document is checked and its message is written only once the request is accepted and paid for.
+            const documentRow = await context.runQuery(internal.agent.documents.getDocumentInternal, { documentId: documentId as Id<"documents"> });
 
-            if (!documentRow) {
+            // Same owner and thread check as `update-document`, so a document of another user or thread cannot be edited or read.
+            if (!documentRow || documentRow.userId !== context.userId || (documentRow.threadId && documentRow.threadId !== context.threadId)) {
                 return {
                     documentId,
                     error: "Document not found",
@@ -115,16 +113,29 @@ For generate_element, add the result as a FabricImage object in the canvas JSON 
                 };
             }
 
+            if (operation === "style_transfer" && !prompt) {
+                return { documentId, error: "Missing prompt", message: "style_transfer operation requires a prompt", operation };
+            }
+
+            if (!documentRow.content) {
+                return { documentId, error: "No image preview", message: "The design has no image preview to edit", operation };
+            }
+
             const quota = await takeImageQuota(context, context.userId, 1);
 
             if (!quota.ok) {
                 return { code: quota.code, documentId, error: quota.message, message: quota.message, operation };
             }
 
+            await context.runMutation(internal.agent.documents.updateDocumentInternal, {
+                documentId: documentId as Id<"documents">,
+                messageId: context.messageId,
+            });
+
             // Use image editing internal action
             const editOperation = operation === "remove_background" || operation === "upscale" ? operation : "style_transfer";
             const editResult = await context.runAction(internal.chat.functions.editImage, {
-                imageUrl: documentRow.content ?? "",
+                imageUrl: documentRow.content,
                 operation: editOperation,
                 prompt,
             });

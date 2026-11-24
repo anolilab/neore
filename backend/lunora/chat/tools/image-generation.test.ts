@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => {
     return {
+        anonymous: false,
         log: [] as string[],
         plan: { isAdmin: false, plan: null } as { isAdmin: boolean; plan: "premium" | null },
         quotaOk: true,
@@ -51,12 +52,13 @@ const makeContext = () => {
 
             return state.quotaOk ? { ok: true } : { ok: false, retryAfter: 60 };
         },
-        runQuery: async (reference: string) => (reference === "getUserAuthFlagsQuery" ? { isAnonymous: false, plan: null, role: null } : undefined),
+        runQuery: async (reference: string) => (reference === "getUserAuthFlagsQuery" ? { isAnonymous: state.anonymous, plan: null, role: null } : undefined),
         userId: "user-1",
     };
 };
 
 beforeEach(() => {
+    state.anonymous = false;
     state.log.length = 0;
     state.plan = { isAdmin: false, plan: null };
     state.quotaOk = true;
@@ -80,5 +82,23 @@ describe("image generation draws on the daily image allowance", () => {
         expect(output.code).toBe("DAILY_IMAGE_LIMIT_REACHED");
         expect(output.images).toStrictEqual([]);
         expect(state.log).toStrictEqual(["charge:chat/dailyImage:free:1"]);
+    });
+
+    it("refuses a request bigger than the whole bucket as a limit, uncharged, not as a failed check", async () => {
+        // A guest's bucket holds one image: two cannot fit, so nothing is charged and the limiter is never asked.
+        state.anonymous = true;
+
+        const guest = await tool.execute(makeContext(), { numImages: 2, prompt: "a cat" });
+
+        expect(guest.code).toBe("DAILY_IMAGE_LIMIT_REACHED");
+        expect(state.log).toStrictEqual([]);
+
+        // A free user's bucket holds five.
+        state.anonymous = false;
+
+        const free = await tool.execute(makeContext(), { numImages: 6, prompt: "a cat" });
+
+        expect(free.code).toBe("DAILY_IMAGE_LIMIT_REACHED");
+        expect(state.log).toStrictEqual([]);
     });
 });
