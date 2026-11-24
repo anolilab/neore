@@ -42,6 +42,7 @@ import type { ModelId } from "../stores/model-store";
 import { useModelStore } from "../stores/model-store";
 import { mapNavigatorLanguage } from "../utils/language-utilities";
 import { createReadinessGate } from "../utils/readiness-gate";
+import { markTurnEnded } from "../utils/turn-ended";
 import { runEditMessage, runReloadMessage } from "./branch-actions";
 import type { ChangedSettings, StreamingMessage } from "./chat-action-shared";
 import { stopTarget, toAppError } from "./chat-action-shared";
@@ -664,6 +665,20 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     const isThreadStreaming =
         Boolean(threadId) &&
         (streamingMessageId !== null || Boolean(activeStreamId) || isRegenerating || (isLocalStreaming && localStreamingThreadId === threadId));
+
+    // Tells the page when a turn of THIS thread ended (`turn-ended.ts`): a control there whose own read of the thread has not
+    // answered yet still hears a turn that started and ended before it. Only a change within one thread counts.
+    const streamedRef = useRef<{ streaming: boolean; threadId: string | undefined }>({ streaming: false, threadId: undefined });
+
+    useEffect(() => {
+        const previous = streamedRef.current;
+
+        streamedRef.current = { streaming: isThreadStreaming, threadId };
+
+        if (threadId && previous.threadId === threadId && previous.streaming && !isThreadStreaming) {
+            markTurnEnded(threadId);
+        }
+    }, [isThreadStreaming, threadId]);
 
     const { mutateAsync: abortStreamMutation } = useMutation(crpc.chat.functions.abortStreamByMessageId.mutationOptions());
     const { mutateAsync: abortThreadStreamMutation } = useMutation(crpc.chat.functions.abortThreadStream.mutationOptions());

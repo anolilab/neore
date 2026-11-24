@@ -6,6 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/to
 import type { ReactNode, RefObject } from "react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
+import { subscribeTurnEnded } from "@/features/chat/core/utils/turn-ended";
 import { prefillComposer, useComposerTakesPrefill } from "@/features/chat/thread/composer-prefill";
 
 import { catchUpPrompt, catchUpRunId, hostOfPullRequestUrl, isPlainBranchName, isPlainRepo } from "../lib/catch-up-prompt";
@@ -34,17 +35,16 @@ const Shown = ({ children, onFocusLost }: { children: ReactNode; onFocusLost: ()
  * a push or a retarget reads again. Shows nothing while either read has no answer, on a failure (a failed refresh too: a cached
  * "behind" is not known to hold), or once the pull request is merged or closed. A background refresh that has not failed keeps
  * it, so it does not flicker. While it shows, the end of an agent turn in this thread reads the pull request and the comparison
- * again: that turn may have pushed the caught-up branch. Nor for a branch name that is not plain enough to put in a command.
+ * again: that turn may have pushed the caught-up branch. The end comes from the chat's own stream state (`turn-ended.ts`), not
+ * from the header's read of the thread, so a turn that ends before that read answers still counts. Nor for a branch name that is not plain enough to put in a command.
  * Whether the prompt pushes is the host's word on the head's repository, never a guess from names or commits: a fork's branch
  * is not pushed. When it goes away holding focus, focus moves to `returnFocusTo` (the pull request's link).
  */
 const CatchUpControl = ({
-    isRunning,
     link,
     returnFocusTo,
     threadId,
 }: {
-    isRunning: boolean;
     link: { number: number; repository: string };
     returnFocusTo?: RefObject<HTMLElement | null>;
     threadId: string;
@@ -86,7 +86,6 @@ const CatchUpControl = ({
 
         void readAgain();
     });
-    const wasRunning = useRef(isRunning);
     const lostFocus = useRef(false);
 
     useEffect(() => {
@@ -102,13 +101,7 @@ const CatchUpControl = ({
     });
 
     // A turn that ended may have pushed the rebased branch (or merged or closed the pull request): one read, only while it shows.
-    useEffect(() => {
-        if (wasRunning.current && !isRunning) {
-            reread();
-        }
-
-        wasRunning.current = isRunning;
-    }, [isRunning]);
+    useEffect(() => subscribeTurnEnded(threadId, () => reread()), [threadId]);
 
     if (pull.isError || !behind) {
         return null;
@@ -177,7 +170,7 @@ type CatchUpProps = Parameters<typeof CatchUpControl>[0];
  * Mounts the control, and with it its host reads, only where the thread has a composer on the page that takes the prompt
  * (`useComposerPrefill`): a split pane without focus, or a thread whose composer is not shown, reads nothing.
  */
-const ThreadPullRequestCatchUp = ({ isRunning, link, returnFocusTo, threadId }: CatchUpProps) =>
-    useComposerTakesPrefill(threadId) ? <CatchUpControl isRunning={isRunning} link={link} returnFocusTo={returnFocusTo} threadId={threadId} /> : null;
+const ThreadPullRequestCatchUp = ({ link, returnFocusTo, threadId }: CatchUpProps) =>
+    useComposerTakesPrefill(threadId) ? <CatchUpControl link={link} returnFocusTo={returnFocusTo} threadId={threadId} /> : null;
 
 export default ThreadPullRequestCatchUp;

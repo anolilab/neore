@@ -82,10 +82,14 @@ export const catchUpPrompt = ({
     const refPrefix = `refs/neore/pull-${pull}-${run}`;
     const pullRef = `${refPrefix}-head`;
     const base = `${refPrefix}-base`;
-    // Fetch and push URLs can differ (`pushurl`, `pushInsteadOf`, several URLs): each must be exactly one, and this repository.
     // A URL can hold the person's credential (`https://<user>:<token>@host/…`), and what a command prints stays in the session's
     // transcript, so no URL is ever printed: the filter reads each one and prints only `match` or `mismatch`.
-    const checkOrigin = `1. Run \`${originCheck("--all", host, repository)}\` and \`${originCheck("--push --all", host, repository)}\`. Each prints only \`match\` or \`mismatch\`; unless both print \`match\`, stop and say so. Do not print origin's URLs any other way (remote -v, get-url on its own, or the remote's config): they can hold the person's credentials.`;
+    const doNotPrintUrls =
+        "Do not print origin's URLs any other way (remote -v, get-url on its own, or the remote's config): they can hold the person's credentials.";
+    // Fetch and push URLs can differ (`pushurl`, `pushInsteadOf`, several URLs). A run that pushes needs both to be exactly one
+    // URL of this repository; a fork's run never pushes, so only where it fetches from matters there.
+    const checkOriginToPush = `1. Run \`${originCheck("--all", host, repository)}\` and \`${originCheck("--push --all", host, repository)}\`. Each prints only \`match\` or \`mismatch\`; unless both print \`match\`, stop and say so. ${doNotPrintUrls}`;
+    const checkOriginToFetch = `1. Run \`${originCheck("--all", host, repository)}\`. It prints only \`match\` or \`mismatch\`; unless it prints \`match\`, stop and say so. ${doNotPrintUrls}`;
     // Before any fetch or switch: uncommitted changes would be carried onto the pull request's branch, and the rebase then refuses.
     const checkClean =
         "2. Run `git status --porcelain`. If it prints anything, stop without switching branches or changing any ref, and tell the person to commit or stash their work first.";
@@ -121,7 +125,7 @@ export const catchUpPrompt = ({
             `The branch ${headBranch} of ${repository}#${pull} comes from a fork and is behind ${baseBranch}. Rebase it here; it is not pushed, since origin is not where that branch lives.`,
             whereToRun,
             "",
-            checkOrigin,
+            checkOriginToFetch,
             checkClean,
             `3. Fetch by name, which also works in a clone of one branch: ${fetchBaseAndPull}.`,
             // Branches are shared by every linked worktree: one checked out in another already exists here too.
@@ -149,7 +153,7 @@ export const catchUpPrompt = ({
         `The branch ${headBranch} of ${repository}#${pull} is behind ${baseBranch}. Bring it up to date.`,
         whereToRun,
         "",
-        checkOrigin,
+        checkOriginToPush,
         checkClean,
         `3. Fetch by name, which also works in a clone of one branch: \`git fetch origin +refs/heads/${headBranch}:${head}\`, ${fetchBaseAndPull}.`,
         `4. If \`git rev-parse ${head}\` differs from \`git rev-parse ${pullRef}\`, ${stopAfterFetch}: origin's ${headBranch} is not this pull request's head right now. ${checkMerges} Otherwise record the commit \`git rev-parse ${pullRef}\` printed and say it: step 8 leases on that commit. ${checkOtherWorktree} Otherwise run \`git switch --no-guess ${headBranch}\` (\`git switch -c ${headBranch} ${head}\` when there is no local branch of that name), then \`git merge --ff-only ${head}\`. If that fails, or \`git rev-parse HEAD\` then differs from \`git rev-parse ${head}\`, the local branch has commits origin does not: ${stopAfterFetch}.`,

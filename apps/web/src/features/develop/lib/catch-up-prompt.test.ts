@@ -77,21 +77,27 @@ const SAME_REPO = catchUpPrompt({ ...PULL, headInBaseRepository: true });
 const FORK = catchUpPrompt({ ...PULL, headInBaseRepository: false });
 
 describe(catchUpPrompt, () => {
+    // Only a run that pushes checks where origin pushes to: a fork's run fetches from origin and never pushes.
     describe.each([
-        ["a head in the base repository", SAME_REPO, "git switch --no-guess feat/x"],
-        ["a fork", FORK, "git switch -c <name> "],
-    ])("for %s", (_name: string, prompt: string, firstSwitch: string) => {
+        [
+            "a head in the base repository",
+            SAME_REPO,
+            "git switch --no-guess feat/x",
+            ["git remote get-url --all origin", "git remote get-url --push --all origin"],
+        ],
+        ["a fork", FORK, "git switch -c <name> ", ["git remote get-url --all origin"]],
+    ])("for %s", (_name: string, prompt: string, firstSwitch: string, originReads: string[]) => {
         const commands = commandsOf(prompt);
 
-        it("checks origin's fetch and push URLs, then that the checkout is clean, before any fetch or switch", () => {
+        it("checks origin's URLs, then that the checkout is clean, before any fetch or switch", () => {
             const fetch = firstIndex(commands, "git fetch ");
+            const clean = originReads.length;
 
-            expect(firstIndex(commands, "git remote get-url --all origin")).toBe(0);
-            expect(firstIndex(commands, "git remote get-url --push --all origin")).toBe(1);
+            expect(originReads.map((read: string) => firstIndex(commands, read))).toEqual(originReads.map((_read: string, index: number) => index));
             expect(stepsOf(prompt).get(1)).toContain("`match`");
-            expect(firstIndex(commands, "git status --porcelain")).toBe(2);
+            expect(firstIndex(commands, "git status --porcelain")).toBe(clean);
             expect(commandsMatching(commands, "git status --porcelain")[0]?.step).toBe(2);
-            expect(fetch).toBeGreaterThan(2);
+            expect(fetch).toBeGreaterThan(clean);
             expect(firstIndex(commands, firstSwitch)).toBeGreaterThan(fetch);
         });
 
@@ -141,10 +147,7 @@ describe(catchUpPrompt, () => {
                 ({ command }: Command) => command.includes("get-url") || command.startsWith("git remote") || command.startsWith("git config"),
             );
 
-            expect(urlReads.map(({ command, step }: Command) => [step, command.split(" | ", 1)[0]])).toEqual([
-                [1, "git remote get-url --all origin"],
-                [1, "git remote get-url --push --all origin"],
-            ]);
+            expect(urlReads.map(({ command, step }: Command) => [step, command.split(" | ", 1)[0]])).toEqual(originReads.map((read: string) => [1, read]));
 
             for (const { command } of urlReads) {
                 expect(command.split(" | ").at(-1)).toContain('print (n == 1 && !bad) ? "match" : "mismatch"');
@@ -226,6 +229,14 @@ describe(catchUpPrompt, () => {
         expect(steps.get(6)).toContain("as step 7 says");
         expect(SAME_REPO).not.toContain("leave the rebased commits in place");
         expect(SAME_REPO).not.toMatch(FORCED_BRANCH_MOVE);
+    });
+
+    it("for a fork, checks only origin's fetch URL, so a checkout that pushes elsewhere still catches up", () => {
+        const forkReads = commandsOf(FORK).filter(({ command }: Command) => command.includes("get-url"));
+
+        expect(forkReads.map(({ command }: Command) => command.split(" | ", 1)[0])).toEqual(["git remote get-url --all origin"]);
+        expect(FORK).not.toContain("--push --all");
+        expect(commandsOf(SAME_REPO).some(({ command }: Command) => command.startsWith("git remote get-url --push --all origin"))).toBe(true);
     });
 
     it("for a fork, even one whose branch has origin's name and commit, holds no push and never touches origin's branch of that name", () => {

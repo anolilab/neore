@@ -4,10 +4,12 @@
  * composer without sending.
  */
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 import { createRef } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { markTurnEnded } from "@/features/chat/core/utils/turn-ended";
 
 import ThreadPullRequestCatchUp from "./thread-pull-request-catch-up";
 
@@ -125,7 +127,14 @@ const given = (state: string, mergeState: string | undefined, headBranch = "feat
     };
 };
 
-const control = (isRunning = false) => <ThreadPullRequestCatchUp isRunning={isRunning} link={{ number: 7, repository: "octo/hello" }} threadId="thread-1" />;
+const control = () => <ThreadPullRequestCatchUp link={{ number: 7, repository: "octo/hello" }} threadId="thread-1" />;
+
+/** The chat's stream state saw a turn of `threadId` end (`ChatProvider`). */
+const turnEnds = (threadId = "thread-1") => {
+    act(() => {
+        markTurnEnded(threadId);
+    });
+};
 
 const REBASE_ON_RUN_BASE = /`git rebase --no-update-refs refs\/neore\/pull-7-[\da-f]{8}-base`/u;
 
@@ -269,13 +278,11 @@ describe("ThreadPullRequestCatchUp", () => {
     it("reads the pull request again when a turn of the thread ends while it shows, and drops the label once caught up", async () => {
         given("open", "behind");
 
-        const view = render(control(false));
-
-        view.rerender(control(true));
+        const view = render(control());
 
         expect(refetch).not.toHaveBeenCalled();
 
-        view.rerender(control(false));
+        turnEnds();
 
         expect(refetch).toHaveBeenCalledTimes(1);
         await vi.waitFor(() => {
@@ -284,22 +291,50 @@ describe("ThreadPullRequestCatchUp", () => {
 
         // The host's answer after the push.
         given("open", "clean");
-        view.rerender(control(false));
+        view.rerender(control());
 
         expect(screen.queryByText("Behind main")).toBeNull();
         expect(screen.queryByRole("button", BUTTON)).toBeNull();
     });
 
-    it("leaves the old revision's comparison unread when the turn pushed a new head: the new key reads it", async () => {
+    // The header's read of the thread may not have answered when a fast turn starts and ends: no running state reaches the
+    // control then, and only the chat's own end of the turn tells it.
+    it("reads again for a turn that ended while the thread's read was pending, with a cached comparison that says behind", async () => {
+        given("open", "behind");
+        render(control());
+
+        expect(screen.getByRole("button", BUTTON)).toBeTruthy();
+
+        turnEnds();
+
+        await vi.waitFor(() => {
+            expect(compareRefetch).toHaveBeenCalledTimes(1);
+        });
+        expect(refetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("reads nothing again for another thread's turn, nor after it unmounts", () => {
         given("open", "behind");
 
-        const view = render(control(true));
+        const view = render(control());
+
+        turnEnds("thread-2");
+        view.unmount();
+        turnEnds();
+
+        expect(refetch).not.toHaveBeenCalled();
+        expect(compareRefetch).not.toHaveBeenCalled();
+    });
+
+    it("leaves the old revision's comparison unread when the turn pushed a new head: the new key reads it", async () => {
+        given("open", "behind");
+        render(control());
 
         // The pull request's read after the turn answers with the pushed head.
         refetch.mockImplementationOnce(async () => {
             return { data: { detail: { ...pull.current.data!.detail!, headSha: "def456" }, status: "ok" } };
         });
-        view.rerender(control(false));
+        turnEnds();
 
         await vi.waitFor(() => {
             expect(refetch).toHaveBeenCalledTimes(1);
@@ -311,10 +346,9 @@ describe("ThreadPullRequestCatchUp", () => {
 
     it("makes no extra read at the end of a turn while it does not show", () => {
         given("open", "clean");
+        render(control());
 
-        const view = render(control(true));
-
-        view.rerender(control(false));
+        turnEnds();
 
         expect(refetch).not.toHaveBeenCalled();
         expect(compareRefetch).not.toHaveBeenCalled();
@@ -362,7 +396,7 @@ describe("ThreadPullRequestCatchUp", () => {
                     octo/hello#7
                 </a>
                 <input aria-label="elsewhere" />
-                <ThreadPullRequestCatchUp isRunning={false} link={{ number: 7, repository: "octo/hello" }} returnFocusTo={returnFocusTo} threadId="thread-1" />
+                <ThreadPullRequestCatchUp link={{ number: 7, repository: "octo/hello" }} returnFocusTo={returnFocusTo} threadId="thread-1" />
             </>
         );
 
