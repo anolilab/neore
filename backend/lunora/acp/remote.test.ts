@@ -106,6 +106,15 @@ const NOT_IN_PROJECT = /not allowed in this project/u;
 const SOME_PROJECTS_ONLY = /only be used in some projects/u;
 const ACCESS_DENIED = /access denied/u;
 
+/** A fixed instant for cases that compare a thread's time to a stored one, so neither comes from the real clock. */
+const FIXED = Date.UTC(2026, 0, 1);
+
+/** Freezes `Date` at {@link FIXED}; `afterEach` restores the real clock. */
+const pinClock = (): void => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(FIXED);
+};
+
 const OFFER = { agentKey: "claude", agentLabel: "Claude Code", folderId: "f1", folderLabel: "neore" };
 const SESSION_OPEN = { ...OFFER, kind: "session_open" };
 
@@ -1074,6 +1083,7 @@ describe("a project remembers its runner", () => {
     });
 
     it("drops defaults that can never be used again before it pushes out a live one at the cap", async () => {
+        pinClock();
         activeOrganization.current = { id: "org-a", name: "Org", role: "member", slug: null };
         await run(async (ctx) => {
             await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId });
@@ -1113,7 +1123,7 @@ describe("a project remembers its runner", () => {
         await run(async (ctx) => {
             const others: [string, unknown][] = [];
             // Recorded from threads started after the live entry's, so it stays the oldest of the live ones.
-            const later = { ...runner, threadAt: Date.now() + 1000 };
+            const later = { ...runner, threadAt: FIXED + 1000 };
 
             for (let index = 0; index < 199 - unusable.length; index += 1) {
                 others.push([(await ctx.db.insert("projects", { createdAt: 0, organizationId: "org-a", title: "Live", userId: ownerId })) as string, later]);
@@ -1139,6 +1149,7 @@ describe("a project remembers its runner", () => {
     });
 
     it("looks up only the oldest few defaults at the cap, and drops the oldest when their projects all exist", async () => {
+        pinClock();
         activeOrganization.current = { id: "org-a", name: "Org", role: "member", slug: null };
         await run(async (ctx) => {
             await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId });
@@ -1160,7 +1171,7 @@ describe("a project remembers its runner", () => {
         // 191 live projects after the oldest, then 8 deleted ones: the record is at the cap, and no deleted one is among the oldest.
         // They come first in the stored object but from threads started later: the order is the threads', not the writes'.
         await run(async (ctx) => {
-            const later = { ...runner, threadAt: Date.now() + 1000 };
+            const later = { ...runner, threadAt: FIXED + 1000 };
             const live: string[] = [];
             const gone: string[] = [];
 
@@ -1616,10 +1627,11 @@ describe("a project remembers its runner", () => {
     });
 
     it("records no personal runner for a thread started before the project moved into an organization and back", async () => {
+        pinClock();
         const device = await pairedDevice(ownerId);
         const projectId = await insertProject({ userId: ownerId });
         const runner = { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" };
-        const startedAt = Date.now() - 60_000;
+        const startedAt = FIXED - 60_000;
 
         activeOrganization.current = { id: "org-a", name: "A", role: "member", slug: null };
         await run(async (ctx) => await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId }));
