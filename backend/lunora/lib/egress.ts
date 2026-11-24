@@ -6,8 +6,9 @@
  * a public address, and then connects to the checked address. The host name is still used for the TLS certificate check,
  * so the connection is to the checked address and the certificate is for the host the user named.
  *
- * Only https on port 443 is allowed, with no credentials. Redirects are not followed: the status comes back as it is, and
- * the response body is not read. The socket API and the DNS fetch are injected, so the rules are tested without a network.
+ * Only https on port 443 is allowed, with no credentials. Redirects are not followed: the status comes back as it is.
+ * `postCheckedHttps` reads the status and no body; `requestCheckedHttps` also returns the body, up to `MAX_REPLY_BYTES`.
+ * The socket API and the DNS fetch are injected, so the rules are tested without a network.
  *
  * A host on one of Cloudflare's published ranges is refused as `unsupported_target`: Workers cannot open TCP connections to
  * those addresses, so the connect would fail anyway.
@@ -27,6 +28,12 @@ const BRACKETED_HOST = /^\[(.*)\]$/;
 const CR_OR_LF = /[\r\n]/;
 const IP_LITERAL = /^[\d.]+$/;
 const HTTP_STATUS_LINE = /^HTTP\/1\.[01] (\d{3})(?: |\r\n)/;
+const STATUS_LINE = /^HTTP\/1\.[01] (\d{3})(?: |$)/;
+const CR = 0x0d;
+const LF = 0x0a;
+
+/** The most bytes of a reply `requestCheckedHttps` keeps. A longer reply is cut there: the body is then only a prefix. */
+export const MAX_REPLY_BYTES = 64 * 1024;
 
 /** The default deadline for the whole exchange: lookup, connect, request and status line. */
 export const EGRESS_TIMEOUT_MS = 10_000;
@@ -258,6 +265,10 @@ export interface EgressResponse {
     status: number;
 }
 
+export interface EgressBodyResponse extends EgressResponse {
+    body: string;
+}
+
 interface DnsBody {
     Answer?: { data?: unknown; type?: unknown }[];
     Status?: unknown;
@@ -446,11 +457,172 @@ const readStatus = async (socket: EgressSocket): Promise<number> => {
     }
 };
 
+const findHeadEnd = (bytes: Uint8Array): number => {
+    for (let index = 0; index + 3 < bytes.length; index += 1) {
+        if (bytes[index] === CR && bytes[index + 1] === LF && bytes[index + 2] === CR && bytes[index + 3] === LF) {
+            return index;
+        }
+    }
+
+    return -1;
+};
+
+const indexOfCrlf = (bytes: Uint8Array, from: number): number => {
+    for (let index = from; index + 1 < bytes.length; index += 1) {
+        if (bytes[index] === CR && bytes[index + 1] === LF) {
+            return index;
+        }
+    }
+
+    return -1;
+};
+
+const concatBytes = (parts: Uint8Array[]): Uint8Array => {
+    const total = parts.reduce((sum, part) => sum + part.byteLength, 0);
+    const joined = new Uint8Array(total);
+    let offset = 0;
+
+    for (const part of parts) {
+        joined.set(part, offset);
+        offset += part.byteLength;
+    }
+
+    return joined;
+};
+
+/** Reads until the server closes the connection (every request says `Connection: close`), or until `MAX_REPLY_BYTES` have come. */
+const readRaw = async (socket: EgressSocket): Promise<Uint8Array> => {
+    const reader = socket.readable.getReader();
+    const parts: Uint8Array[] = [];
+    let total = 0;
+
+    try {
+        while (total < MAX_REPLY_BYTES) {
+            const { done, value } = await reader.read();
+
+            if (done) {
+                break;
+            }
+
+            parts.push(value);
+            total += value.byteLength;
+        }
+    } finally {
+        await reader.cancel().catch(() => undefined);
+    }
+
+    const joined = concatBytes(parts);
+
+    return joined.byteLength > MAX_REPLY_BYTES ? joined.subarray(0, MAX_REPLY_BYTES) : joined;
+};
+
 /**
- * POSTs `request.body` to `request.url` at the first checked address, and returns the status. A 3xx is returned as it is.
- * Any refusal, failure or timeout throws an `EgressError` with a code and no URL or body in the message.
+ * The payload of a chunked body, as far as it is whole. A chunk cut short by the reply limit is dropped, so the result is a
+ * prefix of the body and never a corrupt one.
  */
-export const postCheckedHttps = async (request: EgressRequest, dependencies: EgressDependencies): Promise<EgressResponse> => {
+const decodeChunked = (bytes: Uint8Array): Uint8Array => {
+    const parts: Uint8Array[] = [];
+    let position = 0;
+
+    for (;;) {
+        const lineEnd = indexOfCrlf(bytes, position);
+
+        if (lineEnd === -1) {
+            break;
+        }
+
+        const size = Number.parseInt(new TextDecoder().decode(bytes.subarray(position, lineEnd)).split(";", 1)[0] ?? "", 16);
+
+        if (size <= 0 || !Number.isSafeInteger(size)) {
+            break;
+        }
+
+        const start = lineEnd + 2;
+        const end = start + size;
+
+        if (end > bytes.byteLength) {
+            break;
+        }
+
+        parts.push(bytes.subarray(start, end));
+        position = end + 2;
+    }
+
+    return concatBytes(parts);
+};
+
+const CHUNKED_CODING = /chunked/iu;
+const DIGITS_ONLY = /^\d+$/u;
+
+/** The header lines after the status line, names lower-cased. A line without a colon is not a header and is skipped. */
+const headersOf = (lines: string[]): Map<string, string> => {
+    const headers = new Map<string, string>();
+
+    for (const line of lines.slice(1)) {
+        const colon = line.indexOf(":");
+
+        if (colon > 0) {
+            headers.set(line.slice(0, colon).trim().toLowerCase(), line.slice(colon + 1).trim());
+        }
+    }
+
+    return headers;
+};
+
+/** The body bytes of a final answer: decoded when chunked, cut to `Content-Length` when it has one, otherwise as they came. */
+const payloadOf = (rest: Uint8Array, headers: Map<string, string>): Uint8Array => {
+    if (CHUNKED_CODING.test(headers.get("transfer-encoding") ?? "")) {
+        return decodeChunked(rest);
+    }
+
+    const length = headers.get("content-length");
+
+    return length !== undefined && DIGITS_ONLY.test(length) ? rest.subarray(0, Math.min(Number(length), rest.byteLength)) : rest;
+};
+
+/**
+ * The status and the body of the final answer. Interim 1xx heads are read past. The body is decoded when the answer is chunked,
+ * cut to its `Content-Length` when it has one, and otherwise taken as it came, up to the reply limit.
+ */
+const readReply = async (socket: EgressSocket): Promise<EgressBodyResponse> => {
+    let bytes = await readRaw(socket);
+
+    for (;;) {
+        const end = findHeadEnd(bytes);
+
+        if (end === -1) {
+            throw new EgressError("bad_response", "The server did not send a complete response head.");
+        }
+
+        if (end + 4 > MAX_HEAD_BYTES) {
+            throw new EgressError("bad_response", "The response head is too large.");
+        }
+
+        const lines = new TextDecoder().decode(bytes.subarray(0, end)).split("\r\n");
+        const match = STATUS_LINE.exec(lines[0] ?? "");
+
+        if (match === null) {
+            throw new EgressError("bad_response", "The server did not answer with HTTP.");
+        }
+
+        const status = Number(match[1]);
+        const rest = bytes.subarray(end + 4);
+
+        if (status < 200) {
+            bytes = rest;
+
+            continue;
+        }
+
+        return { body: new TextDecoder().decode(payloadOf(rest, headersOf(lines))), status };
+    }
+};
+
+/**
+ * POSTs `request.body` to `request.url` at the first checked address, and reads the answer with `read`. Shared by the two
+ * public entry points below, so the address check, the pin, the deadline and the cleanup are written once.
+ */
+const checkedPost = async <T>(request: EgressRequest, dependencies: EgressDependencies, read: (socket: EgressSocket) => Promise<T>): Promise<T> => {
     const target = parseTarget(request.url);
 
     assertHeaders(request.headers);
@@ -462,7 +634,7 @@ export const postCheckedHttps = async (request: EgressRequest, dependencies: Egr
         await Promise.all(opened.map(async (socket) => await socket.close().catch(() => undefined)));
     };
 
-    const attempt = async (): Promise<EgressResponse> => {
+    const attempt = async (): Promise<T> => {
         const [address] = await resolveChecked(target.hostname, dependencies, controller.signal);
 
         // The deadline can pass while a lookup is in flight. Cleanup has already run by then, so open nothing.
@@ -479,11 +651,11 @@ export const postCheckedHttps = async (request: EgressRequest, dependencies: Egr
         opened.push(socket);
         await writeRequest(socket, target, request);
 
-        return { status: await readStatus(socket) };
+        return await read(socket);
     };
 
     // A socket failure from connect, TLS, write or read is not part of the caller's contract: it comes back as bad_response.
-    const exchange = async (): Promise<EgressResponse> => {
+    const exchange = async (): Promise<T> => {
         try {
             return await attempt();
         } catch (error) {
@@ -513,3 +685,20 @@ export const postCheckedHttps = async (request: EgressRequest, dependencies: Egr
         void closeAll();
     }
 };
+
+/**
+ * POSTs `request.body` to `request.url` at the first checked address, and returns the status. A 3xx is returned as it is, and
+ * no body is read. Any refusal, failure or timeout throws an `EgressError` with a code and no URL or body in the message.
+ */
+export const postCheckedHttps = async (request: EgressRequest, dependencies: EgressDependencies): Promise<EgressResponse> =>
+    await checkedPost(request, dependencies, async (socket) => {
+        return { status: await readStatus(socket) };
+    });
+
+/**
+ * The same POST, and the answer's status with its body: the body is read up to `MAX_REPLY_BYTES`, and a longer one is cut there.
+ * The reply is read to the server's close, so a server that holds the connection open runs into the deadline. Errors are as
+ * `postCheckedHttps`.
+ */
+export const requestCheckedHttps = async (request: EgressRequest, dependencies: EgressDependencies): Promise<EgressBodyResponse> =>
+    await checkedPost(request, dependencies, readReply);

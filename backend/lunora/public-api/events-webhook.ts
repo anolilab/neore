@@ -3,15 +3,15 @@
  * key and its derived `id`, the `whsec_` secret rule, the TTL grant and the callback host rule. Pure, so the dispatcher, the
  * store and the tests share one definition.
  *
- * Spec compliance, part 2a: `events/subscribe` and `events/unsubscribe` (the key, the idempotent upsert, the refresh and the
- * TTL grant, expiry, the cursor and `truncated`, and the InvalidParams / NotFound / Forbidden / ResourceExhausted answers).
- * Not here yet, part 2b: the endpoint verification handshake, signed deliveries, `gap` and `terminated` envelopes, retries,
- * and `deliveryStatus`. Until 2b, no request leaves the Worker for a callback URL: a subscription is stored and waits.
+ * Spec compliance: `events/subscribe` and `events/unsubscribe` (the key, the idempotent upsert, the refresh and the TTL grant,
+ * expiry, the cursor and `truncated`, and the InvalidParams / NotFound / Forbidden / ResourceExhausted answers), the endpoint
+ * verification handshake, signed deliveries, `gap` and `terminated` envelopes, and bounded retries (part 2b).
+ * Not implemented: `deliveryStatus`, which the spec allows a server to omit.
  *
- * Residual DNS-rebinding window (also in the PR body): the callback host is resolved at subscribe time
- * (`events-webhook-address.ts`). A Worker's `fetch` does not say which address it connected to, so the delivery-time check of
- * part 2b narrows the window but cannot close it. `postCheckedHttps` (`lib/egress.ts`) connects to the checked address, but
- * it reads no response body, so it cannot carry the verification's echoed challenge.
+ * Address checks: every callback POST goes through `requestCheckedHttps` (`lib/egress.ts`), which resolves the host name, refuses
+ * any private or reserved answer, and connects to the checked address. The connection is pinned, so a name that changes its
+ * answer between a check and a request cannot send the request somewhere else. The subscribe-time check in
+ * `events-webhook-address.ts` is an early refusal only; the connect-time check is the one that decides.
  */
 import { base64ToBytes, bytesToBase64, sha256Hex } from "../lib/crypto";
 import { type EventArguments, findEvent, parseEventArguments } from "./events-catalog";

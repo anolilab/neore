@@ -6,7 +6,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { EgressConnect, EgressDependencies, EgressSocket } from "./egress";
-import { EgressError, isCloudflareAddress, isPublicIPv4, isPublicIPv6, postCheckedHttps } from "./egress";
+import { EgressError, isCloudflareAddress, isPublicIPv4, isPublicIPv6, MAX_REPLY_BYTES, postCheckedHttps, requestCheckedHttps } from "./egress";
 
 const textStream = (text: string) =>
     new ReadableStream<Uint8Array>({
@@ -383,5 +383,54 @@ describe("postCheckedHttps", () => {
         await expect(
             postCheckedHttps({ body: "", headers: {}, timeoutMs: 20, url: HOOK }, dependencies(dnsFetch({ A: ["93.184.216.34"] }), connection)),
         ).rejects.toMatchObject({ code: "timeout" });
+    });
+});
+
+describe("requestCheckedHttps", () => {
+    const send = (response: string, fetch = dnsFetch({ A: ["93.184.216.34"] })) => {
+        const connection = fakeConnect(response);
+
+        return { connection, promise: requestCheckedHttps({ body: "{}", headers: {}, url: HOOK }, dependencies(fetch, connection)) };
+    };
+
+    it("returns the status and the body the length header names", async () => {
+        const { promise } = send("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}");
+
+        expect(await promise).toStrictEqual({ body: "{}", status: 200 });
+    });
+
+    it("decodes a chunked body", async () => {
+        const { promise } = send("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n1\r\n!\r\n0\r\n\r\n");
+
+        expect(await promise).toStrictEqual({ body: "hello!", status: 200 });
+    });
+
+    it("reads past an interim 1xx head to the final answer", async () => {
+        const { promise } = send("HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 201 Created\r\nContent-Length: 2\r\n\r\nok");
+
+        expect(await promise).toStrictEqual({ body: "ok", status: 201 });
+    });
+
+    it("returns a redirect as it is, and asks for nothing at its Location", async () => {
+        const fetch = dnsFetch({ A: ["93.184.216.34"] });
+        const { connection, promise } = send("HTTP/1.1 302 Found\r\nLocation: https://elsewhere.example.com/\r\nContent-Length: 0\r\n\r\n", fetch);
+
+        expect(await promise).toStrictEqual({ body: "", status: 302 });
+        expect(connection.connect).toHaveBeenCalledTimes(1);
+        expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("cuts a body that runs past the reply limit, and keeps the status", async () => {
+        const { promise } = send(`HTTP/1.1 200 OK\r\n\r\n${"x".repeat(MAX_REPLY_BYTES + 100)}`);
+        const result = await promise;
+
+        expect(result.status).toBe(200);
+        expect(result.body.length).toBeLessThanOrEqual(MAX_REPLY_BYTES);
+    });
+
+    it("refuses an answer that is not HTTP and has no complete head", async () => {
+        const { promise } = send("garbage");
+
+        await expect(promise).rejects.toMatchObject({ code: "bad_response" });
     });
 });

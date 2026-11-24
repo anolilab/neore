@@ -56,6 +56,7 @@ const writeOf = (overrides: Partial<SubscribeWrite> = {}): SubscribeWrite => {
         maxAgeMs: null,
         name: "run.completed",
         principal: "key-1",
+        recordVerification: false,
         secretCiphertext: "ciphertext-1",
         url: `https://${HOST}/neore`,
         userId: OWNER,

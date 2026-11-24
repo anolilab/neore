@@ -2,18 +2,24 @@
  * The Events webhook subscription store (`eventWebhookSubscriptions`), on the owner's shard. One row per subscription key. The
  * internal functions here are what the router calls; the plain functions are what the tests drive, with an explicit `now`.
  *
- * A subscription holds a `scanSeq`: the last log position it has been scanned to. Part 2a scans nothing, so the position is
- * where the subscription started; part 2b's sweep moves it, and the cursor the client persists is derived from it.
+ * A subscription holds a `scanSeq`: the last log position it has been scanned to. The sweep in `event-webhook-deliveries.ts` moves
+ * it; the cursor the client persists is the watermark derived from it (`watermarkFor`).
+ *
+ * A subscription is written only after its callback has verified (`recordVerification`): nothing is queued for an unconfirmed URL.
  */
 import { v } from "lunorash/server";
 
-import type { MutationCtx } from "../_generated/server";
-import { internalMutation } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
 import { isHostApproved } from "../auth/event-webhook-hosts";
+import { deleteDeliveriesOf, watermarkFor } from "./event-webhook-deliveries";
 import { MAX_SUBSCRIPTIONS } from "./events-webhook";
 
 /** Expired rows reclaimed per sweep call. The sweep runs again on the next tick while it reports more. */
 const REAP_BATCH = 200;
+
+/** How long a successful verification covers a (principal, URL) pair's later subscribes. */
+export const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 
 export interface SubscribeWrite {
     argumentsKey: string;
@@ -26,10 +32,43 @@ export interface SubscribeWrite {
     maxAgeMs: number | null;
     name: string;
     principal: string;
+    /** The verification ran just now and passed: cache it for this (principal, URL). */
+    recordVerification: boolean;
     secretCiphertext: string;
     url: string;
     userId: string;
 }
+
+interface VerificationKey {
+    principal: string;
+    url: string;
+    userId: string;
+}
+
+/** Whether a verification for this (principal, URL) is still inside its window. */
+export const verificationCachedOn = async (ctx: Pick<QueryCtx, "db">, key: VerificationKey, now: number): Promise<boolean> => {
+    const row = await ctx.db.eventWebhookVerifications.findFirst({ where: { principal: key.principal, url: key.url, userId: key.userId } });
+
+    return row !== null && row !== undefined && row.verifiedUntil > now;
+};
+
+const recordVerificationOn = async (ctx: Pick<MutationCtx, "db">, key: VerificationKey, now: number): Promise<void> => {
+    const row = await ctx.db.eventWebhookVerifications.findFirst({ where: { principal: key.principal, url: key.url, userId: key.userId } });
+
+    if (row) {
+        await ctx.db.patch("eventWebhookVerifications", row._id, { verifiedUntil: now + VERIFICATION_TTL_MS });
+
+        return;
+    }
+
+    await ctx.db.insert("eventWebhookVerifications", {
+        createdAt: now,
+        principal: key.principal,
+        url: key.url,
+        userId: key.userId,
+        verifiedUntil: now + VERIFICATION_TTL_MS,
+    });
+};
 
 export type SubscribeOutcome =
     | { cursorSeq: number; expiresAt: number; kind: "granted"; truncated: boolean }
@@ -80,7 +119,13 @@ export const subscribeOn = async (ctx: Pick<MutationCtx, "db">, input: Subscribe
     if (existing && existing.expiresAt > now) {
         await ctx.db.patch("eventWebhookSubscriptions", existing._id, { expiresAt, secretCiphertext: input.secretCiphertext, updatedAt: now });
 
-        return { cursorSeq: existing.scanSeq, expiresAt, kind: "granted", truncated: false };
+        if (input.recordVerification) {
+            await recordVerificationOn(ctx, { principal: input.principal, url: input.url, userId: input.userId }, now);
+        }
+
+        const watermark = await watermarkFor(ctx, input.userId, input.keyHash, existing.scanSeq);
+
+        return { cursorSeq: watermark, expiresAt, kind: "granted", truncated: false };
     }
 
     if (!existing) {
@@ -91,8 +136,8 @@ export const subscribeOn = async (ctx: Pick<MutationCtx, "db">, input: Subscribe
         }
     }
 
-    const watermark = await ctx.db.mcpEventWatermarks.findFirst({ where: { userId: input.userId } });
-    const latestSeq = watermark?.seq ?? 0;
+    const logWatermark = await ctx.db.mcpEventWatermarks.findFirst({ where: { userId: input.userId } });
+    const latestSeq = logWatermark?.seq ?? 0;
     const oldestSeq = await oldestSeqOf(ctx, input.userId);
     let scanSeq = latestSeq;
     let truncated = false;
@@ -131,10 +176,16 @@ export const subscribeOn = async (ctx: Pick<MutationCtx, "db">, input: Subscribe
         await ctx.db.insert("eventWebhookSubscriptions", { ...fields, createdAt: now, userId: input.userId });
     }
 
-    return { cursorSeq: scanSeq, expiresAt, kind: "granted", truncated };
+    if (input.recordVerification) {
+        await recordVerificationOn(ctx, { principal: input.principal, url: input.url, userId: input.userId }, now);
+    }
+
+    const watermark = await watermarkFor(ctx, input.userId, input.keyHash, scanSeq);
+
+    return { cursorSeq: watermark, expiresAt, kind: "granted", truncated };
 };
 
-/** Ends the subscription with this key. An expired row is removed too, but it is not a subscription that was there to end. */
+/** Ends the subscription with this key, and its queued deliveries. An expired row is removed too, but it is not one there was to end. */
 export const unsubscribeOn = async (ctx: Pick<MutationCtx, "db">, userId: string, keyHash: string, now: number): Promise<boolean> => {
     const row = await ctx.db.eventWebhookSubscriptions.findFirst({ where: { keyHash, userId } });
 
@@ -142,16 +193,18 @@ export const unsubscribeOn = async (ctx: Pick<MutationCtx, "db">, userId: string
         return false;
     }
 
+    await deleteDeliveriesOf(ctx, userId, keyHash);
     await ctx.db.delete("eventWebhookSubscriptions", row._id);
 
     return row.expiresAt > now;
 };
 
-/** Removes up to one batch of expired subscriptions. Each delete is its own call, in order. */
+/** Removes up to one batch of expired subscriptions, and their deliveries. Each delete is its own call, in order. */
 export const reapExpiredOn = async (ctx: Pick<MutationCtx, "db">, now: number): Promise<{ hasMore: boolean; removed: number }> => {
     const { page } = await ctx.db.eventWebhookSubscriptions.findMany({ limit: REAP_BATCH, where: { expiresAt: { lt: now } } });
 
     for (const row of page) {
+        await deleteDeliveriesOf(ctx, row.userId, row.keyHash);
         await ctx.db.delete("eventWebhookSubscriptions", row._id);
     }
 
@@ -170,6 +223,7 @@ export const subscribe = internalMutation
         maxAgeMs: v.optional(v.number()),
         name: v.string(),
         principal: v.string(),
+        recordVerification: v.boolean(),
         secretCiphertext: v.string(),
         url: v.string(),
         userId: v.string(),
@@ -184,6 +238,14 @@ export const unsubscribe = internalMutation
     .output(v.object({ found: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
         return { found: await unsubscribeOn(ctx, args.userId, args.keyHash, ctx.now) };
+    });
+
+/** The router's check, before it runs the handshake: a cached verification skips the POST. */
+export const verificationCached = internalQuery
+    .input({ principal: v.string(), url: v.string(), userId: v.string() })
+    .output(v.object({ cached: v.boolean() }))
+    .query(async ({ args, ctx }) => {
+        return { cached: await verificationCachedOn(ctx, args, ctx.now) };
     });
 
 /** The shard sweep: reclaims expired subscriptions (`lib/shard-housekeeping.ts`). */
