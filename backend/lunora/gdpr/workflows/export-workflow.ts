@@ -25,6 +25,7 @@ import { onUserShard } from "../../lib/workflow-shard";
 import { stepDedupId } from "./dedup-id";
 import type { BrowserExportCursor } from "../../browser/gdpr";
 import { browserExportPageKey, browserExportPrefix, storeAllBrowserPages } from "../../browser/export-pages";
+import { collectAllChatFiles } from "../../agent/export-pages";
 import { collectAllGuides, collectAllPullRequestThreads, collectAllReviewDrafts } from "../../source-control/export-pages";
 import { clearUsagePieces, collectUsageExport, UsageExportError, type UsageExportIo, type UsagePageSummary, usageObjectKey } from "../usage-export-steps";
 
@@ -104,6 +105,15 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             "collect-files",
             async () => await context.run(internal.gdpr.steps.collectFiles, { userId }, { dedupId: stepDedupId(scope, "collect-files") }),
         );
+        // The user's chat files (uploads and generated images) by grant, a page per step so no checkpoint outgrows the log's size limit.
+        const chatFiles = await collectAllChatFiles(async (cursor, page) => {
+            const name = page === 0 ? "collect-chat-files" : `collect-chat-files-${String(page)}`;
+
+            return await context.step.do(
+                name,
+                async () => await context.run(internal.agent.gdpr.collectChatFilesForExport, { cursor, userId }, { dedupId: stepDedupId(scope, name) }),
+            );
+        });
 
         await progress({ currentStep: "collecting_prompts", progress: 60 });
         const prompts = await context.step.do(
@@ -405,6 +415,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                             browserCut,
                             browserPages,
                             browserPrefix,
+                            chatFiles,
                             codingAgentRuns,
                             conversations,
                             devices,

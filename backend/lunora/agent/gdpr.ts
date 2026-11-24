@@ -4,10 +4,14 @@
  * the orchestrator's mutation and the writes are the owner's, not the GDPR module's.
  * Batching follows `gdpr/batch.ts`: at most `BATCH` rows per table, `{ hasMore }` back.
  */
+import { v } from "lunorash/server";
+
 import type { Id } from "../_generated/dataModel";
-import type { MutationCtx } from "../_generated/server";
+import { internalQuery, type MutationCtx } from "../_generated/server";
 import { BATCH, type BatchResult, deleteParentsWithChildren, full } from "../gdpr/batch";
 import { gdprLogger } from "../lib/logger";
+import { storedRow } from "../lib/stored-row";
+import { MAX_LENGTH } from "../lib/validators";
 import { eraseProjectRuleFilesForUser, eraseProjectsRuleFiles, markProjectsRuleFilesErasing, RULE_FILE_ROWS_PER_PAGE } from "../projects/gdpr";
 import { erasePinsNamingDocuments } from "../chat/gdpr";
 import { deleteVectorRow } from "./table-writes";
@@ -76,6 +80,55 @@ export const eraseChatFileAccessForUser = async (ctx: MutationCtx, userId: strin
 
     return { hasMore: full(rows) };
 };
+
+/** Chat-file grants one export page reads (`collectChatFilesForExport`). */
+export const CHAT_FILE_EXPORT_PAGE = 100;
+
+/**
+ * One page of the chat files the user holds a grant for: their own uploads and generated images alike. The grant is what makes a
+ * file theirs (the row is shared by content and has no owner). Metadata only, as a vault file's is: the bytes stay out of the export.
+ * A grant whose row is already gone is left out.
+ */
+export const collectChatFilesForExport = internalQuery
+    .input({
+        cursor: v.optional(v.union(v.string().max(MAX_LENGTH.cursor), v.null())),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(
+        v.object({
+            cursor: v.union(v.string(), v.null()),
+            files: v.array(
+                v.object({
+                    createdAt: v.number(),
+                    filename: v.optional(v.string()),
+                    hash: v.string(),
+                    id: v.string(),
+                    mediaType: v.string(),
+                }),
+            ),
+        }),
+    )
+    .query(async ({ args: { cursor, userId }, ctx }) => {
+        const grants = await ctx.db.chatFileAccess.findMany({ cursor: cursor ?? null, limit: CHAT_FILE_EXPORT_PAGE, where: { userId } });
+        const rows = await Promise.all(grants.page.map(async (grant) => storedRow(await ctx.db.chatFiles.findFirst({ where: { _id: grant.fileId } }))));
+
+        return {
+            cursor: grants.isDone ? null : grants.continueCursor,
+            files: rows.flatMap((file) =>
+                file
+                    ? [
+                          {
+                              createdAt: file._creationTime,
+                              filename: file.filename,
+                              hash: file.hash,
+                              id: file._id,
+                              mediaType: file.mediaType,
+                          },
+                      ]
+                    : [],
+            ),
+        };
+    });
 
 /** The file-to-chat links of the user's own chats (`chatFileThreads`, keyed by owner). */
 export const eraseChatFileThreadsForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {

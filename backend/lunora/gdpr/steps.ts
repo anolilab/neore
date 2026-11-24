@@ -677,6 +677,9 @@ export const generateExportFile = internalAction
         // the same in-flight-replay reason as `threadTags`.
         browserPages: v.optional(v.number()),
         browserPrefix: v.optional(v.string()),
+        // The user's chat files (uploads and generated images), metadata only, read a page per step (`collectChatFilesForExport`).
+        // Optional for the same in-flight-replay reason as `threadTags`.
+        chatFiles: v.optional(v.any()),
         // Coding-agent runs (`coding-agents/gdpr.ts`). Optional for the same
         // in-flight-replay reason as `threadTags`.
         codingAgentRuns: v.optional(v.any()),
@@ -824,6 +827,7 @@ export const generateExportFile = internalAction
             acpSessions,
             bots: args.bots ?? { bots: [] },
             browser,
+            chatFiles: args.chatFiles ?? [],
             codingAgentRuns: args.codingAgentRuns ?? [],
             conversations: args.conversations,
             dataSubject: {
