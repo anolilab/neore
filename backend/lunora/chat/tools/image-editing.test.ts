@@ -8,7 +8,7 @@ const state = vi.hoisted(() => {
     return {
         anonymous: false,
         log: [] as string[],
-        plan: { isAdmin: false, plan: null } as { isAdmin: boolean; plan: "premium" | null },
+        plan: null as "premium" | null,
         quotaOk: true,
         quotaThrows: false,
         retryAfter: 120,
@@ -22,10 +22,7 @@ vi.mock("../../agent/client", () => {
 vi.mock("../../_generated/internal", () => {
     return {
         internal: {
-            auth: {
-                billing: { getRunPlanForOrganizationQuery: "getRunPlanForOrganizationQuery" },
-                functions: { getUserAuthFlagsQuery: "getUserAuthFlagsQuery", getUserRunPlanQuery: "getUserRunPlanQuery" },
-            },
+            auth: { functions: { getUserAuthFlagsQuery: "getUserAuthFlagsQuery" } },
             chat: { functions: { editImage: "editImage" } },
             lib: { rate_limiter_mutations: { applyRateLimit: "applyRateLimit" } },
         },
@@ -59,13 +56,8 @@ const makeContext = () => {
 
             return state.quotaOk ? { ok: true } : { ok: false, retryAfter: state.retryAfter };
         },
-        runQuery: async (reference: string) => {
-            if (reference === "getUserRunPlanQuery" || reference === "getRunPlanForOrganizationQuery") {
-                return state.plan;
-            }
-
-            return reference === "getUserAuthFlagsQuery" ? { isAnonymous: state.anonymous, plan: null, role: state.role } : undefined;
-        },
+        runQuery: async (reference: string) =>
+            reference === "getUserAuthFlagsQuery" ? { isAnonymous: state.anonymous, plan: state.plan, role: state.role } : undefined,
         userId: "user-1",
     };
 };
@@ -75,7 +67,7 @@ const edit = { imageUrl: "https://example.com/photo.png", operation: "remove_bac
 beforeEach(() => {
     state.anonymous = false;
     state.log.length = 0;
-    state.plan = { isAdmin: false, plan: null };
+    state.plan = null;
     state.quotaOk = true;
     state.quotaThrows = false;
     state.role = null;
@@ -90,7 +82,7 @@ describe("image editing draws on the daily image allowance", () => {
     });
 
     it("charges a paid-plan user to the premium bucket", async () => {
-        state.plan = { isAdmin: false, plan: "premium" };
+        state.plan = "premium";
 
         await tool.execute(makeContext(), edit);
 
@@ -106,7 +98,7 @@ describe("image editing draws on the daily image allowance", () => {
     });
 
     it("does not charge a platform admin, as the media route does not", async () => {
-        state.plan = { isAdmin: true, plan: null };
+        state.role = "admin";
 
         await tool.execute(makeContext(), edit);
 

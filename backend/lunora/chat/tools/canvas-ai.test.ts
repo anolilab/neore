@@ -26,10 +26,7 @@ vi.mock("../../_generated/internal", () => {
     return {
         internal: {
             agent: { documents: { getDocumentInternal: "getDocumentInternal", updateDocumentInternal: "updateDocumentInternal" } },
-            auth: {
-                billing: { getRunPlanForOrganizationQuery: "getRunPlanForOrganizationQuery" },
-                functions: { getUserAuthFlagsQuery: "getUserAuthFlagsQuery", getUserRunPlanQuery: "getUserRunPlanQuery" },
-            },
+            auth: { functions: { getUserAuthFlagsQuery: "getUserAuthFlagsQuery" } },
             chat: { functions: { editImage: "editImage", generateImage: "generateImage" } },
             lib: { rate_limiter_mutations: { applyRateLimit: "applyRateLimit" } },
         },
@@ -70,10 +67,6 @@ const makeContext = (chargeOk = true) => {
         runQuery: async (reference: string) => {
             if (reference === "getUserAuthFlagsQuery") {
                 return { isAnonymous: false, plan: null, role: null };
-            }
-
-            if (reference === "getUserRunPlanQuery") {
-                return { isAdmin: false, plan: null };
             }
 
             state.log.push(`read:${reference}`);

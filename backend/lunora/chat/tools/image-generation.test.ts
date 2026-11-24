@@ -8,7 +8,7 @@ const state = vi.hoisted(() => {
     return {
         anonymous: false,
         log: [] as string[],
-        plan: { isAdmin: false, plan: null } as { isAdmin: boolean; plan: "premium" | null },
+        plan: null as "premium" | null,
         quotaOk: true,
     };
 });
@@ -22,10 +22,7 @@ vi.mock("../../agent/client", () => {
 vi.mock("../../_generated/internal", () => {
     return {
         internal: {
-            auth: {
-                billing: { getRunPlanForOrganizationQuery: "getRunPlanForOrganizationQuery" },
-                functions: { getUserAuthFlagsQuery: "getUserAuthFlagsQuery", getUserRunPlanQuery: "getUserRunPlanQuery" },
-            },
+            auth: { functions: { getUserAuthFlagsQuery: "getUserAuthFlagsQuery" } },
             chat: { functions: { generateImage: "generateImage" } },
             lib: { rate_limiter_mutations: { applyRateLimit: "applyRateLimit" } },
         },
@@ -52,13 +49,8 @@ const makeContext = () => {
 
             return state.quotaOk ? { ok: true } : { ok: false, retryAfter: 60 };
         },
-        runQuery: async (reference: string) => {
-            if (reference === "getUserRunPlanQuery" || reference === "getRunPlanForOrganizationQuery") {
-                return state.plan;
-            }
-
-            return reference === "getUserAuthFlagsQuery" ? { isAnonymous: state.anonymous, plan: null, role: null } : undefined;
-        },
+        runQuery: async (reference: string) =>
+            reference === "getUserAuthFlagsQuery" ? { isAnonymous: state.anonymous, plan: state.plan, role: null } : undefined,
         userId: "user-1",
     };
 };
@@ -66,13 +58,13 @@ const makeContext = () => {
 beforeEach(() => {
     state.anonymous = false;
     state.log.length = 0;
-    state.plan = { isAdmin: false, plan: null };
+    state.plan = null;
     state.quotaOk = true;
 });
 
 describe("image generation draws on the daily image allowance", () => {
     it("charges each requested image before generating, to the bucket of the plan the server reads", async () => {
-        state.plan = { isAdmin: false, plan: "premium" };
+        state.plan = "premium";
 
         const output = await tool.execute(makeContext(), { numImages: 2, prompt: "a cat" });
 

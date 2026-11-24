@@ -37,15 +37,10 @@ const limitReached = (retryAfter?: number): ImageQuotaResult => {
  */
 export const takeImageQuota = async (context: ToolContext, userId: string, count: number): Promise<ImageQuotaResult> => {
     try {
-        // The run's plan, read as `readRunPlan` reads it. That helper lives in `chat/lib/agent-run`, which loads the tool registry,
-        // and this module sits inside that registry: importing it here closes a cycle that leaves `ToolName` undefined.
-        const [flags, plan] = await Promise.all([
-            context.runQuery(internal.auth.functions.getUserAuthFlagsQuery, { userId }),
-            context.organizationId === undefined
-                ? context.runQuery(internal.auth.functions.getUserRunPlanQuery, { userId })
-                : context.runQuery(internal.auth.billing.getRunPlanForOrganizationQuery, { organizationId: context.organizationId, userId }),
-        ]);
-        const user = { _id: userId, isAnonymous: flags.isAnonymous, plan: plan.plan, role: plan.isAdmin ? "admin" : flags.role };
+        // The plan `/chat/media` charges on: the user's own, from the user row. An organization's plan is not used, so one person
+        // draws the same allowance on every image path, whichever organization the run belongs to.
+        const flags = await context.runQuery(internal.auth.functions.getUserAuthFlagsQuery, { userId });
+        const user = { _id: userId, isAnonymous: flags.isAnonymous, plan: flags.plan, role: flags.role };
 
         // A request bigger than the whole bucket can never fit, and the limiter throws on it instead of refusing it, so it is
         // refused here, uncharged, rather than reported as a failed check.
