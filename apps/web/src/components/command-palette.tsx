@@ -43,9 +43,10 @@ import {
     Trash2,
 } from "lucide-react";
 import type { FC } from "react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 
+import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
 import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
@@ -250,6 +251,19 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
 
     // The palette's input text: message search follows it, and picking a project clears it.
     const [searchInput, setSearchInput] = useState("");
+    // The thread delete waiting for confirmation. It opens the same destructive dialog the sidebar row uses.
+    const [pendingDelete, setPendingDelete] = useState<{ run: () => void } | undefined>(undefined);
+    // Set by the delete prompt's own confirm, so closing it after a confirm does not bring the palette back.
+    const deleteConfirmedRef = useRef(false);
+
+    // Every new prompt starts unconfirmed: the dialog's action button does not always go through its close callback.
+    useEffect(() => {
+        if (pendingDelete !== undefined) {
+            deleteConfirmedRef.current = false;
+        }
+    }, [pendingDelete]);
+    // Leaving the open chat drops its pending delete, so a confirm cannot delete a chat other than the one the prompt was opened from.
+    useEffect(() => () => setPendingDelete(undefined), [currentThreadId]);
     // The filters and the project the palette is narrowed to. Each closes with the palette.
     const [scope, setScope] = useState<PaletteScope>(NO_PALETTE_SCOPE);
     const [projectFilter, setProjectFilter] = useState<ProjectFilter | undefined>(undefined);
@@ -347,7 +361,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     const { hasMore: hasMoreProjects, isError: isProjectListFailed, projects } = useProjectList(shouldQuery && scope.projects);
 
     const setLoadingStates = () => {};
-    const { handleCreateBranch, handlePinThread, handleUnpinThread, updateThread } = useThreadHandlers(setLoadingStates);
+    const { confirmBeforeDelete, confirmDialog, handleCreateBranch, handlePinThread, handleUnpinThread, updateThread } = useThreadHandlers(setLoadingStates);
     // An admin acting as the owner may not archive or delete their chats: the server refuses both.
     const isImpersonating = useImpersonating();
 
@@ -521,6 +535,19 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         close();
     };
 
+    // Closing the palette clears its search text, scope and project. A confirmation it asks for keeps them: the caller takes this
+    // snapshot when it asks, and backing out of the confirmation reopens the palette with it.
+    const snapshotPalette = () => {
+        return { projectFilter, scope, searchInput };
+    };
+
+    const reopenPaletteWith = (kept: ReturnType<typeof snapshotPalette>) => () => {
+        setOpen(true);
+        setSearchInput(kept.searchInput);
+        setScope(kept.scope);
+        setProjectFilter(kept.projectFilter);
+    };
+
     const handlePinUnpinThread = () => {
         if (!currentThreadId || currentThreadId === "default") {
             return;
@@ -529,12 +556,18 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         const currentThread = allThreads.find((candidate) => candidate.id === currentThreadId);
 
         if (currentThread?.isPinned && handleUnpinThread) {
-            handleUnpinThread(currentThreadId);
+            handleUnpinThread(currentThreadId, { onCancel: reopenPaletteWith(snapshotPalette()) });
         } else if (!currentThread?.isPinned && handlePinThread) {
             handlePinThread(currentThreadId);
         }
 
         close();
+    };
+
+    // With the setting on, the palette closes and the destructive dialog opens; the delete runs only on confirm.
+    const askBeforeDelete = (run: () => void) => {
+        close();
+        setPendingDelete({ run });
     };
 
     const handleDeleteCurrentThread = () => {
@@ -543,18 +576,28 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         }
 
         // The row reappears if the server refuses; nothing is reported deleted before it confirms.
-        deleteBranch(currentThreadId)
-            .then(({ threadDeleted }) => {
-                if (!threadDeleted) {
-                    showError(t`Failed to delete thread`);
-                }
+        const remove = () => {
+            deleteBranch(currentThreadId)
+                .then(({ threadDeleted }) => {
+                    if (!threadDeleted) {
+                        showError(t`Failed to delete thread`);
+                    }
 
-                return undefined;
-            })
-            .catch((error: unknown) => {
-                console.error("Failed to delete thread:", error);
-                showError(t`Failed to delete thread`);
-            });
+                    return undefined;
+                })
+                .catch((error: unknown) => {
+                    console.error("Failed to delete thread:", error);
+                    showError(t`Failed to delete thread`);
+                });
+        };
+
+        if (confirmBeforeDelete) {
+            askBeforeDelete(remove);
+
+            return;
+        }
+
+        remove();
         close();
     };
 
@@ -566,7 +609,9 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         const currentThread = allThreads.find((candidate) => candidate.id === currentThreadId);
 
         if (currentThread && updateThread) {
-            updateThread(currentThreadId, currentThreadModel, currentThread.status === "archived" ? "active" : "archived");
+            updateThread(currentThreadId, currentThreadModel, currentThread.status === "archived" ? "active" : "archived", {
+                onCancel: reopenPaletteWith(snapshotPalette()),
+            });
             close();
         }
     };
@@ -848,167 +893,214 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     }
 
     return (
-        <CommandDialog
-            onOpenChange={(newOpen) => {
-                setOpen(newOpen);
-            }}
-            open={isOpen}
-        >
-            <CommandDialogPopup>
-                <Command filter={filterItem} items={groupedItems} onValueChange={setSearchInput} value={searchInput}>
-                    <CommandInput placeholder={t`Search threads, navigate, or perform actions...`} />
-                    <div aria-label={t`Filter results`} className="flex flex-wrap items-center gap-1.5 px-3 pt-2" role="group">
-                        <Toggle onPressedChange={(pressed) => setScope({ ...scope, threads: pressed })} pressed={scope.threads} size="sm" variant="outline">
-                            {t`Threads`}
-                        </Toggle>
-                        <Toggle
-                            onPressedChange={(pressed) => {
-                                setScope({ ...scope, projects: pressed });
+        <>
+            {confirmDialog}
+            <DeleteConfirmationDialog
+                description={t`Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation.`}
+                onConfirm={() => {
+                    const pending = pendingDelete;
 
-                                // Project rows hide under a chosen project, and the Projects filter hides thread rows: together they list nothing.
-                                if (pressed) {
-                                    setProjectFilter(undefined);
-                                }
-                            }}
-                            pressed={scope.projects}
-                            size="sm"
-                            variant="outline"
-                        >
-                            {t`Projects`}
-                        </Toggle>
-                        <Toggle onPressedChange={(pressed) => setScope({ ...scope, archived: pressed })} pressed={scope.archived} size="sm" variant="outline">
-                            {t`Archived`}
-                        </Toggle>
-                        {projectFilter !== undefined && (
-                            <Toggle onPressedChange={() => setProjectFilter(undefined)} pressed size="sm" variant="outline">
-                                {t`Project: ${projectFilter.title}`}
+                    deleteConfirmedRef.current = true;
+                    setPendingDelete(undefined);
+                    pending?.run();
+                }}
+                onOpenChange={(open) => {
+                    if (open) {
+                        return;
+                    }
+
+                    setPendingDelete(undefined);
+                    // A confirm and this close come from the same click, in either order. The flag is read once that click has
+                    // finished: a confirmed delete has run, and the flag is used up ready for the next prompt. Otherwise the prompt was
+                    // cancelled or dismissed, and the palette comes back with its input focused.
+                    queueMicrotask(() => {
+                        if (deleteConfirmedRef.current) {
+                            deleteConfirmedRef.current = false;
+                        } else {
+                            setOpen(true);
+                        }
+                    });
+                }}
+                open={pendingDelete !== undefined}
+                title={t`Delete thread?`}
+            />
+            <CommandDialog
+                onOpenChange={(newOpen) => {
+                    setOpen(newOpen);
+                }}
+                open={isOpen}
+            >
+                <CommandDialogPopup>
+                    <Command filter={filterItem} items={groupedItems} onValueChange={setSearchInput} value={searchInput}>
+                        <CommandInput placeholder={t`Search threads, navigate, or perform actions...`} />
+                        <div aria-label={t`Filter results`} className="flex flex-wrap items-center gap-1.5 px-3 pt-2" role="group">
+                            <Toggle onPressedChange={(pressed) => setScope({ ...scope, threads: pressed })} pressed={scope.threads} size="sm" variant="outline">
+                                {t`Threads`}
                             </Toggle>
-                        )}
-                    </div>
-                    <CommandPanel>
-                        {/* A state tag, the Archived filter and a chosen project filter the threads loaded here, one page of them: say so when there are more, so an empty or short list is not taken as complete. */}
-                        {(stateFilter !== undefined || scope.archived || projectFilter !== undefined) && allThreadsData.hasMore && (
-                            <p className="text-muted-foreground px-3 pt-2 text-xs">
-                                {t`Only the ${allThreadsData.lunora.length} threads loaded here are filtered; older ones are not included.`}
-                            </p>
-                        )}
-                        {projectMayMissLocked && (
-                            <p className="text-muted-foreground px-3 pt-2 text-xs">{t`Locked chats do not reveal their project, so some may be missing here.`}</p>
-                        )}
-                        {projectRowsVisible(scope) && projectFilter === undefined && hasMoreProjects && (
-                            <p className="text-muted-foreground px-3 pt-2 text-xs">{t`Only the first ${projects.length} projects are listed here.`}</p>
-                        )}
-                        {/* The archived hits are what is left of the closest matches overall, so archived threads ranked below many active ones can be missing. */}
-                        {isMeaningSearchCurrent && scope.archived && !isMeaningSearchFailed && (
-                            <p className="text-muted-foreground px-3 pt-2 text-xs">
-                                {t`Related archived threads are picked from the closest matches across all your threads, so some may not be listed.`}
-                            </p>
-                        )}
-                        {/* A failed read is said, so an empty or short list is not taken for "nothing there". */}
-                        {listFailure === undefined ? (
-                            <CommandEmpty>{t`No results found.`}</CommandEmpty>
-                        ) : (
-                            <p className="text-destructive px-3 pt-2 text-xs" role="alert">
-                                {listFailure}
-                            </p>
-                        )}
-                        <CommandList>
-                            {(group: Group, index: number) => (
-                                <React.Fragment key={group.value}>
-                                    <CommandGroup items={group.items}>
-                                        <CommandGroupLabel>{group.value}</CommandGroupLabel>
-                                        <CommandCollection>
-                                            {(item: Item) => (
-                                                <CommandItem key={item.value} onClick={item.onClick} value={item.value}>
-                                                    {item.icon}
-                                                    <span className={item.isMessageHit ? "ml-2 line-clamp-2 flex-1 break-words" : "ml-2 flex-1"}>
-                                                        {item.label}
-                                                    </span>
-                                                    {item.detail && (
-                                                        <CommandShortcut className="max-w-40 truncate tracking-normal">{item.detail}</CommandShortcut>
-                                                    )}
-                                                    {item.shortcut && <CommandShortcut>{formatShortcutForDisplay(item.shortcut)}</CommandShortcut>}
-                                                    {item.isCurrent && <CommandShortcut>{t`Current`}</CommandShortcut>}
-                                                    {item.threadId && !isImpersonating && (
-                                                        <div className="ml-auto flex gap-1">
-                                                            <button
-                                                                aria-label={item.status === "archived" ? t`Unarchive thread` : t`Archive thread`}
-                                                                className="hover:bg-muted rounded p-1"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
+                            <Toggle
+                                onPressedChange={(pressed) => {
+                                    setScope({ ...scope, projects: pressed });
 
-                                                                    if (updateThread) {
-                                                                        updateThread(
-                                                                            item.threadId!,
-                                                                            currentThreadModel,
-                                                                            item.status === "archived" ? "active" : "archived",
-                                                                        );
-                                                                        close();
-                                                                    }
-                                                                }}
-                                                                type="button"
-                                                            >
-                                                                {item.status === "archived" ? (
-                                                                    <ArchiveRestore className="size-3" />
-                                                                ) : (
-                                                                    <Archive className="size-3" />
-                                                                )}
-                                                            </button>
-                                                            {item.threadId !== "default" && (
+                                    // Project rows hide under a chosen project, and the Projects filter hides thread rows: together they list nothing.
+                                    if (pressed) {
+                                        setProjectFilter(undefined);
+                                    }
+                                }}
+                                pressed={scope.projects}
+                                size="sm"
+                                variant="outline"
+                            >
+                                {t`Projects`}
+                            </Toggle>
+                            <Toggle
+                                onPressedChange={(pressed) => setScope({ ...scope, archived: pressed })}
+                                pressed={scope.archived}
+                                size="sm"
+                                variant="outline"
+                            >
+                                {t`Archived`}
+                            </Toggle>
+                            {projectFilter !== undefined && (
+                                <Toggle onPressedChange={() => setProjectFilter(undefined)} pressed size="sm" variant="outline">
+                                    {t`Project: ${projectFilter.title}`}
+                                </Toggle>
+                            )}
+                        </div>
+                        <CommandPanel>
+                            {/* A state tag, the Archived filter and a chosen project filter the threads loaded here, one page of them: say so when there are more, so an empty or short list is not taken as complete. */}
+                            {(stateFilter !== undefined || scope.archived || projectFilter !== undefined) && allThreadsData.hasMore && (
+                                <p className="text-muted-foreground px-3 pt-2 text-xs">
+                                    {t`Only the ${allThreadsData.lunora.length} threads loaded here are filtered; older ones are not included.`}
+                                </p>
+                            )}
+                            {projectMayMissLocked && (
+                                <p className="text-muted-foreground px-3 pt-2 text-xs">{t`Locked chats do not reveal their project, so some may be missing here.`}</p>
+                            )}
+                            {projectRowsVisible(scope) && projectFilter === undefined && hasMoreProjects && (
+                                <p className="text-muted-foreground px-3 pt-2 text-xs">{t`Only the first ${projects.length} projects are listed here.`}</p>
+                            )}
+                            {/* The archived hits are what is left of the closest matches overall, so archived threads ranked below many active ones can be missing. */}
+                            {isMeaningSearchCurrent && scope.archived && !isMeaningSearchFailed && (
+                                <p className="text-muted-foreground px-3 pt-2 text-xs">
+                                    {t`Related archived threads are picked from the closest matches across all your threads, so some may not be listed.`}
+                                </p>
+                            )}
+                            {/* A failed read is said, so an empty or short list is not taken for "nothing there". */}
+                            {listFailure === undefined ? (
+                                <CommandEmpty>{t`No results found.`}</CommandEmpty>
+                            ) : (
+                                <p className="text-destructive px-3 pt-2 text-xs" role="alert">
+                                    {listFailure}
+                                </p>
+                            )}
+                            <CommandList>
+                                {(group: Group, index: number) => (
+                                    <React.Fragment key={group.value}>
+                                        <CommandGroup items={group.items}>
+                                            <CommandGroupLabel>{group.value}</CommandGroupLabel>
+                                            <CommandCollection>
+                                                {(item: Item) => (
+                                                    <CommandItem key={item.value} onClick={item.onClick} value={item.value}>
+                                                        {item.icon}
+                                                        <span className={item.isMessageHit ? "ml-2 line-clamp-2 flex-1 break-words" : "ml-2 flex-1"}>
+                                                            {item.label}
+                                                        </span>
+                                                        {item.detail && (
+                                                            <CommandShortcut className="max-w-40 truncate tracking-normal">{item.detail}</CommandShortcut>
+                                                        )}
+                                                        {item.shortcut && <CommandShortcut>{formatShortcutForDisplay(item.shortcut)}</CommandShortcut>}
+                                                        {item.isCurrent && <CommandShortcut>{t`Current`}</CommandShortcut>}
+                                                        {item.threadId && !isImpersonating && (
+                                                            <div className="ml-auto flex gap-1">
                                                                 <button
-                                                                    aria-label={t`Delete thread`}
+                                                                    aria-label={item.status === "archived" ? t`Unarchive thread` : t`Archive thread`}
                                                                     className="hover:bg-muted rounded p-1"
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        handleDeleteThread(item.threadId!);
+
+                                                                        if (updateThread) {
+                                                                            updateThread(
+                                                                                item.threadId!,
+                                                                                currentThreadModel,
+                                                                                item.status === "archived" ? "active" : "archived",
+                                                                                { onCancel: reopenPaletteWith(snapshotPalette()) },
+                                                                            );
+                                                                            close();
+                                                                        }
                                                                     }}
                                                                     type="button"
                                                                 >
-                                                                    <Trash2 className="size-3" />
+                                                                    {item.status === "archived" ? (
+                                                                        <ArchiveRestore className="size-3" />
+                                                                    ) : (
+                                                                        <Archive className="size-3" />
+                                                                    )}
                                                                 </button>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </CommandItem>
-                                            )}
-                                        </CommandCollection>
-                                    </CommandGroup>
-                                    {index < groupedItems.length - 1 && <CommandSeparator />}
-                                </React.Fragment>
-                            )}
-                        </CommandList>
-                    </CommandPanel>
-                    <CommandFooter>
-                        <div className="flex items-center gap-4">
+                                                                {item.threadId !== "default" && (
+                                                                    <button
+                                                                        aria-label={t`Delete thread`}
+                                                                        className="hover:bg-muted rounded p-1"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+
+                                                                            if (confirmBeforeDelete) {
+                                                                                askBeforeDelete(() => {
+                                                                                    void handleDeleteThread(item.threadId!);
+                                                                                });
+
+                                                                                return;
+                                                                            }
+
+                                                                            handleDeleteThread(item.threadId!);
+                                                                        }}
+                                                                        type="button"
+                                                                    >
+                                                                        <Trash2 className="size-3" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </CommandItem>
+                                                )}
+                                            </CommandCollection>
+                                        </CommandGroup>
+                                        {index < groupedItems.length - 1 && <CommandSeparator />}
+                                    </React.Fragment>
+                                )}
+                            </CommandList>
+                        </CommandPanel>
+                        <CommandFooter>
+                            <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-2">
+                                    <KbdGroup>
+                                        <Kbd>
+                                            <ArrowUpIcon />
+                                        </Kbd>
+                                        <Kbd>
+                                            <ArrowDownIcon />
+                                        </Kbd>
+                                    </KbdGroup>
+                                    <span>{t`Navigate`}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Kbd>
+                                        <CornerDownLeftIcon />
+                                    </Kbd>
+                                    <span>{t`Open`}</span>
+                                </div>
+                            </div>
                             <div className="flex items-center gap-2">
                                 <KbdGroup>
-                                    <Kbd>
-                                        <ArrowUpIcon />
-                                    </Kbd>
-                                    <Kbd>
-                                        <ArrowDownIcon />
-                                    </Kbd>
+                                    <Kbd>⌘</Kbd>
+                                    <Kbd>K</Kbd>
                                 </KbdGroup>
-                                <span>{t`Navigate`}</span>
+                                <span>{t`Close`}</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <Kbd>
-                                    <CornerDownLeftIcon />
-                                </Kbd>
-                                <span>{t`Open`}</span>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <KbdGroup>
-                                <Kbd>⌘</Kbd>
-                                <Kbd>K</Kbd>
-                            </KbdGroup>
-                            <span>{t`Close`}</span>
-                        </div>
-                    </CommandFooter>
-                </Command>
-            </CommandDialogPopup>
-        </CommandDialog>
+                        </CommandFooter>
+                    </Command>
+                </CommandDialogPopup>
+            </CommandDialog>
+        </>
     );
 };
 

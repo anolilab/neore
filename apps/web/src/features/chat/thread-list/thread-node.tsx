@@ -57,6 +57,7 @@ import { THREAD_CATEGORY_LABELS } from "@/features/chat/tags/thread-categories";
 import ThreadTagChips from "@/features/chat/tags/thread-tag-chips";
 import ThreadTagsMenu from "@/features/chat/tags/thread-tags-menu";
 import { usePullRequestCount } from "@/features/develop/components/pull-request-counts";
+import { focusThreadSearchToggle } from "@/features/keyboard/lib/thread-search-target";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { useHasOpened } from "@/hooks/use-has-opened";
 import { LOAD_MARKS, useLoadMarkWhenVisible } from "@/lib/analytics/load-marks";
@@ -66,6 +67,7 @@ import { showError, showWarning } from "@/lib/toast";
 
 import { useIsKeyboardSelected } from "./contexts/keyboard-selection-context";
 import useCanHover from "./hooks/use-can-hover";
+import { useConfirmBeforeDelete } from "./hooks/use-confirm-before-delete";
 import { useThreadStateActions } from "./hooks/use-thread-state-actions";
 import { releaseBlinkWindow } from "./lib/needs-you-blink";
 import { hasUnreadReply, isSnoozed } from "./lib/thread-state-rules";
@@ -241,6 +243,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     // Mounted on first open only: rendered closed in every row, the lazy dialog loaded on first paint.
     const hasOpenedMoveToProject = useHasOpened(showMoveToProjectDialog);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const confirmBeforeDelete = useConfirmBeforeDelete();
     const [lockMode, setLockMode] = useState<ThreadLockMode | null>(null);
     // An admin acting as the owner may not lock, archive or delete: the server refuses each, as each withdraws the guest link.
     const isImpersonating = useImpersonating();
@@ -1084,7 +1087,16 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                         disabled={isDeleting}
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            setShowDeleteDialog(true);
+
+                                            if (confirmBeforeDelete) {
+                                                setShowDeleteDialog(true);
+
+                                                return;
+                                            }
+
+                                            // The row leaves at once and takes this button with it, so focus goes to the search toggle first, which stays.
+                                            focusThreadSearchToggle();
+                                            handleDeleteThread(node.threadId);
                                         }}
                                         size="icon-sm"
                                         variant="ghost"
@@ -1109,6 +1121,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
 
                                 handleDeleteThread(node.threadId);
                                 setShowDeleteDialog(false);
+                                // The dialog returns focus to the button that opened it on close, and that button leaves with the row: the toggle gets focus after the return.
+                                globalThis.setTimeout(focusThreadSearchToggle, 0);
                             }}
                             onOpenChange={setShowDeleteDialog}
                             open={showDeleteDialog}

@@ -75,6 +75,7 @@ const SelectionToolbar: FC<{
     const dateFromId = useId();
     const dateToId = useId();
 
+    // Bulk delete always confirms, whatever the single-chat setting says: it can remove many chats at once.
     const handleDeleteClick = () => setShowDeleteDialog(true);
     const handleConfirmDelete = () => {
         onDeleteSelected();
@@ -886,35 +887,45 @@ const HierarchicalThreadList: FC<
     );
 
     // Show loading state if threads are still loading
+    // Every state below keeps the confirmation mounted, so an open confirm survives a switch between loading, empty and rows.
     if (!threadsData) {
         return (
-            <div className="flex h-full items-center justify-center">
-                <div className="text-muted-foreground flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm">{t`Loading threads...`}</span>
+            <>
+                <div className="flex h-full items-center justify-center">
+                    <div className="text-muted-foreground flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-sm">{t`Loading threads...`}</span>
+                    </div>
                 </div>
-            </div>
+                {threadHandlers.confirmDialog}
+            </>
         );
     }
 
     // Show empty state if no threads (check threadGroups to include temporary threads)
     if (threadGroups.length === 0 && !searchQuery.trim()) {
         return (
-            <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-                <p className="text-muted-foreground">{t`No threads yet`}</p>
-                <p className="text-muted-foreground text-xs">{t`Start a new conversation to create your first thread`}</p>
-                <p className="mt-2 text-xs opacity-70">{t`Press ? for keyboard shortcuts`}</p>
-            </div>
+            <>
+                <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+                    <p className="text-muted-foreground">{t`No threads yet`}</p>
+                    <p className="text-muted-foreground text-xs">{t`Start a new conversation to create your first thread`}</p>
+                    <p className="mt-2 text-xs opacity-70">{t`Press ? for keyboard shortcuts`}</p>
+                </div>
+                {threadHandlers.confirmDialog}
+            </>
         );
     }
 
     // Show empty state for search results
     if (threadGroups.length === 0 && searchQuery.trim() && isSearchError) {
         return (
-            <div className="text-muted-foreground px-3 py-8 text-center text-sm">
-                <p role="alert">{t`Search failed for "${searchQuery}". Try again.`}</p>
-                <p className="mt-2 text-xs opacity-70">{t`Press ? for keyboard shortcuts`}</p>
-            </div>
+            <>
+                <div className="text-muted-foreground px-3 py-8 text-center text-sm">
+                    <p role="alert">{t`Search failed for "${searchQuery}". Try again.`}</p>
+                    <p className="mt-2 text-xs opacity-70">{t`Press ? for keyboard shortcuts`}</p>
+                </div>
+                {threadHandlers.confirmDialog}
+            </>
         );
     }
 
@@ -922,22 +933,25 @@ const HierarchicalThreadList: FC<
         const message = searchType === "threads" ? t`No threads found for` : t`No messages found for`;
 
         return (
-            <div className="text-muted-foreground px-3 py-8 text-center text-sm">
-                {isSearchLoading ? (
-                    <div className="flex items-center justify-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>{t`Searching...`}</span>
-                    </div>
-                ) : (
-                    <>
-                        <p>{`${message} "${searchQuery}"`}</p>
-                        <p className="mt-1 text-xs">
-                            {searchType === "threads" ? t`Try searching in thread titles or summaries` : t`Try searching in message content`}
-                        </p>
-                    </>
-                )}
-                <p className="mt-2 text-xs opacity-70">{t`Press ? for keyboard shortcuts`}</p>
-            </div>
+            <>
+                <div className="text-muted-foreground px-3 py-8 text-center text-sm">
+                    {isSearchLoading ? (
+                        <div className="flex items-center justify-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>{t`Searching...`}</span>
+                        </div>
+                    ) : (
+                        <>
+                            <p>{`${message} "${searchQuery}"`}</p>
+                            <p className="mt-1 text-xs">
+                                {searchType === "threads" ? t`Try searching in thread titles or summaries` : t`Try searching in message content`}
+                            </p>
+                        </>
+                    )}
+                    <p className="mt-2 text-xs opacity-70">{t`Press ? for keyboard shortcuts`}</p>
+                </div>
+                {threadHandlers.confirmDialog}
+            </>
         );
     }
 
@@ -1120,6 +1134,7 @@ const HierarchicalThreadList: FC<
                             open={!!projectToDelete}
                             title={t`Delete Project`}
                         />
+                        {threadHandlers.confirmDialog}
                         {snoozeThread && (
                             <SnoozeUntilDialog
                                 key={snoozeThread.threadId}

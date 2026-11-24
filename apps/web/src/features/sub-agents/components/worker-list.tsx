@@ -11,13 +11,17 @@ import type { Id } from "@neore/backend/dataModel";
 import { useUnlockProof } from "@neore/client-runtime";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
+import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArchiveIcon, Bot, SquareIcon } from "lucide-react";
 import type { FC } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
+import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useUpdateThread } from "@/features/chat/core/hooks/use-threads";
+import { chatActionConfirmations, CONFIRM_EVERYTHING } from "@/features/chat/thread-list/lib/chat-action-confirmations";
 import { quietMinutesAt, useNow, useQuietMinutes, useStopWorker } from "@/features/sub-agents/hooks/use-stop-worker";
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -74,6 +78,23 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
         crpc.sub_agents.functions.listWorkers.queryOptions(threadId && afterFirstPaint ? { leadThreadId: threadId as Id<"threads">, unlockProof } : skipToken),
     );
 
+    const { data: userSettings } = useUserSettings();
+    const confirmations = userSettings === undefined ? CONFIRM_EVERYTHING : chatActionConfirmations(userSettings);
+    // The archive waiting for confirmation, with the lead chat it was asked from. It counts only while that chat is still shown,
+    // so a dialog opened in one chat cannot archive a worker after the person has moved to another.
+    const [archiveTarget, setArchiveTarget] = useState<{ leadThreadId: string | undefined; workerId: string } | undefined>(undefined);
+    const pendingArchive = archiveTarget !== undefined && archiveTarget.leadThreadId === threadId ? archiveTarget.workerId : undefined;
+
+    // Leaving a lead chat, or its list going empty, ends the pending archive, so the dialog never reopens for a worker it was opened on.
+    const hasWorkers = (workers?.length ?? 0) > 0;
+
+    useEffect(() => () => setArchiveTarget(undefined), [threadId, hasWorkers]);
+    const archiveWorker = (workerId: string) => {
+        updateThread({ status: "archived", threadId: workerId as Id<"threads"> }).catch(() => showError(t`Failed to archive the worker`));
+    };
+    // The list, which keeps focus on the page after an archive: the Archive button that opened the dialog unmounts once the worker is archived.
+    const listRef = useRef<HTMLElement>(null);
+
     const now = useNow((workers ?? []).some((worker) => worker.lastActivityAt !== null));
 
     if (!workers || workers.length === 0) {
@@ -92,7 +113,7 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
     const quietNames = workers.filter((worker) => quietMinutesAt(now, worker.lastActivityAt, worker.quietAfterMs) !== null).map((worker) => worker.name);
 
     return (
-        <section aria-label={t`Workers`} className={className}>
+        <section aria-label={t`Workers`} className={className} ref={listRef} tabIndex={-1}>
             <p aria-live="polite" className="sr-only" role="status">
                 {quietNames.length === 0 ? "" : t`No progress: ${quietNames.join(", ")}`}
             </p>
@@ -102,6 +123,7 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
                         <Bot aria-hidden="true" className="text-muted-foreground size-4 shrink-0" />
                         <Link
                             className="min-w-0 flex-1 truncate underline-offset-4 hover:underline"
+                            data-worker-link={worker.workerId}
                             params={{ threadId: worker.workerId }}
                             to="/chat/$threadId"
                         >
@@ -131,9 +153,13 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
                             <Button
                                 aria-label={t`Archive ${worker.name}`}
                                 onClick={() => {
-                                    updateThread({ status: "archived", threadId: worker.workerId as Id<"threads"> }).catch(() =>
-                                        showError(t`Failed to archive the worker`),
-                                    );
+                                    if (confirmations.archive) {
+                                        setArchiveTarget({ leadThreadId: threadId, workerId: worker.workerId });
+
+                                        return;
+                                    }
+
+                                    archiveWorker(worker.workerId);
                                 }}
                                 size="icon-sm"
                                 type="button"
@@ -145,6 +171,38 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
                     </li>
                 ))}
             </ul>
+            <ConfirmDialog
+                confirmLabel={t`Archive`}
+                description={t`Archived chats stay searchable, and you can restore them from the archive.`}
+                onConfirm={() => {
+                    // Checked again now: the dialog can stay open while the worker starts working, and an active worker is never archived.
+                    const worker = workers.find((candidate) => candidate.workerId === pendingArchive);
+
+                    if (worker !== undefined && worker.state === "idle" && !worker.stopping && !worker.archived && !isImpersonating) {
+                        archiveWorker(worker.workerId);
+                    }
+
+                    // The archive button that opened the dialog is gone once the worker is archived, so focus goes to the worker's
+                    // chat link, which stays in the list, and to the list itself if that link is not there. After the dialog returns focus.
+                    const archivedId = pendingArchive;
+
+                    globalThis.setTimeout(() => {
+                        const links = [...(listRef.current?.querySelectorAll<HTMLElement>("[data-worker-link]") ?? [])];
+                        const link = links.find((candidate) => candidate.dataset.workerLink === archivedId);
+
+                        (link ?? listRef.current)?.focus();
+                    }, 0);
+
+                    setArchiveTarget(undefined);
+                }}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setArchiveTarget(undefined);
+                    }
+                }}
+                open={pendingArchive !== undefined}
+                title={t`Archive this chat?`}
+            />
         </section>
     );
 };
