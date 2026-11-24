@@ -261,6 +261,11 @@ describe("beginHostGuide", () => {
         it("files the guide under the oldest such project, even when it listed the repository after a newer one", async () => {
             const deviceId = await pairedDevice(ownerId);
             const older = await insertProject("Older");
+            const olderAt = Date.now();
+
+            // Two inserts in one millisecond share a creation time, and then neither is the older one.
+            await vi.waitUntil(() => Date.now() > olderAt, { interval: 1 });
+
             const newer = await insertProject("Newer");
 
             await addRepo(newer);
