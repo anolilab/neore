@@ -12,6 +12,7 @@ const harness = vi.hoisted(() => {
         isDesktop: true,
         navigate: vi.fn(async (_options: unknown) => undefined),
         openBeside: vi.fn(async (_threadId: string, _originThreadId?: string) => "opened" as string),
+        requestComposerFocus: vi.fn((_threadId: string) => undefined),
         preferences: { splitViewEnabled: true, subAgentOpenPlace: undefined as unknown },
         run: undefined as Record<string, unknown> | undefined,
         showInSplitView: vi.fn(async (_threadId: string) => undefined),
@@ -72,6 +73,7 @@ vi.mock("@/features/chat/split/desktop-layout", () => {
 vi.mock("@/features/chat/split/split-layout-store", () => {
     return {
         openThreadBesideFocusedPane: (threadId: string, originThreadId?: string) => harness.openBeside(threadId, originThreadId),
+        requestComposerFocus: (threadId: string) => harness.requestComposerFocus(threadId),
         showThreadInSplitView: (threadId: string) => harness.showInSplitView(threadId),
     };
 });
@@ -155,6 +157,7 @@ describe("where a sub-agent's chat opens", () => {
         harness.openBeside.mockClear();
         harness.openBeside.mockResolvedValue("opened");
         harness.showInSplitView.mockClear();
+        harness.requestComposerFocus.mockClear();
         harness.preferences = { splitViewEnabled: true, subAgentOpenPlace: undefined };
     });
 
@@ -284,6 +287,28 @@ describe("where a sub-agent's chat opens", () => {
         await vi.waitFor(() => {
             expect(harness.navigate).toHaveBeenCalledWith(MAIN_VIEW);
         });
+    });
+
+    it("asks the opened pane for its composer on a keyboard activation, so focus reaches the chat", async () => {
+        const { link } = renderRunningCard();
+
+        // A keyboard activation of a link is a click with no detail (0); a mouse click has a detail of at least 1.
+        fireEvent.click(link, { detail: 0 });
+
+        await vi.waitFor(() => {
+            expect(harness.requestComposerFocus).toHaveBeenCalledWith("child-1");
+        });
+    });
+
+    it("leaves focus where it is after a mouse click", async () => {
+        const { link } = renderRunningCard();
+
+        fireEvent.click(link, { detail: 1 });
+
+        await vi.waitFor(() => {
+            expect(harness.openBeside).toHaveBeenCalled();
+        });
+        expect(harness.requestComposerFocus).not.toHaveBeenCalled();
     });
 
     it("opens the main view when every pane is taken, where the chat always opened, showing its pane first", async () => {

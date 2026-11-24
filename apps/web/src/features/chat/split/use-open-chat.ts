@@ -8,7 +8,7 @@ import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import type { ChatClick } from "./chat-open-place";
 import { chatOpenPlaceFor, readChatOpenPlace } from "./chat-open-place";
 import { useIsDesktop } from "./desktop-layout";
-import { openThreadBesideFocusedPane, showThreadInSplitView } from "./split-layout-store";
+import { openThreadBesideFocusedPane, requestComposerFocus, showThreadInSplitView } from "./split-layout-store";
 
 /** Shows the chat's pane, if the saved layout can be read. The route still opens the chat when it cannot. */
 const showPaneQuietly = async (threadId: string): Promise<void> => {
@@ -74,6 +74,13 @@ export const useOpenChatClick = (): ((threadId: string, click: ChatClick, origin
                     }
 
                     await openInMainView();
+
+                    return;
+                }
+
+                // A keyboard activation (`detail` 0) leaves focus on the link: the opened pane takes it, so the user reaches the chat.
+                if (click.detail === 0) {
+                    requestComposerFocus(threadId);
                 }
             };
 

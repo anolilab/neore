@@ -13,7 +13,7 @@ export const DEFAULT_CHAT_OPEN_PLACE: ChatOpenPlace = "side";
 export const readChatOpenPlace = (value: unknown): ChatOpenPlace => (value === "main" ? "main" : DEFAULT_CHAT_OPEN_PLACE);
 
 /** The parts of a mouse event that decide the place: the button (1 is the middle button) and the two modifier keys. */
-export type ChatClick = { button: number; ctrlKey: boolean; metaKey: boolean };
+export type ChatClick = { button: number; ctrlKey: boolean; detail?: number; metaKey: boolean };
 
 const otherPlace = (place: ChatOpenPlace): ChatOpenPlace => (place === "side" ? "main" : "side");
 
