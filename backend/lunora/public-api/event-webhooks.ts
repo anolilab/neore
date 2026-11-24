@@ -52,9 +52,12 @@ const toWire = (outcome: SubscribeOutcome) =>
         ? { cursorSeq: outcome.cursorSeq, expiresAt: outcome.expiresAt, refusal: null, truncated: outcome.truncated }
         : { cursorSeq: 0, expiresAt: 0, refusal: outcome.kind, truncated: false };
 
-/** The seq at one end of the owner's log, or `undefined` when it is empty. */
-const edgeSeq = async (ctx: Pick<MutationCtx, "db">, userId: string, direction: "asc" | "desc"): Promise<number | undefined> => {
-    const row = await ctx.db.mcpEvents.findFirst({ orderBy: [{ seq: direction }], where: { userId } });
+/**
+ * The seq of the oldest row the owner's log still keeps, or `undefined` when it keeps none. The newest seq is the watermark's
+ * (`mcpEventWatermarks`), never a row's: retention may delete the newest rows.
+ */
+const oldestSeqOf = async (ctx: Pick<MutationCtx, "db">, userId: string): Promise<number | undefined> => {
+    const row = await ctx.db.mcpEvents.findFirst({ orderBy: [{ seq: "asc" }], where: { userId } });
 
     return row?.seq;
 };
@@ -88,16 +91,21 @@ export const subscribeOn = async (ctx: Pick<MutationCtx, "db">, input: Subscribe
         }
     }
 
-    const latestSeq = (await edgeSeq(ctx, input.userId, "desc")) ?? 0;
-    const oldestSeq = await edgeSeq(ctx, input.userId, "asc");
+    const watermark = await ctx.db.mcpEventWatermarks.findFirst({ where: { userId: input.userId } });
+    const latestSeq = watermark?.seq ?? 0;
+    const oldestSeq = await oldestSeqOf(ctx, input.userId);
     let scanSeq = latestSeq;
     let truncated = false;
 
     if (input.cursorSeq !== null) {
         scanSeq = Math.min(input.cursorSeq, latestSeq);
 
-        if (oldestSeq !== undefined && scanSeq + 1 < oldestSeq) {
-            scanSeq = oldestSeq - 1;
+        // An empty log holds nothing, so its oldest position is the one after its end (as `events/poll` reads it): a cursor
+        // behind that has been skipped past.
+        const oldest = oldestSeq ?? latestSeq + 1;
+
+        if (scanSeq + 1 < oldest) {
+            scanSeq = oldest - 1;
             truncated = true;
         }
     }

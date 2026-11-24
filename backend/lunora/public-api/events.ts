@@ -16,13 +16,6 @@ import { RETENTION_MS } from "./events-log";
 /** Rows the sweep deletes per call. The sweep runs again while it reports more. */
 const PRUNE_BATCH = 200;
 
-/** The seq at one end of the user's log, or `undefined` when it is empty. */
-const edgeSeq = async (ctx: QueryCtx, userId: string, direction: "asc" | "desc"): Promise<number | undefined> => {
-    const row = await ctx.db.mcpEvents.findFirst({ orderBy: [{ seq: direction }], where: { userId } });
-
-    return row?.seq;
-};
-
 const storeOn = (ctx: QueryCtx, userId: string): EventLogStore => {
     return {
         after: async (afterSeq, limit) => {
@@ -38,8 +31,16 @@ const storeOn = (ctx: QueryCtx, userId: string): EventLogStore => {
                 };
             });
         },
-        latestSeq: async () => (await edgeSeq(ctx, userId, "desc")) ?? 0,
-        oldestSeq: async () => await edgeSeq(ctx, userId, "asc"),
+        latestSeq: async () => {
+            const watermark = await ctx.db.mcpEventWatermarks.findFirst({ where: { userId } });
+
+            return watermark?.seq ?? 0;
+        },
+        oldestSeq: async () => {
+            const oldest = await ctx.db.mcpEvents.findFirst({ orderBy: [{ seq: "asc" }], where: { userId } });
+
+            return oldest?.seq;
+        },
     };
 };
 
@@ -93,25 +94,17 @@ export const pollEvents = internalQuery
     });
 
 /**
- * The retention sweep, run per shard (`shardSweeps()` in `lib/shard-housekeeping.ts`). Deletes events older than the window,
- * but never the highest row of a user's log: the sequence must not restart, or an old cursor would read a new event as one
- * it had already passed.
+ * The retention sweep, run per shard (`runShardHousekeeping` in `lib/shard-housekeeping.ts`). Deletes up to `PRUNE_BATCH`
+ * events older than the window, the highest of a log included: the sequence is kept in `mcpEventWatermarks`, so it does not
+ * restart. `hasMore` says a full batch was deleted, so the caller calls again.
  */
 export const pruneMcpEvents = internalMutation.output(v.object({ hasMore: v.boolean(), removed: v.number() })).mutation(async ({ ctx }) => {
     const cutoff = ctx.now - RETENTION_MS;
     const { page } = await ctx.db.mcpEvents.findMany({ limit: PRUNE_BATCH, where: { createdAt: { lt: cutoff } } });
-    let removed = 0;
 
     for (const row of page) {
-        const newest = await ctx.db.mcpEvents.findFirst({ orderBy: [{ seq: "desc" }], where: { userId: row.userId } });
-
-        if (newest?.seq === row.seq) {
-            continue;
-        }
-
         await ctx.db.delete("mcpEvents", row._id);
-        removed += 1;
     }
 
-    return { hasMore: page.length === PRUNE_BATCH && removed > 0, removed };
+    return { hasMore: page.length === PRUNE_BATCH, removed: page.length };
 });

@@ -72,31 +72,70 @@ describe("a run's end in the Events log", () => {
 });
 
 describe("retention of the Events log", () => {
-    it("drops events past the window and keeps the newest row, so the sequence never restarts", async () => {
-        const old = Date.now() - 8 * 24 * 60 * 60 * 1000;
-        const row = (seq: number, createdAt: number) => {
-            return {
-                createdAt,
-                data: "{}",
-                eventId: `run:old-${seq}`,
-                name: "run.completed",
-                seq,
-                timestamp: createdAt,
-                userId: OWNER,
-            };
-        };
+    const OLD = Date.now() - 8 * 24 * 60 * 60 * 1000;
 
+    /** `count` events of `OWNER`'s log written `OLD`, numbered from 1, and the watermark the recorder would have left. */
+    const seedOldLog = async (count: number): Promise<void> => {
         await harness.run(async (ctx: any) => {
-            await ctx.db.insert("mcpEvents", row(1, old));
-            await ctx.db.insert("mcpEvents", row(2, old));
-            await ctx.db.insert("mcpEvents", row(3, old));
+            for (let seq = 1; seq <= count; seq += 1) {
+                await ctx.db.insert("mcpEvents", {
+                    createdAt: OLD,
+                    data: "{}",
+                    eventId: `run:old-${seq}`,
+                    name: "run.completed",
+                    seq,
+                    timestamp: OLD,
+                    userId: OWNER,
+                });
+            }
+
+            await ctx.db.insert("mcpEventWatermarks", { seq: count, userId: OWNER });
         });
+    };
+
+    it("drops every expired event, the highest included, and the next event carries on from the watermark", async () => {
+        await seedOldLog(3);
 
         const outcome = await harness.run(async (ctx: any) => await ctx.runMutation(pruneMcpEvents, {}));
 
-        expect(outcome).toMatchObject({ removed: 2 });
+        expect(outcome).toStrictEqual({ hasMore: false, removed: 3 });
+        expect(await eventsOf()).toStrictEqual([]);
+
+        await finish({ runEnd: "succeeded" });
+
         const events = await eventsOf();
 
-        expect(events.map((event) => event.seq)).toStrictEqual([3]);
+        expect(events.map((event) => event.seq)).toStrictEqual([4]);
+    });
+
+    it("takes a backlog longer than one batch over several calls, and says hasMore until it is drained", async () => {
+        await seedOldLog(205);
+
+        const first = await harness.run(async (ctx: any) => await ctx.runMutation(pruneMcpEvents, {}));
+        const second = await harness.run(async (ctx: any) => await ctx.runMutation(pruneMcpEvents, {}));
+
+        expect(first).toStrictEqual({ hasMore: true, removed: 200 });
+        expect(second).toStrictEqual({ hasMore: false, removed: 5 });
+        expect(await eventsOf()).toStrictEqual([]);
+    });
+
+    it("keeps events inside the window", async () => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("mcpEvents", {
+                createdAt: Date.now(),
+                data: "{}",
+                eventId: "run:recent",
+                name: "run.completed",
+                seq: 1,
+                timestamp: Date.now(),
+                userId: OWNER,
+            });
+        });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(pruneMcpEvents, {}));
+
+        const events = await eventsOf();
+
+        expect(events.map((event) => event.eventId)).toStrictEqual(["run:recent"]);
     });
 });
