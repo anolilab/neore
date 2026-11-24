@@ -16,7 +16,7 @@ const OAuthCallback = () => {
     const { t } = useLingui();
     const navigate = useNavigate();
     const { mutateAsync: completeOAuth } = useMutation(useLunoraActionOptions(api.connectors.oauth.completeConnectorOAuth));
-    const searchParams = Route.useSearch() as { code?: string; error?: string; error_description?: string; iss?: string; state?: string };
+    const searchParams = Route.useSearch() as { code?: string; error?: string; error_description?: string; state?: string };
     const [message, setMessage] = useState(() => t`Completing the connection...`);
     // The authorization code is single-use: a second run (StrictMode, a re-render
     // with new search params) would burn the state and report a false failure.
@@ -52,9 +52,11 @@ const OAuthCallback = () => {
             }
 
             try {
+                // The root route's search validator keeps only its own keys, so the router's search never carries `iss`. Read it from the redirect itself.
+                const iss = new URLSearchParams(globalThis.location.search).get("iss");
                 const { accountLabel, kind, name } = await completeOAuth({
                     code: searchParams.code,
-                    ...(searchParams.iss !== undefined && { iss: searchParams.iss }),
+                    ...(iss !== null && { iss }),
                     state: searchParams.state,
                 });
 
