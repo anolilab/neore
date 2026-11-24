@@ -22,14 +22,14 @@ vi.mock("../../agent/client", () => {
 vi.mock("../../_generated/internal", () => {
     return {
         internal: {
-            auth: { functions: { getUserAuthFlagsQuery: "getUserAuthFlagsQuery" } },
+            auth: {
+                billing: { getRunPlanForOrganizationQuery: "getRunPlanForOrganizationQuery" },
+                functions: { getUserAuthFlagsQuery: "getUserAuthFlagsQuery", getUserRunPlanQuery: "getUserRunPlanQuery" },
+            },
             chat: { functions: { editImage: "editImage" } },
             lib: { rate_limiter_mutations: { applyRateLimit: "applyRateLimit" } },
         },
     };
-});
-vi.mock("../lib/agent-run", () => {
-    return { readRunPlan: async () => state.plan };
 });
 
 interface EditTool {
@@ -59,8 +59,13 @@ const makeContext = () => {
 
             return state.quotaOk ? { ok: true } : { ok: false, retryAfter: state.retryAfter };
         },
-        runQuery: async (reference: string) =>
-            reference === "getUserAuthFlagsQuery" ? { isAnonymous: state.anonymous, plan: null, role: state.role } : undefined,
+        runQuery: async (reference: string) => {
+            if (reference === "getUserRunPlanQuery" || reference === "getRunPlanForOrganizationQuery") {
+                return state.plan;
+            }
+
+            return reference === "getUserAuthFlagsQuery" ? { isAnonymous: state.anonymous, plan: null, role: state.role } : undefined;
+        },
         userId: "user-1",
     };
 };

@@ -13,7 +13,6 @@ import { internal } from "../../_generated/internal";
 import type { ToolCtx as ToolContext } from "../../agent/client";
 import { RATE_LIMIT_CONFIGS } from "../../lib/rate-limiter";
 import { toolsLogger } from "../../lib/logger";
-import { readRunPlan } from "../lib/agent-run";
 import { chargeDailyLimit, dailyLimitKeyOf, dailyLimitTierOf, isPlatformAdmin } from "../lib/daily-limit";
 
 export const DAILY_IMAGE_LIMIT_REACHED = "DAILY_IMAGE_LIMIT_REACHED";
@@ -38,9 +37,13 @@ const limitReached = (retryAfter?: number): ImageQuotaResult => {
  */
 export const takeImageQuota = async (context: ToolContext, userId: string, count: number): Promise<ImageQuotaResult> => {
     try {
+        // The run's plan, read as `readRunPlan` reads it. That helper lives in `chat/lib/agent-run`, which loads the tool registry,
+        // and this module sits inside that registry: importing it here closes a cycle that leaves `ToolName` undefined.
         const [flags, plan] = await Promise.all([
             context.runQuery(internal.auth.functions.getUserAuthFlagsQuery, { userId }),
-            readRunPlan(context, userId, context.organizationId),
+            context.organizationId === undefined
+                ? context.runQuery(internal.auth.functions.getUserRunPlanQuery, { userId })
+                : context.runQuery(internal.auth.billing.getRunPlanForOrganizationQuery, { organizationId: context.organizationId, userId }),
         ]);
         const user = { _id: userId, isAnonymous: flags.isAnonymous, plan: plan.plan, role: plan.isAdmin ? "admin" : flags.role };
 
