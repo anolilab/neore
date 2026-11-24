@@ -131,6 +131,12 @@ describe("events/poll over a log", () => {
         await expect(pollEvents(log, { fromSeq: 0, maxEvents: 0, name: RUN_COMPLETED_EVENT, now: NOW })).rejects.toThrow("at least 1");
     });
 
+    it.each([-1, NaN, Infinity])("refuses a window of %s ms, which would read every event as older than the floor", async (maxAgeMs) => {
+        const log = logOf([run(1, 100)]);
+
+        await expect(pollEvents(log, { fromSeq: 0, maxAgeMs, maxEvents: 50, name: RUN_COMPLETED_EVENT, now: NOW })).rejects.toThrow("maxAgeMs");
+    });
+
     it("caps a batch at maxEvents, keeps the cursor before the first event not sent, and says hasMore", async () => {
         const log = logOf([run(1, 100), run(2, 200), run(3, 300), run(4, 400), run(5, 500)]);
 
