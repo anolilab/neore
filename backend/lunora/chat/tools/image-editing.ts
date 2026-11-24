@@ -10,6 +10,7 @@ import { internal } from "../../_generated/internal";
 import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
 import { toolsLogger } from "../../lib/logger";
+import { type ImageQuotaCode, takeImageQuota } from "./image-quota";
 import { isSafeUrl } from "./utilities";
 
 type ImageEditOperation = "remove_background" | "upscale" | "style_transfer" | "inpaint" | "face_enhance";
@@ -25,6 +26,7 @@ const imageEditingTool = createTool<
         prompt?: string;
     },
     {
+        code?: ImageQuotaCode;
         error?: string;
         operation: string;
         resultUrl: string;
@@ -60,6 +62,13 @@ Requires an image URL as input.`,
                 operation,
                 resultUrl: "",
             };
+        }
+
+        // One image of the daily allowance per edit, taken after the request is validated and before the provider call.
+        const quota = await takeImageQuota(context, context.userId, 1);
+
+        if (!quota.ok) {
+            return { code: quota.code, error: quota.message, operation, resultUrl: "" };
         }
 
         toolsLogger.debug(`[IMAGE_EDIT] ${operation} on ${imageUrl.slice(0, 50)}...`);
