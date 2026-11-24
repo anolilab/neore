@@ -128,7 +128,11 @@ export const collectAllMessageFileIds = async (
 export const collectAllChatFileMetadata = async <Row>(
     walkGrants: (meter: ChatFileMeter) => Promise<Walked>,
     walkMessages: (meter: ChatFileMeter) => Promise<Walked>,
-    readMetadata: (fileIds: string[]) => Promise<{ readBytes: number; rows: Row[] }>,
+    readMetadata: (
+        fileIds: string[],
+        bytesLeft: number,
+        queriesLeft: number,
+    ) => Promise<{ queries?: number; readBytes: number; rows: Row[]; truncated?: boolean }>,
     chunkSize: number = CHAT_FILE_METADATA_CHUNK,
     meter: ChatFileMeter = chatFileMeter(),
 ): Promise<{ rows: Row[]; truncated: boolean }> => {
@@ -144,11 +148,16 @@ export const collectAllChatFileMetadata = async <Row>(
                 return { rows, truncated: true };
             }
 
-            const chunk = await readMetadata(fileIds.slice(start, start + chunkSize));
+            const chunk = await readMetadata(fileIds.slice(start, start + chunkSize), meter.bytesLeft, metadataQueriesLeft);
 
             meter.bytesLeft -= chunk.readBytes;
-            metadataQueriesLeft -= 1;
+            metadataQueriesLeft -= chunk.queries ?? 1;
             rows.push(...chunk.rows);
+
+            // A chunk that stopped its repairs at the budget says so: the rest of the files are not read.
+            if (chunk.truncated) {
+                return { rows, truncated: true };
+            }
         }
 
         return { rows, truncated: false };
@@ -231,6 +240,47 @@ export const capChatFiles = <Row>(rows: Row[], budget: number = CHAT_FILE_EXPORT
     }
 
     return { files, truncated: false };
+};
+
+/**
+ * One chunk's metadata for the export: the rows `read` finds, and for each file it found none for, the row `repair` writes (the file row is
+ * read and its metadata written, for a file stored before the metadata was written). A file is repaired in its own mutation: its file row
+ * is read whole, and one row is far below Lunora's per-transaction read limit where a chunk of them is not. The repairs stop once the
+ * chunk has read `bytesLeft`, and the chunk says so.
+ */
+export const readChunkMetadata = async <Row extends { id: string }>(
+    fileIds: string[],
+    bytesLeft: number,
+    queriesLeft: number,
+    read: (fileIds: string[]) => Promise<{ readBytes: number; rows: Row[] }>,
+    repair: (fileId: string) => Promise<{ readBytes: number; rows: Row[] }>,
+): Promise<{ queries: number; readBytes: number; rows: Row[]; truncated: boolean }> => {
+    const found = await read(fileIds);
+    const answered = new Set(found.rows.map((row) => row.id));
+    const rows = [...found.rows];
+    let { readBytes } = found;
+    // The read is one query; each repair is one more. The repairs share the export's query allowance, so a legacy export cannot issue
+    // one mutation per file without bound.
+    let queries = 1;
+
+    for (const fileId of fileIds) {
+        if (answered.has(fileId)) {
+            continue;
+        }
+
+        if (readBytes >= bytesLeft || queries >= queriesLeft) {
+            return { queries, readBytes, rows, truncated: true };
+        }
+
+        const repaired = await repair(fileId);
+
+        readBytes += repaired.readBytes;
+        queries += 1;
+        rows.push(...repaired.rows);
+    }
+
+    // Every file was answered: nothing is left out, even when the last repair overshot the budget (the next chunk stops at the budget).
+    return { queries, readBytes, rows, truncated: false };
 };
 
 /** The UTF-8 bytes of a text, as the file's size limit counts them. */

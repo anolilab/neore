@@ -71,7 +71,8 @@ export const resolveQuestionAnswers = (
             throw new LunoraError("BAD_REQUEST", `Notes take up to ${String(ASK_USER_ANSWER_MAX)} characters`);
         }
 
-        if (selected.length === 0 && !note) {
+        // A multi-select question may go out with nothing picked: "none of these" is an answer. A single-choice one needs a pick or a note.
+        if (selected.length === 0 && !note && asked.multiSelect !== true) {
             throw new LunoraError("BAD_REQUEST", "Answer every question with a choice or a note");
         }
 

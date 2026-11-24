@@ -27,8 +27,12 @@ import { announcedWaitMs, formatCountdown, providerLabel } from "./rate-limit-pa
 
 /** The pause `getActiveStreamForThread` reports for a run waiting on a rate limit. */
 export interface RateLimitPause {
+    /** The person resumes the run: nothing resumes it at `retryAt`, so the notice waits for them after the reset. */
+    awaitsPerson?: boolean;
     provider?: string;
     reason: "rate_limit";
+    /** The provider gave no reset time: `retryAt` is only the default wait, so the notice does not call it a reset. */
+    resetUnreported?: boolean;
     /** Epoch ms the run resumes at. */
     retryAt: number;
     status: number;
@@ -74,13 +78,43 @@ export const RateLimitPauseNoticeView: FC<RateLimitPauseNoticeViewProps> = ({ ca
     const isWaiting = remainingMs > 0;
     // The resume that was queued for the retry time did not run: asking again queues another.
     const isOverdue = remainingMs <= -OVERDUE_MS;
+    // The person resumes this run: nothing is queued for it, so after the reset it waits for them (and there is no overdue resume).
+    const awaitsPerson = pause.awaitsPerson === true;
+    // With no reset time from the provider there is nothing to wait for: the person may resume at once.
+    const canResume = awaitsPerson ? pause.resetUnreported === true || !isWaiting : isWaiting || isOverdue;
     const countdown = formatCountdown(remainingMs);
     const announced = formatCountdown(announcedWaitMs(remainingMs));
+    // A message sent into a reply that waits for the person is queued, not steered, and goes out after Resume. Stop pauses the queue
+    // (`onStop`), so after Stop nothing sends it on its own.
+    const queuedNote = awaitsPerson && canControl ? t`A message you send here is queued, and it is sent after you resume the reply.` : undefined;
 
     let spoken: string;
     let shown: string;
 
-    if (isOverdue) {
+    if (awaitsPerson && canControl) {
+        if (pause.resetUnreported === true) {
+            spoken = t`Rate limited. Waiting for you to resume`;
+            shown = spoken;
+        } else if (isWaiting) {
+            spoken = t`Rate limited. The limit resets in about ${announced}. Waiting for you to resume`;
+            shown = t`Rate limited, the limit resets in ${countdown}. Waiting for you to resume`;
+        } else {
+            spoken = t`The limit has reset. Waiting for you to resume`;
+            shown = spoken;
+        }
+    } else if (awaitsPerson) {
+        // A viewer who cannot resume the run is told the limit's state only, not that the run waits for them.
+        if (pause.resetUnreported === true) {
+            spoken = t`Rate limited`;
+            shown = spoken;
+        } else if (isWaiting) {
+            spoken = t`Rate limited. The limit resets in about ${announced}`;
+            shown = t`Rate limited, the limit resets in ${countdown}`;
+        } else {
+            spoken = t`The limit has reset`;
+            shown = spoken;
+        }
+    } else if (isOverdue) {
         spoken = t`The retry is taking longer than expected`;
         shown = spoken;
     } else if (!isWaiting) {
@@ -94,6 +128,12 @@ export const RateLimitPauseNoticeView: FC<RateLimitPauseNoticeViewProps> = ({ ca
         shown = t`Rate limited, retrying in ${countdown}`;
     }
 
+    // The joining punctuation is part of each message, so a locale sets its own (Japanese uses a full stop, for one).
+    if (queuedNote !== undefined) {
+        spoken = t`${spoken}. ${queuedNote}`;
+        shown = t`${shown}. ${queuedNote}`;
+    }
+
     return (
         <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-2", className)} data-rate-limit-pause="true">
             <span aria-live="polite" className="sr-only" role="status">
@@ -104,9 +144,9 @@ export const RateLimitPauseNoticeView: FC<RateLimitPauseNoticeViewProps> = ({ ca
             </p>
             {canControl && (
                 <div className="flex items-center gap-2">
-                    <Button className="h-6 gap-1.5 text-xs" disabled={!(isWaiting || isOverdue) || isRetrying} onClick={onRetryNow} size="sm" variant="outline">
+                    <Button className="h-6 gap-1.5 text-xs" disabled={!canResume || isRetrying} onClick={onRetryNow} size="sm" variant="outline">
                         <RefreshCw aria-hidden="true" className="size-3" />
-                        <Trans>Retry now</Trans>
+                        {awaitsPerson ? <Trans>Resume</Trans> : <Trans>Retry now</Trans>}
                     </Button>
                     <Button className="h-6 gap-1.5 text-xs" disabled={isStopping} onClick={onStop} size="sm" variant="ghost">
                         <Square aria-hidden="true" className="size-3" />
@@ -121,11 +161,13 @@ export const RateLimitPauseNoticeView: FC<RateLimitPauseNoticeViewProps> = ({ ca
 interface RateLimitPauseNoticeProps {
     className?: string;
     pause: RateLimitPause;
+    /** The paused reply this notice belongs to: a manual Resume resumes only that reply, not the chat's other waits. */
+    streamId?: string;
     threadId: string;
 }
 
 /** The notice wired to the thread: "Retry now" ends the wait, "Stop" is the ordinary stop of the reply; both need write access. */
-export const RateLimitPauseNotice: FC<RateLimitPauseNoticeProps> = ({ className, pause, threadId }) => {
+export const RateLimitPauseNotice: FC<RateLimitPauseNoticeProps> = ({ className, pause, streamId, threadId }) => {
     const crpc = useCRPC();
     const { t } = useLingui();
     const { isPending: isRetrying, mutate: retryNow } = useMutation(crpc.chat.rate_limit_retry.retryRateLimitedRun.mutationOptions());
@@ -142,7 +184,11 @@ export const RateLimitPauseNotice: FC<RateLimitPauseNoticeProps> = ({ className,
             isRetrying={isRetrying}
             isStopping={isStopping}
             onRetryNow={() => {
-                retryNow({ threadId: threadId as never }, { onError: () => showError(t`Could not retry. Please try again.`) });
+                // The proof of the unlocked chat: a locked chat's Resume or Retry now is refused without it.
+                // A manual Resume names its own reply, so the other waits on the chat keep waiting.
+                const scope = pause.awaitsPerson === true && streamId !== undefined ? { streamId } : {};
+
+                retryNow({ threadId: threadId as never, unlockProof, ...scope }, { onError: () => showError(t`Could not retry. Please try again.`) });
             }}
             onStop={() => {
                 // Like the composer's Stop: a manual stop keeps the queued prompts, and nothing auto-sends them.

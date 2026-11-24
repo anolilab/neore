@@ -2365,7 +2365,8 @@ describe("mergeGuestInto across two real shards", () => {
             const { runs } = await mergeToEnd(merge.call, "guest", "user");
 
             expect(runs.at(-1)).toMatchObject({ guestKept: true });
-            expect(shardLocalTables().indexOf(runs.at(-1)!.table)).toBeGreaterThan(shardLocalTables().indexOf("threads"));
+            // The clear went on past the kept row's table, and the merge stopped for good there (its last run may be a later phase).
+            expect(runs.some((run) => run.phase === "clear" && shardLocalTables().indexOf(run.table) > shardLocalTables().indexOf("threads"))).toBe(true);
             expect(runs.length).toBeLessThan(shardLocalTables().length);
             expect(await merge.threadsOn("user")).toStrictEqual(
                 [

@@ -273,6 +273,7 @@ export const NOT_USER_REFERENCE_FIELDS: Readonly<Record<string, string>> = {
     dispatchedBy: "a dispatch source",
     isAdvancedUser: "a flag",
     lastUserMessageAt: "a time",
+    pauseResetUnreported: "a flag: the provider gave no reset time, so the pause's retry time is the default wait",
     platformUserId: "the person's id on a messenger platform",
     platformUsername: "the person's name on a messenger platform",
     resumedBy: "an approval id",

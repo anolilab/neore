@@ -48,6 +48,7 @@ import {
     memoryToCarry,
     readResumeInterruptedRuns,
     readRunPlan,
+    readUsageLimitPreferences,
     resolveBackupModelId,
     resolveRunModel,
     resumeApprovedRun,
@@ -885,6 +886,7 @@ export const runStreamingAgent = internalAction
                             runEpoch,
                             settle: async () => await result.consumeStream(),
                             streamId,
+                            usageLimit: async () => await readUsageLimitPreferences(userId),
                         }));
 
                     // The steps that finished are not recorded yet: the reply is one reply, recorded when the run ends (or, if

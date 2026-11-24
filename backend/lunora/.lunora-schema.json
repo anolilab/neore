@@ -5152,6 +5152,53 @@
       "relations": {},
       "shardMode": "global:d1"
     },
+    "chatFileMetadata": {
+      "commitOrdered": false,
+      "fields": {
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "fileId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "chatFiles"
+        },
+        "filename": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "hash": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "mediaType": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_fileId": {
+          "fields": [
+            "fileId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
+    },
     "chatFileThreads": {
       "commitOrdered": false,
       "fields": {
@@ -21533,12 +21580,46 @@
             }
           }
         },
+        "pauseAwaitsPerson": {
+          "kind": "literal",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "literal": "true"
+        },
         "pauseCause": {
           "kind": "literal",
           "nullable": false,
           "optional": true,
           "unique": false,
           "literal": "\"interrupted\""
+        },
+        "pauseResetUnreported": {
+          "kind": "literal",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "literal": "true"
+        },
+        "pauseSnooze": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "previousUntil": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "until": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            }
+          }
         },
         "pausedRun": {
           "kind": "object",
@@ -33854,6 +33935,12 @@
             }
           }
         },
+        "resumeAfterUsageLimit": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "resumeInterruptedRuns": {
           "kind": "boolean",
           "nullable": false,
@@ -33895,6 +33982,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "snoozeUntilUsageLimitReset": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         },
         "subAgentRoles": {
           "kind": "object",

@@ -7,13 +7,13 @@
 import { v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
-import { internalQuery, type MutationCtx } from "../_generated/server";
+import { internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
 import { BATCH, type BatchResult, deleteParentsWithChildren, full } from "../gdpr/batch";
 import { gdprLogger } from "../lib/logger";
 import { patchRow } from "../lib/patch";
-import { storedRows } from "../lib/stored-row";
+import { storedRow, storedRows } from "../lib/stored-row";
 import { countedWorkflowFileIds } from "../workflow/images";
-import { changeRefcount } from "./files";
+import { changeRefcount, ensureChatFileMetadata } from "./files";
 import { MAX_LENGTH } from "../lib/validators";
 import { eraseProjectRuleFilesForUser, eraseProjectsRuleFiles, markProjectsRuleFilesErasing, RULE_FILE_ROWS_PER_PAGE } from "../projects/gdpr";
 import { erasePinsNamingDocuments } from "../chat/gdpr";
@@ -192,14 +192,15 @@ export const collectMessageFileIdsForExport = internalQuery
     });
 
 /**
- * The metadata of the given chat files, read in one query (the caller passes at most one chunk of ids). Metadata only, as a vault
- * file's is: the bytes stay out of the export. A file whose row is already gone is left out.
+ * The metadata of the given chat files, read in one query from `chatFileMetadata` (the caller passes at most one chunk of ids). Metadata
+ * only, as a vault file's is: the bytes stay out of the export, and the file row, which holds the extracted text, is not read. A file
+ * whose metadata is already gone is left out (its row is erased with it).
  */
 export const chatFileMetadataForExport = internalQuery
     .input({ fileIds: v.array(v.id("chatFiles")) })
     .output(
         v.object({
-            // The bytes the query read: each whole row, as stored. The export action meters its chunks against a budget with this.
+            // The bytes the query read: each metadata row, as stored. The export action meters its chunks against a budget with this.
             readBytes: v.number(),
             rows: v.array(
                 v.object({
@@ -219,24 +220,99 @@ export const chatFileMetadataForExport = internalQuery
         }
 
         // Primary, as the grants are: a file uploaded moments before the export must be in it.
-        const { page } = await ctx.db.chatFiles.findMany({ consistency: "primary", where: { _id: { in: fileIds } } });
-        const files = storedRows(page);
-        // The whole row is read, extracted text included, so the bytes read are the row's size as stored, not the metadata's.
-        const readBytes = files.reduce((total, file) => total + rowBytes(file), 0);
+        const { page } = await ctx.db.chatFileMetadata.findMany({ consistency: "primary", where: { fileId: { in: fileIds } } });
+        const readRows = storedRows(page);
+        const readBytes = readRows.reduce((total, row) => total + rowBytes(row), 0);
+        // Two stores of the same bytes at once can each write a metadata row, so a file may have two: the export lists it once.
+        const seen = new Set<string>();
+        const rowsOf = readRows.filter((row) => {
+            if (seen.has(row.fileId)) {
+                return false;
+            }
+
+            seen.add(row.fileId);
+
+            return true;
+        });
 
         return {
             readBytes,
-            rows: files.map((file) => {
-                return {
-                    createdAt: file._creationTime,
-                    filename: file.filename?.slice(0, CHAT_FILE_NAME_MAX),
-                    filenameCut: (file.filename?.length ?? 0) > CHAT_FILE_NAME_MAX,
-                    hash: file.hash.slice(0, CHAT_FILE_HASH_MAX),
-                    id: file._id,
-                    mediaType: file.mediaType.slice(0, CHAT_FILE_TYPE_MAX),
-                };
-            }),
+            rows: rowsOf.map((row) => chatFileExportRow(row)),
         };
+    });
+
+/** A file's row in the export, with its name, type and hash cut to their limits. */
+const chatFileExportRow = (row: { createdAt: number; fileId: string; filename?: string; hash: string; mediaType: string }) => {
+    return {
+        createdAt: row.createdAt,
+        filename: row.filename?.slice(0, CHAT_FILE_NAME_MAX),
+        filenameCut: (row.filename?.length ?? 0) > CHAT_FILE_NAME_MAX,
+        hash: row.hash.slice(0, CHAT_FILE_HASH_MAX),
+        id: row.fileId,
+        mediaType: row.mediaType.slice(0, CHAT_FILE_TYPE_MAX),
+    };
+};
+
+/**
+ * The export's view of files that have none: stored before `chatFileMetadata` was written, or whose write did not land. Each file row is
+ * read and its metadata written (`ensureChatFileMetadata`), then answered as {@link chatFileMetadataForExport} answers. The export action
+ * calls this for the ids that query found nothing for (`agent/export-pages.ts#readChunkMetadata`), so a file is never left out for the
+ * want of a row.
+ */
+export const repairChatFileMetadataForExport = internalMutation
+    .input({ fileIds: v.array(v.id("chatFiles")) })
+    .output(
+        v.object({
+            readBytes: v.number(),
+            rows: v.array(
+                v.object({
+                    createdAt: v.number(),
+                    filename: v.optional(v.string()),
+                    filenameCut: v.boolean(),
+                    hash: v.string(),
+                    id: v.string(),
+                    mediaType: v.string(),
+                }),
+            ),
+        }),
+    )
+    .mutation(async ({ args: { fileIds }, ctx }) => {
+        let readBytes = 0;
+        const rows = [];
+
+        for (const fileId of fileIds) {
+            // Primary: a lagging replica can still return a file the reaper has just deleted, and the repair would write its metadata.
+            const file = storedRow(await ctx.db.chatFiles.findFirst({ consistency: "primary", where: { _id: fileId } }));
+
+            if (!file) {
+                continue;
+            }
+
+            // The whole row is read, as the metadata query's reads are counted: the export meters these against its budget.
+            readBytes += rowBytes(file);
+            readBytes += await ensureChatFileMetadata(ctx, file);
+
+            // A reaper that deleted the file between the read and the write leaves the metadata just written orphaned: check the file
+            // row again, at primary, and take the metadata back if it is gone. (The reaper also clears its file's metadata after the row.)
+            const stillThere = storedRow(await ctx.db.chatFiles.findFirst({ consistency: "primary", where: { _id: fileId } }));
+
+            // This read is a whole row too, and the same mutation: its bytes count against the export's budget like the first.
+            readBytes += stillThere ? rowBytes(stillThere) : 0;
+
+            if (!stillThere) {
+                const { page: orphans } = await ctx.db.chatFileMetadata.findMany({ consistency: "primary", where: { fileId } });
+
+                await Promise.all(orphans.map(async (row) => await ctx.db.delete("chatFileMetadata", row._id)));
+
+                continue;
+            }
+
+            rows.push(
+                chatFileExportRow({ createdAt: file._creationTime, fileId: file._id, filename: file.filename, hash: file.hash, mediaType: file.mediaType }),
+            );
+        }
+
+        return { readBytes, rows };
     });
 
 /** The file-to-chat links of the user's own chats (`chatFileThreads`, keyed by owner). */

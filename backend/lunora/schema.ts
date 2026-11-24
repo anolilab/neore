@@ -609,6 +609,22 @@ export const schema = defineSchema({
         .index("by_fileId_userId", ["fileId", "userId"])
         .index("by_userId", ["userId"]),
 
+    /**
+     * A chat file's export view: its name, type, hash and when it was stored. The GDPR export reads this instead of the file row, which
+     * holds the extracted text the export does not carry and which a read meters whole. Written with the file (`addFile`) and erased with
+     * it (the unused-file reaper), in the same mutation, so the two stay in step.
+     */
+    chatFileMetadata: defineTable({
+        createdAt: v.number(),
+        fileId: v.id("chatFiles"),
+        filename: v.optional(v.string()),
+        hash: v.string(),
+        mediaType: v.string(),
+    })
+        // `.global()`, like `chatFiles`: it is written and erased with the file row, so it lives where that row does.
+        .global()
+        .index("by_fileId", ["fileId"]),
+
     chatFiles: defineTable({
         extractedText: v.optional(v.string()),
         extractionError: v.optional(v.string()),
@@ -2206,6 +2222,9 @@ export const schema = defineSchema({
                 status: v.number(),
             }),
         ),
+        // The person resumes the paused run (`resumeAfterUsageLimit` is off): no resume is queued, and "Retry now" resumes it once the reset has
+        // passed. Set and cleared with `pause`; a top-level field, not a change to the `pause` object, so stored pauses keep their shape.
+        pauseAwaitsPerson: v.optional(v.literal(true)),
         // What the run has done before its pauses, cumulative across them: the reply rows it saved, how many steps
         // it ran (the resume gets only the rest of the step cap), and what its usage record needs (`skill`,
         // `timeZone`). The run records ONE reply when it ends, covering these rows; a pause that never resumes
@@ -2224,6 +2243,11 @@ export const schema = defineSchema({
         ),
         // The rows a run paused on, one per pause (`rate-limit-pause.ts#planPause`): a step is paused on once, a run three times.
         pausedSteps: v.optional(v.array(v.string())),
+        // The provider gave no reset time, so the pause's `retryAt` is the default wait, not a reset (`pauseRunForRateLimit`).
+        pauseResetUnreported: v.optional(v.literal(true)),
+        // The snooze a rate-limit pause put on its chat (`pauseRunForRateLimit`): the reset time it set, and the value it replaced
+        // (absent if none), so lifting it restores the owner's own snooze.
+        pauseSnooze: v.optional(v.object({ previousUntil: v.optional(v.number()), until: v.number() })),
         producer: v.optional(v.literal("host")),
         // What the reply's usage record needs, kept from the run's start (`registerResumableRun`) for a run that dies before
         // any pause stored it in `pausedRun`.
@@ -4337,6 +4361,8 @@ export const schema = defineSchema({
                 }),
             ),
         ),
+        // A reply paused by a provider's usage limit resumes by itself when the limit resets. Absent = on (`chat/lib/usage-limit-settings.ts`).
+        resumeAfterUsageLimit: v.optional(v.boolean()),
         // A run whose worker died resumes from its last saved row, up to 3 times per reply (`chat/streaming/persistent/interrupted.ts`). Absent = on.
         resumeInterruptedRuns: v.optional(v.boolean()),
         // Opt-in: opening /chat lands on the most recent thread. Absent = off.
@@ -4346,6 +4372,8 @@ export const schema = defineSchema({
         sendBehavior: v.optional(v.string()),
         // First-run setup steps the user skipped (`auth/setup-steps.ts`): "pair" | "ssh" | "agent". At most 8, capped by `auth/lib/setup-step-limits.ts`. Absent = none.
         setupStepsSkipped: v.optional(v.array(v.string())),
+        // A chat whose reply is paused by a usage limit is snoozed until the reset time. Absent = off.
+        snoozeUntilUsageLimitReset: v.optional(v.boolean()),
         // A model and instructions per kind of delegated work (`sub-agents/roles.ts`).
         subAgentRoles: v.optional(vSubAgentRoles),
         // Opt-in email when a task or trigger run finishes with a result (`notifications/task-email.ts`). Absent = off.
