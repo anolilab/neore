@@ -2,8 +2,9 @@
 
 /** The row's hover actions are icon-only buttons; each needs an accessible name of its own. */
 // eslint-disable-next-line testing-library/no-manual-cleanup -- vitest runs without globals, so nothing else cleans up between tests
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clearComposerDrafts, saveComposerDraft } from "@/features/chat/split/composer-drafts";
 import { useSplitLayoutStore } from "@/features/chat/split/split-layout-store";
@@ -124,8 +125,26 @@ vi.mock("@/hooks/use-has-opened", () => {
     return { useHasOpened: () => false };
 });
 
+const userSettings = vi.hoisted(() => {
+    return { value: undefined as Record<string, boolean> | undefined };
+});
+
+vi.mock("./hooks/use-confirm-before-delete", () => {
+    return {
+        useConfirmBeforeDelete: () => userSettings.value?.confirmBeforeDeleteChat !== false,
+    };
+});
+
+// Shows its confirm button only while open, as the real dialog is shown only when a delete asks first.
 vi.mock("@/components/delete-confirmation-dialog", () => {
-    return { default: () => null };
+    return {
+        default: ({ onConfirm, open }: { onConfirm: () => void; open: boolean }) =>
+            open ? (
+                <button onClick={onConfirm} type="button">
+                    Confirm delete
+                </button>
+            ) : null,
+    };
 });
 
 vi.mock("@/features/chat/core/stores/prompt-queue-store", () => {
@@ -230,6 +249,76 @@ const baseProps = {
     toggleExpanded: () => {},
     updateThread: () => {},
 };
+
+/** The thread list beside the row, which takes the row away when it is deleted, as the optimistic deletion does. */
+const RowHost = () => {
+    const [deleted, setDeleted] = useState(false);
+
+    return (
+        <>
+            <button data-search-toggle="" type="button">
+                Search threads
+            </button>
+            {!deleted && <ThreadNode {...baseProps} handleDeleteThread={() => setDeleted(true)} />}
+        </>
+    );
+};
+
+describe("ThreadNode delete confirmation", () => {
+    beforeEach(() => {
+        userSettings.value = undefined;
+    });
+
+    it("asks first by default, and deletes only once the dialog is confirmed", () => {
+        const handleDeleteThread = vi.fn();
+
+        render(<ThreadNode {...baseProps} handleDeleteThread={handleDeleteThread} />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Delete thread: Quarterly plan" }));
+
+        expect(handleDeleteThread).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+
+        expect(handleDeleteThread).toHaveBeenCalledWith("t1");
+    });
+
+    it("deletes at once, with no dialog, when the setting is saved as off", () => {
+        userSettings.value = { confirmBeforeDeleteChat: false };
+        const handleDeleteThread = vi.fn();
+
+        render(<ThreadNode {...baseProps} handleDeleteThread={handleDeleteThread} />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Delete thread: Quarterly plan" }));
+
+        expect(handleDeleteThread).toHaveBeenCalledWith("t1");
+        expect(screen.queryByRole("button", { name: "Confirm delete" })).toBeNull();
+    });
+
+    it("moves focus to the search toggle when a delete at once takes the focused row away", () => {
+        userSettings.value = { confirmBeforeDeleteChat: false };
+
+        render(<RowHost />);
+
+        const deleteButton = screen.getByRole("button", { name: "Delete thread: Quarterly plan" });
+
+        deleteButton.focus();
+        fireEvent.click(deleteButton);
+
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement (document.activeElement) is what this test asserts
+        expect(document.activeElement).toBe(screen.getByRole("button", { name: "Search threads" }));
+    });
+
+    it("moves focus to the search toggle after a confirmed delete, since the row's button that opened the dialog leaves", async () => {
+        render(<RowHost />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Delete thread: Quarterly plan" }));
+        fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement (document.activeElement) is what this test asserts
+        await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Search threads" })));
+    });
+});
 
 describe("ThreadNode", () => {
     it("shows the linked pull request count with an accessible label, and none for a thread with no link", () => {

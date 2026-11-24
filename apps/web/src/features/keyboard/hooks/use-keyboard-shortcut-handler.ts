@@ -59,7 +59,7 @@ const useKeyboardShortcutHandler = (): ((action: keyof KeyboardShortcuts, event:
                     break;
                 }
                 case "deleteThread": {
-                    // The open thread's listener asks for confirmation before it deletes.
+                    // The open thread's listener asks before it deletes, unless the delete confirmation setting is off.
                     globalThis.dispatchEvent(new CustomEvent("deleteThread"));
                     break;
                 }

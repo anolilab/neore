@@ -373,6 +373,43 @@ describe("a collaborator's pins on the owner's shard", () => {
 
         expect(owners).toStrictEqual(["user-new"]);
     });
+
+    it.each(["user-guest", "user-new"])("moves no pin once an erasure of %s has begun, and says so", async (erased) => {
+        await harness.run(async (context: any) => {
+            await context.db.insert("threadPins", { createdAt: 1, messageRole: "assistant", threadId, updatedAt: 1, userId: "user-guest" });
+            await context.db.insert("accountMoves", { createdAt: Date.now(), kind: "erasing", userId: erased });
+        });
+
+        try {
+            expect(
+                await harness.run(
+                    async (context: any) => await context.runMutation(reassignUserPinsOnThread, { from: "user-guest", threadId, to: "user-new" }),
+                ),
+            ).toStrictEqual({ erasing: true, hasMore: false });
+
+            const owners = await harness.run(async (context: any) => {
+                const rows = await context.db.query("threadPins").collect();
+
+                return rows.map((row: { userId: string }) => row.userId) as unknown[];
+            });
+
+            expect(owners).toStrictEqual(["user-guest"]);
+        } finally {
+            await harness.run(async (context: any) => {
+                const pins = await context.db.query("threadPins").collect();
+
+                for (const row of pins) {
+                    await context.db.delete("threadPins", row._id);
+                }
+
+                const { page } = await context.db.accountMoves.findMany({ where: { userId: erased } });
+
+                for (const row of page) {
+                    await context.db.delete("accountMoves", row._id);
+                }
+            });
+        }
+    });
 });
 
 describe("listing a thread's pins after a grant is revoked", () => {

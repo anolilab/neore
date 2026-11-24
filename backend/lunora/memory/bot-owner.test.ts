@@ -7,7 +7,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
-import { reassignGlobalRows } from "../lib/account-merge";
+import { acquireMergeLease, reassignGlobalRows } from "../lib/account-merge";
 import { botOwnerRows } from "./bot-owner";
 import { listUserMemories } from "./functions";
 
@@ -47,6 +47,14 @@ beforeEach(async () => {
 afterEach(() => {
     harness.close();
 });
+
+/** One `reassignGlobalRows` call as the merge runs it: holding the guest's merge lease, with its generation. */
+const reassignAsMerge = async (from: string, to: string): Promise<unknown> =>
+    await harness.run(async (ctx: any) => {
+        const { generation } = (await ctx.runMutation(acquireMergeLease, { from, to })) as { generation: number };
+
+        return await ctx.runMutation(reassignGlobalRows, { from, generation, to });
+    });
 
 const insertCollaboratorMemory = async (botId: string | undefined): Promise<void> => {
     await harness.run(
@@ -140,8 +148,8 @@ describe("account conversion in batches", () => {
             }
         });
 
-        const first = await harness.run(async (ctx: any) => await ctx.runMutation(reassignGlobalRows, { from: guest, to: OWNER }));
-        const second = await harness.run(async (ctx: any) => await ctx.runMutation(reassignGlobalRows, { from: guest, to: OWNER }));
+        const first = await reassignAsMerge(guest, OWNER);
+        const second = await reassignAsMerge(guest, OWNER);
 
         expect(first).toEqual({ done: false, reassigned: 200 });
         expect(second).toEqual({ done: true, reassigned: 50 });
@@ -155,12 +163,14 @@ describe("account conversion in batches", () => {
 describe("account conversion", () => {
     it("re-points the bot owner row to the new account and keeps a shared bot another owner's", async () => {
         const guest = "guest";
-        const account = "account";
+        const account = await harness.run(
+            async (ctx: any) => await ctx.db.insert("user", { createdAt: 0, email: "account@example.com", emailVerified: true, name: "account", updatedAt: 0 }),
+        );
 
         await harness.run(async (ctx: any) => {
             await ctx.db.insert("botOwners", { botId: "guest-bot", createdAt: 1, ownerId: guest });
         });
-        await harness.run(async (ctx: any) => await ctx.runMutation(reassignGlobalRows, { from: guest, to: account }));
+        await reassignAsMerge(guest, account);
 
         await harness.run(async (ctx: any) => {
             const row = await ctx.db.botOwners.findFirst({ where: { botId: "guest-bot" } });

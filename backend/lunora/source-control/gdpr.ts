@@ -222,6 +222,8 @@ export const collectPullRequestThreadsForExport = internalQuery
                     kind: v.union(v.literal("attached"), v.literal("linked"), v.literal("opened")),
                     number: v.number(),
                     repository: v.string(),
+                    state: v.optional(v.union(v.literal("open"), v.literal("closed"), v.literal("merged"))),
+                    stateCheckedAt: v.optional(v.number()),
                     threadId: v.string(),
                     title: v.string(),
                     url: v.string(),
@@ -245,6 +247,8 @@ export const collectPullRequestThreadsForExport = internalQuery
                     kind: link.kind,
                     number: link.number,
                     repository: link.repository,
+                    ...(link.state !== undefined && { state: link.state }),
+                    ...(link.stateCheckedAt !== undefined && { stateCheckedAt: link.stateCheckedAt }),
                     threadId: link.threadId,
                     title: link.title,
                     url: link.url,
@@ -265,5 +269,19 @@ export const deleteUserPullRequestThreads = internalMutation
 
         await Promise.all(links.map((link) => ctx.db.delete("pullRequestThreads", link._id)));
 
-        return { hasMore: links.length >= BATCH };
+        const hasMore = links.length >= BATCH;
+
+        // The scan position goes with the last batch, so no sweep resumes over links that are gone.
+        if (!hasMore) {
+            const scan = await ctx.db
+                .query("pullRequestStateScans")
+                .withIndex("by_userId", (q) => q.eq("userId", userId))
+                .unique();
+
+            if (scan) {
+                await ctx.db.delete("pullRequestStateScans", scan._id);
+            }
+        }
+
+        return { hasMore };
     });

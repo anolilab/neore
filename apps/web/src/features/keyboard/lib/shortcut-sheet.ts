@@ -31,13 +31,15 @@ export const SHORTCUT_ENTRIES: ReadonlyArray<ShortcutEntry> = [
     { action: "audioRecord", group: "composer", id: "audioRecord" },
     { action: "increaseEffort", group: "composer", id: "increaseEffort" },
     { action: "decreaseEffort", group: "composer", id: "decreaseEffort" },
+    // Fixed in the composer (`prompt-search-key.ts`): Ctrl, literally, so it stays out of the browser's reload.
+    { fixed: "control+r", group: "composer", id: "promptSearch" },
     { fixed: "arrowup+arrowdown", group: "threadList", id: "listNavigate" },
     { fixed: "enter", group: "threadList", id: "listOpen" },
     { fixed: "ctrl+a", group: "threadList", id: "listSelectAll" },
     { fixed: "escape", group: "threadList", id: "listCancel" },
 ];
 
-const MODIFIERS = new Set(["alt", "cmd", "ctrl", "meta", "shift"]);
+const MODIFIERS = new Set(["alt", "cmd", "control", "ctrl", "meta", "shift"]);
 
 const NAMED_KEYS: Record<string, string> = {
     arrowdown: "↓",
@@ -66,6 +68,10 @@ const formatKey = (part: string, isMac: boolean): string => {
         case "cmd":
         case "meta": {
             return isMac ? "⌘" : "Meta";
+        }
+        // The literal Control key, which is not the platform modifier.
+        case "control": {
+            return isMac ? "⌃" : "Ctrl";
         }
         // The store keeps the platform modifier as "ctrl"; it is Command on a Mac.
         case "ctrl": {
@@ -96,7 +102,7 @@ export const shortcutToKeys = (shortcut: string | undefined, isMac: boolean): st
     // Modifiers first, in the order platforms print them.
     const modifiers = parts.filter((part) => MODIFIERS.has(part.toLowerCase()));
     const keys = parts.filter((part) => !MODIFIERS.has(part.toLowerCase()));
-    const order = ["ctrl", "meta", "cmd", "alt", "shift"];
+    const order = ["control", "ctrl", "meta", "cmd", "alt", "shift"];
     const sorted = modifiers.toSorted((a, b) => order.indexOf(a.toLowerCase()) - order.indexOf(b.toLowerCase()));
 
     return [...sorted, ...keys].map((part) => formatKey(part, isMac));

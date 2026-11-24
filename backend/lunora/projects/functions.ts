@@ -904,6 +904,52 @@ const REPO_LOOKUP_LIMIT = MAX_PROJECT_REPOSITORIES;
 const MEMBERSHIP_PAGES = 10;
 
 /**
+ * Those of `within` that are the caller's OWN projects listing `repo` (any form `normalizeRepoUrl` takes), oldest first;
+ * none for a URL it refuses. Only ids: the caller decides each project with `writableProject`. What a start made outside a
+ * project, such as a pull-request guide, files its thread under on a computer limited to some projects
+ * (`source-control/guide-host.ts`). Reading only the computer's projects keeps a matching one from being crowded out by
+ * the person's other projects listing the same URL; a project lists a URL once, so `within` bounds the rows.
+ */
+export const ownProjectIdsListingRepo = async (
+    context: QueryCtx,
+    userId: string,
+    repo: string,
+    within: ReadonlyArray<Id<"projects">>,
+): Promise<Id<"projects">[]> => {
+    let url: string;
+
+    try {
+        url = normalizeRepoUrl(repo);
+    } catch {
+        return [];
+    }
+
+    const projectIds = [...new Set(within)];
+    const batches: Id<"projects">[][] = [];
+
+    for (let start = 0; start < projectIds.length; start += IDS_PER_READ) {
+        batches.push(projectIds.slice(start, start + IDS_PER_READ));
+    }
+
+    const pages = await Promise.all(
+        batches.map(async (batch) =>
+            storedPage(
+                await context.db.projectRepositories.findMany({
+                    consistency: "primary",
+                    limit: batch.length,
+                    where: { projectId: { in: batch }, url, userId },
+                }),
+            ).page.filter((row) => isRepoRow(row)),
+        ),
+    );
+
+    return pages
+        .flat()
+        .toSorted((a, b) => a._creationTime - b._creationTime)
+        .map((row) => row.projectId);
+};
+
+/**
  * The oldest project the caller can read that lists this repository, or `null`: a run picker reopened on a saved run
  * shows the project its repository came from (a coding-agent task stores the URL, not the project). Only the caller's
  * own rows and those of the organizations they belong to (any of them, not only the active one) are read, each

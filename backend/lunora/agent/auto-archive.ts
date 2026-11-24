@@ -18,11 +18,21 @@ import { pendingApprovalCutoff } from "../chat/lib/tool-approval-cleanup";
 import { currentUserShard } from "../lib/shard-context";
 import type { ScanPage } from "../lib/scan-pages";
 import { MAX_LENGTH } from "../lib/validators";
-import { type AutoArchiveCandidate, autoArchiveCutoff, isAutoArchiveDays, runArchivePass, selectAutoArchiveDue } from "./auto-archive-logic";
+import {
+    type AutoArchiveCandidate,
+    autoArchiveCutoff,
+    isAutoArchiveDays,
+    isOpenPullRequestForArchive,
+    keepsOpenPullRequestChats,
+    runArchivePass,
+    selectAutoArchiveDue,
+} from "./auto-archive-logic";
 import { markThreadArchived } from "./threads";
 
 /** Threads archived per pass. The rest wait for the next pass, which is idempotent. */
 const ARCHIVE_BATCH = 100;
+/** Pull request links read per thread. A full page keeps the thread: a closed link may hide an open one past it. */
+const PULL_REQUEST_LINK_READ = 100;
 /** Index rows read per page, and per pass before the pass hands its cursor to a follow-up run. */
 const PAGE_SIZE = 200;
 const READ_BUDGET = 1000;
@@ -91,12 +101,81 @@ const threadHasLiveGuestLink = async (ctx: MutationCtx, threadId: Id<"threads">)
 };
 
 /**
- * Archives one thread if, as read now, it is still due. The eligibility check runs
+ * True when the thread's owner keeps open-pull-request chats (the default) and the thread has a linked pull request that
+ * is open, by the stored state. Reads the links only, never the host. A thread with no link returns before the settings read,
+ * so a chat without a pull request is decided exactly as before.
+ */
+const threadKeptForOpenPullRequest = async (ctx: MutationCtx, userId: string | undefined, threadId: Id<"threads">): Promise<boolean> => {
+    if (userId === undefined) {
+        return false;
+    }
+
+    // One link past the bound, so exactly `PULL_REQUEST_LINK_READ` links reads as complete, not truncated.
+    const read = await ctx.db
+        .query("pullRequestThreads")
+        .withIndex("by_user_and_threadId", (q) => q.eq("userId", userId).eq("threadId", threadId))
+        .take(PULL_REQUEST_LINK_READ + 1);
+    const truncated = read.length > PULL_REQUEST_LINK_READ;
+    const links = read.slice(0, PULL_REQUEST_LINK_READ);
+
+    if (!truncated && links.every((link) => !isOpenPullRequestForArchive(link))) {
+        return false;
+    }
+
+    const settings = await ctx.db
+        .query("userSettings")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .unique();
+
+    return keepsOpenPullRequestChats(settings?.keepOpenPullRequestChats) && (truncated || links.some((link) => isOpenPullRequestForArchive(link)));
+};
+
+/**
+ * Archives one thread if, as read now, it is still due at `cutoff`. The eligibility check runs
  * on the fresh row, its project's pin state, its live streams and any request waiting on the owner, in the same
  * transaction as the write, so nothing that happened after the scan is overwritten.
  */
+const archiveThreadIfDue = async (ctx: MutationCtx, threadId: Id<"threads">, cutoff: number): Promise<boolean> => {
+    const thread = await ctx.db.get("threads", threadId);
+
+    if (!thread) {
+        return false;
+    }
+
+    // The project pin is read per thread, not from a capped list of pinned projects.
+    const project = thread.projectId ? await ctx.db.projects.findFirst({ where: { _id: thread.projectId } }) : null;
+    const pinnedProjectIds = new Set<string>(project && project.pinnedAt !== undefined && thread.projectId ? [thread.projectId] : []);
+
+    // The row checks run first, so a thread that is not due never reads its streams.
+    const due = selectAutoArchiveDue([candidateOf(thread)], cutoff, { liveThreadIds: new Set<string>(), pinnedProjectIds }, 1);
+
+    if (
+        due.length === 0 ||
+        (await threadHasLiveStream(ctx, threadId)) ||
+        (await threadWaitsOnPerson(ctx, threadId)) ||
+        (await threadHasLiveGuestLink(ctx, threadId)) ||
+        (await threadKeptForOpenPullRequest(ctx, thread.userId, threadId))
+    ) {
+        return false;
+    }
+
+    await markThreadArchived(ctx, threadId);
+
+    return true;
+};
+
 export const archiveIfStillIdle = internalMutation
     .input({ cutoff: v.number(), threadId: v.id("threads") })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => await archiveThreadIfDue(ctx, args.threadId, args.cutoff));
+
+/**
+ * Archives a chat that a closed or merged pull request made due (`source-control/pr-state.ts`). The owner's auto-archive
+ * setting and the cutoff are read here, in the same transaction as the decision, so a setting changed after the job was
+ * scheduled decides it: auto-archive off archives nothing, and a raised threshold keeps the chat.
+ */
+export const archiveClosedLinkChat = internalMutation
+    .input({ threadId: v.id("threads") })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         const thread = await ctx.db.get("threads", args.threadId);
@@ -105,25 +184,23 @@ export const archiveIfStillIdle = internalMutation
             return false;
         }
 
-        // The project pin is read per thread, not from a capped list of pinned projects.
-        const project = thread.projectId ? await ctx.db.projects.findFirst({ where: { _id: thread.projectId } }) : null;
-        const pinnedProjectIds = new Set<string>(project && project.pinnedAt !== undefined && thread.projectId ? [thread.projectId] : []);
+        const settings = await ctx.db
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", thread.userId))
+            .unique();
+        const days = settings?.autoArchiveAfterDays;
 
-        // The row checks run first, so a thread that is not due never reads its streams.
-        const due = selectAutoArchiveDue([candidateOf(thread)], args.cutoff, { liveThreadIds: new Set<string>(), pinnedProjectIds }, 1);
-
-        if (
-            due.length === 0 ||
-            (await threadHasLiveStream(ctx, args.threadId)) ||
-            (await threadWaitsOnPerson(ctx, args.threadId)) ||
-            (await threadHasLiveGuestLink(ctx, args.threadId))
-        ) {
+        if (!isAutoArchiveDays(days) || days === 0) {
             return false;
         }
 
-        await markThreadArchived(ctx, args.threadId);
+        const archived = await archiveThreadIfDue(ctx, args.threadId, autoArchiveCutoff(ctx.now, days));
 
-        return true;
+        if (archived) {
+            ctx.log.event("chat.auto_archive", { archived: 1, reason: "pull_request_closed" });
+        }
+
+        return archived;
     });
 
 const runAutoArchivePass = async (ctx: MutationCtx, cursor: string | null): Promise<void> => {

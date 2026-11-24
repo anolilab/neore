@@ -58,10 +58,13 @@
   row is written only within `ORGANIZATION_RECORD_LATE_MS` of its reply, and
   the view ends that long (and a margin) before now. A new write to
   `usageOrganizationReplies` keeps both. A guest merge moves older rows only
-  with the guest's own cohort (`handOverOrganizationContributors` runs before
-  the copy); where the account already has an entry, the guest's goes. Every
+  with the guest's own cohort (`handOverOrganizationContributors`, the merge's
+  first, lease-checked `contributors` phase, runs before the copy); where the
+  account already has an entry, the guest's goes. Every
   guest row still moves: an older one that cannot join the guest's cohort is
   held (`heldFrom`), kept for export and erasure until retention prunes it, and
-  never read by the view or the reconcile. A marked entry (`mergedFrom`)
-  withholds its cohort and blocks re-booking the guest until the merge settles
-  it; a merge stopped by a round cap throws, so its redelivery settles it.
+  never read by the view or the reconcile; the hold is decided at a row's
+  first import, and the clear's re-import keeps it. A marked entry
+  (`mergedFrom`) withholds its cohort and blocks re-booking the guest until
+  the merge's `global` step settles it, after its clear emptied the guest's
+  shard; a merge that never gets there keeps the mark.

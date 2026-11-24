@@ -2,6 +2,17 @@ import { LunoraError, v } from "lunorash/server";
 
 import { buildUsageJson, spliceUsageJson, usageObjectKey } from "./usage-export-steps";
 import { readStoredText } from "../lib/storage-read";
+import {
+    CHAT_FILE_METADATA_CHUNK,
+    capChatFiles,
+    chatFileMeter,
+    chatFileSectionBudget,
+    collectAllChatFileMetadata,
+    collectAllMessageFileIds,
+    textBytes,
+    walkIds,
+    withChatFiles,
+} from "../agent/export-pages";
 import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
 import { callOnShard } from "../lib/cross-shard";
 import { collectOrganizationReplyPages } from "../usage/organization";
@@ -10,7 +21,14 @@ import { BROWSER_EXPORT_BYTES, browserExportPageKey, readAllBrowserPages } from 
 import { collectAllFeedback } from "../feedback/gdpr";
 import { collectAllTriggers } from "../triggers/export-pages";
 import { attachProjectRuleFiles, collectAllOwnedProjects, collectAllRepositories } from "../projects/export-pages";
-import { feedbackReadBudget, projectDetailsReadBudget, repositoriesReadBudget, threadFollowsReadBudget, triggerReadBudget } from "./read-budget";
+import {
+    chatFilesReadBudget,
+    feedbackReadBudget,
+    projectDetailsReadBudget,
+    repositoriesReadBudget,
+    threadFollowsReadBudget,
+    triggerReadBudget,
+} from "./read-budget";
 import { collectAllThreadFollows } from "../chat/follows/export-pages";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -839,6 +857,37 @@ export const generateExportFile = internalAction
                       BROWSER_EXPORT_BYTES,
                       browserCut === true,
                   );
+        // The user's chat files (uploads and generated images), metadata only: the files behind their grants and the files their messages
+        // name (`agent/export-pages.ts`), read here a page per query, as the sections above are. The walks and the metadata reads share
+        // one budget of bytes and queries, what every section above left of the action's read budget (`read-budget.ts`); past it the
+        // section is cut and flagged. The grants' metadata is read before the message walk, so a long history cannot leave them out.
+        const chatFileRead = await collectAllChatFileMetadata(
+            async (meter) =>
+                await walkIds(
+                    async (cursor) => await context.runQuery(internal.agent.gdpr.collectGrantedChatFileIdsForExport, { cursor, userId: args.userId }),
+                    meter,
+                ),
+            async (meter) =>
+                await collectAllMessageFileIds(
+                    async (cursor) => await context.runQuery(internal.agent.gdpr.collectThreadIdsForExport, { cursor, userId: args.userId }),
+                    async (threadId, cursor) =>
+                        await context.runQuery(internal.agent.gdpr.collectMessageFileIdsForExport, { cursor, threadId: threadId as Id<"threads"> }),
+                    meter,
+                ),
+            async (fileIds) => await context.runQuery(internal.agent.gdpr.chatFileMetadataForExport, { fileIds: fileIds as Id<"chatFiles">[] }),
+            CHAT_FILE_METADATA_CHUNK,
+            chatFileMeter(
+                chatFilesReadBudget(
+                    earlierReadBytes +
+                        repositories.readBytes +
+                        feedback.readBytes +
+                        ownedProjects.readBytes +
+                        threadFollows.readBytes +
+                        triggers.readBytes +
+                        ownedWithRules.readBytes,
+                ),
+            ),
+        );
         const exportData = {
             acpSessions,
             bots: args.bots ?? { bots: [] },
@@ -883,7 +932,14 @@ export const generateExportFile = internalAction
             watchedRepositories: args.watchedRepositories ?? { watched: [] },
         };
 
-        const head = JSON.stringify(exportData, null, 2);
+        // The rest of the export, serialized without the chat-file section. The section takes what the rest leaves under the file's size
+        // limit (usage JSON included, as it is spliced in), so the file is never written past it: a large history is cut and flagged.
+        const rest = JSON.stringify(exportData, null, 2);
+        const restBytes = textBytes(rest) + (usageJson === undefined ? 0 : textBytes(usageJson));
+        const chatFileCapped = capChatFiles(chatFileRead.rows, chatFileSectionBudget(restBytes, MAX_EXPORT_BYTES));
+        // Cut by the byte cap, by the file's size limit or by the read budget: each way the section says so.
+        const chatFiles = { files: chatFileCapped.files, truncated: chatFileCapped.truncated || chatFileRead.truncated };
+        const head = withChatFiles(rest, chatFiles);
         // The usage JSON is written as the file's last keys rather than parsed and serialized again.
         const jsonString = usageJson === undefined ? head : spliceUsageJson(head, usageJson);
         const blob = new Blob([jsonString], { type: "application/json" });

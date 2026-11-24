@@ -1787,6 +1787,10 @@ export const schema = defineSchema({
         text: v.optional(v.string()),
         threadId: v.id("threads"),
         tool: v.boolean(),
+        // What the person typed into a user message (`agent/shared.ts#typedTextColumn`: no attachment, quote or placeholder),
+        // written beside `text` on insert, edit and rewrite. Only the composer's prompt search reads it, through
+        // `typed_text_search`; `text` stays the message as it was sent. Unset on every other row.
+        typedText: v.optional(v.string()),
         usage: v.optional(
             v.object({
                 cachedInputTokens: v.optional(v.number()),
@@ -1811,6 +1815,7 @@ export const schema = defineSchema({
         .index("by_threadId_parentMessageId", ["threadId", "parentMessageId"])
         .index("embeddingId_threadId", ["embeddingId", "threadId"])
         .searchIndex("text_search", { field: "text", filterFields: ["userId", "threadId"] })
+        .searchIndex("typed_text_search", { field: "typedText", filterFields: ["userId"] })
         // A deleted user turn can drop its thread below the palette search's turn gate (`agent/thread-search-triggers.ts`).
         .triggers((t) => threadSearchMessageTriggers(t))
         .relations((r) => {
@@ -1885,6 +1890,8 @@ export const schema = defineSchema({
     // the provider; `flow` carries what completion needs (PKCE verifier and any
     // DCR client secret encrypted). Single-use: completion deletes the row.
     oauthStates: defineTable({
+        // RFC 9207: the server advertised `iss` on its responses, so the callback refuses one without it.
+        authorizationResponseIssParameterSupported: v.optional(v.boolean()),
         // Legacy target encoding (a slug, or `mcp:<name>` plus `mcpServer`), read
         // only for rows written before `target`; new rows carry `target` alone.
         connectorSlug: v.optional(v.string()),
@@ -2419,11 +2426,23 @@ export const schema = defineSchema({
         // The device the project's folder lives on (this computer, or an SSH server's device) and the absolute folder path on it.
         machineId: v.optional(v.id("devices")),
         order: v.optional(v.number()),
+        // When the project last changed organization: a person's runner default from a thread started before it no longer applies.
+        organizationChangedAt: v.optional(v.number()),
         organizationId: v.optional(v.string()),
         path: v.optional(v.string()),
         pinnedAt: v.optional(v.number()),
         projectType: v.optional(v.union(v.literal("chat"), v.literal("workflow"))),
         publicAccessToken: v.optional(v.string()),
+        // The runner a new thread here starts on by default: the computer, agent and folder id of its last host thread (`acp/lib/project-runner.ts`).
+        // Personal projects only; an organization project keeps each person's default on `userSettings.projectRunnerDefaults`. The folder path never leaves the desktop.
+        runnerAgentKey: v.optional(v.string()),
+        runnerDeviceId: v.optional(v.string()),
+        runnerFolderId: v.optional(v.string()),
+        runnerKind: v.optional(v.literal("host")),
+        // When the thread that recorded the runner started: an older thread opening a session later leaves it.
+        runnerThreadAt: v.optional(v.number()),
+        // That thread's id: of two threads started in the same millisecond, the one with the greater id keeps the runner.
+        runnerThreadId: v.optional(v.string()),
         // Per-project overrides of the owner's sub-agent roles (`sub-agents/roles.ts`).
         subAgentRoles: v.optional(vSubAgentRoles),
         title: v.string(),
@@ -2578,6 +2597,15 @@ export const schema = defineSchema({
         .index("by_user_and_pull", ["userId", "hostOrigin", "repository", "number"])
         .index("by_threadId", ["threadId"]),
 
+    // Where the housekeeping sweep's state refresh (`source-control/pr-state.ts`) resumes its scan of the owner's
+    // `pullRequestThreads`, one row per person. Null starts from the first link. Erased with the links.
+    pullRequestStateScans: defineTable({
+        cursor: v.union(v.string(), v.null()),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId", ["userId"]),
+
     // Develop mode: the thread a pull request is worked on in, and the pull requests a coding agent opened FROM a
     // thread. `kind` says which: `attached` when the person started work on it ("Work on this PR"), `opened` when a run
     // it belonged to opened it. One row per (user, repository, number, kind) at most; the thread id is the link both
@@ -2590,6 +2618,10 @@ export const schema = defineSchema({
         kind: v.union(v.literal("attached"), v.literal("linked"), v.literal("opened")),
         number: v.number(),
         repository: v.string(),
+        // The host's state of the pull request, as the last refresh read it (`source-control/pr-state.ts`). Absent until the
+        // first read: an unknown state keeps the thread out of auto-archive, like an open one.
+        state: v.optional(v.union(v.literal("open"), v.literal("closed"), v.literal("merged"))),
+        stateCheckedAt: v.optional(v.number()),
         // Set while the thread is soft-deleted, so the sidebar count reads these rows alone. Kept in step by the thread's delete and restore.
         threadDeleted: v.optional(v.boolean()),
         threadId: v.id("threads"),
@@ -4250,6 +4282,10 @@ export const schema = defineSchema({
         composerAutocompleteEnabled: v.optional(v.boolean()),
         // Opt-in Vim keys in the chat composer. Absent = off.
         composerVimMode: v.optional(v.boolean()),
+        // Ask before a chat is archived, deleted or unpinned in the web app. Archive and unpin: absent = off; delete: absent = on.
+        confirmBeforeArchiveChat: v.optional(v.boolean()),
+        confirmBeforeDeleteChat: v.optional(v.boolean()),
+        confirmBeforeUnpinChat: v.optional(v.boolean()),
         // Appearance: contrast mode (accepted values: `auth/fields.ts`). Absent = follow the system.
         contrast: v.optional(v.string()),
         customInstructions: v.optional(v.string()),
@@ -4257,6 +4293,8 @@ export const schema = defineSchema({
         dailyBriefEnabled: v.optional(v.boolean()),
         // When the user answered "Not now" to the home page's one-time Daily Brief offer (`home/overview.ts`). Server-written only. Absent = not answered.
         dailyBriefOfferDismissedAt: v.optional(v.number()),
+        // The permission mode a new chat starts with (`chat/lib/thread-permission-mode.ts`). Absent = auto.
+        defaultPermissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
         // Appearance: UI spacing preset (accepted values: `auth/fields.ts`).
         density: v.optional(v.string()),
         dictationLanguage: v.optional(v.string()),
@@ -4267,6 +4305,8 @@ export const schema = defineSchema({
         // A message sent during a coding agent's turn interrupts that turn and goes next, instead of queueing behind it. Absent = queue.
         hostFollowUpSteer: v.optional(v.boolean()),
         isAdvancedUser: v.optional(v.boolean()),
+        // Keep an idle chat out of auto-archive while it has a linked pull request that is open (`agent/auto-archive.ts`). Absent = on.
+        keepOpenPullRequestChats: v.optional(v.boolean()),
         keyboardShortcuts: v.optional(v.any()),
         language: v.optional(v.string()),
         lastChatId: v.optional(v.string()),
@@ -4284,6 +4324,19 @@ export const schema = defineSchema({
         // (`auth/lib/personalization.ts`), and kept: a run with it gets no saved login. Server-written only.
         personalizationByImpersonator: v.optional(v.literal(true)),
         profession: v.optional(v.string()),
+        // The runner a new thread in each organization project starts on for this person, keyed by project id (`acp/lib/project-runner.ts`). Written server-side only, at most 200 projects.
+        projectRunnerDefaults: v.optional(
+            v.record(
+                v.string(),
+                v.object({
+                    agentKey: v.string(),
+                    deviceId: v.string(),
+                    folderId: v.string(),
+                    threadAt: v.optional(v.number()),
+                    threadId: v.optional(v.string()),
+                }),
+            ),
+        ),
         // A run whose worker died resumes from its last saved row, up to 3 times per reply (`chat/streaming/persistent/interrupted.ts`). Absent = on.
         resumeInterruptedRuns: v.optional(v.boolean()),
         // Opt-in: opening /chat lands on the most recent thread. Absent = off.
