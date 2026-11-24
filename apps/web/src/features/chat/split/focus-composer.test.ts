@@ -171,6 +171,21 @@ describe("useComposerFocusRequest", () => {
         expect(useComposerFocusRequestStore.getState().threadId).toBeUndefined();
     });
 
+    it("clears the request when the composer never mounts within the frame budget", () => {
+        const { pane } = mountPane();
+
+        requestComposerFocus("chat-a");
+        renderHook(() => useComposerFocusRequest(pane, "chat-a", true));
+
+        for (let frame = 0; frame < FOCUS_FRAMES; frame += 1) {
+            runFrame();
+        }
+
+        // A request that gave up must not stay pending: a later focus of this pane would otherwise move focus into its composer.
+        expect(focusLog).toEqual([]);
+        expect(useComposerFocusRequestStore.getState().threadId).toBeUndefined();
+    });
+
     it("waits until the pane is focused before it moves focus", () => {
         const { pane } = mountPane(composer());
 
