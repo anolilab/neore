@@ -31,6 +31,8 @@ export interface RateLimitPause {
     awaitsPerson?: boolean;
     provider?: string;
     reason: "rate_limit";
+    /** The provider gave no reset time: `retryAt` is only the default wait, so the notice does not call it a reset. */
+    resetUnreported?: boolean;
     /** Epoch ms the run resumes at. */
     retryAt: number;
     status: number;
@@ -78,7 +80,8 @@ export const RateLimitPauseNoticeView: FC<RateLimitPauseNoticeViewProps> = ({ ca
     const isOverdue = remainingMs <= -OVERDUE_MS;
     // The person resumes this run: nothing is queued for it, so after the reset it waits for them (and there is no overdue resume).
     const awaitsPerson = pause.awaitsPerson === true;
-    const canResume = awaitsPerson ? !isWaiting : isWaiting || isOverdue;
+    // With no reset time from the provider there is nothing to wait for: the person may resume at once.
+    const canResume = awaitsPerson ? pause.resetUnreported === true || !isWaiting : isWaiting || isOverdue;
     const countdown = formatCountdown(remainingMs);
     const announced = formatCountdown(announcedWaitMs(remainingMs));
 
@@ -86,7 +89,10 @@ export const RateLimitPauseNoticeView: FC<RateLimitPauseNoticeViewProps> = ({ ca
     let shown: string;
 
     if (awaitsPerson) {
-        if (isWaiting) {
+        if (pause.resetUnreported === true) {
+            spoken = t`Rate limited. Waiting for you to resume`;
+            shown = spoken;
+        } else if (isWaiting) {
             spoken = t`Rate limited. The limit resets in about ${announced}. Waiting for you to resume`;
             shown = t`Rate limited, the limit resets in ${countdown}. Waiting for you to resume`;
         } else {
@@ -155,7 +161,8 @@ export const RateLimitPauseNotice: FC<RateLimitPauseNoticeProps> = ({ className,
             isRetrying={isRetrying}
             isStopping={isStopping}
             onRetryNow={() => {
-                retryNow({ threadId: threadId as never }, { onError: () => showError(t`Could not retry. Please try again.`) });
+                // The proof of the unlocked chat: a locked chat's Resume or Retry now is refused without it.
+                retryNow({ threadId: threadId as never, unlockProof }, { onError: () => showError(t`Could not retry. Please try again.`) });
             }}
             onStop={() => {
                 // Like the composer's Stop: a manual stop keeps the queued prompts, and nothing auto-sends them.

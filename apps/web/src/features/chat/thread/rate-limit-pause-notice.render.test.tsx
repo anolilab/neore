@@ -11,15 +11,23 @@ vi.mock("@lingui/react/macro", () => {
         },
     };
 });
-const { access, queueStore } = vi.hoisted(() => {
-    return { access: { permission: undefined as "admin" | "read" | "write" | undefined }, queueStore: { setPaused: vi.fn() } };
+const { access, mutateSpy, queueStore } = vi.hoisted(() => {
+    return {
+        access: { permission: undefined as "admin" | "read" | "write" | undefined },
+        mutateSpy: vi.fn(),
+        queueStore: { setPaused: vi.fn() },
+    };
+});
+
+vi.mock("@neore/client-runtime", () => {
+    return { useUnlockProof: () => "proof-1" };
 });
 
 vi.mock("@tanstack/react-query", () => {
     return {
         skipToken: Symbol("skipToken"),
         useMutation: () => {
-            return { isPending: false, mutate: vi.fn() };
+            return { isPending: false, mutate: mutateSpy };
         },
         useQuery: () => {
             return { data: access.permission ? { permission: access.permission } : undefined };
@@ -67,8 +75,11 @@ vi.mock("@/lib/toast", () => {
 const { OVERDUE_MS, RateLimitPauseNotice, RateLimitPauseNoticeView } = await import("./rate-limit-pause-notice");
 
 const START = Date.parse("2026-10-31T12:00:00.000Z");
+const LIMIT_RESETS = /limit resets/;
 
-const mount = (overrides: { awaitsPerson?: boolean; canControl?: boolean; isRetrying?: boolean; provider?: string; retryInMs?: number } = {}) => {
+const mount = (
+    overrides: { awaitsPerson?: boolean; canControl?: boolean; isRetrying?: boolean; provider?: string; resetUnreported?: boolean; retryInMs?: number } = {},
+) => {
     const onRetryNow = vi.fn();
     const onStop = vi.fn();
 
@@ -81,6 +92,7 @@ const mount = (overrides: { awaitsPerson?: boolean; canControl?: boolean; isRetr
             onStop={onStop}
             pause={{
                 ...(overrides.awaitsPerson !== undefined && { awaitsPerson: overrides.awaitsPerson }),
+                ...(overrides.resetUnreported === true && { resetUnreported: true }),
                 provider: "provider" in overrides ? overrides.provider : "anthropic",
                 reason: "rate_limit",
                 retryAt: START + (overrides.retryInMs ?? 42_000),
@@ -213,6 +225,17 @@ describe("rate limit pause notice", () => {
             expect(onRetryNow).toHaveBeenCalledOnce();
         });
 
+        it("does not call a default wait a reset: the provider gave no time, so Resume is offered at once", () => {
+            const { onRetryNow } = mount({ awaitsPerson: true, resetUnreported: true });
+
+            expect(screen.getByRole("status").textContent).toBe("Rate limited. Waiting for you to resume");
+            expect(screen.queryByText(LIMIT_RESETS)).toBeNull();
+            expect((screen.getByRole("button", { name: "Resume" }) as HTMLButtonElement).disabled).toBe(false);
+
+            fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+            expect(onRetryNow).toHaveBeenCalledOnce();
+        });
+
         it("does not call the wait overdue after the reset: nothing was queued to be late", () => {
             mount({ awaitsPerson: true, retryInMs: 3000 });
 
@@ -241,6 +264,15 @@ describe("rate limit pause notice", () => {
 
             expect(screen.getByRole("button", { name: "Retry now" })).toBeTruthy();
             expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy();
+        });
+
+        it("sends the unlock proof with Retry now, so a locked chat resumes for its owner", () => {
+            access.permission = "write";
+            wired();
+
+            fireEvent.click(screen.getByRole("button", { name: "Retry now" }));
+
+            expect(mutateSpy).toHaveBeenCalledWith(expect.objectContaining({ threadId: "t1", unlockProof: "proof-1" }), expect.anything());
         });
 
         it("Stop keeps the queued prompts from auto-sending, as the composer's Stop does", () => {

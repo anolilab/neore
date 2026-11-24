@@ -1410,4 +1410,90 @@ describe("the usage-limit settings of a rate-limited run", () => {
 
         expect(await snoozedUntil()).toBe(later);
     });
+
+    it("does not stamp the owner's choice order on the snooze it puts on the chat", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", ids.threadId as never));
+
+        expect(thread.snoozedUntil).toBeDefined();
+        expect(thread.snoozeChosenAt).toBeUndefined();
+    });
+
+    it("an early Retry now lifts the snooze the pause put on the chat", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited(), textStep("Hello there.")]);
+
+        await run();
+
+        expect(await snoozedUntil()).toBeDefined();
+
+        const resumed = await harness.run(async (ctx: any) => await ctx.runMutation(retryPausedRunsNow, { threadId: ids.threadId }));
+
+        expect(resumed).toBe(true);
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("Stop lifts the snooze the pause put on the chat", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        expect(await snoozedUntil()).toBeDefined();
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(stopActiveForThread, { threadId: ids.threadId }));
+
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("an early Retry now keeps a snooze the owner chose for another time", async () => {
+        const later = Date.now() + 2 * 60 * 60 * 1000;
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", ids.threadId as never, { snoozeChosenAt: Date.now() - 1000, snoozedUntil: later }));
+
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited(), textStep("Hello there.")]);
+
+        await run();
+        await harness.run(async (ctx: any) => await ctx.runMutation(retryPausedRunsNow, { threadId: ids.threadId }));
+
+        expect(await snoozedUntil()).toBe(later);
+    });
+
+    it("tells the chat when the provider gave no reset time, and only then", async () => {
+        const { getActiveStreamForThread } = await import("./streaming");
+        const activePause = async () =>
+            (await harness.withIdentity({ userId: OWNER } as never).query(getActiveStreamForThread as never, { threadId: ids.threadId } as never)) as {
+                pause: object;
+            };
+
+        modelState.model = planned([
+            Object.assign(new Error("Gateway model proxy failed (502): rate limited"), {
+                rateLimit: { provider: "anthropic", status: 429 },
+                statusCode: 502,
+            }),
+        ]);
+
+        await run();
+
+        expect(await activePause()).toMatchObject({ pause: { resetUnreported: true } });
+    });
+
+    it("does not call the wait an unreported reset when the provider gave one", async () => {
+        const { getActiveStreamForThread } = await import("./streaming");
+
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const active = (await harness
+            .withIdentity({ userId: OWNER } as never)
+            .query(getActiveStreamForThread as never, { threadId: ids.threadId } as never)) as { pause: object };
+
+        expect(active.pause).not.toHaveProperty("resetUnreported");
+    });
 });

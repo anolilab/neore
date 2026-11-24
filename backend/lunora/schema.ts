@@ -2197,6 +2197,8 @@ export const schema = defineSchema({
         ),
         // The rows a run paused on, one per pause (`rate-limit-pause.ts#planPause`): a step is paused on once, a run three times.
         pausedSteps: v.optional(v.array(v.string())),
+        // The provider gave no reset time, so the pause's `retryAt` is the default wait, not a reset (`pauseRunForRateLimit`).
+        pauseResetUnreported: v.optional(v.literal(true)),
         producer: v.optional(v.literal("host")),
         // What the reply's usage record needs, kept from the run's start (`registerResumableRun`) for a run that dies before
         // any pause stored it in `pausedRun`.
@@ -4284,7 +4286,6 @@ export const schema = defineSchema({
         // (`auth/lib/personalization.ts`), and kept: a run with it gets no saved login. Server-written only.
         personalizationByImpersonator: v.optional(v.literal(true)),
         profession: v.optional(v.string()),
-<<<<<<< HEAD
         // The runner a new thread in each organization project starts on for this person, keyed by project id (`acp/lib/project-runner.ts`). Written server-side only, at most 200 projects.
         projectRunnerDefaults: v.optional(
             v.record(
