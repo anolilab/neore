@@ -818,10 +818,10 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             if (mustSignIn) {
                 openLoginPrompt();
 
-                return;
+                return undefined;
             }
 
-            await runReloadMessage(
+            return runReloadMessage(
                 {
                     authHeader,
                     defaultLanguage,
@@ -930,8 +930,10 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
         const lastAssistantMessage = messagesRef.current.findLast((m) => m.role === "assistant");
 
         if (lastAssistantMessage) {
-            await reloadMessage(lastAssistantMessage.id);
+            return reloadMessage(lastAssistantMessage.id);
         }
+
+        return undefined;
     }, [reloadMessage]);
 
     // Derived isEmpty boolean — only changes when empty↔non-empty transitions,
