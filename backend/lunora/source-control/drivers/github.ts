@@ -1014,7 +1014,9 @@ const comparisonSchema = z.object({ ahead_by: z.int().nonnegative(), behind_by: 
 
 /**
  * `GET /repos/{o}/{r}/compare/{base}...{sha}`: the head by its commit, which the host finds in a fork too (a fork shares the
- * base repository's network). One commit per page: only the counts are read.
+ * base repository's network). Only the counts are read, and the host sends them on every page but lists the changed files
+ * (patches included, up to 300) only on the first, so the second page of one commit is asked for: a large diff is
+ * never downloaded and cannot outgrow the response cap.
  */
 const compareWithBase = async (request: HostRequest, ref: PullRequestRef, baseBranch: string, headSha: string): Promise<BranchComparison> => {
     const base = branchPath(baseBranch);
@@ -1023,7 +1025,10 @@ const compareWithBase = async (request: HostRequest, ref: PullRequestRef, baseBr
         throw new HostApiError("Not a branch and commit to compare", 404);
     }
 
-    const comparison = parse(comparisonSchema, await readJson(await request(`${repoPath(ref)}/compare/${base}...${headSha}`, { query: { per_page: 1 } })));
+    const comparison = parse(
+        comparisonSchema,
+        await readJson(await request(`${repoPath(ref)}/compare/${base}...${headSha}`, { query: { page: 2, per_page: 1 } })),
+    );
 
     return { aheadBy: comparison.ahead_by, behindBy: comparison.behind_by };
 };

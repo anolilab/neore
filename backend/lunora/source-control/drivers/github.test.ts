@@ -606,8 +606,17 @@ describe("github driver: comparing a head with its base", () => {
 
         expect(comparison).toEqual({ aheadBy: 2, behindBy });
         expect(comparison.behindBy > 0).toBe(behind);
-        // Only the counts are read: one commit per page.
-        expect(calls).toEqual([{ path: COMPARE, query: { per_page: 1 } }]);
+        // Only the counts are read: the second page of one commit, which carries no changed files.
+        expect(calls).toEqual([{ path: COMPARE, query: { page: 2, per_page: 1 } }]);
+    });
+
+    it("reads the counts from a page past the commits, which lists no commits and no changed files", async () => {
+        // The host's shape for a page past the first: the counts, an empty commit list, no `files`.
+        const { request } = fakeHost({
+            [COMPARE]: (query) => (query.page === 2 ? { ahead_by: 1, behind_by: 7, commits: [], status: "diverged", total_commits: 1 } : { files: [] }),
+        });
+
+        await expect(githubDriver.compareWithBase(request, REF, "main", SHA)).resolves.toEqual({ aheadBy: 1, behindBy: 7 });
     });
 
     it("compares a fork's head by its commit in the base repository, never by the fork's branch name", async () => {
