@@ -1652,3 +1652,38 @@ describe("a headless machine paired by code", () => {
         ).rejects.toThrow(NOT_FOUND_ERROR);
     });
 });
+
+describe("the new-device alert", () => {
+    const alertsOf = async (userId: string) => {
+        const { page } = await harness.run(async (ctx: any) => await ctx.db.notifications.findMany({ where: { type: "device_paired", userId } }));
+
+        return page as { link?: string; title: string }[];
+    };
+
+    it("tells the owner when a device is paired, and not when that device reconnects", async () => {
+        const owner = await insertUser();
+        const { deviceId } = await register(owner);
+
+        const alerts = await alertsOf(owner);
+
+        expect(alerts).toHaveLength(1);
+        expect(alerts[0]).toMatchObject({ link: "/dashboard/settings/chat/devices", title: "Laptop" });
+
+        await expect(as(owner).mutation(functions.heartbeatDevice as never, { deviceId } as never)).resolves.toEqual({ paired: true });
+        expect(await alertsOf(owner)).toHaveLength(1);
+    });
+
+    it("tells the owner once when a machine paired by code is registered, and not again when its registration is retried", async () => {
+        const owner = await insertUser();
+        const registerByCode = async () =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.runMutation(internals.registerHeadlessDevice, { codeId: "code-alert", name: "build-box", platform: "linux", userId: owner }),
+            );
+
+        await registerByCode();
+        await registerByCode();
+
+        expect(await alertsOf(owner)).toHaveLength(1);
+    });
+});

@@ -12899,6 +12899,13 @@
               "nullable": false,
               "optional": false,
               "unique": false,
+              "literal": "\"device_paired\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
               "literal": "\"eval\""
             },
             {

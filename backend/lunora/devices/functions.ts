@@ -36,7 +36,7 @@ import {
 } from "./lib/constants";
 import { isAppVersion } from "./lib/app-version";
 import { scheduleClearDeviceProjects } from "./internal";
-import { assertRoomForDevice, insertDevice } from "./lib/register";
+import { announceNewDevice, assertRoomForDevice, insertDevice } from "./lib/register";
 import { parseAcpOffers, parseManifestTools } from "./lib/manifest";
 import { filterOwnProjectIds, ownProjectTitles } from "./lib/scope";
 import { claimWindowMs, expireOpenCalls, isAcpTool, isDeviceOutdated, isForwardPhase } from "./lib/state";
@@ -137,12 +137,15 @@ export const registerDevice = authMutation
             }
         }
 
+        const name = args.name.trim();
         const { deviceId, secret } = await insertDevice(ctx, {
-            name: args.name.trim(),
+            name,
             platform: args.platform,
             userId,
             ...(args.viaDeviceId !== undefined && { transport: "ssh" as const, viaDeviceId: args.viaDeviceId }),
         });
+
+        await announceNewDevice(ctx, { deviceId, name, userId });
 
         ctx.log.event("devices.register_device", { platform: args.platform, ssh: args.viaDeviceId !== undefined });
 

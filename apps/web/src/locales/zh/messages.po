@@ -2197,6 +2197,10 @@ msgstr "一个项目最多包含 {limit} 个规则文件。请先删除一个。
 msgid "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
 msgstr "公开的 http 或 https 地址。首次检查只记录页面的外观。仅读取页面的前 1 MiB。"
 
+#: src/features/notifications/lib/notification-labels.ts:56
+msgid "A new device signed in"
+msgstr "新设备已登录"
+
 #: src/features/notifications/lib/notification-labels.ts:40
 msgid "A question is waiting for you"
 msgstr "有一个问题在等你回答"

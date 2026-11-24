@@ -28,7 +28,7 @@ import {
 } from "./lib/constants";
 import { isDeviceInScope, resolveThreadProject } from "./lib/scope";
 import { signDevicePayload, utf8Length } from "./lib/signing";
-import { assertRoomForDevice, insertDevice } from "./lib/register";
+import { announceNewDevice, assertRoomForDevice, insertDevice } from "./lib/register";
 import { mergeTaint } from "./lib/taint";
 import { clearMachineFromProjects } from "../projects/machine-location";
 import { runAfterWithRetry } from "../lib/shard-scheduler";
@@ -454,6 +454,8 @@ export const registerHeadlessDevice = internalMutation
             transport: "headless",
             userId: args.userId,
         });
+
+        await announceNewDevice(ctx, { deviceId: registered.deviceId, name: args.name, userId: args.userId });
 
         ctx.log.event("devices.register_headless_device", { platform: args.platform });
 

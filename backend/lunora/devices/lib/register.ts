@@ -7,6 +7,7 @@ import { LunoraError } from "lunorash/server";
 import type { Doc } from "../../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import { encryptKey } from "../../lib/encryption";
+import { notifyQuietly } from "../../notifications/notify";
 import { setShardRoute } from "../../lib/shard-routes";
 import { DEVICE_LIMIT_CODE, MAX_DEVICES_PER_USER } from "./constants";
 import { generateDeviceSecret } from "./signing";
@@ -44,4 +45,20 @@ export const insertDevice = async (ctx: Pick<MutationCtx, "db" | "now">, device:
     await setShardRoute(ctx, "device", deviceId as string, device.userId);
 
     return { deviceId: deviceId as string, secret };
+};
+
+/**
+ * Tells the owner that a device was just paired or signed in for the first time. Called only right after a row is
+ * created (`registerDevice`, `registerHeadlessDevice`), so a routine reconnect of a known device never alerts. Keyed on
+ * the device id, so a redelivered registration notifies once. Goes through `notifyQuietly`: a notification failure
+ * never fails the pairing.
+ */
+export const announceNewDevice = async (ctx: MutationCtx, device: { deviceId: string; name: string; userId: string }): Promise<void> => {
+    await notifyQuietly(ctx, {
+        dedupeKey: `device-paired:${device.deviceId}`,
+        link: "/dashboard/settings/chat/devices",
+        title: device.name,
+        type: "device_paired",
+        userId: device.userId,
+    });
 };

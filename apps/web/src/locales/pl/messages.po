@@ -2197,6 +2197,10 @@ msgstr "Projekt może mieć najwyżej {limit} plików reguł. Najpierw usuń jed
 msgid "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
 msgstr "Publiczny adres http lub https. Pierwsze sprawdzenie tylko zapisuje wygląd strony. Odczytywany jest tylko pierwszy 1 MiB strony."
 
+#: src/features/notifications/lib/notification-labels.ts:56
+msgid "A new device signed in"
+msgstr "Zalogowano się na nowym urządzeniu"
+
 #: src/features/notifications/lib/notification-labels.ts:40
 msgid "A question is waiting for you"
 msgstr "Czeka na Ciebie pytanie"
