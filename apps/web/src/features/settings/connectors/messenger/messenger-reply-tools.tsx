@@ -63,7 +63,7 @@ const MessengerReplyTools: FC<MessengerReplyToolsProps> = ({ connectionId, disab
                         {t`Let replies use tools`}
                     </Label>
                     <p className="text-muted-foreground text-xs">
-                        {t`Replies can search, generate images and more, charged to your account. Tools set to "Ask" are skipped — nobody can approve them in a messenger.`}
+                        {t`Replies can search and more, charged to your account. Tools set to "Ask" are skipped — nobody can approve them in a messenger.`}
                     </p>
                 </div>
                 <Switch

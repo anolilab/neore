@@ -28940,8 +28940,8 @@ msgid "Replies and spend per day over the last 53 weeks"
 msgstr "過去53週間の1日あたりの返信数と支出"
 
 #: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:67
-msgid "Replies can search, generate images and more, charged to your account. Tools set to \"Ask\" are skipped — nobody can approve them in a messenger."
-msgstr "返信で検索や画像生成などができます。費用はあなたのアカウントに請求されます。「確認」に設定したツールはスキップされます（メッセンジャーでは誰も承認できないため）。"
+msgid "Replies can search and more, charged to your account. Tools set to \"Ask\" are skipped — nobody can approve them in a messenger."
+msgstr "返信で検索などができます。費用はあなたのアカウントに請求されます。「確認」に設定したツールはスキップされます（メッセンジャーでは誰も承認できないため）。"
 
 #: src/features/settings/components/chat/event-trigger-fields.tsx:155
 msgid "Replies in a thread"
