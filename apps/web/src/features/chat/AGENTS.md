@@ -34,17 +34,18 @@ apps/web/src/features/chat/
 
 ## WHERE TO LOOK
 
-| Task                    | Location                                | Notes                                         |
-| ----------------------- | --------------------------------------- | --------------------------------------------- |
-| Thread management       | core/hooks/use-threads.ts               | Thread CRUD operations                        |
-| AI model integration    | core/hooks/use-current-model.ts         | Model selection and configuration             |
-| Message handling        | lib/agent (`toUIMessages`, re-exported) | Message format conversion                     |
-| Prompt improvement      | prompt-improvement/                     | AI-powered prompt enhancement                 |
-| Thread tagging          | tags/                                   | Thread categorization                         |
-| Chat context            | core/context/chat-context.tsx           | React context for chat state                  |
-| **Pin messages**        | **pins/**                               | **Pin button in message-item.tsx action bar** |
-| **Right sidebar tabs**  | **core/stores/chat-ui-store.ts**        | **`activeRightSidebarTab` state + setter**    |
-| **Right sidebar panel** | **sidebar/thread-sidebar.tsx**          | **Tabs: summary, prompts, variables, pins**   |
+| Task                    | Location                                | Notes                                                         |
+| ----------------------- | --------------------------------------- | ------------------------------------------------------------- |
+| Thread management       | core/hooks/use-threads.ts               | Thread CRUD operations                                        |
+| AI model integration    | core/hooks/use-current-model.ts         | Model selection and configuration                             |
+| Message handling        | lib/agent (`toUIMessages`, re-exported) | Message format conversion                                     |
+| Prompt improvement      | prompt-improvement/                     | AI-powered prompt enhancement                                 |
+| Thread tagging          | tags/                                   | Thread categorization                                         |
+| Chat context            | core/context/chat-context.tsx           | React context for chat state                                  |
+| Pinned goal             | goal/pinned-goal.tsx                    | Owner pin; `send-message.ts` applies it when no goal is armed |
+| **Pin messages**        | **pins/**                               | **Pin button in message-item.tsx action bar**                 |
+| **Right sidebar tabs**  | **core/stores/chat-ui-store.ts**        | **`activeRightSidebarTab` state + setter**                    |
+| **Right sidebar panel** | **sidebar/thread-sidebar.tsx**          | **Tabs: summary, prompts, variables, pins**                   |
 
 ## CONVENTIONS
 

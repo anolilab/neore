@@ -171,6 +171,13 @@ describe(checkBatch, () => {
         expect(rejected.get("a")).toStrictEqual({ problems: ["missing placeholder {0}", "unexpected placeholder {name}"], translation: "Bonjour {name}" });
         expect(rejected.get("c")).toStrictEqual({ problems: ["no translation returned"], translation: null });
     });
+
+    it("rejects a reply that is a map of every locale's translation", () => {
+        const { accepted, rejected } = checkBatch([{ context: {}, key: "a", source: "Save" }], { 1: "{'de': 'Speichern', 'fr': 'Enregistrer'}" });
+
+        expect(accepted.size).toBe(0);
+        expect(rejected.get("a")?.problems).toContain("a map of locales, not this locale's translation");
+    });
 });
 
 describe(styleExamples, () => {

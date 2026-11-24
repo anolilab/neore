@@ -27,16 +27,19 @@ interface DocumentArtifactProps {
     documentId: string;
     kind: "code" | "design" | "image" | "sheet" | "text";
     language?: string;
+    /** The thread the document was made in, carried on its reference: the canvas opens it in that chat. */
+    threadId?: string;
     title: string;
     version: number;
 }
 
-const DocumentArtifact: FC<DocumentArtifactProps> = memo(({ className, documentId, kind, language, title, version }) => {
+const DocumentArtifact: FC<DocumentArtifactProps> = memo(({ className, documentId, kind, language, threadId: threadIdOnReference, title, version }) => {
     const { activeDocumentId, openCanvas } = useCanvasState();
     const { t } = useLingui();
     const crpc = useCRPC();
     // Read without throwing, so the card also renders where no chat provider is mounted. The panel shows only in the chat that opened it.
-    const threadId = use(ChatThreadContext)?.threadId;
+    // The thread on the reference comes first: a card with no chat provider mounted still opens its document in the chat it was made in.
+    const threadId = threadIdOnReference ?? use(ChatThreadContext)?.threadId;
     const onOpen = useCallback(
         (id: string) => {
             if (!openCanvas(id, threadId)) {
@@ -72,6 +75,7 @@ const DocumentArtifact: FC<DocumentArtifactProps> = memo(({ className, documentI
     const { data: document } = useQuery({
         ...crpc.agent.documents.getDocument.queryOptions({
             documentId: documentId as Id<"documents">,
+            threadId: (threadId || undefined) as Id<"threads"> | undefined,
         }),
         enabled: kind === "sheet",
     });

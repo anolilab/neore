@@ -4,14 +4,15 @@
 
 - The password is encrypted with the `site-logins` key purpose and never leaves the server: no client-reachable
   procedure, export, log line or model-facing list returns it or its ciphertext. The UI learns only `hasPassword: true`.
-  The one exception is the internal `siteLoginForFill`, which returns the ciphertext for the server-side fill action (the next part);
-  keep it internal and keep the ciphertext inside the action that decrypts it.
+  The one exception is the internal `siteLoginForFill`, which returns the ciphertext to the fill action
+  (`chat/tools/site-login-node.ts#fillSavedLogin`); keep it internal and keep the ciphertext inside that action.
 - A login belongs to one exact origin (`lib/site-origin.ts#normalizeSiteOrigin`: HTTPS only, punycode host, default
-  port dropped, a trailing-dot host refused since the browser keeps the dot). Compare origins as plain strings; never match a subdomain, port or suffix. The origin of a saved login
-  never changes on edit.
+  port dropped, a trailing-dot host refused since the browser keeps the dot). Compare origins as plain strings; never match a subdomain, port or suffix; the origin never changes on edit.
+  Its optional sign-in page (`signInUrl`, `normalizeSignInUrl`): a full `https://` URL, no credentials, origin exactly the login's (else `SITE_LOGIN_SIGN_IN_PAGE_REFUSED`), stored without its fragment;
+  empty clears it, absent on an edit keeps it. The fill opens only this page (or the front page), never one the model names.
 - Which run may use a login is decided from its THREAD, TURN and the text in front of the model, never from client
-  input, by ONE function: `site-login-turn.ts#siteLoginTurnVerdict`, an ALLOWLIST. Both queries use it, and the fill
-  tool of the next part must call it too (through `usableSiteLogins`), never a check of its own. Safe, and only this:
+  input, by ONE function: `site-login-turn.ts#siteLoginTurnVerdict`, an ALLOWLIST. Both queries use it, and so does the fill
+  tool (through `usableSiteLogins`), never a check of its own. Safe, and only this:
   the owner's own typed text (their row, text parts with no mark, attachment, guest or outside-agent text, goal note,
   compressed history or quote-like line, `carriesQuotedLines`: a quoted reply and a rich paste are unmarked `>` lines; a forward is also marked), the lead model's own replies (text, reasoning, tool calls; no speaker, `acp-host`, sources,
   memories, file, `neore…` metadata but `neoreGateway`), rows whose `agentName` is a model id or unset
@@ -41,14 +42,14 @@
   session reads as the user's own (`useImpersonationState`).
 - The export carries each login's `teammateIds`, never the password or ciphertext.
 - No audit triggers on `savedSiteLogins`: a history snapshot would outlive the row with the ciphertext in it.
-- The fill itself (browser tool, approval per site per thread, activity entry) is the next part; these are its rules. It passes
-  `siteLoginForFill` the origin of the page the browser is on, never a site the model names; checks that origin again
-  inside the browser-renderer right before typing, after any navigation; and decrypts and types in one action, never
-  returning the ciphertext from a workflow step or putting it in a queue payload. It fills the turn with `siteLoginTurnOf`
+- The fill is `signInWithSavedLogin` (`chat/tools/site-login.ts`; `needsApproval: true`, `BUILTIN_TOOLS_NEEDING_A_PERSON`).
+  The model names the site only (the page is above); the renderer's `/login` types in ONE call (its README has the rules). Owner's
+  domain lists apply, the session is held via `beginSessionUse` (`PERSON_HAS_CONTROL`), the action row is `login` naming the site only, and every
+  string read back is scrubbed (`withoutPassword`) twice. Decrypt and type in one action, never a step or queue payload. It fills the turn with `siteLoginTurnOf`
   from its tool context (`dispatchOrigin`, `headless`, `startedBy`, and `runTurn`: `impersonated`, the turn's own
   `promptMessageId`, `systemContext`; never `ToolCtx.promptMessageId`, which a resumed or approved run points at its own
   row), `stepMessages` as `ToolExecutionOptions.messages` holds them (never filtered) and `toolSources` with one entry
-  per offered tool. `runTurn` is set whole or not at all (`setRunTurn`): `/chat/start` records `impersonated` from the
+  per offered tool (`ToolCtx.runToolSources`, from the run's permission keys; unset refuses). `runTurn` is set whole or not at all (`setRunTurn`): `/chat/start` records `impersonated` from the
   session on the job (none without a sign-in session), `runStreamingAgent` adds the prompt and the kinds, and the
   approval snapshot and a pause's stored arguments carry them; a resume runs on the union of the stored kinds and the
   rebuilt ones, never fewer (`resumedSystemContext`; stored none: `unrecorded`, refused). An approval, question or secret answered by an admin
@@ -81,12 +82,12 @@
   `>` lines (`carriesQuotedLines`), not marked, so deleting the chip leaves typed text usable. A plain-text paste stays unseen. A new draft kind goes in
   `NOT_TYPED_DRAFTS` and `vNotTypedDraft` (`not-typed-text-validator.ts`; a type check fails until both agree), which the
   stored mark, `steerRun` and `saveLocalTurn` use; the `/chat/start`, steer and verdict tests walk the list. Words an admin wrote while
-  impersonating are marked on their row from the session, and the mark stays (no clear path yet, as
-  `contentByImpersonator`): a bot's name or instructions (`instructionsByImpersonator`), personalization and language
+  impersonating are marked on their row from the session, and the mark stays through any own edit; only the owner's
+  "Keep as mine" clears one field's mark (`keepBotInstructions`, `keepPersonalization`, `keepVariableValue` per name;
+  FORBIDDEN while impersonating; web `features/admin/components/changed-by-admin-mark.tsx`): a bot's name or instructions (`instructionsByImpersonator`), personalization and language
   (`personalizationByImpersonator`, `auth/lib/personalization.ts`, also `initializeUserSettings`; a field sent unchanged
   marks nothing), and variable values (`variablesByImpersonator`, user, organization and thread rows, per name: only a value changed or
-  added over the stored one, `prompts/functions.ts#markedNames`;
-  `getResolvedVariables` reports them as `impersonated` and the composer marks the draft so). `loadRunContext` names each
+  added over the stored one, `prompts/functions.ts#markedNames`; `getResolvedVariables` reports them as `impersonated` and the composer marks the draft so). `loadRunContext` names each
   system-prompt piece (`chat/lib/system-context-kinds.ts`, `systemContext`): a marked one is `…-impersonated`, and a
   thread's own language `thread-language`, which refuse. An accepted
   ghost-text completion marks an unmarked draft `suggestion`; Restore to input and prompt history of a message another
@@ -94,5 +95,5 @@
   row naming nobody counts as someone else's (`features/chat/core/utils/message-author.ts`). No mark is backfilled: the
   backend holds no data from before these marks, and past impersonation is recorded only by the client-reported
   `user.impersonate.*` audit entries, which name no row. The allowlist refuses a step holding a page's result or an approval's
-  request and response parts: the fill navigates and types inside its one call, and its own approval parts are admitted
-  only for that call's id, added here on purpose.
+  parts, but the fill's own request (`ownCallId`). An approved call runs with no messages (`tool-approval.ts`): its step
+  is the saved rows from the prompt down to the row holding that request (`approvedStepRefusal`); none found refuses.

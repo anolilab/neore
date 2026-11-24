@@ -6,6 +6,7 @@ import { Button } from "@neore/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Heading, HeadingSection } from "@neore/ui/components/heading";
 import { Label } from "@neore/ui/components/label";
+import { RadioGroup, RadioGroupItem } from "@neore/ui/components/radio-group";
 import { Separator } from "@neore/ui/components/separator";
 import { Switch } from "@neore/ui/components/switch";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -14,6 +15,17 @@ import type { FC } from "react";
 import { toast } from "sonner";
 
 import { useCRPC } from "@/lib/lunora/crpc";
+
+type BrowserClickMode = "page" | "pointer" | "all";
+
+/** The stored click mode as one of the three modes; anything else (an unset or unknown value) is the safe default, "page". */
+const toBrowserClickMode = (value: unknown): BrowserClickMode => {
+    if (value === "pointer" || value === "all") {
+        return value;
+    }
+
+    return "page";
+};
 
 /**
  * Agent Settings Component
@@ -39,6 +51,37 @@ const AgentSettings: FC = () => {
             onSuccess: () => {
                 void queryClient.invalidateQueries({ queryKey: crpc.auth.functions.getAIUserPreferences.queryKey({}) });
                 toast.success(t`Pull request settings updated`);
+            },
+        }),
+    );
+
+    const browserClickModeOptions: ReadonlyArray<{ description: string; label: string; mode: BrowserClickMode }> = [
+        {
+            description: t`The page is checked and clicked in one step, so nothing can change between them. Hover and press handlers respond. Popups and checks that need a real click may not work.`,
+            label: t`Checked in the page (recommended)`,
+            mode: "page",
+        },
+        {
+            description: t`Ordinary buttons and links are checked, then clicked for real, so popups and real-click checks work. A page can change one in the moment between that check and the press, and that press is not checked again, so an ordinary button can become a purchase unseen. Purchases you approve are still checked in the page.`,
+            label: t`Real clicks, purchases checked in the page`,
+            mode: "pointer",
+        },
+        {
+            description: t`Ordinary clicks are checked, then made for real. A page can change an ordinary button between the check and the press, so it can become a purchase unseen. Purchases you approve are still checked in the page.`,
+            label: t`Real clicks for everything`,
+            mode: "all",
+        },
+    ];
+
+    // Server-written too: how the agent's browser clicks has its own setter, like the commit identity.
+    const setBrowserClickModeMutation = useMutation(
+        crpc.chat.functions.setBrowserClickMode.mutationOptions({
+            onError: () => {
+                toast.error(t`Failed to update browser click settings`);
+            },
+            onSuccess: () => {
+                void queryClient.invalidateQueries({ queryKey: crpc.auth.functions.getAIUserPreferences.queryKey({}) });
+                toast.success(t`Browser click settings updated`);
             },
         }),
     );
@@ -224,6 +267,32 @@ const AgentSettings: FC = () => {
                                 {t`Retry`}
                             </Button>
                         ) : null}
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle id="browserClickModeTitle">{t`Browser Clicks`}</CardTitle>
+                        <CardDescription>{t`How the agent's browser presses buttons and links`}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <RadioGroup
+                            aria-labelledby="browserClickModeTitle"
+                            className="gap-4"
+                            disabled={setBrowserClickModeMutation.isPending || isAIPreferencesError}
+                            onValueChange={(value: unknown) => setBrowserClickModeMutation.mutate({ mode: toBrowserClickMode(value) })}
+                            value={toBrowserClickMode(aiPreferences?.browserClickMode)}
+                        >
+                            {browserClickModeOptions.map((option) => (
+                                <label className="flex cursor-pointer items-start gap-3" htmlFor={`browser-click-mode-${option.mode}`} key={option.mode}>
+                                    <RadioGroupItem className="mt-0.5" id={`browser-click-mode-${option.mode}`} value={option.mode} />
+                                    <span className="min-w-0 flex-1 space-y-1">
+                                        <span className="block font-medium">{option.label}</span>
+                                        <span className="text-muted-foreground block text-sm">{option.description}</span>
+                                    </span>
+                                </label>
+                            ))}
+                        </RadioGroup>
                     </CardContent>
                 </Card>
 

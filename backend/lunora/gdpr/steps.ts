@@ -4,6 +4,7 @@ import { buildUsageJson, spliceUsageJson, usageObjectKey } from "./usage-export-
 import { readStoredText } from "../lib/storage-read";
 import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
 import { collectAcpSessionPages } from "../acp/gdpr";
+import { BROWSER_EXPORT_BYTES, browserExportPageKey, readAllBrowserPages } from "../browser/export-pages";
 import { collectAllFeedback } from "../feedback/gdpr";
 import { collectAllTriggers } from "../triggers/export-pages";
 import { attachProjectRuleFiles, collectAllOwnedProjects, collectAllRepositories } from "../projects/export-pages";
@@ -17,6 +18,7 @@ import { queueEmail } from "../email/mailer";
 import { SITE_URL } from "../env";
 import { withDependency } from "../lib/dependency";
 import { storedPage, storedRows } from "../lib/stored-row";
+import { callOnShard } from "../lib/cross-shard";
 
 const TRAILING_SLASH = /\/$/;
 
@@ -239,6 +241,21 @@ export const collectConversations = internalAction.input({ userId: v.string() })
             text?: string;
             tool?: boolean;
         }[];
+        /** The owner's own pins on the thread: what each pins, the note on it and the text it quotes (`chat/pins/functions.ts`). */
+        pins: {
+            _id: string;
+            createdAt: number;
+            documentId?: string;
+            documentKind?: string;
+            imageIndex?: number;
+            imageKey?: string;
+            kind?: "document" | "image" | "message";
+            messageId?: string;
+            messageRole: string;
+            note?: string;
+            selectedText?: string;
+            updatedAt: number;
+        }[];
         thread: {
             _id: string;
             activeLeafMessageId?: string;
@@ -273,7 +290,7 @@ export const collectConversations = internalAction.input({ userId: v.string() })
 
         // Process current batch of threads
         for (const listed of threads.page) {
-            let collected: Omit<(typeof conversations)[number], "guestLinks" | "guestNotes"> | undefined;
+            let collected: Omit<(typeof conversations)[number], "guestLinks" | "guestNotes" | "pins"> | undefined;
 
             try {
                 // A locked chat is listed as its stub (no title, no model, no tags). The export
@@ -337,7 +354,12 @@ export const collectConversations = internalAction.input({ userId: v.string() })
                         ? []
                         : await readAllPages(async (cursor) => await context.runQuery(internal.chat.guest_links.listGuestNotesForExport, { cursor, threadId }));
 
-                conversations.push({ ...collected, guestLinks, guestNotes });
+                // The owner's pins, read by the owner's id: a pin someone else made on a shared thread is theirs to export.
+                const pins = await readAllPages(
+                    async (cursor) => await context.runQuery(internal.chat.pins.functions.listPinsForExport, { cursor, threadId, userId }),
+                );
+
+                conversations.push({ ...collected, guestLinks, guestNotes, pins });
             }
         }
 
@@ -355,6 +377,94 @@ export const collectConversations = internalAction.input({ userId: v.string() })
 
     return conversations;
 });
+
+/**
+ * The pins the caller made on threads other people shared with them. Such a thread and its pins live on its owner's shard, so the
+ * pins are read there, page by page, by the caller's own id. A thread's pins that the caller made nothing on are left out.
+ */
+export const collectSharedPins = internalAction.input({ userId: v.string() }).action(async ({ args: { userId }, ctx: context }) => {
+    const routes = await readAllPages(async (cursor) => await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, { cursor, userId }));
+    const shared: { pins: unknown[]; threadId: string; unreadable?: true }[] = [];
+
+    const seen = new Set<string>();
+
+    for (const route of routes) {
+        // A thread is read once, even if two routes name it (a replica can miss the first insert).
+        if (seen.has(route.threadId)) {
+            continue;
+        }
+
+        seen.add(route.threadId);
+
+        let pins: unknown[];
+
+        try {
+            pins = await readAllPages(
+                async (cursor) =>
+                    await callOnShard(
+                        internal.chat.pins.functions.listPinsForExport,
+                        { cursor, threadId: route.threadId as Id<"threads">, userId },
+                        { shardKey: route.ownerId },
+                    ),
+            );
+        } catch (error) {
+            // One owner's shard that cannot be read (an unreachable shard, a thread removed mid-read) must not fail the whole export:
+            // the thread is listed as unreadable, so the file says its pins were not included rather than dropping them silently.
+            gdprLogger.error(`Failed to read shared pins for thread ${route.threadId}:`, error);
+            shared.push({ pins: [], threadId: route.threadId, unreadable: true });
+            continue;
+        }
+
+        if (pins.length > 0) {
+            shared.push({ pins, threadId: route.threadId });
+        }
+    }
+
+    return shared;
+});
+
+/**
+ * Erases the caller's pins on the threads other people own, from each owner's shard, before the routes that find them are removed
+ * (`gdpr/workflows/deletion-workflow.ts`). A collaborator's pins are written on the owner's shard, so the caller's own shard holds none.
+ */
+export const erasePinsOnOwnerShards = internalAction
+    .input({ release: v.optional(v.boolean()), userId: v.string() })
+    .output(v.null())
+    .action(async ({ args: { release, userId }, ctx: context }) => {
+        const routes = await readAllPages(
+            async (cursor) => await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, { cursor, userId }),
+        );
+        const owners = [...new Set(routes.map((route) => route.ownerId))];
+
+        // Each owner shard is fenced before it is swept: a pin write of this account that commits on it from now on is refused in its own
+        // transaction, so nothing it writes escapes the sweep. The fence is lifted once the second sweep has run (`release`).
+        for (const ownerId of owners) {
+            await callOnShard(internal.lib.account_moves.fencePinsOnShardFor, { userId }, { shardKey: ownerId });
+        }
+
+        for (const route of routes) {
+            // One batch per call on the owner's shard: repeat until none is left.
+            let more = true;
+
+            while (more) {
+                const result = await callOnShard(
+                    internal.chat.pins.functions.eraseUserPinsOnThread,
+                    { threadId: route.threadId as Id<"threads">, userId },
+                    { shardKey: route.ownerId },
+                );
+
+                more = result.hasMore;
+            }
+        }
+
+        if (release === true) {
+            for (const ownerId of owners) {
+                await callOnShard(internal.lib.account_moves.unfencePinsOnShardFor, { userId }, { shardKey: ownerId });
+            }
+        }
+
+        return null;
+    });
 
 export const collectFiles = internalQuery
     .input({ userId: v.string() })
@@ -385,6 +495,7 @@ export const collectFiles = internalQuery
                 v.object({
                     createdAt: v.number(),
                     label: v.optional(v.string()),
+                    signInUrl: v.optional(v.string()),
                     site: v.string(),
                     teammateIds: v.array(v.id("bots")),
                     updatedAt: v.number(),
@@ -433,6 +544,7 @@ export const collectFiles = internalQuery
                 return {
                     createdAt: login.createdAt,
                     label: login.label,
+                    signInUrl: login.signInUrl,
                     site: login.origin,
                     teammateIds: login.teammateIds ?? [],
                     updatedAt: login.updatedAt,
@@ -559,6 +671,12 @@ export const generateExportFile = internalAction
         // Bots, their persona and computer settings (`bots/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
         bots: v.optional(v.any()),
+        // The workflow stopped at `BROWSER_EXPORT_PAGES` with history left: the section is marked as cut.
+        browserCut: v.optional(v.boolean()),
+        // How many browser pages the workflow stored under `browserPrefix` (`browser/export-pages.ts`), read here. Optional for
+        // the same in-flight-replay reason as `threadTags`.
+        browserPages: v.optional(v.number()),
+        browserPrefix: v.optional(v.string()),
         // Coding-agent runs (`coding-agents/gdpr.ts`). Optional for the same
         // in-flight-replay reason as `threadTags`.
         codingAgentRuns: v.optional(v.any()),
@@ -596,6 +714,9 @@ export const generateExportFile = internalAction
         // The outbound run webhook's URL and switch, never its secret (`run-webhooks/gdpr.ts`). Optional for the same reason.
         runWebhooks: v.optional(v.any()),
         settings: v.any(),
+        // The pins the caller made on threads shared with them, read from each owner's shard (`collectSharedPins`). Optional for
+        // the same in-flight-replay reason as `threadTags`.
+        sharedThreadPins: v.optional(v.any()),
         // Goals and tasks with their run history (`tasks/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
         tasks: v.optional(v.any()),
@@ -689,9 +810,22 @@ export const generateExportFile = internalAction
             ),
             PROJECT_CONTEXT_EXPORT_BYTES,
         );
+        // The browser pages, read from their objects, so neither this action's arguments nor its read budget carry them.
+        // Held to its share of the file: past it the section is cut and says so, and the rest of the export is written.
+        const { browserCut, browserPages, browserPrefix } = args;
+        const browser =
+            browserPrefix === undefined || browserPages === undefined
+                ? { actions: [], extensions: [], humanChecks: [], sessions: [] }
+                : await readAllBrowserPages(
+                      async (page) => await readStoredText(context.storage, browserExportPageKey(browserPrefix, page), { maxBytes: MAX_EXPORT_BYTES }),
+                      browserPages,
+                      BROWSER_EXPORT_BYTES,
+                      browserCut === true,
+                  );
         const exportData = {
             acpSessions,
             bots: args.bots ?? { bots: [] },
+            browser,
             codingAgentRuns: args.codingAgentRuns ?? [],
             conversations: args.conversations,
             dataSubject: {
@@ -717,6 +851,7 @@ export const generateExportFile = internalAction
             reviewDrafts: args.reviewDrafts ?? { drafts: [] },
             runWebhooks: args.runWebhooks ?? { runWebhooks: [] },
             settings: args.settings,
+            sharedThreadPins: args.sharedThreadPins ?? [],
             subAgentRuns: activity?.subAgentRuns ?? [],
             tasks: args.tasks ?? { goals: [], tasks: [] },
             threadFollows: threadFollows.section,

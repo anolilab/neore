@@ -13,7 +13,9 @@ import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { internalQuery } from "../_generated/server";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { admitPinWriteUnlessMoving } from "../lib/account-moves";
 import { decryptKey, encryptKey } from "../lib/encryption";
+import { onOwnShard } from "../lib/own-shard";
 import { deliverRunWebhook } from "./delivery";
 import { buildTestEvent, generateRunWebhookSecret, MAX_RUN_WEBHOOK_URL_LENGTH, runWebhookUrlProblem } from "./payload";
 
@@ -30,6 +32,28 @@ const vRunWebhookView = v.object({
     url: v.optional(v.string()),
 });
 
+/**
+ * Nothing that holds or uses the signing secret runs while an admin acts as the owner: a save or a rotation hands the
+ * secret back, and a test signs with it, so either would let the admin keep or use a credential with no impersonation
+ * mark (`backend/lunora/auth/AGENTS.md`). The read returns no secret and stays open.
+ */
+const refuseImpersonation = (impersonatedBy: string | null | undefined): void => {
+    if (impersonatedBy) {
+        throw new LunoraError("FORBIDDEN", "The run webhook cannot be changed or tested while impersonating.");
+    }
+};
+
+/**
+ * A guest merge copies the guest's webhook and then clears the guest's shard. A save or rotation that commits between the two
+ * would be lost, so a write takes the same fence pins use (`lib/account-moves.ts`): refused once the account is marked as
+ * merging or erased, and otherwise holding the account's lease, which the merge waits out before it copies.
+ */
+const refuseWhileMoving = async (ctx: Parameters<typeof admitPinWriteUnlessMoving>[0], userId: string, now: number): Promise<void> => {
+    if (await admitPinWriteUnlessMoving(ctx, userId, now)) {
+        throw new LunoraError("FORBIDDEN", "The run webhook cannot be changed while this account is being moved or erased.");
+    }
+};
+
 /** The user's row, if any. Reads are bounded by the one-row-per-user rule. */
 const ownRow = async (ctx: Pick<QueryCtx, "db">, userId: string): Promise<Doc<"runWebhooks"> | null> => {
     const { page } = await ctx.db.runWebhooks.findMany({ limit: 1, where: { userId } });
@@ -37,11 +61,22 @@ const ownRow = async (ctx: Pick<QueryCtx, "db">, userId: string): Promise<Doc<"r
     return page[0] ?? null;
 };
 
+/**
+ * The webhook lives on its owner's own shard only, where export, erasure and the account merge read it. A call that
+ * names a shared thread owner's shard, or `__root__`, is refused there: a row saved on it would escape all three.
+ */
+const assertOwnShard = (userId: string): void => {
+    if (!onOwnShard(userId)) {
+        throw new LunoraError("FORBIDDEN", "The run webhook is saved on your own account only.");
+    }
+};
+
 export const getRunWebhook = authQuery
     .input({})
     .output(vRunWebhookView)
     .query(async ({ ctx }) => {
-        const row = await ownRow(ctx, ctx.user.userId);
+        // Off the caller's own shard nothing of theirs is there to read.
+        const row = onOwnShard(ctx.user.userId) ? await ownRow(ctx, ctx.user.userId) : null;
 
         return row ? { configured: true, enabled: row.enabled, url: row.url } : { configured: false, enabled: false };
     });
@@ -58,7 +93,11 @@ export const saveRunWebhook = authMutation
     .use(rateLimit("runWebhooks/update"))
     .output(v.object({ secret: v.optional(v.string()) }))
     .mutation(async ({ args, ctx: context }) => {
-        const { userId } = context.user;
+        const { impersonatedBy, userId } = context.user;
+
+        refuseImpersonation(impersonatedBy);
+        assertOwnShard(userId);
+
         const problem = runWebhookUrlProblem(args.url);
 
         if (problem !== null) {
@@ -69,6 +108,9 @@ export const saveRunWebhook = authMutation
         // input gate then keeps two first saves from both finding no row (the same read-then-write rule `rls/policies.ts` names).
         const secret = generateRunWebhookSecret();
         const secretCiphertext = await encryptKey(secret, "tool-keys");
+
+        await refuseWhileMoving(context, userId, context.now);
+
         const existing = await ownRow(context, userId);
 
         if (existing) {
@@ -98,16 +140,23 @@ export const rotateRunWebhookSecret = authMutation
     .use(rateLimit("runWebhooks/update"))
     .output(v.object({ secret: v.string() }))
     .mutation(async ({ ctx: context }) => {
+        refuseImpersonation(context.user.impersonatedBy);
+        assertOwnShard(context.user.userId);
+
+        // Encrypted before the fence, so the lease is taken right before the write it covers.
+        const secret = generateRunWebhookSecret();
+        const secretCiphertext = await encryptKey(secret, "tool-keys");
+
+        await refuseWhileMoving(context, context.user.userId, context.now);
+
         const existing = await ownRow(context, context.user.userId);
 
         if (!existing) {
             throw new LunoraError("NOT_FOUND", "Save a webhook URL first.");
         }
 
-        const secret = generateRunWebhookSecret();
-
         await context.db.patch("runWebhooks", existing._id, {
-            secretCiphertext: await encryptKey(secret, "tool-keys"),
+            secretCiphertext,
             updatedAt: context.now,
         });
         context.log.event("runWebhooks.rotate_secret", {});
@@ -134,7 +183,11 @@ export const sendRunWebhookTest = authAction
     .input({})
     .output(vDeliveryResult)
     .action(async ({ ctx: context }) => {
-        const { userId } = context.user;
+        const { impersonatedBy, userId } = context.user;
+
+        refuseImpersonation(impersonatedBy);
+        assertOwnShard(userId);
+
         const row = await context.runQuery(internal.run_webhooks.functions.getRunWebhookInternal, { userId });
 
         if (!row.found || row.url === undefined || row.secretCiphertext === undefined) {

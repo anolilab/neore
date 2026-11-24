@@ -19,11 +19,14 @@ import { authAction, authMutation, authQuery, internalMutation, internalQuery, r
 import { throwForbidden, throwThreadNotFound } from "../lib/error-helpers";
 import { hmacSha256Hex, timingSafeEqual } from "../lib/crypto";
 import { fetchWithDeadline } from "../lib/fetch-timeout";
+import { getRateLimitKey, getUserTier } from "../lib/rate-limiter";
 import { systemDb } from "../lib/rls/scope";
 import { isServiceBound, serviceFetch } from "../lib/services";
 import { validateDomain } from "../chat/tools/utilities";
 import { activeThreadSession } from "./functions";
+import { claimIdOf, releaseTokenFor } from "./release-token";
 import { patchRow } from "../lib/patch";
+import { currentShard, ROOT_SHARD_KEY } from "../lib/shard-context";
 import {
     browserAliveUntil,
     browserIdOf,
@@ -51,6 +54,11 @@ type ReaderBrowser =
           kind: "watchable";
           providerSessionId: string;
           session: Doc<"browserSessions">;
+          /**
+           * The shard the session row is on: the one serving this read (the thread owner's). Never the row's `userId`, which names whoever opened
+           * the browser (a collaborator's first action in a shared thread opens it on the owner's shard).
+           */
+          shardKey: string;
       }
     | { kind: "denied" }
     | { kind: "none" };
@@ -85,7 +93,7 @@ const settled = <C extends { renewing?: string; renewingEnded?: string }>({
  * Takes, keeps and drives no browser while an admin acts as the owner: the browser is signed in to the owner's sites,
  * and what is opened in it is recorded as the owner's own. `handBack` stays open, so a lease can always be ended.
  */
-const refuseImpersonation = (impersonatedBy: string | null | undefined): void => {
+export const refuseImpersonation = (impersonatedBy: string | null | undefined): void => {
     if (impersonatedBy) {
         throw new LunoraError("FORBIDDEN", "The browser cannot be controlled while impersonating");
     }
@@ -148,8 +156,13 @@ const readerBrowser = async (
         kind: "watchable",
         providerSessionId,
         session,
+        shardKey: currentShard() ?? access.thread.userId ?? ROOT_SHARD_KEY,
     };
 };
+
+/** The public names of the claims that name `lease`: its own, and the one a renewal still being minted replaces. */
+const leaseClaimIds = async (lease: { claim: string; renewing?: string }): Promise<string[]> =>
+    await Promise.all([lease.claim, ...(lease.renewing === undefined ? [] : [lease.renewing])].map(async (claim: string) => await claimIdOf(claim)));
 
 /**
  * The thread's running cloud browser, or `null`. A grantee's read goes through the thread decision, then past row-level
@@ -168,9 +181,14 @@ export const getThreadBrowser = authQuery
                 canControl: v.boolean(),
                 /**
                  * A person drives the browser until `until`; `byYou`: the caller (from any of their tabs). `byClaim`, only
-                 * with a `claim` asked for: the lease is the one that claim names, and not handed back.
+                 * with a `claim` asked for: the lease is the one that claim names, and not handed back. `claimIds`, only
+                 * when it is the caller's: the public names (`claimIdOf`) of the claims that name the lease (its own, and
+                 * the one a renewal still being minted replaces), so a tab tells at once that another of the caller's
+                 * tabs took it over.
                  */
-                control: v.optional(v.object({ byClaim: v.optional(v.boolean()), byYou: v.boolean(), until: v.number() })),
+                control: v.optional(
+                    v.object({ byClaim: v.optional(v.boolean()), byYou: v.boolean(), claimIds: v.optional(v.array(v.string())), until: v.number() }),
+                ),
                 currentUrl: v.optional(v.string()),
                 idleUntil: v.number(),
                 /**
@@ -199,6 +217,7 @@ export const getThreadBrowser = authQuery
                 control: {
                     ...(claim !== undefined && { byClaim: control.byCaller && lease?.ended === undefined && claimNames(lease, claim) }),
                     byYou: control.byCaller,
+                    ...(control.byCaller && lease !== undefined && { claimIds: await leaseClaimIds(lease) }),
                     until: control.until,
                 },
             }),
@@ -384,6 +403,8 @@ export const claimControl = internalMutation
                 providerSessionId: v.string(),
                 /** An earlier lease ended and the agent was not told yet: a dropped claim puts that note back. */
                 returned: v.optional(v.union(v.literal("browser_closed"), v.literal("handed_back"), v.literal("idle"), v.literal("left"))),
+                /** The thread owner's shard, where the session row is: a closing page's hand back is sent there. */
+                shardKey: v.string(),
                 /** When the lease this claim wrote ends unrenewed. */
                 until: v.number(),
             }),
@@ -442,6 +463,7 @@ export const claimControl = internalMutation
                 kind: "ok" as const,
                 previousClaim: current.renewing ?? current.claim,
                 providerSessionId: browser.providerSessionId,
+                shardKey: browser.shardKey,
                 until,
                 ...(current.ended !== undefined && { handedBack: current.ended }),
             };
@@ -454,7 +476,15 @@ export const claimControl = internalMutation
             control: { by, claim, since: ctx.now, until },
         });
 
-        return { claim, fresh: true, kind: "ok" as const, providerSessionId: browser.providerSessionId, until, ...(returned !== undefined && { returned }) };
+        return {
+            claim,
+            fresh: true,
+            kind: "ok" as const,
+            providerSessionId: browser.providerSessionId,
+            shardKey: browser.shardKey,
+            until,
+            ...(returned !== undefined && { returned }),
+        };
     });
 
 /**
@@ -571,8 +601,18 @@ export const takeControl = authAction
             /**
              * `claim` names this lease: the view passes it to `keepControl`, `handBack` and `navigateInControl`. `until`:
              * when the lease ends unrenewed, on the server's clock, so the view need not wait for a status read to know.
+             * `claimId`: the claim's public name, as the live status shows it. `release`: the token a closing page sends
+             * to `POST /browser/release` (a beacon carries no session), good for this claim's lease alone.
              */
-            v.object({ claim: v.string(), connectBy: v.number(), status: v.literal("ok"), until: v.number(), url: v.string() }),
+            v.object({
+                claim: v.string(),
+                claimId: v.string(),
+                connectBy: v.number(),
+                release: v.optional(v.string()),
+                status: v.literal("ok"),
+                until: v.number(),
+                url: v.string(),
+            }),
             v.object({ status: v.union(v.literal("busy"), v.literal("ended"), v.literal("taken"), v.literal("unavailable")) }),
         ),
     )
@@ -687,7 +727,17 @@ export const takeControl = authAction
 
         ctx.log.event("browser.control_taken", { ok: true, reason: claim.fresh ? "fresh" : "renewed" });
 
-        return { claim: claim.claim, connectBy: Date.now() + LIVE_VIEW_CONNECT_DEADLINE_MS, status: "ok" as const, until: claim.until, url };
+        const release = await releaseTokenFor({ claim: claim.claim, shardKey: claim.shardKey, threadId });
+
+        return {
+            claim: claim.claim,
+            claimId: await claimIdOf(claim.claim),
+            connectBy: Date.now() + LIVE_VIEW_CONNECT_DEADLINE_MS,
+            ...(release !== undefined && { release }),
+            status: "ok" as const,
+            until: claim.until,
+            url,
+        };
     });
 
 /**
@@ -726,6 +776,44 @@ export const keepControl = authMutation
     });
 
 /**
+ * Ends the lease `claim` names, the way its view closed, as {@link handBack} does. `again`: a send again of a hand back
+ * that already landed; `renewing`: the view a renewal is replacing closed, which only records how; `undefined`: the
+ * lease is not that claim's (another person's, a newer claim, or lapsed), or `isHolder` refused it.
+ */
+const returnLease = async (
+    db: Parameters<typeof patchRow>[0],
+    session: Doc<"browserSessions"> | null,
+    claim: string,
+    reason: "handed_back" | "left",
+    now: number,
+    isHolder: (session: Doc<"browserSessions">) => Promise<boolean>,
+): Promise<"again" | "ended" | "renewing" | undefined> => {
+    // A send again of a hand back that already landed (its answer did not get through): it changes nothing.
+    if (session?.control?.claim === claim && (session.control.ended === "handed_back" || session.control.ended === "left") && (await isHolder(session))) {
+        return "again";
+    }
+
+    if (session === null || !claimNames(session.control, claim) || controlStateOf(session, now) !== "person" || !(await isHolder(session))) {
+        return undefined;
+    }
+
+    // A view a renewal is replacing closed: the renewal decides (another tab of the person's may be taking over), and
+    // ends the lease the way this view closed if it fails, as no view holds it then.
+    if (session.control.claim !== claim) {
+        await patchRow(db, "browserSessions", session, { control: { ...settled(session.control), renewingEnded: reason } });
+
+        return "renewing";
+    }
+
+    // A page the person asked for is still loading: the agent waits for it too, then the lease ends with it.
+    const until = Math.max(now, session.control.navigatingUntil ?? 0);
+
+    await patchRow(db, "browserSessions", session, { ...activeNow(session, now), control: { ...session.control, ended: reason, until } });
+
+    return "ended";
+};
+
+/**
  * The person gives the browser back (`handed_back`) or left the view (`left`); the agent's next action is told. Takes
  * no thread decision and no rate limit: it only ends the caller's own lease, and only the one `claim` names, so an
  * older tab of theirs closing never ends the lease a newer tab took. Answers whether that claim's lease is handed back
@@ -736,44 +824,40 @@ export const handBack = authMutation
     .input({ claim: v.string(), reason: v.union(v.literal("handed_back"), v.literal("left")), threadId: v.id("threads") })
     .output(v.boolean())
     .mutation(async ({ args: { claim, reason, threadId }, ctx }) => {
-        const session = await activeThreadSession(systemDb(ctx), threadId);
+        const db = systemDb(ctx);
+        const ended = await returnLease(
+            db,
+            await activeThreadSession(db, threadId),
+            claim,
+            reason,
+            ctx.now,
+            async (session) => await holdsLease(session, ctx.user.userId),
+        );
 
-        // A send again of a hand back that already landed (its answer did not get through): it changes nothing.
-        if (
-            session?.control?.claim === claim &&
-            (session.control.ended === "handed_back" || session.control.ended === "left") &&
-            (await holdsLease(session, ctx.user.userId))
-        ) {
-            return true;
-        }
-
-        if (
-            session !== null &&
-            claimNames(session.control, claim) &&
-            controlStateOf(session, ctx.now) === "person" &&
-            (await holdsLease(session, ctx.user.userId))
-        ) {
-            // A view a renewal is replacing closed: the renewal decides (another tab of the person's may be taking
-            // over), and ends the lease the way this view closed if it fails, as no view holds it then.
-            if (session.control.claim !== claim) {
-                await patchRow(systemDb(ctx), "browserSessions", session, { control: { ...settled(session.control), renewingEnded: reason } });
-
-                return false;
-            }
-
-            // A page the person asked for is still loading: the agent waits for it too, then the lease ends with it.
-            const until = Math.max(ctx.now, session.control.navigatingUntil ?? 0);
-
-            await patchRow(systemDb(ctx), "browserSessions", session, {
-                ...activeNow(session, ctx.now),
-                control: { ...session.control, ended: reason, until },
-            });
+        if (ended === "ended") {
             ctx.log.event("browser.control_returned", { reason });
-
-            return true;
         }
 
-        return false;
+        return ended === "ended" || ended === "again";
+    });
+
+/**
+ * A closing page's hand back (`POST /browser/release`), which carries no session: the route verified the release token
+ * `takeControl` gave the claim's holder alone, and this runs on the shard it names. It ends only the lease that claim
+ * names, as `handBack` would: `left`, or `handed_back` for a page that closed while the person's own hand back was
+ * still out. A newer claim, or a lease already ended, is left as it is.
+ */
+export const releaseControl = internalMutation
+    .input({ claim: v.string(), reason: v.union(v.literal("handed_back"), v.literal("left")), threadId: v.id("threads") })
+    .output(v.boolean())
+    .mutation(async ({ args: { claim, reason, threadId }, ctx }) => {
+        const ended = await returnLease(ctx.db, await activeThreadSession(ctx.db, threadId), claim, reason, ctx.now, async () => true);
+
+        if (ended === "ended") {
+            ctx.log.event("browser.control_returned", { reason });
+        }
+
+        return ended === "ended" || ended === "again";
     });
 
 /**
@@ -826,17 +910,28 @@ export const navigateInControl = authAction
         // and one too late for any of it is not sent (no answer, like a call that failed: the browser is left as it is).
         const budget = rendererCallBudget(navigation.navigatingUntil, startedAt);
         const signal = budget === 0 ? undefined : AbortSignal.timeout(budget);
-        const { data } =
+        const { data, error, response } =
             signal === undefined
-                ? { data: undefined }
+                ? { data: undefined, error: undefined, response: undefined }
                 : await browserAction({
                       body: { action: "navigate", sessionId: navigation.providerSessionId, url },
                       client,
                       signal,
                   }).catch(() => {
-                      return { data: undefined };
+                      return { data: undefined, error: undefined, response: undefined };
                   });
         const result = data as BrowserActionResponse | undefined;
+        // The renderer retired the browser for good: the row forgets it, so the next action opens a new one.
+        const isRetired = response?.status === 410;
+        // The renderer lost the call's hold while the page loaded (a 503 that ran something): the page may have opened,
+        // and the browser it names (a new one, when the row's could not be reconnected) stays the row's.
+        const withheld =
+            response?.status === 503 && response.headers?.get?.("x-browser-action") !== "not-run"
+                ? ((error ?? {}) as { error?: unknown; sessionId?: unknown })
+                : undefined;
+        const withheldSessionId = typeof withheld?.sessionId === "string" ? withheld.sessionId : undefined;
+        const withheldError = typeof withheld?.error === "string" ? withheld.error : undefined;
+
         // A call cut off at its deadline may still be loading the page in the renderer: its hold runs out on its own, so
         // the agent never acts while it lands. The signal, as the clock may lag the timer that fired it.
         const mayStillLoad = signal !== undefined && result === undefined && (signal.aborted || Date.now() >= startedAt + budget);
@@ -849,37 +944,58 @@ export const navigateInControl = authAction
         let logged: { replaced: boolean } | undefined;
 
         try {
-            logged = await ctx.runMutation(internal.browser.functions.logAction, {
-                action: "navigate",
-                actor: navigation.byOwner ? "owner" : "collaborator",
-                durationMs: Date.now() - startedAt,
-                ...(result?.success !== true && { errorMessage: result?.error ?? "The page could not be opened." }),
-                ...(result !== undefined && { providerSessionId: result.sessionId ?? NO_PROVIDER_SESSION }),
-                sessionId: navigation.sessionId,
-                startedAt,
-                startedWithProviderSessionId: navigation.providerSessionId,
-                success: result?.success === true,
-                target: url,
-            });
-        } finally {
-            if (!mayStillLoad) {
-                await ctx.runMutation(internal.browser.live_view.endControlNavigation, {
-                    at: Date.now(),
-                    navigatingUntil: navigation.navigatingUntil,
+            try {
+                logged = await ctx.runMutation(internal.browser.functions.logAction, {
+                    action: "navigate",
+                    actor: navigation.byOwner ? "owner" : "collaborator",
+                    durationMs: Date.now() - startedAt,
+                    ...(result?.success !== true && { errorMessage: result?.error ?? withheldError ?? "The page could not be opened." }),
+                    ...((result !== undefined || isRetired) && { providerSessionId: result?.sessionId ?? NO_PROVIDER_SESSION }),
+                    ...(withheldSessionId !== undefined && { providerSessionId: withheldSessionId }),
                     sessionId: navigation.sessionId,
-                    userId,
+                    startedAt,
+                    startedWithProviderSessionId: navigation.providerSessionId,
+                    success: result?.success === true,
+                    target: url,
                 });
+            } finally {
+                if (!mayStillLoad) {
+                    await ctx.runMutation(internal.browser.live_view.endControlNavigation, {
+                        at: Date.now(),
+                        navigatingUntil: navigation.navigatingUntil,
+                        sessionId: navigation.sessionId,
+                        userId,
+                    });
+                }
+            }
+        } finally {
+            // The renderer opened nothing (the session was retired, or its lock refused the call): the person's charge for
+            // this navigation is given back, as the agent's is (`chat/tools/browser-node.ts`). After the row is logged and
+            // the hold ended, whether or not those writes succeed, and a refund that fails is let go: it never keeps a
+            // hold or a retired browser on the row, nor hides their error.
+            if (isRetired || response?.headers?.get?.("x-browser-action") === "not-run") {
+                await ctx
+                    .runMutation(internal.lib.rate_limiter_mutations.refundRateLimit, {
+                        identifier: userId,
+                        key: getRateLimitKey("browser/control", getUserTier({ plan: ctx.user.plan })),
+                    })
+                    .catch(() => undefined);
             }
         }
 
         // The row was closed or moved on to another browser meanwhile (`replaced` covers both), or the renderer opened
         // the page in a new browser (the old one expired), which ended the lease: the person's view shows a browser gone.
-        if (logged?.replaced === true || (result?.success === true && (result.sessionId ?? NO_PROVIDER_SESSION) !== navigation.providerSessionId)) {
+        if (
+            logged?.replaced === true ||
+            isRetired ||
+            (result?.success === true && (result.sessionId ?? NO_PROVIDER_SESSION) !== navigation.providerSessionId) ||
+            (withheldSessionId !== undefined && withheldSessionId !== navigation.providerSessionId)
+        ) {
             return { status: "closed" as const };
         }
 
         if (result?.success !== true) {
-            return { error: result?.error ?? "The page could not be opened.", status: "refused" as const };
+            return { error: result?.error ?? withheldError ?? "The page could not be opened.", status: "refused" as const };
         }
 
         return { status: "ok" as const, ...(result.url !== undefined && { url: result.url }) };

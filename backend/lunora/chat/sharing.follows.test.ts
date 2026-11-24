@@ -80,6 +80,7 @@ const remove = async () => await as(OWNER).mutation(removeThreadAccess as never,
 beforeAll(async () => {
     registerModule(registry, "chat_sharing", await import("./sharing"));
     registerModule(registry, "agent_sharing", await import("../agent/sharing"));
+    registerModule(registry, "agent_followup_suggestions", await import("../agent/followup-suggestions"));
     registerModule(registry, "chat_follows_functions", await import("./follows/functions"));
 });
 

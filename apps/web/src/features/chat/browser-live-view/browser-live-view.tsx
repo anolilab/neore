@@ -19,6 +19,7 @@ import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import { onBrowserControlRequest } from "@/features/chat/browser-live-view/control-request";
 import { usePassed, useStatusSkew } from "@/features/chat/browser-live-view/status-clock";
+import env from "@/lib/env";
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
 /**
@@ -112,15 +113,29 @@ type NavigationAnswer = { error: string; status: "refused" } | { status: "closed
 
 type Answer =
     | { status: "busy" | "controlled" | "ended" | "taken" | "unavailable" }
-    | { claim?: string; connectBy: number; status: "ok"; until?: number; url: string };
+    | { claim?: string; claimId?: string; connectBy: number; release?: string; status: "ok"; until?: number; url: string };
 
 /**
  * The claim this tab holds, on the server's clock. Its lease was written before `writtenBy` (when `takeControl`
  * answered), so only a status read from then on can have seen it: an older one says nothing about this claim. `until`:
  * when the lease ends unrenewed, as `takeControl` answered it, moved on by every `keepControl` that answered for it.
- * `confirmedUntil`: the end a status read made at the lease's end named, already on this device's clock.
+ * `confirmedUntil`: the end a status read made at the lease's end named, already on this device's clock. `claimId`: the
+ * claim's public name, as the live status names the lease's claims. `release`: the token a closing page's beacon sends.
  */
-type Held = { claim: string; confirmedUntil?: number; until: number; writtenBy: number };
+type Held = { claim: string; claimId?: string; confirmedUntil?: number; release?: string; until: number; writtenBy: number };
+
+/**
+ * The hand back of a page that is closing: a beacon outlives the page, a mutation may not. It carries no session (a
+ * beacon cannot), only the claim's release token, as plain text (no preflight), and on a second line `handed_back` when
+ * the person's own hand back was still out. `false`: it could not be queued.
+ */
+const sendReleaseBeacon = (release: string, reason: "handed_back" | "left"): boolean => {
+    if (typeof navigator === "undefined" || typeof navigator.sendBeacon !== "function") {
+        return false;
+    }
+
+    return navigator.sendBeacon(new URL("/browser/release", env.VITE_LUNORA_URL), reason === "left" ? release : `${release}\nhanded_back`);
+};
 
 /**
  * What the view becomes after the person asked for it. `ended` reads as unavailable too: the browser may be gone before the
@@ -183,8 +198,11 @@ const settle = async <T,>(request: Promise<T>): Promise<Settled<T>> => {
 
 type StatusRead = { canControl: boolean; control?: { byClaim?: boolean; byYou: boolean; until: number }; now: number } | null;
 
-/** A person's lease as the status names it, on the server's clock; `byYou`: the caller holds it (from any of their tabs). */
-type Control = { byYou: boolean; until: number };
+/**
+ * A person's lease as the status names it, on the server's clock; `byYou`: the caller holds it (from any of their tabs).
+ * `claimIds`, with `byYou`: the public names of the claims that name it, so a tab sees another of the caller's take over.
+ */
+type Control = { byYou: boolean; claimIds?: string[]; until: number };
 
 type CardProps = {
     browserId: string;
@@ -244,6 +262,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     // State to render from, and a ref for answers that come back after the render that asked.
     const [lease, setLeaseState] = useState<Held | undefined>(undefined);
     const claimRef = useRef<string | undefined>(undefined);
+    const releaseRef = useRef<string | undefined>(undefined);
     const claim = lease?.claim;
     /** The claim whose hand back the person asked for: it stays this tab's (and the view interactive) until it lands. */
     const [returning, setReturningState] = useState<string | undefined>(undefined);
@@ -313,6 +332,15 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     // A renewal of the view is being minted under a new claim: a hand back now would name the claim it replaces, and the
     // lease would go on under the new one. Hand back waits for its answer (seconds).
     const renewingControl = view.kind === "opening" && view.mode === "control" && claim !== undefined;
+    // Another of the person's tabs took the lease over: the live status names its claim, not this tab's. Not while this
+    // tab's own renewal mints: its new claim may be named before `takeControl` answers with it.
+    const takenByOtherTab =
+        seen &&
+        !renewingControl &&
+        lease.claimId !== undefined &&
+        control?.byYou === true &&
+        control.claimIds !== undefined &&
+        !control.claimIds.includes(lease.claimId);
     const warn = usePassed(youControl && leaseUntil !== undefined ? leaseUntil - CONTROL_WARNING_MS : undefined);
     const showStillLoading = !usePassed(stillLoading === 0 ? undefined : stillLoading) && stillLoading !== 0;
     const forbiddenText = impersonating ? t`Taking control is not available while impersonating.` : t`You may not take control of this browser.`;
@@ -338,14 +366,20 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
         // A status read still out speaks for the claim it was asked for only.
         dropCheck();
         claimRef.current = next?.claim;
+        releaseRef.current = next?.release;
         setLeaseState(next);
         setReturning(undefined);
     };
 
     /**
      * The tab is leaving the lease it holds, if any (its view is gone or going): the claim goes at once, and the server
-     * ends only the lease that claim names. A hand back that does not arrive leaves the lease to its idle timeout.
+     * ends only the lease that claim names. A hand back that does not arrive leaves the lease to its idle timeout. While
+     * the person's own hand back of that claim is out, this says `handed_back` too: whichever lands first decides what
+     * the agent is told.
      */
+    const leavingReason = (holding: string | undefined): "handed_back" | "left" =>
+        holding !== undefined && returningRef.current === holding ? "handed_back" : "left";
+
     const giveBack = (): void => {
         const holding = claimRef.current;
 
@@ -353,8 +387,10 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
             return;
         }
 
+        const reason = leavingReason(holding);
+
         setClaim(undefined);
-        leaveLease.mutate({ claim: holding, reason: "left", threadId });
+        leaveLease.mutate({ claim: holding, reason, threadId });
     };
 
     /**
@@ -382,7 +418,13 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
 
         if (result.status === "ok" && result.claim !== undefined && result.until !== undefined) {
             if (current) {
-                setClaim({ claim: result.claim, until: result.until, writtenBy: result.connectBy - CONNECT_WINDOW_MS });
+                setClaim({
+                    claim: result.claim,
+                    ...(result.claimId !== undefined && { claimId: result.claimId }),
+                    ...(result.release !== undefined && { release: result.release }),
+                    until: result.until,
+                    writtenBy: result.connectBy - CONNECT_WINDOW_MS,
+                });
             } else {
                 // Hidden (or gone) while it was asked for: the lease nobody looks at goes back at once.
                 leaveLease.mutate({ claim: result.claim, reason: "left", threadId });
@@ -615,11 +657,18 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     });
 
     // The view closes too: a page restored from the back/forward cache must not wait on a view whose lease is gone. A
-    // control request still out is no longer wanted: the lease it answers goes back at once. The hand back is a normal
-    // mutation (the Lunora client has no keepalive send, and there is no HTTP route for it), so a page that unloads may
-    // cut it off: the lease then ends on its idle timeout.
+    // control request still out is no longer wanted: the lease it answers goes back at once. A page that unloads may cut
+    // the hand back's mutation off, so a beacon with the claim's release token goes first: it outlives the page, and the
+    // server ends only that claim's lease, once, whichever of the two lands.
     const pageLeft = useEffectEvent((): void => {
         wantedControl.current = undefined;
+
+        // The person's own hand back may be out still, and the close may cut it off too: the beacon says so, so the agent
+        // is told it was handed back, not left.
+        if (releaseRef.current !== undefined) {
+            sendReleaseBeacon(releaseRef.current, leavingReason(claimRef.current));
+        }
+
         giveBack();
         setView((current) => (isControlView(current) ? CLOSED : current));
     });
@@ -643,6 +692,19 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
             controlEnded();
         }
     }, [youControl]);
+
+    // The lease is the other tab's now: nothing is handed back, and this view closes as `keepControl` would have had it.
+    const otherTabTook = useEffectEvent((): void => {
+        if (claimRef.current !== undefined) {
+            endControl(t`You no longer have control of the browser.`);
+        }
+    });
+
+    useEffect(() => {
+        if (takenByOtherTab) {
+            otherTabTook();
+        }
+    }, [takenByOtherTab]);
 
     // The end the card heard passed: re-decided whenever an answer that could move it comes in.
     useEffect(() => {

@@ -426,6 +426,8 @@ const RULES: Record<string, TableRules> = {
  * fails when a schema table is in neither this list nor {@link POLICIES}.
  */
 export const UNPOLICED_TABLES: Record<string, string> = {
+    accountMoves:
+        "the erasure and guest-merge markers: written by those workflows before an account's pins move, read by pin writers through the primary; no client reads them",
     actionCache: "server-side cache of computed values; no user column",
     apikey: "better-auth's own table, reached through its adapter and `verifyApiKey`",
     auditLog: "admin-only audit trail (`admin*` procedures)",
@@ -456,6 +458,8 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     payment_subscriptions: "`@lunora/payment` store (Creem subscriptions); system only — the tier lands on `user` / `organization`",
     payment_usageEvents: "`@lunora/payment` usage metering; unused (Creem has none), system only",
     persistentChunks: "no owner column; read through HTTP actions keyed by a verified stream token",
+    pinWriteLeases:
+        "the in-flight pin-write lease of an account: renewed by pin writers before their move check, read by the move that waits for them; no client reads it",
     playgroundApiKeys: "internal only",
     presentationSlides: "no owner column; every access follows the parent presentation's owner check",
     projectKnowledge: "link rows with no owner column; every access follows the project's owner check",
@@ -468,7 +472,11 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     rateLimits: "rate-limit counters written by every procedure's rate-limit middleware",
     sandboxActions: "no owner column; internal only",
     shardActivity: "per-shard housekeeping bookkeeping; system only",
+    shardPinFences:
+        "an erasure's fence on one owner shard: read by the pin write in its own transaction and written only by the erasure's sweep; no client reads it",
     shardRoutes: "key → owner-shard lookup (a share token, a webhook id), read before any identity; holds no user content",
+    sharedPinRoutes:
+        "a collaborator's pin routes: written by the pin writers on the owner's shard, read only by the owner-side export (internal); no client reads it",
     signUpInvitation: "invite-only registration; admin and seed route only",
     skillFiles: "internal only",
     skillHistory: "`userId` is the EDITOR (an org admin edits another member's skill); read under the skill's rule",

@@ -107,6 +107,26 @@ vi.mock("../auth", async (importOriginal) => {
     };
 });
 
+// A connected GitHub account, and a listing whose own walk the redirects of a renamed repository spend.
+vi.mock("../connectors/lib/github-token", () => {
+    return {
+        resolveGithubToken: async () => {
+            return { accessToken: "token" };
+        },
+    };
+});
+
+vi.mock("../source-control/repo-rule-files", async (importOriginal) => {
+    const original = await importOriginal<typeof import("../source-control/repo-rule-files")>();
+
+    return {
+        ...original,
+        listRepoRuleFiles: async () => {
+            throw new original.FetchBudgetSpent();
+        },
+    };
+});
+
 let harness: ReturnType<typeof lunoraTest>;
 
 beforeAll(async () => {
@@ -794,6 +814,8 @@ describe("a repository for a rule-file import", () => {
 
         await expect(list(MEMBER, onGithub)).rejects.toMatchObject({ code: "NOT_FOUND" });
         await expect(list(OWNER, elsewhere)).resolves.toStrictEqual({ status: "unsupported_host" });
+        // A walk its host requests ran out for is told apart from the host's error: a retry meets the same redirects.
+        await expect(list(OWNER, onGithub)).resolves.toStrictEqual({ status: "budget_spent" });
         await expect(
             harness
                 .withIdentity({ userId: OWNER })

@@ -1,23 +1,27 @@
 /**
- * Embedder declared on the schema's Vectorize indexes.
+ * Vector encoding for the schema's Vectorize indexes.
  *
- * Lunora's `.vectorize()` keeps an index in sync on every write by calling this
- * on the source text. Embeddings must go through the LLM Gateway (they are
- * billed and usage-tracked), and the gateway is reachable only over its service
- * binding — `ctx.services.llmGateway`, which exists on ACTIONS only. This
- * function receives no `ctx`, and `.vectorize()` sync runs inline inside the
- * mutation, which may not do external I/O anyway.
+ * A vector row keeps its vector as an array and a text copy (`vectorText`, written by
+ * `encodeVector`), because `.vectorize()` syncs the indexed column to Vectorize on every
+ * write and only accepts a text source. The embedding itself is computed beforehand, in
+ * an action, through the LLM Gateway (billed and usage-tracked; the gateway is reachable
+ * only over its service binding, which an action's ctx carries). The writes then pass the
+ * finished vector in, so the sync needs no model call.
  *
- * So rows are embedded from an action (see `chat/embeddings.ts`) using
- * `ctx.vectors.upsert(index, { id, input, embed: async () => vector })`, with
- * the vector computed through `createGatewayEmbeddingModel(gatewayFetch(ctx))`;
- * the declared index is present for the read path (`ctx.vectors.query`).
- *
- * Reaching this function is therefore a bug, and it throws rather than silently
- * writing a zero vector.
+ * `embed` is the declared embedder: the sync calls it with the stored text and it
+ * returns that vector. It throws on anything that is not a finite number array, so a
+ * corrupt row fails the write rather than indexing a wrong vector.
  */
-export const embed = async (_input: string): Promise<ReadonlyArray<number>> => {
-    throw new Error(
-        "Schema-level embedding is not supported: embeddings go through the LLM gateway's service binding, which only an action's ctx carries. Embed in an action and pass `embed` to ctx.vectors.upsert.",
-    );
+export const encodeVector = (vector: ReadonlyArray<number>): string => JSON.stringify(vector);
+
+export const decodeVector = (text: string): number[] => {
+    const parsed: unknown = JSON.parse(text);
+
+    if (!Array.isArray(parsed) || parsed.some((value) => !(typeof value === "number" && Number.isFinite(value)))) {
+        throw new Error("A stored vector must be a JSON array of finite numbers.");
+    }
+
+    return parsed;
 };
+
+export const embed = async (input: string): Promise<ReadonlyArray<number>> => decodeVector(input);

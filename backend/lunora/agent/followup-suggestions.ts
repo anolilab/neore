@@ -4,10 +4,390 @@
  */
 import { v } from "lunorash/server";
 
+import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type QueryCtx as QueryContext } from "../_generated/server";
+import { getUser } from "../auth/lib/better-auth-queries";
+import { claimFence, claimRow, holdClaim, holdTtlFrom, releaseClaim } from "../lib/claim-once";
+import { isThreadLocked } from "../lib/thread-lock";
+import { isLocalBrowserModel, LOCAL_BROWSER_PROVIDER, loadCustomProviders } from "../chat/lib/local-turn";
+import { contextResetOf } from "./context-reset-read";
+import { loadActivePathTail } from "./branch-rows";
+
+/**
+ * Which of the given messages a local-browser model wrote, judged by the owner's own custom endpoints. Those rows stay on the device,
+ * so the suggestion job leaves them out of the history it sends to a cloud model.
+ */
+export const localBrowserRowIds = internalQuery
+    .input({ messageIds: v.array(v.string()), userId: v.string() })
+    .output(v.array(v.string()))
+    .query(async ({ args, ctx: context }) => {
+        const providers = await loadCustomProviders(context, args.userId);
+        const flags = await Promise.all(
+            args.messageIds.map(async (messageId) => {
+                const row = await context.db.get("messages", messageId as Id<"messages">);
+
+                // A saved local reply carries the provider tag (its model is a bare id); a custom endpoint's reply carries `custom:<id>/…`.
+                // A row the run stamped is judged by that stamp, as the run saw its provider. Older rows fall back to the endpoint's current type.
+                const local = row !== null && (row.localRun ?? (row.provider === LOCAL_BROWSER_PROVIDER || isLocalBrowserModel(row.model, providers)));
+
+                return local ? messageId : null;
+            }),
+        );
+
+        return flags.filter((messageId): messageId is string => messageId !== null);
+    });
+
+/**
+ * The newest user or assistant row the composer shows: on the active path of a branched thread, else in the thread. A cache write
+ * queued for a reply is current only while this is still that reply's row (a newer message, even with the leaf unchanged, supersedes it).
+ */
+export const newestShownRowIdHandler = async (context: QueryContext, { leafId, threadId }: { leafId?: string; threadId: string }): Promise<string | null> => {
+    const rows =
+        leafId === undefined
+            ? await context.db
+                  .query("messages")
+                  .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
+                  .order("desc")
+                  .take(FOLLOWUP_PATH_LIMIT)
+            : await loadActivePathTail(context, threadId as Id<"threads">, leafId, FOLLOWUP_PATH_LIMIT);
+    const roleOf = (row: unknown): string | undefined => (row as { message?: { role?: string } }).message?.role;
+    const newest = rows.find((row) => roleOf(row) === "user" || roleOf(row) === "assistant");
+
+    return newest?._id ?? null;
+};
+
+export const newestShownRowId = internalQuery
+    .input({ leafId: v.optional(v.string()), threadId: v.string() })
+    .output(v.union(v.string(), v.null()))
+    .query(async ({ args, ctx: context }) => await newestShownRowIdHandler(context, args));
+
+/** How many rows of a branched thread's active path the job reads: a turn longer than this is not keyed (see the job). */
+export const FOLLOWUP_PATH_LIMIT = 60;
+
+/**
+ * The ids on a branched thread's active path, newest first, capped at {@link FOLLOWUP_PATH_LIMIT}. The composer shows exactly these
+ * rows, so the job reads them rather than the raw rows, where replies on other branches share an `order`.
+ */
+export const activePathIds = internalQuery
+    .input({ leafId: v.string(), threadId: v.string() })
+    .output(v.array(v.string()))
+    .query(async ({ args, ctx }) => {
+        // One row past the cap, so a path of exactly the cap is known to be whole (a path past it is not).
+        const rows = await loadActivePathTail(ctx, args.threadId as Id<"threads">, args.leafId, FOLLOWUP_PATH_LIMIT + 1);
+
+        return rows.map((row) => row._id);
+    });
+
+/** One paid suggestion call per reply: keyed `<threadId>:<lastMessageId>`, so a second run of the same reply finds it taken. */
+export const FOLLOWUP_CLAIM_SCOPE = "followup-suggestions";
+/**
+ * The claim covers one run in flight, and lapses so an interrupted run (a killed action leaves no catch to release it) can be retried.
+ * A retry is not charged again: the Text charge is keyed per reply and holds for a day (`chat/daily-charge.ts`). Once a reply is
+ * cached, the cache check ends every later run before admission.
+ */
+const FOLLOWUP_CLAIM_TTL_MS = 60 * 60 * 1000;
+
+/** Long enough for one grant delete; a removal that dies lets requests resume after this (`holdFollowupRevoke`, on the chat's row). */
+export const FOLLOWUP_REVOKE_TTL_MS = 60 * 1000;
+
+/** Long enough for one model call; a job that dies lets the chat be locked again after this (`beginFollowupDispatch`, on the chat's row). */
+export const FOLLOWUP_DISPATCH_TTL_MS = 2 * 60 * 1000;
+
+/** The fields of a message row that decide which row a reply is keyed by. */
+export interface ReplyAnchorRow {
+    message?: { role?: string } | null;
+    order: number;
+    stepOrder: number;
+}
+
+/**
+ * The row a reply is keyed by: the first row of the last assistant group the composer shows. The UI closes a group at
+ * every user or system row of the turn (ui-messages.ts), so only rows after the last of those belong to the reply on
+ * screen. A switch divider (a system row) is never the anchor, because the composer never shows it. Only the boundaries before the
+ * newest reply's row count: a divider appended after the reply (a task run's) starts nothing and must not move the anchor.
+ */
+export const replyAnchorRow = <Row extends ReplyAnchorRow>(turnRows: ReadonlyArray<Row>, newest: Row): Row => {
+    const isBoundary = (row: Row) => row.message?.role === "user" || row.message?.role === "system";
+    const turn = turnRows.filter((row) => row.order === newest.order);
+    const boundary = Math.max(-Infinity, ...turn.filter((row) => isBoundary(row) && row.stepOrder < newest.stepOrder).map((row) => row.stepOrder));
+
+    let anchor = newest;
+
+    for (const row of turn) {
+        if (row.stepOrder > boundary && !isBoundary(row) && row.stepOrder < anchor.stepOrder) {
+            anchor = row;
+        }
+    }
+
+    return anchor;
+};
+
+/**
+ * The rows the suggestion model reads: the reply's whole turn, its user prompt included, then the older rows of the first page.
+ * Both lists come newest first and the result keeps that order, so a tool turn longer than one page is not cut short.
+ */
+export const followupModelRows = <Row extends { _id: string }>(turnRows: ReadonlyArray<Row>, pageRows: ReadonlyArray<Row>): Row[] => {
+    const inTurn = new Set(turnRows.map((row) => row._id));
+
+    return [...turnRows, ...pageRows.filter((row) => !inTurn.has(row._id))];
+};
+
+/**
+ * Runs `call` with a signal that aborts after `timeoutMs`. An explicit timer, not `AbortSignal.timeout`: the deadline must fire
+ * whatever the runtime does with that signal, and it is cleared as soon as the call settles.
+ */
+export const withDeadline = async <T>(timeoutMs: number, call: (signal: AbortSignal) => Promise<T>): Promise<T> => {
+    const controller = new AbortController();
+    const deadline = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        return await call(controller.signal);
+    } finally {
+        clearTimeout(deadline);
+    }
+};
+
+/**
+ * Whether a reply gets a suggestion for this user: the setting is on (absent = on) and the user is not a guest.
+ * Read before any model is picked, so a user who switched the setting off costs no call.
+ */
+export const getFollowupSuggestionGate = internalQuery
+    .input({ userId: v.string() })
+    .output(v.object({ enabled: v.boolean(), guest: v.boolean() }))
+    .query(async ({ args: { userId }, ctx: context }) => {
+        const settings = await context.db
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .unique();
+        const user = await getUser(context, userId);
+
+        return { enabled: settings?.enableFollowupSuggestions !== false, guest: user?.isAnonymous === true };
+    });
+
+/**
+ * The last check before the paid call: the thread is still open, and this reply's suggestion is not already claimed. Answers the
+ * claim's `claimedAt`, the fence the run releases with, or `null` for a locked or deleted thread, or a reply another run holds.
+ */
+export const admitFollowupSuggestions = internalMutation
+    .input({ lastMessageId: v.string(), threadId: v.string(), userId: v.string() })
+    .output(v.union(v.null(), v.number()))
+    .mutation(async ({ args: { lastMessageId, threadId, userId }, ctx: context }) => {
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
+
+        // A hard delete marks `deletingAt` while its rows are still readable, so that window is closed too.
+        if (!thread || thread.deletedAt || thread.deletingAt !== undefined || isThreadLocked(thread)) {
+            return null;
+        }
+
+        return await claimFence(context, FOLLOWUP_CLAIM_SCOPE, `${threadId}:${lastMessageId}`, { ttlMs: FOLLOWUP_CLAIM_TTL_MS, userId });
+    });
+
+/**
+ * Gives a reply's claim back, when its charge was refused or its run failed before the cache: a later run may ask again. Only the claim
+ * this run took (`claimedAt`) is freed: a run whose claim lapsed must not free the claim a later run has taken on the same key.
+ */
+/**
+ * Renews a reply's claim for another hour from now, while its cache write is still being retried: a later run for the same reply
+ * then finds the claim held and does not call the model again. Only the claim that took the reply renews it.
+ */
+export const holdFollowupClaim = internalMutation
+    .input({ claimedAt: v.number(), lastMessageId: v.string(), threadId: v.string(), userId: v.string() })
+    .output(v.boolean())
+    .mutation(async ({ args: { claimedAt, lastMessageId, threadId, userId }, ctx: context }) => {
+        const key = `${threadId}:${lastMessageId}`;
+        // Renewed only while this run's own claim is live. A claim row that is gone (another run took and released the reply) or has
+        // lapsed is not brought back, so the retry that lost its claim drops its write.
+        const live = await claimRow(context, FOLLOWUP_CLAIM_SCOPE, key);
+
+        if (live?.claimedAt !== claimedAt) {
+            return false;
+        }
+
+        return await holdClaim(context, FOLLOWUP_CLAIM_SCOPE, key, claimedAt, holdTtlFrom(claimedAt, FOLLOWUP_CLAIM_TTL_MS, context.now), userId);
+    });
+
+export const releaseFollowupSuggestions = internalMutation
+    .input({ claimedAt: v.number(), lastMessageId: v.string(), threadId: v.string(), userId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args: { claimedAt, lastMessageId, threadId }, ctx: context }) => {
+        await releaseClaim(context, FOLLOWUP_CLAIM_SCOPE, `${threadId}:${lastMessageId}`, claimedAt);
+
+        return null;
+    });
+
+/** A lease on the chat's row is live until its `expiresAt`; `0` (or the past) is no lease. */
+const liveLease = (lease: { expiresAt: number } | undefined, now: number): boolean => lease !== undefined && lease.expiresAt > now;
+
+/** Lets one follow-up model request leave. The request takes a lease on the chat's own row, in the same transaction that checks the chat is open. */
+export const beginFollowupDispatch = internalMutation
+    .input({ requestId: v.string(), threadId: v.string() })
+    .output(v.union(v.null(), v.number()))
+    .mutation(async ({ args: { requestId, threadId }, ctx: context }) => {
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
+        const { now } = context;
+
+        if (!thread || thread.deletedAt || thread.deletingAt !== undefined || isThreadLocked(thread)) {
+            return null;
+        }
+
+        // One request at a time on a chat, and none while a grant removal holds it. Both leases sit on this row, as the lock does, so the
+        // check and the claim are one transaction with the lock (`agent/thread-lock.ts`): a lock either sees the lease or lands first.
+        if (liveLease(thread.followupRevoke, now) || liveLease(thread.followupDispatch, now)) {
+            return null;
+        }
+
+        await context.db.patch("threads", threadId as Id<"threads">, {
+            followupDispatch: { claimedAt: now, expiresAt: now + FOLLOWUP_DISPATCH_TTL_MS, requestId },
+        });
+
+        return now;
+    });
+
+/**
+ * Holds the chat's suggestion requests back while a grant is removed. Refused (`null`) while a request is in flight: the removal then
+ * waits for it. Once held, no request can start on the chat until the hold is released, so the grant is gone before any later request
+ * reads it. The hold is a lease on the chat's own row, the same row a request's lease is checked against.
+ */
+export const holdFollowupRevoke = internalMutation
+    .input({ threadId: v.string() })
+    .output(v.union(v.null(), v.number()))
+    .mutation(async ({ args: { threadId }, ctx: context }) => {
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
+        const { now } = context;
+
+        if (!thread || liveLease(thread.followupDispatch, now) || liveLease(thread.followupRevoke, now)) {
+            return null;
+        }
+
+        await context.db.patch("threads", threadId as Id<"threads">, { followupRevoke: { claimedAt: now, expiresAt: now + FOLLOWUP_REVOKE_TTL_MS } });
+
+        return now;
+    });
+
+/** The grant's removal has returned: requests may start on the chat again. Only the hold this removal took is cleared. */
+export const releaseFollowupRevoke = internalMutation
+    .input({ claimedAt: v.number(), threadId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args: { claimedAt, threadId }, ctx: context }) => {
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
+
+        if (thread?.followupRevoke?.claimedAt === claimedAt) {
+            await context.db.patch("threads", threadId as Id<"threads">, { followupRevoke: { claimedAt: 0, expiresAt: 0 } });
+        }
+
+        return null;
+    });
+
+/**
+ * Renews the removal's hold for another full lifetime, right before the grant is deleted: a removal whose earlier steps took longer
+ * than the hold cannot then delete the grant under a hold that has lapsed. `false` when the hold was lost: the removal must not run.
+ */
+export const renewFollowupRevoke = internalMutation
+    .input({ claimedAt: v.number(), threadId: v.string() })
+    .output(v.boolean())
+    .mutation(async ({ args: { claimedAt, threadId }, ctx: context }) => {
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
+        const { now } = context;
+        const lease = thread?.followupRevoke;
+
+        // Renewed only while this removal's own hold is live. A lapsed hold is not brought back: a dispatch may have started in the gap.
+        if (!lease || lease.claimedAt !== claimedAt || !liveLease(lease, now)) {
+            return false;
+        }
+
+        await context.db.patch("threads", threadId as Id<"threads">, { followupRevoke: { claimedAt, expiresAt: now + FOLLOWUP_REVOKE_TTL_MS } });
+
+        return true;
+    });
+
+/**
+ * The reply's unit is taken: its suggestions become readable. Only the row for this reply is marked, so another reply's row is not
+ * touched. A repeat is harmless (the unit is keyed per reply, so the charge is not taken twice).
+ */
+export const markFollowupCharged = internalMutation
+    .input({ lastMessageId: v.string(), threadId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args: { lastMessageId, threadId }, ctx: context }) => {
+        const own = await context.db
+            .query("followupSuggestions")
+            .withIndex("by_thread_and_message", (q) => q.eq("threadId", threadId).eq("lastMessageId", lastMessageId))
+            .first();
+
+        if (own && own.charged !== true) {
+            await context.db.patch("followupSuggestions", own._id, { charged: true });
+        }
+
+        return null;
+    });
+
+/** The request has settled: its lease goes, and the chat may be locked again. Only the lease this request took is cleared. */
+export const endFollowupDispatch = internalMutation
+    .input({ claimedAt: v.number(), requestId: v.string(), threadId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args: { claimedAt, requestId, threadId }, ctx: context }) => {
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
+        const lease = thread?.followupDispatch;
+
+        if (lease?.claimedAt === claimedAt && lease.requestId === requestId) {
+            await context.db.patch("threads", threadId as Id<"threads">, { followupDispatch: { claimedAt: 0, expiresAt: 0 } });
+        }
+
+        return null;
+    });
+
+/** Whether a follow-up model request is in flight for this chat: the chat's lease, read on the chat's own row. */
+export const followupDispatchInFlight = async (context: Pick<QueryContext, "db">, threadId: string): Promise<boolean> => {
+    const thread = await context.db.get("threads", threadId as Id<"threads">);
+
+    return liveLease(thread?.followupDispatch, Date.now());
+};
+
+/** Whether a suggestion for this chat is being sent to a model now: the chat's delete actions wait for it (`chat/functions.ts`). */
+export const followupInFlight = internalQuery
+    .input({ threadId: v.string() })
+    .output(v.boolean())
+    .query(async ({ args: { threadId }, ctx }) => await followupDispatchInFlight(ctx, threadId));
+
+/**
+ * Stamps the rows a run saved with whether it ran on the device, judged now, while the provider is what the run used. A provider changed later
+ * does not change these rows (`localBrowserRowIds` reads the stamp). Called when a run finishes (`chat/lib/agent-run.ts`).
+ */
+export const stampRunLocality = internalMutation
+    .input({ messageIds: v.array(v.string()), model: v.optional(v.string()), userId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args: { messageIds, model, userId }, ctx: context }) => {
+        const local = isLocalBrowserModel(model, await loadCustomProviders(context, userId));
+
+        await Promise.all(
+            messageIds.map(async (messageId) => {
+                const row = await context.db.get("messages", messageId as Id<"messages">);
+
+                if (row && row.localRun !== local) {
+                    await context.db.patch("messages", row._id, { localRun: local });
+                }
+            }),
+        );
+
+        return null;
+    });
+
+/** How many replies' suggestions a thread keeps: the newest, so a branch the person can switch back to keeps its own row. */
+export const FOLLOWUP_CACHE_ROWS = 20;
+
+/** Newer replies first: the later turn, then the later sibling of the same turn, then the row written later. */
+/** How a reply ranks: its turn, its sibling time, and when it was written. A stored row and an incoming reply both rank this way. */
+export interface ReplyRank {
+    createdAt: number;
+    order?: number;
+    replyAt?: number;
+}
+
+export const newerFirst = (a: ReplyRank, b: ReplyRank): number =>
+    (b.order ?? -1) - (a.order ?? -1) || (b.replyAt ?? -1) - (a.replyAt ?? -1) || b.createdAt - a.createdAt;
 
 export const getCachedFollowupSuggestions = internalQuery
     .input({
+        lastMessageId: v.optional(v.string()),
         threadId: v.string(),
     })
     .output(
@@ -25,11 +405,20 @@ export const getCachedFollowupSuggestions = internalQuery
  * Direct handler for cached follow-up suggestions.
  * Exported for hot-path queries to bypass runQuery validator overhead.
  */
-export const getCachedFollowupSuggestionsHandler = async (context: QueryContext, args: { threadId: string }) => {
-    const cached = await context.db
-        .query("followupSuggestions")
-        .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
-        .first();
+export const getCachedFollowupSuggestionsHandler = async (context: QueryContext, { lastMessageId, threadId }: { lastMessageId?: string; threadId: string }) => {
+    // With a reply id, that reply's own row (one per reply); without one, the thread's newest reply. A row whose unit is not taken yet
+    // is not read: it is shown only once charged.
+    const rows =
+        lastMessageId === undefined
+            ? await context.db
+                  .query("followupSuggestions")
+                  .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+                  .collect()
+            : await context.db
+                  .query("followupSuggestions")
+                  .withIndex("by_thread_and_message", (q) => q.eq("threadId", threadId).eq("lastMessageId", lastMessageId))
+                  .collect();
+    const cached = rows.filter((row) => row.charged !== false).toSorted(newerFirst)[0];
 
     if (!cached) {
         return null;
@@ -41,36 +430,97 @@ export const getCachedFollowupSuggestionsHandler = async (context: QueryContext,
     };
 };
 
+/**
+ * Stores the suggestions for one reply, in that reply's own row. The check and the write run in one mutation, so a run for an
+ * older reply that finishes late is refused when a newer reply on the same branch already has suggestions. A reply is older than
+ * a stored one when its turn is older, or when it is a sibling of the same turn that was created earlier (siblings share `order`).
+ * A reply's own row is always rewritten, so its clear or retry is not refused.
+ *
+ * `pathIds` is the active path of a branched thread, the rows the composer shows. A stored reply counts only when it is on that
+ * path: a reply on an inactive branch never blocks the branch being written. Without it the thread has one branch, and every
+ * stored reply counts.
+ */
 export const cacheFollowupSuggestions = internalMutation
     .input({
         lastMessageId: v.string(),
+        order: v.number(),
+        pathIds: v.optional(v.array(v.string())),
+        replyAt: v.number(),
+        // The reply as the job saw it: a write is refused once a newer message is the one the composer shows. Checked here, in the same
+        // transaction as the write, so a message that lands after the job's own check cannot be cached and charged for.
+        shown: v.optional(v.object({ leafId: v.optional(v.string()), newestId: v.string(), resetOrder: v.optional(v.number()) })),
         suggestions: v.array(v.string()),
         threadId: v.string(),
     })
-    .output(v.null())
-    .mutation(async ({ args: { lastMessageId, suggestions, threadId }, ctx: context }) => {
+    .output(v.boolean())
+    .mutation(async ({ args: { lastMessageId, order, pathIds, replyAt, shown, suggestions, threadId }, ctx: context }) => {
         const { now } = context;
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
 
-        const existing = await context.db
-            .query("followupSuggestions")
-            .withIndex("by_thread", (q) => q.eq("threadId", threadId))
-            .first();
-
-        if (existing) {
-            await context.db.patch("followupSuggestions", existing._id, {
-                lastMessageId,
-                suggestions,
-                updatedAt: now,
-            });
-        } else {
-            await context.db.insert("followupSuggestions", {
-                createdAt: now,
-                lastMessageId,
-                suggestions,
-                threadId,
-                updatedAt: now,
-            });
+        // A deleted thread keeps no suggestions, and a hard delete marks `deletingAt` first, so that window keeps none either.
+        if (!thread || thread.deletedAt || thread.deletingAt !== undefined) {
+            return false;
         }
 
-        return null;
+        // Suggestions for a reply that is no longer the one the composer shows are not stored (nor charged): a newer message supersedes it.
+        // A `/clear` that committed after the job read the context ends this reply's context too, so the write checks the reset as well.
+        if (shown && suggestions.length > 0) {
+            const current = await newestShownRowIdHandler(context, { leafId: shown.leafId, threadId });
+            const reset = await contextResetOf(context, threadId as Id<"threads">);
+
+            if (current !== shown.newestId || reset?.order !== shown.resetOrder) {
+                return false;
+            }
+        }
+
+        const stored = await context.db
+            .query("followupSuggestions")
+            .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+            .collect();
+        const own = stored.find((row) => row.lastMessageId === lastMessageId);
+
+        // A reply's own row is rewritten in place, so its clear or retry is never refused by another reply's row.
+        // Suggestions start uncharged: the reply's unit is taken next, and `markFollowupCharged` then makes them readable.
+        const uncharged = suggestions.length > 0 ? { charged: false } : {};
+
+        if (own) {
+            await context.db.patch("followupSuggestions", own._id, { lastMessageId, order, replyAt, suggestions, updatedAt: now, ...uncharged });
+
+            return true;
+        }
+
+        // A newer reply on this branch already has its suggestions: this older run must not be written, so it is not charged.
+        const newerOnBranch = stored.some(
+            (row) =>
+                (pathIds === undefined || pathIds.includes(row.lastMessageId)) &&
+                ((row.order !== undefined && row.order > order) || (row.order === order && row.replyAt !== undefined && row.replyAt > replyAt)),
+        );
+
+        if (newerOnBranch) {
+            return false;
+        }
+
+        // The thread keeps its newest replies. A full thread refuses a reply that ranks below every row it keeps (nothing is evicted for
+        // it, and no unit is taken); otherwise the lowest-ranked row makes room for this one.
+        const ranked = stored.toSorted(newerFirst);
+        const lastKept = ranked[FOLLOWUP_CACHE_ROWS - 1];
+
+        if (lastKept && newerFirst({ createdAt: now, order, replyAt }, lastKept) >= 0) {
+            return false;
+        }
+
+        await Promise.all(ranked.slice(FOLLOWUP_CACHE_ROWS - 1).map(async (row) => await context.db.delete("followupSuggestions", row._id)));
+
+        await context.db.insert("followupSuggestions", {
+            createdAt: now,
+            lastMessageId,
+            order,
+            replyAt,
+            suggestions,
+            threadId,
+            updatedAt: now,
+            ...uncharged,
+        });
+
+        return true;
     });

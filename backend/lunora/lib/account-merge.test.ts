@@ -1,7 +1,10 @@
 /**
  * A converting guest's rows move from the guest's shard to the new account's
  * (`account-merge.ts`). The unit harness is one database for every shard, so
- * the shards here are two in-memory maps behind a fake shard caller.
+ * the end-to-end merges run the real procedures on one harness per store
+ * ("mergeGuestInto on real shard procedures"). The in-memory `fakeShards`
+ * caller stays for what a real store cannot stage: a failing or lapsing store
+ * probe, the follows round cap, a follow written after the last page.
  */
 import { lunoraTest } from "@lunora/testing";
 import { describe, expect, it, vi } from "vitest";
@@ -10,7 +13,7 @@ import { deleteMergedGuest } from "../auth/hooks";
 import { FOLLOW_MERGE_PAGE_SIZE } from "../chat/follows/follow-writes";
 import { requireOwnCollectionId } from "../knowledge/documents-shared";
 import type { MergeReferences, ShardCall } from "./account-merge";
-import { importShardRows, listShardRowIds, MERGE_PAGE_SIZE } from "./account-merge";
+import { deleteShardRows, importShardRows, listShardRowIds, listShardRowsPage, MERGE_PAGE_SIZE, shardOwnerField } from "./account-merge";
 import {
     GLOBAL_USER_COLUMNS,
     GLOBAL_USER_TABLES_NOT_REASSIGNED,
@@ -20,6 +23,7 @@ import {
     rewriteOwner,
     shardLocalTables,
 } from "./account-merge";
+import { claimHeld, claimKey, releaseKey } from "./claim-once";
 import { schemaWithShardedTables } from "./test-schema";
 
 const ref = (name: string) => {
@@ -32,24 +36,58 @@ const REFERENCES: MergeReferences = {
     importRows: ref("importShardRows"),
     list: ref("listShardRowsPage"),
     listIds: ref("listShardRowIds"),
+    markProbe: { __lunoraRef: "lib_claim_once:claimKey" },
+    probeHeld: { __lunoraRef: "lib_claim_once:claimHeld" },
     reassignFollows: ref("reassignThreadFollowsPage"),
     reassignGlobal: ref("reassignGlobalRows"),
+    releaseProbe: { __lunoraRef: "lib_claim_once:releaseKey" },
 };
 
 type Row = Record<string, unknown> & { _id: string };
 
+/** What a failed store probe throws: its own message, or the shard call's error passed through. */
+const PROBE_FAILURE = /probe|shard unavailable/;
+
 /**
  * Two shards as `shardKey → table → rows`, and a caller that plays the procedures against them. `follows` is how many
- * follow rows the guest holds (`pageSize` move per call); `followsRemain` is what the guest deletion reports.
+ * follow rows the guest holds (`pageSize` move per call); `followsRemain` is what the guest deletion reports. With
+ * `sameStore`, the new account's key serves the guest's store, as local routing can.
  */
 const fakeShards = (
     seed: Record<string, Record<string, Row[]>>,
     pageSize = 2,
-    { follows = 0, followsRemain = false }: { follows?: number; followsRemain?: boolean } = {},
+    {
+        follows = 0,
+        followsRemain = false,
+        probe = {},
+        sameStore = false,
+    }: {
+        follows?: number;
+        followsRemain?: boolean;
+        /** Overrides of the store probe: what the marker write answers, what the read answers or throws, and markers already there. */
+        probe?: { held?: () => unknown; stale?: string[]; written?: unknown };
+        sameStore?: boolean;
+    } = {},
 ) => {
     let followsLeft = follows;
     let followPageCalls = 0;
     const shards = new Map(Object.entries(seed).map(([key, tables]) => [key, new Map(Object.entries(tables).map(([table, rows]) => [table, [...rows]]))]));
+    const probes = new Map<Map<string, Row[]>, Set<string>>();
+
+    if (sameStore) {
+        shards.set("user", shards.get("guest") ?? new Map<string, Row[]>());
+    }
+
+    const probeKeys: string[] = [];
+    const releasedProbes: string[] = [];
+
+    if (probe.stale !== undefined) {
+        const store = shards.get("guest") ?? new Map<string, Row[]>();
+
+        shards.set("guest", store);
+        probes.set(store, new Set(probe.stale));
+    }
+
     const reassigned: { from: string; to: string }[] = [];
     /** Each guest deletion, with how many rows the guest's shard still held at that moment. */
     const deletedGuests: { left: number; shardKey: string; userId: string }[] = [];
@@ -70,6 +108,29 @@ const fakeShards = (
         const table = args.table as string;
 
         switch (name) {
+            case "claimHeld": {
+                if (probe.held !== undefined) {
+                    return probe.held() as never;
+                }
+
+                const store = shards.get(shardKey);
+
+                return (store !== undefined && (probes.get(store)?.has(args.key as string) ?? false)) as never;
+            }
+            case "claimKey": {
+                const store = shards.get(shardKey) ?? new Map<string, Row[]>();
+
+                shards.set(shardKey, store);
+                probeKeys.push(args.key as string);
+
+                if (probe.written !== undefined) {
+                    return probe.written as never;
+                }
+
+                probes.set(store, (probes.get(store) ?? new Set()).add(args.key as string));
+
+                return true as never;
+            }
             case "deleteMergedGuest": {
                 if (followsRemain) {
                     return { deleted: false, followsRemain: true } as never;
@@ -95,15 +156,22 @@ const fakeShards = (
                 const target = tableOf(shardKey, table);
 
                 for (const row of args.rows as Row[]) {
-                    if (target.every((existing) => existing._id !== row._id)) {
-                        target.push(rewriteOwner(row, args.from as string, args.to as string) as Row);
+                    const existing = target.find((candidate) => candidate._id === row._id);
+                    const guestOwned = row.userId === args.from;
+
+                    if (existing === undefined) {
+                        target.push((guestOwned ? rewriteOwner(row, args.from as string, args.to as string) : row) as Row);
+                    } else if (existing.userId === args.from) {
+                        existing.userId = args.to;
                     }
                 }
 
                 return { imported: 0 } as never;
             }
             case "listShardRowIds": {
+                // A table with no owner column is listed whole, as the procedure once did: the merge must not ask for one.
                 return tableOf(shardKey, table)
+                    .filter((row) => args.ownedBy === undefined || shardOwnerField(table) === undefined || row.userId === args.ownedBy)
                     .slice(0, pageSize)
                     .map((row) => row._id) as never;
             }
@@ -128,13 +196,19 @@ const fakeShards = (
 
                 return { hasMore: followsLeft > 0, moved } as never;
             }
+            case "releaseKey": {
+                releasedProbes.push(args.key as string);
+                probes.get(shards.get(shardKey) ?? new Map())?.delete(args.key as string);
+
+                return null as never;
+            }
             default: {
                 throw new Error(`unexpected ${String(name)}`);
             }
         }
     };
 
-    return { call, deletedGuests, followPageCalls: () => followPageCalls, reassigned, shards };
+    return { call, deletedGuests, followPageCalls: () => followPageCalls, probeKeys, reassigned, releasedProbes, shards };
 };
 
 describe("rewriteOwner", () => {
@@ -165,36 +239,6 @@ describe("shardLocalTables", () => {
 });
 
 describe("mergeGuestInto", () => {
-    it("copies every row to the new shard under the same id, re-owned, then empties the guest's shard", async () => {
-        const threads: Row[] = [
-            { _id: "t1", title: "a", userId: "guest" },
-            { _id: "t2", title: "b", userId: "guest" },
-            { _id: "t3", title: "c", userId: "guest" },
-        ];
-        const messages: Row[] = [{ _id: "m1", threadId: "t1", userId: "guest" }];
-        const { call, reassigned, shards } = fakeShards({ guest: { messages, threads }, user: { threads: [{ _id: "own", title: "mine", userId: "user" }] } });
-
-        const { moved } = await mergeGuestInto(call, REFERENCES, "guest", "user");
-
-        expect(moved).toBe(4);
-        expect(
-            shards
-                .get("user")
-                ?.get("threads")
-                ?.map((row) => [row._id, row.userId]),
-        ).toStrictEqual([
-            ["own", "user"],
-            ["t1", "user"],
-            ["t2", "user"],
-            ["t3", "user"],
-        ]);
-        // The reference between rows survives: the message still names its thread.
-        expect(shards.get("user")?.get("messages")).toStrictEqual([{ _id: "m1", threadId: "t1", userId: "user" }]);
-        expect(shards.get("guest")?.get("threads")).toStrictEqual([]);
-        expect(shards.get("guest")?.get("messages")).toStrictEqual([]);
-        expect(reassigned).toStrictEqual([{ from: "guest", to: "user" }]);
-    });
-
     it("deletes the guest once its shard is empty, on the guest's shard", async () => {
         const { call, deletedGuests } = fakeShards({
             guest: {
@@ -244,6 +288,62 @@ describe("mergeGuestInto", () => {
         const { call } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } }, 2, { followsRemain: true });
 
         await expect(mergeGuestInto(call, REFERENCES, "guest", "user")).rejects.toThrow("thread follows");
+    });
+
+    it("clears a collaborator's row an earlier, interrupted run already copied", async () => {
+        const collaboratorRow: Row = { _id: "c2", body: "a collaborator's", userId: "collaborator" };
+        const { call, shards } = fakeShards({ guest: { threads: [collaboratorRow] }, user: { threads: [{ ...collaboratorRow }] } });
+
+        await mergeGuestInto(call, REFERENCES, "guest", "user");
+
+        expect(shards.get("user")?.get("threads")).toStrictEqual([collaboratorRow]);
+        expect(shards.get("guest")?.get("threads")).toStrictEqual([]);
+    });
+
+    it("probes with a key of its own on every attempt and releases it, so an earlier attempt's marker is never the one read", async () => {
+        const { call, probeKeys, releasedProbes } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } });
+
+        await mergeGuestInto(call, REFERENCES, "guest", "user");
+        await mergeGuestInto(call, REFERENCES, "guest", "user");
+
+        expect(new Set(probeKeys).size).toBe(2);
+        expect(releasedProbes).toStrictEqual(probeKeys);
+    });
+
+    it("keeps collaborators' rows when the store is shared, even with an earlier attempt's marker about to lapse", async () => {
+        // An earlier attempt's marker under the old fixed key; a retry that reused it would read whatever is left of it.
+        const { call, shards } = fakeShards({ guest: { threads: [{ _id: "c2", userId: "collaborator" }] } }, 2, {
+            probe: { stale: ["guest:user"] },
+            sameStore: true,
+        });
+
+        await mergeGuestInto(call, REFERENCES, "guest", "user");
+
+        expect(shards.get("guest")?.get("threads")).toStrictEqual([{ _id: "c2", userId: "collaborator" }]);
+    });
+
+    it.each([
+        { name: "the marker write takes no fresh claim", probe: { written: false } },
+        {
+            name: "the read fails",
+            probe: {
+                held: () => {
+                    throw new Error("shard unavailable");
+                },
+            },
+        },
+        { name: "the read gives no answer", probe: { held: () => undefined } },
+    ])("fails the merge and clears nothing when $name", async ({ probe }) => {
+        const rows: Row[] = [
+            { _id: "c1", userId: "guest" },
+            { _id: "c2", userId: "collaborator" },
+        ];
+        const { call, deletedGuests, shards } = fakeShards({ guest: { threads: rows } }, 2, { probe });
+
+        await expect(mergeGuestInto(call, REFERENCES, "guest", "user")).rejects.toThrow(PROBE_FAILURE);
+
+        expect(shards.get("guest")?.get("threads")).toStrictEqual(rows);
+        expect(deletedGuests).toStrictEqual([]);
     });
 
     it("is safe to run twice", async () => {
@@ -684,6 +784,55 @@ describe("importShardRows for runWebhooks", () => {
         expect(rows).toHaveLength(1);
         expect(rows[0]).toMatchObject({ url: "https://example.com/own" });
     });
+
+    it("stops the merge, and leaves the row alone, when another user's webhook holds the guest webhook's id", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const stored = await harness.run(async (context: any) => {
+                const strangerId = await context.db.insert("runWebhooks", webhook({ url: "https://example.com/stranger", userId: "stranger" }));
+
+                await expect(
+                    context.runMutation(importShardRows, {
+                        from: "guest",
+                        rows: [webhook({ _id: strangerId, url: "https://example.com/guest", userId: "guest" })],
+                        table: "runWebhooks",
+                        to: "user",
+                    }),
+                ).rejects.toThrow("already exists on the new account's shard");
+
+                return context.db.query("runWebhooks").take(MERGE_PAGE_SIZE);
+            });
+
+            expect(stored).toHaveLength(1);
+            expect(stored[0]).toMatchObject({ url: "https://example.com/stranger", userId: "stranger" });
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+describe("importShardRows on an id another user's row holds", () => {
+    it("stops the merge instead of skipping the guest's row, so the clear pass cannot delete it", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                const strangerId = await context.db.insert("threads", { title: "stranger chat", userId: "stranger" });
+
+                await expect(
+                    context.runMutation(importShardRows, {
+                        from: "guest",
+                        rows: [{ _id: strangerId, title: "guest chat", userId: "guest" }],
+                        table: "threads",
+                        to: "user",
+                    }),
+                ).rejects.toThrow("already exists on the new account's shard");
+            });
+        } finally {
+            harness.close();
+        }
+    });
 });
 
 describe("a shard that holds both accounts' rows", () => {
@@ -861,25 +1010,315 @@ describe("clearing the guest's settings", () => {
         }
     });
 
-    it("asks for the guest's rows alone when it clears the tables the new account keeps its own row of", async () => {
-        const { call } = fakeShards({ guest: { userSettings: [{ _id: "g1", userId: "guest" }] } });
-        const listIdCalls: Record<string, unknown>[] = [];
+    it("lists none of a table without an owner column when asked for one user's rows, never the whole table", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
 
-        await mergeGuestInto(
-            async (reference, args, shardKey) => {
-                if (reference.__lunoraRef.endsWith(":listShardRowIds")) {
-                    listIdCalls.push(args);
-                }
+        try {
+            const result = await harness.run(async (context: any) => {
+                const row = { createdAt: 1, lastMessageId: "m1", suggestions: ["next"], updatedAt: 1 };
 
-                return await call(reference, args, shardKey);
-            },
-            REFERENCES,
-            "guest",
-            "user",
-        );
+                await context.db.insert("followupSuggestions", { ...row, threadId: "t-guest" });
+                await context.db.insert("followupSuggestions", { ...row, threadId: "t-other-user" });
 
-        expect(listIdCalls.find((args) => args.table === "userSettings")).toEqual({ ownedBy: "guest", table: "userSettings" });
-        expect(listIdCalls.find((args) => args.table === "runWebhooks")).toEqual({ ownedBy: "guest", table: "runWebhooks" });
-        expect(listIdCalls.find((args) => args.table === "threads")).toEqual({ ownedBy: "guest", table: "threads" });
+                return {
+                    owned: await context.runQuery(listShardRowIds, { ownedBy: "guest", table: "followupSuggestions" }),
+                    whole: await context.runQuery(listShardRowIds, { table: "followupSuggestions" }),
+                };
+            });
+
+            expect(result.owned).toEqual([]);
+            expect(result.whole).toHaveLength(2);
+        } finally {
+            harness.close();
+        }
     });
+
+    it.each([
+        { expectedThreads: { table: "threads" }, sameStore: false },
+        { expectedThreads: { ownedBy: "guest", table: "threads" }, sameStore: true },
+    ])(
+        "asks for the guest's rows alone when it clears the tables the new account keeps its own row of (one store: $sameStore)",
+        async ({ expectedThreads, sameStore }) => {
+            const { call } = fakeShards({ guest: { userSettings: [{ _id: "g1", userId: "guest" }] } }, 2, { sameStore });
+            const listIdCalls: Record<string, unknown>[] = [];
+
+            await mergeGuestInto(
+                async (reference, args, shardKey) => {
+                    if (reference.__lunoraRef.endsWith(":listShardRowIds")) {
+                        listIdCalls.push(args);
+                    }
+
+                    return await call(reference, args, shardKey);
+                },
+                REFERENCES,
+                "guest",
+                "user",
+            );
+
+            expect(listIdCalls.find((args) => args.table === "userSettings")).toEqual({ ownedBy: "guest", table: "userSettings" });
+            expect(listIdCalls.find((args) => args.table === "runWebhooks")).toEqual({ ownedBy: "guest", table: "runWebhooks" });
+            expect(listIdCalls.find((args) => args.table === "threads")).toEqual(expectedThreads);
+        },
+    );
+});
+
+/**
+ * `mergeGuestInto` against the REAL shard procedures: each shard key is a `lunoraTest` harness, and the caller runs the
+ * referenced procedure (the probe's `claimKey`/`claimHeld`/`releaseKey` included) on the harness behind that key. Two
+ * harnesses stand for separate stores; one harness behind both keys for a shared store (shard routing off). The harness
+ * also holds the `.global()` tables as shard tables (`test/setup-harness.ts`), so the merge walks those too; the
+ * assertions are about the shard-local tables.
+ */
+describe("mergeGuestInto on real shard procedures", () => {
+    type Harness = ReturnType<typeof lunoraTest>;
+    type Method = "runMutation" | "runQuery";
+
+    const PROCEDURES: Record<string, [procedure: unknown, method: Method]> = {
+        "auth_hooks:deleteMergedGuest": [deleteMergedGuest, "runMutation"],
+        "lib_account_merge:deleteShardRows": [deleteShardRows, "runMutation"],
+        "lib_account_merge:importShardRows": [importShardRows, "runMutation"],
+        "lib_account_merge:listShardRowIds": [listShardRowIds, "runQuery"],
+        "lib_account_merge:listShardRowsPage": [listShardRowsPage, "runQuery"],
+        "lib_account_merge:reassignGlobalRows": [reassignGlobalRows, "runMutation"],
+        "lib_account_merge:reassignThreadFollowsPage": [reassignThreadFollowsPage, "runMutation"],
+        "lib_claim_once:claimHeld": [claimHeld, "runQuery"],
+        "lib_claim_once:claimKey": [claimKey, "runMutation"],
+        "lib_claim_once:releaseKey": [releaseKey, "runMutation"],
+    };
+
+    /** A shard caller over `stores` (shard key → harness). Before each delete on the guest's shard, `beforeDelete` sees it. */
+    const realShards =
+        (stores: Record<string, Harness>, beforeDelete?: (table: string, ids: string[]) => Promise<void>): ShardCall =>
+        async (reference, args, shardKey) => {
+            const entry = PROCEDURES[reference.__lunoraRef];
+            const harness = stores[shardKey];
+
+            if (entry === undefined || harness === undefined) {
+                throw new Error(`no procedure ${reference.__lunoraRef} on shard ${shardKey}`);
+            }
+
+            if (reference.__lunoraRef.endsWith(":deleteShardRows") && beforeDelete !== undefined) {
+                await beforeDelete(args.table as string, args.ids as string[]);
+            }
+
+            const [procedure, method] = entry;
+
+            return (await harness.run(async (context: any) => await context[method](procedure, args))) as never;
+        };
+
+    const insert = async (harness: Harness, table: string, row: Record<string, unknown>): Promise<string> =>
+        (await harness.run(async (context: any) => await context.db.insert(table, row))) as string;
+
+    /** A row under an id of the caller's choosing, as a copy from another shard is written. */
+    const insertWithId = async (harness: Harness, table: string, row: Record<string, unknown>): Promise<void> => {
+        await harness.run(async (context: any) => await context.db.insert(table, row, { allowExplicitId: true }));
+    };
+
+    const get = async (harness: Harness, table: string, id: string): Promise<Record<string, unknown> | null> =>
+        (await harness.run(async (context: any) => await context.db.get(table, id))) as Record<string, unknown> | null;
+
+    const all = async (harness: Harness, table: string): Promise<Record<string, unknown>[]> =>
+        (await harness.run(async (context: any) => await context.db.query(table).take(MERGE_PAGE_SIZE))) as Record<string, unknown>[];
+
+    const ownersOf = async (harness: Harness, table: string): Promise<Record<string, unknown>> => {
+        const rows = await all(harness, table);
+
+        return Object.fromEntries(rows.map((row) => [row._id as string, row.userId]));
+    };
+
+    const rowsOf = async (harness: Harness, table: string, userId: string): Promise<Record<string, unknown>[]> => {
+        const rows = await all(harness, table);
+
+        return rows.filter((row) => row.userId === userId);
+    };
+
+    const guestUser = async (harness: Harness): Promise<string> =>
+        await insert(harness, "user", { createdAt: 0, email: "guest@example.com", emailVerified: false, isAnonymous: true, name: "Guest", updatedAt: 0 });
+
+    const webhook = (url: string, userId: string) => {
+        return { createdAt: 1, enabled: true, secretCiphertext: "v1:cipher", updatedAt: 1, url, userId };
+    };
+
+    const suggestion = (threadId: string) => {
+        return { createdAt: 1, lastMessageId: "m", suggestions: ["next"], threadId, updatedAt: 1 };
+    };
+
+    it("separate stores: moves the guest's and collaborators' rows, keeps everyone else's, and deletes nothing before it is copied", async () => {
+        const guestStore = lunoraTest(schemaWithShardedTables([]) as never);
+        const userStore = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const guest = await guestUser(guestStore);
+            const thread = await insert(guestStore, "threads", { title: "guest chat", userId: guest });
+            const message = await insert(guestStore, "messages", { threadId: thread, userId: guest });
+            const page = await insert(guestStore, "pages", {
+                contentRevision: 0,
+                createdAt: 0,
+                order: 0,
+                revision: 0,
+                title: "Plan",
+                updatedAt: 0,
+                userId: guest,
+            });
+            const comment = await insert(guestStore, "pageComments", {
+                authorName: "Collaborator",
+                body: "from a collaborator",
+                commentId: "c-collab",
+                createdAt: 0,
+                pageId: page,
+                status: "open",
+                userId: "collab",
+            });
+            const guestSuggestion = await insert(guestStore, "followupSuggestions", suggestion(thread));
+            const strangerSettings = await insert(guestStore, "userSettings", { language: "fr-FR", userId: "stranger" });
+
+            await insert(guestStore, "userSettings", { setupStepsSkipped: ["ssh"], userId: guest });
+
+            const ownThread = await insert(userStore, "threads", { title: "own chat", userId: "user" });
+            const strangerThread = await insert(userStore, "threads", { title: "stranger chat", userId: "stranger" });
+            const strangerSuggestion = await insert(userStore, "followupSuggestions", suggestion("t-stranger"));
+
+            await insert(userStore, "userSettings", { language: "de-DE", userId: "user" });
+
+            const notYetCopied: string[] = [];
+            const call = realShards({ [guest]: guestStore, user: userStore }, async (table, ids) => {
+                for (const id of ids) {
+                    // Every guest-shard row the clear pass deletes is already on the new shard.
+                    if (
+                        (await get(guestStore, table, id)) !== null &&
+                        (await get(userStore, table, id)) === null &&
+                        !["runWebhooks", "userSettings"].includes(table)
+                    ) {
+                        notYetCopied.push(`${table}:${id}`);
+                    }
+                }
+            });
+
+            await mergeGuestInto(call, REFERENCES, guest, "user");
+
+            expect(notYetCopied).toStrictEqual([]);
+            // The guest's own rows, re-owned under their ids; the reference between them still holds.
+            expect(await get(userStore, "threads", thread)).toMatchObject({ title: "guest chat", userId: "user" });
+            expect(await get(userStore, "messages", message)).toMatchObject({ threadId: thread, userId: "user" });
+            expect(await get(userStore, "pages", page)).toMatchObject({ userId: "user" });
+            // The collaborator's comment moves with the page, still the collaborator's.
+            expect(await get(userStore, "pageComments", comment)).toMatchObject({ pageId: page, userId: "collab" });
+            // A table without an owner column moves whole from a store that held only the guest's key.
+            expect(await get(userStore, "followupSuggestions", guestSuggestion)).toMatchObject({ threadId: thread });
+            // Everyone else's rows on the new shard are as they were.
+            expect(await ownersOf(userStore, "threads")).toStrictEqual({ [ownThread]: "user", [strangerThread]: "stranger", [thread]: "user" });
+            expect(await get(userStore, "followupSuggestions", strangerSuggestion)).toMatchObject({ threadId: "t-stranger" });
+            // The new account keeps its own settings, with the guest's skipped step added.
+            expect(await rowsOf(userStore, "userSettings", "user")).toStrictEqual([expect.objectContaining({ language: "de-DE", setupStepsSkipped: ["ssh"] })]);
+
+            // The guest's shard is emptied of what moved; another user's settings, copied for the guest alone, stay there.
+            for (const table of ["threads", "messages", "pages", "pageComments", "followupSuggestions"]) {
+                expect(await all(guestStore, table)).toStrictEqual([]);
+            }
+
+            expect(await all(guestStore, "userSettings")).toStrictEqual([expect.objectContaining({ _id: strangerSettings, userId: "stranger" })]);
+            expect(await all(guestStore, "idempotencyClaims")).toStrictEqual([]);
+            expect(await all(userStore, "idempotencyClaims")).toStrictEqual([]);
+        } finally {
+            guestStore.close();
+            userStore.close();
+        }
+    });
+
+    it("shared store: re-owns only the guest's rows in place, clears no ownerless table, and keeps everyone else's", async () => {
+        const store = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const guest = await guestUser(store);
+            const guestThread = await insert(store, "threads", { title: "guest chat", userId: guest });
+            const ownThread = await insert(store, "threads", { title: "own chat", userId: "user" });
+            const strangerThread = await insert(store, "threads", { title: "stranger chat", userId: "stranger" });
+            const suggestions = [
+                await insert(store, "followupSuggestions", suggestion(guestThread)),
+                await insert(store, "followupSuggestions", suggestion(strangerThread)),
+            ];
+            const ownSettings = await insert(store, "userSettings", { language: "de-DE", userId: "user" });
+            const strangerSettings = await insert(store, "userSettings", { language: "fr-FR", userId: "stranger" });
+
+            await insert(store, "userSettings", { setupStepsSkipped: ["agent"], userId: guest });
+
+            await mergeGuestInto(realShards({ [guest]: store, user: store }), REFERENCES, guest, "user");
+
+            expect(await ownersOf(store, "threads")).toStrictEqual({ [guestThread]: "user", [ownThread]: "user", [strangerThread]: "stranger" });
+            const keptSuggestions = await all(store, "followupSuggestions");
+
+            expect(keptSuggestions.map((row) => row._id as string).toSorted((a, b) => a.localeCompare(b))).toStrictEqual(
+                suggestions.toSorted((a, b) => a.localeCompare(b)),
+            );
+            expect(await ownersOf(store, "userSettings")).toStrictEqual({ [ownSettings]: "user", [strangerSettings]: "stranger" });
+            expect(await get(store, "userSettings", ownSettings)).toMatchObject({ language: "de-DE", setupStepsSkipped: ["agent"] });
+            // Nothing of the guest's is left, so the guest itself goes.
+            expect(await get(store, "user", guest)).toBeNull();
+            expect(await all(store, "idempotencyClaims")).toStrictEqual([]);
+        } finally {
+            store.close();
+        }
+    });
+
+    it("stops before clearing anything when the real import refuses a row partway through the copy", async () => {
+        const guestStore = lunoraTest(schemaWithShardedTables([]) as never);
+        const userStore = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const guest = await guestUser(guestStore);
+            // A stranger's thread on the new shard holds the id of one of the guest's threads.
+            const clash = await insert(userStore, "threads", { title: "stranger chat", userId: "stranger" });
+
+            await insertWithId(guestStore, "threads", { _id: clash, title: "guest chat", userId: guest });
+
+            // `messages` is copied before `threads`, so the copy has started when it is refused.
+            const message = await insert(guestStore, "messages", { threadId: clash, userId: guest });
+            const before = { messages: await all(guestStore, "messages"), threads: await all(guestStore, "threads") };
+
+            await expect(mergeGuestInto(realShards({ [guest]: guestStore, user: userStore }), REFERENCES, guest, "user")).rejects.toThrow(
+                "already exists on the new account's shard",
+            );
+
+            expect(await get(userStore, "messages", message)).toMatchObject({ userId: "user" });
+            expect(await all(guestStore, "messages")).toStrictEqual(before.messages);
+            expect(await all(guestStore, "threads")).toStrictEqual(before.threads);
+            expect(await get(guestStore, "user", guest)).toMatchObject({ isAnonymous: true });
+            expect(await get(userStore, "threads", clash)).toMatchObject({ title: "stranger chat", userId: "stranger" });
+        } finally {
+            guestStore.close();
+            userStore.close();
+        }
+    });
+
+    it.each([{ sameStore: false }, { sameStore: true }])(
+        "drops the guest's webhook where the new account already has one, and touches nobody else's (one store: $sameStore)",
+        async ({ sameStore }) => {
+            const guestStore = lunoraTest(schemaWithShardedTables([]) as never);
+            const userStore = sameStore ? guestStore : lunoraTest(schemaWithShardedTables([]) as never);
+
+            try {
+                const guest = await guestUser(guestStore);
+                const guestHook = await insert(guestStore, "runWebhooks", webhook("https://example.com/guest", guest));
+                const strangerOnGuest = await insert(guestStore, "runWebhooks", webhook("https://example.com/stranger-a", "stranger"));
+                const ownHook = await insert(userStore, "runWebhooks", webhook("https://example.com/own", "user"));
+                const strangerOnUser = await insert(userStore, "runWebhooks", webhook("https://example.com/stranger-b", "stranger"));
+
+                await mergeGuestInto(realShards({ [guest]: guestStore, user: userStore }), REFERENCES, guest, "user");
+
+                expect(await rowsOf(userStore, "runWebhooks", "user")).toStrictEqual([
+                    expect.objectContaining({ _id: ownHook, url: "https://example.com/own" }),
+                ]);
+                expect(await get(guestStore, "runWebhooks", guestHook)).toBeNull();
+                expect(await get(userStore, "runWebhooks", guestHook)).toBeNull();
+                expect(await get(guestStore, "runWebhooks", strangerOnGuest)).toMatchObject({ url: "https://example.com/stranger-a", userId: "stranger" });
+                expect(await get(userStore, "runWebhooks", strangerOnUser)).toMatchObject({ url: "https://example.com/stranger-b", userId: "stranger" });
+            } finally {
+                guestStore.close();
+
+                if (!sameStore) {
+                    userStore.close();
+                }
+            }
+        },
+    );
 });

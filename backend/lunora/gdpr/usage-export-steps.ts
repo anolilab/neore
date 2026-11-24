@@ -34,7 +34,7 @@ export interface UsagePageSummary {
  * clear the pieces.
  */
 export interface UsageExportIo {
-    clear: (name: string) => Promise<{ hasMore: boolean }>;
+    clear: (name: string, keepRun: boolean) => Promise<{ hasMore: boolean }>;
     clearVerified: (name: string, pass: number) => Promise<{ hasMore: boolean }>;
     countRows: (name: string, args: { cursor: string | null; cutoff: string }) => Promise<{ backfill: string; closed: ClosedTotals; cursor: string | null }>;
     pause: (name: string) => Promise<void>;
@@ -92,7 +92,7 @@ export const collectUsageExport = async (io: UsageExportIo): Promise<{ pass: num
             const counted = await countPass(io, pass, cutoff);
 
             if (pages.backfillMoved || counted.backfillMoved || !sameTotals(counted.totals, pages.closed) || counted.backfill !== pages.backfill) {
-                await clearUsagePieces(io, `usage-p${String(pass)}-discard`);
+                await clearUsagePieces(io, `usage-p${String(pass)}-discard`, true);
                 continue;
             }
 
@@ -105,7 +105,7 @@ export const collectUsageExport = async (io: UsageExportIo): Promise<{ pass: num
             const final = await countPass(io, pass, cutoff, "final");
 
             if (final.backfillMoved || !sameTotals(final.totals, pages.closed) || final.backfill !== pages.backfill) {
-                await clearUsagePieces(io, `usage-p${String(pass)}-discard`);
+                await clearUsagePieces(io, `usage-p${String(pass)}-discard`, true);
                 continue;
             }
 
@@ -116,11 +116,14 @@ export const collectUsageExport = async (io: UsageExportIo): Promise<{ pass: num
     throw new UsageExportError("changed");
 };
 
-/** Clears a run's pieces: one batch per step, until none is left. */
-export const clearUsagePieces = async (io: UsageExportIo, label = "usage-clear"): Promise<void> => {
+/**
+ * Clears a run's pieces: one batch per step, until none is left. A discarded pass keeps the run's record (`keepRun`): the run goes on,
+ * and its browser pages are already stored, so a run killed before its next piece is still found by the sweep.
+ */
+export const clearUsagePieces = async (io: UsageExportIo, label = "usage-clear", keepRun = false): Promise<void> => {
     for (let round = 0; ; round += 1) {
         const name = `${label}-${String(round)}`;
-        const { hasMore } = await io.step(name, async () => await io.clear(name));
+        const { hasMore } = await io.step(name, async () => await io.clear(name, keepRun));
 
         if (!hasMore) {
             return;

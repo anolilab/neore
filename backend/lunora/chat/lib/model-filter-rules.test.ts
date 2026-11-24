@@ -149,6 +149,30 @@ describe("the plan carried by the rules", () => {
             model: "anthropic/claude-haiku-4.5",
         });
     });
+
+    // The owner pays for a collaborator's follow-up: the owner's plan grades the paid fallback and is the one it is metered to.
+    it("grades a collaborator's paid fallback by the owner's plan when the owner pays", async () => {
+        const paid = "anthropic/claude-haiku-4.5";
+        // Both users may use the paid model; only the plan of `premiumUserId` is paid.
+        const planOf = (premiumUserId: string) =>
+            ({
+                runQuery: vi.fn(async (reference: unknown, args: { userId?: string } = {}) => {
+                    const isPlanRead = JSON.stringify(reference).includes(PLAN_REF) || String(reference).includes(PLAN_REF);
+
+                    if (!isPlanRead) {
+                        return prefs({ modelFilterRules: { allowedModels: [paid] } });
+                    }
+
+                    return args.userId === premiumUserId ? { isAdmin: false, plan: "premium" } : FREE_PLAN;
+                }),
+            }) as never;
+
+        await expect(resolveBackgroundModel(planOf("collaborator"), "owner", "moonshotai/kimi-k2-0905", "owner", "collaborator")).resolves.toBeUndefined();
+        await expect(resolveBackgroundModel(planOf("owner"), "owner", "moonshotai/kimi-k2-0905", "owner", "collaborator")).resolves.toMatchObject({
+            billedUserId: "owner",
+            model: paid,
+        });
+    });
 });
 
 describe("getUtilityModelForUser", () => {

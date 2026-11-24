@@ -131,6 +131,7 @@ const createDesignTool = createTool<
         documentId: string;
         height: number;
         kind: string;
+        threadId: string;
         title: string;
         version: number;
         width: number;
@@ -204,6 +205,7 @@ Design tips: Use the rule of thirds for element placement. Ensure text contrast 
             documentId: document._id,
             height,
             kind: "design",
+            threadId: context.threadId,
             title: document.title,
             version: document.version,
             width,

@@ -330,6 +330,18 @@ export const setRunTurn = (ctx: object, turn: Partial<RunTurn> | undefined): voi
 };
 
 /**
+ * The agent forwards the action ctx to tools as their `ToolCtx`, which declares `runToolSources`: the source of each tool
+ * the run offers, read off its permission key (`builtin:…`, `mcp:…`, `connector:…`, `device:…`), never off its name; a
+ * key with no source reads as `unknown`. A continuation passes the keys its snapshot recorded too, so a tool the step
+ * that made the call was offered still counts after it is gone; a snapshot that recorded none sets none.
+ */
+export const setRunToolSources = (ctx: object, ...permissionKeys: ReadonlyArray<Record<string, string> | undefined>): void => {
+    (ctx as { runToolSources?: ReadonlyArray<string> }).runToolSources = permissionKeys.includes(undefined)
+        ? undefined
+        : permissionKeys.flatMap((keys) => Object.values(keys ?? {}).map((key) => (key.includes(":") ? key.slice(0, key.indexOf(":")) : "unknown")));
+};
+
+/**
  * The organization whose policy caps this run's tools. A sub-agent it dispatches records it when the parent thread has no
  * stored organization, so the child is capped as the run was.
  */
@@ -1183,6 +1195,20 @@ export const finishRun = async (
 
     await stampSavedToolCalls(ctx, { autoApprovals, mcpLabels, run, savedMessages, userId });
 
+    // Each row the run saved is stamped with whether the run ran on the device, now: the suggestion job reads that stamp (`stampRunLocality`).
+    // Best effort, as the tool-call stamp is: a row left unstamped falls back to its endpoint's current type, and the reply is kept.
+    if (savedMessages?.length) {
+        try {
+            await ctx.runMutation(internal.agent.followup_suggestions.stampRunLocality, {
+                messageIds: savedMessages.map((m) => m._id),
+                model: snapshot.model,
+                userId,
+            });
+        } catch (error) {
+            streamLogger.warn("[AgentRun] Could not stamp the run's locality:", error);
+        }
+    }
+
     // With no step left to answer it, a request is not a pause: nothing could resume the run past it.
     const approvalIds = noStepLeft ? [] : collectApprovalRequestIds(savedMessages);
     const askUserApprovalIds = noStepLeft ? [] : collectAskUserApprovalIds(savedMessages, ASK_USER_TOOL_NAME);
@@ -1373,6 +1399,8 @@ export const resumeApprovedRun = async (
     looped?: LoopFinding;
     messageIds?: string[];
     paused: boolean;
+    /** Whether the continuation saved an assistant row, not only tool results: what a finished reply after an approval is judged by. */
+    savedReply?: boolean;
     stopped: boolean;
     /** A sub-agent child that paused again: whether its run now waits (false: it was refused or ended, its requests closed). */
     subAgentWaits?: boolean;
@@ -1586,6 +1614,7 @@ export const resumeApprovedRun = async (
         setRunStartedBy(ctx, config.startedBy);
         // And what the saved-login verdict needs of that turn: a snapshot without any of it sets none.
         setRunTurn(ctx, { impersonated: config.impersonated, promptMessageId: config.promptMessageId, systemContext: config.systemContext });
+        setRunToolSources(ctx, config.toolPermissionKeys, toolResult.permissionKeys);
         setRunOrganizationId(ctx, config.organizationId ?? config.group?.organizationId);
         setRunReplyKey(ctx, config.replyKey ?? streamId);
 
@@ -1800,6 +1829,7 @@ export const resumeApprovedRun = async (
             looped,
             messageIds,
             paused,
+            savedReply: (result.savedMessages ?? []).some((message) => !message.tool),
             stopped: false,
             ...(subAgentWaits !== undefined && { subAgentWaits }),
         };

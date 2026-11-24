@@ -45,7 +45,7 @@ export const generateRunWebhookSecret = (): string => {
 /**
  * Why a URL cannot be the target of a run webhook, or `null` when it can.
  *
- * Only https, no credentials in the URL, and no literal private, loopback,
+ * Only https on port 443, no credentials in the URL, and no literal private, loopback,
  * link-local or reserved address (`isSafeUrl`). That check reads the host as
  * written. A name that resolves into a private range is caught at delivery, by
  * `postCheckedHttps` (`lib/egress.ts`), which resolves it and refuses any
@@ -67,6 +67,11 @@ export const runWebhookUrlProblem = (value: string): string | null => {
 
     if (parsed.protocol !== "https:") {
         return "The URL must use https://.";
+    }
+
+    // `URL` drops a written ":443", so any port left here is one delivery (`postCheckedHttps`) refuses.
+    if (parsed.port !== "") {
+        return "The URL must use the standard https port (443).";
     }
 
     if (parsed.username !== "" || parsed.password !== "") {

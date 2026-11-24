@@ -208,6 +208,18 @@ describe("github driver: a pull request", () => {
         expect(detail.state).toBe(state);
     });
 
+    it.each([
+        ["dirty", "conflicting"],
+        ["clean", "clean"],
+        [undefined, "unknown"],
+    ])("reads the merge state %s from the same answer as %s", async (mergeable_state, mergeState) => {
+        const { request } = fakeHost({ "/repos/octo/hello/pulls/7": () => pullBody({ mergeable_state }) });
+
+        const detail = await githubDriver.getPullRequest(request, REF);
+
+        expect(detail.mergeState).toBe(mergeState);
+    });
+
     it("keeps no link that is not a GitHub address", async () => {
         const { request } = fakeHost({ "/repos/octo/hello/pulls/7": () => pullBody({ html_url: "https://evil.example/octo/hello/pull/7" }) });
 

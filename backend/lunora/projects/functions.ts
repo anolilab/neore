@@ -526,10 +526,13 @@ export const setProjectRuleFiles = authMutation
 
 export const getProject = authQuery
     .input({
+        // `primary`: a caller that reads "not there" as proof (the mobile reconnect check) reads the authoritative row; a replica
+        // that lags a fresh share would otherwise answer no project for one that exists.
+        primary: v.optional(v.boolean()),
         projectId: v.id("projects"),
     })
-    .query(async ({ args: { projectId }, ctx: context }) => {
-        const project = await readableProject(context, projectId as Id<"projects">, context.user.userId);
+    .query(async ({ args: { primary, projectId }, ctx: context }) => {
+        const project = await readableProject(context, projectId as Id<"projects">, context.user.userId, { primary: primary === true });
 
         return project && forViewer(project, context.user.userId);
     });

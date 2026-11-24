@@ -2,6 +2,7 @@ import { api } from "@neore/backend/api";
 import { createFileRoute } from "@tanstack/react-router";
 
 import AdminDashboardStats from "@/features/admin/components/admin-dashboard-stats";
+import AdminProviderCacheRow from "@/features/admin/components/admin-provider-cache-row";
 import AdminShardFootprintRow from "@/features/admin/components/admin-shard-footprint-row";
 import { createLunoraQueryOptions } from "@/lib/lunora/crpc";
 import { referenceNow } from "@/lib/reference-time";
@@ -10,6 +11,7 @@ const RouteComponent = () => (
     <div className="flex flex-col gap-6">
         <AdminDashboardStats />
         <AdminShardFootprintRow />
+        <AdminProviderCacheRow />
     </div>
 );
 
