@@ -151,6 +151,26 @@ describe("useComposerFocusRequest", () => {
         expect(useComposerFocusRequestStore.getState().threadId).toBeUndefined();
     });
 
+    it("keeps the request until a composer that mounts a few frames later takes focus, then clears it", () => {
+        const { pane, update } = mountPane();
+
+        requestComposerFocus("chat-a");
+        renderHook(() => useComposerFocusRequest(pane, "chat-a", true));
+
+        // The composer loads after the pane is shown: the request must survive the frames before it mounts.
+        runFrame();
+        runFrame();
+
+        expect(focusLog).toEqual([]);
+        expect(useComposerFocusRequestStore.getState().threadId).toBe("chat-a");
+
+        update(composer());
+        runFrame();
+
+        expect(focusLog).toEqual([screen.getByRole("textbox")]);
+        expect(useComposerFocusRequestStore.getState().threadId).toBeUndefined();
+    });
+
     it("waits until the pane is focused before it moves focus", () => {
         const { pane } = mountPane(composer());
 
