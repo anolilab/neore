@@ -87,9 +87,14 @@ const endSupersededManualWaits = async (ctx: MutationCtx, threadId: string, newS
             continue;
         }
 
-        if (await isSuperseded(ctx, stream, stream.pause.from)) {
-            await endPausedRun(ctx, stream);
+        // Read again: ending an earlier wait may have handed its snooze to this one, and the end must use that row.
+        const current = await ctx.db.get("persistentStreams", stream._id);
+
+        if (current === null || current.pause === undefined || !(await isSuperseded(ctx, current, current.pause.from))) {
+            continue;
         }
+
+        await endPausedRun(ctx, current);
     }
 };
 

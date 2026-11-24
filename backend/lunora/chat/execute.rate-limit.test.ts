@@ -33,6 +33,8 @@ const { enqueued, modelState, registry } = vi.hoisted(() => {
             toolCtx: undefined as { runTurn?: { systemContext?: ReadonlyArray<string> } } | undefined,
             /** The person's usage-limit settings, as the prefs read answers them (absent = the defaults). */
             usagePrefs: {} as { resumeAfterUsageLimit?: boolean; snoozeUntilUsageLimitReset?: boolean },
+            /** The person's settings cannot be read: the shard read fails. */
+            usagePrefsFail: false,
             withTools: false,
         },
         registry: new Map<string, unknown>(),
@@ -64,6 +66,10 @@ vi.mock("../lib/cross-shard", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../lib/cross-shard")>()),
         callOnShard: vi.fn(async () => {
+            if (modelState.usagePrefsFail) {
+                throw new Error("shard unreachable");
+            }
+
             return { memoryEnabled: false, resumeInterruptedRuns: false, threadSummariesEnabled: false, ...modelState.usagePrefs };
         }),
     };
@@ -246,6 +252,7 @@ beforeEach(async () => {
     modelState.withTools = false;
     modelState.groupConfig = null;
     modelState.usagePrefs = {};
+    modelState.usagePrefsFail = false;
     vi.mocked(runGroupTurn).mockClear();
     modelState.model = scriptedModel([textStep("Hello there.")]);
 
@@ -1582,7 +1589,7 @@ describe("the usage-limit settings of a rate-limited run", () => {
     });
 
     /** A second reply on the chat, live and not yet paused, paused through the pause mutation: its reset is `minutes` away. */
-    const pauseSecondReply = async (minutes: number) => {
+    const pauseSecondReply = async (minutes: number, resumeAfterLimit?: boolean) => {
         const streamId = await harness.run(
             async (ctx: any) =>
                 await ctx.db.insert("persistentStreams", {
@@ -1608,6 +1615,7 @@ describe("the usage-limit settings of a rate-limited run", () => {
                         threadId: ids.threadId,
                         userId: OWNER,
                     },
+                    ...(resumeAfterLimit !== undefined && { resumeAfterLimit }),
                     snoozeUntilReset: true,
                     status: 429,
                     stepsUsed: 0,
@@ -1776,5 +1784,52 @@ describe("the usage-limit settings of a rate-limited run", () => {
 
         expect(resumed).toBe(true);
         expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("a failed settings read leaves a rate-limited reply waiting for the person, never resuming it", async () => {
+        modelState.usagePrefsFail = true;
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const state = await readState();
+
+        expect(state.pauseAwaitsPerson).toBe(true);
+        expect(enqueued).toHaveLength(0);
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("a new reply ends every manual wait it moves past, including one that took over a snooze", async () => {
+        const { createStream } = await import("./streaming/persistent/library");
+
+        // Both replies wait for the person. The first holds the chat's snooze; the second, with an earlier reset, takes it over when the first ends.
+        modelState.usagePrefs = { resumeAfterUsageLimit: false, snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+        await pauseSecondReply(0.5, false);
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(createStream, {
+                    messageId: ids.messageId,
+                    streamingConfig: { contentType: "text", model: "test-model" },
+                    threadId: ids.threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        const first = await readState();
+
+        expect(first.streamStatus).toBe("done");
+        expect(await snoozedUntil()).toBeUndefined();
+
+        const second = await harness.run(async (ctx: any) => {
+            const streams = await ctx.db.query("persistentStreams").collect();
+
+            return streams.find((stream: any) => stream.messageId === "other-message");
+        });
+
+        expect(second.status).toBe("done");
     });
 });
