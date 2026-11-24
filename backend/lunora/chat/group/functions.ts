@@ -35,7 +35,7 @@ import type { GroupChat, GroupChatMode } from "./validators";
 import { vGroupChatMode } from "./validators";
 import { admitSkills } from "../../lib/rls/scope";
 import { MAX_LENGTH } from "../../lib/validators";
-import { ownerNewChatMode } from "../lib/new-chat-mode";
+import { callerRestrictsFull, ownerNewChatMode } from "../lib/new-chat-mode";
 import type { ThreadPermissionMode } from "../lib/thread-permission-mode";
 
 const DEFAULT_GROUP_TITLE = "Group chat";
@@ -307,7 +307,7 @@ export const createGroupChat = authMutation
         const { userId } = ctx.user;
         const organizationId = ctx.user.activeOrganization?.id;
 
-        const permissionMode = await ownerNewChatMode(ctx, userId, Boolean(ctx.user.impersonatedBy));
+        const permissionMode = await ownerNewChatMode(ctx, userId, await callerRestrictsFull(ctx, ctx.user));
 
         const created = await insertGroupChat(
             ctx,
@@ -385,6 +385,9 @@ export const createGroupChatFromTemplate = authMutation
             ...(template.synthesizerSlug !== undefined && { synthesizerSkillId: template.synthesizerSlug }),
         });
 
+        // The owner's default mode is read before any skill is written: a failed read here must not leave global skill rows behind.
+        const permissionMode = await ownerNewChatMode(ctx, userId, await callerRestrictsFull(ctx, ctx.user));
+
         // The caller's own skills (found by slug, or created now), each with an
         // enabled link — usable by construction, so no usability re-check here.
         const skillIds = await ensureTemplateSkills(
@@ -394,8 +397,6 @@ export const createGroupChatFromTemplate = authMutation
         );
         const synthesizerSkillId = slugOptions.synthesizerSkillId === undefined ? undefined : skillIds[slugs.indexOf(slugOptions.synthesizerSkillId)];
         const options = { ...slugOptions, ...(synthesizerSkillId !== undefined && { synthesizerSkillId }) };
-
-        const permissionMode = await ownerNewChatMode(ctx, userId, Boolean(ctx.user.impersonatedBy));
 
         const { now } = ctx;
         const threadId = await insertThread(ctx.db, {
