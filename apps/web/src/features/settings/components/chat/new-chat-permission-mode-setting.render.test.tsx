@@ -74,6 +74,17 @@ describe("NewChatPermissionModeSetting", () => {
         expect(screen.getByRole("button", { name: "Auto" }).getAttribute("aria-pressed")).toBe("true");
     });
 
+    it("describes the group with the guidance for the selected mode, for a screen reader", () => {
+        state.settings = { defaultPermissionMode: "supervised" };
+
+        render(<NewChatPermissionModeSetting />);
+
+        const group = screen.getByRole("group", { name: "Default for new chats" });
+        const guidance = screen.getByText("Anything that is not a plain lookup asks first");
+
+        expect((group.getAttribute("aria-describedby") ?? "").split(" ")).toContain(guidance.id);
+    });
+
     it("stays locked while the saved default is still loading, so no mode can overwrite an unseen one", () => {
         state.settings = undefined;
 

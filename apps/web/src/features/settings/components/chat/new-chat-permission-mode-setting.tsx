@@ -24,6 +24,8 @@ const NewChatPermissionModeSetting: FC = () => {
     const updateUserSettings = useUpdateUserSettings();
     const titleId = useId();
     const descriptionId = useId();
+    // The guidance for the selected mode, which a screen reader reads with the group (it changes as the mode does).
+    const modeGuidanceId = useId();
 
     // An absent value is the defaults, which is Auto. Until the settings load, the saved value is unknown, so the control shows Auto
     // only as a placeholder and stays locked: a choice made now would overwrite a default the person has not seen.
@@ -57,7 +59,7 @@ const NewChatPermissionModeSetting: FC = () => {
             </CardHeader>
             <CardContent className="space-y-3">
                 <ToggleGroup
-                    aria-describedby={descriptionId}
+                    aria-describedby={`${descriptionId} ${modeGuidanceId}`}
                     aria-labelledby={titleId}
                     disabled={updateUserSettings.isPending || locked}
                     onValueChange={(value) => {
@@ -84,7 +86,9 @@ const NewChatPermissionModeSetting: FC = () => {
                         </ToggleGroupItem>
                     ))}
                 </ToggleGroup>
-                <p className="text-muted-foreground text-sm">{descriptions[current]}</p>
+                <p className="text-muted-foreground text-sm" id={modeGuidanceId}>
+                    {descriptions[current]}
+                </p>
                 {impersonating && <p className="text-muted-foreground text-sm">{t`An admin acting as you cannot change this default.`}</p>}
             </CardContent>
         </Card>
