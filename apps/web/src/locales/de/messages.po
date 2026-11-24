@@ -307,7 +307,7 @@ msgstr "{0, plural, one {# Datei} other {# Dateien}}"
 
 #. placeholder {0}: items.length
 #. placeholder {0}: option.value
-#: ../../packages/ui/src/components/image-gallery.tsx:407
+#: ../../packages/ui/src/components/image-gallery.tsx:446
 #: src/features/chat/thread/composer-image-settings.tsx:227
 msgid "{0, plural, one {# image} other {# images}}"
 msgstr "{0, plural, one {# Bild} other {# Bilder}}"
@@ -765,12 +765,12 @@ msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "{0} von {MAX_PARALLEL} ausgewählt"
 
 #. placeholder {0}: referenceImageIds.length
-#: src/features/chat/thread/media-gallery-view.tsx:370
+#: src/features/chat/thread/media-gallery-view.tsx:372
 msgid "{0} of {MAX_REFERENCE_IMAGES} references selected"
 msgstr "{0} von {MAX_REFERENCE_IMAGES} Referenzen ausgewählt"
 
 #. placeholder {0}: selection.length
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:248
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:250
 msgid "{0} of {maxReferences} selected"
 msgstr "{0} von {maxReferences} ausgewählt"
 
@@ -1290,11 +1290,11 @@ msgstr "{metricLabel} > {threshold} pro Stunde"
 msgid "{metricLabel} > {threshold} per month"
 msgstr "{metricLabel} > {threshold} pro Monat"
 
-#: src/features/chat/thread/media-gallery-view.tsx:345
+#: src/features/chat/thread/media-gallery-view.tsx:347
 msgid "{mins}m"
 msgstr "{mins}m"
 
-#: src/features/chat/thread/media-gallery-view.tsx:345
+#: src/features/chat/thread/media-gallery-view.tsx:347
 msgid "{mins}m {secs}s"
 msgstr "{mins}m {secs}s"
 
@@ -1537,7 +1537,7 @@ msgstr "{rowsNeeded, plural, one {Wir brauchen # zusätzliche Zeile, um alles au
 msgid "{secondLabel} ×{secondCount}"
 msgstr "{secondLabel} ×{secondCount}"
 
-#: src/features/chat/thread/media-gallery-view.tsx:339
+#: src/features/chat/thread/media-gallery-view.tsx:341
 msgid "{seconds}s"
 msgstr "{seconds}s"
 
@@ -2745,7 +2745,7 @@ msgstr "Rechteck hinzufügen"
 msgid "Add reference image"
 msgstr "Referenzbild hinzufügen"
 
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:210
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:212
 msgid "Add reference images"
 msgstr "Referenzbilder hinzufügen"
 
@@ -3567,7 +3567,7 @@ msgstr "Alle Modelle aktiviert"
 msgid "All models. <0>One workspace.</0>"
 msgstr "Alle Modelle. <0>Ein Arbeitsbereich.</0>"
 
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:227
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:229
 msgid "All my images"
 msgstr "Alle meine Bilder"
 
@@ -4557,8 +4557,8 @@ msgstr "Bitte deinen anderen Assistenten, aufzulisten, was er sich merkt, füge 
 msgid "Aspect ratio"
 msgstr "Seitenverhältnis"
 
-#: src/features/chat/thread/media-gallery-view.tsx:456
-#: src/features/chat/thread/media-gallery-view.tsx:541
+#: src/features/chat/thread/media-gallery-view.tsx:458
+#: src/features/chat/thread/media-gallery-view.tsx:543
 #: src/features/workflow/components/nodes/video-node.tsx:178
 msgid "Aspect Ratio"
 msgstr "Seitenverhältnis"
@@ -4742,7 +4742,7 @@ msgstr "auto"
 #: src/features/chat/thread/composer-permission-mode.tsx:41
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:65
-#: src/features/chat/thread/media-gallery-view.tsx:509
+#: src/features/chat/thread/media-gallery-view.tsx:511
 #: src/features/settings/components/chat/bots-settings.tsx:132
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Auto"
@@ -6003,7 +6003,7 @@ msgstr "Kanada"
 #: src/features/auth/components/team/leave-team-dialog.tsx:76
 #: src/features/auth/components/team/team-settings-dialog.tsx:209
 #: src/features/canvas/canvas-panel.tsx:121
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:256
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:258
 #: src/features/chat/forward/forward-dialog.tsx:169
 #: src/features/chat/forward/forward-selection-bar.tsx:78
 #: src/features/chat/group/create-group-chat-button.tsx:240
@@ -6885,9 +6885,9 @@ msgstr "Bereinigung fehlgeschlagen"
 
 #: ../../packages/ui/src/components/combobox.tsx:108
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:233
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:252
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:254
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:96
-#: src/features/chat/thread/media-gallery-view.tsx:380
+#: src/features/chat/thread/media-gallery-view.tsx:382
 #: src/features/prompts/components/prompt-list.tsx:614
 #: src/features/settings/components/chat/api-keys-settings.tsx:401
 #: src/features/settings/components/chat/models-settings.tsx:477
@@ -9920,7 +9920,7 @@ msgstr "Anpassung"
 msgid "Customize"
 msgstr "Anpassen"
 
-#: src/features/chat/thread/media-gallery-view.tsx:437
+#: src/features/chat/thread/media-gallery-view.tsx:439
 msgid "Customize and regenerate"
 msgstr "Anpassen und neu generieren"
 
@@ -10882,7 +10882,7 @@ msgstr "Beschreibe, wie das Bild umgewandelt werden soll..."
 msgid "Describe the image to generate..."
 msgstr "Beschreibe das zu generierende Bild..."
 
-#: src/features/chat/thread/media-gallery-view.tsx:446
+#: src/features/chat/thread/media-gallery-view.tsx:448
 msgid "Describe the image you want to create..."
 msgstr "Beschreibe das Bild, das du erstellen möchtest..."
 
@@ -10907,7 +10907,7 @@ msgstr "Beschreibe die Aufgabe, das erwartete Ergebnis und wann sie sich wiederh
 msgid "Describe the video to generate..."
 msgstr "Beschreibe das zu generierende Video..."
 
-#: src/features/chat/thread/media-gallery-view.tsx:446
+#: src/features/chat/thread/media-gallery-view.tsx:448
 msgid "Describe the video you want to create..."
 msgstr "Beschreibe das Video, das du erstellen möchtest..."
 
@@ -10974,7 +10974,7 @@ msgstr "Beschreibung ist erforderlich"
 msgid "Description must be {SKILL_DESCRIPTION_MAX} characters or less"
 msgstr "Die Beschreibung darf höchstens {SKILL_DESCRIPTION_MAX} Zeichen lang sein"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:337
+#: ../../packages/ui/src/components/image-gallery.tsx:376
 msgid "Deselect"
 msgstr "Abwählen"
 
@@ -10983,7 +10983,7 @@ msgstr "Abwählen"
 msgid "Deselect all"
 msgstr "Alle abwählen"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:238
+#: ../../packages/ui/src/components/image-gallery.tsx:263
 msgid "Deselect image"
 msgstr "Bild abwählen"
 
@@ -11463,6 +11463,7 @@ msgstr "Download"
 
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:109
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:183
+#: ../../packages/ui/src/components/save-file-button.tsx:27
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:82
 #: src/features/canvas/canvas-panel.tsx:811
 #: src/features/canvas/canvas-panel.tsx:828
@@ -11487,6 +11488,7 @@ msgid "Download {displayName}"
 msgstr "{displayName} herunterladen"
 
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:118
+#: ../../packages/ui/src/components/save-file-button.tsx:27
 msgid "Download {filename}"
 msgstr "{filename} herunterladen"
 
@@ -11497,6 +11499,11 @@ msgstr "{fileName} herunterladen"
 #: src/features/chat/thread/sandbox-files.tsx:241
 msgid "Download {name} ({size})"
 msgstr "{name} herunterladen ({size})"
+
+#: ../../packages/ui/src/components/image-gallery.tsx:254
+#: ../../packages/ui/src/components/image-gallery.tsx:367
+msgid "Download {tileName} ({position})"
+msgstr "{tileName} ({position}) herunterladen"
 
 #: src/features/settings/components/privacy/data-export.tsx:98
 msgid "Download a copy of all your personal data in JSON format (GDPR Article 20 - Right to Data Portability)"
@@ -11721,7 +11728,7 @@ msgstr "Auswahl duplizieren ({selectedNonGroupCount})"
 
 #: src/features/admin/components/ban-user-dialog.tsx:117
 #: src/features/chat/header/temporary-chat-dropdown.tsx:300
-#: src/features/chat/thread/media-gallery-view.tsx:567
+#: src/features/chat/thread/media-gallery-view.tsx:569
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:136
 msgid "Duration"
 msgstr "Dauer"
@@ -14004,7 +14011,7 @@ msgstr "Konto konnte nicht verknüpft werden"
 msgid "Failed to load analytics. Ensure the LLM Gateway is running and reachable."
 msgstr "Analytics konnten nicht geladen werden. Stelle sicher, dass das LLM Gateway läuft und erreichbar ist."
 
-#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:84
+#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:85
 msgid "Failed to load audio"
 msgstr "Audio konnte nicht geladen werden"
 
@@ -14025,7 +14032,7 @@ msgstr "Tabelle konnte nicht geladen werden"
 msgid "Failed to load usage data. Ensure the LLM Gateway is running and reachable."
 msgstr "Nutzungsdaten konnten nicht geladen werden. Stelle sicher, dass das LLM Gateway läuft und erreichbar ist."
 
-#: ../../packages/ui/src/components/file-renderers/video-player.tsx:92
+#: ../../packages/ui/src/components/file-renderers/video-player.tsx:98
 msgid "Failed to load video stream."
 msgstr "Videostream konnte nicht geladen werden."
 
@@ -15830,7 +15837,9 @@ msgstr "Galicisch"
 msgid "Galician (Spain)"
 msgstr "Galicisch (Spanien)"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:193
+#: ../../packages/ui/src/components/image-gallery.tsx:168
+#: ../../packages/ui/src/components/image-gallery.tsx:207
+#: ../../packages/ui/src/components/image-gallery.tsx:299
 msgid "Gallery item"
 msgstr "Galerie-Element"
 
@@ -15972,7 +15981,7 @@ msgstr "Ideen für eine kreative Geschichte generieren"
 msgid "Generate image"
 msgstr "Bild generieren"
 
-#: src/features/chat/thread/media-gallery-view.tsx:620
+#: src/features/chat/thread/media-gallery-view.tsx:622
 #: src/features/workflow/templates/index.ts:106
 msgid "Generate Image"
 msgstr "Bild generieren"
@@ -15998,7 +16007,7 @@ msgstr "Einzigartige Geschäftsideen für 2025 generieren"
 msgid "Generate video"
 msgstr "Video generieren"
 
-#: src/features/chat/thread/media-gallery-view.tsx:620
+#: src/features/chat/thread/media-gallery-view.tsx:622
 #: src/features/workflow/templates/index.ts:424
 msgid "Generate Video"
 msgstr "Video generieren"
@@ -16028,15 +16037,15 @@ msgstr "Generiertes Bild"
 msgid "Generated Image"
 msgstr "Generiertes Bild"
 
-#: src/features/chat/thread/media-gallery-view.tsx:353
+#: src/features/chat/thread/media-gallery-view.tsx:355
 msgid "Generated images will appear here. Start by describing what you want to create in the composer below."
 msgstr "Generierte Bilder werden hier angezeigt. Beginne damit, unten im Composer zu beschreiben, was du erstellen möchtest."
 
-#: src/features/chat/thread/media-gallery-view.tsx:244
+#: src/features/chat/thread/media-gallery-view.tsx:245
 msgid "Generated video"
 msgstr "Generiertes Video"
 
-#: src/features/chat/thread/media-gallery-view.tsx:354
+#: src/features/chat/thread/media-gallery-view.tsx:356
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "Generierte Videos werden hier angezeigt. Beginne damit, unten im Composer zu beschreiben, was du erstellen möchtest."
 
@@ -16049,7 +16058,7 @@ msgid "Generating draft…"
 msgstr "Entwurf wird erstellt…"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:530
-#: src/features/chat/thread/media-gallery-view.tsx:403
+#: src/features/chat/thread/media-gallery-view.tsx:405
 msgid "Generating image..."
 msgstr "Bild wird generiert..."
 
@@ -16062,7 +16071,7 @@ msgid "Generating response"
 msgstr "Antwort wird generiert"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:531
-#: src/features/chat/thread/media-gallery-view.tsx:403
+#: src/features/chat/thread/media-gallery-view.tsx:405
 msgid "Generating video..."
 msgstr "Video wird generiert..."
 
@@ -17210,7 +17219,7 @@ msgstr "Verlauf"
 msgid "Hit rate"
 msgstr "Trefferquote"
 
-#: ../../packages/ui/src/components/file-renderers/video-player.tsx:92
+#: ../../packages/ui/src/components/file-renderers/video-player.tsx:98
 msgid "HLS playback is not supported in this browser."
 msgstr "HLS-Wiedergabe wird in diesem Browser nicht unterstützt."
 
@@ -17567,7 +17576,7 @@ msgid "Image generation"
 msgstr "Bildgenerierung"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:177
-#: src/features/chat/thread/media-gallery-view.tsx:350
+#: src/features/chat/thread/media-gallery-view.tsx:352
 #: src/features/marketing/components/landing-page.tsx:287
 #: src/features/marketing/components/model-detail-page.tsx:87
 #: src/features/workflow/components/gallery/publish-dialog.tsx:28
@@ -20151,7 +20160,7 @@ msgstr "Gesperrter Chat"
 
 #: src/components/command-palette.tsx:896
 msgid "Locked chats do not reveal their project, so some may be missing here."
-msgstr"Gesperrte Chats zeigen ihr Projekt nicht an, daher können hier einige fehlen."
+msgstr "Gesperrte Chats zeigen ihr Projekt nicht an, daher können hier einige fehlen."
 
 #. placeholder {0}: getModelModeName(anchorMode)
 #: src/components/model-picker/model-picker.tsx:1397
@@ -23022,7 +23031,7 @@ msgid "No icon found"
 msgstr "Kein Icon gefunden"
 
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:171
-#: src/features/chat/thread/media-gallery-view.tsx:351
+#: src/features/chat/thread/media-gallery-view.tsx:353
 msgid "No images yet"
 msgstr "Noch keine Bilder"
 
@@ -23038,7 +23047,7 @@ msgstr "Eine Weile keine Eingabe: In weniger als einer Minute geht die Steuerung
 msgid "No instruction files were found in this repository."
 msgstr "In diesem Repository wurden keine Anweisungsdateien gefunden."
 
-#: ../../packages/ui/src/components/image-gallery.tsx:489
+#: ../../packages/ui/src/components/image-gallery.tsx:528
 msgid "No items"
 msgstr "Keine Einträge"
 
@@ -23216,7 +23225,7 @@ msgstr "Kein Projekt"
 msgid "No projects available. Create a project first."
 msgstr "Keine Projekte verfügbar. Erstelle zuerst ein Projekt."
 
-#: ../../packages/ui/src/components/image-gallery.tsx:400
+#: ../../packages/ui/src/components/image-gallery.tsx:439
 msgid "No prompt"
 msgstr "Kein Prompt"
 
@@ -23258,7 +23267,7 @@ msgstr "Für diese Erinnerung wurde kein Zitat gespeichert."
 msgid "No ratings yet"
 msgstr "Noch keine Bewertungen"
 
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:248
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:250
 msgid "No references selected"
 msgstr "Keine Referenzen ausgewählt"
 
@@ -23467,7 +23476,7 @@ msgstr "Keine Variablen gefunden"
 msgid "No versions yet. Versions are saved as you edit."
 msgstr "Noch keine Versionen. Versionen werden beim Bearbeiten gespeichert."
 
-#: src/features/chat/thread/media-gallery-view.tsx:351
+#: src/features/chat/thread/media-gallery-view.tsx:353
 msgid "No videos yet"
 msgstr "Noch keine Videos"
 
@@ -25678,7 +25687,7 @@ msgstr "URL des Stil-Referenzbilds einfügen..."
 msgid "Path"
 msgstr "Pfad"
 
-#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:93
+#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:96
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:168
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:233
 msgid "Pause"
@@ -25949,7 +25958,7 @@ msgstr "Wähle Skills, Zeitpläne, Webhooks und Gruppenchats aus, die du als ein
 msgid "Pick the computer or server the project's folder is on."
 msgstr "Wähle den Computer oder Server, auf dem der Ordner des Projekts liegt."
 
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:212
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:214
 msgid "Pick up to {maxReferences} images. The order you select them is the order the model will see them."
 msgstr "Wähle bis zu {maxReferences} Bilder. In der Reihenfolge, in der du sie auswählst, sieht sie auch das Modell."
 
@@ -26108,7 +26117,7 @@ msgstr "Planung"
 msgid "Platform"
 msgstr "Plattform"
 
-#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:93
+#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:96
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:168
 msgid "Play"
 msgstr "Abspielen"
@@ -26868,8 +26877,8 @@ msgstr "professionell"
 msgid "Professional"
 msgstr "Professionell"
 
-#: src/features/chat/thread/media-gallery-view.tsx:527
-#: src/features/chat/thread/media-gallery-view.tsx:606
+#: src/features/chat/thread/media-gallery-view.tsx:529
+#: src/features/chat/thread/media-gallery-view.tsx:608
 msgid "Professional Camera Controls"
 msgstr "Professionelle Kamerasteuerung"
 
@@ -27012,8 +27021,8 @@ msgstr "Zum Administrator befördern"
 msgid "prompt"
 msgstr "Prompt"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:400
-#: src/features/chat/thread/media-gallery-view.tsx:441
+#: ../../packages/ui/src/components/image-gallery.tsx:439
+#: src/features/chat/thread/media-gallery-view.tsx:443
 #: src/features/settings/components/chat/trigger-settings.tsx:1017
 #: src/features/workflow/templates/index.ts:96
 #: src/features/workflow/templates/index.ts:230
@@ -27347,7 +27356,7 @@ msgid "Put several agents with their own roles in one thread. A review panel can
 msgstr "Bringe mehrere Agenten mit eigenen Rollen in einen Thread. Ein Review-Panel kann eine Änderung aus Sicherheits- und Performance-Sicht prüfen, und eine Debatte kann vor einer Synthese beide Seiten abwägen."
 
 #: src/features/chat/thread/composer-image-settings.tsx:181
-#: src/features/chat/thread/media-gallery-view.tsx:481
+#: src/features/chat/thread/media-gallery-view.tsx:483
 msgid "Quality"
 msgstr "Qualität"
 
@@ -30418,7 +30427,7 @@ msgstr "Wähle ein Objekt aus, um seine Eigenschaften zu bearbeiten"
 msgid "Select an organization to manage teams"
 msgstr "Organisation auswählen, um Teams zu verwalten"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:337
+#: ../../packages/ui/src/components/image-gallery.tsx:376
 msgid "Select as reference"
 msgstr "Als Referenz auswählen"
 
@@ -30442,7 +30451,7 @@ msgstr "Datei auswählen"
 msgid "Select files to upload"
 msgstr "Dateien zum Hochladen auswählen"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:238
+#: ../../packages/ui/src/components/image-gallery.tsx:263
 msgid "Select image as reference"
 msgstr "Bild als Referenz auswählen"
 
@@ -30572,7 +30581,7 @@ msgstr "Deine Nachricht auswählen"
 msgid "Selected {requestNoun}"
 msgstr "Ausgewählter {requestNoun}"
 
-#: src/features/chat/thread/media-gallery-view.tsx:365
+#: src/features/chat/thread/media-gallery-view.tsx:367
 msgid "Selected reference"
 msgstr "Ausgewählte Referenz"
 
@@ -33142,7 +33151,7 @@ msgid "style"
 msgstr "Stil"
 
 #: src/features/chat/thread/composer-image-settings.tsx:205
-#: src/features/chat/thread/media-gallery-view.tsx:502
+#: src/features/chat/thread/media-gallery-view.tsx:504
 #: src/features/workflow/components/nodes/character-ref-node.tsx:26
 msgid "Style"
 msgstr "Stil"
@@ -35345,7 +35354,7 @@ msgstr "Lade dann ein Modell herunter und nutze diese Basis-URL:"
 msgid "There are no credits left to answer this. Add credits and try again."
 msgstr "Es sind keine Credits mehr übrig, um dies zu beantworten. Füge Credits hinzu und versuche es erneut."
 
-#: ../../packages/ui/src/components/image-gallery.tsx:490
+#: ../../packages/ui/src/components/image-gallery.tsx:529
 msgid "There are no items to display."
 msgstr "Es gibt keine Einträge zum Anzeigen."
 
@@ -36094,7 +36103,7 @@ msgstr "Diese Aufgabe wurde noch nicht ausgeführt."
 msgid "This text is only hidden characters, so there is nothing to save."
 msgstr "Dieser Text besteht nur aus unsichtbaren Zeichen, daher gibt es nichts zu speichern."
 
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:226
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:228
 msgid "This thread"
 msgstr "Dieser Thread"
 
@@ -37969,7 +37978,7 @@ msgid "Usage dashboard"
 msgstr "Nutzungs-Dashboard"
 
 #. placeholder {0}: selection.length
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:259
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:261
 msgid "Use {0, plural, one {# reference} other {# references}}"
 msgstr "{0, plural, one {# Referenz} other {# Referenzen}} verwenden"
 
@@ -38052,7 +38061,7 @@ msgstr "Aus einem MCP-Client verwenden"
 msgid "Use lowercase letters, numbers and single hyphens only"
 msgstr "Verwende nur Kleinbuchstaben, Ziffern und einzelne Bindestriche"
 
-#: src/features/chat/thread/media-gallery-view.tsx:631
+#: src/features/chat/thread/media-gallery-view.tsx:633
 msgid "Use Original Prompt"
 msgstr "Ursprünglichen Prompt verwenden"
 
@@ -38061,7 +38070,7 @@ msgstr "Ursprünglichen Prompt verwenden"
 msgid "Use Prompt"
 msgstr "Prompt verwenden"
 
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:259
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:261
 msgid "Use selected"
 msgstr "Auswahl verwenden"
 
@@ -38593,7 +38602,7 @@ msgstr "Videogenerierung"
 msgid "Video generation"
 msgstr "Videogenerierung"
 
-#: src/features/chat/thread/media-gallery-view.tsx:350
+#: src/features/chat/thread/media-gallery-view.tsx:352
 #: src/features/marketing/components/model-detail-page.tsx:95
 msgid "Video Generation"
 msgstr "Videogenerierung"

@@ -12,7 +12,7 @@ import {
     eraseThreadPasscodesForUser,
     eraseThreadSuggestionsAndInvites,
 } from "../../agent/gdpr";
-import { eraseSharedPinRoutesBatch, eraseThreadPinsAndTagsForUser, erasePersistentStreamsForUser, erasePresentationsForUser } from "../../chat/gdpr";
+import { eraseSharedPinRoutesBatch, eraseThreadPinsAndTagsBatch, erasePersistentStreamsForUser, erasePresentationsForUser } from "../../chat/gdpr";
 import { deleteFollowRowsOfUserBatch } from "../../chat/follows/functions";
 import { eraseVaultForUser } from "../../vault/gdpr";
 import { erasePromptsForUser } from "../../prompts/gdpr";
@@ -98,12 +98,17 @@ export const deleteUserThreadMetadata = internalMutation
         // Relationships, temporary threads and thread grants are the agent module's (`agent/gdpr.ts`).
         await eraseThreadMetadataForUser(context, userId);
 
-        // Pins and tags are the chat module's (`chat/gdpr.ts`), passcodes the agent module's.
-        await eraseThreadPinsAndTagsForUser(context, userId);
+        // Passcodes are the agent module's; pins and tags are drained by `deleteUserPinsAndTags`.
         await eraseThreadPasscodesForUser(context, userId);
 
         return null;
     });
+
+/** One batch of the user's pins and tags (`chat/gdpr.ts`), drained by the deletion workflow before the threads go. */
+export const deleteUserPinsAndTags = internalMutation
+    .input({ userId: v.string() })
+    .output(vBatchResult)
+    .mutation(async ({ args: { userId }, ctx: context }) => await eraseThreadPinsAndTagsBatch(context, userId));
 
 /** Threads one {@link deleteUserThreadCascade} call visits. */
 export const THREAD_CASCADE_PAGE = 25;
