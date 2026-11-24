@@ -1667,6 +1667,31 @@ describe("the usage-limit settings of a rate-limited run", () => {
         expect(await snoozedUntil()).toBeUndefined();
     });
 
+    it("a Retry now over two paused replies whose restore chain names the earlier reset still leaves the chat visible", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const first = await readState();
+
+        expect(await pauseSecondReply(5)).toMatchObject({ paused: true });
+
+        // The later reply's restore value is the earlier reply's reset (the state the review describes). Lifting in stream order would
+        // then restore that earlier reset after the earlier reply's lift had found nothing to match, leaving the chat snoozed.
+        await harness.run(async (ctx: any) => {
+            const later = await ctx.db.persistentStreams.findFirst({ where: { messageId: "other-message" } });
+
+            await ctx.db.patch("persistentStreams", later._id, {
+                pauseSnooze: { previousUntil: first.pause!.retryAt, until: later.pauseSnooze.until },
+            });
+        });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(retryPausedRunsNow, { threadId: ids.threadId }));
+
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
     it("stopping the whole chat with two paused replies in one call leaves it visible", async () => {
         modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
         modelState.model = planned([rateLimited()]);
