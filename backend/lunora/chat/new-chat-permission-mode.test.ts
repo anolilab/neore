@@ -6,7 +6,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
-import { ownerNewChatMode } from "./lib/new-chat-mode";
+import { callerRestrictsFull, ownerNewChatMode } from "./lib/new-chat-mode";
 import { newChatPermissionMode } from "./lib/thread-permission-mode";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
@@ -96,6 +96,30 @@ describe("newChatPermissionMode", () => {
     it("never gives an impersonating admin full, but still gives supervised", () => {
         expect(newChatPermissionMode("full", true)).toBeUndefined();
         expect(newChatPermissionMode("supervised", true)).toBe("supervised");
+    });
+});
+
+/** A caller context with the session row and identity the caller presents; `session` null is a row that is gone. */
+const callerCtx = (session: Record<string, unknown> | null, identity: Record<string, unknown>, impersonatedBy?: string) => {
+    return {
+        auth: { getIdentity: async () => identity },
+        db: { session: { findFirst: async () => session } },
+        now: 1000,
+        user: { impersonatedBy, userId: OWNER },
+    };
+};
+
+describe("callerRestrictsFull reads the session's standing", () => {
+    it("restricts a still-valid token whose impersonation session row is gone", async () => {
+        expect(await callerRestrictsFull(callerCtx(null, { sessionId: "ended" }) as never)).toBe(true);
+    });
+
+    it("leaves the owner's own web session unrestricted", async () => {
+        expect(await callerRestrictsFull(callerCtx({ expiresAt: 5000, userId: OWNER }, { sessionId: "own" }) as never)).toBe(false);
+    });
+
+    it("restricts a grant session", async () => {
+        expect(await callerRestrictsFull(callerCtx({ expiresAt: 5000, userId: OWNER }, { grantSessionId: "grant" }) as never)).toBe(true);
     });
 });
 
