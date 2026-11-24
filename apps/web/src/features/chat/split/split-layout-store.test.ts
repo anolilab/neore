@@ -13,12 +13,19 @@ describe("readSavedLayoutOrEmpty", () => {
         vi.restoreAllMocks();
     });
 
-    it("resolves when the saved layout cannot be read, and keeps the empty layout", async () => {
-        vi.spyOn(useSplitLayoutStore.persist, "hasHydrated").mockReturnValue(false);
-        vi.spyOn(useSplitLayoutStore.persist, "rehydrate").mockRejectedValueOnce(new Error("storage unavailable"));
+    it("keeps the saved panes when the read fails, so a later change does not overwrite them", async () => {
+        localStorage.setItem("chat-split-layout", JSON.stringify({ state: { layout: layoutOf(["a"]) }, version: 1 }));
+        // zustand swallows a failed read: the store just stays un-hydrated, with an empty layout.
+        vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+            throw new Error("storage unavailable");
+        });
 
         await expect(readSavedLayoutOrEmpty()).resolves.toBeUndefined();
-        expect(useSplitLayoutStore.getState().layout.panes).toEqual([]);
+        useSplitLayoutStore.getState().dispatch({ threadId: "b", type: "open" });
+
+        vi.restoreAllMocks();
+        expect(localStorage.getItem("chat-split-layout")).toContain('"a"');
+        expect(localStorage.getItem("chat-split-layout")).not.toContain('"b"');
     });
 });
 

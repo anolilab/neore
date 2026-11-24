@@ -1,7 +1,8 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import type { StateStorage } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 
@@ -14,6 +15,22 @@ type SplitLayoutState = {
     /** Each pane's header title, reported by the pane once its chat has loaded. Not saved: a reload reads them again. */
     setTitle: (threadId: string, title: string) => void;
     titles: Record<string, string>;
+};
+
+/**
+ * Whether the saved layout has been read in this page. Until it has, the store holds an empty layout, and a write would replace the
+ * saved panes with it when the read fails (zustand swallows a failed read: its `onRehydrateStorage` callback is the only signal).
+ */
+const savedLayout = { read: false };
+
+const guardedLocalStorage: StateStorage = {
+    getItem: (name) => localStorage.getItem(name),
+    removeItem: (name) => localStorage.removeItem(name),
+    setItem: (name, value) => {
+        if (savedLayout.read) {
+            localStorage.setItem(name, value);
+        }
+    },
 };
 
 /**
@@ -45,6 +62,10 @@ export const useSplitLayoutStore = create<SplitLayoutState>()(
                 return { ...current, layout: parseSplitLayout((persisted as { layout?: unknown } | undefined)?.layout) };
             },
             name: "chat-split-layout",
+            onRehydrateStorage: () => (_state, error) => {
+                savedLayout.read = error === undefined;
+            },
+            storage: createJSONStorage(() => guardedLocalStorage),
             partialize: (state) => {
                 return { layout: state.layout };
             },
