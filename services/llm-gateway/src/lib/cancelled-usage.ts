@@ -53,9 +53,10 @@ export const estimateCancelledUsage = ({
     emittedChars: number;
     promptChars: number;
     reasoningChars: number;
-}): { cachedTokens: 0; completionTokens: number; promptTokens: number; reasoningTokens: number } => {
+}): { cachedTokens: 0; cacheWriteTokens: 0; completionTokens: number; promptTokens: number; reasoningTokens: number } => {
     return {
         cachedTokens: 0,
+        cacheWriteTokens: 0,
         completionTokens: toTokens(emittedChars + reasoningChars),
         promptTokens: toTokens(promptChars),
         reasoningTokens: toTokens(reasoningChars),
