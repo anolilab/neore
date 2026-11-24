@@ -61,6 +61,16 @@ describe("SaveFileButton", () => {
         expect(button.getAttribute("aria-label")).toBe("Download");
     });
 
+    it("is named by its label when one is given, and still saves under the file's name", () => {
+        const button = render(<SaveFileButton filename="cat.png" label="Generated image 2" url="https://files.test/cat.png" />);
+
+        expect(button.getAttribute("aria-label")).toBe("Download Generated image 2");
+
+        act(() => button.click());
+
+        expect(saveFromUrl).toHaveBeenCalledWith("https://files.test/cat.png", "cat.png", undefined);
+    });
+
     it("saves the file at its URL under its name", () => {
         const button = render(<SaveFileButton filename="report.pdf" url="https://files.test/report.pdf" />);
 

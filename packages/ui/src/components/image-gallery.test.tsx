@@ -39,15 +39,24 @@ document.body.append(host);
 
 const root = createRoot(host);
 
-const cat: GalleryItem = { alt: "cat.png", batchId: "batch-1", id: "msg-1-0", src: "https://files.test/cat.png", type: "image" };
-const dog: GalleryItem = { alt: "dog.png", batchId: "batch-1", id: "msg-1-1", src: "https://files.test/dog.png", type: "image" };
-const flagged: GalleryItem = {
-    alt: "flagged.png",
-    batchId: "batch-1",
-    id: "msg-1-2",
-    nsfwStatus: "blocked",
-    src: "https://files.test/flagged.png",
-    type: "image",
+const cat: GalleryItem = { alt: "cat.png", batchId: "batch-1", filename: "cat.png", id: "msg-1-0", src: "https://files.test/cat.png", type: "image" };
+const dog: GalleryItem = { alt: "dog.png", batchId: "batch-1", filename: "dog.png", id: "msg-1-1", src: "https://files.test/dog.png", type: "image" };
+/** An image with no file name and no description, as a batch can hold. */
+const unnamed = (id: string): GalleryItem => {
+    return { batchId: "batch-2", id, src: `https://files.test/${id}.png`, type: "image" };
+};
+
+/** An image whose classifier status is `status`. */
+const withStatus = (status: string): GalleryItem => {
+    return {
+        alt: "status.png",
+        batchId: "batch-3",
+        filename: "status.png",
+        id: `status-${status}`,
+        nsfwStatus: status,
+        src: "https://files.test/status.png",
+        type: "image",
+    };
 };
 
 const renderGallery = (items: GalleryItem[], onItemClick: (item: GalleryItem) => void): void => {
@@ -60,8 +69,9 @@ const renderGallery = (items: GalleryItem[], onItemClick: (item: GalleryItem) =>
     });
 };
 
-const saveButton = (name: string): HTMLButtonElement | null =>
-    [...host.querySelectorAll("button")].find((button) => button.getAttribute("aria-label") === `Download ${name}`) ?? null;
+/** The save control whose accessible name is "Download <label>". */
+const saveButton = (label: string): HTMLButtonElement | null =>
+    [...host.querySelectorAll("button")].find((button) => button.getAttribute("aria-label") === `Download ${label}`) ?? null;
 
 afterEach(() => {
     act(() => root.render(<></>));
@@ -69,26 +79,26 @@ afterEach(() => {
 });
 
 describe("media gallery save control", () => {
-    it("gives each generated image a named save control", () => {
+    it("gives each generated image a named save control, numbered by its place in the gallery", () => {
         renderGallery([cat, dog], () => {});
 
-        expect(saveButton("cat.png")).not.toBeNull();
-        expect(saveButton("dog.png")).not.toBeNull();
+        expect(saveButton("cat.png 1")).not.toBeNull();
+        expect(saveButton("dog.png 2")).not.toBeNull();
     });
 
-    it("does not offer to save an image the classifier flagged", () => {
-        renderGallery([cat, flagged], () => {});
+    it("names unnamed images apart, so a row of save controls tells them apart", () => {
+        renderGallery([unnamed("a"), unnamed("b")], () => {});
 
-        expect(saveButton("cat.png")).not.toBeNull();
-        expect(saveButton("flagged.png")).toBeNull();
+        expect(saveButton("Gallery item 1")).not.toBeNull();
+        expect(saveButton("Gallery item 2")).not.toBeNull();
     });
 
-    it("saves the full file under its name, and does not open the preview", () => {
+    it("saves the full file under its own name, and does not open the preview", () => {
         const onItemClick = vi.fn();
 
         renderGallery([cat], onItemClick);
 
-        act(() => saveButton("cat.png")?.click());
+        act(() => saveButton("cat.png 1")?.click());
 
         expect(saveFromUrl).toHaveBeenCalledWith("https://files.test/cat.png", "cat.png", "image-msg-1-0");
         expect(onItemClick).not.toHaveBeenCalled();
@@ -97,7 +107,7 @@ describe("media gallery save control", () => {
     it("is a button of its own, outside the preview button, so keyboard focus reaches it", () => {
         renderGallery([cat], () => {});
 
-        const save = saveButton("cat.png");
+        const save = saveButton("cat.png 1");
 
         expect(save).not.toBeNull();
         expect(save?.parentElement?.closest("button")).toBeNull();
@@ -105,5 +115,26 @@ describe("media gallery save control", () => {
         act(() => save?.focus());
 
         expect(document.activeElement).toBe(save);
+    });
+
+    it("does not save a description as the file's name", () => {
+        // A reference picker sets `alt` to a thread title and no file name: the file takes its fallback name.
+        renderGallery([{ alt: "My chat", batchId: "batch-4", id: "ref-1", src: "https://files.test/ref-1.png", type: "image" }], () => {});
+
+        act(() => saveButton("My chat 1")?.click());
+
+        expect(saveFromUrl).toHaveBeenCalledWith("https://files.test/ref-1.png", undefined, "image-ref-1");
+    });
+
+    it("offers a save for an image the classifier cleared", () => {
+        renderGallery([withStatus("safe")], () => {});
+
+        expect(saveButton("status.png 1")).not.toBeNull();
+    });
+
+    it.each(["pending", "checking", "failed", "blocked"])("withholds the save control for a %s image", (status) => {
+        renderGallery([withStatus(status)], () => {});
+
+        expect(saveButton("status.png 1")).toBeNull();
     });
 });

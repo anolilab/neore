@@ -7,8 +7,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import AudioWaveformPlayer from "./audio-waveform-player";
 import VideoPlayer from "./video-player";
 
-const { saveFromUrl } = vi.hoisted(() => {
-    return { saveFromUrl: vi.fn((_url: string, _filename?: string, _fallbackName?: string) => Promise.resolve()) };
+const { saveFromUrl, waveHandlers } = vi.hoisted(() => {
+    return {
+        saveFromUrl: vi.fn((_url: string, _filename?: string, _fallbackName?: string) => Promise.resolve()),
+        waveHandlers: new Map<string, () => void>(),
+    };
 });
 
 // eslint-disable-next-line no-restricted-syntax -- vi.mock is hoisted; the download call is the thing under test
@@ -67,14 +70,16 @@ vi.mock("hls.js", () => {
     return { default: HlsStub, Events: { ERROR: "hlsError" } };
 });
 
-// The waveform is not under test: a stub that loads at once and does nothing else.
+// The waveform is not under test: a stub that records its event handlers, so a test can raise an error.
 // eslint-disable-next-line no-restricted-syntax -- vi.mock is hoisted; the waveform is not under test
 vi.mock("wavesurfer.js", () => {
     const create = () => {
         return {
             destroy() {},
             getDuration: () => 0,
-            on() {},
+            on(name: string, handler: () => void) {
+                waveHandlers.set(name, handler);
+            },
             playPause() {},
         };
     };
@@ -122,11 +127,31 @@ describe("video player save control", () => {
         expect(host.querySelector("button[aria-label^='Download']")).toBeNull();
         expect(host.textContent).toContain("live.m3u8");
     });
+
+    it("offers no save for a signed HLS playlist, whose query string follows the .m3u8 ending", () => {
+        render(<VideoPlayer filename="live.m3u8" url="https://files.test/live.m3u8?token=abc" />);
+
+        expect(host.querySelector("button[aria-label^='Download']")).toBeNull();
+    });
 });
 
 describe("audio player save control", () => {
     it("saves the audio under its name", () => {
         render(<AudioWaveformPlayer filename="voice.mp3" url="https://files.test/voice.mp3" />);
+
+        const save = saveButton("voice.mp3");
+
+        expect(save).not.toBeNull();
+
+        act(() => save?.click());
+
+        expect(saveFromUrl).toHaveBeenCalledWith("https://files.test/voice.mp3", "voice.mp3", "audio");
+    });
+
+    it("still offers the save when the audio fails to load", () => {
+        render(<AudioWaveformPlayer filename="voice.mp3" url="https://files.test/voice.mp3" />);
+
+        act(() => waveHandlers.get("error")?.());
 
         const save = saveButton("voice.mp3");
 

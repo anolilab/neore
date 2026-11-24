@@ -37,7 +37,12 @@ export interface VideoPlayerProps {
     url: string;
 }
 
-const isHlsUrl = (url: string, mediaType?: string): boolean => mediaType === "application/vnd.apple.mpegurl" || url.endsWith(".m3u8");
+/** The start of a query string or fragment. */
+const QUERY_OR_FRAGMENT = /[?#]/u;
+
+/** The URL's path, without a query string or fragment: a signed playlist URL still ends in `.m3u8` before its `?`. */
+const isHlsUrl = (url: string, mediaType?: string): boolean =>
+    mediaType === "application/vnd.apple.mpegurl" || (url.split(QUERY_OR_FRAGMENT, 1)[0] ?? url).endsWith(".m3u8");
 
 const VideoPlayer: FC<VideoPlayerProps> = memo(({ className, filename, mediaType, url }) => {
     const videoRef = useRef<HTMLVideoElement>(null);

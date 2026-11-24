@@ -19,6 +19,8 @@ export interface GalleryItem {
     batchId?: string; // groups images from the same generation request
     createdAt?: Date;
     duration?: number; // for videos, in seconds
+    /** The file's own name, which a save keeps. Not the description: a reference picker's `alt` is a thread title. */
+    filename?: string;
     id: string;
     modelName?: string; // display name of the model used for generation
     nsfwStatus?: string; // NSFW classification status
@@ -27,6 +29,12 @@ export interface GalleryItem {
     thumbnail?: string;
     type: "image" | "video";
 }
+
+/**
+ * Whether a tile offers to save its file. A file the classifier has not cleared is not saved: `pending`, `checking`,
+ * `failed` and `blocked` are withheld. An absent status is cleared, as the backend treats it (`fork-copy.ts`).
+ */
+const canSaveItem = (item: GalleryItem): boolean => item.nsfwStatus === undefined || item.nsfwStatus === "safe";
 
 // Root component
 interface ImageGalleryProps {
@@ -154,14 +162,13 @@ const formatDuration = (seconds: number): string => {
 
 const ImageGalleryItem = ({ className, item }: ImageGalleryItemProps) => {
     const { t } = useLingui();
-    const { maxSelections, onItemClick, onToggleSelection, selectedIds, selectionEnabled } = useImageGallery();
+    const { items, maxSelections, onItemClick, onToggleSelection, selectedIds, selectionEnabled } = useImageGallery();
     const isSelected = selectedIds.includes(item.id);
     const isAtMaxSelections = selectedIds.length >= maxSelections;
     const canSelect = isSelected || !isAtMaxSelections;
 
     const thumbnailSource = item.thumbnail || item.src;
-    // A flagged or unscanned image is not saved: its file is the thing the classifier held back.
-    const canSave = item.nsfwStatus !== "blocked" && item.nsfwStatus !== "checking";
+    const canSave = canSaveItem(item);
 
     const handleClick = () => {
         onItemClick(item);
@@ -239,7 +246,8 @@ const ImageGalleryItem = ({ className, item }: ImageGalleryItemProps) => {
                 <SaveFileButton
                     className="absolute top-2 left-2 bg-black/60 text-white opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-black/75 hover:text-white focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
                     fallbackName={`${item.type}-${item.id}`}
-                    filename={item.alt}
+                    filename={item.filename}
+                    label={`${item.alt || t`Gallery item`} ${items.indexOf(item) + 1}`}
                     url={item.src}
                 />
             )}
@@ -283,14 +291,13 @@ const ImageGalleryItem = ({ className, item }: ImageGalleryItemProps) => {
  */
 const KreaImageItem = ({ className, item }: ImageGalleryItemProps) => {
     const { t } = useLingui();
-    const { maxSelections, onItemClick, onToggleSelection, selectedIds, selectionEnabled } = useImageGallery();
+    const { items, maxSelections, onItemClick, onToggleSelection, selectedIds, selectionEnabled } = useImageGallery();
     const isSelected = selectedIds.includes(item.id);
     const isAtMaxSelections = selectedIds.length >= maxSelections;
     const canSelect = isSelected || !isAtMaxSelections;
     // Default to 4/3 until the image loads and we know its real dimensions
     const [cellAspectRatio, setCellAspectRatio] = useState<string>("4/3");
-    // A flagged or unscanned image is not saved: its file is the thing the classifier held back.
-    const canSave = item.nsfwStatus !== "blocked" && item.nsfwStatus !== "checking";
+    const canSave = canSaveItem(item);
 
     return (
         <div
@@ -350,7 +357,8 @@ const KreaImageItem = ({ className, item }: ImageGalleryItemProps) => {
                 <SaveFileButton
                     className="absolute top-2.5 left-2.5 bg-black/60 text-white opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-black/75 hover:text-white focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
                     fallbackName={`${item.type}-${item.id}`}
-                    filename={item.alt}
+                    filename={item.filename}
+                    label={`${item.alt || t`Gallery item`} ${items.indexOf(item) + 1}`}
                     url={item.src}
                 />
             )}
