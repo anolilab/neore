@@ -2487,7 +2487,7 @@ msgstr "Aktywne dni"
 msgid "Active Sessions ({0})"
 msgstr "Aktywne sesje ({0})"
 
-#: src/components/command-palette.tsx:526
+#: src/components/command-palette.tsx:721
 msgid "Active Threads"
 msgstr "Aktywne wątki"
 
@@ -3812,7 +3812,7 @@ msgstr "Załączony obraz nie został zaakceptowany. Usuń go lub dołącz obraz
 msgid "An Encrypt Key is required: Feishu only signs events when one is set, and unsigned events are refused."
 msgstr "Wymagany jest Encrypt Key: Feishu podpisuje zdarzenia tylko wtedy, gdy jest ustawiony, a niepodpisane zdarzenia są odrzucane."
 
-#: src/features/chat/thread/chat-error.tsx:49
+#: src/features/chat/thread/chat-error.tsx:57
 msgid "An error occurred"
 msgstr "Wystąpił błąd"
 
@@ -4345,12 +4345,13 @@ msgid "Archive the open thread, or restore it when it is archived ({0})"
 msgstr "Archiwizuje otwarty wątek, a gdy jest już zarchiwizowany, przywraca go ({0})"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:98
-#: src/components/command-palette.tsx:493
-#: src/components/command-palette.tsx:655
+#: src/components/command-palette.tsx:661
+#: src/components/command-palette.tsx:935
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Archive thread"
 msgstr "Archiwizuj wątek"
 
+#: src/components/command-palette.tsx:880
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:644
 #: src/features/sub-agents/components/worker-list.tsx:86
 #: src/features/tasks/components/goal-form-dialog.tsx:47
@@ -4362,7 +4363,7 @@ msgstr "Zarchiwizowane"
 msgid "Archived for at least"
 msgstr "Zarchiwizowane od co najmniej"
 
-#: src/components/command-palette.tsx:543
+#: src/components/command-palette.tsx:738
 msgid "Archived Threads"
 msgstr "Zarchiwizowane wątki"
 
@@ -7055,7 +7056,7 @@ msgstr "Sklonuj lub utwórz nowy…"
 #: ../../packages/ui/src/components/dialog.tsx:84
 #: ../../packages/ui/src/components/image-editor.tsx:264
 #: ../../packages/ui/src/components/sheet.tsx:75
-#: src/components/command-palette.tsx:726
+#: src/components/command-palette.tsx:1006
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:835
 #: src/features/canvas/pdf-preview-panel.tsx:105
@@ -8352,7 +8353,7 @@ msgstr "Generowanie uwzględniające kontekst"
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
 #: src/features/auth/components/device-code-parts.tsx:189
 #: src/features/chat/host/host-composer.tsx:969
-#: src/features/chat/thread/message-item.tsx:548
+#: src/features/chat/thread/message-item.tsx:546
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
 msgstr "Dalej"
@@ -9472,7 +9473,7 @@ msgstr "Utwórz klucz API"
 msgid "Create bot"
 msgstr "Utwórz bota"
 
-#: src/components/command-palette.tsx:477
+#: src/components/command-palette.tsx:645
 #: src/features/chat/thread-list/thread-node.tsx:743
 #: src/features/chat/thread-list/thread-node.tsx:766
 msgid "Create branch"
@@ -9784,7 +9785,7 @@ msgstr "Kuba"
 msgid "Currency Conversion"
 msgstr "Przeliczanie walut"
 
-#: src/components/command-palette.tsx:651
+#: src/components/command-palette.tsx:931
 #: src/features/auth/components/settings/security/session-cell.tsx:80
 #: src/features/projects/components/move-to-project-dialog.tsx:84
 #: src/features/prompts/components/prompt-history-dialog.tsx:136
@@ -10688,8 +10689,8 @@ msgid "Delete this login?"
 msgstr "Usunąć ten login?"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
-#: src/components/command-palette.tsx:499
-#: src/components/command-palette.tsx:679
+#: src/components/command-palette.tsx:667
+#: src/components/command-palette.tsx:959
 #: src/features/chat/thread-list/thread-node.tsx:1082
 #: src/features/chat/thread-list/thread-node.tsx:1100
 #: src/features/pages/components/page-comments-panel.tsx:188
@@ -11267,7 +11268,7 @@ msgstr "Zamknij"
 msgid "Dismiss digest"
 msgstr "Zamknij podsumowanie"
 
-#: src/features/chat/thread/chat-error.tsx:66
+#: src/features/chat/thread/chat-error.tsx:74
 msgid "Dismiss error"
 msgstr "Odrzuć błąd"
 
@@ -13881,10 +13882,10 @@ msgstr "Nie udało się usunąć zbioru danych"
 msgid "Failed to delete the thread. {0, plural, one {# branch was deleted.} other {# branches were deleted.}}"
 msgstr "Nie udało się usunąć wątku. {0, plural, one {Usunięto # gałąź.} few {Usunięto # gałęzie.} many {Usunięto # gałęzi.} other {Usunięto # gałęzi.}}"
 
-#: src/components/command-palette.tsx:333
-#: src/components/command-palette.tsx:341
-#: src/components/command-palette.tsx:384
-#: src/components/command-palette.tsx:391
+#: src/components/command-palette.tsx:498
+#: src/components/command-palette.tsx:506
+#: src/components/command-palette.tsx:549
+#: src/components/command-palette.tsx:556
 msgid "Failed to delete thread"
 msgstr "Nie udało się usunąć wątku"
 
@@ -15084,6 +15085,10 @@ msgstr "Filtruj wspomnienia według typu"
 msgid "Filter path"
 msgstr "Ścieżka filtra"
 
+#: src/components/command-palette.tsx:860
+msgid "Filter results"
+msgstr "Filtruj wyniki"
+
 #: src/features/settings/components/chat/model-filter-settings.tsx:55
 #: src/features/settings/components/chat/model-filter-settings.tsx:66
 msgid "Filter rules updated"
@@ -16258,7 +16263,7 @@ msgstr "Przejdź od pomysłu do gotowego efektu bez zmieniania narzędzi. Tekst,
 msgid "Go to chat"
 msgstr "Przejdź do czatu"
 
-#: src/components/command-palette.tsx:425
+#: src/components/command-palette.tsx:593
 #: src/routes/(public)/invite/$inviteToken.tsx:70
 msgid "Go to Chat"
 msgstr "Przejdź do czatu"
@@ -16301,7 +16306,7 @@ msgstr "Przejdź do parowania"
 msgid "Go to previous page"
 msgstr "Przejdź do poprzedniej strony"
 
-#: src/components/command-palette.tsx:431
+#: src/components/command-palette.tsx:599
 msgid "Go to Prompts"
 msgstr "Przejdź do promptów"
 
@@ -16313,7 +16318,7 @@ msgstr "Przejdź do odpowiedzi"
 msgid "Go to servers"
 msgstr "Przejdź do serwerów"
 
-#: src/components/command-palette.tsx:443
+#: src/components/command-palette.tsx:611
 msgid "Go to Settings"
 msgstr "Przejdź do ustawień"
 
@@ -16338,7 +16343,7 @@ msgstr "Przejdź do slajdu {slideNumber}"
 msgid "Go to step {0}"
 msgstr "Przejdź do kroku {0}"
 
-#: src/components/command-palette.tsx:437
+#: src/components/command-palette.tsx:605
 msgid "Go to Vault"
 msgstr "Przejdź do sejfu"
 
@@ -19785,6 +19790,7 @@ msgstr "Wczytaj nowy prompt"
 msgid "Load preset"
 msgstr "Wczytaj ustawienie wstępne"
 
+#: src/features/chat/thread/chat-error.tsx:47
 #: src/features/chat/thread/message-item.tsx:525
 msgid "Load the earlier messages, then try again: this reply's prompt is not loaded."
 msgstr "Wczytaj wcześniejsze wiadomości i spróbuj ponownie: prompt tej odpowiedzi nie jest wczytany."
@@ -20157,6 +20163,10 @@ msgstr "Zablokuj ten czat"
 #: src/features/chat/thread-list/thread-node.tsx:260
 msgid "Locked chat"
 msgstr "Zablokowany czat"
+
+#: src/components/command-palette.tsx:896
+msgid "Locked chats do not reveal their project, so some may be missing here."
+msgstr "Zablokowane czaty nie ujawniają swojego projektu, więc niektórych może tu brakować."
 
 #. placeholder {0}: getModelModeName(anchorMode)
 #: src/components/model-picker/model-picker.tsx:1397
@@ -21124,7 +21134,7 @@ msgstr "Wersje wiadomości"
 msgid "Message..."
 msgstr "Wiadomość..."
 
-#: src/components/command-palette.tsx:562
+#: src/components/command-palette.tsx:757
 #: src/features/chat/sharing/shared-thread-page.tsx:151
 #: src/features/chat/thread-list/search-bar.tsx:57
 msgid "Messages"
@@ -22201,7 +22211,7 @@ msgid "navigate"
 msgstr "nawigacja"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:110
-#: src/components/command-palette.tsx:712
+#: src/components/command-palette.tsx:992
 msgid "Navigate"
 msgstr "Nawiguj"
 
@@ -22230,7 +22240,7 @@ msgid "Navigating to {target}..."
 msgstr "Przechodzenie do {target}..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:132
-#: src/components/command-palette.tsx:450
+#: src/components/command-palette.tsx:618
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:68
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:59
 msgid "Navigation"
@@ -22602,7 +22612,7 @@ msgstr "Nowy czat tymczasowy"
 msgid "New Temporary Chat"
 msgstr "Nowy czat tymczasowy"
 
-#: src/components/command-palette.tsx:466
+#: src/components/command-palette.tsx:634
 msgid "New temporary thread"
 msgstr "Nowy wątek tymczasowy"
 
@@ -22610,7 +22620,7 @@ msgstr "Nowy wątek tymczasowy"
 msgid "New this week"
 msgstr "Nowi w tym tygodniu"
 
-#: src/components/command-palette.tsx:459
+#: src/components/command-palette.tsx:627
 msgid "New thread"
 msgstr "Nowy wątek"
 
@@ -23298,7 +23308,7 @@ msgstr "Nie znaleziono wyników"
 msgid "No results found for “{searchTerm}”"
 msgstr "Nie znaleziono wyników dla „{searchTerm}”"
 
-#: src/components/command-palette.tsx:634
+#: src/components/command-palette.tsx:909
 #: src/features/chat/thread/widgets/wolfram-widget.tsx:34
 msgid "No results found."
 msgstr "Nie znaleziono wyników."
@@ -24171,8 +24181,18 @@ msgstr "Tylko osoba, która może pisać w tym czacie, może przejąć sterowani
 
 #. placeholder {0}: allThreadsData.lunora.length
 #: src/components/command-palette.tsx:631
-msgid "Only the {0} threads loaded here are filtered by state; older ones are not included."
-msgstr "Według stanu filtrowane są tylko {0} wątki wczytane tutaj; starsze nie są uwzględnione."
+#~ msgid "Only the {0} threads loaded here are filtered by state; older ones are not included."
+#~ msgstr "Według stanu filtrowane są tylko {0} wątki wczytane tutaj; starsze nie są uwzględnione."
+
+#. placeholder {0}: allThreadsData.lunora.length
+#: src/components/command-palette.tsx:892
+msgid "Only the {0} threads loaded here are filtered; older ones are not included."
+msgstr "Filtrowane są tylko wczytane tutaj wątki ({0}); starsze nie są uwzględnione."
+
+#. placeholder {0}: projects.length
+#: src/components/command-palette.tsx:899
+msgid "Only the first {0} projects are listed here."
+msgstr "Wyświetlane są tu tylko pierwsze projekty ({0})."
 
 #: src/features/knowledge/hooks/use-knowledge-import.ts:156
 msgid "Only the first {MAX_DOCUMENTS_PER_IMPORT} documents were imported."
@@ -24260,7 +24280,7 @@ msgid "Opacity"
 msgstr "Krycie"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:796
-#: src/components/command-palette.tsx:718
+#: src/components/command-palette.tsx:998
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
 #: src/features/develop/components/pull-request-view.tsx:75
@@ -26012,7 +26032,7 @@ msgid "Pin message"
 msgstr "Przypnij wiadomość"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
-#: src/components/command-palette.tsx:483
+#: src/components/command-palette.tsx:651
 #: src/features/chat/thread-list/thread-node.tsx:117
 msgid "Pin thread"
 msgstr "Przypnij wątek"
@@ -26967,6 +26987,13 @@ msgstr "Projekt nie jest już dostępny"
 msgid "Project repository"
 msgstr "Repozytorium projektu"
 
+#. placeholder {0}: projectFilter.title
+#: src/components/command-palette.tsx:884
+msgid "Project: {0}"
+msgstr "Projekt: {0}"
+
+#: src/components/command-palette.tsx:700
+#: src/components/command-palette.tsx:877
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:606
 msgid "Projects"
 msgstr "Projekty"
@@ -28166,6 +28193,14 @@ msgstr "Odrzuć"
 msgid "Rejecting a result in review marks the run as failed. The rejected answer stays on record."
 msgstr "Odrzucenie wyniku w przeglądzie oznacza uruchomienie jako nieudane. Odrzucona odpowiedź pozostaje w zapisie."
 
+#: src/components/command-palette.tsx:904
+msgid "Related archived threads are picked from the closest matches across all your threads, so some may not be listed."
+msgstr "Powiązane zarchiwizowane wątki są wybierane spośród najbliższych dopasowań ze wszystkich Twoich wątków, więc niektórych może brakować."
+
+#: src/components/command-palette.tsx:781
+msgid "Related threads"
+msgstr "Powiązane wątki"
+
 #: src/features/devices/lib/device-diagnostics.ts:69
 msgid "relay (another paired computer)"
 msgstr "przekaźnik (inny sparowany komputer)"
@@ -29052,7 +29087,7 @@ msgid "retry"
 msgstr "ponów"
 
 #: src/features/chat/host/host-composer.tsx:1093
-#: src/features/chat/thread/chat-error.tsx:56
+#: src/features/chat/thread/chat-error.tsx:64
 #: src/features/chat/thread/request-secret-prompt.tsx:475
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:240
@@ -30009,6 +30044,14 @@ msgstr "Szukaj w artykułach naukowych i plikach PDF"
 msgid "Search across the entire internet"
 msgstr "Szukaj w całym internecie"
 
+#: src/components/command-palette.tsx:845
+msgid "Search by meaning failed, so related threads are not listed. Try again in a moment."
+msgstr "Wyszukiwanie według znaczenia nie powiodło się, więc powiązane wątki nie są wyświetlane. Spróbuj ponownie za chwilę."
+
+#: src/components/command-palette.tsx:844
+msgid "Search by meaning isn't available under your account's model rules, so related threads are not listed."
+msgstr "Wyszukiwanie według znaczenia jest niedostępne w ramach reguł modeli Twojego konta, więc powiązane wątki nie są wyświetlane."
+
 #: src/features/admin/components/users-management-card.tsx:122
 msgid "Search by name or email..."
 msgstr "Szukaj po imieniu lub e-mailu..."
@@ -30215,7 +30258,7 @@ msgstr "Szukaj wątków"
 msgid "Search threads ({focusSearchShortcut})"
 msgstr "Szukaj wątków ({focusSearchShortcut})"
 
-#: src/components/command-palette.tsx:626
+#: src/components/command-palette.tsx:859
 msgid "Search threads, navigate, or perform actions..."
 msgstr "Szukaj wątków, nawiguj lub wykonuj akcje..."
 
@@ -30508,7 +30551,8 @@ msgstr "Wybierz język odpowiedzi AI. Określa on, w jakim języku asystent będ
 msgid "Select the lens characteristics"
 msgstr "Wybierz charakterystykę obiektywu"
 
-#: src/features/chat/thread/message-item.tsx:530
+#: src/features/chat/thread/chat-error.tsx:49
+#: src/features/chat/thread/message-item.tsx:528
 msgid "Select the model that wrote this reply to continue it."
 msgstr "Wybierz model, który napisał tę odpowiedź, aby ją kontynuować."
 
@@ -36192,7 +36236,7 @@ msgstr "wątek"
 msgid "Thread"
 msgstr "Wątek"
 
-#: src/components/command-palette.tsx:507
+#: src/components/command-palette.tsx:676
 msgid "Thread Actions"
 msgstr "Akcje wątku"
 
@@ -36290,6 +36334,7 @@ msgstr "Zmienne wątku"
 msgid "Thread will auto-delete in {0}"
 msgstr "Wątek zostanie automatycznie usunięty za {0}"
 
+#: src/components/command-palette.tsx:862
 #: src/features/admin/components/admin-shard-footprint-row.tsx:125
 #: src/features/admin/components/admin-shard-footprint-row.tsx:142
 #: src/features/admin/components/admin-shard-footprint-row.tsx:163
@@ -37009,7 +37054,7 @@ msgstr "Spróbuj ponownie"
 msgid "Try Again"
 msgstr "Spróbuj ponownie"
 
-#: src/features/chat/thread/chat-error.tsx:62
+#: src/features/chat/thread/chat-error.tsx:70
 msgid "Try again in {retryMinutes}m"
 msgstr "Spróbuj ponownie za {retryMinutes} min"
 
@@ -37295,8 +37340,8 @@ msgstr "Ultraszeroki kąt, architektoniczna"
 msgid "unarchive"
 msgstr "przywróć z archiwum"
 
-#: src/components/command-palette.tsx:493
-#: src/components/command-palette.tsx:655
+#: src/components/command-palette.tsx:661
+#: src/components/command-palette.tsx:935
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Unarchive thread"
 msgstr "Przywróć wątek z archiwum"
@@ -37503,7 +37548,7 @@ msgid "Unpin memory"
 msgstr "Odepnij wspomnienie"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
-#: src/components/command-palette.tsx:483
+#: src/components/command-palette.tsx:651
 #: src/features/chat/thread-list/thread-node.tsx:117
 msgid "Unpin thread"
 msgstr "Odepnij wątek"
@@ -37571,9 +37616,10 @@ msgstr "Bez tytułu"
 msgid "Untitled chat"
 msgstr "Czat bez tytułu"
 
-#: src/components/command-palette.tsx:265
-#: src/components/command-palette.tsx:278
-#: src/components/command-palette.tsx:554
+#: src/components/command-palette.tsx:430
+#: src/components/command-palette.tsx:443
+#: src/components/command-palette.tsx:749
+#: src/components/command-palette.tsx:774
 #: src/features/chat/core/hooks/use-thread-manager.ts:254
 msgid "Untitled Thread"
 msgstr "Wątek bez tytułu"
@@ -40436,6 +40482,10 @@ msgstr "Twój plan"
 #: src/features/auth/components/organization/billing-settings-card.tsx:148
 msgid "Your plan and credit allowance follow your subscription."
 msgstr "Twój plan i limit kredytów zależą od subskrypcji."
+
+#: src/components/command-palette.tsx:847
+msgid "Your projects could not be loaded. Try again in a moment."
+msgstr "Nie udało się wczytać Twoich projektów. Spróbuj ponownie za chwilę."
 
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:162
 msgid "Your rating"
