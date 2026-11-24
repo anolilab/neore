@@ -15,6 +15,12 @@ export const READ_MARGIN_BYTES = 8 * 1024 * 1024;
  */
 export const TRIGGER_READ_BYTES = 12 * 1024 * 1024;
 
+/**
+ * The most reading the chat-file metadata may cost (`agent/export-pages.ts`). Each row is read whole, extracted text included, so this
+ * is what keeps a large set of files from using the budget the export's other sections need.
+ */
+export const CHAT_FILES_READ_BYTES = 16 * 1024 * 1024;
+
 /** The most reading the user's feedback may cost (`feedback/gdpr.ts`); its rows are exported about as read. */
 export const FEEDBACK_READ_BYTES = 4 * 1024 * 1024;
 
@@ -35,6 +41,9 @@ export const projectDetailsReadBudget = (used: number): number => Math.max(0, AC
 
 /** What the trigger history may read after every other section read `used` bytes; 0 leaves it all out, marked as cut. */
 export const triggerReadBudget = (used: number): number => Math.max(0, Math.min(TRIGGER_READ_BYTES, ACTION_READ_BYTES - used - READ_MARGIN_BYTES));
+
+/** What the chat-file metadata may read after the earlier sections read `used` bytes; 0 leaves it all out, marked as cut. */
+export const chatFilesReadBudget = (used: number): number => Math.max(0, Math.min(CHAT_FILES_READ_BYTES, ACTION_READ_BYTES - used - READ_MARGIN_BYTES));
 
 /** What the feedback may read after the earlier sections read `used` bytes; 0 leaves it all out, marked as cut. */
 export const feedbackReadBudget = (used: number): number => Math.max(0, Math.min(FEEDBACK_READ_BYTES, ACTION_READ_BYTES - used - READ_MARGIN_BYTES));

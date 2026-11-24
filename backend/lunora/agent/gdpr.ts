@@ -87,12 +87,17 @@ export const CHAT_FILE_EXPORT_PAGE = 100;
 /** A chat file's name and media type are cut to these lengths in the export, so one page of rows has a bounded size. */
 export const CHAT_FILE_NAME_MAX = 512;
 export const CHAT_FILE_TYPE_MAX = 255;
+/** A content hash is a SHA-256 in hex (64 characters); a longer one was not made by an upload, and is cut so a row stays small. */
+export const CHAT_FILE_HASH_MAX = 128;
 
 /**
  * Messages read per query when looking for their files. A message row is read whole (there is no index on `fileIds`), and a message can
  * be large, so the page is small: each query stays well inside the export action's read budget.
  */
 export const CHAT_FILE_MESSAGE_PAGE = 20;
+
+/** The UTF-8 bytes a row takes as the query reads it: the unit the export's read budget counts in. */
+const rowBytes = (row: unknown): number => new TextEncoder().encode(JSON.stringify(row)).byteLength;
 
 /**
  * One page of the ids of the files the user holds a grant for (`chatFileAccess`): their uploads and generated images. The grant is
@@ -111,14 +116,23 @@ export const collectGrantedChatFileIdsForExport = internalQuery
         v.object({
             cursor: v.union(v.string(), v.null()),
             ids: v.array(v.string()),
+            // The bytes the query read: each grant row, as stored. The export action meters its walk against a budget with this.
+            readBytes: v.number(),
         }),
     )
     .query(async ({ args: { cursor, userId }, ctx }) => {
-        const grants = await ctx.db.chatFileAccess.findMany({ cursor: cursor ?? null, limit: CHAT_FILE_EXPORT_PAGE, where: { userId } });
+        // Primary, so a grant made moments before the export is in it (a lagging replica could omit it).
+        const grants = await ctx.db.chatFileAccess.findMany({
+            consistency: "primary",
+            cursor: cursor ?? null,
+            limit: CHAT_FILE_EXPORT_PAGE,
+            where: { userId },
+        });
 
         return {
             cursor: grants.isDone ? null : grants.continueCursor,
             ids: grants.page.map((grant) => grant.fileId),
+            readBytes: grants.page.reduce((total, grant) => total + rowBytes(grant), 0),
         };
     });
 
@@ -132,6 +146,7 @@ export const collectThreadIdsForExport = internalQuery
         v.object({
             cursor: v.union(v.string(), v.null()),
             ids: v.array(v.string()),
+            readBytes: v.number(),
         }),
     )
     .query(async ({ args: { cursor, userId }, ctx }) => {
@@ -143,6 +158,7 @@ export const collectThreadIdsForExport = internalQuery
         return {
             cursor: page.isDone ? null : page.continueCursor,
             ids: page.page.map((thread) => thread._id),
+            readBytes: page.page.reduce((total, thread) => total + rowBytes(thread), 0),
         };
     });
 
@@ -156,6 +172,7 @@ export const collectMessageFileIdsForExport = internalQuery
         v.object({
             cursor: v.union(v.string(), v.null()),
             ids: v.array(v.string()),
+            readBytes: v.number(),
         }),
     )
     .query(async ({ args: { cursor, threadId }, ctx }) => {
@@ -167,6 +184,7 @@ export const collectMessageFileIdsForExport = internalQuery
         return {
             cursor: page.isDone ? null : page.continueCursor,
             ids: page.page.flatMap((message) => message.fileIds ?? []),
+            readBytes: page.page.reduce((total, message) => total + rowBytes(message), 0),
         };
     });
 
@@ -197,10 +215,11 @@ export const chatFileMetadataForExport = internalQuery
             return { readBytes: 0, rows: [] };
         }
 
-        const { page } = await ctx.db.chatFiles.findMany({ where: { _id: { in: fileIds } } });
+        // Primary, as the grants are: a file uploaded moments before the export must be in it.
+        const { page } = await ctx.db.chatFiles.findMany({ consistency: "primary", where: { _id: { in: fileIds } } });
         const files = storedRows(page);
         // The whole row is read, extracted text included, so the bytes read are the row's size as stored, not the metadata's.
-        const readBytes = files.reduce((total, file) => total + JSON.stringify(file).length, 0);
+        const readBytes = files.reduce((total, file) => total + rowBytes(file), 0);
 
         return {
             readBytes,
@@ -209,7 +228,7 @@ export const chatFileMetadataForExport = internalQuery
                     createdAt: file._creationTime,
                     filename: file.filename?.slice(0, CHAT_FILE_NAME_MAX),
                     filenameCut: (file.filename?.length ?? 0) > CHAT_FILE_NAME_MAX,
-                    hash: file.hash,
+                    hash: file.hash.slice(0, CHAT_FILE_HASH_MAX),
                     id: file._id,
                     mediaType: file.mediaType.slice(0, CHAT_FILE_TYPE_MAX),
                 };

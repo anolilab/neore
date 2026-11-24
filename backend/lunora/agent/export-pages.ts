@@ -1,7 +1,20 @@
-/** A page of ids from a source: the ids, and where the next page starts (`null` when this was the last). */
+import { CHAT_FILES_READ_BYTES } from "../gdpr/read-budget";
+
+/**
+ * A page of ids from a source: the ids, where the next page starts (`null` when this was the last), and the bytes the query read
+ * (`readBytes`, each row as stored), which the walk meters against its budget.
+ */
 export interface IdsPage {
     cursor: string | null;
     ids: string[];
+    readBytes?: number;
+}
+
+/** A walk to its end, or until its read budget was spent (`truncated`): the ids it reached, and the bytes it read. */
+export interface Walked {
+    ids: string[];
+    readBytes: number;
+    truncated: boolean;
 }
 
 /** Metadata is read this many ids at a time: one query per chunk. */
@@ -14,26 +27,29 @@ export const CHAT_FILE_METADATA_CHUNK = 100;
 export const CHAT_FILE_EXPORT_BYTES = 8 * 1024 * 1024;
 
 /**
- * The chat-file metadata reads are held to this many bytes of stored rows (each row is read whole, extracted text included). Past it the
- * rest of the files are not read, and the section is flagged. The export action's other sections read against their own budgets.
+ * Walks one source to its end, or until the bytes its pages read reach `budget`: the check runs before each page, so the page that
+ * crosses the budget is the last one read, and the walk says it stopped short.
  */
-export const CHAT_FILE_READ_BYTES = 16 * 1024 * 1024;
-
-/** Walks one source to its end, returning every id it yields. */
-const walkIds = async (read: (cursor: string | null) => Promise<IdsPage>): Promise<string[]> => {
+export const walkIds = async (read: (cursor: string | null) => Promise<IdsPage>, budget: number): Promise<Walked> => {
     const ids: string[] = [];
     let cursor: string | null = null;
     let more = true;
+    let readBytes = 0;
 
     while (more) {
+        if (readBytes >= budget) {
+            return { ids, readBytes, truncated: true };
+        }
+
         const page = await read(cursor);
 
         ids.push(...page.ids);
+        readBytes += page.readBytes ?? 0;
         more = page.cursor !== null;
         cursor = page.cursor;
     }
 
-    return ids;
+    return { ids, readBytes, truncated: false };
 };
 
 /**
@@ -44,15 +60,26 @@ const walkIds = async (read: (cursor: string | null) => Promise<IdsPage>): Promi
 export const collectAllMessageFileIds = async (
     listThreads: (cursor: string | null) => Promise<IdsPage>,
     listFiles: (threadId: string, cursor: string | null) => Promise<IdsPage>,
-): Promise<string[]> => {
-    const threadIds = await walkIds(listThreads);
+    budget: number,
+): Promise<Walked> => {
+    const threads = await walkIds(listThreads, budget);
     const ids: string[] = [];
+    let { readBytes, truncated } = threads;
 
-    for (const threadId of threadIds) {
-        ids.push(...(await walkIds(async (cursor) => await listFiles(threadId, cursor))));
+    // Each thread's messages take what the threads and the threads before them left of the budget.
+    for (const threadId of threads.ids) {
+        const messages = await walkIds(async (cursor) => await listFiles(threadId, cursor), budget - readBytes);
+
+        ids.push(...messages.ids);
+        readBytes += messages.readBytes;
+
+        if (messages.truncated) {
+            truncated = true;
+            break;
+        }
     }
 
-    return ids;
+    return { ids, readBytes, truncated };
 };
 
 /**
@@ -64,23 +91,19 @@ export const collectAllMessageFileIds = async (
  * extension type checks do not resolve.
  */
 export const collectAllChatFileMetadata = async <Row>(
-    listGrantedIds: (cursor: string | null) => Promise<IdsPage>,
-    listMessageFileIds: () => Promise<string[]>,
+    walkGrants: (budget: number) => Promise<Walked>,
+    walkMessages: (budget: number) => Promise<Walked>,
     readMetadata: (fileIds: string[]) => Promise<{ readBytes: number; rows: Row[] }>,
     chunkSize: number = CHAT_FILE_METADATA_CHUNK,
-    readBudget: number = CHAT_FILE_READ_BYTES,
+    readBudget: number = CHAT_FILES_READ_BYTES,
 ): Promise<{ rows: Row[]; truncated: boolean }> => {
-    const ids = new Set<string>(await walkIds(listGrantedIds));
-
-    const messageIds = await listMessageFileIds();
-
-    for (const id of messageIds) {
-        ids.add(id);
-    }
-
-    const all = [...ids];
+    // The walks and the metadata reads share one budget: each takes what the ones before it left, so the section cannot read past it.
+    const granted = await walkGrants(readBudget);
+    const messages = await walkMessages(Math.max(0, readBudget - granted.readBytes));
+    const all = [...new Set([...granted.ids, ...messages.ids])];
     const rows: Row[] = [];
-    let readBytes = 0;
+    let readBytes = granted.readBytes + messages.readBytes;
+    const truncated = granted.truncated || messages.truncated;
 
     for (let start = 0; start < all.length; start += chunkSize) {
         // Past the budget the rest of the files are not read: the section says so, as it does past its byte cap.
@@ -94,20 +117,33 @@ export const collectAllChatFileMetadata = async <Row>(
         rows.push(...chunk.rows);
     }
 
-    return { rows, truncated: false };
+    return { rows, truncated };
 };
 
 /**
- * The rows that fit in the section's byte budget, in order, measured as the export writes them (indented JSON). Past the budget the
- * rest are left out and `truncated` says so; the caller records that in the export.
+ * What the section takes beyond its rows, as the export writes it: the `chatFiles` and `files` keys, the brackets and the flag. Reserved
+ * whole, so the rows that fit are never over-counted by less than this and the section never runs past its budget.
+ */
+const CHAT_FILE_SECTION_FRAME_BYTES = 256;
+
+/** What one row takes in the array beyond its own lines: the line break and indent before it, and the comma after it. */
+const CHAT_FILE_ROW_FRAME_BYTES = 8;
+
+/**
+ * The rows that fit in the section's byte budget, in order, measured as the export writes them: each row's lines indented to the depth
+ * of the `chatFiles.files` array (the export is `JSON.stringify(…, null, 2)`), plus the section's frame. Past the budget the rest are
+ * left out and `truncated` says so; the caller records that in the export.
  */
 export const capChatFiles = <Row>(rows: Row[], budget: number = CHAT_FILE_EXPORT_BYTES): { files: Row[]; truncated: boolean } => {
     const encoder = new TextEncoder();
     const files: Row[] = [];
-    let bytes = 0;
+    let bytes = CHAT_FILE_SECTION_FRAME_BYTES;
 
     for (const row of rows) {
-        bytes += encoder.encode(JSON.stringify(row, null, 2)).byteLength;
+        // An array element sits three levels deep (`chatFiles` → `files` → element), so each of its lines is indented six spaces more.
+        const written = JSON.stringify(row, null, 2).replaceAll("\n", "\n      ");
+
+        bytes += encoder.encode(written).byteLength + CHAT_FILE_ROW_FRAME_BYTES;
 
         if (bytes > budget) {
             return { files, truncated: true };

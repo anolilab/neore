@@ -2,7 +2,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import { buildUsageJson, spliceUsageJson, usageObjectKey } from "./usage-export-steps";
 import { readStoredText } from "../lib/storage-read";
-import { capChatFiles, collectAllChatFileMetadata, collectAllMessageFileIds } from "../agent/export-pages";
+import { CHAT_FILE_METADATA_CHUNK, capChatFiles, collectAllChatFileMetadata, collectAllMessageFileIds, walkIds } from "../agent/export-pages";
 import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
 import { callOnShard } from "../lib/cross-shard";
 import { collectOrganizationReplyPages } from "../usage/organization";
@@ -11,7 +11,14 @@ import { BROWSER_EXPORT_BYTES, browserExportPageKey, readAllBrowserPages } from 
 import { collectAllFeedback } from "../feedback/gdpr";
 import { collectAllTriggers } from "../triggers/export-pages";
 import { attachProjectRuleFiles, collectAllOwnedProjects, collectAllRepositories } from "../projects/export-pages";
-import { feedbackReadBudget, projectDetailsReadBudget, repositoriesReadBudget, threadFollowsReadBudget, triggerReadBudget } from "./read-budget";
+import {
+    chatFilesReadBudget,
+    feedbackReadBudget,
+    projectDetailsReadBudget,
+    repositoriesReadBudget,
+    threadFollowsReadBudget,
+    triggerReadBudget,
+} from "./read-budget";
 import { collectAllThreadFollows } from "../chat/follows/export-pages";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -837,16 +844,32 @@ export const generateExportFile = internalAction
                       browserCut === true,
                   );
         // The user's chat files (uploads and generated images), metadata only: the files behind their grants and the files their messages
-        // name (`agent/export-pages.ts`), read here a page per query, as the sections above are. Held to a byte budget, with a flag when cut.
+        // name (`agent/export-pages.ts`), read here a page per query, as the sections above are. The walks and the metadata reads share
+        // one budget, what every section above left of the action's read budget (`read-budget.ts`); past it the section is cut and flagged.
         const chatFileRead = await collectAllChatFileMetadata(
-            async (cursor) => await context.runQuery(internal.agent.gdpr.collectGrantedChatFileIdsForExport, { cursor, userId: args.userId }),
-            async () =>
+            async (budget) =>
+                await walkIds(
+                    async (cursor) => await context.runQuery(internal.agent.gdpr.collectGrantedChatFileIdsForExport, { cursor, userId: args.userId }),
+                    budget,
+                ),
+            async (budget) =>
                 await collectAllMessageFileIds(
                     async (cursor) => await context.runQuery(internal.agent.gdpr.collectThreadIdsForExport, { cursor, userId: args.userId }),
                     async (threadId, cursor) =>
                         await context.runQuery(internal.agent.gdpr.collectMessageFileIdsForExport, { cursor, threadId: threadId as Id<"threads"> }),
+                    budget,
                 ),
             async (fileIds) => await context.runQuery(internal.agent.gdpr.chatFileMetadataForExport, { fileIds: fileIds as Id<"chatFiles">[] }),
+            CHAT_FILE_METADATA_CHUNK,
+            chatFilesReadBudget(
+                earlierReadBytes +
+                    repositories.readBytes +
+                    feedback.readBytes +
+                    ownedProjects.readBytes +
+                    threadFollows.readBytes +
+                    triggers.readBytes +
+                    ownedWithRules.readBytes,
+            ),
         );
         const chatFileCapped = capChatFiles(chatFileRead.rows);
         // Cut by the byte cap or by the read budget: either way the section says so.

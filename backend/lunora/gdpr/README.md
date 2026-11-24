@@ -129,8 +129,9 @@ Users can request a complete export of all their personal data in JSON format. T
 4. **Files** - Vault file and folder metadata, and the chat files of the user (uploads and generated images): the files behind their
    grants and the files their messages still name, metadata only, the bytes are not exported (`agent/export-pages.ts`, read by
    `agent/gdpr.ts#collectGrantedChatFileIdsForExport`, the thread and message walk, and `chatFileMetadataForExport`). The section is held
-   to 8 MiB; past it the rest are left out and the section says so. A chat link alone is not exported: a link outlives the message
-   that named the file
+   to 8 MiB as written; past it the rest are left out and the section says so. Its reads take what the sections before it left of the
+   action's read budget (`chatFilesReadBudget`), and past that the section is cut and flagged too. A chat link alone is not exported: a
+   link outlives the message that named the file
 5. **Prompts** - Saved prompts and history
 6. **Usage History** - AI usage tracking events
 7. **Browser** - Browser sessions (started, status, last page, the extension that drove it), their actions (action, target, time, success),

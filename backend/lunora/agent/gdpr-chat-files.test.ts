@@ -12,19 +12,29 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
 import { addFile } from "./files";
-import { type IdsPage, capChatFiles, collectAllChatFileMetadata, collectAllMessageFileIds } from "./export-pages";
+import { type IdsPage, capChatFiles, collectAllChatFileMetadata, collectAllMessageFileIds, walkIds } from "./export-pages";
 import {
     CHAT_FILE_EXPORT_PAGE,
+    CHAT_FILE_HASH_MAX,
     CHAT_FILE_NAME_MAX,
     chatFileMetadataForExport,
     collectGrantedChatFileIdsForExport,
     collectMessageFileIdsForExport,
     collectThreadIdsForExport,
 } from "./gdpr";
+import { ACTION_READ_BYTES, CHAT_FILES_READ_BYTES, READ_MARGIN_BYTES, chatFilesReadBudget } from "../gdpr/read-budget";
 
 const A = "user-a";
 const B = "user-b";
 const MANY = CHAT_FILE_EXPORT_PAGE + 30;
+
+/** The `chatFiles` section as the export writes it: its key and value, at the export's indentation. */
+const sectionBytes = (chatFiles: unknown): number => {
+    const text = JSON.stringify({ chatFiles }, null, 2);
+
+    // The export object's own braces wrap the section: `{` and the `\n}` closing it are not the section's.
+    return new TextEncoder().encode(text.slice(text.indexOf('"chatFiles"'), -2)).byteLength;
+};
 
 type Harness = ReturnType<typeof lunoraTest>;
 interface ExportedFile {
@@ -125,18 +135,20 @@ const staleLinkOf = async (userId: string, hash: string): Promise<string> =>
 const exportedFor = async (userId: string): Promise<{ files: ExportedFile[]; pages: number }> => {
     let pages = 0;
     const read = (await collectAllChatFileMetadata(
-        async (cursor) => {
-            pages += 1;
+        async (budget) =>
+            await walkIds(async (cursor) => {
+                pages += 1;
 
-            return (await harness.run(async (ctx: any) => await ctx.runQuery(collectGrantedChatFileIdsForExport, { cursor, userId }))) as IdsPage;
-        },
-        async () =>
+                return (await harness.run(async (ctx: any) => await ctx.runQuery(collectGrantedChatFileIdsForExport, { cursor, userId }))) as IdsPage;
+            }, budget),
+        async (budget) =>
             await collectAllMessageFileIds(
                 async (cursor) => (await harness.run(async (ctx: any) => await ctx.runQuery(collectThreadIdsForExport, { cursor, userId }))) as IdsPage,
                 async (threadId, cursor) =>
                     (await harness.run(
                         async (ctx: any) => await ctx.runQuery(collectMessageFileIdsForExport, { cursor, threadId: threadId as never }),
                     )) as IdsPage,
+                budget,
             ),
         async (fileIds) => await harness.run(async (ctx: any) => await ctx.runQuery(chatFileMetadataForExport, { fileIds })),
     )) as { rows: ExportedFile[]; truncated: boolean };
@@ -215,6 +227,14 @@ describe("chat files in the GDPR export", () => {
         expect(exported?.filenameCut).toBe(true);
     });
 
+    it("cuts a hash past its limit, so one row cannot outgrow a page", async () => {
+        const longHashFile = await store(A, "long-hash.png", "h".repeat(CHAT_FILE_HASH_MAX + 40));
+
+        const { files } = await exportedFor(A);
+
+        expect(files.find((file) => file.id === longHashFile)?.hash).toHaveLength(CHAT_FILE_HASH_MAX);
+    });
+
     it("reads every page of a user's files", async () => {
         for (let index = 0; index < MANY; index += 1) {
             await store(A, `image-${String(index)}.png`, `hash-${String(index)}`);
@@ -234,8 +254,10 @@ describe("chat files in the GDPR export", () => {
         const reads: string[][] = [];
 
         const { rows } = await collectAllChatFileMetadata(
-            async (cursor) => grantPages[cursor ?? ""] ?? { cursor: null, ids: [] },
-            async () => ["d", "a"],
+            async (budget) => await walkIds(async (cursor) => grantPages[cursor ?? ""] ?? { cursor: null, ids: [] }, budget),
+            async () => {
+                return { ids: ["d", "a"], readBytes: 0, truncated: false };
+            },
             async (fileIds) => {
                 reads.push(fileIds);
 
@@ -260,10 +282,13 @@ describe("chat files in the GDPR export", () => {
         const reads: string[][] = [];
 
         const { rows, truncated } = await collectAllChatFileMetadata(
+            async (budget) =>
+                await walkIds(async () => {
+                    return { cursor: null, ids: ["a", "b", "c", "d", "e", "f"] };
+                }, budget),
             async () => {
-                return { cursor: null, ids: ["a", "b", "c", "d", "e", "f"] };
+                return { ids: [], readBytes: 0, truncated: false };
             },
-            async () => [],
             async (fileIds) => {
                 reads.push(fileIds);
 
@@ -295,24 +320,85 @@ describe("chat files in the GDPR export", () => {
             "t2:": { cursor: null, ids: ["z"] },
         };
 
-        const ids = await collectAllMessageFileIds(
+        const { ids } = await collectAllMessageFileIds(
             async (cursor) => threadPages[cursor ?? ""] ?? { cursor: null, ids: [] },
             async (threadId, cursor) => messagePages[`${threadId}:${cursor ?? ""}`] ?? { cursor: null, ids: [] },
+            Infinity,
         );
 
         expect(ids).toEqual(["x", "y", "z"]);
     });
 
-    it("keeps the rows that fit the section's budget and flags the cut", () => {
+    it("stops a walk once the bytes its pages read reach the budget, and says so", async () => {
+        const pages: Record<string, IdsPage> = {
+            "": { cursor: "p1", ids: ["a"], readBytes: 10 },
+            p1: { cursor: "p2", ids: ["b"], readBytes: 10 },
+            p2: { cursor: null, ids: ["c"], readBytes: 10 },
+        };
+
+        expect(await walkIds(async (cursor) => pages[cursor ?? ""] ?? { cursor: null, ids: [] }, 15)).toEqual({
+            ids: ["a", "b"],
+            readBytes: 20,
+            truncated: true,
+        });
+        expect(await walkIds(async (cursor) => pages[cursor ?? ""] ?? { cursor: null, ids: [] }, 100)).toEqual({
+            ids: ["a", "b", "c"],
+            readBytes: 30,
+            truncated: false,
+        });
+    });
+
+    it("gives the message walk what the grants left of the budget, and stops in the threads that follow once it is spent", async () => {
+        const messageReads: string[] = [];
+
+        const walked = await collectAllMessageFileIds(
+            async () => {
+                return { cursor: null, ids: ["t1", "t2", "t3"] };
+            },
+            async (threadId) => {
+                messageReads.push(threadId);
+
+                return { cursor: null, ids: [threadId], readBytes: 10 };
+            },
+            15,
+        );
+
+        // Thread t1 reads 10 bytes, t2 reads 10 more (past 15): t3 is not read, and the walk says it stopped short.
+        expect(messageReads).toEqual(["t1", "t2"]);
+        expect(walked).toEqual({ ids: ["t1", "t2"], readBytes: 20, truncated: true });
+    });
+
+    it("keeps the rows whose section, as the export writes it, fits the budget, and flags the cut", () => {
         const rows = [{ id: "a".repeat(40) }, { id: "b".repeat(40) }, { id: "c".repeat(40) }];
 
-        const fitting = capChatFiles(rows, 10_000);
-        const cut = capChatFiles(rows, 100);
+        expect(capChatFiles(rows, 10_000)).toEqual({ files: rows, truncated: false });
 
-        expect(fitting).toEqual({ files: rows, truncated: false });
-        expect(cut.truncated).toBe(true);
-        expect(cut.files).toEqual(rows.slice(0, cut.files.length));
-        expect(cut.files.length).toBeLessThan(rows.length);
+        for (const budget of [1000, 400, 300, 100]) {
+            const cut = capChatFiles(rows, budget);
+
+            expect(sectionBytes({ files: cut.files, truncated: cut.truncated })).toBeLessThanOrEqual(budget);
+            expect(cut.truncated).toBe(cut.files.length < rows.length);
+            expect(cut.files).toEqual(rows.slice(0, cut.files.length));
+        }
+    });
+
+    it("counts a row as the export writes it, with the nested rows' own lines and the section's frame", () => {
+        // Rows with nested objects and multi-byte text: their written size is larger than their compact JSON.
+        const rows = Array.from({ length: 40 }, (_, index) => {
+            return { filename: `ünïcode-${String(index)}.png`, meta: { tags: ["a", "b"] } };
+        });
+
+        for (const budget of [2000, 5000, 9000]) {
+            const cut = capChatFiles(rows, budget);
+
+            expect(sectionBytes({ files: cut.files, truncated: cut.truncated })).toBeLessThanOrEqual(budget);
+        }
+    });
+
+    it("gives the chat-file metadata what the sections before it left of the action's read budget", () => {
+        expect(chatFilesReadBudget(0)).toBe(CHAT_FILES_READ_BYTES);
+        expect(chatFilesReadBudget(ACTION_READ_BYTES)).toBe(0);
+        expect(chatFilesReadBudget(ACTION_READ_BYTES - READ_MARGIN_BYTES - 1024)).toBe(1024);
     });
 
     it("is wired into the export action", () => {
@@ -323,6 +409,7 @@ describe("chat files in the GDPR export", () => {
         expect(steps).toContain("internal.agent.gdpr.collectMessageFileIdsForExport");
         expect(steps).toContain("internal.agent.gdpr.chatFileMetadataForExport");
         expect(steps).toContain("capChatFiles(chatFileRead.rows)");
+        expect(steps).toContain("chatFilesReadBudget(");
         expect(steps).toContain("\n            chatFiles,\n");
     });
 });
