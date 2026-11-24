@@ -69,6 +69,8 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "dispatchDueEventTriggers", ref: internal.triggers.events.dispatchDueEventTriggers },
     // Same backstop for the watched repositories: a repository whose shard lost its due row is still polled.
     { name: "dispatchDueRepoPolls", ref: internal.source_control.freshness_internal.dispatchDueRepoPolls },
+    // The stored state of linked pull requests that auto-archive reads (`source-control/pr-state.ts`); a no-op when the setting is off.
+    { name: "dispatchLinkedPullRequestChecks", ref: internal.source_control.pr_state.dispatchLinkedPullRequestChecks },
     { name: "cleanupExpiredPersistentStreams", ref: internal.chat.streaming.persistent.crons.cleanupExpiredStreams },
     { name: "purgeFinishedStreams", ref: internal.chat.streaming.persistent.purge.purgeFinishedStreams },
     { name: "failStaleMediaRows", ref: internal.chat.media_stale.failStaleMediaRows },

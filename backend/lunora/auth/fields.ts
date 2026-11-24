@@ -74,6 +74,8 @@ export const userSettingsFieldsWithoutUserId = {
     hostFollowUpSteer: v.optional(v.boolean()), // A message sent during a coding agent's turn interrupts it and goes next. Absent means queue.
     id: v.optional(v.string().max(MAX_LENGTH.id)),
     isAdvancedUser: v.optional(v.boolean()),
+    // Keep an idle chat out of auto-archive while it has a linked pull request that is open. Absent = on (`agent/auto-archive.ts`).
+    keepOpenPullRequestChats: v.optional(v.boolean()),
     keyboardShortcuts: v.optional(
         v.object({
             archiveThread: v.optional(v.string().max(MAX_LENGTH.short)),

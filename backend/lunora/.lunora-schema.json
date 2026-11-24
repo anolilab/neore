@@ -24360,6 +24360,41 @@
           "optional": false,
           "unique": false
         },
+        "state": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"closed\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"merged\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"open\""
+            }
+          ]
+        },
+        "stateCheckedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "threadDeleted": {
           "kind": "boolean",
           "nullable": false,
@@ -33444,6 +33479,12 @@
           "unique": false
         },
         "isAdvancedUser": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "keepOpenPullRequestChats": {
           "kind": "boolean",
           "nullable": false,
           "optional": true,

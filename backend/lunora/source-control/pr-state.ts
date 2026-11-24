@@ -1,0 +1,121 @@
+/**
+ * The stored state of a thread's linked pull requests, which auto-archive reads (`agent/auto-archive.ts`): open, closed
+ * or merged, as the host last said. Kept fresh by the housekeeping sweep on the user's own shard, never by a query.
+ *
+ * The sweep leases a bounded set of open links (stamping `stateCheckedAt` in the same transaction, so the next sweep
+ * skips them) and schedules one action per link. The action asks the host with the person's token and records the
+ * answer only while the link still exists. A failed or unlinked read leaves the state as it was.
+ * The sweep does nothing while the person turned "Keep chats with an open pull request" off.
+ */
+import { v } from "lunorash/server";
+
+import { internal } from "../_generated/internal";
+import { internalAction, internalMutation, internalQuery } from "../_generated/server";
+import { keepsOpenPullRequestChats, isOpenPullRequestForArchive } from "../agent/auto-archive-logic";
+import { resolveGithubToken } from "../connectors/lib/github-token";
+import { currentUserShard } from "../lib/shard-context";
+import { DEVELOP_DRIVER } from "./develop-driver";
+import { readFromHost } from "./read-host";
+
+/** A link's state is re-read once it is this old. */
+export const PR_STATE_MAX_AGE_MS = 10 * 60 * 1000;
+/** Links read per sweep. Past them, the rest wait for a later sweep. */
+const SCAN_LIMIT = 200;
+/** Links checked per sweep, so one user's host calls stay bounded. */
+const CHECK_LIMIT = 20;
+
+const vState = v.union(v.literal("open"), v.literal("closed"), v.literal("merged"));
+
+/** Shard sweep: leases the open links whose state is stale and schedules one host read for each. */
+export const dispatchLinkedPullRequestChecks = internalMutation
+    .input({})
+    .output(v.object({ dispatched: v.number() }))
+    .mutation(async ({ ctx }) => {
+        const userId = currentUserShard();
+
+        if (userId === undefined) {
+            return { dispatched: 0 };
+        }
+
+        const settings = await ctx.db
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .unique();
+
+        if (!keepsOpenPullRequestChats(settings?.keepOpenPullRequestChats)) {
+            return { dispatched: 0 };
+        }
+
+        const { now } = ctx;
+        const links = await ctx.db
+            .query("pullRequestThreads")
+            .withIndex("by_user_and_repository_number", (q) => q.eq("userId", userId))
+            .take(SCAN_LIMIT);
+        const due = links
+            .filter(
+                (link) =>
+                    link.threadDeleted !== true &&
+                    isOpenPullRequestForArchive(link) &&
+                    (link.stateCheckedAt === undefined || now - link.stateCheckedAt >= PR_STATE_MAX_AGE_MS),
+            )
+            .slice(0, CHECK_LIMIT);
+
+        for (const link of due) {
+            // Stamped first: a sweep that runs again before the read lands skips this link.
+            await ctx.db.patch("pullRequestThreads", link._id, { stateCheckedAt: now });
+            await ctx.scheduler.runAfter(0, internal.source_control.pr_state.checkLinkedPullRequest, { linkId: link._id });
+        }
+
+        return { dispatched: due.length };
+    });
+
+/** What the host read needs from a link, read on the user's shard. Null when the link is gone. */
+export const readLinkForStateCheck = internalQuery
+    .input({ linkId: v.id("pullRequestThreads") })
+    .output(v.union(v.null(), v.object({ number: v.number(), repository: v.string(), userId: v.string() })))
+    .query(async ({ args, ctx }) => {
+        const link = await ctx.db.get("pullRequestThreads", args.linkId);
+
+        return link === null ? null : { number: link.number, repository: link.repository, userId: link.userId };
+    });
+
+/** Records what the host said about a link, if the link is still there. */
+export const recordLinkState = internalMutation
+    .input({ linkId: v.id("pullRequestThreads"), state: vState })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const link = await ctx.db.get("pullRequestThreads", args.linkId);
+
+        if (link !== null) {
+            await ctx.db.patch("pullRequestThreads", link._id, { state: args.state, stateCheckedAt: ctx.now });
+        }
+
+        return null;
+    });
+
+/** One host read for one link, with the person's own token. A read that fails changes nothing. */
+export const checkLinkedPullRequest = internalAction
+    .input({ linkId: v.id("pullRequestThreads") })
+    .output(v.null())
+    .action(async ({ args, ctx }) => {
+        const target = await ctx.runQuery(internal.source_control.pr_state.readLinkForStateCheck, { linkId: args.linkId });
+
+        if (target === null) {
+            return null;
+        }
+
+        const token = await resolveGithubToken(ctx, target.userId);
+        const outcome = await readFromHost(DEVELOP_DRIVER, token, async (request) => {
+            const detail = await DEVELOP_DRIVER.getPullRequest(request, { number: target.number, repository: target.repository });
+
+            return { state: detail.state };
+        });
+
+        if (outcome.status !== "ok") {
+            return null;
+        }
+
+        await ctx.runMutation(internal.source_control.pr_state.recordLinkState, { linkId: args.linkId, state: outcome.state });
+
+        return null;
+    });

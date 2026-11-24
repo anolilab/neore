@@ -18,11 +18,21 @@ import { pendingApprovalCutoff } from "../chat/lib/tool-approval-cleanup";
 import { currentUserShard } from "../lib/shard-context";
 import type { ScanPage } from "../lib/scan-pages";
 import { MAX_LENGTH } from "../lib/validators";
-import { type AutoArchiveCandidate, autoArchiveCutoff, isAutoArchiveDays, runArchivePass, selectAutoArchiveDue } from "./auto-archive-logic";
+import {
+    type AutoArchiveCandidate,
+    autoArchiveCutoff,
+    isAutoArchiveDays,
+    isOpenPullRequestForArchive,
+    keepsOpenPullRequestChats,
+    runArchivePass,
+    selectAutoArchiveDue,
+} from "./auto-archive-logic";
 import { markThreadArchived } from "./threads";
 
 /** Threads archived per pass. The rest wait for the next pass, which is idempotent. */
 const ARCHIVE_BATCH = 100;
+/** Pull request links read per thread. A full page keeps the thread: a closed link may hide an open one past it. */
+const PULL_REQUEST_LINK_READ = 100;
 /** Index rows read per page, and per pass before the pass hands its cursor to a follow-up run. */
 const PAGE_SIZE = 200;
 const READ_BUDGET = 1000;
@@ -91,6 +101,34 @@ const threadHasLiveGuestLink = async (ctx: MutationCtx, threadId: Id<"threads">)
 };
 
 /**
+ * True when the thread's owner keeps open-pull-request chats (the default) and the thread has a linked pull request that
+ * is open, by the stored state. Reads the links only, never the host. A thread with no link returns before the settings read,
+ * so a chat without a pull request is decided exactly as before.
+ */
+const threadKeptForOpenPullRequest = async (ctx: MutationCtx, userId: string | undefined, threadId: Id<"threads">): Promise<boolean> => {
+    if (userId === undefined) {
+        return false;
+    }
+
+    const links = await ctx.db
+        .query("pullRequestThreads")
+        .withIndex("by_user_and_threadId", (q) => q.eq("userId", userId).eq("threadId", threadId))
+        .take(PULL_REQUEST_LINK_READ);
+    const truncated = links.length === PULL_REQUEST_LINK_READ;
+
+    if (!truncated && links.every((link) => !isOpenPullRequestForArchive(link))) {
+        return false;
+    }
+
+    const settings = await ctx.db
+        .query("userSettings")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .unique();
+
+    return keepsOpenPullRequestChats(settings?.keepOpenPullRequestChats) && (truncated || links.some((link) => isOpenPullRequestForArchive(link)));
+};
+
+/**
  * Archives one thread if, as read now, it is still due. The eligibility check runs
  * on the fresh row, its project's pin state, its live streams and any request waiting on the owner, in the same
  * transaction as the write, so nothing that happened after the scan is overwritten.
@@ -116,7 +154,8 @@ export const archiveIfStillIdle = internalMutation
             due.length === 0 ||
             (await threadHasLiveStream(ctx, args.threadId)) ||
             (await threadWaitsOnPerson(ctx, args.threadId)) ||
-            (await threadHasLiveGuestLink(ctx, args.threadId))
+            (await threadHasLiveGuestLink(ctx, args.threadId)) ||
+            (await threadKeptForOpenPullRequest(ctx, thread.userId, args.threadId))
         ) {
             return false;
         }

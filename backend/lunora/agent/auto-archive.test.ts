@@ -204,3 +204,59 @@ describe("archiveIfStillIdle and live guest links", () => {
         expect(await archiveWithGuestLink(1)).toBe(true);
     });
 });
+
+describe("archiveIfStillIdle and linked pull requests", () => {
+    type PullState = "open" | "closed" | "merged";
+
+    /** An idle thread, with a pull request link in `state` (absent = the refresh has not read it yet), and the setting as given (absent = never set). */
+    const archiveWithPullRequest = (options: { keepSetting?: boolean; link: boolean; state?: PullState }) =>
+        harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Old", updatedAt: 1, userId: OWNER });
+
+            if (options.keepSetting !== undefined) {
+                await ctx.db.insert("userSettings", { keepOpenPullRequestChats: options.keepSetting, userId: OWNER });
+            }
+
+            if (options.link) {
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 0,
+                    kind: "attached",
+                    number: 7,
+                    repository: "acme/app",
+                    threadId,
+                    title: "Add the thing",
+                    url: "https://example.test/acme/app/pull/7",
+                    userId: OWNER,
+                    ...(options.state !== undefined && { state: options.state }),
+                });
+            }
+
+            return await ctx.runMutation(archiveIfStillIdle, { cutoff: CUTOFF, threadId });
+        });
+
+    it("keeps an idle chat with an open pull request when the setting is on", async () => {
+        expect(await archiveWithPullRequest({ keepSetting: true, link: true, state: "open" })).toBe(false);
+    });
+
+    it("keeps an idle chat with an open pull request when the setting was never set (on by default)", async () => {
+        expect(await archiveWithPullRequest({ link: true, state: "open" })).toBe(false);
+    });
+
+    it("archives an idle chat with an open pull request when the setting is off", async () => {
+        expect(await archiveWithPullRequest({ keepSetting: false, link: true, state: "open" })).toBe(true);
+    });
+
+    it("archives an idle chat with no pull request, with the setting on or off", async () => {
+        expect(await archiveWithPullRequest({ keepSetting: true, link: false })).toBe(true);
+        expect(await archiveWithPullRequest({ keepSetting: false, link: false })).toBe(true);
+    });
+
+    it("archives an idle chat whose pull request is closed or merged", async () => {
+        expect(await archiveWithPullRequest({ link: true, state: "closed" })).toBe(true);
+        expect(await archiveWithPullRequest({ link: true, state: "merged" })).toBe(true);
+    });
+
+    it("keeps an idle chat whose pull request state the refresh has not read yet", async () => {
+        expect(await archiveWithPullRequest({ link: true })).toBe(false);
+    });
+});
