@@ -481,7 +481,7 @@ describe("a stalled guest merge behind more active shards", () => {
                 facade.findMany = read;
                 const page = await read(...args);
 
-                await noteShardDue({ db: ctx.db }, Date.now() + MERGE_STALL_MS, "user");
+                await noteShardDue({ db: ctx.db }, Date.now() + MERGE_STALL_MS, "user", { rearmPassed: true });
 
                 return page;
             };
@@ -506,6 +506,29 @@ describe("a stalled guest merge behind more active shards", () => {
         expect(await dispatchWith(dispatchDueShards)).toStrictEqual([{ path: "lib_shard_housekeeping:runShardTick", shardKey: "user" }]);
     });
 
+    it("leaves a passed due time alone for any caller other than a merge's progress save, so it writes nothing", async () => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("shardActivity", { lastActiveAt: NOW, nextDueAt: NOW - 60_000, shardKey: "user" });
+        });
+
+        const patched = await harness.run(async (ctx: any) => {
+            const patch = ctx.db.patch.bind(ctx.db);
+            let calls = 0;
+
+            ctx.db.patch = async (...args: unknown[]) => {
+                calls += 1;
+
+                return await patch(...args);
+            };
+            await noteShardDue({ db: ctx.db }, Date.now() + MERGE_STALL_MS, "user");
+
+            return calls;
+        });
+
+        expect(patched).toBe(0);
+        expect(await dueOf("user")).toBe(NOW - 60_000);
+    });
+
     it("replaces a passed due time left armed for the dispatch with the tick's own next time, so the shard is not woken again", async () => {
         // A due time a save moved by a millisecond while the dispatch read it: still passed when the tick it sent runs.
         await harness.run(async (ctx: any) => {
@@ -528,7 +551,7 @@ describe("a stalled guest merge behind more active shards", () => {
 
         await harness.run(async (ctx: any) => {
             ctx.scheduler.runAfter = async () => {
-                await noteShardDue({ db: ctx.db }, Date.now() + MERGE_STALL_MS, "user");
+                await noteShardDue({ db: ctx.db }, Date.now() + MERGE_STALL_MS, "user", { rearmPassed: true });
 
                 return "job";
             };

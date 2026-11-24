@@ -167,10 +167,12 @@ export const noteShardActivity = async (ctx: CensusCtx, shardKey: string | undef
 /**
  * Tell the root tick that `shardKey` (default: this shard) has timed work due
  * at `dueAt`. Keeps the EARLIEST due time; {@link runShardTick} resets it.
- * A due time already passed may be in {@link dispatchDueShards}' hands, whose
- * tick can run before this caller's work is visible: it is moved by a
- * millisecond, still due, so that dispatch sees it changed and leaves it armed
- * for the next one instead of clearing it. `consumedBefore`: the shard tick's
+ * `rearmPassed` (a guest merge's progress save): a due time already passed may
+ * be in {@link dispatchDueShards}' hands, whose tick can run before this
+ * caller's work is visible, so it is moved by a millisecond, still due, and
+ * dispatch sees it changed and leaves it armed for the next one instead of
+ * clearing it. Only that caller pays the primary read and the write it takes;
+ * any other keeps a passed time as it is. `consumedBefore`: the shard tick's
  * start; a due time at or before it is one this tick has done the work of
  * (moved or not), so `dueAt` replaces it instead of the passed time staying and
  * waking the shard again for nothing.
@@ -179,14 +181,14 @@ export const noteShardDue = async (
     ctx: CensusCtx,
     dueAt: number,
     shardKey: string | undefined = currentUserShard(),
-    { consumedBefore }: { consumedBefore?: number } = {},
+    { consumedBefore, rearmPassed = false }: { consumedBefore?: number; rearmPassed?: boolean } = {},
 ): Promise<void> => {
     if (shardKey === undefined) {
         return;
     }
 
     await bestEffort("noteShardDue", async () => {
-        const row = await censusRow(ctx, shardKey, "primary");
+        const row = await censusRow(ctx, shardKey, rearmPassed || consumedBefore !== undefined ? "primary" : undefined);
         const now = Date.now();
 
         if (!row) {
@@ -197,7 +199,7 @@ export const noteShardDue = async (
 
         if (row.nextDueAt === undefined || dueAt < row.nextDueAt || (consumedBefore !== undefined && row.nextDueAt <= consumedBefore)) {
             await ctx.db.patch("shardActivity", row._id, { nextDueAt: dueAt });
-        } else if (row.nextDueAt <= now) {
+        } else if (rearmPassed && row.nextDueAt <= now) {
             await ctx.db.patch("shardActivity", row._id, { nextDueAt: row.nextDueAt < now ? row.nextDueAt + 1 : row.nextDueAt - 1 });
         }
     });

@@ -931,7 +931,7 @@ const saveMergeProgress = async (ctx: Pick<MutationCtx, "db">, from: string, to:
     // Housekeeping reads only the most recently active shards, so a merge stalled on a shard behind them would never be
     // swept. The shard's timed work is dispatched by due time instead: the tick there checks for the stall
     // (`resumeStalledGuestMergesOnTick`) and re-arms while a record is left.
-    await noteShardDue(ctx, now + MERGE_STALL_MS, to);
+    await noteShardDue(ctx, now + MERGE_STALL_MS, to, { rearmPassed: true });
 };
 
 const dropMergeProgress = async (db: MutationCtx["db"], from: string): Promise<void> => {
@@ -1091,7 +1091,7 @@ export const resumeStalledMerges = async (ctx: MutationCtx): Promise<{ dropped: 
     if (resumedInto !== undefined) {
         // Every restarted record is this shard's account's: one note of the shard covers them all.
         await noteShardActivity(ctx, resumedInto, now);
-        await noteShardDue(ctx, now + MERGE_STALL_MS, resumedInto);
+        await noteShardDue(ctx, now + MERGE_STALL_MS, resumedInto, { rearmPassed: true });
     }
 
     return { dropped, resumed, ...(nextCheckAt !== undefined && { nextCheckAt }) };
