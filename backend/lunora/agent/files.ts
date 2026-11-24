@@ -91,6 +91,29 @@ export const addFile = internalMutation
     )
     .mutation(async ({ args, ctx }) => await addFileHandler(ctx, args));
 
+/**
+ * The export's view of a file (`chatFileMetadata`), written only if it is missing. The file row and this row are two writes, so a store
+ * whose second write did not land leaves a file the export cannot see; the next store of the same bytes finds the row and completes this.
+ */
+const ensureChatFileMetadata = async (
+    context: MutationContext,
+    file: { _id: Id<"chatFiles">; filename?: string; hash: string; mediaType: string },
+): Promise<void> => {
+    const { page } = await context.db.chatFileMetadata.findMany({ where: { fileId: file._id } });
+
+    if (page.length > 0) {
+        return;
+    }
+
+    await context.db.insert("chatFileMetadata", {
+        createdAt: Date.now(),
+        fileId: file._id,
+        filename: file.filename,
+        hash: file.hash,
+        mediaType: file.mediaType,
+    });
+};
+
 export async function addFileHandler(context: MutationContext, args: InferArgs<typeof addFileFields>) {
     // Use compound index when filename is provided, otherwise use hash index
     const existingFile = await findChatFile(context, args.hash, args.filename);
@@ -99,6 +122,7 @@ export async function addFileHandler(context: MutationContext, args: InferArgs<t
         // A store that raced another for the same bytes: the row is shared, and only the messages that save it count
         // it (`changeRefcount`), as for a new row and for `useExistingFile`. Counting it here too kept it forever.
         await context.db.patch("chatFiles", existingFile._id, { lastTouchedAt: Date.now() });
+        await ensureChatFileMetadata(context, storedRow(existingFile));
         await grantFileAccess(context, existingFile._id, args.userId);
 
         return {

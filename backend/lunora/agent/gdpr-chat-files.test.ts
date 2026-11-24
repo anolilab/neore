@@ -262,6 +262,25 @@ describe("chat files in the GDPR export", () => {
         expect(files.find((file) => file.id === longHashFile)?.hash).toHaveLength(CHAT_FILE_HASH_MAX);
     });
 
+    it("completes the export's view of a file whose metadata write did not land, on the next store of the same bytes", async () => {
+        const fileId = await store(A, "retried.png", "hash-retried");
+
+        await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.chatFileMetadata.findMany({ where: { fileId } });
+
+            await Promise.all(page.map(async (row: any) => await ctx.db.delete("chatFileMetadata", row._id)));
+        });
+        const before = await exportedFor(A);
+
+        expect(before.files.map((file) => file.id)).not.toContain(fileId);
+
+        await store(A, "retried.png", "hash-retried");
+
+        const after = await exportedFor(A);
+
+        expect(after.files.map((file) => file.id)).toContain(fileId);
+    });
+
     it("reads the metadata, not the file row, so a large extracted text is not read", async () => {
         const fileId = await store(A, "documented.png", "hash-documented");
 
