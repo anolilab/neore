@@ -254,18 +254,17 @@ describe("messenger replies without tools", () => {
 
 describe("messenger replies with tools", () => {
     it("run headless on the tool model, narrowed to the picked groups, capped and charged once", async () => {
-        state.setting = { enabled: true, groups: ["webSearch", "imageGeneration"] };
+        state.setting = { enabled: true, groups: ["webSearch", "dateTime"] };
 
         await respond();
 
         expect(state.runs[0]).toMatchObject({
-            additionalTools: ["imageGeneration"],
             maxSteps: MESSENGER_TOOL_REPLY_MAX_STEPS,
             memory: false,
             model: MESSENGER_MEDIA_MODEL,
             personalization: "none",
             system: MESSENGER_TOOL_SYSTEM,
-            toolAllowlist: ["webSearch", "imageGeneration"],
+            toolAllowlist: ["webSearch", "dateTime"],
             toolAllowlistKeepsMcp: false,
             // Headless: the owner's `ask` tools are dropped by the permission layer.
             tools: "headless",
@@ -285,7 +284,7 @@ describe("messenger replies with tools", () => {
     });
 
     it("upload a generated image through the platform adapter after the text", async () => {
-        state.setting = { enabled: true, groups: ["imageGeneration"] };
+        state.setting = { enabled: true, groups: ["webSearch"] };
 
         await respond();
 
@@ -389,7 +388,7 @@ describe("reply windows", () => {
     });
 
     it("still upload within WeChat's 48h window, past WhatsApp's 24h", async () => {
-        state.setting = { enabled: true, groups: ["imageGeneration"] };
+        state.setting = { enabled: true, groups: ["webSearch"] };
 
         await respond({ inboundAt: NOW - 30 * HOUR, platform: "wechat" });
 

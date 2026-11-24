@@ -18,7 +18,6 @@ const GROUP_LABELS: Record<MessengerReplyToolGroup, MessageDescriptor> = {
     codeExecution: msg`Code execution and sandbox files`,
     connectors: msg`Your connectors and MCP tools set to "Auto"`,
     dateTime: msg`Date and time`,
-    imageGeneration: msg`Image generation`,
     knowledge: msg`Knowledge search`,
     urlFetch: msg`Open links`,
     webSearch: msg`Web search`,

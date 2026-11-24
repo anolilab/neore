@@ -85,7 +85,8 @@ export const toolPermissionKey = (source: ToolSource, toolName: string, owner?: 
 };
 
 /**
- * Built-ins that default to `ask`. `delegateToCodingAgent` spends the user's
+ * Built-ins that default to `ask`. `canvasAI` and the paid generation tools (imageGeneration, imageEditing, videoGeneration,
+ * musicGeneration) ask too: a default `auto` would run a paid call with no approval for anyone who has not set an override. `delegateToCodingAgent` spends the user's
  * own provider key on a long sandbox run and can push to their GitHub;
  * `delegateToSubAgent` and `messageWorker` start a background run charged to their task quota —
  * so the user sees the task before anything starts. `replyToReviewComment` and `rerunFailedChecks` act on a pull request
@@ -97,14 +98,19 @@ export const toolPermissionKey = (source: ToolSource, toolName: string, owner?: 
  */
 export const BUILTIN_TOOLS_ASK_BY_DEFAULT: ReadonlySet<string> = new Set([
     "askUser",
+    "canvasAI",
     "delegateToCodingAgent",
     "delegateToSubAgent",
+    "imageEditing",
+    "imageGeneration",
     "mergePullRequest",
     "messageWorker",
+    "musicGeneration",
     "replyToReviewComment",
     "requestSecret",
     "rerunFailedChecks",
     "signInWithSavedLogin",
+    "videoGeneration",
 ]);
 
 const SUB_AGENT_BUILTINS: ReadonlySet<string> = new Set(["delegateToSubAgent", "messageWorker"]);
