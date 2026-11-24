@@ -64,9 +64,9 @@ export type UIMessage<METADATA = unknown, DATA_PARTS extends UIDataTypes = UIDat
     error?: string;
     /** A host-run turn's changed files and, when kept, its patch (`acp/lib/changes.ts`); older builds ignore it. */
     hostChanges?: HostChanges;
+    key: string;
     /** The browser streamed this reply from the user's own model server (`local-browser`): the thread shows its cause and Continue. */
     localReply?: true;
-    key: string;
     /**
      * Set when memories were injected into this reply's prompt: how many, and the
      * row that records them (`memory_functions.getMessageMemoryUsage` takes its id).
