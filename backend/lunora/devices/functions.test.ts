@@ -1660,29 +1660,50 @@ describe("the new-device alert", () => {
         return page as { link?: string; title: string }[];
     };
 
-    it("tells the owner when a device is paired, and not when that device reconnects", async () => {
+    it("is sent by the separate announcement, not by the registration, and not again on a repeat or a reconnect", async () => {
         const owner = await insertUser();
         const { deviceId } = await register(owner);
+
+        expect(await alertsOf(owner)).toHaveLength(0);
+
+        await expect(as(owner).mutation(functions.announcePairedDevice as never, { deviceId } as never)).resolves.toBeNull();
 
         const alerts = await alertsOf(owner);
 
         expect(alerts).toHaveLength(1);
         expect(alerts[0]).toMatchObject({ link: "/dashboard/settings/chat/devices", title: "Laptop" });
 
+        await as(owner).mutation(functions.announcePairedDevice as never, { deviceId } as never);
         await expect(as(owner).mutation(functions.heartbeatDevice as never, { deviceId } as never)).resolves.toEqual({ paired: true });
         expect(await alertsOf(owner)).toHaveLength(1);
     });
 
-    it("tells the owner once when a machine paired by code is registered, and not again when its registration is retried", async () => {
+    it("refuses to announce another account's device", async () => {
         const owner = await insertUser();
-        const registerByCode = async () =>
-            await harness.run(
+        const stranger = await insertUser();
+        const { deviceId } = await register(owner);
+
+        await expect(as(stranger).mutation(functions.announcePairedDevice as never, { deviceId } as never)).rejects.toThrow();
+        expect(await alertsOf(owner)).toHaveLength(0);
+    });
+
+    it("is sent once for a machine paired by code, through its announcement, and a redemption retry adds none", async () => {
+        const owner = await insertUser();
+        const redeem = async () =>
+            (await harness.run(
                 async (ctx: any) =>
                     await ctx.runMutation(internals.registerHeadlessDevice, { codeId: "code-alert", name: "build-box", platform: "linux", userId: owner }),
-            );
+            )) as { deviceId: string };
+        const announce = async (deviceId: string) =>
+            await harness.run(async (ctx: any) => await ctx.runMutation(internals.announceHeadlessDevice, { deviceId, userId: owner }));
 
-        await registerByCode();
-        await registerByCode();
+        const { deviceId } = await redeem();
+
+        expect(await alertsOf(owner)).toHaveLength(0);
+
+        await announce(deviceId);
+        await redeem();
+        await announce(deviceId);
 
         expect(await alertsOf(owner)).toHaveLength(1);
     });

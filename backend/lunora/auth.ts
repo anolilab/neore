@@ -676,8 +676,23 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
                 precheck: async (userId, codeId) => {
                     await shard.call(internal.devices.internal.checkHeadlessPairing, { codeId, userId }, { shardKey: userId });
                 },
-                register: async ({ codeId, name, platform, userId }) =>
-                    await shard.call(internal.devices.internal.registerHeadlessDevice, { codeId, name, platform, userId }, { shardKey: userId }),
+                register: async ({ codeId, name, platform, userId }) => {
+                    const registered = await shard.call(
+                        internal.devices.internal.registerHeadlessDevice,
+                        { codeId, name, platform, userId },
+                        { shardKey: userId },
+                    );
+
+                    // The owner's alert comes after the secret is in hand: a failure to hand it off must not cost the machine
+                    // its secret (the code is then spent). A missed alert is logged, not retried.
+                    try {
+                        await shard.call(internal.devices.internal.announceHeadlessDevice, { deviceId: registered.deviceId, userId }, { shardKey: userId });
+                    } catch (error) {
+                        console.warn("[devices] Failed to announce a machine paired by code:", error);
+                    }
+
+                    return registered;
+                },
             },
             // Queued, not run here: moving a guest's rows takes a round trip per
             // table and page, too long to hold the sign-up request. The job runs

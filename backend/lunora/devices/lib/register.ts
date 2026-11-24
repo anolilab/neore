@@ -48,10 +48,10 @@ export const insertDevice = async (ctx: Pick<MutationCtx, "db" | "now">, device:
 };
 
 /**
- * Tells the owner that a device was just paired or signed in for the first time. Called only right after a row is
- * created (`registerDevice`, `registerHeadlessDevice`), so a routine reconnect of a known device never alerts. Keyed on
- * the device id, so a redelivered registration notifies once. Goes through `notifyQuietly`: a notification failure
- * never fails the pairing.
+ * Tells the owner that a device was just paired. Called only by the announcements that follow a confirmed pairing
+ * (`announcePairedDevice`, `announceHeadlessDevice`), never by the registration itself, so a failure to hand the alert off
+ * cannot cost the caller the device's secret. A routine reconnect of a known device never calls it. Keyed on the device id,
+ * so a repeat notifies once. Goes through `notifyQuietly`.
  */
 export const announceNewDevice = async (ctx: MutationCtx, device: { deviceId: string; name: string; userId: string }): Promise<void> => {
     await notifyQuietly(ctx, {

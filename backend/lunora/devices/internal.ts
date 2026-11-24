@@ -455,9 +455,24 @@ export const registerHeadlessDevice = internalMutation
             userId: args.userId,
         });
 
-        await announceNewDevice(ctx, { deviceId: registered.deviceId, name: args.name, userId: args.userId });
-
         ctx.log.event("devices.register_headless_device", { platform: args.platform });
 
         return registered;
+    });
+
+/**
+ * The owner's alert for a machine paired by code, sent by the redemption after `registerHeadlessDevice` has returned the
+ * secret (`auth.ts`), so a failure here can never cost the machine it. Idempotent per device, as `announcePairedDevice` is.
+ */
+export const announceHeadlessDevice = internalMutation
+    .input({ deviceId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.short) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const device = await ctx.db.devices.findFirst({ where: { _id: ctx.db.asId("devices", args.deviceId), userId: args.userId } });
+
+        if (device) {
+            await announceNewDevice(ctx, { deviceId: args.deviceId, name: device.name, userId: args.userId });
+        }
+
+        return null;
     });

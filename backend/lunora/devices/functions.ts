@@ -137,19 +137,37 @@ export const registerDevice = authMutation
             }
         }
 
-        const name = args.name.trim();
         const { deviceId, secret } = await insertDevice(ctx, {
-            name,
+            name: args.name.trim(),
             platform: args.platform,
             userId,
             ...(args.viaDeviceId !== undefined && { transport: "ssh" as const, viaDeviceId: args.viaDeviceId }),
         });
 
-        await announceNewDevice(ctx, { deviceId, name, userId });
-
         ctx.log.event("devices.register_device", { platform: args.platform, ssh: args.viaDeviceId !== undefined });
 
         return { deviceId, secret };
+    });
+
+/**
+ * Tells the owner that a device was just paired from the web. A separate call after `registerDevice` returns, not part of
+ * it: the alert is scheduled work, and a failure to hand that work off after the commit must never cost the caller the
+ * device's secret. Idempotent per device (the notification's dedupe key), so a repeat call adds nothing.
+ */
+export const announcePairedDevice = authMutation
+    .input({ deviceId: v.id("devices") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const { userId } = ctx.user;
+        const device = await ctx.db.devices.findFirst({ where: { _id: args.deviceId, userId } });
+
+        if (!device) {
+            throw new LunoraError("NOT_FOUND", "Device not found");
+        }
+
+        await announceNewDevice(ctx, { deviceId: args.deviceId as string, name: device.name, userId });
+
+        return null;
     });
 
 /** The caller's paired devices. Online state is the client's to derive from `lastSeenAt` (`DEVICE_ONLINE_WINDOW_MS`). */
