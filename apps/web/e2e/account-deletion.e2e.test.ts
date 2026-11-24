@@ -5,6 +5,9 @@ const SIGN_IN_URL_RE = /\/auth\/sign-in/;
 
 test.describe("Account deletion", () => {
     test("deleting the account signs the user out and removes their rows", async ({ user, userPage: page }) => {
+        // The deletion workflow sleeps 2 minutes (`erase-pins-grace`) before the identity rows go.
+        test.slow();
+
         const [row] = await queryBackend<{ id: string }>('SELECT id FROM "user" WHERE email = ?', user.email);
 
         expect(row?.id, "the seeded user exists before deletion").toBeTruthy();
@@ -43,7 +46,7 @@ test.describe("Account deletion", () => {
 
                     return users.length + sessions.length + accounts.length;
                 },
-                { intervals: [1000, 2000, 5000], timeout: 120_000 },
+                { intervals: [1000, 2000, 5000], timeout: 240_000 },
             )
             .toBe(0);
 
