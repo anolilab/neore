@@ -40759,3 +40759,37 @@ msgstr "Zurich"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ points"
+
+msgid "Archive"
+msgstr "Archiver"
+
+msgid "Archive this chat?"
+msgstr "Archiver ce chat ?"
+
+msgid "Archived chats stay searchable, and you can restore them from the archive."
+msgstr "Les chats archivés restent consultables, et vous pouvez les restaurer depuis les archives."
+
+msgid "Asks before a chat is archived. Off: archiving happens on the first click."
+msgstr "Demande confirmation avant d'archiver un chat. Désactivé : l'archivage se fait au premier clic."
+
+msgid "Asks before a chat is deleted. Off: deleting happens on the first click."
+msgstr "Demande confirmation avant de supprimer un chat. Désactivé : la suppression se fait au premier clic."
+
+msgid "Asks before a pinned chat is unpinned. Off: unpinning happens on the first click."
+msgstr "Demande confirmation avant de désépingler un chat. Désactivé : le désépinglage se fait au premier clic."
+
+msgid "Confirm before archiving a chat"
+msgstr "Confirmer avant d'archiver un chat"
+
+msgid "Confirm before deleting a chat"
+msgstr "Confirmer avant de supprimer un chat"
+
+msgid "Confirm before unpinning a chat"
+msgstr "Confirmer avant de désépingler un chat"
+
+msgid "The chat will no longer be pinned. You can pin it again from the list."
+msgstr "Le chat ne sera plus épinglé. Vous pouvez le réépingler depuis la liste."
+
+msgid "Unpin this chat?"
+msgstr "Désépingler ce chat ?"
+

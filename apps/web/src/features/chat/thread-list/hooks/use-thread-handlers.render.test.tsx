@@ -4,6 +4,12 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const deleteBranch = vi.fn();
+// The stored settings the hook reads; `undefined` is a user who has never saved them.
+const settings = vi.hoisted(() => {
+    return { value: undefined as Record<string, boolean> | undefined };
+});
+// Every thread mutation the hook sends, in order: the confirmation tests check what reached the server.
+const calls: { args: unknown; fn: string }[] = [];
 const deleteThreadMetadata = vi.fn();
 const removeOptimisticDeletion = vi.fn();
 const navigate = vi.fn();
@@ -39,6 +45,8 @@ vi.mock("@tanstack/react-query", () => {
         useMutation: (options: { fn: string }) => {
             return {
                 mutateAsync: async (args: { threadId?: string; threadIds?: string[] }) => {
+                    calls.push({ args, fn: options.fn });
+
                     if (options.fn === "undoDelete") {
                         undone.push(args.threadId!);
 
@@ -95,6 +103,14 @@ vi.mock("@/lib/lunora/crpc", () => {
     };
 });
 
+vi.mock("@/features/auth/hooks/use-user-settings", () => {
+    return {
+        useUserSettings: () => {
+            return { data: settings.value };
+        },
+    };
+});
+
 vi.mock("@/features/chat/core/hooks/use-thread-manager", () => {
     return {
         useThreadManager: () => {
@@ -145,6 +161,160 @@ const flush = () =>
     });
 
 const setup = () => renderHook(() => useThreadHandlers(vi.fn(), "root")).result;
+
+type Handlers = ReturnType<typeof useThreadHandlers>;
+
+// Every render's handlers, so a test reads the hook as of its latest render.
+const rendered = vi.fn<(handlers: Handlers) => void>();
+
+/** Renders the hook with its confirmation dialog, so the dialog's buttons are in the document as the person sees them. */
+const Confirmable = () => {
+    const handlers = useThreadHandlers(vi.fn(), "root");
+
+    rendered(handlers);
+
+    return <>{handlers.confirmDialog}</>;
+};
+
+const current = (): Handlers => {
+    const last = rendered.mock.lastCall;
+
+    if (last === undefined) {
+        throw new Error("the hook has not rendered");
+    }
+
+    return last[0];
+};
+
+describe("chat action confirmations", () => {
+    beforeEach(() => {
+        calls.length = 0;
+        settings.value = undefined;
+        rendered.mockClear();
+    });
+
+    it("unpins at once by default, with no dialog", async () => {
+        render(<Confirmable />);
+
+        await act(async () => {
+            current().handleUnpinThread("t1");
+            await flush();
+        });
+
+        expect(calls).toStrictEqual([{ args: { threadId: "t1" }, fn: "unpin" }]);
+        expect(screen.queryByText("Unpin this chat?")).toBeNull();
+    });
+
+    it("unpins at once when the unpin setting is saved as off", async () => {
+        settings.value = { confirmBeforeUnpinChat: false };
+        render(<Confirmable />);
+
+        await act(async () => {
+            current().handleUnpinThread("t1");
+            await flush();
+        });
+
+        expect(calls).toStrictEqual([{ args: { threadId: "t1" }, fn: "unpin" }]);
+    });
+
+    it("asks before unpinning when the setting is on, and unpins only once confirmed", async () => {
+        settings.value = { confirmBeforeUnpinChat: true };
+        render(<Confirmable />);
+
+        act(() => {
+            current().handleUnpinThread("t1");
+        });
+
+        expect(screen.getByText("Unpin this chat?")).toBeTruthy();
+        expect(calls).toHaveLength(0);
+
+        fireEvent.click(screen.getByRole("button", { name: "Unpin" }));
+        await act(flush);
+
+        expect(calls).toStrictEqual([{ args: { threadId: "t1" }, fn: "unpin" }]);
+    });
+
+    it("leaves the thread pinned when the unpin dialog is cancelled", async () => {
+        settings.value = { confirmBeforeUnpinChat: true };
+        render(<Confirmable />);
+
+        act(() => {
+            current().handleUnpinThread("t1");
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+        await act(flush);
+
+        expect(calls).toHaveLength(0);
+    });
+
+    it("archives at once by default, with no dialog", async () => {
+        render(<Confirmable />);
+
+        await act(async () => {
+            current().updateThread("t1", "model-a", "archived");
+            await flush();
+        });
+
+        expect(calls).toStrictEqual([{ args: { model: "model-a", status: "archived", threadId: "t1" }, fn: "updateThread" }]);
+        expect(screen.queryByText("Archive this chat?")).toBeNull();
+    });
+
+    it("archives at once when the archive setting is saved as off", async () => {
+        settings.value = { confirmBeforeArchiveChat: false };
+        render(<Confirmable />);
+
+        await act(async () => {
+            current().updateThread("t1", "model-a", "archived");
+            await flush();
+        });
+
+        expect(calls).toStrictEqual([{ args: { model: "model-a", status: "archived", threadId: "t1" }, fn: "updateThread" }]);
+    });
+
+    it("asks before archiving when the setting is on, and archives only once confirmed", async () => {
+        settings.value = { confirmBeforeArchiveChat: true };
+        render(<Confirmable />);
+
+        act(() => {
+            current().updateThread("t1", "model-a", "archived");
+        });
+
+        expect(screen.getByText("Archive this chat?")).toBeTruthy();
+        expect(calls).toHaveLength(0);
+
+        fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+        await act(flush);
+
+        expect(calls).toStrictEqual([{ args: { model: "model-a", status: "archived", threadId: "t1" }, fn: "updateThread" }]);
+    });
+
+    it("restores without asking even when the archive setting is on", async () => {
+        settings.value = { confirmBeforeArchiveChat: true };
+        render(<Confirmable />);
+
+        await act(async () => {
+            current().updateThread("t1", "model-a", "active");
+            await flush();
+        });
+
+        expect(calls).toStrictEqual([{ args: { model: "model-a", status: "active", threadId: "t1" }, fn: "updateThread" }]);
+        expect(screen.queryByText("Archive this chat?")).toBeNull();
+    });
+
+    it("exposes delete as confirmed by default, for its callers to ask about", () => {
+        render(<Confirmable />);
+
+        expect(current().confirmBeforeDelete).toBe(true);
+    });
+
+    it("exposes delete as not confirmed once the setting is saved as off", () => {
+        settings.value = { confirmBeforeDeleteChat: false };
+        render(<Confirmable />);
+
+        expect(current().confirmBeforeDelete).toBe(false);
+    });
+});
 
 describe("useThreadHandlers deletes", () => {
     beforeEach(() => {

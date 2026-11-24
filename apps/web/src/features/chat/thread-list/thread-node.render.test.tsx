@@ -3,7 +3,7 @@
 /** The row's hover actions are icon-only buttons; each needs an accessible name of its own. */
 // eslint-disable-next-line testing-library/no-manual-cleanup -- vitest runs without globals, so nothing else cleans up between tests
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clearComposerDrafts, saveComposerDraft } from "@/features/chat/split/composer-drafts";
 import { useSplitLayoutStore } from "@/features/chat/split/split-layout-store";
@@ -124,8 +124,28 @@ vi.mock("@/hooks/use-has-opened", () => {
     return { useHasOpened: () => false };
 });
 
+const userSettings = vi.hoisted(() => {
+    return { value: undefined as Record<string, boolean> | undefined };
+});
+
+vi.mock("@/features/auth/hooks/use-user-settings", () => {
+    return {
+        useUserSettings: () => {
+            return { data: userSettings.value };
+        },
+    };
+});
+
+// Shows its confirm button only while open, as the real dialog is shown only when a delete asks first.
 vi.mock("@/components/delete-confirmation-dialog", () => {
-    return { default: () => null };
+    return {
+        default: ({ onConfirm, open }: { onConfirm: () => void; open: boolean }) =>
+            open ? (
+                <button onClick={onConfirm} type="button">
+                    Confirm delete
+                </button>
+            ) : null,
+    };
 });
 
 vi.mock("@/features/chat/core/stores/prompt-queue-store", () => {
@@ -230,6 +250,38 @@ const baseProps = {
     toggleExpanded: () => {},
     updateThread: () => {},
 };
+
+describe("ThreadNode delete confirmation", () => {
+    beforeEach(() => {
+        userSettings.value = undefined;
+    });
+
+    it("asks first by default, and deletes only once the dialog is confirmed", () => {
+        const handleDeleteThread = vi.fn();
+
+        render(<ThreadNode {...baseProps} handleDeleteThread={handleDeleteThread} />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Delete thread: Quarterly plan" }));
+
+        expect(handleDeleteThread).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+
+        expect(handleDeleteThread).toHaveBeenCalledWith("t1");
+    });
+
+    it("deletes at once, with no dialog, when the setting is saved as off", () => {
+        userSettings.value = { confirmBeforeDeleteChat: false };
+        const handleDeleteThread = vi.fn();
+
+        render(<ThreadNode {...baseProps} handleDeleteThread={handleDeleteThread} />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Delete thread: Quarterly plan" }));
+
+        expect(handleDeleteThread).toHaveBeenCalledWith("t1");
+        expect(screen.queryByRole("button", { name: "Confirm delete" })).toBeNull();
+    });
+});
 
 describe("ThreadNode", () => {
     it("shows the linked pull request count with an accessible label, and none for a thread with no link", () => {

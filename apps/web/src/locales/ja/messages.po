@@ -40759,3 +40759,37 @@ msgstr "チューリッヒ"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ ポイント"
+
+msgid "Archive"
+msgstr "アーカイブ"
+
+msgid "Archive this chat?"
+msgstr "このチャットをアーカイブしますか？"
+
+msgid "Archived chats stay searchable, and you can restore them from the archive."
+msgstr "アーカイブしたチャットも検索でき、アーカイブから元に戻せます。"
+
+msgid "Asks before a chat is archived. Off: archiving happens on the first click."
+msgstr "チャットをアーカイブする前に確認します。オフ: 最初のクリックでアーカイブします。"
+
+msgid "Asks before a chat is deleted. Off: deleting happens on the first click."
+msgstr "チャットを削除する前に確認します。オフ: 最初のクリックで削除します。"
+
+msgid "Asks before a pinned chat is unpinned. Off: unpinning happens on the first click."
+msgstr "ピン留めされたチャットのピン留めを解除する前に確認します。オフ: 最初のクリックでピン留めを解除します。"
+
+msgid "Confirm before archiving a chat"
+msgstr "チャットをアーカイブする前に確認"
+
+msgid "Confirm before deleting a chat"
+msgstr "チャットを削除する前に確認"
+
+msgid "Confirm before unpinning a chat"
+msgstr "チャットのピン留めを解除する前に確認"
+
+msgid "The chat will no longer be pinned. You can pin it again from the list."
+msgstr "チャットのピン留めが解除されます。リストからいつでも再度ピン留めできます。"
+
+msgid "Unpin this chat?"
+msgstr "このチャットのピン留めを解除しますか？"
+

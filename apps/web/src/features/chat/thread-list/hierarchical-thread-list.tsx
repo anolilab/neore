@@ -57,6 +57,7 @@ const ProjectFormDialog = lazy(() => import("@/features/projects/components/proj
 
 // SelectionToolbar - Toolbar for bulk thread operations
 const SelectionToolbar: FC<{
+    confirmBeforeDelete: boolean;
     isAllSelected: boolean;
     onClearSelection: () => void;
     onDeleteSelected: () => void;
@@ -64,7 +65,7 @@ const SelectionToolbar: FC<{
     onSelectAll: () => void;
     onSelectByDate: (range: ThreadDateRange) => void;
     selectedCount: number;
-}> = memo(({ isAllSelected, onClearSelection, onDeleteSelected, onDone, onSelectAll, onSelectByDate, selectedCount }) => {
+}> = memo(({ confirmBeforeDelete, isAllSelected, onClearSelection, onDeleteSelected, onDone, onSelectAll, onSelectByDate, selectedCount }) => {
     const { t } = useLingui();
     // An admin acting as the owner may not delete their chats: the server refuses it.
     const isImpersonating = useImpersonating();
@@ -75,7 +76,16 @@ const SelectionToolbar: FC<{
     const dateFromId = useId();
     const dateToId = useId();
 
-    const handleDeleteClick = () => setShowDeleteDialog(true);
+    const handleDeleteClick = () => {
+        // With the setting off the selection is deleted at once; the dialog is the confirmation, not a second step.
+        if (!confirmBeforeDelete) {
+            onDeleteSelected();
+
+            return;
+        }
+
+        setShowDeleteDialog(true);
+    };
     const handleConfirmDelete = () => {
         onDeleteSelected();
         setShowDeleteDialog(false);
@@ -1086,6 +1096,7 @@ const HierarchicalThreadList: FC<
                     >
                         {isSelectionMode && (
                             <SelectionToolbar
+                                confirmBeforeDelete={threadHandlers.confirmBeforeDelete}
                                 isAllSelected={isAllSelected}
                                 onClearSelection={handleClearSelection}
                                 onDeleteSelected={handleBulkDelete}
@@ -1120,6 +1131,7 @@ const HierarchicalThreadList: FC<
                             open={!!projectToDelete}
                             title={t`Delete Project`}
                         />
+                        {threadHandlers.confirmDialog}
                         {snoozeThread && (
                             <SnoozeUntilDialog
                                 key={snoozeThread.threadId}

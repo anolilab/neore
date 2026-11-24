@@ -47,6 +47,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
 import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
+import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { DEFAULT_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import type { ThreadLockMode } from "@/features/chat/lock/thread-lock-dialog";
@@ -67,6 +68,7 @@ import { showError, showWarning } from "@/lib/toast";
 import { useIsKeyboardSelected } from "./contexts/keyboard-selection-context";
 import useCanHover from "./hooks/use-can-hover";
 import { useThreadStateActions } from "./hooks/use-thread-state-actions";
+import { chatActionConfirmations } from "./lib/chat-action-confirmations";
 import { releaseBlinkWindow } from "./lib/needs-you-blink";
 import { hasUnreadReply, isSnoozed } from "./lib/thread-state-rules";
 import MessageSearchMatches from "./message-search-matches";
@@ -241,6 +243,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     // Mounted on first open only: rendered closed in every row, the lazy dialog loaded on first paint.
     const hasOpenedMoveToProject = useHasOpened(showMoveToProjectDialog);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const { data: userSettings } = useUserSettings();
+    const confirmBeforeDelete = chatActionConfirmations(userSettings).delete;
     const [lockMode, setLockMode] = useState<ThreadLockMode | null>(null);
     // An admin acting as the owner may not lock, archive or delete: the server refuses each, as each withdraws the guest link.
     const isImpersonating = useImpersonating();
@@ -1084,7 +1088,14 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                         disabled={isDeleting}
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            setShowDeleteDialog(true);
+
+                                            if (confirmBeforeDelete) {
+                                                setShowDeleteDialog(true);
+
+                                                return;
+                                            }
+
+                                            handleDeleteThread(node.threadId);
                                         }}
                                         size="icon-sm"
                                         variant="ghost"

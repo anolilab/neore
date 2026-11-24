@@ -14,6 +14,10 @@ import GlobalCommandPalette from "./command-palette";
 
 const harness = vi.hoisted(() => {
     return {
+        askFirst: vi.fn(),
+        confirmBeforeDelete: true,
+        // Set by the delete-confirmation tests; `undefined` keeps the thread manager's delete unavailable, as before them.
+        deleteBranch: undefined as undefined | ReturnType<typeof vi.fn>,
         navigate: vi.fn(),
         scrollToMessage: vi.fn(),
         searchArgs: [] as unknown[],
@@ -173,7 +177,7 @@ vi.mock("@/features/chat/core/hooks/use-current-model", () => {
 vi.mock("@/features/chat/core/hooks/use-thread-manager", () => {
     return {
         useThreadManager: () => {
-            return { deleteBranch: undefined, switchToBranch: vi.fn() };
+            return { deleteBranch: harness.deleteBranch, switchToBranch: vi.fn() };
         },
     };
 });
@@ -185,7 +189,15 @@ vi.mock("@/features/chat/core/stores/thread-store-hooks", () => {
 vi.mock("@/features/chat/thread-list/hooks/use-thread-handlers", () => {
     return {
         default: () => {
-            return { handleCreateBranch: vi.fn(), handlePinThread: vi.fn(), handleUnpinThread: vi.fn(), updateThread: vi.fn() };
+            return {
+                askFirst: harness.askFirst,
+                confirmBeforeDelete: harness.confirmBeforeDelete,
+                confirmDialog: null,
+                handleCreateBranch: vi.fn(),
+                handlePinThread: vi.fn(),
+                handleUnpinThread: vi.fn(),
+                updateThread: vi.fn(),
+            };
         },
     };
 });
@@ -372,6 +384,56 @@ describe("command palette message search", () => {
         await waitFor(() => expect(harness.navigate).toHaveBeenCalledTimes(1));
         expect(harness.navigate).toHaveBeenCalledWith({ hash: "message-message-9", params: { threadId: "thread-2" }, search: {}, to: "/chat/$threadId" });
         expect(harness.scrollToMessage).toHaveBeenCalledWith("message-9", { position: { order: 3, stepOrder: 0 }, threadId: "thread-2" });
+    });
+});
+
+describe("command palette thread delete confirmation", () => {
+    beforeEach(() => {
+        Element.prototype.getAnimations = () => [];
+        stubResizeObserver();
+        harness.askFirst.mockReset();
+        harness.confirmBeforeDelete = true;
+        harness.deleteBranch = vi.fn(async () => {
+            return { deletedIds: [], threadDeleted: true };
+        });
+    });
+
+    afterEach(() => {
+        act(() => {
+            useCommandDialogStore.getState().close();
+        });
+        harness.deleteBranch = undefined;
+    });
+
+    it("asks before deleting a thread from its row, and deletes it only once confirmed", async () => {
+        renderPalette();
+        await openPalette();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Delete thread" }));
+
+        expect(harness.deleteBranch).not.toHaveBeenCalled();
+        expect(harness.askFirst).toHaveBeenCalledTimes(1);
+
+        const request = harness.askFirst.mock.calls[0]?.[0] as { run: () => void; title: string };
+
+        expect(request.title).toBe("Delete thread?");
+
+        await act(async () => {
+            request.run();
+        });
+
+        expect(harness.deleteBranch).toHaveBeenCalledWith("thread-1");
+    });
+
+    it("deletes a thread from its row at once, with no confirmation, when the setting is saved as off", async () => {
+        harness.confirmBeforeDelete = false;
+        renderPalette();
+        await openPalette();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Delete thread" }));
+
+        expect(harness.askFirst).not.toHaveBeenCalled();
+        expect(harness.deleteBranch).toHaveBeenCalledWith("thread-1");
     });
 });
 

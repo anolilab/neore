@@ -40759,3 +40759,37 @@ msgstr "Zürich"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ Punkte"
+
+msgid "Archive"
+msgstr "Archivieren"
+
+msgid "Archive this chat?"
+msgstr "Diesen Chat archivieren?"
+
+msgid "Archived chats stay searchable, and you can restore them from the archive."
+msgstr "Archivierte Chats bleiben durchsuchbar. Du kannst sie im Archiv wiederherstellen."
+
+msgid "Asks before a chat is archived. Off: archiving happens on the first click."
+msgstr "Fragt, bevor ein Chat archiviert wird. Aus: Archivieren passiert beim ersten Klick."
+
+msgid "Asks before a chat is deleted. Off: deleting happens on the first click."
+msgstr "Fragt, bevor ein Chat gelöscht wird. Aus: Löschen passiert beim ersten Klick."
+
+msgid "Asks before a pinned chat is unpinned. Off: unpinning happens on the first click."
+msgstr "Fragt, bevor ein angehefteter Chat nicht mehr angeheftet wird. Aus: Das passiert beim ersten Klick."
+
+msgid "Confirm before archiving a chat"
+msgstr "Vor dem Archivieren eines Chats bestätigen"
+
+msgid "Confirm before deleting a chat"
+msgstr "Vor dem Löschen eines Chats bestätigen"
+
+msgid "Confirm before unpinning a chat"
+msgstr "Vor dem Nicht-mehr-Anheften eines Chats bestätigen"
+
+msgid "The chat will no longer be pinned. You can pin it again from the list."
+msgstr "Der Chat ist nicht mehr angeheftet. Du kannst ihn in der Liste wieder anheften."
+
+msgid "Unpin this chat?"
+msgstr "Diesen Chat nicht mehr anheften?"
+

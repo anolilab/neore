@@ -3,10 +3,12 @@ import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Doc, Id } from "@neore/backend/dataModel";
 import { shardOptionsFor } from "@neore/client-runtime";
+import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
+import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useThreadManager } from "@/features/chat/core/hooks/use-thread-manager";
 import { useOptimisticActions, useThreadActions } from "@/features/chat/core/stores/thread-store-hooks";
 import { routeIsOn, survivingPaneAfterDelete } from "@/features/chat/split/split-layout-store";
@@ -16,7 +18,16 @@ import { ValidationError } from "@/lib/errors";
 import { useCRPC, useLunora, useLunoraActionOptions } from "@/lib/lunora/crpc";
 import { showError, showSuccess } from "@/lib/toast";
 
+import { chatActionConfirmations } from "../lib/chat-action-confirmations";
 import type { BranchNode, LoadingStates } from "../types";
+
+/** What a confirmation asks, and the action it runs only on confirm. */
+interface ConfirmationRequest {
+    confirmLabel: string;
+    description: string;
+    run: () => void;
+    title: string;
+}
 
 const updateLoadingState = <K extends keyof LoadingStates>(previous: LoadingStates, key: K, threadId: string, isAdding: boolean): LoadingStates => {
     const currentSet = previous[key] as Set<string>;
@@ -38,6 +49,16 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
     const { deleteThreadMetadata } = useThreadActions();
     const { clearOptimisticPin, clearOptimisticStatus, removeOptimisticDeletion, setOptimisticPin, setOptimisticStatus } = useOptimisticActions();
     const crpc = useCRPC();
+    const { data: userSettings } = useUserSettings();
+    const confirmations = chatActionConfirmations(userSettings);
+    // One confirmation at a time: the request the dialog shows, and whether it is open.
+    const [pendingRequest, setPendingRequest] = useState<ConfirmationRequest | undefined>(undefined);
+    const [dialogOpen, setDialogOpen] = useState(false);
+
+    const askFirst = useCallback((request: ConfirmationRequest) => {
+        setPendingRequest(request);
+        setDialogOpen(true);
+    }, []);
 
     const lunora = useLunora();
     const { mutateAsync: pinThreadMutation } = useMutation(crpc.chat.functions.pinThread.mutationOptions());
@@ -216,7 +237,7 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
         [pinThreadMutation, setOptimisticPin, clearOptimisticPin, t],
     );
 
-    const handleUnpinThread = useCallback(
+    const unpinNow = useCallback(
         async (threadId: string) => {
             // Optimistic update - show unpinned immediately
             setOptimisticPin(threadId, false);
@@ -244,7 +265,27 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
         [unpinThreadMutation, handleUndoUnpinThread, setOptimisticPin, clearOptimisticPin, t],
     );
 
-    const updateThread = useCallback(
+    const handleUnpinThread = useCallback(
+        (threadId: string) => {
+            if (!confirmations.unpin) {
+                void unpinNow(threadId);
+
+                return;
+            }
+
+            askFirst({
+                confirmLabel: t`Unpin`,
+                description: t`The chat will no longer be pinned. You can pin it again from the list.`,
+                run: () => {
+                    void unpinNow(threadId);
+                },
+                title: t`Unpin this chat?`,
+            });
+        },
+        [askFirst, confirmations.unpin, t, unpinNow],
+    );
+
+    const applyThreadStatus = useCallback(
         async (threadId: string, model: string, status: "archived" | "active") => {
             // Optimistic update - show new status immediately
             const previousStatus = status === "archived" ? "active" : "archived";
@@ -279,6 +320,27 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
                 });
         },
         [updateThreadAction, handleUndoArchiveThread, setOptimisticStatus, clearOptimisticStatus, t],
+    );
+
+    // Restoring runs at once; only archiving asks, when the setting is on.
+    const updateThread = useCallback(
+        (threadId: string, model: string, status: "archived" | "active") => {
+            if (status !== "archived" || !confirmations.archive) {
+                void applyThreadStatus(threadId, model, status);
+
+                return;
+            }
+
+            askFirst({
+                confirmLabel: t`Archive`,
+                description: t`Archived chats stay searchable, and you can restore them from the archive.`,
+                run: () => {
+                    void applyThreadStatus(threadId, model, status);
+                },
+                title: t`Archive this chat?`,
+            });
+        },
+        [applyThreadStatus, askFirst, confirmations.archive, t],
     );
 
     const handleBulkDeleteThreads = useCallback(
@@ -332,7 +394,26 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
         [deleteThreadsMutation, deleteThreadMetadata, t, currentThreadId, navigate, lunora],
     );
 
+    // Rendered by the caller, once, so the dialog survives the menu that opened it.
+    const confirmDialog = (
+        <ConfirmDialog
+            confirmLabel={pendingRequest?.confirmLabel}
+            description={pendingRequest?.description}
+            onConfirm={() => {
+                setDialogOpen(false);
+                pendingRequest?.run();
+            }}
+            onOpenChange={setDialogOpen}
+            open={dialogOpen}
+            title={pendingRequest?.title ?? ""}
+        />
+    );
+
     return {
+        // Delete is not gated here: each caller asks in its own dialog, so a gate here would ask twice.
+        askFirst,
+        confirmBeforeDelete: confirmations.delete,
+        confirmDialog,
         handleBulkDeleteThreads,
         handleCreateBranch,
         handleDeleteThread,
