@@ -111,7 +111,13 @@ describe(createReplyGuard, () => {
     it("still stops a loop whose repeats are separated by one blank line", () => {
         expect.assertions(1);
 
-        expect(feedContent(createReplyGuard(), "Let me try that again.\n\n".repeat(LOCAL_REPEAT_LIMIT))).toBe("repeat-loop");
+        expect(feedContent(createReplyGuard(), "Let me try that again.\n\n".repeat(LOCAL_LINE_REPEAT_LIMIT))).toBe("repeat-loop");
+    });
+
+    it("does not stop a requested list of one line with blank lines between the items", () => {
+        expect.assertions(1);
+
+        expect(feedContent(createReplyGuard(), "I will not talk in class.\n\n".repeat(10))).toBeUndefined();
     });
 
     it("does not treat nested lines that differ only in indentation as a repeat", () => {

@@ -35,7 +35,7 @@ const HIGH_SURROGATE = /^[\uD800-\uDBFF]$/u;
 export const dropTrailingHighSurrogate = (text: string): string => (HIGH_SURROGATE.test(text.charAt(text.length - 1)) ? text.slice(0, -1) : text);
 
 /** The completed lines the repeat check can still see: enough for the longest block, and a line, repeated the limit's times. */
-const WINDOW_LINES = Math.max(LOCAL_LINE_REPEAT_LIMIT, LOCAL_REPEAT_LIMIT * LOCAL_REPEAT_MAX_BLOCK_LINES);
+const WINDOW_LINES = LOCAL_LINE_REPEAT_LIMIT * LOCAL_REPEAT_MAX_BLOCK_LINES;
 
 /** The shortest run of lines that the block repeats: the block itself when no shorter run does. */
 const shortestMotif = (block: ReadonlyArray<string>): ReadonlyArray<string> => {
@@ -48,19 +48,18 @@ const shortestMotif = (block: ReadonlyArray<string>): ReadonlyArray<string> => {
     return block;
 };
 
-/** Whether the last `size` lines are one block repeated `limit` times in a row. */
-const repeatsAtTail = (lines: ReadonlyArray<string>, size: number, limit: number): boolean => {
-    const span = size * limit;
+/** How many copies end a loop: one line, with blank lines between its copies, needs the line limit; any other block the block limit. */
+const copiesNeeded = (motif: ReadonlyArray<string>): number =>
+    new Set(motif.map((line) => line.trim()).filter((line) => line !== "")).size === 1 ? LOCAL_LINE_REPEAT_LIMIT : LOCAL_REPEAT_LIMIT;
 
-    if (lines.length < span) {
+/** Whether the last `size` lines are one block repeated enough times in a row to be a loop. */
+const repeatsAtTail = (lines: ReadonlyArray<string>, size: number): boolean => {
+    if (lines.length < size) {
         return false;
     }
 
-    const start = lines.length - span;
-    const block = lines.slice(start, start + size);
-
-    // A block made of a shorter repeating run is that run repeated: it is judged at the run's own size and limit, so one line
-    // is not also a two-line block that stops it at twelve copies.
+    // The most recent copy. A block made of a shorter repeating run is that run repeated: it is judged at the run's own size.
+    const block = lines.slice(lines.length - size);
     const motif = shortestMotif(block);
 
     if (motif.length < size) {
@@ -74,7 +73,16 @@ const repeatsAtTail = (lines: ReadonlyArray<string>, size: number, limit: number
         return false;
     }
 
-    for (let copy = 1; copy < limit; copy += 1) {
+    const limit = copiesNeeded(motif);
+    const span = size * limit;
+
+    if (lines.length < span) {
+        return false;
+    }
+
+    const start = lines.length - span;
+
+    for (let copy = 0; copy < limit; copy += 1) {
         for (let index = 0; index < size; index += 1) {
             if (lines[start + copy * size + index] !== block[index]) {
                 return false;
@@ -121,7 +129,7 @@ export const createReplyGuard = (): ReplyGuard => {
         }
 
         for (let size = 1; size <= LOCAL_REPEAT_MAX_BLOCK_LINES; size += 1) {
-            if (repeatsAtTail(lines, size, size === 1 ? LOCAL_LINE_REPEAT_LIMIT : LOCAL_REPEAT_LIMIT)) {
+            if (repeatsAtTail(lines, size)) {
                 return true;
             }
         }
