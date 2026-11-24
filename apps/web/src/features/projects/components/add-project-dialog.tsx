@@ -381,7 +381,8 @@ const AddProjectContent = ({ onAddingChange, onClose, onCreateNew, pairedHosts, 
 
         pairedHosts.add(sshAlias);
         // Confirmed on this computer: the owner is told now (`announcePairedDevice`), never for a pairing that was cancelled.
-        await attempt(() => announcePairedDevice({ deviceId: deviceId as Id<"devices"> }));
+        // Not awaited: an offline pause must not hold the connection, and the server's sweep announces it anyway if this is lost.
+        void attempt(() => announcePairedDevice({ deviceId: deviceId as Id<"devices"> }));
 
         return attempt(() => bridge.connectAddProjectMachine(sshAlias));
     };

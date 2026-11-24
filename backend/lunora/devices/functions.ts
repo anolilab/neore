@@ -138,6 +138,7 @@ export const registerDevice = authMutation
         }
 
         const { deviceId, secret } = await insertDevice(ctx, {
+            alertPending: true,
             name: args.name.trim(),
             platform: args.platform,
             userId,
@@ -165,7 +166,7 @@ export const announcePairedDevice = authMutation
             throw new LunoraError("NOT_FOUND", "Device not found");
         }
 
-        await announceNewDevice(ctx, { deviceId: args.deviceId as string, name: device.name, userId });
+        await announceNewDevice(ctx, device);
 
         return null;
     });

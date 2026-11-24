@@ -12,7 +12,7 @@ import { setShardRoute } from "../../lib/shard-routes";
 import { DEVICE_LIMIT_CODE, MAX_DEVICES_PER_USER } from "./constants";
 import { generateDeviceSecret } from "./signing";
 
-type NewDevice = Partial<Pick<Doc<"devices">, "pairedByCode" | "projectIds" | "transport" | "viaDeviceId">> &
+type NewDevice = Partial<Pick<Doc<"devices">, "alertPending" | "pairedByCode" | "projectIds" | "transport" | "viaDeviceId">> &
     Pick<Doc<"devices">, "name" | "platform" | "userId">;
 
 /** Refuses when the account already holds as many devices as it may. */
@@ -39,6 +39,7 @@ export const insertDevice = async (ctx: Pick<MutationCtx, "db" | "now">, device:
         ...(device.transport !== undefined && { transport: device.transport }),
         ...(device.projectIds !== undefined && { projectIds: device.projectIds }),
         ...(device.viaDeviceId !== undefined && { viaDeviceId: device.viaDeviceId }),
+        ...(device.alertPending === true && { alertPending: true }),
     });
 
     // The host ingest has no session: it finds this device's owner, hence its shard, from this row.
@@ -48,14 +49,19 @@ export const insertDevice = async (ctx: Pick<MutationCtx, "db" | "now">, device:
 };
 
 /**
- * Tells the owner that a device was just paired. Called only by the announcements that follow a confirmed pairing
- * (`announcePairedDevice`, `announceHeadlessDevice`), never by the registration itself, so a failure to hand the alert off
- * cannot cost the caller the device's secret. A routine reconnect of a known device never calls it. Keyed on the device id,
- * so a repeat notifies once. Goes through `notifyQuietly`.
+ * Writes the owner's alert for a device that was just paired, once. `alertPending` is set when the row is created and
+ * cleared here, in the same transaction as the alert, so a repeat call or the housekeeping sweep finds nothing left to do.
+ * The registration never calls this: the callers that do run after the secret is returned, so a failure to hand the alert
+ * off cannot cost the caller the device. Goes through `notifyQuietly`.
  */
-export const announceNewDevice = async (ctx: MutationCtx, device: { deviceId: string; name: string; userId: string }): Promise<void> => {
+export const announceNewDevice = async (ctx: MutationCtx, device: Doc<"devices">): Promise<void> => {
+    if (device.alertPending !== true) {
+        return;
+    }
+
+    await ctx.db.patch("devices", device._id, { alertPending: false });
     await notifyQuietly(ctx, {
-        dedupeKey: `device-paired:${device.deviceId}`,
+        dedupeKey: `device-paired:${device._id as string}`,
         link: "/dashboard/settings/chat/devices",
         title: device.name,
         type: "device_paired",

@@ -518,7 +518,7 @@ const AddServer: FC<{ desktopId: string; onAdded: () => void }> = ({ desktopId, 
             }
 
             // Confirmed on this computer: the owner is told now (`announcePairedDevice`), never for a pairing that was cancelled.
-            await announcePaired.mutateAsync({ deviceId: deviceId as Id<"devices"> }).catch(() => undefined);
+            void announcePaired.mutateAsync({ deviceId: deviceId as Id<"devices"> }).catch(() => undefined);
             form.reset();
             onAdded();
             toast.success(t`Server added. Choose which of its folders to share in the desktop app.`);
@@ -625,7 +625,7 @@ const DevicesSettings: FC = () => {
             }
 
             // Confirmed on this computer: the owner is told now (`announcePairedDevice`), never for a pairing that was cancelled.
-            await announcePaired.mutateAsync({ deviceId: deviceId as Id<"devices"> }).catch(() => undefined);
+            void announcePaired.mutateAsync({ deviceId: deviceId as Id<"devices"> }).catch(() => undefined);
             globalThis.dispatchEvent(new Event(DEVICE_PAIRED_EVENT));
             setNative(await getNativeDeviceStatus());
             toast.success(t`This computer is paired. Choose which folders to share in the desktop app.`);

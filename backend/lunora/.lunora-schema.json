@@ -6985,6 +6985,12 @@
             }
           }
         },
+        "alertPending": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "appVersion": {
           "kind": "string",
           "nullable": false,
@@ -7185,6 +7191,12 @@
         }
       },
       "indexes": {
+        "by_alertPending": {
+          "fields": [
+            "alertPending"
+          ],
+          "unique": false
+        },
         "by_userId": {
           "fields": [
             "userId"

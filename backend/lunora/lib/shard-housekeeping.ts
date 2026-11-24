@@ -95,6 +95,8 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "pruneOldNotifications", ref: internal.notifications.functions.pruneOldNotifications },
     { name: "dispatchOutcomeEmails", ref: internal.notifications.task_email.dispatchOutcomeEmails },
     { name: "sweepDeviceCalls", ref: internal.devices.internal.sweepDeviceCalls },
+    // A pairing whose owner was never told (`devices/internal.ts`): the alert does not depend on the caller staying around.
+    { name: "sweepPendingDeviceAlerts", ref: internal.devices.internal.sweepPendingDeviceAlerts },
     { name: "sweepKnowledgeFiles", ref: internal.knowledge.housekeeping.sweepKnowledgeFiles },
     { name: "pruneRetainedActivity", ref: internal.gdpr.retention.pruneRetainedActivity },
     // An export whose workflow died leaves its pieces and usage object on the shard; past their time to live, the sweep removes them.

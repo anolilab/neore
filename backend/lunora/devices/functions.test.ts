@@ -1708,3 +1708,36 @@ describe("the new-device alert", () => {
         expect(await alertsOf(owner)).toHaveLength(1);
     });
 });
+
+describe("the pending device alert sweep", () => {
+    const alertsOf = async (userId: string) => {
+        const { page } = await harness.run(async (ctx: any) => await ctx.db.notifications.findMany({ where: { type: "device_paired", userId } }));
+
+        return page as { title: string }[];
+    };
+    const sweep = async () => await harness.run(async (ctx: any) => await ctx.runMutation(internals.sweepPendingDeviceAlerts, {}));
+
+    it("tells the owner of a pairing whose announcing call never came, and only once", async () => {
+        const owner = await insertUser();
+        const { deviceId } = await register(owner);
+
+        expect(await alertsOf(owner)).toHaveLength(0);
+
+        await sweep();
+        expect(await alertsOf(owner)).toHaveLength(1);
+
+        await sweep();
+        await as(owner).mutation(functions.announcePairedDevice as never, { deviceId } as never);
+        expect(await alertsOf(owner)).toHaveLength(1);
+    });
+
+    it("leaves a device the owner was already told about alone", async () => {
+        const owner = await insertUser();
+        const { deviceId } = await register(owner);
+
+        await as(owner).mutation(functions.announcePairedDevice as never, { deviceId } as never);
+        await sweep();
+
+        expect(await alertsOf(owner)).toHaveLength(1);
+    });
+});

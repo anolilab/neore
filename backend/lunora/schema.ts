@@ -974,6 +974,9 @@ export const schema = defineSchema({
         // The (agent, folder) pairs the user approved for coding agents, from the signed manifest
         // (`updateDeviceManifest`); unset until a shell that knows coding agents has sent one.
         acpOffers: v.optional(v.array(vAcpOffer)),
+        // Set by the registration that creates the row, cleared once its owner alert is written (`devices/lib/register.ts`).
+        // The housekeeping sweep announces any still set, so an alert never depends on the caller staying around to make it.
+        alertPending: v.optional(v.boolean()),
         // The desktop app's version, as the page relayed it beside the last manifest. Unsigned and display-only.
         appVersion: v.optional(v.string()),
         createdAt: v.number(),
@@ -997,7 +1000,8 @@ export const schema = defineSchema({
         viaDeviceId: v.optional(v.id("devices")),
     })
         .shardBy("userId")
-        .index("by_userId", ["userId"]),
+        .index("by_userId", ["userId"])
+        .index("by_alertPending", ["alertPending"]),
 
     // Ported 1:1 from the audit-history component schema. Read by
     // GDPR (`listUserActivity`, `getDocumentAtTime`) and the canvas version
