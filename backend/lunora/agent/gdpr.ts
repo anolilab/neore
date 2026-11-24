@@ -289,6 +289,9 @@ export const repairChatFileMetadataForExport = internalMutation
 
             // The whole row is read, as the metadata query's reads are counted: the export meters these against its budget.
             readBytes += rowBytes(file);
+            // Touched, as a store of the bytes is: the unused-file reaper leaves a file touched in the last day alone, so a file
+            // exported now is not reaped between this read and the metadata write (a reap that lands first would leave the metadata).
+            await ctx.db.patch("chatFiles", file._id, { lastTouchedAt: ctx.now });
             readBytes += await ensureChatFileMetadata(ctx, file);
             rows.push(
                 chatFileExportRow({ createdAt: file._creationTime, fileId: file._id, filename: file.filename, hash: file.hash, mediaType: file.mediaType }),
