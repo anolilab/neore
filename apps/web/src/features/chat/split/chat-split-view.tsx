@@ -179,9 +179,8 @@ const Pane: FC<PaneProps> = ({
             return undefined;
         }
 
-        clearComposerFocusRequest();
-
-        return focusComposerWhenMounted(paneRef, () => undefined);
+        // Cleared only once the composer has taken focus: clearing it earlier would re-run this effect and cancel the focus loop.
+        return focusComposerWhenMounted(paneRef, clearComposerFocusRequest);
     }, [composerRequested, isFocused]);
 
     const activate = () => {
