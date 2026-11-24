@@ -51,6 +51,12 @@ const matches = (event: StoredEvent, query: PollQuery): boolean =>
     event.name === query.name && (query.threadId === undefined || event.data["threadId"] === query.threadId);
 
 export const pollEvents = async (store: EventLogStore, query: PollQuery): Promise<PollOutcome> => {
+    // A poll allowed to return nothing could stop before it moves the cursor, and the client would ask again from the same place.
+    // The MCP boundary already refuses this; the core refuses it too, so it cannot be reached another way.
+    if (!Number.isSafeInteger(query.maxEvents) || query.maxEvents < 1) {
+        throw new RangeError("maxEvents must be an integer of at least 1");
+    }
+
     if (query.fromSeq === null) {
         // "Start from now": nothing is replayed, and the cursor is the log's current end.
         return { events: [], hasMore: false, nextSeq: await store.latestSeq(), truncated: false };

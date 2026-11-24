@@ -125,6 +125,12 @@ describe("events/poll over a log", () => {
         expect(outcome.events.map((event) => event.eventId)).toStrictEqual(["run:5", "run:6", "run:7"]);
     });
 
+    it("refuses a poll that may return no events, since its cursor could never move past the first match", async () => {
+        const log = logOf([run(1, 100)]);
+
+        await expect(pollEvents(log, { fromSeq: 0, maxEvents: 0, name: RUN_COMPLETED_EVENT, now: NOW })).rejects.toThrow("at least 1");
+    });
+
     it("caps a batch at maxEvents, keeps the cursor before the first event not sent, and says hasMore", async () => {
         const log = logOf([run(1, 100), run(2, 200), run(3, 300), run(4, 400), run(5, 500)]);
 
