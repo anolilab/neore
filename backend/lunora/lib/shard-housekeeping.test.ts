@@ -1,17 +1,25 @@
 import { lunoraTest } from "@lunora/testing";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
 import { RATE_LIMIT_RETENTION_MS, RATE_LIMIT_SWEEP_PAGE, sweepDormantShardRateLimits, sweepExpiredRateLimits } from "./rate-limit-sweep";
 import { createRatelimit, getRateLimitKey } from "./rate-limiter";
+import { internalMutation } from "../_generated/server";
+import { v } from "lunorash/server";
 import { runInShard } from "./shard-context";
+import { MERGE_STALL_MS, recordGuestMerge } from "./account-merge";
 import {
     dispatchDormantRateLimitSweeps,
+    dispatchDueShards,
+    dispatchShardHousekeeping,
     DISPATCH_BATCH,
     HOUSEKEEPING_HORIZON_MS,
     HOUSEKEEPING_IDLE_INTERVAL_MS,
     markRateLimitsPending,
     needsHousekeeping,
+    noteShardDue,
+    runShardTick,
     settleRateLimitsPending,
 } from "./shard-housekeeping";
 
@@ -26,6 +34,26 @@ vi.mock(
             },
         }) as never,
 );
+
+// The `user` table is `.global()`, which this harness does not hold: a merge's new account counts as present.
+vi.mock(import("../auth/lib/merge-destination"), () => ({ isMergeDestination: async () => true, isMergeSource: async () => true }) as never);
+
+// The shard tick's own steps run as registered procedures; the dispatch targets stay plain references, so their paths show.
+const registry = vi.hoisted(() => new Map<string, unknown>());
+
+vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
+
+beforeAll(async () => {
+    registerModule(registry, "source_control_freshness_internal", await import("../source-control/freshness-internal"));
+    registerModule(registry, "triggers_schedule", await import("../triggers/schedule"));
+    registerModule(registry, "triggers_functions", await import("../triggers/functions"));
+    registerModule(registry, "triggers_events", await import("../triggers/events"));
+    registerModule(registry, "acp_ingest", await import("../acp/ingest"));
+    registerModule(registry, "usage_gdpr", await import("../usage/gdpr"));
+    const { resumeStalledGuestMergesOnTick } = await import("./account-merge");
+
+    registry.set("lib_account_merge:resumeStalledGuestMergesOnTick", resumeStalledGuestMergesOnTick);
+});
 
 const NOW = 10_000_000_000;
 
@@ -362,5 +390,247 @@ describe("the dormant-shard rate-limit sweep", () => {
                 path: "lib_shard_housekeeping:markRateLimitsPending",
             },
         ]);
+    });
+});
+
+describe("a stalled guest merge behind more active shards", () => {
+    let harness: ReturnType<typeof lunoraTest>;
+
+    beforeEach(() => {
+        vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+        harness = lunoraTest(schema as never);
+        enqueued.length = 0;
+    });
+
+    afterEach(() => {
+        harness.close();
+        vi.useRealTimers();
+    });
+
+    /** What a root dispatch schedules, by shard. */
+    const dispatchWith = async (reference: unknown): Promise<{ path: string; shardKey?: string }[]> =>
+        await harness.run(async (ctx: any) => {
+            const scheduled: { path: string; shardKey?: string }[] = [];
+
+            ctx.scheduler.runAfter = async (_delay: number, target: { __lunoraRef: string }, _args: unknown, options?: { shardKey?: string }) => {
+                scheduled.push({ path: target.__lunoraRef, shardKey: options?.shardKey });
+
+                return "job";
+            };
+
+            await ctx.runMutation(reference, {});
+
+            return scheduled;
+        });
+
+    const dueOf = async (shardKey: string): Promise<number | undefined> =>
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.shardActivity.findFirst({ where: { shardKey } });
+
+            return row?.nextDueAt ?? undefined;
+        });
+
+    it("is reached by the minute tick, which the housekeeping dispatch's most-recent page never gets to", async () => {
+        // The merge is handed over on the new account's shard: its progress record arms the shard's timed work.
+        await runInShard("user", async () => await harness.run(async (ctx: any) => await ctx.runMutation(recordGuestMerge, { from: "guest", to: "user" })));
+
+        expect(await dueOf("user")).toBe(NOW + MERGE_STALL_MS);
+
+        // Its job dies; over the next hour more than a housekeeping page of shards turn active, each swept since.
+        vi.setSystemTime(NOW + MERGE_STALL_MS + 60_000);
+        await harness.run(async (ctx: any) => {
+            const user = await ctx.db.shardActivity.findFirst({ where: { shardKey: "user" } });
+
+            await ctx.db.patch("shardActivity", user._id, { housekeptAt: NOW });
+
+            for (let index = 0; index < DISPATCH_BATCH * 5 + 1; index += 1) {
+                await ctx.db.insert("shardActivity", { housekeptAt: Date.now(), lastActiveAt: Date.now() - 1000 - index, shardKey: `newer-${index}` });
+            }
+        });
+        vi.setSystemTime(NOW + HOUSEKEEPING_IDLE_INTERVAL_MS);
+
+        // Housekeeping reads the most recently active page only: the merge's shard is behind it.
+        const housekept = await dispatchWith(dispatchShardHousekeeping);
+
+        expect(housekept.map((job) => job.shardKey)).not.toContain("user");
+
+        // The minute dispatch reads by due time and reaches it.
+        expect(await dispatchWith(dispatchDueShards)).toContainEqual({ path: "lib_shard_housekeeping:runShardTick", shardKey: "user" });
+
+        // There the tick restarts the merge and arms the shard again for the restarted job's stall.
+        await runInShard("user", async () => await harness.run(async (ctx: any) => await ctx.runMutation(runShardTick, {})));
+
+        expect(enqueued.filter((job) => job.path.endsWith("runGuestMerge"))).toStrictEqual([
+            { args: { from: "guest", to: "user" }, options: { shardKey: "user" }, path: "lib_account_merge:runGuestMerge" },
+        ]);
+        expect(await dueOf("user")).toBe(Date.now() + MERGE_STALL_MS);
+    });
+
+    it("leaves a due time saved between the dispatch's read and its clear armed, so the merge it records is still checked", async () => {
+        const due = NOW - 60_000;
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("shardActivity", { lastActiveAt: NOW, nextDueAt: due, shardKey: "user" });
+        });
+
+        // A merge's progress is saved on the shard right after the dispatch read the census row, before it clears it.
+        const scheduled = await harness.run(async (ctx: any) => {
+            const facade = ctx.db.shardActivity;
+            const read = facade.findMany;
+            const sent: { path: string; shardKey?: string }[] = [];
+
+            facade.findMany = async (...args: unknown[]) => {
+                facade.findMany = read;
+                const page = await read(...args);
+
+                await noteShardDue({ db: ctx.db }, Date.now() + MERGE_STALL_MS, "user", { rearmPassed: true });
+
+                return page;
+            };
+            ctx.scheduler.runAfter = async (_delay: number, target: { __lunoraRef: string }, _args: unknown, options?: { shardKey?: string }) => {
+                sent.push({ path: target.__lunoraRef, shardKey: options?.shardKey });
+
+                return "job";
+            };
+
+            try {
+                await ctx.runMutation(dispatchDueShards, {});
+            } finally {
+                facade.findMany = read;
+            }
+
+            return sent;
+        });
+
+        expect(scheduled).toStrictEqual([{ path: "lib_shard_housekeeping:runShardTick", shardKey: "user" }]);
+        // Still due, so the next dispatch sends the tick again, by when the saved progress is there to see.
+        expect(await dueOf("user")).toBeLessThanOrEqual(NOW);
+        expect(await dispatchWith(dispatchDueShards)).toStrictEqual([{ path: "lib_shard_housekeeping:runShardTick", shardKey: "user" }]);
+    });
+
+    it("leaves a passed due time alone for any caller other than a merge's progress save, so it writes nothing", async () => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("shardActivity", { lastActiveAt: NOW, nextDueAt: NOW - 60_000, shardKey: "user" });
+        });
+
+        const patched = await harness.run(async (ctx: any) => {
+            const patch = ctx.db.patch.bind(ctx.db);
+            let calls = 0;
+
+            ctx.db.patch = async (...args: unknown[]) => {
+                calls += 1;
+
+                return await patch(...args);
+            };
+            await noteShardDue({ db: ctx.db }, Date.now() + MERGE_STALL_MS, "user");
+
+            return calls;
+        });
+
+        expect(patched).toBe(0);
+        expect(await dueOf("user")).toBe(NOW - 60_000);
+    });
+
+    it("replaces a passed due time left armed for the dispatch with the tick's own next time, so the shard is not woken again", async () => {
+        // A due time a save moved by a millisecond while the dispatch read it: still passed when the tick it sent runs.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("shardActivity", { lastActiveAt: NOW, nextDueAt: NOW - 60_000 + 1, shardKey: "user" });
+        });
+        await runInShard("user", async () => await harness.run(async (ctx: any) => await ctx.runMutation(recordGuestMerge, { from: "guest", to: "user" })));
+
+        expect(await dueOf("user")).toBeLessThanOrEqual(NOW);
+
+        await runInShard("user", async () => await harness.run(async (ctx: any) => await ctx.runMutation(runShardTick, {})));
+
+        expect(await dueOf("user")).toBe(NOW + MERGE_STALL_MS);
+        expect(await dispatchWith(dispatchDueShards)).toStrictEqual([]);
+    });
+
+    it("leaves a due time a merge's save moves during the tick armed, so the merge it records is checked by the next tick", async () => {
+        // Unrelated work much later (retained rows): the tick's own next time, which must not stand in for the merge's check.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("shardActivity", { lastActiveAt: NOW, nextDueAt: NOW - 60_000, retentionDueAt: NOW + 10 * 60 * 60 * 1000, shardKey: "user" });
+        });
+
+        const original = registry.get("lib_account_merge:resumeStalledGuestMergesOnTick");
+
+        // The tick's merge check has run when the save lands: it saw none of what the save records.
+        registry.set(
+            "lib_account_merge:resumeStalledGuestMergesOnTick",
+            internalMutation
+                .input({})
+                .output(v.any())
+                .mutation(async ({ ctx }) => {
+                    const checked = await ctx.runMutation(original as never, {});
+
+                    await noteShardDue(ctx as never, Date.now() + MERGE_STALL_MS, "user", { rearmPassed: true });
+
+                    return checked;
+                }),
+        );
+
+        try {
+            await runInShard("user", async () => await harness.run(async (ctx: any) => await ctx.runMutation(runShardTick, {})));
+        } finally {
+            registry.set("lib_account_merge:resumeStalledGuestMergesOnTick", original);
+        }
+
+        // Not the passed time the tick read, so not replaced: still due, and the next dispatch sends the tick again.
+        expect(await dueOf("user")).toBe(NOW - 60_000 + 1);
+        expect(await dispatchWith(dispatchDueShards)).toStrictEqual([{ path: "lib_shard_housekeeping:runShardTick", shardKey: "user" }]);
+    });
+
+    it("keeps a due time saved while the dispatched tick is being sent, after the dispatch's clear", async () => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("shardActivity", { lastActiveAt: NOW, nextDueAt: NOW - 60_000, shardKey: "user" });
+        });
+
+        await harness.run(async (ctx: any) => {
+            ctx.scheduler.runAfter = async () => {
+                await noteShardDue({ db: ctx.db }, Date.now() + MERGE_STALL_MS, "user", { rearmPassed: true });
+
+                return "job";
+            };
+
+            await ctx.runMutation(dispatchDueShards, {});
+        });
+
+        expect(await dueOf("user")).toBe(NOW + MERGE_STALL_MS);
+    });
+
+    it("puts a cleared due time back when its tick is not sent, and still dispatches the shards after it", async () => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("shardActivity", { lastActiveAt: NOW, nextDueAt: NOW - 120_000, shardKey: "failing" });
+            await ctx.db.insert("shardActivity", { lastActiveAt: NOW, nextDueAt: NOW - 60_000, shardKey: "user" });
+        });
+
+        const result = await harness.run(async (ctx: any) => {
+            ctx.scheduler.runAfter = async (_delay: number, _target: unknown, _args: unknown, options?: { shardKey?: string }) => {
+                if (options?.shardKey === "failing") {
+                    throw new Error("the scheduler is unreachable");
+                }
+
+                return "job";
+            };
+
+            return await ctx.runMutation(dispatchDueShards, {});
+        });
+
+        // The failed send threw nothing, so the restored due time committed: the next dispatch sends that tick again.
+        expect(result).toStrictEqual({ dispatched: 1 });
+        expect(await dueOf("failing")).toBe(NOW - 120_000);
+        expect(await dueOf("user")).toBeUndefined();
+        expect(await dispatchWith(dispatchDueShards)).toStrictEqual([{ path: "lib_shard_housekeeping:runShardTick", shardKey: "failing" }]);
+    });
+
+    it("stops arming the tick once the shard holds no merge record", async () => {
+        await runInShard("user", async () => {
+            await harness.run(async (ctx: any) => {
+                await ctx.db.insert("shardActivity", { lastActiveAt: NOW, shardKey: "user" });
+                await ctx.runMutation(runShardTick, {});
+            });
+        });
+
+        expect(await dueOf("user")).toBeUndefined();
     });
 });

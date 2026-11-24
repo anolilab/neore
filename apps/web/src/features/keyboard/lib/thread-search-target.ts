@@ -43,3 +43,19 @@ export const focusThreadSearch = (): boolean => {
 
     return true;
 };
+
+/**
+ * Moves focus to the thread list's search toggle without opening the bar. The toggle stays on the page while the sidebar is open,
+ * so it is a place for focus to land when the row that had it goes. False when the sidebar is closed.
+ */
+export const focusThreadSearchToggle = (): boolean => {
+    const toggle = findVisible<HTMLButtonElement>(SEARCH_TOGGLE_SELECTOR);
+
+    if (!toggle) {
+        return false;
+    }
+
+    toggle.focus();
+
+    return true;
+};

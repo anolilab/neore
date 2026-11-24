@@ -14,6 +14,8 @@ import type {
 } from "@ai-sdk/provider-utils";
 import type { ModelMessage, TextPart, UIDataTypes, UIMessagePart, UITools } from "ai";
 
+import type { TypedTextOptions } from "../chat/lib/attached-text";
+import { typedTextOf } from "../chat/lib/attached-text";
 import type { Message, MessageContentParts } from "./validators";
 
 /**
@@ -82,6 +84,22 @@ export const extractText = (message: Message | ModelMessage) => {
     }
 
     return undefined;
+};
+
+/**
+ * The `typedText` column: what the person typed into a user message (`typedTextOf`: no attached document or page, no
+ * quote, no guest's note, no outside agent's text, no placeholder), which the composer's prompt search indexes
+ * (`typed_text_search`). Unset for every other row, for a row with nothing typed, and for a row kept out of search (no
+ * `text`), so the index and `text` agree on what is searchable. `text` stays the message as it was sent.
+ */
+export const typedTextColumn = (message: Message | ModelMessage | undefined, text: string | undefined, options?: TypedTextOptions): string | undefined => {
+    if (text === undefined) {
+        return undefined;
+    }
+
+    const typed = typedTextOf(message as Parameters<typeof typedTextOf>[0], options).trim();
+
+    return typed === "" ? undefined : typed;
 };
 
 /**

@@ -32,7 +32,7 @@ const ThreadShortcutsListener: FC<ThreadShortcutsListenerProperties> = ({ isOwne
     const currentThreadId = threadId ?? urlThreadId;
     const optimisticStatuses = useOptimisticStatuses();
     const currentModel = useCurrentModel();
-    const { handleDeleteThread, updateThread } = useThreadHandlers(() => {}, currentThreadId);
+    const { confirmBeforeDelete, confirmDialog, handleDeleteThread, updateThread } = useThreadHandlers(() => {}, currentThreadId);
     // An admin acting as the owner may not archive or delete: the server refuses both.
     const isImpersonating = useImpersonating();
     const mayChange = isOwner && !isImpersonating;
@@ -56,6 +56,13 @@ const ThreadShortcutsListener: FC<ThreadShortcutsListenerProperties> = ({ isOwne
                 return;
             }
 
+            // With the setting off the delete runs at once; the dialog below is only for the confirmation.
+            if (!confirmBeforeDelete) {
+                handleDeleteThread(currentThreadId);
+
+                return;
+            }
+
             setDeleteTargetId(currentThreadId);
         };
 
@@ -66,26 +73,29 @@ const ThreadShortcutsListener: FC<ThreadShortcutsListenerProperties> = ({ isOwne
             globalThis.removeEventListener("archiveThread", archive);
             globalThis.removeEventListener("deleteThread", askToDelete);
         };
-    }, [currentModel, currentThreadId, mayChange, model, optimisticStatuses, status, updateThread]);
+    }, [confirmBeforeDelete, currentModel, currentThreadId, handleDeleteThread, mayChange, model, optimisticStatuses, status, updateThread]);
 
     return (
-        <DeleteConfirmationDialog
-            description={t`Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation.`}
-            onConfirm={() => {
-                if (deleteTargetId !== undefined) {
-                    handleDeleteThread(deleteTargetId);
-                }
+        <>
+            {confirmDialog}
+            <DeleteConfirmationDialog
+                description={t`Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation.`}
+                onConfirm={() => {
+                    if (deleteTargetId !== undefined) {
+                        handleDeleteThread(deleteTargetId);
+                    }
 
-                setDeleteTargetId(undefined);
-            }}
-            onOpenChange={(open) => {
-                if (!open) {
                     setDeleteTargetId(undefined);
-                }
-            }}
-            open={deleteTargetId !== undefined}
-            title={t`Delete thread?`}
-        />
+                }}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setDeleteTargetId(undefined);
+                    }
+                }}
+                open={deleteTargetId !== undefined}
+                title={t`Delete thread?`}
+            />
+        </>
     );
 };
 

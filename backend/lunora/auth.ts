@@ -61,6 +61,7 @@ import {
     TURNSTILE_SITE_KEY,
 } from "./env";
 import { parseOidcIssuer } from "./lib/env-validation";
+import { handOverGuestMerge } from "./lib/guest-merge-hand-over";
 import { enqueueJob } from "./lib/job-queue";
 import { authLogger } from "./lib/logger";
 import type { ApiKeyAuthApi } from "./public-api/identity";
@@ -682,8 +683,17 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
             // table and page, too long to hold the sign-up request. The job runs
             // on the NEW user's shard (`lib/account-merge.ts#runGuestMerge`). A
             // failure is the caller's to handle: each one keeps the request alive.
+            // The merge's record goes first, so the housekeeping sweep restarts a
+            // merge whose job never ran (`resumeStalledGuestMerges`). A record that
+            // cannot be written still queues the job, then fails the hand-over, so
+            // the caller keeps it for another try (`handOverGuestMerge`).
             onGuestConverted: async (guestId, userId) => {
-                await enqueueJob(internal.lib.account_merge.runGuestMerge, { from: guestId, to: userId }, { shardKey: userId });
+                await handOverGuestMerge(
+                    async () => await shard.call(internal.lib.account_merge.recordGuestMerge, { from: guestId, to: userId }, { shardKey: userId }),
+                    async () => {
+                        await enqueueJob(internal.lib.account_merge.runGuestMerge, { from: guestId, to: userId }, { shardKey: userId });
+                    },
+                );
             },
         }),
         database: lunoraD1Adapter(env.DB),

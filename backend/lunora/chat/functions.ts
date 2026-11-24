@@ -67,11 +67,13 @@ import { insertTemporaryThread, publicThread, threadForViewer } from "../agent/t
 import { insertThread, patchThread } from "../agent/table-writes";
 import { withoutUndefined } from "../lib/patch";
 import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
+import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
 import { readChildThreads } from "./lib/child-threads";
+import { capSearchTerms, matchesQueryTerms, queryTerms } from "./lib/search-terms";
 import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGranted, type ThreadGateOutcome } from "./lib/thread-gate";
-import { vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
-import { statelessPrompt } from "../lib/not-typed-text";
-import { vNotTypedMarks } from "../lib/not-typed-text-validator";
+import { type TypedPromptRow, vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
+import { type DraftFrom, draftFromOfMarks, notTypedMarksOfMessage, statelessPrompt } from "../lib/not-typed-text";
+import { vDraftFrom, vNotTypedMarks } from "../lib/not-typed-text-validator";
 import { paginatedOf } from "../lib/output-validators";
 import { getAuthUserIdentity } from "../auth";
 import { readableProject } from "../projects/functions";
@@ -3468,6 +3470,276 @@ export const searchMessages = authQuery
             isDone: endIndex >= threadsWithMessages.length,
             page: paginatedThreads,
         };
+    });
+
+/** A prompt the person sent, as the composer's Ctrl+R search lists it (`composer-prompt-search.tsx`). */
+const vSentPrompt = v.object({
+    createdAt: v.optional(v.number()),
+    /** The prompt's not-typed mark, so a pick goes out marked again, as an ArrowUp recall does. */
+    draftFrom: v.optional(vDraftFrom),
+    messageId: v.id("messages"),
+    text: v.string(),
+    threadId: v.string(),
+    threadTitle: v.string(),
+});
+
+/**
+ * Index hits read before the thread filter and the newest-first sort, against the transaction's 32 MiB read budget. The
+ * index holds only typed words (`typedText`), so replies and attachments never take a window; the first pass reads the
+ * smaller one and widens once, only when fewer than a full list of prompts survived every filter (a row read again is
+ * charged once). The index ranks by score, so a common word lists the newest prompts of its best hits, and `truncated`
+ * says so. A hit past the wider window is not searched.
+ */
+const SENT_PROMPT_WINDOW = 100;
+const SENT_PROMPT_WINDOW_MAX = 400;
+const SENT_PROMPT_LIMIT = 50;
+/** Thread lookups that run at once inside one search. */
+const SENT_PROMPT_LOOKUP_BATCH = 16;
+/** Parent links followed from a thread to the chat it was first branched from; a deeper chain stops there. */
+const SENT_PROMPT_LINEAGE_DEPTH = 8;
+
+/**
+ * `threadRelationships` reads one search may make to tell branch copies apart, across both windows. Past it a thread counts
+ * as its own family: a copy may list twice, but no prompt is dropped.
+ */
+export const SENT_PROMPT_LINEAGE_READS = 64;
+
+/**
+ * One saved row as a sent prompt: a user row someone typed, with its `typedText` (the indexed words, so what lists is
+ * what matched) and its not-typed mark. `undefined` for a reply, a goal continuation round (typed by nobody), and a row
+ * with no typed words: an attached document alone, a quote, the app's placeholder, a guest's note or an outside agent's
+ * text sent on. `typedText` (`typedTextOf`) leaves those parts out of a row that has typed parts beside them, so only the
+ * person's own words list, and a row of nothing but such parts has no `typedText`.
+ */
+const sentPromptOf = (message: TypedPromptRow): { draftFrom: DraftFrom | undefined; typed: string } | undefined => {
+    const stored = message.message as { content?: unknown; role?: string } | undefined;
+    const typed = message.typedText;
+
+    if (typed === undefined || message.tool || stored?.role !== "user" || message.agentName === GOAL_CONTINUATION_AGENT) {
+        return undefined;
+    }
+
+    return { draftFrom: draftFromOfMarks(notTypedMarksOfMessage(stored)), typed };
+};
+
+/**
+ * Whether the search may list a thread's prompts: the caller's own chat, not trashed, deleted for good (`deletingAt`,
+ * erased in batches after the delete), locked or temporary. The same rule as the thread search (`isSearchEligible`).
+ */
+const listsSentPrompts = (thread: ThreadDoc | null, userId: string): thread is ThreadDoc =>
+    thread !== null && thread.userId === userId && !thread.deleted && thread.deletingAt === undefined && !isThreadLocked(thread) && thread.isTemporary !== true;
+
+/** Lunora's answer for a search index whose backfill has not yet covered the table (`SEARCH_INDEX_BUILDING`, 503). */
+export const isSearchIndexBuilding = (error: unknown): boolean => error instanceof LunoraError && error.code === "SEARCH_INDEX_BUILDING";
+
+/**
+ * The caller's own sent prompts that match `searchQuery`, newest first, at most 50. It reads the typed-words index
+ * (`typed_text_search`, `typedText`: what the person typed, no attached document or page, no quoted line and no app
+ * placeholder) through `typedTextSearch`, which drops every locked thread (no proof is passed), so a locked chat's prompt
+ * never lists. Whole words, and the last word also as the start of a longer one (`dep` finds `deploy`), as the index
+ * matches. Trashed threads, chats deleted for good, temporary chats, other people's threads and goal continuation rounds (typed by nobody) are
+ * dropped too. A guest's note or an outside agent's text sent on never lists: `typedText` leaves those parts out, so a
+ * message holding them beside typed words lists and matches by the typed words alone. A branch copies its rows, so the same prompt
+ * in chats of one branch family (`threadRelationships`) lists once; the same words sent in unrelated chats list once per
+ * chat. A query longer than the search reads is cut to its first characters and words, not refused. `truncated` says a
+ * matching prompt may be missing: the index window was full, or more prompts matched than the list holds. `preparing`
+ * says the index is still being built after a deploy (`isSearchIndexBuilding`), so nothing was searched yet.
+ */
+export const searchSentPrompts = authQuery
+    .input({ searchQuery: v.string().max(MAX_LENGTH.long) })
+    .output(v.object({ preparing: v.optional(v.literal(true)), prompts: v.array(vSentPrompt), truncated: v.boolean() }))
+    .query(async ({ args: { searchQuery }, ctx: context }) => {
+        const { userId } = context.user;
+        const text = capSearchTerms(searchQuery.trim().slice(0, MAX_LENGTH.short).trim());
+        const terms = queryTerms(text);
+
+        if (terms.length === 0) {
+            context.log.event("chat.search_sent_prompts", { listed: 0, truncated: false, widened: false });
+
+            return { prompts: [], truncated: false };
+        }
+
+        // The index already holds only typed words; this keeps a hit only when they match as the query reads them.
+        const typedHits = (hits: ReadonlyArray<TypedPromptRow>) =>
+            hits.flatMap((message) => {
+                const prompt = sentPromptOf(message);
+
+                return prompt !== undefined && matchesQueryTerms(prompt.typed, terms) ? [{ ...prompt, message }] : [];
+            });
+        // Kept across both windows, so widening looks up only the threads the first window did not reach.
+        const threads = new Map<string, ThreadDoc | null>();
+        const roots = new Map<string, string>();
+        let lineageReads = 0;
+
+        // The chat a thread was first branched from (itself when it is no branch). A sub-agent's chat copies no prompts, so its
+        // link is not followed. Read only for a prompt the list may show whose words and send time another thread shares,
+        // and at most `SENT_PROMPT_LINEAGE_READS` times per search.
+        const lineageRoot = async (threadId: string): Promise<string> => {
+            const walked: string[] = [];
+            let current = threadId;
+
+            for (let step = 0; step < SENT_PROMPT_LINEAGE_DEPTH; step += 1) {
+                const known = roots.get(current);
+
+                if (known !== undefined) {
+                    current = known;
+                    break;
+                }
+
+                if (lineageReads >= SENT_PROMPT_LINEAGE_READS) {
+                    // Not cached: the walk stopped for the budget, not at a root.
+                    return threadId;
+                }
+
+                walked.push(current);
+                lineageReads += 1;
+
+                const [link] = await context.db
+                    .query("threadRelationships")
+                    .withIndex("by_thread", (q) => q.eq("threadId", current as Id<"threads">))
+                    .take(1);
+
+                if (!link || link.branchType === "subagent" || (link.userId ?? userId) !== userId) {
+                    break;
+                }
+
+                current = link.parentThreadId;
+            }
+
+            for (const id of walked) {
+                roots.set(id, current);
+            }
+
+            return current;
+        };
+
+        // Every prompt one index window gives, after all the filters below.
+        const collect = async (limit: number) => {
+            const { filled, messages } = await context.runQuery(internal.agent.messages.typedTextSearch, { limit, text, userId });
+            const sent = typedHits(messages);
+            const unseen = [...new Set(sent.map(({ message }) => message.threadId))].filter((threadId) => !threads.has(threadId));
+
+            // Each lookup is a nested query and Lunora caps how many run at once, so they go in small batches. A failed lookup
+            // is not caught: a missing thread already reads as null, and swallowing an error would drop its prompts unseen.
+            for (let start = 0; start < unseen.length; start += SENT_PROMPT_LOOKUP_BATCH) {
+                const batch = unseen.slice(start, start + SENT_PROMPT_LOOKUP_BATCH);
+                const found = await Promise.all(
+                    batch.map((threadId) => context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> })),
+                );
+
+                for (const [offset, threadId] of batch.entries()) {
+                    threads.set(threadId, found[offset] ?? null);
+                }
+            }
+
+            const sentAt = (message: TypedPromptRow): number => message.createdAt ?? message._creationTime;
+            const copyKey = (message: TypedPromptRow, typed: string) => `${String(sentAt(message))}\u{0}${typed}`;
+            const listed = sent
+                .filter(({ message }) => listsSentPrompts(threads.get(message.threadId) ?? null, userId))
+                .toSorted(
+                    (a, b) =>
+                        sentAt(b.message) - sentAt(a.message) ||
+                        b.message._creationTime - a.message._creationTime ||
+                        a.message.threadId.localeCompare(b.message.threadId) ||
+                        b.message.order - a.message.order ||
+                        b.message.stepOrder - a.message.stepOrder ||
+                        String(a.message._id).localeCompare(String(b.message._id)),
+                );
+            // A branch copies its rows with the same text and send time: only a thread whose prompt shares its key is walked.
+            const threadsByKey = new Map<string, Set<string>>();
+
+            for (const { message, typed } of listed) {
+                const key = copyKey(message, typed);
+                const group = threadsByKey.get(key) ?? new Set<string>();
+
+                group.add(message.threadId);
+                threadsByKey.set(key, group);
+            }
+
+            // One prompt per branch family, listed from its newest copy. Newest first, and only until one past the list's
+            // limit is known, so no lineage is read for a prompt the list would not show.
+            const seen = new Set<string>();
+            const distinct: typeof listed = [];
+
+            for (const entry of listed) {
+                if (distinct.length > SENT_PROMPT_LIMIT) {
+                    break;
+                }
+
+                const key = copyKey(entry.message, entry.typed);
+                const family = (threadsByKey.get(key)?.size ?? 0) > 1 ? await lineageRoot(entry.message.threadId) : entry.message.threadId;
+                const familyKey = `${family}\u{0}${key}`;
+
+                if (!seen.has(familyKey)) {
+                    seen.add(familyKey);
+                    distinct.push(entry);
+                }
+            }
+
+            const prompts = distinct.slice(0, SENT_PROMPT_LIMIT).map(({ draftFrom, message, typed }) => {
+                return {
+                    createdAt: message.createdAt,
+                    ...(draftFrom !== undefined && { draftFrom }),
+                    messageId: message._id as Id<"messages">,
+                    text: typed,
+                    threadId: message.threadId,
+                    threadTitle: threads.get(message.threadId)?.title ?? DEFAULT_THREAD_TITLE,
+                };
+            });
+
+            return { cut: distinct.length > SENT_PROMPT_LIMIT, filled, prompts };
+        };
+
+        try {
+            let { cut, filled, prompts } = await collect(SENT_PROMPT_WINDOW);
+            const widened = filled && prompts.length < SENT_PROMPT_LIMIT;
+
+            // Branch copies and trashed or temporary chats can take the first window; a common word whose first window already
+            // gave a full list stops there.
+            if (widened) {
+                ({ cut, filled, prompts } = await collect(SENT_PROMPT_WINDOW_MAX));
+            }
+
+            context.log.event("chat.search_sent_prompts", { listed: prompts.length, truncated: filled || cut, widened });
+
+            return { prompts, truncated: filled || cut };
+        } catch (error) {
+            // After a deploy that adds `typed_text_search`, Lunora refuses the index until its backfill covers the existing
+            // messages. That is "not ready yet", not a failure and not "no match": the composer says so and the person retries.
+            if (isSearchIndexBuilding(error)) {
+                context.log.event("chat.search_sent_prompts", { listed: 0, preparing: true, truncated: false, widened: false });
+
+                return { preparing: true as const, prompts: [], truncated: false };
+            }
+
+            throw error;
+        }
+    });
+
+/**
+ * A prompt the search listed, as it reads now: its typed words (`typedText`, kept current by an edit) and its not-typed
+ * mark, as {@link searchSentPrompts} would list them, or `null` when it may no longer go in the draft: not the caller's
+ * own sent prompt, no typed words left, or a chat that is trashed, deleted for good, locked or temporary. The composer puts this in the
+ * draft, never the list's copy, which an edit since the search may have changed. It reads that one prompt rather than
+ * running the search again: a prompt pushed past the search's 50 by newer matches is still available.
+ */
+export const currentSentPrompt = authQuery
+    .input({ messageId: v.id("messages") })
+    .output(v.union(v.object({ draftFrom: v.optional(vDraftFrom), text: v.string() }), v.null()))
+    .query(async ({ args: { messageId }, ctx: context }) => {
+        const { userId } = context.user;
+        const message = await context.runQuery(internal.agent.messages.typedPromptRow, { messageId });
+        // No `typedText` is a row the typed-words index does not hold (`sentPromptOf`), so the search never lists it.
+        const prompt = message && message.userId === userId ? sentPromptOf(message) : undefined;
+        const thread =
+            message && prompt !== undefined
+                ? await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: message.threadId as Id<"threads"> })
+                : null;
+        const available = prompt !== undefined && listsSentPrompts(thread, userId);
+
+        context.log.event("chat.current_sent_prompt", { available });
+
+        return available ? { ...(prompt.draftFrom !== undefined && { draftFrom: prompt.draftFrom }), text: prompt.typed } : null;
     });
 
 /**

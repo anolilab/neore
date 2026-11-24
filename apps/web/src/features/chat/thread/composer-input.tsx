@@ -83,6 +83,8 @@ import { breaksBefore, inOpenFence, isLongPaste, onOwnLines, planPaste, planText
 import { takesPaste } from "./composer-paste/paste-target";
 import { prefillThreadOf, useComposerPrefill } from "./composer-prefill";
 import ComposerPromptQueue from "./composer-prompt-queue";
+import type { PickedPrompt } from "./composer-prompt-search";
+import ComposerPromptSearch from "./composer-prompt-search";
 import { composerSubmitIntent } from "./composer-submit-intent";
 import { isEditable, TextAttachmentEditorDialog } from "./composer-text-attachment-editor";
 import { quoteRestoreDraft } from "./composer-tiptap/extensions/quote-chip";
@@ -550,6 +552,30 @@ const ComposerInput = ({
 
     // Composer state from store
     const { addAttachment, attachments, clear, removeAttachment, setText, text, updateAttachment } = useComposerState();
+    // Ctrl+R opens the search over the person's sent prompts (`composer-prompt-search.tsx`). Only a thread composer has one.
+    // The chat the search was opened in; `null` while it is closed. It belongs to that chat: the composer stays mounted when
+    // another chat opens, and a pick must not land in that chat's draft.
+    const [promptSearchThread, setPromptSearchThread] = useState<string | null>(null);
+    const promptSearchOpen = promptSearchThread !== null;
+    const promptSearchLocked = disabled || isComparisonLoading;
+
+    // A composer that locks, or moves to another chat, while the search is open closes it: a pick must not change a draft
+    // that is locked or another chat's. Adjusted during render, as `useDebouncedValue` does, so it never shows again.
+    if (promptSearchOpen && (promptSearchLocked || promptSearchThread !== (threadId ?? ""))) {
+        setPromptSearchThread(null);
+    }
+
+    const openPromptSearch = useCallback((): boolean => {
+        setPromptSearchThread(threadId ?? "");
+
+        return true;
+    }, [threadId]);
+    // Escape, the close button or the backdrop: the search opened from the editor without a trigger, so focus goes back to
+    // the editor, as after a pick. A close forced by a locked composer or another chat does not come through here.
+    const closePromptSearch = useCallback(() => {
+        setPromptSearchThread(null);
+        inputAreaRef.current?.focus();
+    }, []);
 
     // A `/compact` typed in one chat is not carried into the next: submitting it there would compact the chat that is open.
     useEffect(() => {
@@ -586,6 +612,50 @@ const ComposerInput = ({
 
     const getComposerText = useCallback(() => useChatUIStore.getState().composerText, []);
     const promptHistory = usePromptHistory(getComposerText);
+
+    // The prompt becomes the draft, and is never sent. Text already typed stays, with the prompt below it.
+    const pickSentPrompt = useCallback(
+        ({ draftFrom, text: prompt }: PickedPrompt) => {
+            const draft = useChatUIStore.getState().composerText;
+
+            // A picked prompt is a new draft: an ArrowUp recall ends here, so Escape keeps the picked text.
+            promptHistory.reset();
+
+            if (draft.trim() === "") {
+                setText(prompt);
+                // The prompt is the whole draft now, so it carries its own mark: none for the person's own words, whatever
+                // the blank draft held before (`noteSavedPrompt` treats a saved prompt that replaced the draft the same way).
+                useChatUIStore.getState().setComposerDraftFrom(draftFrom);
+            } else {
+                const addition = `\n${prompt}`;
+                const editor = inputAreaRef.current?.getEditor();
+                const shown = editor?.getEditor();
+
+                // While the editor shows the store's draft, the prompt goes in only through an editor transaction, so the draft's
+                // quote chips stay chips; a rebuild from the text would flatten them. Otherwise the store takes the whole draft.
+                const appendedInEditor =
+                    editor &&
+                    shown &&
+                    !shown.isDestroyed &&
+                    shown.state.doc.textBetween(0, shown.state.doc.content.size, "\n") === draft &&
+                    editor.appendText(addition);
+
+                if (!appendedInEditor) {
+                    setText(`${draft}${addition}`);
+                }
+
+                // A prompt saved as not typed by the person goes out marked again, as an ArrowUp recall does. An admin's writing
+                // (`impersonated`) replaces a weaker mark the draft already has; the person's own prompt keeps the draft's mark.
+                if (draftFrom !== undefined && (composerDraftFrom() === undefined || draftFrom === "impersonated")) {
+                    markComposerDraft(draftFrom);
+                }
+            }
+
+            setPromptSearchThread(null);
+            inputAreaRef.current?.focus();
+        },
+        [promptHistory, setText],
+    );
 
     // Reference images attached for the next outgoing message — rendered as a numbered strip
     // above the attachments row so the user can see (and the model will receive) them in order.
@@ -1947,6 +2017,7 @@ const ComposerInput = ({
                 {failureAnnouncement}
             </span>
             {isThreadComposer && <PromptHistorySource onEntries={promptHistory.setEntries} />}
+            {isThreadComposer && promptSearchOpen && <ComposerPromptSearch onClose={closePromptSearch} onPick={pickSentPrompt} />}
             {isThreadComposer && <ComposerPromptQueue />}
             {isThreadComposer && <AutoReadReplies />}
             {isThreadComposer && <CompletionSound />}
@@ -2040,6 +2111,7 @@ const ComposerInput = ({
                 onDraw={compact ? undefined : onOpenDraw}
                 onHistoryNavigate={isThreadComposer ? promptHistory.navigate : undefined}
                 onPaste={compact ? undefined : handlePaste}
+                onPromptSearch={isThreadComposer && !promptSearchLocked ? openPromptSearch : undefined}
                 onSelectChat={compact ? undefined : handleSelectChat}
                 onSelectFileUpload={compact ? undefined : handleSelectFileUpload}
                 onSelectVaultFile={compact ? undefined : handleSelectVaultFile}

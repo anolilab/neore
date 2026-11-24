@@ -97,6 +97,8 @@ export type UserPreferences = {
     soundEffects: boolean;
     /** Opt-in, this browser only: open several chats side by side (`features/chat/split`). */
     splitViewEnabled: boolean;
+    /** This browser only: where a click on a sub-agent opens it, the side panel or the main view (`features/chat/split/chat-open-place`). */
+    subAgentOpenPlace: "main" | "side";
 };
 
 /** What "Reset to Defaults" restores. */
@@ -252,6 +254,7 @@ const defaultUIState = {
         showTimestamps: true,
         soundEffects: false,
         splitViewEnabled: false,
+        subAgentOpenPlace: "side" as const,
     },
     rightSidebarWidth: RIGHT_SIDEBAR_DEFAULT_WIDTH,
     search: { isOpen: false, query: "", recentSearches: [], type: "threads" as const },

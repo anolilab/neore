@@ -279,7 +279,35 @@ export const updateProject = internalMutation
             }
         }
 
-        await patchRow(ctx.db, "projects", project, changes);
+        const changesOrganization =
+            args.patch.organizationId !== undefined && (args.patch.organizationId || undefined) !== (project.organizationId || undefined);
+
+        // A project that changes organization leaves its personal runner behind: on the row it would show to the organization's
+        // members, and it would come back if the project moved back. An organization's default lives on each starter's settings.
+        // Emptied, not removed: removing a column replaces the whole row from the one read above, which could carry back a value
+        // another write set since; a patch writes only these keys onto the row as it stands. Always, not only when the row read had
+        // a runner: one recorded since that read is emptied by this patch, and one recorded after it is refused
+        // (`setProjectRunnerDefault` writes only while the organization is the one it read). `projectRunnerOf` reads an empty id as none.
+        // The settings entries of the space it leaves stay on each person's own shard; `organizationChangedAt` retires them.
+        if (changesOrganization) {
+            // A colour or icon removed with the move goes first, on its own: removing replaces the row from the read above, so the
+            // move's stamp and the emptied runner are then patched onto the row as it stands, never rebuilt from that read.
+            const removed = Object.fromEntries(Object.entries(changes).filter(([, value]) => value === undefined));
+
+            if (Object.keys(removed).length > 0) {
+                await patchRow(ctx.db, "projects", project, removed);
+            }
+
+            await ctx.db.patch("projects", project._id, {
+                ...withoutUndefined(changes),
+                organizationChangedAt: ctx.now,
+                runnerAgentKey: "",
+                runnerDeviceId: "",
+                runnerFolderId: "",
+            });
+        } else {
+            await patchRow(ctx.db, "projects", project, changes);
+        }
 
         if (args.patch.workflowContent !== undefined) {
             await recountWorkflowImages(ctx, project.userId, project.workflowContent, args.patch.workflowContent);

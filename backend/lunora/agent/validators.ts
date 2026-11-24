@@ -627,6 +627,32 @@ export const vMessageDocFields = {
 
 export const vMessageDoc = v.object(vMessageDocFields);
 
+/**
+ * Message columns no client reads: `publicMessage` (`agent/messages.ts`) leaves them out of every message read and stream, so
+ * `vMessageDocFields` does not declare them. `typedText` is the prompt search's index column (`schema.ts`); the search
+ * reads it through {@link vTypedPromptRow} only.
+ */
+export const SERVER_ONLY_MESSAGE_COLUMNS = ["typedText"] as const;
+
+/**
+ * A row of the typed-words index as the composer's prompt search reads it (`agent/messages.ts#typedTextSearch`,
+ * `#typedPromptRow`): what `chat/functions.ts#sentPromptOf` decides with, and the typed words. Server-only.
+ */
+export const vTypedPromptRow = v.object({
+    _creationTime: v.number(),
+    _id: v.string(),
+    agentName: v.optional(v.string()),
+    createdAt: v.optional(v.number()),
+    message: v.optional(vMessage),
+    order: v.number(),
+    stepOrder: v.number(),
+    threadId: v.string(),
+    tool: v.boolean(),
+    typedText: v.optional(v.string()),
+    userId: v.optional(v.string()),
+});
+export type TypedPromptRow = Infer<typeof vTypedPromptRow>;
+
 /** The columns `updateMessage` may patch; literal for the reason on `vThreadPatchFields`. */
 export const vMessagePatchFields = {
     error: v.optional(v.string()),
@@ -920,6 +946,15 @@ export const vProjectDocFields = {
     _creationTime: v.number(),
     _id: v.string(),
     createdAt: v.number(),
+    // Set when the project changes organization; retires runner defaults from before (`acp/lib/project-runner.ts`).
+    organizationChangedAt: v.optional(v.number()),
+    // Written by `acp/lib/project-runner.ts`, never by a caller: the runner a new thread here starts on.
+    runnerAgentKey: v.optional(v.string()),
+    runnerDeviceId: v.optional(v.string()),
+    runnerFolderId: v.optional(v.string()),
+    runnerKind: v.optional(v.literal("host")),
+    runnerThreadAt: v.optional(v.number()),
+    runnerThreadId: v.optional(v.string()),
     updatedAt: v.optional(v.number()),
 };
 

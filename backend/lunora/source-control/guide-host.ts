@@ -14,9 +14,11 @@ import type { Infer } from "lunorash/server";
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
+import type { Doc } from "../_generated/dataModel";
+import type { MutationCtx } from "../_generated/server";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { readHostTranscript } from "../acp/lib/finish";
-import { OUTDATED_NOTICE } from "../acp/lib/start";
+import { isOutOfScopeStart, OUTDATED_NOTICE } from "../acp/lib/start";
 import { startHostSessionFor } from "../acp/remote";
 import { hostOrganizationRefusal } from "../acp/lib/organization-cap";
 import { sendToHostFor } from "../acp/send";
@@ -26,7 +28,9 @@ import { isDeviceOnline } from "../devices/lib/state";
 import type { DeviceTaintSource } from "../devices/lib/taint";
 import { enqueueJob } from "../lib/job-queue";
 import { getUserTier } from "../lib/rate-limiter";
+import type { StoredRow } from "../lib/stored-row";
 import { MAX_LENGTH } from "../lib/validators";
+import { ownProjectIdsListingRepo, writableProject } from "../projects/functions";
 import { DEVELOP_DRIVER } from "./develop-driver";
 import { guideFromHostAnswer, promptInputOf, readPullRequestForGuide } from "./guide-generate";
 import { reserveGuide } from "./guide-internal";
@@ -43,6 +47,38 @@ const GUIDE_TAINT: ReadonlyArray<DeviceTaintSource> = ["web"];
 /** The refusals of a send that the page words for itself; any other is a "busy" in effect. */
 const REPORTED_OUTCOMES: ReadonlySet<string> = new Set(["busy", "offline", "outdated", "rate_limited", "session_ended", "too_large"]);
 
+/**
+ * The project a guide's session is filed under: on a computer limited to some projects (`devices/lib/scope.ts`), the
+ * oldest of the caller's own projects that lists this repository, is in the computer's scope and is one they may write to;
+ * `null` when there is none, which the start would refuse. A computer offered in any chat files the guide under no
+ * project, as before.
+ */
+const guideProjectOf = async (
+    ctx: MutationCtx,
+    device: Doc<"devices">,
+    userId: string,
+    repo: string,
+): Promise<{ project: StoredRow<Doc<"projects">> | undefined } | null> => {
+    if (device.projectIds === undefined) {
+        return { project: undefined };
+    }
+
+    const listing = await ownProjectIdsListingRepo(ctx, userId, repo, device.projectIds);
+    let oldest: StoredRow<Doc<"projects">> | undefined;
+
+    for (const projectId of listing) {
+        // The same check the start makes: the caller's client never names this project, the repository does.
+        const project = await writableProject(ctx, projectId, userId, { primary: true });
+
+        // By the project's age, not the repository entry's: an older project may have listed the repository later.
+        if (project && (oldest === undefined || project._creationTime < oldest._creationTime)) {
+            oldest = project;
+        }
+    }
+
+    return oldest ? { project: oldest } : null;
+};
+
 const vUnavailable = v.object({
     reason: v.union(
         v.literal("busy"),
@@ -50,6 +86,7 @@ const vUnavailable = v.object({
         v.literal("outdated"),
         v.literal("rate_limited"),
         v.literal("session_ended"),
+        v.literal("out_of_scope"),
         v.literal("too_large"),
     ),
     status: v.literal("unavailable"),
@@ -83,7 +120,8 @@ export const beginHostGuide = internalMutation
     )
     .mutation(async ({ args, ctx }) => {
         const { userId } = args;
-        const device = await ctx.db.devices.findFirst({ where: { _id: args.deviceId, userId } });
+        // From the primary, as the start reads it: its project scope decides the project the guide is filed under.
+        const device = await ctx.db.devices.findFirst({ consistency: "primary", where: { _id: args.deviceId, userId } });
         const offer = device?.acpOffers?.find((candidate) => candidate.agentKey === args.agentKey && candidate.folderId === args.folderId);
 
         // A folder is offered by its label, which is the user's own text: it must at least look like this repository.
@@ -95,9 +133,17 @@ export const beginHostGuide = internalMutation
             return { reason: "offline" as const, status: "unavailable" as const };
         }
 
+        // Before the guide is reserved: the session start below refuses a computer limited to projects this repository is in none of.
+        const filed = await guideProjectOf(ctx, device, userId, args.repository);
+
+        if (filed === null) {
+            return { reason: "out_of_scope" as const, status: "unavailable" as const };
+        }
+
         // Before the guide is reserved: the session start below would refuse it too, but its refusal reads as "busy" here.
-        // The organization is the caller's verified one, so the owner is a member of it: only the cap can refuse.
-        if (await hostOrganizationRefusal(ctx, args.organizationId, userId)) {
+        // A project of an organization holds the thread under that organization's cap, as the start files it; otherwise the
+        // organization is the caller's verified one, so the owner is a member of it: only the cap can refuse.
+        if (await hostOrganizationRefusal(ctx, filed.project?.organizationId || args.organizationId, userId)) {
             return { status: "not_allowed" as const };
         }
 
@@ -114,16 +160,25 @@ export const beginHostGuide = internalMutation
             return { status: "running" as const };
         }
 
-        // The session start refuses only when the computer is busy or went offline between the check above and now.
+        // The session start refuses only when the computer is busy, or went offline or out of scope between the checks above and now.
         const started = await startHostSessionFor(ctx, userId, {
             agentKey: args.agentKey,
             clientId: ctx.newId(),
             deviceId: args.deviceId,
             folderId: args.folderId,
             organizationId: args.organizationId,
+            ...(filed.project && { projectId: filed.project._id }),
         }).catch((error: unknown) => {
-            // A computer too old to start an agent says so, rather than passing for busy.
-            throw new LunoraError("BAD_REQUEST", `${HOST_ROLLBACK}${error instanceof Error && error.message === OUTDATED_NOTICE ? "outdated" : "busy"}`);
+            // A computer too old to start an agent, or one limited to other projects, says so, rather than passing for busy.
+            let reason = "busy";
+
+            if (isOutOfScopeStart(error)) {
+                reason = "out_of_scope";
+            } else if (error instanceof Error && error.message === OUTDATED_NOTICE) {
+                reason = "outdated";
+            }
+
+            throw new LunoraError("BAD_REQUEST", `${HOST_ROLLBACK}${reason}`);
         });
 
         if (!started.started || started.threadId === undefined) {
@@ -167,6 +222,7 @@ const unavailableReason = (error: unknown): Unavailable["reason"] | null => {
     switch (reason) {
         case "busy":
         case "offline":
+        case "out_of_scope":
         case "outdated":
         case "rate_limited":
         case "session_ended":

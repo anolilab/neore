@@ -11,11 +11,14 @@
     "add-group-pause-file-ids",
     "add-headless-approved",
     "add-headless-resume-bounds",
+    "add-project-runner-thread-at",
+    "add-project-runner-thread-id",
     "add-purchase-look-browser",
     "add-run-args-impersonated",
     "add-run-args-system-context",
     "add-steer-text-length",
     "backfill-approval-organization",
+    "backfill-message-typed-text",
     "drop-agent-option-fields",
     "session-options-to-session-state",
     "widen-not-typed-steer-collaborator",
@@ -7372,6 +7375,12 @@
     "embeddings_1024": {
       "commitOrdered": false,
       "fields": {
+        "archived": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "model": {
           "kind": "string",
           "nullable": false,
@@ -7450,6 +7459,12 @@
     "embeddings_128": {
       "commitOrdered": false,
       "fields": {
+        "archived": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "model": {
           "kind": "string",
           "nullable": false,
@@ -7528,6 +7543,12 @@
     "embeddings_1408": {
       "commitOrdered": false,
       "fields": {
+        "archived": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "model": {
           "kind": "string",
           "nullable": false,
@@ -7606,6 +7627,12 @@
     "embeddings_1536": {
       "commitOrdered": false,
       "fields": {
+        "archived": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "model": {
           "kind": "string",
           "nullable": false,
@@ -7684,6 +7711,12 @@
     "embeddings_256": {
       "commitOrdered": false,
       "fields": {
+        "archived": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "model": {
           "kind": "string",
           "nullable": false,
@@ -7762,6 +7795,12 @@
     "embeddings_512": {
       "commitOrdered": false,
       "fields": {
+        "archived": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "model": {
           "kind": "string",
           "nullable": false,
@@ -7840,6 +7879,12 @@
     "embeddings_768": {
       "commitOrdered": false,
       "fields": {
+        "archived": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "model": {
           "kind": "string",
           "nullable": false,
@@ -11741,6 +11786,12 @@
           "optional": false,
           "unique": false
         },
+        "typedText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "usage": {
           "kind": "object",
           "nullable": false,
@@ -12434,6 +12485,12 @@
     "oauthStates": {
       "commitOrdered": false,
       "fields": {
+        "authorizationResponseIssParameterSupported": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "connectorSlug": {
           "kind": "string",
           "nullable": false,
@@ -22631,6 +22688,12 @@
           "optional": true,
           "unique": false
         },
+        "organizationChangedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "organizationId": {
           "kind": "string",
           "nullable": false,
@@ -22672,6 +22735,43 @@
           ]
         },
         "publicAccessToken": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "runnerAgentKey": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "runnerDeviceId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "runnerFolderId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "runnerKind": {
+          "kind": "literal",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "literal": "\"host\""
+        },
+        "runnerThreadAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "runnerThreadId": {
           "kind": "string",
           "nullable": false,
           "optional": true,
@@ -33253,6 +33353,24 @@
           "optional": true,
           "unique": false
         },
+        "confirmBeforeArchiveChat": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "confirmBeforeDeleteChat": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "confirmBeforeUnpinChat": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "contrast": {
           "kind": "string",
           "nullable": false,
@@ -33421,6 +33539,56 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "projectRunnerDefaults": {
+          "kind": "record",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "key": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          },
+          "of": {
+            "kind": "object",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "fields": {
+              "agentKey": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "deviceId": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "folderId": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "threadAt": {
+                "kind": "number",
+                "nullable": false,
+                "optional": true,
+                "unique": false
+              },
+              "threadId": {
+                "kind": "string",
+                "nullable": false,
+                "optional": true,
+                "unique": false
+              }
+            }
+          }
         },
         "resumeInterruptedRuns": {
           "kind": "boolean",

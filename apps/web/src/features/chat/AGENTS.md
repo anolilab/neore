@@ -76,6 +76,8 @@ Tabs: `"summary"` | `"prompts"` | `"variables"` | `"pins"` (and any future tabs 
 - Don't directly mutate UI state - use stores/hooks
 - Don't mix message formats without converters
 - Don't create chat components without proper TypeScript types
+- A click that opens a chat (a sub-agent's link) goes through `useOpenChatClick` (`split/use-open-chat.ts`): it honours the
+  "where a sub-agent or side chat opens" setting and the Ctrl, Cmd and middle-click places. A plain `Link` to `/chat/$threadId` skips both.
 - Don't import `@tiptap/extension-emoji` statically in the composer: its data is ~64 KB gzipped. Load it through
   `thread/composer-tiptap/emoji-shortcode/emoji-index.ts`, which the composer starts once the list can open.
 - A composer text-input rule must be a plugin registered after `VimMode`, not an editor prop: editor props are asked
