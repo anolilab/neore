@@ -127,6 +127,8 @@ const SUB_AGENT_BUILTINS: ReadonlySet<string> = new Set(["delegateToSubAgent", "
  * - delegateToSubAgent, messageWorker: start a run charged to the task quota, or send more work to a worker.
  * - replyToReviewComment: posts a comment on a pull request as the person.
  * - rerunFailedChecks: re-runs checks on a pull request with the person's GitHub access.
+ * - mergePullRequest: merges a pull request as the person.
+ * - signInWithSavedLogin: types a saved password for the person into a site.
  *
  * `tool-permissions.grants.test.ts` checks that every name here is a real built-in.
  */
@@ -136,10 +138,12 @@ export const ALWAYS_ALLOW_REFUSED_BUILTINS: ReadonlySet<string> = new Set([
     "delegateToSubAgent",
     "imageEditing",
     "imageGeneration",
+    "mergePullRequest",
     "messageWorker",
     "musicGeneration",
     "replyToReviewComment",
     "rerunFailedChecks",
+    "signInWithSavedLogin",
     "videoGeneration",
 ]);
 
