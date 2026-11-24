@@ -1275,8 +1275,11 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
 
     if (message.status === "failed" && !isAnimating && (renderedParts.length === 0 || isLocalReply)) {
         // An error that is only an old kind code (`unreachable`) is what older builds saved for a local reply: never show the code.
+        // A gateway failure keeps the error it saved, as before.
         const errorMessage =
-            message.error && !LEGACY_LOCAL_ERROR_CODES.has(message.error) ? message.error : t`An error occurred while generating the response.`;
+            message.error && !(isLocalReply && LEGACY_LOCAL_ERROR_CODES.has(message.error))
+                ? message.error
+                : t`An error occurred while generating the response.`;
 
         renderedParts.push(
             <div

@@ -257,6 +257,18 @@ describe("reply guard stops", () => {
         }
     });
 
+    it("does not save a high surrogate that the reasoning limit split from its low half", async () => {
+        expect.assertions(1);
+
+        const before = "r".repeat(LOCAL_REASONING_LIMIT_CHARS - 1);
+        // The first delta ends on a high surrogate exactly at the limit; the next starts with its low half, which passes the limit.
+        const { options, save } = setup(holdingFetch([frame({ reasoning: `${before}\u{D83D}` }), frame({ reasoning: "\u{DE00}" })]));
+
+        await runLocalTurn(options);
+
+        expect(save).toHaveBeenCalledWith({ error: "reasoning-limit", outcome: "failed", prompt: "hi", reasoning: before, reply: "" });
+    });
+
     it("stops a reply whose reasoning passes its limit", async () => {
         expect.assertions(2);
 

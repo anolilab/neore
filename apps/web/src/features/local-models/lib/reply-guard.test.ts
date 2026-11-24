@@ -166,6 +166,13 @@ describe(createReplyGuard, () => {
         expect(guard.finish()).toBe("repeat-loop");
     });
 
+    it("does not stop a short line repeated over many lines, since its motif is too short to count", () => {
+        expect.assertions(1);
+
+        // Each `---` is three characters, but three of them joined as one block are eleven: the motif is what counts.
+        expect(feedContent(createReplyGuard(), "---\n".repeat(LOCAL_REPEAT_LIMIT * 3))).toBeUndefined();
+    });
+
     it("does not stop at the end of a stream that ends under the limit", () => {
         expect.assertions(2);
 

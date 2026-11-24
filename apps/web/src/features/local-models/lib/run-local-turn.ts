@@ -12,7 +12,7 @@ import { streamLocalChat } from "./local-client";
 import type { LocalErrorInfo } from "./local-errors";
 import { diagnoseLocalError } from "./local-errors";
 import type { ReplyStopKind } from "./reply-guard";
-import { createReplyGuard, LOCAL_IDLE_TIMEOUT_MS } from "./reply-guard";
+import { createReplyGuard, dropTrailingHighSurrogate, LOCAL_IDLE_TIMEOUT_MS } from "./reply-guard";
 
 /** How many earlier messages go to the local model as context. */
 export const LOCAL_HISTORY_LIMIT = 40;
@@ -137,6 +137,12 @@ export const runLocalTurn = async (options: RunLocalTurnOptions): Promise<RunLoc
 
                 text += repeat ? delta.content.slice(0, repeat.keep) : delta.content;
                 reasoning += overflow ? delta.reasoning.slice(0, overflow.keep) : delta.reasoning;
+
+                if (overflow) {
+                    // An earlier delta may have ended on a high surrogate whose low half the limit cut off.
+                    reasoning = dropTrailingHighSurrogate(reasoning);
+                }
+
                 onUpdate(text, reasoning);
                 armIdle();
 

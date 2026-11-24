@@ -29,8 +29,22 @@ const TRAILING_CR = /\r$/u;
 /** The first half of a UTF-16 surrogate pair: a character that is only whole with the second half after it. */
 const HIGH_SURROGATE = /^[\uD800-\uDBFF]$/u;
 
+/** Drops a high surrogate at the end of kept text: the limit cut off its low half, so it is not a character to save. */
+export const dropTrailingHighSurrogate = (text: string): string => (HIGH_SURROGATE.test(text.charAt(text.length - 1)) ? text.slice(0, -1) : text);
+
 /** The completed lines the repeat check can still see: enough for the longest block repeated the limit's times. */
 const WINDOW_LINES = LOCAL_REPEAT_LIMIT * LOCAL_REPEAT_MAX_BLOCK_LINES;
+
+/** The shortest run of lines that the block repeats: the block itself when no shorter run does. */
+const shortestMotif = (block: ReadonlyArray<string>): ReadonlyArray<string> => {
+    for (let period = 1; period < block.length; period += 1) {
+        if (block.length % period === 0 && block.every((line, index) => line === block[index % period])) {
+            return block.slice(0, period);
+        }
+    }
+
+    return block;
+};
 
 /** Whether the last `size` lines are one block repeated {@link LOCAL_REPEAT_LIMIT} times in a row. */
 const repeatsAtTail = (lines: ReadonlyArray<string>, size: number): boolean => {
@@ -43,7 +57,12 @@ const repeatsAtTail = (lines: ReadonlyArray<string>, size: number): boolean => {
     const start = lines.length - span;
     const block = lines.slice(start, start + size);
 
-    if (block.map((line) => line.trim()).join("\n").length < LOCAL_REPEAT_MIN_CHARS) {
+    // The minimum is for the motif: `---` repeated is too short to count however many lines it takes.
+    if (
+        shortestMotif(block)
+            .map((line) => line.trim())
+            .join("\n").length < LOCAL_REPEAT_MIN_CHARS
+    ) {
         return false;
     }
 
