@@ -823,6 +823,31 @@ describe("importShardRows on an id another user's row holds", () => {
             harness.close();
         }
     });
+
+    it.each(["user", "guest"])("stops the merge when a collaborator's row finds its id held by a %s-owned row", async (holder) => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const stored = await harness.run(async (context: any) => {
+                const heldId = await context.db.insert("threads", { title: "held chat", userId: holder });
+
+                await expect(
+                    context.runMutation(importShardRows, {
+                        from: "guest",
+                        rows: [{ _id: heldId, title: "collaborator chat", userId: "collaborator" }],
+                        table: "threads",
+                        to: "user",
+                    }),
+                ).rejects.toThrow("already exists on the new account's shard");
+
+                return context.db.get("threads", heldId);
+            });
+
+            expect(stored).toMatchObject({ title: "held chat", userId: holder });
+        } finally {
+            harness.close();
+        }
+    });
 });
 
 describe("a shard that holds both accounts' rows", () => {

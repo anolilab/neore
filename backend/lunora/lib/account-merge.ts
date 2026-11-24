@@ -268,8 +268,11 @@ export const importShardRows = internalMutation
             // let the clear pass delete the guest's copy, so the merge stops before anything is cleared.
             if (ownerField !== undefined) {
                 const existingOwner = existing[ownerField];
+                const incomingOwner = row[ownerField];
+                // Only the guest's own row may find itself under either account; a collaborator's row must find the same owner.
+                const reowned = incomingOwner === args.from && (existingOwner === args.from || existingOwner === args.to);
 
-                if (existingOwner !== args.from && existingOwner !== args.to && existingOwner !== row[ownerField]) {
+                if (!reowned && existingOwner !== incomingOwner) {
                     throw new Error(`${args.table} row ${id} already exists on the new account's shard as another user's row; the merge into ${args.to} stops`);
                 }
             }
