@@ -21,6 +21,11 @@ const DELETE_REF = /^git update-ref -d (\S+)$/u;
 /** The ref a push leases on, and the value it expects that ref to hold. */
 const LEASE = /--force-with-lease=([^:\s]+):(\S+)/u;
 
+const SET_ASIDE_AS_STEP_SEVEN = /set the rebase aside as step 7 says/gu;
+
+/** A command that moves or deletes a branch whatever it holds. */
+const FORCED_BRANCH_MOVE = /git (?:reset|branch -[fD])\b/u;
+
 const LAST_STEP = /^9\. /u;
 
 const STEP_EIGHT_GATE = /^8\. Only once step 7 passed/u;
@@ -136,7 +141,7 @@ describe(catchUpPrompt, () => {
                 ({ command }: Command) => command.includes("get-url") || command.startsWith("git remote") || command.startsWith("git config"),
             );
 
-            expect(urlReads.map(({ command, step }: Command) => [step, command.split(" | ")[0]])).toEqual([
+            expect(urlReads.map(({ command, step }: Command) => [step, command.split(" | ", 1)[0]])).toEqual([
                 [1, "git remote get-url --all origin"],
                 [1, "git remote get-url --push --all origin"],
             ]);
@@ -217,10 +222,10 @@ describe(catchUpPrompt, () => {
         expect(steps.get(7)).toContain("start with pr-42-a1b2c3d4,");
         expect(commandsMatching(commands, "git update-ref refs/heads/")).toHaveLength(1);
         // The base moving twice, a refused push, and an aborted repeat rebase all set the rebase aside the same way.
-        expect(steps.get(8)?.match(/as step 7 says/gu)).toHaveLength(2);
+        expect(steps.get(8)?.match(SET_ASIDE_AS_STEP_SEVEN)).toHaveLength(2);
         expect(steps.get(6)).toContain("as step 7 says");
         expect(SAME_REPO).not.toContain("leave the rebased commits in place");
-        expect(SAME_REPO).not.toMatch(/git (?:reset|branch -[fD])\b/u);
+        expect(SAME_REPO).not.toMatch(FORCED_BRANCH_MOVE);
     });
 
     it("for a fork, even one whose branch has origin's name and commit, holds no push and never touches origin's branch of that name", () => {

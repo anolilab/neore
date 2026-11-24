@@ -30,10 +30,10 @@ export const catchUpRunId = (): string => crypto.randomUUID().replaceAll("-", ""
 /**
  * A command that checks one of origin's URL lists without printing any URL: each URL loses its scheme, user and password, port
  * and `.git`, an scp-like `host:owner/name` reads as `host/owner/name`, and the filter prints `match` only when the list holds
- * exactly one URL and that one is `host/repository` (ignoring case). `host` and `repository` are plain ({@link isPlainRepo}).
+ * exactly one URL and that one is `host/repository` (ignoring case). `host` and `repo` are plain ({@link isPlainRepo}).
  */
-const originCheck = (list: string, host: string, repository: string): string =>
-    `git remote get-url ${list} origin | tr '[:upper:]' '[:lower:]' | sed -E 's#^[a-z][a-z0-9+.-]*://##; s#^[^@/]*@##; s#^([^/:]+):[0-9]+/#\\1/#; s#^([^/:]+):#\\1/#; s#/+$##; s#\\.git$##' | awk -v want='${host}/${repository.toLowerCase()}' '{ n++; if ($0 != want) bad++ } END { print (n == 1 && !bad) ? "match" : "mismatch" }'`;
+const originCheck = (list: string, host: string, repo: string): string =>
+    String.raw`git remote get-url ${list} origin | tr '[:upper:]' '[:lower:]' | sed -E 's#^[a-z][a-z0-9+.-]*://##; s#^[^@/]*@##; s#^([^/:]+):[0-9]+/#\1/#; s#^([^/:]+):#\1/#; s#/+$##; s#\.git$##' | awk -v want='${host}/${repo.toLowerCase()}' '{ n++; if ($0 != want) bad++ } END { print (n == 1 && !bad) ? "match" : "mismatch" }'`;
 
 /** How a run picks a local branch of its own: `local`, or the first of `local-2`, `local-3`, … that does not exist yet. */
 const chooseBranch = (local: string): string =>

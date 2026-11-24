@@ -21,7 +21,7 @@ const FILTER = (/`git remote get-url --all origin \| ([^`]+)`/u.exec(PROMPT)?.[1
 /** A user and password in an address, built here so no literal in this file reads as a credential. */
 const USERINFO = ["someone", "placeholder-value"].join(":");
 
-const check = (urls: string[]): string => execFileSync("sh", ["-c", FILTER], { encoding: "utf8", input: urls.map((url: string) => `${url}\n`).join("") });
+const check = (urls: string[]): string => execFileSync("/bin/sh", ["-c", FILTER], { encoding: "utf8", input: urls.map((url: string) => `${url}\n`).join("") });
 
 describe("catchUpPrompt's origin check", () => {
     it("has a filter to run", () => {
