@@ -307,7 +307,7 @@ msgstr "{0, plural, other {# 個のファイル}}"
 
 #. placeholder {0}: items.length
 #. placeholder {0}: option.value
-#: ../../packages/ui/src/components/image-gallery.tsx:407
+#: ../../packages/ui/src/components/image-gallery.tsx:446
 #: src/features/chat/thread/composer-image-settings.tsx:227
 msgid "{0, plural, one {# image} other {# images}}"
 msgstr "{0, plural, other {# 枚}}"
@@ -765,12 +765,12 @@ msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "{0} / {MAX_PARALLEL} 個を選択中"
 
 #. placeholder {0}: referenceImageIds.length
-#: src/features/chat/thread/media-gallery-view.tsx:370
+#: src/features/chat/thread/media-gallery-view.tsx:372
 msgid "{0} of {MAX_REFERENCE_IMAGES} references selected"
 msgstr "{0} / {MAX_REFERENCE_IMAGES} 枚の参照画像を選択中"
 
 #. placeholder {0}: selection.length
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:248
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:250
 msgid "{0} of {maxReferences} selected"
 msgstr "{0} / {maxReferences} 個を選択中"
 
@@ -1290,11 +1290,11 @@ msgstr "{metricLabel} > 1 時間あたり {threshold}"
 msgid "{metricLabel} > {threshold} per month"
 msgstr "{metricLabel} > 1 か月あたり {threshold}"
 
-#: src/features/chat/thread/media-gallery-view.tsx:345
+#: src/features/chat/thread/media-gallery-view.tsx:347
 msgid "{mins}m"
 msgstr "{mins} 分"
 
-#: src/features/chat/thread/media-gallery-view.tsx:345
+#: src/features/chat/thread/media-gallery-view.tsx:347
 msgid "{mins}m {secs}s"
 msgstr "{mins} 分 {secs} 秒"
 
@@ -1537,7 +1537,7 @@ msgstr "{rowsNeeded, plural, other {クリップボードの内容をすべて�
 msgid "{secondLabel} ×{secondCount}"
 msgstr "{secondLabel} ×{secondCount}"
 
-#: src/features/chat/thread/media-gallery-view.tsx:339
+#: src/features/chat/thread/media-gallery-view.tsx:341
 msgid "{seconds}s"
 msgstr "{seconds} 秒"
 
@@ -2745,7 +2745,7 @@ msgstr "長方形を追加"
 msgid "Add reference image"
 msgstr "参照画像を追加"
 
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:210
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:212
 msgid "Add reference images"
 msgstr "参照画像を追加"
 
@@ -3567,7 +3567,7 @@ msgstr "すべてのモデルを有効にしました"
 msgid "All models. <0>One workspace.</0>"
 msgstr "すべてのモデル。<0>1 つのワークスペースで。</0>"
 
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:227
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:229
 msgid "All my images"
 msgstr "自分の画像すべて"
 
@@ -4556,8 +4556,8 @@ msgstr "別のアシスタントに覚えていることの一覧を出しても
 msgid "Aspect ratio"
 msgstr "アスペクト比"
 
-#: src/features/chat/thread/media-gallery-view.tsx:456
-#: src/features/chat/thread/media-gallery-view.tsx:541
+#: src/features/chat/thread/media-gallery-view.tsx:458
+#: src/features/chat/thread/media-gallery-view.tsx:543
 #: src/features/workflow/components/nodes/video-node.tsx:178
 msgid "Aspect Ratio"
 msgstr "アスペクト比"
@@ -4741,7 +4741,7 @@ msgstr "自動"
 #: src/features/chat/thread/composer-permission-mode.tsx:41
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:65
-#: src/features/chat/thread/media-gallery-view.tsx:509
+#: src/features/chat/thread/media-gallery-view.tsx:511
 #: src/features/settings/components/chat/bots-settings.tsx:132
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Auto"
@@ -6002,7 +6002,7 @@ msgstr "カナダ"
 #: src/features/auth/components/team/leave-team-dialog.tsx:76
 #: src/features/auth/components/team/team-settings-dialog.tsx:209
 #: src/features/canvas/canvas-panel.tsx:121
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:256
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:258
 #: src/features/chat/forward/forward-dialog.tsx:169
 #: src/features/chat/forward/forward-selection-bar.tsx:78
 #: src/features/chat/group/create-group-chat-button.tsx:240
@@ -6884,9 +6884,9 @@ msgstr "クリーンアップに失敗しました"
 
 #: ../../packages/ui/src/components/combobox.tsx:108
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:233
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:252
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:254
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:96
-#: src/features/chat/thread/media-gallery-view.tsx:380
+#: src/features/chat/thread/media-gallery-view.tsx:382
 #: src/features/prompts/components/prompt-list.tsx:614
 #: src/features/settings/components/chat/api-keys-settings.tsx:401
 #: src/features/settings/components/chat/models-settings.tsx:477
@@ -9923,7 +9923,7 @@ msgstr "カスタマイズ"
 msgid "Customize"
 msgstr "カスタマイズ"
 
-#: src/features/chat/thread/media-gallery-view.tsx:437
+#: src/features/chat/thread/media-gallery-view.tsx:439
 msgid "Customize and regenerate"
 msgstr "カスタマイズして再生成"
 
@@ -10885,7 +10885,7 @@ msgstr "画像をどのように変換するかを説明してください..."
 msgid "Describe the image to generate..."
 msgstr "生成する画像を説明してください..."
 
-#: src/features/chat/thread/media-gallery-view.tsx:446
+#: src/features/chat/thread/media-gallery-view.tsx:448
 msgid "Describe the image you want to create..."
 msgstr "作成したい画像を説明してください..."
 
@@ -10910,7 +10910,7 @@ msgstr "タスク、期待する結果、繰り返しのタイミング（毎日
 msgid "Describe the video to generate..."
 msgstr "生成する動画を説明してください..."
 
-#: src/features/chat/thread/media-gallery-view.tsx:446
+#: src/features/chat/thread/media-gallery-view.tsx:448
 msgid "Describe the video you want to create..."
 msgstr "作成したい動画を説明してください..."
 
@@ -10977,7 +10977,7 @@ msgstr "説明は必須です"
 msgid "Description must be {SKILL_DESCRIPTION_MAX} characters or less"
 msgstr "説明は {SKILL_DESCRIPTION_MAX} 文字以内で入力してください"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:337
+#: ../../packages/ui/src/components/image-gallery.tsx:376
 msgid "Deselect"
 msgstr "選択を解除"
 
@@ -10986,7 +10986,7 @@ msgstr "選択を解除"
 msgid "Deselect all"
 msgstr "すべて選択解除"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:238
+#: ../../packages/ui/src/components/image-gallery.tsx:263
 msgid "Deselect image"
 msgstr "画像の選択を解除"
 
@@ -11466,6 +11466,7 @@ msgstr "ダウンロード"
 
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:109
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:183
+#: ../../packages/ui/src/components/save-file-button.tsx:27
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:82
 #: src/features/canvas/canvas-panel.tsx:811
 #: src/features/canvas/canvas-panel.tsx:828
@@ -11490,6 +11491,7 @@ msgid "Download {displayName}"
 msgstr "{displayName} をダウンロード"
 
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:118
+#: ../../packages/ui/src/components/save-file-button.tsx:27
 msgid "Download {filename}"
 msgstr "{filename} をダウンロード"
 
@@ -11500,6 +11502,11 @@ msgstr "{fileName} をダウンロード"
 #: src/features/chat/thread/sandbox-files.tsx:241
 msgid "Download {name} ({size})"
 msgstr "{name} をダウンロード（{size}）"
+
+#: ../../packages/ui/src/components/image-gallery.tsx:254
+#: ../../packages/ui/src/components/image-gallery.tsx:367
+msgid "Download {tileName} ({position})"
+msgstr "{tileName} ({position}) をダウンロード"
 
 #: src/features/settings/components/privacy/data-export.tsx:98
 msgid "Download a copy of all your personal data in JSON format (GDPR Article 20 - Right to Data Portability)"
@@ -11724,7 +11731,7 @@ msgstr "選択項目を複製（{selectedNonGroupCount}）"
 
 #: src/features/admin/components/ban-user-dialog.tsx:117
 #: src/features/chat/header/temporary-chat-dropdown.tsx:300
-#: src/features/chat/thread/media-gallery-view.tsx:567
+#: src/features/chat/thread/media-gallery-view.tsx:569
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:136
 msgid "Duration"
 msgstr "長さ"
@@ -14007,7 +14014,7 @@ msgstr "アカウントをリンクできませんでした"
 msgid "Failed to load analytics. Ensure the LLM Gateway is running and reachable."
 msgstr "アナリティクスを読み込めませんでした。LLM Gateway が起動していて到達可能であることを確認してください。"
 
-#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:84
+#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:85
 msgid "Failed to load audio"
 msgstr "音声を読み込めませんでした"
 
@@ -14028,7 +14035,7 @@ msgstr "スプレッドシートを読み込めませんでした"
 msgid "Failed to load usage data. Ensure the LLM Gateway is running and reachable."
 msgstr "使用量データを読み込めませんでした。LLM Gateway が起動していて到達可能であることを確認してください。"
 
-#: ../../packages/ui/src/components/file-renderers/video-player.tsx:92
+#: ../../packages/ui/src/components/file-renderers/video-player.tsx:98
 msgid "Failed to load video stream."
 msgstr "動画ストリームを読み込めませんでした。"
 
@@ -15829,7 +15836,9 @@ msgstr "ガリシア語"
 msgid "Galician (Spain)"
 msgstr "ガリシア語（スペイン）"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:193
+#: ../../packages/ui/src/components/image-gallery.tsx:168
+#: ../../packages/ui/src/components/image-gallery.tsx:207
+#: ../../packages/ui/src/components/image-gallery.tsx:299
 msgid "Gallery item"
 msgstr "ギャラリー項目"
 
@@ -15971,7 +15980,7 @@ msgstr "創作ストーリーのアイデアを出す"
 msgid "Generate image"
 msgstr "画像を生成"
 
-#: src/features/chat/thread/media-gallery-view.tsx:620
+#: src/features/chat/thread/media-gallery-view.tsx:622
 #: src/features/workflow/templates/index.ts:106
 msgid "Generate Image"
 msgstr "画像を生成"
@@ -15997,7 +16006,7 @@ msgstr "2025 年向けのユニークなビジネスアイデアを考える"
 msgid "Generate video"
 msgstr "動画を生成"
 
-#: src/features/chat/thread/media-gallery-view.tsx:620
+#: src/features/chat/thread/media-gallery-view.tsx:622
 #: src/features/workflow/templates/index.ts:424
 msgid "Generate Video"
 msgstr "動画を生成"
@@ -16027,15 +16036,15 @@ msgstr "生成された画像"
 msgid "Generated Image"
 msgstr "生成された画像"
 
-#: src/features/chat/thread/media-gallery-view.tsx:353
+#: src/features/chat/thread/media-gallery-view.tsx:355
 msgid "Generated images will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成した画像はここに表示されます。まずは下の入力欄で作りたいものを説明してください。"
 
-#: src/features/chat/thread/media-gallery-view.tsx:244
+#: src/features/chat/thread/media-gallery-view.tsx:245
 msgid "Generated video"
 msgstr "生成された動画"
 
-#: src/features/chat/thread/media-gallery-view.tsx:354
+#: src/features/chat/thread/media-gallery-view.tsx:356
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成した動画はここに表示されます。まずは下の入力欄で作りたいものを説明してください。"
 
@@ -16048,7 +16057,7 @@ msgid "Generating draft…"
 msgstr "下書きを生成しています…"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:530
-#: src/features/chat/thread/media-gallery-view.tsx:403
+#: src/features/chat/thread/media-gallery-view.tsx:405
 msgid "Generating image..."
 msgstr "画像を生成しています..."
 
@@ -16061,7 +16070,7 @@ msgid "Generating response"
 msgstr "応答を生成中"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:531
-#: src/features/chat/thread/media-gallery-view.tsx:403
+#: src/features/chat/thread/media-gallery-view.tsx:405
 msgid "Generating video..."
 msgstr "動画を生成しています..."
 
@@ -17209,7 +17218,7 @@ msgstr "履歴"
 msgid "Hit rate"
 msgstr "ヒット率"
 
-#: ../../packages/ui/src/components/file-renderers/video-player.tsx:92
+#: ../../packages/ui/src/components/file-renderers/video-player.tsx:98
 msgid "HLS playback is not supported in this browser."
 msgstr "このブラウザーは HLS 再生に対応していません。"
 
@@ -17566,7 +17575,7 @@ msgid "Image generation"
 msgstr "画像生成"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:177
-#: src/features/chat/thread/media-gallery-view.tsx:350
+#: src/features/chat/thread/media-gallery-view.tsx:352
 #: src/features/marketing/components/landing-page.tsx:287
 #: src/features/marketing/components/model-detail-page.tsx:87
 #: src/features/workflow/components/gallery/publish-dialog.tsx:28
@@ -23018,7 +23027,7 @@ msgid "No icon found"
 msgstr "アイコンが見つかりません"
 
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:171
-#: src/features/chat/thread/media-gallery-view.tsx:351
+#: src/features/chat/thread/media-gallery-view.tsx:353
 msgid "No images yet"
 msgstr "画像はまだありません"
 
@@ -23034,7 +23043,7 @@ msgstr "しばらく入力がありません。1 分以内に操作がエージ�
 msgid "No instruction files were found in this repository."
 msgstr "このリポジトリには指示ファイルが見つかりませんでした。"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:489
+#: ../../packages/ui/src/components/image-gallery.tsx:528
 msgid "No items"
 msgstr "アイテムなし"
 
@@ -23212,7 +23221,7 @@ msgstr "プロジェクトなし"
 msgid "No projects available. Create a project first."
 msgstr "利用可能なプロジェクトがありません。先にプロジェクトを作成してください。"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:400
+#: ../../packages/ui/src/components/image-gallery.tsx:439
 msgid "No prompt"
 msgstr "プロンプトなし"
 
@@ -23254,7 +23263,7 @@ msgstr "このメモリには引用が保持されていません。"
 msgid "No ratings yet"
 msgstr "評価はまだありません"
 
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:248
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:250
 msgid "No references selected"
 msgstr "参照が選択されていません"
 
@@ -23463,7 +23472,7 @@ msgstr "変数が見つかりません"
 msgid "No versions yet. Versions are saved as you edit."
 msgstr "バージョンはまだありません。編集するとバージョンが保存されます。"
 
-#: src/features/chat/thread/media-gallery-view.tsx:351
+#: src/features/chat/thread/media-gallery-view.tsx:353
 msgid "No videos yet"
 msgstr "動画はまだありません"
 
@@ -25666,7 +25675,7 @@ msgstr "スタイル参照画像の URL を貼り付け..."
 msgid "Path"
 msgstr "パス"
 
-#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:93
+#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:96
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:168
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:233
 msgid "Pause"
@@ -25937,7 +25946,7 @@ msgstr "共有するスキル、スケジュール、Webhook、グループチ�
 msgid "Pick the computer or server the project's folder is on."
 msgstr "プロジェクトのフォルダーがあるコンピューターまたはサーバーを選択してください。"
 
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:212
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:214
 msgid "Pick up to {maxReferences} images. The order you select them is the order the model will see them."
 msgstr "画像を最大 {maxReferences} 枚選択してください。選択した順番でモデルに渡されます。"
 
@@ -26096,7 +26105,7 @@ msgstr "計画"
 msgid "Platform"
 msgstr "プラットフォーム"
 
-#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:93
+#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:96
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:168
 msgid "Play"
 msgstr "再生"
@@ -26856,8 +26865,8 @@ msgstr "プロフェッショナル"
 msgid "Professional"
 msgstr "プロフェッショナル"
 
-#: src/features/chat/thread/media-gallery-view.tsx:527
-#: src/features/chat/thread/media-gallery-view.tsx:606
+#: src/features/chat/thread/media-gallery-view.tsx:529
+#: src/features/chat/thread/media-gallery-view.tsx:608
 msgid "Professional Camera Controls"
 msgstr "プロ向けカメラコントロール"
 
@@ -26997,8 +27006,8 @@ msgstr "管理者に昇格"
 msgid "prompt"
 msgstr "プロンプト"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:400
-#: src/features/chat/thread/media-gallery-view.tsx:441
+#: ../../packages/ui/src/components/image-gallery.tsx:439
+#: src/features/chat/thread/media-gallery-view.tsx:443
 #: src/features/settings/components/chat/trigger-settings.tsx:1017
 #: src/features/workflow/templates/index.ts:96
 #: src/features/workflow/templates/index.ts:230
@@ -27332,7 +27341,7 @@ msgid "Put several agents with their own roles in one thread. A review panel can
 msgstr "役割の異なる複数のエージェントを 1 つのスレッドに配置できます。レビューパネルはセキュリティとパフォーマンスの観点から変更を確認でき、ディベートでは統合の前に両方の立場を議論できます。"
 
 #: src/features/chat/thread/composer-image-settings.tsx:181
-#: src/features/chat/thread/media-gallery-view.tsx:481
+#: src/features/chat/thread/media-gallery-view.tsx:483
 msgid "Quality"
 msgstr "品質"
 
@@ -30387,7 +30396,7 @@ msgstr "オブジェクトを選択してプロパティを編集"
 msgid "Select an organization to manage teams"
 msgstr "チームを管理する組織を選択してください"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:337
+#: ../../packages/ui/src/components/image-gallery.tsx:376
 msgid "Select as reference"
 msgstr "参照として選択"
 
@@ -30411,7 +30420,7 @@ msgstr "ファイルを選択"
 msgid "Select files to upload"
 msgstr "アップロードするファイルを選択"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:238
+#: ../../packages/ui/src/components/image-gallery.tsx:263
 msgid "Select image as reference"
 msgstr "画像を参照として選択"
 
@@ -30541,7 +30550,7 @@ msgstr "自分のメッセージを選択"
 msgid "Selected {requestNoun}"
 msgstr "選択した{requestNoun}"
 
-#: src/features/chat/thread/media-gallery-view.tsx:365
+#: src/features/chat/thread/media-gallery-view.tsx:367
 msgid "Selected reference"
 msgstr "選択した参照"
 
@@ -33111,7 +33120,7 @@ msgid "style"
 msgstr "スタイル"
 
 #: src/features/chat/thread/composer-image-settings.tsx:205
-#: src/features/chat/thread/media-gallery-view.tsx:502
+#: src/features/chat/thread/media-gallery-view.tsx:504
 #: src/features/workflow/components/nodes/character-ref-node.tsx:26
 msgid "Style"
 msgstr "スタイル"
@@ -35314,7 +35323,7 @@ msgstr "次に、モデルをダウンロードして以下のベース URL を�
 msgid "There are no credits left to answer this. Add credits and try again."
 msgstr "これに回答するためのクレジットが残っていません。クレジットを追加して、もう一度お試しください。"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:490
+#: ../../packages/ui/src/components/image-gallery.tsx:529
 msgid "There are no items to display."
 msgstr "表示するアイテムがありません。"
 
@@ -36063,7 +36072,7 @@ msgstr "このタスクはまだ実行されていません。"
 msgid "This text is only hidden characters, so there is nothing to save."
 msgstr "このテキストは非表示の文字だけなので、保存する内容がありません。"
 
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:226
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:228
 msgid "This thread"
 msgstr "このスレッド"
 
@@ -37936,7 +37945,7 @@ msgid "Usage dashboard"
 msgstr "使用状況ダッシュボード"
 
 #. placeholder {0}: selection.length
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:259
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:261
 msgid "Use {0, plural, one {# reference} other {# references}}"
 msgstr "{0, plural, other {# 件の参照を使用}}"
 
@@ -38019,7 +38028,7 @@ msgstr "MCP クライアントから使用する"
 msgid "Use lowercase letters, numbers and single hyphens only"
 msgstr "小文字、数字、単一のハイフンのみ使用できます"
 
-#: src/features/chat/thread/media-gallery-view.tsx:631
+#: src/features/chat/thread/media-gallery-view.tsx:633
 msgid "Use Original Prompt"
 msgstr "元のプロンプトを使用"
 
@@ -38028,7 +38037,7 @@ msgstr "元のプロンプトを使用"
 msgid "Use Prompt"
 msgstr "プロンプトを使用"
 
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:259
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:261
 msgid "Use selected"
 msgstr "選択したものを使用"
 
@@ -38560,7 +38569,7 @@ msgstr "動画生成"
 msgid "Video generation"
 msgstr "動画生成"
 
-#: src/features/chat/thread/media-gallery-view.tsx:350
+#: src/features/chat/thread/media-gallery-view.tsx:352
 #: src/features/marketing/components/model-detail-page.tsx:95
 msgid "Video Generation"
 msgstr "動画生成"
