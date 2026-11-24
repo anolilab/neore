@@ -20,10 +20,10 @@ import { useThreadPaneState } from "@/features/chat/thread/use-thread-pane-state
 
 import { setSplitViewMounted } from "./composer-drafts";
 import { useIsDesktop } from "./desktop-layout";
-import { COMPOSER_INPUT, focusComposerWhenMounted } from "./focus-composer";
+import { COMPOSER_INPUT, focusComposerWhenMounted, useComposerFocusRequest } from "./focus-composer";
 import { leaveSplitView, restoreLiveComposerFor, syncFocusedModel, watchPaneFocus } from "./pane-state";
 import { MIN_PANE_PX } from "./split-layout";
-import { clearComposerFocusRequest, readSavedLayoutOrEmpty, useSplitLayoutStore } from "./split-layout-store";
+import { readSavedLayoutOrEmpty, useSplitLayoutStore } from "./split-layout-store";
 import { useChatHasDraft } from "./use-chat-has-draft";
 
 /** The space between two panes: the resize handle itself, so there is no line between them. */
@@ -141,22 +141,8 @@ const Pane: FC<PaneProps> = ({
         });
     }, [isFocused]);
 
-    // A keyboard activation of a link that opened this pane asks for its composer: the request is consumed here.
-    const composerRequested = useSplitLayoutStore((state) => state.composerFocusThreadId === threadId);
-
-    useEffect(() => {
-        if (!(isFocused && composerRequested)) {
-            return undefined;
-        }
-
-        // The request is cleared once the composer has taken focus or has given up; a pane left meanwhile clears it too.
-        const cancel = focusComposerWhenMounted(paneRef, () => clearComposerFocusRequest(threadId));
-
-        return () => {
-            cancel();
-            clearComposerFocusRequest(threadId);
-        };
-    }, [composerRequested, isFocused, threadId]);
+    // A keyboard activation of a link that opened this pane asks for its composer: the request is consumed by this hook.
+    useComposerFocusRequest(paneRef, threadId, isFocused);
 
     const activate = () => {
         focusComposerRef.current = true;

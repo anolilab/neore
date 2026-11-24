@@ -1,3 +1,7 @@
+import { useEffect } from "react";
+
+import { clearComposerFocusRequest, useSplitLayoutStore } from "./split-layout-store";
+
 /** How many frames to wait for the composer's editor (it loads lazily) before giving up on moving focus into it. */
 export const FOCUS_FRAMES = 60;
 
@@ -35,4 +39,25 @@ export const focusComposerWhenMounted = (pane: { current: HTMLElement | null }, 
     focusEditor();
 
     return () => cancelAnimationFrame(frame);
+};
+
+/**
+ * Moves focus into a pane's composer when a keyboard activation asked for it: once the pane is focused and its composer has mounted. The
+ * request is cleared when the composer takes focus or gives up, and when the pane is left meanwhile.
+ */
+export const useComposerFocusRequest = (pane: { current: HTMLElement | null }, threadId: string, isFocused: boolean): void => {
+    const isRequested = useSplitLayoutStore((state) => state.composerFocusThreadId === threadId);
+
+    useEffect(() => {
+        if (!(isFocused && isRequested)) {
+            return undefined;
+        }
+
+        const cancel = focusComposerWhenMounted(pane, () => clearComposerFocusRequest(threadId));
+
+        return () => {
+            cancel();
+            clearComposerFocusRequest(threadId);
+        };
+    }, [isFocused, isRequested, pane, threadId]);
 };
