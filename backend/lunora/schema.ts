@@ -1855,6 +1855,8 @@ export const schema = defineSchema({
     // the provider; `flow` carries what completion needs (PKCE verifier and any
     // DCR client secret encrypted). Single-use: completion deletes the row.
     oauthStates: defineTable({
+        // RFC 9207: the server advertised `iss` on its responses, so the callback refuses one without it.
+        authorizationResponseIssParameterSupported: v.optional(v.boolean()),
         // Legacy target encoding (a slug, or `mcp:<name>` plus `mcpServer`), read
         // only for rows written before `target`; new rows carry `target` alone.
         connectorSlug: v.optional(v.string()),

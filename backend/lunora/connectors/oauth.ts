@@ -25,12 +25,21 @@ import { authAction, rateLimit } from "../lib/crpc";
 import { beginOAuthFlow, providerFailure } from "./lib/begin-flow";
 import { readEnvOAuthClient } from "./lib/client-config";
 import { resolveOAuthClient } from "./lib/grant-runtime";
-import { exchangeAuthorizationCode } from "./lib/mcp-oauth";
+import { checkAuthorizationResponseIssuer, exchangeAuthorizationCode, OAUTH_ISSUER_MISSING } from "./lib/mcp-oauth";
 import { hashOAuthState } from "./lib/pkce";
 import { decryptConnectorSecret, encryptConnectorTokens } from "./lib/token-crypto";
 import type { StoredOAuthClient } from "./lib/validators";
 
 const vSlug = v.string().check((value) => value.length > 0 && value.length <= 64, { message: "Invalid connector" });
+
+/** The coded refusal for a callback whose RFC 9207 `iss` does not check out. */
+const issuerRefusal = (code: string): LunoraError =>
+    new LunoraError(
+        code,
+        code === OAUTH_ISSUER_MISSING
+            ? "The provider did not say which authorization server answered. Please connect again."
+            : "The authorization response came from a different authorization server. Please connect again.",
+    );
 
 export const startConnectorOAuth = authAction
     .use(rateLimit("connectors/oauth"))
@@ -75,6 +84,8 @@ export const completeConnectorOAuth = authAction
     .use(rateLimit("connectors/oauth"))
     .input({
         code: v.string().check((value) => value.length > 0 && value.length <= 4096, { message: "Invalid authorization code" }),
+        /** RFC 9207 `iss` from the redirect. Checked against the flow's issuer before the code is exchanged. */
+        iss: v.optional(v.string().check((value) => value.length <= 2048, { message: "Invalid issuer" })),
         state: v.string().check((value) => value.length > 0 && value.length <= 256, { message: "Invalid state" }),
     })
     .output(
@@ -85,7 +96,7 @@ export const completeConnectorOAuth = authAction
             name: v.string(),
         }),
     )
-    .action(async ({ args: { code, state }, ctx }) => {
+    .action(async ({ args: { code, iss, state }, ctx }) => {
         const consumed = await ctx.runMutation(internal.connectors.store.consumeOAuthState, {
             stateHash: await hashOAuthState(state),
             userId: ctx.user.userId,
@@ -103,6 +114,18 @@ export const completeConnectorOAuth = authAction
         }
 
         const { flow, target } = consumed;
+
+        // RFC 9207: a response from another authorization server must not complete this flow. Refused before the exchange, so the code is never sent.
+        const issuerCheck = checkAuthorizationResponseIssuer({
+            expectedIssuer: flow.issuer,
+            iss,
+            issParameterSupported: consumed.authorizationResponseIssParameterSupported === true,
+        });
+
+        if (!issuerCheck.ok) {
+            throw issuerRefusal(issuerCheck.code);
+        }
+
         const definition = target.kind === "connector" ? await ctx.runQuery(internal.connectors.store.getDefinitionForOAuth, { slug: target.slug }) : null;
 
         if (target.kind === "connector" && !definition) {

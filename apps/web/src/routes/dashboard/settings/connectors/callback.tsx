@@ -52,7 +52,13 @@ const OAuthCallback = () => {
             }
 
             try {
-                const { accountLabel, kind, name } = await completeOAuth({ code: searchParams.code, state: searchParams.state });
+                // The root route's search validator keeps only its own keys, so the router's search never carries `iss`. Read it from the redirect itself.
+                const iss = new URLSearchParams(globalThis.location.search).get("iss");
+                const { accountLabel, kind, name } = await completeOAuth({
+                    code: searchParams.code,
+                    ...(iss !== null && { iss }),
+                    state: searchParams.state,
+                });
 
                 setMessage(t`${name} connected.`);
                 toast.success(accountLabel ? t`${name} connected to ${accountLabel}` : t`${name} connected`);
