@@ -67,8 +67,9 @@
     },
     "scripts": {
         "build": "node scripts/run-then-codegen.mjs lunora build --emit-bindings lunora-bindings.json",
+        "check:schema-baseline": "node scripts/check-schema-baseline.mjs",
         "clean": "rimraf node_modules dist .eslintcache lunora/_generated",
-        "codegen": "lunora codegen && node scripts/check-generated.mjs",
+        "codegen": "lunora codegen --strict-advisories && node scripts/check-generated.mjs",
         "deploy": "lunora deploy",
         "dev": "lunora dev --inspector-port 9235",
         "lint:eslint": "eslint .",

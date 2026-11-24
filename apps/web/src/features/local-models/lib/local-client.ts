@@ -231,6 +231,8 @@ export interface StreamLocalChatOptions {
     messages: LocalChatMessage[];
     model: string;
     onDelta: (delta: { content: string; reasoning: string }) => void;
+    /** Called once the server has answered the request, before any token is read. */
+    onOpen?: () => void;
     signal?: AbortSignal;
 }
 
@@ -242,7 +244,15 @@ export interface StreamLocalChatOptions {
  * On abort the promise rejects with the `AbortError`; the caller keeps the
  * text it already received through `onDelta`.
  */
-export const streamLocalChat = async ({ baseUrl, fetchImpl = fetch, messages, model, onDelta, signal }: StreamLocalChatOptions): Promise<LocalChatResult> => {
+export const streamLocalChat = async ({
+    baseUrl,
+    fetchImpl = fetch,
+    messages,
+    model,
+    onDelta,
+    onOpen,
+    signal,
+}: StreamLocalChatOptions): Promise<LocalChatResult> => {
     const response = await assertLocalOk(
         await fetchImpl(`${baseUrl}/chat/completions`, {
             body: JSON.stringify({ messages, model, stream: true }),
@@ -251,6 +261,8 @@ export const streamLocalChat = async ({ baseUrl, fetchImpl = fetch, messages, mo
             signal,
         }),
     );
+
+    onOpen?.();
 
     if (!response.body) {
         throw new Error("The local server sent no stream");

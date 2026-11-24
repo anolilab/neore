@@ -104,6 +104,11 @@ jobs:
                   NODE_OPTIONS: "--max-old-space-size=4096"
               run: "pnpm --filter @neore/backend run codegen"
 
+            - name: "Check the schema baseline is committed"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run check:schema-baseline"
+
             - name: "Check formatting"
               shell: "bash"
               run: "pnpm lint:oxfmt"

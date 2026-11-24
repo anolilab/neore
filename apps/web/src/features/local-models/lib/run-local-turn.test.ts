@@ -1,10 +1,35 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { classifyLocalError } from "./local-errors";
+import { LOCAL_IDLE_TIMEOUT_MS, LOCAL_LINE_REPEAT_LIMIT, LOCAL_REASONING_LIMIT_CHARS } from "./reply-guard";
 import type { RunLocalTurnOptions } from "./run-local-turn";
 import { buildLocalHistory, runLocalTurn } from "./run-local-turn";
 
 const BASE = ["http", "//localhost:11434/v1"].join(":");
+
+/** One SSE `data:` frame carrying a chat-completion delta. */
+const frame = (delta: { content?: string; reasoning?: string }) => `data: ${JSON.stringify({ choices: [{ delta }] })}\n\n`;
+
+/** Sends the frames, then stays open until the caller aborts — how a model that has stopped talking looks. */
+const holdingFetch =
+    (frames: string[]) =>
+    async (_url: string, init?: RequestInit): Promise<Response> => {
+        const encoder = new TextEncoder();
+
+        return new Response(
+            new ReadableStream({
+                start(controller) {
+                    for (const part of frames) {
+                        controller.enqueue(encoder.encode(part));
+                    }
+
+                    init?.signal?.addEventListener("abort", () => {
+                        controller.error(new DOMException("aborted", "AbortError"));
+                    });
+                },
+            }),
+        );
+    };
 
 const sseResponse = (parts: string[], tail: "done" | "error" = "done") => {
     const encoder = new TextEncoder();
@@ -28,7 +53,7 @@ const sseResponse = (parts: string[], tail: "done" | "error" = "done") => {
     );
 };
 
-const setup = (fetchImpl: () => Promise<Response>, overrides: Partial<RunLocalTurnOptions> = {}) => {
+const setup = (fetchImpl: (url: string, init?: RequestInit) => Promise<Response>, overrides: Partial<RunLocalTurnOptions> = {}) => {
     const save = vi.fn(async () => {
         return { threadId: "thread-1" };
     });
@@ -84,6 +109,32 @@ describe(runLocalTurn, () => {
         expect(save).toHaveBeenCalledWith({ error: "out of memory", outcome: "failed", prompt: "hi", reasoning: "", reply: "partial" });
     });
 
+    it("saves a localized sentence, not a bare code, when a failed reply has no server detail", async () => {
+        expect.assertions(1);
+
+        // Pulled, not started: erroring a stream in `start` would discard the partial chunk before it is read.
+        const encoder = new TextEncoder();
+        const partial = encoder.encode(frame({ content: "partial" }));
+        let sent = false;
+        const failing = new ReadableStream({
+            pull(controller) {
+                if (!sent) {
+                    sent = true;
+                    controller.enqueue(partial);
+
+                    return;
+                }
+
+                controller.error(new TypeError("Failed to fetch"));
+            },
+        });
+        const { options, save } = setup(async () => new Response(failing), { describeError: (info) => `described ${info.kind}` });
+
+        await runLocalTurn(options);
+
+        expect(save).toHaveBeenCalledWith({ error: "described unreachable", outcome: "failed", prompt: "hi", reasoning: "", reply: "partial" });
+    });
+
     it("saves what arrived before a stop, and nothing for a stop before the first token", async () => {
         expect.assertions(3);
 
@@ -133,6 +184,124 @@ describe(runLocalTurn, () => {
             { content: "reply", role: "assistant" },
             { content: "hi", role: "user" },
         ]);
+    });
+});
+
+describe("reply guard stops", () => {
+    it("stops a reply that repeats one line, keeps the text before the stop, and saves the cause", async () => {
+        expect.assertions(2);
+
+        const line = "I will try the same thing again.\n";
+        const { options, save } = setup(holdingFetch(Array.from({ length: LOCAL_LINE_REPEAT_LIMIT + 2 }, () => frame({ content: line }))));
+
+        await expect(runLocalTurn(options)).resolves.toStrictEqual({ error: { kind: "repeat-loop" }, outcome: "failed", saved: true, threadId: "thread-1" });
+        expect(save).toHaveBeenCalledWith({
+            error: "repeat-loop",
+            outcome: "failed",
+            prompt: "hi",
+            reasoning: "",
+            reply: line.repeat(LOCAL_LINE_REPEAT_LIMIT),
+        });
+    });
+
+    it("does not save text that arrives in the same chunk after the repeat", async () => {
+        expect.assertions(2);
+
+        const line = "I will try the same thing again.\n";
+        const chunk = frame({ content: `${line.repeat(LOCAL_LINE_REPEAT_LIMIT)}after the loop` });
+        const { options, save } = setup(holdingFetch([chunk]));
+
+        await expect(runLocalTurn(options)).resolves.toMatchObject({ error: { kind: "repeat-loop" }, outcome: "failed" });
+        expect(save).toHaveBeenCalledWith({
+            error: "repeat-loop",
+            outcome: "failed",
+            prompt: "hi",
+            reasoning: "",
+            reply: line.repeat(LOCAL_LINE_REPEAT_LIMIT),
+        });
+    });
+
+    it("does not start the idle clock until the server has answered", async () => {
+        expect.assertions(2);
+
+        vi.useFakeTimers();
+
+        try {
+            const open = holdingFetch([]);
+            let answer: () => void = () => undefined;
+            const { options, save } = setup(
+                (url, init) =>
+                    new Promise<Response>((resolve) => {
+                        answer = () => {
+                            resolve(open(url, init));
+                        };
+                    }),
+            );
+            const pending = runLocalTurn(options);
+
+            await vi.advanceTimersByTimeAsync(LOCAL_IDLE_TIMEOUT_MS * 2);
+            expect(save).not.toHaveBeenCalled();
+
+            answer();
+            await vi.advanceTimersByTimeAsync(LOCAL_IDLE_TIMEOUT_MS);
+
+            await expect(pending).resolves.toMatchObject({ error: { kind: "idle" } });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("stops a reply that sends nothing for the idle limit, even before the first token", async () => {
+        expect.assertions(2);
+
+        vi.useFakeTimers();
+
+        try {
+            const { options, save } = setup(holdingFetch([]));
+            const pending = runLocalTurn(options);
+
+            await vi.advanceTimersByTimeAsync(LOCAL_IDLE_TIMEOUT_MS);
+
+            await expect(pending).resolves.toStrictEqual({ error: { kind: "idle" }, outcome: "failed", saved: true, threadId: "thread-1" });
+            expect(save).toHaveBeenCalledWith({ error: "idle", outcome: "failed", prompt: "hi", reasoning: "", reply: "" });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("does not save a high surrogate that the reasoning limit split from its low half", async () => {
+        expect.assertions(1);
+
+        const before = "r".repeat(LOCAL_REASONING_LIMIT_CHARS - 1);
+        // The first delta ends on a high surrogate exactly at the limit; the next starts with its low half, which passes the limit.
+        const { options, save } = setup(holdingFetch([frame({ reasoning: `${before}\u{D83D}` }), frame({ reasoning: "\u{DE00}" })]));
+
+        await runLocalTurn(options);
+
+        expect(save).toHaveBeenCalledWith({ error: "reasoning-limit", outcome: "failed", prompt: "hi", reasoning: before, reply: "" });
+    });
+
+    it("stops a reply whose reasoning passes its limit", async () => {
+        expect.assertions(2);
+
+        const atLimit = "r".repeat(LOCAL_REASONING_LIMIT_CHARS);
+        const frames = [frame({ reasoning: atLimit }), frame({ reasoning: "rr" })];
+        const { options, save } = setup(holdingFetch(frames));
+
+        await expect(runLocalTurn(options)).resolves.toMatchObject({ error: { kind: "reasoning-limit" }, outcome: "failed", saved: true });
+        // The "rr" past the limit is not kept: the saved reasoning stays at the limit.
+        expect(save).toHaveBeenCalledWith({ error: "reasoning-limit", outcome: "failed", prompt: "hi", reasoning: atLimit, reply: "" });
+    });
+
+    it("stops a reply whose last repeat has no newline when the stream ends", async () => {
+        expect.assertions(2);
+
+        const line = "I will try the same thing again.";
+        const reply = `${`${line}\n`.repeat(LOCAL_LINE_REPEAT_LIMIT - 1)}${line}`;
+        const { options, save } = setup(async () => sseResponse([`${line}\n`.repeat(LOCAL_LINE_REPEAT_LIMIT - 1), line]));
+
+        await expect(runLocalTurn(options)).resolves.toMatchObject({ error: { kind: "repeat-loop" }, outcome: "failed", saved: true });
+        expect(save).toHaveBeenCalledWith({ error: "repeat-loop", outcome: "failed", prompt: "hi", reasoning: "", reply });
     });
 });
 
