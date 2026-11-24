@@ -253,8 +253,12 @@ export const createStreamWithMessage = internalMutation
  */
 /** What the chat shows of a paused run: who limited it and when it resumes. The job's own arguments stay on the row. */
 const vRunPause = v.object({
+    /** The person resumes the run: it does not resume by itself at `retryAt` (`usage-limit-settings.ts`). */
+    awaitsPerson: v.optional(v.boolean()),
     provider: v.optional(v.string()),
     reason: v.literal("rate_limit"),
+    /** The provider gave no reset time: `retryAt` is the default wait, so the chat must not describe it as a reset. */
+    resetUnreported: v.optional(v.boolean()),
     retryAt: v.number(),
     status: v.number(),
 });
@@ -314,6 +318,8 @@ export const getActiveStreamForThread = optionalAuthQuery
             ...(stream.pause &&
                 stream.pauseCause === undefined && {
                     pause: {
+                        ...(stream.pauseAwaitsPerson === true && { awaitsPerson: true }),
+                        ...(stream.pauseResetUnreported === true && { resetUnreported: true }),
                         ...(stream.pause.provider !== undefined && { provider: stream.pause.provider }),
                         reason: stream.pause.reason,
                         retryAt: stream.pause.retryAt,
