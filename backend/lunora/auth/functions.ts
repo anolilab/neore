@@ -985,6 +985,12 @@ export const updateUserSettings = authMutation
     .input(userSettingsFieldsWithoutUserId)
     .mutation(async (options) => {
         const { ctx } = options;
+
+        // The default mode of new chats is the owner's to set: an admin acting as them may not change it, as no thread's mode can be.
+        if (options.args.defaultPermissionMode !== undefined && ctx.user.impersonatedBy) {
+            throw new LunoraError("FORBIDDEN", "The default permission mode cannot be changed while impersonating");
+        }
+
         const result = await settingsUpsert("userSettings", options);
 
         ctx.log.event("auth.update_user_settings", { fieldCount: Object.keys(options.args).length });
