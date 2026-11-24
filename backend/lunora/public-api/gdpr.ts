@@ -11,8 +11,14 @@ import { internalMutation, internalQuery } from "../_generated/server";
 const BATCH = 200;
 
 /**
- * The user's Events, every page to the last one, for the export. The data is the event's stored payload, as recorded: the
- * thread it concerns and its outcome or request, never a secret.
+ * The most events the export carries: the newest. A step result and the export file's dispatch body are each Lunora's 1 MiB, so a
+ * longer history is cut, and the section says so (`truncated`), as a long browser history is cut in its export section.
+ */
+export const MAX_EXPORT_EVENTS = 500;
+
+/**
+ * The user's newest Events, up to {@link MAX_EXPORT_EVENTS}, oldest first, for the export. The data is the event's stored payload,
+ * as recorded: the thread it concerns and its outcome or request, never a secret.
  */
 export const collectMcpEventsForExport = internalQuery
     .input({ userId: v.string() })
@@ -21,23 +27,28 @@ export const collectMcpEventsForExport = internalQuery
             events: v.array(
                 v.object({ createdAt: v.number(), data: v.string(), eventId: v.string(), name: v.string(), seq: v.number(), timestamp: v.number() }),
             ),
+            truncated: v.boolean(),
         }),
     )
     .query(async ({ args: { userId }, ctx }) => {
+        // Newest first, a page at a time, until one row past the cap is read: that row says the history was cut.
         const rows: Doc<"mcpEvents">[] = [];
         let cursor: string | undefined;
 
         do {
-            const result = await ctx.db.mcpEvents.findMany({ consistency: "primary", cursor, limit: BATCH, where: { userId } });
+            const result = await ctx.db.mcpEvents.findMany({ consistency: "primary", cursor, limit: BATCH, orderBy: [{ seq: "desc" }], where: { userId } });
 
             rows.push(...result.page);
             cursor = result.isDone ? undefined : (result.continueCursor ?? undefined);
-        } while (cursor !== undefined);
+        } while (cursor !== undefined && rows.length <= MAX_EXPORT_EVENTS);
+
+        const kept = rows.slice(0, MAX_EXPORT_EVENTS).toReversed();
 
         return {
-            events: rows.map((row) => {
+            events: kept.map((row) => {
                 return { createdAt: row.createdAt, data: row.data, eventId: row.eventId, name: row.name, seq: row.seq, timestamp: row.timestamp };
             }),
+            truncated: rows.length > MAX_EXPORT_EVENTS,
         };
     });
 

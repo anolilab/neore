@@ -2,11 +2,43 @@ import { lunoraTest } from "@lunora/testing";
 import { describe, expect, it } from "vitest";
 
 import { schemaWithShardedTables } from "../lib/test-schema";
-import { collectMcpEventsForExport, deleteUserMcpEvents } from "./gdpr";
+import { collectMcpEventsForExport, deleteUserMcpEvents, MAX_EXPORT_EVENTS } from "./gdpr";
 
 const BATCH = 200;
 
 describe("collectMcpEventsForExport", () => {
+    it("keeps the newest events, oldest first, and says the history was cut past the cap", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < MAX_EXPORT_EVENTS + 1; index += 1) {
+                    await context.db.insert("mcpEvents", {
+                        createdAt: 1,
+                        data: "{}",
+                        eventId: `run:${index}`,
+                        name: "run.completed",
+                        seq: index + 1,
+                        timestamp: 1,
+                        userId: "user",
+                    });
+                }
+            });
+
+            const { events, truncated } = (await harness.run(
+                async (context: any) => await context.runQuery(collectMcpEventsForExport, { userId: "user" }),
+            )) as { events: { seq: number }[]; truncated: boolean };
+
+            expect(truncated).toBe(true);
+            expect(events).toHaveLength(MAX_EXPORT_EVENTS);
+            // The oldest (seq 1) is the one left out; the kept run is seq 2 to the newest, in order.
+            expect(events[0]?.seq).toBe(2);
+            expect(events.at(-1)?.seq).toBe(MAX_EXPORT_EVENTS + 1);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("returns every page of the user's events, and no other user's", async () => {
         const harness = lunoraTest(schemaWithShardedTables([]) as never);
 
