@@ -13,6 +13,7 @@
  */
 
 import { useLingui } from "@lingui/react/macro";
+import SaveFileButton from "@ui/components/save-file-button";
 import cn from "@ui/utils/cn";
 import HlsPlayer, { Events as HlsEvents } from "hls.js";
 import {
@@ -114,6 +115,9 @@ const VideoPlayer: FC<VideoPlayerProps> = memo(({ className, filename, mediaType
         "--media-tooltip-border-radius": "var(--radius-md)",
     } as CSSProperties;
 
+    // An HLS stream saves as its playlist, which is not the video: no save control for one.
+    const canSave = !isHlsUrl(url, mediaType);
+
     return (
         <div className={cn("my-2 w-full max-w-2xl overflow-hidden rounded-lg border", className)}>
             <MediaController style={mediaChromeStyles}>
@@ -138,9 +142,10 @@ const VideoPlayer: FC<VideoPlayerProps> = memo(({ className, filename, mediaType
                     <MediaFullscreenButton />
                 </MediaControlBar>
             </MediaController>
-            {filename && (
-                <div className="bg-muted/50 border-t px-3 py-1.5">
-                    <span className="text-muted-foreground truncate text-xs">{filename}</span>
+            {(filename || canSave) && (
+                <div className="bg-muted/50 flex items-center justify-between gap-2 border-t px-3 py-1.5">
+                    {filename && <span className="text-muted-foreground min-w-0 truncate text-xs">{filename}</span>}
+                    {canSave && <SaveFileButton className="-my-1 shrink-0" fallbackName="video" filename={filename} url={url} />}
                 </div>
             )}
         </div>

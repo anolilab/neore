@@ -9,6 +9,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { ImageGalleryContext } from "./image-gallery-context";
 import LazyImage from "./lazy-image";
+import SaveFileButton from "./save-file-button";
 import { useImageGallery } from "./use-image-gallery";
 
 // Types
@@ -159,6 +160,8 @@ const ImageGalleryItem = ({ className, item }: ImageGalleryItemProps) => {
     const canSelect = isSelected || !isAtMaxSelections;
 
     const thumbnailSource = item.thumbnail || item.src;
+    // A flagged or unscanned image is not saved: its file is the thing the classifier held back.
+    const canSave = item.nsfwStatus !== "blocked" && item.nsfwStatus !== "checking";
 
     const handleClick = () => {
         onItemClick(item);
@@ -231,6 +234,16 @@ const ImageGalleryItem = ({ className, item }: ImageGalleryItemProps) => {
                 )}
             </button>
 
+            {/* A sibling of the preview button, not a child: a nested button is invalid HTML. Shown on hover and keyboard focus. */}
+            {canSave && (
+                <SaveFileButton
+                    className="absolute top-2 left-2 bg-black/60 text-white opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-black/75 hover:text-white focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                    fallbackName={`${item.type}-${item.id}`}
+                    filename={item.alt}
+                    url={item.src}
+                />
+            )}
+
             {/* Selection checkbox - always visible when selection is enabled */}
             {selectionEnabled && (
                 <button
@@ -276,6 +289,8 @@ const KreaImageItem = ({ className, item }: ImageGalleryItemProps) => {
     const canSelect = isSelected || !isAtMaxSelections;
     // Default to 4/3 until the image loads and we know its real dimensions
     const [cellAspectRatio, setCellAspectRatio] = useState<string>("4/3");
+    // A flagged or unscanned image is not saved: its file is the thing the classifier held back.
+    const canSave = item.nsfwStatus !== "blocked" && item.nsfwStatus !== "checking";
 
     return (
         <div
@@ -329,6 +344,16 @@ const KreaImageItem = ({ className, item }: ImageGalleryItemProps) => {
                     </div>
                 )}
             </button>
+
+            {/* A sibling of the preview button, not a child: a nested button is invalid HTML. Shown on hover and keyboard focus. */}
+            {canSave && (
+                <SaveFileButton
+                    className="absolute top-2.5 left-2.5 bg-black/60 text-white opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-black/75 hover:text-white focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                    fallbackName={`${item.type}-${item.id}`}
+                    filename={item.alt}
+                    url={item.src}
+                />
+            )}
 
             {/* Selection circle */}
             {selectionEnabled && (

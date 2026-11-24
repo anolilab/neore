@@ -12,6 +12,7 @@
  */
 
 import { useLingui } from "@lingui/react/macro";
+import SaveFileButton from "@ui/components/save-file-button";
 import cn from "@ui/utils/cn";
 import { Pause, Play } from "lucide-react";
 import type { FC } from "react";
@@ -107,6 +108,7 @@ const AudioWaveformPlayer: FC<AudioWaveformPlayerProps> = memo(({ className, fil
                     <span>{duration > 0 ? formatTime(duration) : "--:--"}</span>
                 </div>
             </div>
+            <SaveFileButton className="shrink-0" fallbackName="audio" filename={filename} url={url} />
         </div>
     );
 });
