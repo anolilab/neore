@@ -1407,7 +1407,7 @@ msgstr "{name} está instalado"
 msgid "{name} is offline. Open the desktop app on it and try again."
 msgstr "{name} está offline. Abra o app para desktop nele e tente novamente."
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:241
+#: ../../packages/chat-ui/src/chat/message-item.tsx:250
 #: src/features/chat/thread/streaming-placeholder.tsx:508
 msgid "{name} is responding"
 msgstr "{name} está respondendo"
@@ -4614,7 +4614,7 @@ msgstr "Anexe arquivos ou coleções inteiras para a IA consultar e citar nesta 
 msgid "Attached files"
 msgstr "Arquivos anexados"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:121
+#: ../../packages/chat-ui/src/chat/message-item.tsx:122
 msgid "Attached image"
 msgstr "Imagem anexada"
 
@@ -5507,8 +5507,8 @@ msgstr "Crie ideias para melhorar a produtividade da equipe"
 msgid "Brainstorming"
 msgstr "Brainstorming"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:149
-#: ../../packages/chat-ui/src/chat/message-item.tsx:203
+#: ../../packages/chat-ui/src/chat/message-item.tsx:150
+#: ../../packages/chat-ui/src/chat/message-item.tsx:212
 #: src/features/chat/core/hooks/use-thread-manager.ts:148
 #: src/features/chat/core/hooks/use-thread-manager.ts:161
 #: src/features/tasks/components/task-form-dialog.tsx:336
@@ -5521,8 +5521,8 @@ msgstr "Branch"
 msgid "Branch condition is required"
 msgstr "A condição da ramificação é obrigatória"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:149
-#: ../../packages/chat-ui/src/chat/message-item.tsx:203
+#: ../../packages/chat-ui/src/chat/message-item.tsx:150
+#: ../../packages/chat-ui/src/chat/message-item.tsx:212
 msgid "Branch from here"
 msgstr "Ramificar a partir daqui"
 
@@ -8349,6 +8349,7 @@ msgstr "Edições que entendem o contexto e preservam o original"
 msgid "Context-aware generation"
 msgstr "Geração com reconhecimento de contexto"
 
+#: ../../packages/chat-ui/src/chat/message-item.tsx:194
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
 #: src/features/auth/components/device-code-parts.tsx:189
 #: src/features/chat/host/host-composer.tsx:969
@@ -8564,7 +8565,7 @@ msgstr "Copiado para a área de transferência"
 msgid "Copied!"
 msgstr "Copiado!"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:76
+#: ../../packages/chat-ui/src/chat/message-item.tsx:77
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:225
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
@@ -8625,7 +8626,7 @@ msgstr "Copiar último bloco de código"
 msgid "Copy Last Code Block"
 msgstr "Copiar último bloco de código"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:76
+#: ../../packages/chat-ui/src/chat/message-item.tsx:77
 msgid "Copy message"
 msgstr "Copiar mensagem"
 
@@ -15238,7 +15239,7 @@ msgstr "Corrigir o passo «{step}»"
 msgid "Fix the failing checks on pull request {address}. Read each failing check's log, find the cause and fix it on the pull request's branch. Before you push, run the failing tests or builds locally and show that they pass; after you push, confirm the checks are green on the pull request. Tell me which checks you fixed and how you know they pass."
 msgstr "Corrija as verificações com falha no pull request {address}. Leia o log de cada verificação com falha, encontre a causa e corrija-a no branch do pull request. Antes de fazer push, execute localmente os testes ou builds com falha e mostre que passam; depois do push, confirme que as verificações estão verdes no pull request. Diga-me quais verificações você corrigiu e como sabe que passam."
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:113
+#: ../../packages/chat-ui/src/chat/message-item.tsx:114
 msgid "Flagged for review"
 msgstr "Sinalizado para revisão"
 
@@ -20097,11 +20098,11 @@ msgid "Local models are text only. Remove the attachments to send."
 msgstr "Modelos locais aceitam apenas texto. Remova os anexos para enviar."
 
 #. placeholder {0}: info.detail
-#: src/features/local-models/lib/local-errors.ts:204
+#: src/features/local-models/lib/local-errors.ts:218
 msgid "Local request failed: {0}"
 msgstr "Falha na solicitação local: {0}"
 
-#: src/features/local-models/lib/local-errors.ts:204
+#: src/features/local-models/lib/local-errors.ts:218
 msgid "Local request failed."
 msgstr "Falha na solicitação local."
 
@@ -23701,7 +23702,7 @@ msgstr "Nada foi executado em um dispositivo ainda."
 msgid "Nothing here."
 msgstr "Nada aqui."
 
-#: src/features/local-models/lib/local-errors.ts:201
+#: src/features/local-models/lib/local-errors.ts:215
 msgid "Nothing is listening at that address. Start Ollama or LM Studio's server, check the port, and make sure the URL ends in /v1."
 msgstr "Nada está respondendo nesse endereço. Inicie o servidor do Ollama ou do LM Studio, confira a porta e verifique se a URL termina em /v1."
 
@@ -25975,8 +25976,8 @@ msgstr "Pika Labs 2.2 — geração focada em narrativa"
 msgid "Pika Labs 2.2 — narrative-focused video model with strong storytelling and motion control"
 msgstr "Pika Labs 2.2 — modelo de vídeo focado em narrativa, com storytelling forte e controle de movimento"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:144
-#: ../../packages/chat-ui/src/chat/message-item.tsx:193
+#: ../../packages/chat-ui/src/chat/message-item.tsx:145
+#: ../../packages/chat-ui/src/chat/message-item.tsx:202
 #: src/features/chat/thread-list/group-header.tsx:135
 #: src/features/chat/thread/text-selection-menu.tsx:504
 msgid "Pin"
@@ -26000,8 +26001,8 @@ msgstr "Fixar imagem"
 msgid "Pin memory"
 msgstr "Fixar memória"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:144
-#: ../../packages/chat-ui/src/chat/message-item.tsx:193
+#: ../../packages/chat-ui/src/chat/message-item.tsx:145
+#: ../../packages/chat-ui/src/chat/message-item.tsx:202
 #: src/features/chat/thread/message-item.tsx:384
 msgid "Pin message"
 msgstr "Fixar mensagem"
@@ -28099,12 +28100,12 @@ msgstr "Atualizar"
 msgid "Refresh installed models"
 msgstr "Atualizar modelos instalados"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:198
+#: ../../packages/chat-ui/src/chat/message-item.tsx:207
 #: src/features/chat/thread/message-item.tsx:390
 msgid "Regenerate"
 msgstr "Gerar novamente"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:198
+#: ../../packages/chat-ui/src/chat/message-item.tsx:207
 msgid "Regenerate response"
 msgstr "Gerar resposta novamente"
 
@@ -29621,7 +29622,7 @@ msgstr "Russo (Rússia)"
 msgid "S&P Global financial metrics, company data, and market info"
 msgstr "Métricas financeiras, dados de empresas e informações de mercado da S&P Global"
 
-#: src/features/local-models/lib/local-errors.ts:186
+#: src/features/local-models/lib/local-errors.ts:194
 msgid "Safari blocks this secure page from calling http://localhost. Use Chrome, Edge or Firefox for local models."
 msgstr "O Safari impede que esta página segura acesse http://localhost. Use Chrome, Edge ou Firefox para modelos locais."
 
@@ -29894,7 +29895,7 @@ msgstr "A leitura não funcionou? Copie esta chave e digite-a manualmente no seu
 msgid "scan this QR code. it will generate a 6 digit code for you to enter below."
 msgstr "leia este QR code. Ele vai gerar um código de 6 dígitos para você digitar abaixo."
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:113
+#: ../../packages/chat-ui/src/chat/message-item.tsx:114
 msgid "Scanning..."
 msgstr "Verificando..."
 
@@ -32779,7 +32780,7 @@ msgstr "Interrompido: a execução falhou"
 msgid "Stopped: you sent a new message"
 msgstr "Interrompido: você enviou uma nova mensagem"
 
-#: src/features/local-models/lib/local-errors.ts:175
+#: src/features/local-models/lib/local-errors.ts:180
 msgid "Stopped."
 msgstr "Interrompido."
 
@@ -34886,30 +34887,42 @@ msgid "The live view is not available right now."
 msgstr "A visualização ao vivo não está disponível no momento."
 
 #. placeholder {0}: info.detail
-#: src/features/local-models/lib/local-errors.ts:195
+#: src/features/local-models/lib/local-errors.ts:209
 msgid "The local model reported an error: {0}"
 msgstr "O modelo local informou um erro: {0}"
 
-#: src/features/local-models/lib/local-errors.ts:195
+#: src/features/local-models/lib/local-errors.ts:209
 msgid "The local model reported an error."
 msgstr "O modelo local informou um erro."
 
+#: src/features/local-models/lib/local-errors.ts:206
+msgid "The local model stopped: it kept repeating the same text. Continue to ask again."
+msgstr "O modelo local parou: ele repetia sempre o mesmo texto. Continuar para perguntar de novo."
+
+#: src/features/local-models/lib/local-errors.ts:191
+msgid "The local model stopped: it sent nothing for {IDLE_SECONDS} seconds. Continue to ask again."
+msgstr "O modelo local parou: não enviou nada durante {IDLE_SECONDS} segundos. Continuar para perguntar de novo."
+
+#: src/features/local-models/lib/local-errors.ts:203
+msgid "The local model stopped: its reasoning ran too long. Continue to ask again."
+msgstr "O modelo local parou: o raciocínio demorou demais. Continuar para perguntar de novo."
+
 #. placeholder {0}: info.status ?? 0
 #. placeholder {1}: info.detail
-#: src/features/local-models/lib/local-errors.ts:182
+#: src/features/local-models/lib/local-errors.ts:187
 msgid "The local server answered HTTP {0}: {1}"
 msgstr "O servidor local respondeu HTTP {0}: {1}"
 
 #. placeholder {0}: info.status ?? 0
-#: src/features/local-models/lib/local-errors.ts:183
+#: src/features/local-models/lib/local-errors.ts:188
 msgid "The local server answered HTTP {0}."
 msgstr "O servidor local respondeu HTTP {0}."
 
-#: src/features/local-models/lib/local-errors.ts:198
+#: src/features/local-models/lib/local-errors.ts:212
 msgid "The local server did not answer in time. Is it still loading the model?"
 msgstr "O servidor local não respondeu a tempo. Ele ainda está carregando o modelo?"
 
-#: src/features/local-models/lib/local-errors.ts:189
+#: src/features/local-models/lib/local-errors.ts:197
 msgid "The local server does not have this model. Pull it first (Ollama: ollama pull <model>) or pick another one."
 msgstr "O servidor local não tem este modelo. Baixe-o primeiro (Ollama: ollama pull <model>) ou escolha outro."
 
@@ -40177,7 +40190,7 @@ msgstr "Seus bots"
 msgid "Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept."
 msgstr "Não foi possível carregar seus bots. As alterações em um login salvo poderão ser salvas quando eles carregarem, para que os bots dele sejam mantidos."
 
-#: src/features/local-models/lib/local-errors.ts:192
+#: src/features/local-models/lib/local-errors.ts:200
 msgid "Your browser blocked access to local network devices for this site. Allow \"Local network access\" in the site settings (the icon left of the address bar), then try again."
 msgstr "Seu navegador bloqueou o acesso deste site aos dispositivos da rede local. Permita \"Acesso à rede local\" nas configurações do site (o ícone à esquerda da barra de endereço) e tente novamente."
 
@@ -40322,7 +40335,7 @@ msgstr "A sua última importação parou antes de terminar. Retome-a para import
 msgid "Your latest changes are not saved yet."
 msgstr "Suas últimas alterações ainda não foram salvas."
 
-#: src/features/local-models/lib/local-errors.ts:178
+#: src/features/local-models/lib/local-errors.ts:183
 msgid "Your local server answered, but refused this site (CORS). Allow this site's origin — for Ollama set OLLAMA_ORIGINS, for LM Studio turn on \"Enable CORS\" — then restart the server."
 msgstr "Seu servidor local respondeu, mas recusou este site (CORS). Permita a origem deste site — no Ollama, defina OLLAMA_ORIGINS; no LM Studio, ative \"Enable CORS\" — e reinicie o servidor."
 

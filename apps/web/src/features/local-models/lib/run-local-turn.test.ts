@@ -1,10 +1,35 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { classifyLocalError } from "./local-errors";
+import { LOCAL_IDLE_TIMEOUT_MS, LOCAL_REASONING_LIMIT_CHARS, LOCAL_REPEAT_LIMIT } from "./reply-guard";
 import type { RunLocalTurnOptions } from "./run-local-turn";
 import { buildLocalHistory, runLocalTurn } from "./run-local-turn";
 
 const BASE = ["http", "//localhost:11434/v1"].join(":");
+
+/** One SSE `data:` frame carrying a chat-completion delta. */
+const frame = (delta: { content?: string; reasoning?: string }) => `data: ${JSON.stringify({ choices: [{ delta }] })}\n\n`;
+
+/** Sends the frames, then stays open until the caller aborts — how a model that has stopped talking looks. */
+const holdingFetch =
+    (frames: string[]) =>
+    async (_url: string, init?: RequestInit): Promise<Response> => {
+        const encoder = new TextEncoder();
+
+        return new Response(
+            new ReadableStream({
+                start(controller) {
+                    for (const part of frames) {
+                        controller.enqueue(encoder.encode(part));
+                    }
+
+                    init?.signal?.addEventListener("abort", () => {
+                        controller.error(new DOMException("aborted", "AbortError"));
+                    });
+                },
+            }),
+        );
+    };
 
 const sseResponse = (parts: string[], tail: "done" | "error" = "done") => {
     const encoder = new TextEncoder();
@@ -28,7 +53,7 @@ const sseResponse = (parts: string[], tail: "done" | "error" = "done") => {
     );
 };
 
-const setup = (fetchImpl: () => Promise<Response>, overrides: Partial<RunLocalTurnOptions> = {}) => {
+const setup = (fetchImpl: (url: string, init?: RequestInit) => Promise<Response>, overrides: Partial<RunLocalTurnOptions> = {}) => {
     const save = vi.fn(async () => {
         return { threadId: "thread-1" };
     });
@@ -133,6 +158,57 @@ describe(runLocalTurn, () => {
             { content: "reply", role: "assistant" },
             { content: "hi", role: "user" },
         ]);
+    });
+});
+
+describe("reply guard stops", () => {
+    it("stops a reply that repeats one line, keeps the text before the stop, and saves the cause", async () => {
+        expect.assertions(2);
+
+        const line = "I will try the same thing again.\n";
+        const { options, save } = setup(holdingFetch(Array.from({ length: LOCAL_REPEAT_LIMIT + 2 }, () => frame({ content: line }))));
+
+        await expect(runLocalTurn(options)).resolves.toStrictEqual({ error: { kind: "repeat-loop" }, outcome: "failed", saved: true, threadId: "thread-1" });
+        expect(save).toHaveBeenCalledWith({ error: "repeat-loop", outcome: "failed", prompt: "hi", reasoning: "", reply: line.repeat(LOCAL_REPEAT_LIMIT) });
+    });
+
+    it("stops a reply that sends nothing for the idle limit, even before the first token", async () => {
+        expect.assertions(2);
+
+        vi.useFakeTimers();
+
+        try {
+            const { options, save } = setup(holdingFetch([]));
+            const pending = runLocalTurn(options);
+
+            await vi.advanceTimersByTimeAsync(LOCAL_IDLE_TIMEOUT_MS);
+
+            await expect(pending).resolves.toStrictEqual({ error: { kind: "idle" }, outcome: "failed", saved: true, threadId: "thread-1" });
+            expect(save).toHaveBeenCalledWith({ error: "idle", outcome: "failed", prompt: "hi", reasoning: "", reply: "" });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("stops a reply whose reasoning passes its limit", async () => {
+        expect.assertions(2);
+
+        const atLimit = "r".repeat(LOCAL_REASONING_LIMIT_CHARS);
+        const frames = [frame({ reasoning: atLimit }), frame({ reasoning: "rr" })];
+        const { options, save } = setup(holdingFetch(frames));
+
+        await expect(runLocalTurn(options)).resolves.toMatchObject({ error: { kind: "reasoning-limit" }, outcome: "failed", saved: true });
+        expect(save).toHaveBeenCalledWith({ error: "reasoning-limit", outcome: "failed", prompt: "hi", reasoning: `${atLimit}rr`, reply: "" });
+    });
+
+    it("does not stop an ordinary reply, including short lines that repeat under the limit", async () => {
+        expect.assertions(2);
+
+        const lines = ["# Notes", "", "- one point", "}", "}", "}", "}", "}", "}", "Done."];
+        const { options, save } = setup(async () => sseResponse(lines.map((line) => `${line}\n`)));
+
+        await expect(runLocalTurn(options)).resolves.toStrictEqual({ outcome: "complete", saved: true, threadId: "thread-1" });
+        expect(save).toHaveBeenCalledWith({ outcome: "complete", prompt: "hi", reasoning: "", reply: `${lines.join("\n")}\n` });
     });
 });
 

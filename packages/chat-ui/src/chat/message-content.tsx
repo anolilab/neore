@@ -1243,27 +1243,28 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
         renderedParts.unshift(<SourceGroup key={`${message.id}-sources`} sources={sourceParts} />);
     }
 
-    // If no parts rendered, show placeholder for streaming or error for failed
-    if (renderedParts.length === 0) {
-        if (isAnimating) {
-            renderedParts.push(
-                <span className="text-muted-foreground animate-pulse" key="loading">
-                    {t`Thinking...`}
-                </span>,
-            );
-        } else if (message.status === "failed") {
-            const errorMessage = message.error || t`An error occurred while generating the response.`;
+    // A placeholder while nothing has rendered yet
+    if (renderedParts.length === 0 && isAnimating) {
+        renderedParts.push(
+            <span className="text-muted-foreground animate-pulse" key="loading">
+                {t`Thinking...`}
+            </span>,
+        );
+    }
 
-            renderedParts.push(
-                <div
-                    className="mb-2 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300"
-                    key="error"
-                >
-                    <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                    <span>{errorMessage}</span>
-                </div>,
-            );
-        }
+    // A failed reply shows its cause after whatever text it kept, so the cause sits in the thread beside the partial reply
+    if (message.status === "failed" && !isAnimating) {
+        const errorMessage = message.error || t`An error occurred while generating the response.`;
+
+        renderedParts.push(
+            <div
+                className="mb-2 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300"
+                key="error"
+            >
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <span>{errorMessage}</span>
+            </div>,
+        );
     }
 
     const containerRef = useRef<HTMLDivElement>(null);

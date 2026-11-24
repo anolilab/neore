@@ -19,6 +19,7 @@ import { acquireUnloadGuard } from "@/lib/unload-guard";
 import type { LatestPerFrame } from "../lib/latest-per-frame";
 import { createLatestPerFrame } from "../lib/latest-per-frame";
 import { describeLocalError } from "../lib/local-errors";
+import { isReplyStopKind } from "../lib/reply-guard";
 import type { HistoryMessage } from "../lib/run-local-turn";
 import { runLocalTurn } from "../lib/run-local-turn";
 
@@ -142,6 +143,7 @@ const useLocalModelTurn = (model: string, savedMessageIds: ReadonlySet<string>):
             try {
                 const result = await runLocalTurn({
                     baseUrl: target.baseUrl,
+                    describeStop: (info) => i18n._(describeLocalError(info)),
                     history,
                     modelId: target.modelId,
                     onUpdate: (text, reasoning) => {
@@ -180,7 +182,8 @@ const useLocalModelTurn = (model: string, savedMessageIds: ReadonlySet<string>):
                 setLive((current) => (current && assistantMessageId ? { ...current, persistedId: assistantMessageId } : null));
                 onSaved({
                     isNewThread: !threadId,
-                    message: result.error ? i18n._(describeLocalError(result.error)) : undefined,
+                    // A reply guard stop is shown in the thread, on the reply itself: no banner for it too.
+                    message: result.error && !isReplyStopKind(result.error.kind) ? i18n._(describeLocalError(result.error)) : undefined,
                     threadId: result.threadId,
                 });
             } catch (error) {

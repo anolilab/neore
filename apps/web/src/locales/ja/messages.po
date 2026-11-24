@@ -1407,7 +1407,7 @@ msgstr "{name} はインストール済みです"
 msgid "{name} is offline. Open the desktop app on it and try again."
 msgstr "{name} はオフラインです。そのコンピューターでデスクトップアプリを開いて、もう一度お試しください。"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:241
+#: ../../packages/chat-ui/src/chat/message-item.tsx:250
 #: src/features/chat/thread/streaming-placeholder.tsx:508
 msgid "{name} is responding"
 msgstr "{name} が応答中です"
@@ -4614,7 +4614,7 @@ msgstr "この会話で AI が参照・引用できるように、ファイル�
 msgid "Attached files"
 msgstr "添付ファイル"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:121
+#: ../../packages/chat-ui/src/chat/message-item.tsx:122
 msgid "Attached image"
 msgstr "添付画像"
 
@@ -5507,8 +5507,8 @@ msgstr "チームの生産性を向上させる方法をブレインストーミ
 msgid "Brainstorming"
 msgstr "ブレインストーミング"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:149
-#: ../../packages/chat-ui/src/chat/message-item.tsx:203
+#: ../../packages/chat-ui/src/chat/message-item.tsx:150
+#: ../../packages/chat-ui/src/chat/message-item.tsx:212
 #: src/features/chat/core/hooks/use-thread-manager.ts:148
 #: src/features/chat/core/hooks/use-thread-manager.ts:161
 #: src/features/tasks/components/task-form-dialog.tsx:336
@@ -5521,8 +5521,8 @@ msgstr "ブランチ"
 msgid "Branch condition is required"
 msgstr "分岐条件は必須です"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:149
-#: ../../packages/chat-ui/src/chat/message-item.tsx:203
+#: ../../packages/chat-ui/src/chat/message-item.tsx:150
+#: ../../packages/chat-ui/src/chat/message-item.tsx:212
 msgid "Branch from here"
 msgstr "ここからブランチを作成"
 
@@ -8349,6 +8349,7 @@ msgstr "元の画像を保つ、コンテキストを考慮した編集"
 msgid "Context-aware generation"
 msgstr "コンテキストを考慮した生成"
 
+#: ../../packages/chat-ui/src/chat/message-item.tsx:194
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
 #: src/features/auth/components/device-code-parts.tsx:189
 #: src/features/chat/host/host-composer.tsx:969
@@ -8564,7 +8565,7 @@ msgstr "クリップボードにコピーしました"
 msgid "Copied!"
 msgstr "コピーしました！"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:76
+#: ../../packages/chat-ui/src/chat/message-item.tsx:77
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:225
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
@@ -8625,7 +8626,7 @@ msgstr "最後のコードブロックをコピー"
 msgid "Copy Last Code Block"
 msgstr "最後のコードブロックをコピー"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:76
+#: ../../packages/chat-ui/src/chat/message-item.tsx:77
 msgid "Copy message"
 msgstr "メッセージをコピー"
 
@@ -15238,7 +15239,7 @@ msgstr "「{step}」ステップを修正"
 msgid "Fix the failing checks on pull request {address}. Read each failing check's log, find the cause and fix it on the pull request's branch. Before you push, run the failing tests or builds locally and show that they pass; after you push, confirm the checks are green on the pull request. Tell me which checks you fixed and how you know they pass."
 msgstr "プルリクエスト {address} の失敗したチェックを修正してください。失敗した各チェックのログを読み、原因を見つけて、プルリクエストのブランチで修正してください。プッシュする前に、失敗したテストやビルドをローカルで実行し、成功することを示してください。プッシュした後、プルリクエストでチェックがグリーンになったことを確認してください。どのチェックを修正したか、そして成功するとどうしてわかるかを教えてください。"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:113
+#: ../../packages/chat-ui/src/chat/message-item.tsx:114
 msgid "Flagged for review"
 msgstr "レビュー対象としてフラグ付け"
 
@@ -20097,11 +20098,11 @@ msgid "Local models are text only. Remove the attachments to send."
 msgstr "ローカルモデルはテキストのみに対応しています。送信するには添付ファイルを削除してください。"
 
 #. placeholder {0}: info.detail
-#: src/features/local-models/lib/local-errors.ts:204
+#: src/features/local-models/lib/local-errors.ts:218
 msgid "Local request failed: {0}"
 msgstr "ローカルリクエストに失敗しました：{0}"
 
-#: src/features/local-models/lib/local-errors.ts:204
+#: src/features/local-models/lib/local-errors.ts:218
 msgid "Local request failed."
 msgstr "ローカルリクエストに失敗しました。"
 
@@ -23701,7 +23702,7 @@ msgstr "デバイスではまだ何も実行されていません。"
 msgid "Nothing here."
 msgstr "ここには何もありません。"
 
-#: src/features/local-models/lib/local-errors.ts:201
+#: src/features/local-models/lib/local-errors.ts:215
 msgid "Nothing is listening at that address. Start Ollama or LM Studio's server, check the port, and make sure the URL ends in /v1."
 msgstr "そのアドレスで待ち受けているサーバーがありません。Ollama または LM Studio のサーバーを起動し、ポートを確認して、URL が /v1 で終わっていることを確認してください。"
 
@@ -25975,8 +25976,8 @@ msgstr "Pika Labs 2.2 — ストーリー重視の生成"
 msgid "Pika Labs 2.2 — narrative-focused video model with strong storytelling and motion control"
 msgstr "Pika Labs 2.2 — 優れたストーリーテリングとモーション制御を備えた物語重視の動画モデル"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:144
-#: ../../packages/chat-ui/src/chat/message-item.tsx:193
+#: ../../packages/chat-ui/src/chat/message-item.tsx:145
+#: ../../packages/chat-ui/src/chat/message-item.tsx:202
 #: src/features/chat/thread-list/group-header.tsx:135
 #: src/features/chat/thread/text-selection-menu.tsx:504
 msgid "Pin"
@@ -26000,8 +26001,8 @@ msgstr "画像をピン留め"
 msgid "Pin memory"
 msgstr "メモリをピン留め"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:144
-#: ../../packages/chat-ui/src/chat/message-item.tsx:193
+#: ../../packages/chat-ui/src/chat/message-item.tsx:145
+#: ../../packages/chat-ui/src/chat/message-item.tsx:202
 #: src/features/chat/thread/message-item.tsx:384
 msgid "Pin message"
 msgstr "メッセージをピン留め"
@@ -28099,12 +28100,12 @@ msgstr "更新"
 msgid "Refresh installed models"
 msgstr "インストール済みのモデルを更新"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:198
+#: ../../packages/chat-ui/src/chat/message-item.tsx:207
 #: src/features/chat/thread/message-item.tsx:390
 msgid "Regenerate"
 msgstr "再生成"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:198
+#: ../../packages/chat-ui/src/chat/message-item.tsx:207
 msgid "Regenerate response"
 msgstr "応答を再生成"
 
@@ -29621,7 +29622,7 @@ msgstr "ロシア語（ロシア）"
 msgid "S&P Global financial metrics, company data, and market info"
 msgstr "S&P Global の財務指標、企業データ、市場情報"
 
-#: src/features/local-models/lib/local-errors.ts:186
+#: src/features/local-models/lib/local-errors.ts:194
 msgid "Safari blocks this secure page from calling http://localhost. Use Chrome, Edge or Firefox for local models."
 msgstr "Safari はこの安全なページから http://localhost への通信をブロックします。ローカルモデルには Chrome、Edge、または Firefox をご利用ください。"
 
@@ -29894,7 +29895,7 @@ msgstr "スキャンできない場合は、このコードキーをコピーし
 msgid "scan this QR code. it will generate a 6 digit code for you to enter below."
 msgstr "この QR コードをスキャンしてください。下に入力する 6 桁のコードが生成されます。"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:113
+#: ../../packages/chat-ui/src/chat/message-item.tsx:114
 msgid "Scanning..."
 msgstr "スキャンしています..."
 
@@ -32779,7 +32780,7 @@ msgstr "停止: 実行に失敗しました"
 msgid "Stopped: you sent a new message"
 msgstr "停止: 新しいメッセージを送信しました"
 
-#: src/features/local-models/lib/local-errors.ts:175
+#: src/features/local-models/lib/local-errors.ts:180
 msgid "Stopped."
 msgstr "停止しました。"
 
@@ -34886,30 +34887,42 @@ msgid "The live view is not available right now."
 msgstr "現在ライブビューは利用できません。"
 
 #. placeholder {0}: info.detail
-#: src/features/local-models/lib/local-errors.ts:195
+#: src/features/local-models/lib/local-errors.ts:209
 msgid "The local model reported an error: {0}"
 msgstr "ローカルモデルがエラーを報告しました：{0}"
 
-#: src/features/local-models/lib/local-errors.ts:195
+#: src/features/local-models/lib/local-errors.ts:209
 msgid "The local model reported an error."
 msgstr "ローカルモデルがエラーを報告しました。"
 
+#: src/features/local-models/lib/local-errors.ts:206
+msgid "The local model stopped: it kept repeating the same text. Continue to ask again."
+msgstr "ローカルモデルが停止しました：同じ文章を繰り返していました。「続行」で再度質問します。"
+
+#: src/features/local-models/lib/local-errors.ts:191
+msgid "The local model stopped: it sent nothing for {IDLE_SECONDS} seconds. Continue to ask again."
+msgstr "ローカルモデルが停止しました：{IDLE_SECONDS}秒間、何も出力されませんでした。「続行」で再度質問します。"
+
+#: src/features/local-models/lib/local-errors.ts:203
+msgid "The local model stopped: its reasoning ran too long. Continue to ask again."
+msgstr "ローカルモデルが停止しました：推論が長すぎました。「続行」で再度質問します。"
+
 #. placeholder {0}: info.status ?? 0
 #. placeholder {1}: info.detail
-#: src/features/local-models/lib/local-errors.ts:182
+#: src/features/local-models/lib/local-errors.ts:187
 msgid "The local server answered HTTP {0}: {1}"
 msgstr "ローカルサーバーが HTTP {0} を返しました：{1}"
 
 #. placeholder {0}: info.status ?? 0
-#: src/features/local-models/lib/local-errors.ts:183
+#: src/features/local-models/lib/local-errors.ts:188
 msgid "The local server answered HTTP {0}."
 msgstr "ローカルサーバーが HTTP {0} を返しました。"
 
-#: src/features/local-models/lib/local-errors.ts:198
+#: src/features/local-models/lib/local-errors.ts:212
 msgid "The local server did not answer in time. Is it still loading the model?"
 msgstr "ローカルサーバーが時間内に応答しませんでした。まだモデルを読み込み中ですか？"
 
-#: src/features/local-models/lib/local-errors.ts:189
+#: src/features/local-models/lib/local-errors.ts:197
 msgid "The local server does not have this model. Pull it first (Ollama: ollama pull <model>) or pick another one."
 msgstr "ローカルサーバーにこのモデルがありません。先に取得するか（Ollama：ollama pull <model>）、別のモデルを選択してください。"
 
@@ -40177,7 +40190,7 @@ msgstr "自分のボット"
 msgid "Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept."
 msgstr "ボットを読み込めませんでした。保存済みログインのボットを維持するため、変更は読み込み後に保存できます。"
 
-#: src/features/local-models/lib/local-errors.ts:192
+#: src/features/local-models/lib/local-errors.ts:200
 msgid "Your browser blocked access to local network devices for this site. Allow \"Local network access\" in the site settings (the icon left of the address bar), then try again."
 msgstr "ブラウザーがこのサイトからローカルネットワーク上のデバイスへのアクセスをブロックしました。サイト設定（アドレスバー左のアイコン）で「ローカルネットワークへのアクセス」を許可してから、もう一度お試しください。"
 
@@ -40322,7 +40335,7 @@ msgstr "前回のインポートは完了する前に停止しました。再開
 msgid "Your latest changes are not saved yet."
 msgstr "最新の変更はまだ保存されていません。"
 
-#: src/features/local-models/lib/local-errors.ts:178
+#: src/features/local-models/lib/local-errors.ts:183
 msgid "Your local server answered, but refused this site (CORS). Allow this site's origin — for Ollama set OLLAMA_ORIGINS, for LM Studio turn on \"Enable CORS\" — then restart the server."
 msgstr "ローカルサーバーは応答しましたが、このサイトを拒否しました（CORS）。このサイトのオリジンを許可してください。Ollama の場合は OLLAMA_ORIGINS を設定し、LM Studio の場合は「Enable CORS」をオンにしてから、サーバーを再起動してください。"
 

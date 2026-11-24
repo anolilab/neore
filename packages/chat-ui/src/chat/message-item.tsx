@@ -1,5 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
 import { Message, MessageAction, MessageActions, MessageContent as MessageContentWrapper } from "@neore/ui/components/ai-elements/message";
+import { Button } from "@neore/ui/components/button";
 import { Check, Copy, GitBranch, Pin, RefreshCw, Timer } from "lucide-react";
 import type { FC } from "react";
 import { memo, useState } from "react";
@@ -185,6 +186,14 @@ const AssistantMessage = ({
                     <MessageContentWrapper className="prose prose-sm dark:prose-invert max-w-none">
                         <MessageContent components={components} isStreaming={isCurrentlyStreaming} message={message} />
                     </MessageContentWrapper>
+
+                    {/* A failed last reply can be asked again: the same prompt, saved as a sibling reply */}
+                    {message.status === "failed" && isLast && onRegenerate && (
+                        <Button className="mb-2 h-7 gap-1.5 text-xs" onClick={onRegenerate} size="sm" variant="outline">
+                            <RefreshCw aria-hidden="true" className="size-3" />
+                            {t`Continue`}
+                        </Button>
+                    )}
 
                     {/* Action bar */}
                     <MessageActions>
