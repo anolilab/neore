@@ -24,7 +24,7 @@ const { compare, compareRefetch, compared, composer, prefill, pull, reads, refet
         composer: { takes: true },
         prefill: vi.fn(),
         reads: vi.fn(),
-        refetch: vi.fn(async () => {}),
+        refetch: vi.fn<() => Promise<{ data?: unknown }>>(),
         pull: {
             current: {} as {
                 data?: {
@@ -133,7 +133,11 @@ describe("ThreadPullRequestCatchUp", () => {
     beforeEach(() => {
         prefill.mockReset();
         reads.mockClear();
-        refetch.mockClear();
+        refetch.mockReset();
+        // A read of the pull request answers with what the host says now.
+        refetch.mockImplementation(async () => {
+            return { data: pull.current.data };
+        });
         compareRefetch.mockClear();
         compared.mockClear();
         composer.takes = true;
@@ -262,7 +266,7 @@ describe("ThreadPullRequestCatchUp", () => {
         expect(screen.getByRole("button", BUTTON)).toBeTruthy();
     });
 
-    it("reads the pull request again when a turn of the thread ends while it shows, and drops the label once caught up", () => {
+    it("reads the pull request again when a turn of the thread ends while it shows, and drops the label once caught up", async () => {
         given("open", "behind");
 
         const view = render(control(false));
@@ -274,7 +278,9 @@ describe("ThreadPullRequestCatchUp", () => {
         view.rerender(control(false));
 
         expect(refetch).toHaveBeenCalledTimes(1);
-        expect(compareRefetch).toHaveBeenCalledTimes(1);
+        await vi.waitFor(() => {
+            expect(compareRefetch).toHaveBeenCalledTimes(1);
+        });
 
         // The host's answer after the push.
         given("open", "clean");
@@ -282,6 +288,25 @@ describe("ThreadPullRequestCatchUp", () => {
 
         expect(screen.queryByText("Behind main")).toBeNull();
         expect(screen.queryByRole("button", BUTTON)).toBeNull();
+    });
+
+    it("leaves the old revision's comparison unread when the turn pushed a new head: the new key reads it", async () => {
+        given("open", "behind");
+
+        const view = render(control(true));
+
+        // The pull request's read after the turn answers with the pushed head.
+        refetch.mockImplementationOnce(async () => {
+            return { data: { detail: { ...pull.current.data!.detail!, headSha: "def456" }, status: "ok" } };
+        });
+        view.rerender(control(false));
+
+        await vi.waitFor(() => {
+            expect(refetch).toHaveBeenCalledTimes(1);
+        });
+        await Promise.resolve();
+
+        expect(compareRefetch).not.toHaveBeenCalled();
     });
 
     it("makes no extra read at the end of a turn while it does not show", () => {

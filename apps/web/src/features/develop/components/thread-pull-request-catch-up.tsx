@@ -71,10 +71,20 @@ const CatchUpControl = ({
             return;
         }
 
-        void pull.refetch();
-        // The same head after the turn keeps the same key: the base may have moved, so this reads it again too. A new head is a
-        // new key, read once the pull request answers with it.
-        void comparison.refetch();
+        const { baseBranch, headSha } = detail;
+
+        // The pull request first: a turn that pushed or retargeted it gives the comparison a new key, which its query reads by
+        // itself. Only the same base and head keep the old key, and the base branch may have moved, so only then is it read again.
+        const readAgain = async (): Promise<void> => {
+            const { data } = await pull.refetch();
+            const next = data?.status === "ok" ? data.detail : undefined;
+
+            if (next?.baseBranch === baseBranch && next.headSha === headSha) {
+                await comparison.refetch();
+            }
+        };
+
+        void readAgain();
     });
     const wasRunning = useRef(isRunning);
     const lostFocus = useRef(false);
