@@ -1757,6 +1757,10 @@ export const schema = defineSchema({
         text: v.optional(v.string()),
         threadId: v.id("threads"),
         tool: v.boolean(),
+        // What the person typed into a user message (`agent/shared.ts#typedTextColumn`: no attachment, quote or placeholder),
+        // written beside `text` on insert, edit and rewrite. Only the composer's prompt search reads it, through
+        // `typed_text_search`; `text` stays the message as it was sent. Unset on every other row.
+        typedText: v.optional(v.string()),
         usage: v.optional(
             v.object({
                 cachedInputTokens: v.optional(v.number()),
@@ -1781,6 +1785,7 @@ export const schema = defineSchema({
         .index("by_threadId_parentMessageId", ["threadId", "parentMessageId"])
         .index("embeddingId_threadId", ["embeddingId", "threadId"])
         .searchIndex("text_search", { field: "text", filterFields: ["userId", "threadId"] })
+        .searchIndex("typed_text_search", { field: "typedText", filterFields: ["userId"] })
         // A deleted user turn can drop its thread below the palette search's turn gate (`agent/thread-search-triggers.ts`).
         .triggers((t) => threadSearchMessageTriggers(t))
         .relations((r) => {
@@ -2562,6 +2567,15 @@ export const schema = defineSchema({
         .index("by_user_and_pull", ["userId", "hostOrigin", "repository", "number"])
         .index("by_threadId", ["threadId"]),
 
+    // Where the housekeeping sweep's state refresh (`source-control/pr-state.ts`) resumes its scan of the owner's
+    // `pullRequestThreads`, one row per person. Null starts from the first link. Erased with the links.
+    pullRequestStateScans: defineTable({
+        cursor: v.union(v.string(), v.null()),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId", ["userId"]),
+
     // Develop mode: the thread a pull request is worked on in, and the pull requests a coding agent opened FROM a
     // thread. `kind` says which: `attached` when the person started work on it ("Work on this PR"), `opened` when a run
     // it belonged to opened it. One row per (user, repository, number, kind) at most; the thread id is the link both
@@ -2574,6 +2588,10 @@ export const schema = defineSchema({
         kind: v.union(v.literal("attached"), v.literal("linked"), v.literal("opened")),
         number: v.number(),
         repository: v.string(),
+        // The host's state of the pull request, as the last refresh read it (`source-control/pr-state.ts`). Absent until the
+        // first read: an unknown state keeps the thread out of auto-archive, like an open one.
+        state: v.optional(v.union(v.literal("open"), v.literal("closed"), v.literal("merged"))),
+        stateCheckedAt: v.optional(v.number()),
         // Set while the thread is soft-deleted, so the sidebar count reads these rows alone. Kept in step by the thread's delete and restore.
         threadDeleted: v.optional(v.boolean()),
         threadId: v.id("threads"),
@@ -4245,6 +4263,8 @@ export const schema = defineSchema({
         dailyBriefEnabled: v.optional(v.boolean()),
         // When the user answered "Not now" to the home page's one-time Daily Brief offer (`home/overview.ts`). Server-written only. Absent = not answered.
         dailyBriefOfferDismissedAt: v.optional(v.number()),
+        // The permission mode a new chat starts with (`chat/lib/thread-permission-mode.ts`). Absent = auto.
+        defaultPermissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
         // Appearance: UI spacing preset (accepted values: `auth/fields.ts`).
         density: v.optional(v.string()),
         dictationLanguage: v.optional(v.string()),
@@ -4255,6 +4275,8 @@ export const schema = defineSchema({
         // A message sent during a coding agent's turn interrupts that turn and goes next, instead of queueing behind it. Absent = queue.
         hostFollowUpSteer: v.optional(v.boolean()),
         isAdvancedUser: v.optional(v.boolean()),
+        // Keep an idle chat out of auto-archive while it has a linked pull request that is open (`agent/auto-archive.ts`). Absent = on.
+        keepOpenPullRequestChats: v.optional(v.boolean()),
         keyboardShortcuts: v.optional(v.any()),
         language: v.optional(v.string()),
         lastChatId: v.optional(v.string()),

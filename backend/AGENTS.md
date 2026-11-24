@@ -69,6 +69,7 @@ cd backend && pnpm codegen     # lunora codegen, then backend/scripts/check-gene
 - `.global()` D1 tables are created lazily: exercise the route before checking `sqlite_master`; drop the `globalSchemaMarker` row if you drop a table by hand.
 - `lunora build` gates schema drift against `backend/lunora/.lunora-schema.json`: commit it with schema changes; with data at rest, widen → migrate → narrow.
 - Delete rows of `AUDIT_TABLES` one at a time, never `Promise.all` (`deleteParentsWithChildren` in `gdpr/batch.ts`).
+- A Worker's D1 statement budget counts only `.global()` statements, audit `documentHistory` inserts included; shard-local tables (`idempotencyClaims` too) are the shard's SQLite, bounded by its transaction limits (50,000 written rows), not by D1's.
 - A cache write (`actionCache`) must never fail the caller.
 
 ## Sharding and concurrency

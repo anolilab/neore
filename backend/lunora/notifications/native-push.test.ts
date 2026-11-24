@@ -6,7 +6,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { cascadeDeleteUser } from "../auth/hooks";
-import { reassignGlobalRows } from "../lib/account-merge";
+import { acquireMergeLease, reassignGlobalRows } from "../lib/account-merge";
 import schema from "../schema";
 import { isUniqueViolation } from "../lib/error-helpers";
 import { getNativePushConfig, registerPushDevice, unregisterPushDevice } from "./native-push";
@@ -274,15 +274,23 @@ describe("phone push tokens", () => {
     });
 
     it("drops a guest's phones on an account merge instead of moving them, through the module's own writes", async () => {
-        await call(registerPushDevice, USER, { platform: "ios", token: PHONE });
-        await call(registerPushDevice, OTHER, { platform: "android", token: SECOND_PHONE });
+        // A merge moves rows only into a real account, so the guest folds into one with a `user` row.
+        const account = (await harness.run(
+            async (ctx: any) => await ctx.db.insert("user", { createdAt: 0, email: "account@example.com", emailVerified: true, name: "account", updatedAt: 0 }),
+        )) as string;
 
-        // USER is the guest folding into OTHER: its phone registers again under OTHER's own sign-in.
-        await call(reassignGlobalRows, null, { from: USER, to: OTHER });
+        sessions[account] = await startSession(account);
+        await call(registerPushDevice, USER, { platform: "ios", token: PHONE });
+        await call(registerPushDevice, account, { platform: "android", token: SECOND_PHONE });
+
+        // USER is the guest folding into the account: its phone registers again under the account's own sign-in.
+        const { generation } = await call<{ generation: number }>(acquireMergeLease, null, { from: USER, to: account });
+
+        await call(reassignGlobalRows, null, { from: USER, generation, to: account });
 
         const stored = await harness.run(async (ctx: any) => await ctx.db.pushDevices.findMany({ where: {} }));
 
-        expect(stored.page.map((row: { token: string; userId: string }) => [row.token, row.userId])).toStrictEqual([[SECOND_PHONE, OTHER]]);
+        expect(stored.page.map((row: { token: string; userId: string }) => [row.token, row.userId])).toStrictEqual([[SECOND_PHONE, account]]);
     });
 
     it("drops a deleted guest's phones with the rest of its account (inactive-guest cleanup and the merge's last step)", async () => {

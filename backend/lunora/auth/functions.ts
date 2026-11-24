@@ -34,6 +34,7 @@ import { runAfterOnShard } from "../lib/shard-scheduler";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { liveTrustedServers } from "../chat/lib/low-risk-trust";
+import { callerRestrictsFull } from "../chat/lib/new-chat-mode";
 import { normalizeSearchDomainBlocklist } from "../chat/tools/search-domains";
 import { backupFilterRejection, eligibleBackupModel } from "../chat/lib/backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "../chat/lib/paid-model";
@@ -985,6 +986,13 @@ export const updateUserSettings = authMutation
     .input(userSettingsFieldsWithoutUserId)
     .mutation(async (options) => {
         const { ctx } = options;
+
+        // The default mode of new chats is the owner's to set by hand: neither an admin acting as them nor a grant session (an app or the
+        // browser extension) may change it, since the default would then reach every chat they start (`callerRestrictsFull`).
+        if (options.args.defaultPermissionMode !== undefined && (await callerRestrictsFull(ctx))) {
+            throw new LunoraError("FORBIDDEN", "The default permission mode cannot be changed from an impersonated or grant session");
+        }
+
         const result = await settingsUpsert("userSettings", options);
 
         ctx.log.event("auth.update_user_settings", { fieldCount: Object.keys(options.args).length });
