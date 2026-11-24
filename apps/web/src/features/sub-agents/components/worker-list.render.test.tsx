@@ -204,4 +204,24 @@ describe("worker list archive confirmation", () => {
 
         expect(harness.updateThread).not.toHaveBeenCalled();
     });
+
+    it("does not reopen a pending archive when the list empties and the worker comes back", async () => {
+        harness.settings = { confirmBeforeArchiveChat: true };
+        const queryClient = mountList([idleWorker()]);
+
+        fireEvent.click(await archiveButton());
+        expect(await screen.findByText("Archive this chat?")).toBeTruthy();
+
+        act(() => {
+            queryClient.setQueryData(["listWorkers"], []);
+        });
+        await waitFor(() => expect(screen.queryByText("Archive this chat?")).toBeNull());
+
+        act(() => {
+            queryClient.setQueryData(["listWorkers"], [idleWorker()]);
+        });
+        expect(await archiveButton()).toBeTruthy();
+        expect(screen.queryByText("Archive this chat?")).toBeNull();
+        expect(harness.updateThread).not.toHaveBeenCalled();
+    });
 });

@@ -253,6 +253,8 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     const [searchInput, setSearchInput] = useState("");
     // The thread delete waiting for confirmation. It opens the same destructive dialog the sidebar row uses.
     const [pendingDelete, setPendingDelete] = useState<{ run: () => void } | undefined>(undefined);
+    // Leaving the open chat drops its pending delete, so a confirm cannot delete a chat other than the one the prompt was opened from.
+    useEffect(() => () => setPendingDelete(undefined), [currentThreadId]);
     // The filters and the project the palette is narrowed to. Each closes with the palette.
     const [scope, setScope] = useState<PaletteScope>(NO_PALETTE_SCOPE);
     const [projectFilter, setProjectFilter] = useState<ProjectFilter | undefined>(undefined);

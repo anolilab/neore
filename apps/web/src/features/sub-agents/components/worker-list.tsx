@@ -85,8 +85,10 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
     const [archiveTarget, setArchiveTarget] = useState<{ leadThreadId: string | undefined; workerId: string } | undefined>(undefined);
     const pendingArchive = archiveTarget !== undefined && archiveTarget.leadThreadId === threadId ? archiveTarget.workerId : undefined;
 
-    // Leaving a lead chat ends its pending archive, so returning to it does not reopen the dialog.
-    useEffect(() => () => setArchiveTarget(undefined), [threadId]);
+    // Leaving a lead chat, or its list going empty, ends the pending archive, so the dialog never reopens for a worker it was opened on.
+    const hasWorkers = (workers?.length ?? 0) > 0;
+
+    useEffect(() => () => setArchiveTarget(undefined), [threadId, hasWorkers]);
     const archiveWorker = (workerId: string) => {
         updateThread({ status: "archived", threadId: workerId as Id<"threads"> }).catch(() => showError(t`Failed to archive the worker`));
     };

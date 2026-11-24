@@ -225,8 +225,13 @@ const isBefore = (earlier: Node, later: Node): boolean => earlier.compareDocumen
 
 const messageQueries = () => harness.searchArgs.filter((args) => args !== skipToken);
 
-const renderPalette = (queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })) =>
-    render(createElement(QueryClientProvider, { client: queryClient }, createElement(GlobalCommandPalette)));
+const renderPalette = (queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })) => {
+    const tree = () => createElement(QueryClientProvider, { client: queryClient }, createElement(GlobalCommandPalette));
+    const view = render(tree());
+
+    // A fresh element, so React re-renders the palette and reads the harness's current chat again.
+    return { ...view, rerenderPalette: () => view.rerender(tree()) };
+};
 
 /** Steps the fake clock past the search debounce (the meaning-search tests run on fake timers). */
 const waitPastDebounce = async () => {
@@ -454,6 +459,23 @@ describe("command palette thread delete confirmation", () => {
         fireEvent.click(await screen.findByRole("option", { name: "Delete thread" }));
 
         expect(harness.deleteBranch).toHaveBeenCalledWith("thread-1");
+    });
+
+    it("drops a pending delete of the open chat once another chat is open, so a confirm cannot delete the chat it left", async () => {
+        harness.currentThreadId = "thread-1";
+        const view = renderPalette();
+
+        await openPalette();
+
+        fireEvent.click(await screen.findByRole("option", { name: "Delete thread" }));
+        expect(await screen.findByText("Delete thread?")).toBeTruthy();
+
+        harness.currentThreadId = "thread-2";
+        view.rerenderPalette();
+
+        await waitFor(() => expect(screen.queryByText("Delete thread?")).toBeNull());
+        expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+        expect(harness.deleteBranch).not.toHaveBeenCalled();
     });
 });
 
