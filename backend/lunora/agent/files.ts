@@ -465,6 +465,7 @@ export const useExistingFile = internalMutation
         }
 
         await ctx.db.patch("chatFiles", file._id, { lastTouchedAt: ctx.now });
+        await ensureChatFileMetadata(ctx, storedRow(file));
         await grantFileAccess(ctx, file._id, args.userId);
 
         return { fileId: file._id, storageId: file.storageId };
@@ -669,8 +670,9 @@ export const deleteFiles = internalMutation
                 // Primary: a replica that lags could miss a row, and the export would then list a file that was deleted.
                 const { page: metadata } = await ctx.db.chatFileMetadata.findMany({ consistency: "primary", where: { fileId } });
 
-                await Promise.all(metadata.map((row) => ctx.db.delete("chatFileMetadata", row._id)));
+                // The file row goes first: if its delete fails, the metadata is still there and the file stays exportable, not hidden.
                 await ctx.db.delete("chatFiles", fileId);
+                await Promise.all(metadata.map((row) => ctx.db.delete("chatFileMetadata", row._id)));
 
                 return fileId;
             }),
