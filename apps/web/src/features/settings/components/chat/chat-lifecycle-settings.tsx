@@ -101,6 +101,28 @@ const ChatLifecycleControls: FC = () => {
                 </Select>
             </div>
 
+            <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                    <Label className="text-base font-medium" htmlFor="keep-open-pull-request-chats">
+                        {t`Keep chats with an open pull request`}
+                    </Label>
+                    <p className="text-muted-foreground text-sm" id="keep-open-pull-request-chats-description">
+                        {t`Auto-archive skips a chat while it is linked to a pull request that is still open.`}
+                    </p>
+                </div>
+                <Switch
+                    aria-describedby="keep-open-pull-request-chats-description"
+                    checked={userSettings?.keepOpenPullRequestChats !== false}
+                    id="keep-open-pull-request-chats"
+                    onCheckedChange={(checked) => {
+                        save(
+                            { keepOpenPullRequestChats: checked },
+                            checked ? t`Chats with an open pull request are kept` : t`Chats with an open pull request can be archived`,
+                        );
+                    }}
+                />
+            </div>
+
             <div className="space-y-2">
                 <Label className="text-base font-medium" htmlFor="search-domain-blocklist">
                     {t`Blocked websites for web search`}

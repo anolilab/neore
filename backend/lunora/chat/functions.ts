@@ -70,6 +70,7 @@ import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
 import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
 import { readChildThreads } from "./lib/child-threads";
 import { capSearchTerms, matchesQueryTerms, queryTerms } from "./lib/search-terms";
+import { callerRestrictsFull, ownerNewChatMode } from "./lib/new-chat-mode";
 import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGranted, type ThreadGateOutcome } from "./lib/thread-gate";
 import { type TypedPromptRow, vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
 import { type DraftFrom, draftFromOfMarks, notTypedMarksOfMessage, statelessPrompt } from "../lib/not-typed-text";
@@ -577,16 +578,29 @@ export const createThread = authMutation
                 }
             }
 
+            // The mode is read before the thread exists, so a failed read writes nothing. A bot's own mode wins; a bot with none starts in
+            // the owner's default, as any new chat does. An admin acting as the owner, or any grant, never takes `full` from the bot or the
+            // default. A grant is the browser extension, the desktop app or the phone app, so a Full bot started from one of those apps
+            // takes the owner's default instead, and keeps `full` only in the web app. The session is read only where it can change the
+            // mode: a bot's `full`, or the owner's `full` default.
+            const restrictsFull = () => callerRestrictsFull(context);
+            const botMode = bot?.permissionMode && !(bot.permissionMode === "full" && (await restrictsFull())) ? bot.permissionMode : undefined;
+            const startMode = botMode ?? (await ownerNewChatMode(context, userId, restrictsFull));
+
             const { threadId } = await agent.createThread(context, {
                 title: threadTitle,
                 userId,
             });
 
-            // A chat with a bot starts in the bot's mode; the owner can still change it per thread. Before the bot patch, so a
-            // thread that names its bot always carries the bot's mode. An admin acting as the owner cannot set a mode, so their
-            // chat never takes `full` from the bot: it stays on the default.
-            if (bot?.permissionMode && !(bot.permissionMode === "full" && context.user.impersonatedBy)) {
-                await context.runMutation(internal.chat.thread_state.copyThreadPermissionMode, { mode: bot.permissionMode, threadId });
+            if (startMode) {
+                try {
+                    await context.runMutation(internal.chat.thread_state.copyThreadPermissionMode, { mode: startMode, threadId });
+                } catch (error) {
+                    // Nothing else is written yet. Without this the chat would stay as an empty chat the user never asked for (as a branch does).
+                    await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: threadId as Id<"threads"> });
+
+                    throw error;
+                }
             }
 
             await context.runMutation(internal.agent.threads.updateThread, {
@@ -667,6 +681,8 @@ export const createThreadWithInitialMessage = internalMutation
         customSystemPrompt: v.optional(v.string()),
         enabledFeatures: v.optional(v.array(v.string())),
         fileIds: v.optional(v.array(v.string())),
+        /** An admin acting as the owner, or a session `/chat/start` saw impersonating: the owner's default never gives such a chat `full`. */
+        impersonated: v.optional(v.boolean()),
         language: v.optional(v.string()),
         messageContent: v.array(v.record(v.string(), v.any())),
         mode: v.optional(v.union(v.literal("text"), v.literal("image"), v.literal("video"))),
@@ -696,6 +712,7 @@ export const createThreadWithInitialMessage = internalMutation
                 customSystemPrompt,
                 enabledFeatures,
                 fileIds,
+                impersonated,
                 language,
                 messageContent,
                 mode,
@@ -731,9 +748,14 @@ export const createThreadWithInitialMessage = internalMutation
 
             // Every write below is in THIS transaction, with no nested mutation (each would commit on its own): a send with
             // a `clientMessageId` must leave either the thread, its prompt and the claim's record, or none of them.
+            // The owner's default mode for a new chat, read here and written with the insert: the claim's invariant allows no nested
+            // mutation, so the default cannot be copied on afterwards.
+            const startMode = await ownerNewChatMode(context, userId, async () => impersonated === true);
+
             const threadId = await insertThread(context.db, {
                 ...withoutUndefined({ customSystemPrompt, enabledFeatures, language, mode, reasoningEffort, statelessMode }),
                 ...(autoModel === true && { autoModel }),
+                ...(startMode && { permissionMode: startMode }),
                 createdAt: context.now,
                 model,
                 // A temporary chat stays untagged, as `createThread` leaves it.

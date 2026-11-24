@@ -468,6 +468,8 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     projectRuleFiles:
         "one row per project; its `userId` copies the project's owner (re-stamped on account merge) for erasure only (`eraseProjectRuleFilesForUser`), and every access follows the project's check (`readableProject`, `projectWithEditableSettings` in `projects/functions.ts`)",
     promptHistory: "`userId` is the EDITOR of an org-shared prompt; read under the prompt's rule",
+    pullRequestStateScans:
+        "the housekeeping sweep's scan position over the owner's pull-request links; written and read only by `dispatchLinkedPullRequestChecks` on the owner's shard, erased with the links (`source-control/gdpr.ts`); no client reads it",
     rateLimit: "better-auth rate limiter",
     rateLimits: "rate-limit counters written by every procedure's rate-limit middleware",
     sandboxActions: "no owner column; internal only",

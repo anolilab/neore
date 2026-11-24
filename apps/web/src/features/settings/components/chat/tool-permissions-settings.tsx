@@ -29,6 +29,8 @@ import { useEffect, useId, useState } from "react";
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
+import NewChatPermissionModeSetting from "./new-chat-permission-mode-setting";
+
 type Mode = "ask" | "auto" | "off";
 
 const MODES: ReadonlyArray<Mode> = ["auto", "ask", "off"];
@@ -361,6 +363,8 @@ const ToolPermissionsSettings: FC = () => {
                     {t`Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so "Ask" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only.`}
                 </AlertDescription>
             </Alert>
+
+            <NewChatPermissionModeSetting />
 
             <QuickCheckSetting checked={settings?.autoApproveLowRisk === true} isSaving={isSavingQuickCheck} onChange={handleQuickCheck} />
 
