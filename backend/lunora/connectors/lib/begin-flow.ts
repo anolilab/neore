@@ -122,6 +122,7 @@ export const beginOAuthFlow = async (
     const state = generateOAuthState();
 
     await ctx.runMutation(internal.connectors.store.createOAuthState, {
+        authorizationResponseIssParameterSupported: authorizationServer.authorizationResponseIssParameterSupported === true,
         expiresAt: Date.now() + OAUTH_STATE_TTL_MS,
         flow: {
             ...(envClient && { clientEnvPrefix: envClient.prefix }),

@@ -9,6 +9,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { ImageGalleryContext } from "./image-gallery-context";
 import LazyImage from "./lazy-image";
+import SaveFileButton from "./save-file-button";
 import { useImageGallery } from "./use-image-gallery";
 
 // Types
@@ -18,14 +19,24 @@ export interface GalleryItem {
     batchId?: string; // groups images from the same generation request
     createdAt?: Date;
     duration?: number; // for videos, in seconds
+    /** The file's own name, which a save keeps. Not the description: a reference picker's `alt` is a thread title. */
+    filename?: string;
     id: string;
     modelName?: string; // display name of the model used for generation
     nsfwStatus?: string; // NSFW classification status
     prompt?: string;
+    /** `false`: the tile offers no save. A picker holds items whose screening status it does not carry. */
+    saveable?: boolean;
     src: string;
     thumbnail?: string;
     type: "image" | "video";
 }
+
+/**
+ * Whether a tile offers to save its file. A file the classifier has not cleared is not saved: `pending`, `checking`,
+ * `failed` and `blocked` are withheld. An absent status is cleared, as the backend treats it (`fork-copy.ts`).
+ */
+const canSaveItem = (item: GalleryItem): boolean => item.saveable !== false && (item.nsfwStatus === undefined || item.nsfwStatus === "safe");
 
 // Root component
 interface ImageGalleryProps {
@@ -153,12 +164,15 @@ const formatDuration = (seconds: number): string => {
 
 const ImageGalleryItem = ({ className, item }: ImageGalleryItemProps) => {
     const { t } = useLingui();
-    const { maxSelections, onItemClick, onToggleSelection, selectedIds, selectionEnabled } = useImageGallery();
+    const { items, maxSelections, onItemClick, onToggleSelection, selectedIds, selectionEnabled } = useImageGallery();
+    const tileName = item.alt || t`Gallery item`;
+    const position = items.indexOf(item) + 1;
     const isSelected = selectedIds.includes(item.id);
     const isAtMaxSelections = selectedIds.length >= maxSelections;
     const canSelect = isSelected || !isAtMaxSelections;
 
     const thumbnailSource = item.thumbnail || item.src;
+    const canSave = canSaveItem(item);
 
     const handleClick = () => {
         onItemClick(item);
@@ -231,6 +245,17 @@ const ImageGalleryItem = ({ className, item }: ImageGalleryItemProps) => {
                 )}
             </button>
 
+            {/* A sibling of the preview button, not a child: a nested button is invalid HTML. Shown on hover and keyboard focus. */}
+            {canSave && (
+                <SaveFileButton
+                    className="absolute top-2 left-2 bg-black/60 text-white opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-black/75 hover:text-white focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                    fallbackName={`${item.type}-${item.id}`}
+                    filename={item.filename}
+                    label={t`Download ${tileName} (${position})`}
+                    url={item.src}
+                />
+            )}
+
             {/* Selection checkbox - always visible when selection is enabled */}
             {selectionEnabled && (
                 <button
@@ -270,12 +295,15 @@ const ImageGalleryItem = ({ className, item }: ImageGalleryItemProps) => {
  */
 const KreaImageItem = ({ className, item }: ImageGalleryItemProps) => {
     const { t } = useLingui();
-    const { maxSelections, onItemClick, onToggleSelection, selectedIds, selectionEnabled } = useImageGallery();
+    const { items, maxSelections, onItemClick, onToggleSelection, selectedIds, selectionEnabled } = useImageGallery();
+    const tileName = item.alt || t`Gallery item`;
+    const position = items.indexOf(item) + 1;
     const isSelected = selectedIds.includes(item.id);
     const isAtMaxSelections = selectedIds.length >= maxSelections;
     const canSelect = isSelected || !isAtMaxSelections;
     // Default to 4/3 until the image loads and we know its real dimensions
     const [cellAspectRatio, setCellAspectRatio] = useState<string>("4/3");
+    const canSave = canSaveItem(item);
 
     return (
         <div
@@ -329,6 +357,17 @@ const KreaImageItem = ({ className, item }: ImageGalleryItemProps) => {
                     </div>
                 )}
             </button>
+
+            {/* A sibling of the preview button, not a child: a nested button is invalid HTML. Shown on hover and keyboard focus. */}
+            {canSave && (
+                <SaveFileButton
+                    className="absolute top-2.5 left-2.5 bg-black/60 text-white opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-black/75 hover:text-white focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                    fallbackName={`${item.type}-${item.id}`}
+                    filename={item.filename}
+                    label={t`Download ${tileName} (${position})`}
+                    url={item.src}
+                />
+            )}
 
             {/* Selection circle */}
             {selectionEnabled && (

@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toAppError } from "@/features/chat/core/context/chat-action-shared";
 import type { AppError } from "@/lib/errors";
 
-import type { ChatToastSettings } from "../lib/chat-toasts";
+import type { ChatToastSettings, ToastMessage } from "../lib/chat-toasts";
 import useChatRunToasts from "./use-chat-run-toasts";
 
 const toastSuccess = vi.hoisted(() => vi.fn());
@@ -31,7 +31,7 @@ vi.mock("@lingui/react/macro", () => {
 interface Props {
     activeStreamId: string | null;
     error: AppError | null;
-    messages: ReadonlyArray<{ parts?: ReadonlyArray<unknown> }>;
+    messages: ReadonlyArray<ToastMessage>;
     settings: ChatToastSettings | null | undefined;
     threadId: string | undefined;
 }
@@ -81,6 +81,40 @@ describe("useChatRunToasts: each toggle suppresses its own toast", () => {
         rerender({ ...idle, messages: waitingOn("call-1"), settings: { chatInputToastEnabled: false } });
 
         expect(toastWarning).not.toHaveBeenCalled();
+    });
+});
+
+describe("useChatRunToasts: a run's outcome", () => {
+    it("shows a failed toast, not a finished one, when the stream ends on an errored reply", () => {
+        const erroredReply: Props["messages"] = [
+            { parts: [{ text: "hello", type: "text" }], role: "user" },
+            { parts: [], role: "assistant", status: "error" },
+        ];
+        const { rerender } = setup({ ...idle, settings: {} });
+
+        finishRun(rerender, { ...idle, messages: erroredReply, settings: {} });
+
+        expect(toastSuccess).not.toHaveBeenCalled();
+        expect(toastError).toHaveBeenCalledTimes(1);
+    });
+
+    it("suppresses the failed toast for an errored reply when the failed toggle is off, and still shows nothing finished", () => {
+        const erroredReply: Props["messages"] = [{ parts: [], role: "assistant", status: "error" }];
+        const { rerender } = setup({ ...idle, settings: { chatFailedToastEnabled: false } });
+
+        finishRun(rerender, { ...idle, messages: erroredReply, settings: { chatFailedToastEnabled: false } });
+
+        expect(toastError).not.toHaveBeenCalled();
+        expect(toastSuccess).not.toHaveBeenCalled();
+    });
+
+    it("shows a finished toast when a browser-local reply ends", () => {
+        const { rerender } = setup({ ...idle, settings: {} });
+
+        rerender({ ...idle, activeStreamId: "local-browser-reply", settings: {} });
+        rerender({ ...idle, activeStreamId: null, settings: {} });
+
+        expect(toastSuccess).toHaveBeenCalledTimes(1);
     });
 });
 

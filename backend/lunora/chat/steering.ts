@@ -89,6 +89,12 @@ export const steerRun = authMutation
             throw new LunoraError("CONFLICT", "This reply is no longer running");
         }
 
+        // A reply waiting for the person has no resume queued: nothing would take a steer until they resume, and Stop or a new
+        // message would drop it. Refused, so the composer keeps the text as a queued message instead.
+        if (stream.pauseAwaitsPerson === true) {
+            throw new LunoraError("CONFLICT", "This reply is waiting for you to resume it");
+        }
+
         // A coding agent on a paired device takes no steer into a running turn: nothing reads the queue.
         if (stream.producer === "host") {
             throw new LunoraError("CONFLICT", "A coding agent's turn cannot be steered");

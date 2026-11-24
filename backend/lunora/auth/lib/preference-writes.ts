@@ -45,6 +45,7 @@ export type UserSettingsPatch = Partial<
         | "chatInputToastEnabled"
         | "dailyBriefEnabled"
         | "dailyBriefOfferDismissedAt"
+        | "projectRunnerDefaults"
         | "setupStepsSkipped"
         | "taskEmailEnabled"
     >

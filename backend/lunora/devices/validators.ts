@@ -71,6 +71,8 @@ export const vDeviceView = v.object({
     platform: vDevicePlatform,
     /** Unset: offered in any chat. A list: only threads of these (still existing) projects; empty: nowhere. */
     projectIds: v.optional(v.array(v.string())),
+    /** The projects of `projectIds` with their titles, so a start can offer them without paging the person's project list. */
+    scopeProjects: v.optional(v.array(v.object({ _id: v.string(), title: v.string() }))),
     toolNames: v.array(v.string()),
     transport: v.optional(vDeviceTransport),
     /** The computer reported a protocol older than the backend serves: it gets no calls until the app is updated. */

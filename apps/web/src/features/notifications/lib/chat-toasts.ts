@@ -22,11 +22,34 @@ const SETTING_OF: Record<ChatToastEvent, keyof ChatToastSettings> = {
 /** Whether the toast for `event` is on: every value other than `false` (absent, `null`, `true`) keeps it. */
 export const isChatToastOn = (settings: ChatToastSettings | null | undefined, event: ChatToastEvent): boolean => settings?.[SETTING_OF[event]] !== false;
 
+/** The message fields the toasts read: its parts, who wrote it, and its status (`error` when the reply failed on the server). */
+export interface ToastMessage {
+    parts?: ReadonlyArray<unknown>;
+    role?: string;
+    status?: string;
+}
+
+/**
+ * Whether the latest assistant reply ended in an error. A server-side failure ends the stream without a client error, so
+ * the stream end alone cannot tell it from a finish.
+ */
+export const lastReplyFailed = (messages: ReadonlyArray<ToastMessage>): boolean => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+        const message = messages[index];
+
+        if (message?.role === "assistant") {
+            return message.status === "error" || message.status === "failed";
+        }
+    }
+
+    return false;
+};
+
 /**
  * The tool calls in `messages` that wait for the person's answer or approval (`approval-requested`). An `askUser` and a
  * secret request wait in the same state, so they count too.
  */
-export const waitingApprovalIds = (messages: ReadonlyArray<{ parts?: ReadonlyArray<unknown> }>): string[] => {
+export const waitingApprovalIds = (messages: ReadonlyArray<ToastMessage>): string[] => {
     const ids: string[] = [];
 
     for (const message of messages) {

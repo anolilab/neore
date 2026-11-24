@@ -616,7 +616,10 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     }
 
     // In-app toasts for a run that failed, finished, or waits for the person (each gated by its setting).
-    useChatRunToasts({ activeStreamId, error, messages, settings: userSettings, threadId });
+    // A browser-local reply has no gateway stream; its own streaming flag marks the run for the toasts.
+    const localRunId = isLocalStreaming && localStreamingThreadId === threadId ? "local-browser-reply" : null;
+
+    useChatRunToasts({ activeStreamId: activeStreamId ?? localRunId, error, messages, settings: userSettings, threadId });
 
     // Track stream completion when activeStreamId transitions from non-null to null
     const { t } = useLingui();
@@ -822,10 +825,10 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             if (mustSignIn) {
                 openLoginPrompt();
 
-                return;
+                return undefined;
             }
 
-            await runReloadMessage(
+            return runReloadMessage(
                 {
                     authHeader,
                     defaultLanguage,
@@ -934,8 +937,10 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
         const lastAssistantMessage = messagesRef.current.findLast((m) => m.role === "assistant");
 
         if (lastAssistantMessage) {
-            await reloadMessage(lastAssistantMessage.id);
+            return reloadMessage(lastAssistantMessage.id);
         }
+
+        return undefined;
     }, [reloadMessage]);
 
     // Derived isEmpty boolean — only changes when empty↔non-empty transitions,

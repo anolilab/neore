@@ -17,10 +17,12 @@ import { internalMutation } from "../_generated/server";
 import { addMessagesHandler } from "../agent/messages";
 import { insertThread } from "../agent/table-writes";
 import { isValidBranchName } from "../coding-agents/commands";
+import { callerRestrictsFull, ownerNewChatMode } from "../chat/lib/new-chat-mode";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import { GITHUB_WEB_ORIGIN, splitGithubRepo } from "./drivers/github";
+import { rereadRelinkedLink } from "./pr-state";
 
 /** Threads kept per pull request: a list, not a history. The newest are the ones anyone is working in. */
 export const MAX_THREADS_PER_PULL_REQUEST = 50;
@@ -160,6 +162,7 @@ export const startWorkOnPullRequest = authMutation
         }
 
         if (attached) {
+            await rereadRelinkedLink(ctx, attached);
             ctx.log.event("source_control.start_work_on_pull_request", { clearedDeadLinks: deadAttached.length, created: false });
 
             return { created: false, threadId: attached.threadId };
@@ -168,9 +171,12 @@ export const startWorkOnPullRequest = authMutation
         const title = `Work on ${address.repository}#${String(address.number)}`.slice(0, MAX_TITLE_CHARS);
         const url = pullRequestUrl(address.repository, address.number);
         const { now } = ctx;
+        // A new chat starts in the owner's default mode (`ownerNewChatMode`), read before the thread is written.
+        const permissionMode = await ownerNewChatMode(ctx, userId, () => callerRestrictsFull(ctx));
         const threadId = await insertThread(ctx.db, {
             createdBy: userId,
             mode: "text",
+            ...(permissionMode && { permissionMode }),
             status: "active",
             tags: ["chat", "develop"],
             title,

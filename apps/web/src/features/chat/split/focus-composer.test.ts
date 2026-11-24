@@ -1,0 +1,239 @@
+import { render, renderHook, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { createElement } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { FOCUS_FRAMES, focusComposerWhenMounted, requestComposerFocus, useComposerFocusRequest, useComposerFocusRequestStore } from "./focus-composer";
+
+// Every element that takes focus, in order: asserted instead of reading `document.activeElement` directly.
+const focusLog: EventTarget[] = [];
+const recordFocus = (event: FocusEvent) => {
+    if (event.target) {
+        focusLog.push(event.target);
+    }
+};
+
+// The frame loop is driven by hand: each `runFrame` is one animation frame.
+const frameQueue: { callbacks: FrameRequestCallback[] } = { callbacks: [] };
+
+const runFrame = (): void => {
+    const due = frameQueue.callbacks;
+
+    frameQueue.callbacks = [];
+
+    for (const callback of due) {
+        callback(0);
+    }
+};
+
+/** A pane element, rendered with `children`: `update` re-renders it with other children (the composer mounting later). */
+const mountPane = (children?: ReactNode) => {
+    const pane: { current: HTMLElement | null } = { current: null };
+    const attach = (element: HTMLElement | null) => {
+        pane.current = element;
+    };
+    const view = render(createElement("section", { ref: attach }, children));
+
+    return {
+        pane,
+        update: (next?: ReactNode) => {
+            view.rerender(createElement("section", { ref: attach }, next));
+        },
+    };
+};
+
+const composer = () => createElement("textarea", { "data-focus-area": "composer" });
+
+beforeEach(() => {
+    focusLog.length = 0;
+    document.addEventListener("focusin", recordFocus);
+    useComposerFocusRequestStore.setState({ threadId: undefined });
+    frameQueue.callbacks = [];
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+        frameQueue.callbacks.push(callback);
+
+        return frameQueue.callbacks.length;
+    });
+    vi.stubGlobal("cancelAnimationFrame", () => {
+        frameQueue.callbacks = [];
+    });
+});
+
+afterEach(() => {
+    document.removeEventListener("focusin", recordFocus);
+    vi.unstubAllGlobals();
+});
+
+describe("focusComposerWhenMounted", () => {
+    it("moves focus into the composer once it has mounted, and settles with true", () => {
+        const { pane, update } = mountPane();
+        const onSettled = vi.fn();
+
+        focusComposerWhenMounted(pane, onSettled);
+
+        // The composer loads after the pane is shown: nothing is focused and nothing has settled yet.
+        runFrame();
+        expect(onSettled).not.toHaveBeenCalled();
+
+        update(composer());
+        runFrame();
+
+        expect(focusLog).toEqual([screen.getByRole("textbox")]);
+        expect(onSettled).toHaveBeenCalledTimes(1);
+        expect(onSettled).toHaveBeenCalledWith(true);
+    });
+
+    it("gives up after the frame budget and settles with false, leaving focus where it was", () => {
+        const { pane } = mountPane();
+        const onSettled = vi.fn();
+
+        focusComposerWhenMounted(pane, onSettled);
+
+        for (let frame = 0; frame < FOCUS_FRAMES; frame += 1) {
+            runFrame();
+        }
+
+        expect(onSettled).toHaveBeenCalledTimes(1);
+        expect(onSettled).toHaveBeenCalledWith(false);
+        expect(focusLog).toEqual([]);
+    });
+
+    it("does not take focus back from where the person moved it while the composer was loading", () => {
+        const { pane, update } = mountPane(createElement("div", null, createElement("button", null, "Start"), createElement("button", null, "Moved")));
+        const onSettled = vi.fn();
+
+        screen.getByRole("button", { name: "Start" }).focus();
+        focusComposerWhenMounted(pane, onSettled);
+        screen.getByRole("button", { name: "Moved" }).focus();
+
+        update(createElement("div", null, createElement("button", null, "Start"), createElement("button", null, "Moved"), composer()));
+        runFrame();
+
+        expect(focusLog.at(-1)).toBe(screen.getByRole("button", { name: "Moved" }));
+        expect(onSettled).toHaveBeenCalledWith(false);
+    });
+
+    it("does not count a composer that cannot take focus, such as a disabled one, as focused", () => {
+        const { pane, update } = mountPane();
+        const onSettled = vi.fn();
+
+        focusComposerWhenMounted(pane, onSettled);
+        update(createElement("textarea", { "data-focus-area": "composer", disabled: true }));
+        runFrame();
+
+        expect(focusLog).toEqual([]);
+        expect(onSettled).toHaveBeenCalledWith(false);
+    });
+
+    it("stops retrying when its cleanup runs, so a left pane does not take focus later", () => {
+        const { pane, update } = mountPane();
+        const onSettled = vi.fn();
+
+        const cancel = focusComposerWhenMounted(pane, onSettled);
+
+        cancel();
+        update(composer());
+        runFrame();
+
+        expect(onSettled).not.toHaveBeenCalled();
+        expect(focusLog).toEqual([]);
+    });
+});
+
+describe("useComposerFocusRequest", () => {
+    it("moves focus into the requested pane's composer once it is focused, and clears the request", () => {
+        const { pane } = mountPane(composer());
+
+        requestComposerFocus("chat-a");
+        renderHook(() => useComposerFocusRequest(pane, "chat-a", true));
+
+        expect(focusLog).toEqual([screen.getByRole("textbox")]);
+        expect(useComposerFocusRequestStore.getState().threadId).toBeUndefined();
+    });
+
+    it("keeps the request until a composer that mounts a few frames later takes focus, then clears it", () => {
+        const { pane, update } = mountPane();
+
+        requestComposerFocus("chat-a");
+        renderHook(() => useComposerFocusRequest(pane, "chat-a", true));
+
+        // The composer loads after the pane is shown: the request must survive the frames before it mounts.
+        runFrame();
+        runFrame();
+
+        expect(focusLog).toEqual([]);
+        expect(useComposerFocusRequestStore.getState().threadId).toBe("chat-a");
+
+        update(composer());
+        runFrame();
+
+        expect(focusLog).toEqual([screen.getByRole("textbox")]);
+        expect(useComposerFocusRequestStore.getState().threadId).toBeUndefined();
+    });
+
+    it("clears the request when the composer never mounts within the frame budget", () => {
+        const { pane } = mountPane();
+
+        requestComposerFocus("chat-a");
+        renderHook(() => useComposerFocusRequest(pane, "chat-a", true));
+
+        for (let frame = 0; frame < FOCUS_FRAMES; frame += 1) {
+            runFrame();
+        }
+
+        // A request that gave up must not stay pending: a later focus of this pane would otherwise move focus into its composer.
+        expect(focusLog).toEqual([]);
+        expect(useComposerFocusRequestStore.getState().threadId).toBeUndefined();
+    });
+
+    it("waits until the pane is focused before it moves focus", () => {
+        const { pane } = mountPane(composer());
+
+        requestComposerFocus("chat-a");
+        const { rerender } = renderHook(({ isFocused }) => useComposerFocusRequest(pane, "chat-a", isFocused), {
+            initialProps: { isFocused: false },
+        });
+
+        expect(focusLog).toEqual([]);
+        expect(useComposerFocusRequestStore.getState().threadId).toBe("chat-a");
+
+        rerender({ isFocused: true });
+
+        expect(focusLog).toEqual([screen.getByRole("textbox")]);
+    });
+
+    it("leaves another pane's request alone", () => {
+        const { pane } = mountPane(composer());
+
+        requestComposerFocus("chat-b");
+        renderHook(() => useComposerFocusRequest(pane, "chat-a", true));
+
+        expect(focusLog).toEqual([]);
+        expect(useComposerFocusRequestStore.getState().threadId).toBe("chat-b");
+    });
+
+    it("clears the request when the pane is left before its composer mounts", () => {
+        const { pane } = mountPane();
+
+        requestComposerFocus("chat-a");
+        const { unmount } = renderHook(() => useComposerFocusRequest(pane, "chat-a", true));
+
+        unmount();
+
+        expect(useComposerFocusRequestStore.getState().threadId).toBeUndefined();
+    });
+});
+
+describe("requestComposerFocus", () => {
+    it("is held in memory: a storage that fails cannot make the request throw", () => {
+        const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+            throw new Error("storage is full");
+        });
+
+        expect(() => requestComposerFocus("chat-a")).not.toThrow();
+        expect(useComposerFocusRequestStore.getState().threadId).toBe("chat-a");
+        expect(setItem).not.toHaveBeenCalled();
+
+        vi.restoreAllMocks();
+    });
+});

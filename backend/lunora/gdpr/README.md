@@ -126,7 +126,12 @@ Users can request a complete export of all their personal data in JSON format. T
 1. **Profile Data** - User account information
 2. **Settings** - User preferences and AI settings
 3. **Conversations** - All threads and messages
-4. **Files** - File metadata (actual files stored separately)
+4. **Files** - Vault file and folder metadata, and the chat files of the user (uploads and generated images): the files behind their
+   grants and the files their messages still name, metadata only, the bytes are not exported (`agent/export-pages.ts`, read by
+   `agent/gdpr.ts#collectGrantedChatFileIdsForExport`, the thread and message walk, and `chatFileMetadataForExport`). The section is held
+   to 8 MiB as written; past it the rest are left out and the section says so. Its reads take what the sections before it left of the
+   action's read budget (`chatFilesReadBudget`), and past that the section is cut and flagged too. A chat link alone is not exported: a
+   link outlives the message that named the file
 5. **Prompts** - Saved prompts and history
 6. **Usage History** - AI usage tracking events
 7. **Browser** - Browser sessions (started, status, last page, the extension that drove it), their actions (action, target, time, success),
@@ -360,15 +365,26 @@ Audit history supports configurable retention via the vacuum feature:
 `gdpr/retention.ts#pruneRetainedActivity` runs in every shard's housekeeping
 sweep (`lib/shard-housekeeping.ts`), a bounded batch per table per run:
 
-| Table          | Kept                                               | Why                                                                           |
-| -------------- | -------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `usageDaily`   | 400 days                                           | The usage page's per-day rollup; a year plus a month of history is enough.    |
-| `subAgentRuns` | 90 days, finished runs only (`succeeded`/`failed`) | The answer was already posted into the parent thread; the row is bookkeeping. |
+| Table                      | Kept                                               | Why                                                                                                                                                                          |
+| -------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `usageDaily`               | 400 days                                           | The usage page's per-day rollup; a year plus a month of history is enough.                                                                                                   |
+| `usageOrganizationReplies` | 400 days, pruned at the next UTC midnight          | Replies recorded under an organization's projects, read by the organization view; the same window as the rollup. Its contributor list drops a user once their rows are gone. |
+| `subAgentRuns`             | 90 days, finished runs only (`succeeded`/`failed`) | The answer was already posted into the parent thread; the row is bookkeeping.                                                                                                |
 
 Both are also in the export and deleted with the account in their own batched
 steps (`deleteUserUsageDaily`, `deleteUserSubAgentRuns`). A failed delete fails
 its step, so the retry removes what is left. `subAgentRuns` is read with
 `collectActivityForExport`, with `knowledgeCollections`.
+
+`usageOrganizationReplies` is erased with the rest of the usage tables
+(`usage/gdpr.ts#eraseUsageForUser`). The user's entries in
+`usageOrganizationContributors` go only in the batch after their ledger rows are
+all gone: until then the organization view still reads the member, sees the
+erasure underway and withholds their cohort's weeks. Once the entry is gone the
+cohort shows with the members it has (an accepted departure, owner's decision
+of 2026-11-23); a cohort left with fewer than three members is withheld
+(`MIN_MEMBERS_SHORT_COHORT`: with two, a member reading the view subtracts
+their own spend and sees the other's).
 
 `usageDaily` is exported in durable steps (`gdpr/usage-export-steps.ts`): a page
 of 900 rows (`USAGE_EXPORT_PAGE`, below a mutation's write limit), then a recount of the closed days (two days before the user's latest
@@ -409,22 +425,23 @@ GDPR Article 12 requires requests to be fulfilled within 30 days. The cron job:
 
 The following tables contain user personal data and are included in exports/deletions:
 
-| Table               | Location    | Data Type                    |
-| ------------------- | ----------- | ---------------------------- |
-| `user`              | Better Auth | Profile (name, email, image) |
-| `account`           | Better Auth | Auth providers, tokens       |
-| `session`           | Better Auth | Active sessions              |
-| `userSettings`      | `schema.ts` | Preferences, shortcuts       |
-| `aiUserPreferences` | `schema.ts` | AI settings, encrypted keys  |
-| `threads`           | `schema.ts` | Chat conversations           |
-| `messages`          | `schema.ts` | Chat messages                |
-| `files`             | `schema.ts` | Uploaded files               |
-| `folders`           | `schema.ts` | Folder structure             |
-| `prompts`           | `schema.ts` | Saved prompts                |
-| `promptHistory`     | `schema.ts` | Prompt versions              |
-| `threadAccess`      | `schema.ts` | Shared thread permissions    |
-| `threadInvites`     | `schema.ts` | Thread sharing invites       |
-| `browser*` tables   | `schema.ts` | Browser sessions and use     |
+| Table               | Location    | Data Type                                                      |
+| ------------------- | ----------- | -------------------------------------------------------------- |
+| `user`              | Better Auth | Profile (name, email, image)                                   |
+| `account`           | Better Auth | Auth providers, tokens                                         |
+| `session`           | Better Auth | Active sessions                                                |
+| `userSettings`      | `schema.ts` | Preferences, shortcuts                                         |
+| `aiUserPreferences` | `schema.ts` | AI settings, encrypted keys                                    |
+| `threads`           | `schema.ts` | Chat conversations                                             |
+| `messages`          | `schema.ts` | Chat messages                                                  |
+| `files`             | `schema.ts` | Uploaded files                                                 |
+| `chatFileAccess`    | `schema.ts` | Chat files held (uploads, generated images), metadata exported |
+| `folders`           | `schema.ts` | Folder structure                                               |
+| `prompts`           | `schema.ts` | Saved prompts                                                  |
+| `promptHistory`     | `schema.ts` | Prompt versions                                                |
+| `threadAccess`      | `schema.ts` | Shared thread permissions                                      |
+| `threadInvites`     | `schema.ts` | Thread sharing invites                                         |
+| `browser*` tables   | `schema.ts` | Browser sessions and use                                       |
 
 **Not in exports or deletions, by design: `wsTicket`** (raw D1, `lib/ws-ticket.ts`).
 Each row is a live-query socket ticket: a SHA-256 hash, a user id, a session id

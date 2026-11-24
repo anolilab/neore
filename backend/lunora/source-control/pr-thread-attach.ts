@@ -17,6 +17,7 @@ import { authAction, authQuery, rateLimit } from "../lib/crpc";
 import { isThreadLocked } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import { DEVELOP_DRIVER } from "./develop-driver";
+import { rereadRelinkedLink } from "./pr-state";
 import { linksFor, MAX_THREADS_PER_PULL_REQUEST, partitionLinks, pullRequestUrl, requireAddress, toOutput, vPullRequestThread } from "./pr-threads";
 import { readFromHost } from "./read-host";
 
@@ -79,7 +80,10 @@ export const recordAttachedPullRequests = internalMutation
             const address = requireAddress(link.repository, link.number);
             const { live } = await partitionLinks(ctx, await linksFor(ctx, args.userId, address.repository, address.number));
 
-            if (live.some((row) => row.threadId === thread._id)) {
+            const own = live.find((row) => row.threadId === thread._id);
+
+            if (own !== undefined) {
+                await rereadRelinkedLink(ctx, own);
                 results.push({ number: address.number, repository: address.repository, status: "already_linked" });
 
                 continue;

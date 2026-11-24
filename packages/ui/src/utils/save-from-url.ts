@@ -24,8 +24,13 @@ const EXTENSION_BY_TYPE: Record<string, string> = {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
     "application/zip": "zip",
+    "audio/aac": "aac",
+    "audio/flac": "flac",
+    "audio/mp4": "m4a",
     "audio/mpeg": "mp3",
+    "audio/ogg": "ogg",
     "audio/wav": "wav",
+    "audio/webm": "webm",
     "image/avif": "avif",
     "image/gif": "gif",
     "image/jpeg": "jpg",
@@ -36,6 +41,8 @@ const EXTENSION_BY_TYPE: Record<string, string> = {
     "text/markdown": "md",
     "text/plain": "txt",
     "video/mp4": "mp4",
+    "video/ogg": "ogv",
+    "video/quicktime": "mov",
     "video/webm": "webm",
 };
 

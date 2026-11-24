@@ -210,6 +210,13 @@ describe("steerRun", () => {
         await expect(steer("hi")).rejects.toThrow("no longer running");
     });
 
+    it("refuses a steer into a reply waiting for the person to resume it, since nothing would take it", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.patch("persistentStreams", streamId, { pauseAwaitsPerson: true }));
+
+        await expect(steer("hi")).rejects.toThrow("waiting for you to resume it");
+        expect((await steersOnStream()) ?? []).toStrictEqual([]);
+    });
+
     it("refuses a group chat, whose runs take no steers", async () => {
         await harness.run(
             async (ctx: any) =>

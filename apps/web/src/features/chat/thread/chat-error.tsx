@@ -13,6 +13,7 @@ import { Button } from "@neore/ui/components/button";
 import cn from "@neore/ui/utils/cn";
 import { AlertCircle, RefreshCw, X } from "lucide-react";
 import type { FC } from "react";
+import { toast } from "sonner";
 
 import { useChatError } from "@/features/chat/core/context/chat-context";
 import { ErrorUtilities, RateLimitError } from "@/lib/errors";
@@ -39,7 +40,14 @@ const ChatError: FC<ChatErrorProps> = ({ className }) => {
     const retryMinutes = isRateLimited ? error.getRetryAfterMinutes() : 0;
 
     const handleRetry = async () => {
-        await regenerate();
+        const outcome = await regenerate();
+
+        // Nothing was asked again: say why, as the reply's own Continue does.
+        if (outcome === false) {
+            toast.error(t`Load the earlier messages, then try again: this reply's prompt is not loaded.`);
+        } else if (outcome === "model-unavailable") {
+            toast.error(t`Select the model that wrote this reply to continue it.`);
+        }
     };
 
     return (

@@ -107,6 +107,7 @@ export const insertBatch = internalMutation
         // userId, vector }` was rejected as an unknown property.
         vectors: v.array(
             v.object({
+                archived: v.optional(v.boolean()),
                 messageId: v.optional(v.id("messages")),
                 model: v.string(),
                 table: v.string(),

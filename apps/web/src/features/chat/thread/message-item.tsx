@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import type { FC, ReactNode } from "react";
 import { memo, useCallback, useState } from "react";
+import { toast } from "sonner";
 
 import { useChatActions, useChatThreadIdentity } from "@/features/chat/core/context/chat-context";
 import { useThreadManager } from "@/features/chat/core/hooks/use-thread-manager";
@@ -514,9 +515,19 @@ const MessageItem: FC<MessageItemProps> = memo(
             copyMessage(message.id, "plain");
         }, [copyMessage, message.id]);
 
-        const handleReload = useCallback(() => {
-            reloadMessage(message.id);
-        }, [reloadMessage, message.id]);
+        const { t } = useLingui();
+
+        const handleReload = useCallback(async () => {
+            const started = await reloadMessage(message.id);
+
+            // The prompt is on a page that is not loaded: say so, rather than doing nothing.
+            if (started === false) {
+                toast.error(t`Load the earlier messages, then try again: this reply's prompt is not loaded.`);
+            } else if (started === "model-unavailable") {
+                // A local reply is not sent to another model: the viewer selects the model that wrote it.
+                toast.error(t`Select the model that wrote this reply to continue it.`);
+            }
+        }, [reloadMessage, message.id, t]);
 
         const handleEdit = useCallback(() => {
             useChatUIStore.getState().startEditing(message.id, message.role === "user" ? getVisibleUserText(message) : message.text);
@@ -528,6 +539,13 @@ const MessageItem: FC<MessageItemProps> = memo(
                 {message.role !== "system" && <MessageSelectCheckbox disabled={messageIsStreaming || message.status === "pending"} message={message} />}
                 <MessageContent isStreaming={messageIsStreaming} message={message} />
                 {message.role === "assistant" && message.hostChanges && <HostChangesOfThread changes={message.hostChanges} messageId={message.id} />}
+                {/* A failed last local reply can be asked again: the same prompt, saved as a sibling reply. A gateway failure keeps its own Retry. */}
+                {message.role === "assistant" && message.status === "failed" && isLast && message.localReply === true && (
+                    <Button className="mb-2 min-h-11 gap-1.5" onClick={handleReload} size="default" variant="outline">
+                        <RefreshCwIcon aria-hidden="true" className="size-4" />
+                        <Trans>Continue</Trans>
+                    </Button>
+                )}
             </>
         );
 

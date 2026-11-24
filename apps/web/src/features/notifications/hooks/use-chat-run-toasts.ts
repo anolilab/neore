@@ -4,16 +4,16 @@ import { toast } from "sonner";
 
 import type { AppError } from "@/lib/errors";
 
-import type { ChatToastSettings } from "../lib/chat-toasts";
-import { isChatToastOn, waitingApprovalIds } from "../lib/chat-toasts";
+import type { ChatToastSettings, ToastMessage } from "../lib/chat-toasts";
+import { isChatToastOn, lastReplyFailed, waitingApprovalIds } from "../lib/chat-toasts";
 
 interface ChatRunToastsInput {
-    /** The thread's live stream, `null` between runs. */
+    /** The thread's live run (a gateway stream, or the local marker for a browser-local reply), `null` between runs. */
     activeStreamId: string | null;
     /** The chat's error state: set when a reply failed. */
     error: AppError | null;
-    /** The thread's messages, to spot a tool call that waits for the person. */
-    messages: ReadonlyArray<{ parts?: ReadonlyArray<unknown> }>;
+    /** The thread's messages: a tool call that waits for the person, and the reply's own status. */
+    messages: ReadonlyArray<ToastMessage>;
     settings: ChatToastSettings | null | undefined;
     threadId: string | undefined;
 }
@@ -54,6 +54,15 @@ const useChatRunToasts = ({ activeStreamId, error, messages, settings, threadId 
         }
 
         if (waitingApprovalIds(messages).length > 0) {
+            return;
+        }
+
+        // A server-side failure ends the stream without the client error: its reply carries the error status instead.
+        if (lastReplyFailed(messages)) {
+            if (isChatToastOn(settings, "failed")) {
+                toast.error(t`A chat reply failed`);
+            }
+
             return;
         }
 

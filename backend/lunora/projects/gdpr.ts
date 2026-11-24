@@ -16,6 +16,7 @@ import { logger } from "../lib/logger";
 import { ROOT_SHARD_KEY } from "../lib/shard-context";
 import { MAX_LENGTH } from "../lib/validators";
 import { vSubAgentRoles } from "../sub-agents/validators";
+import { projectRunnerOf } from "../acp/lib/project-runner";
 import { PROJECTS_PER_DETAILS_READ, PROJECTS_PER_RULE_FILES_READ } from "./export-pages";
 import { DELETION_MARKER_TTL_MS, DELETION_MARKER_URL, isRepoRow } from "./repositories";
 import { findProjectRowsMeasured, projectRowsReadBytes } from "./project-row";
@@ -296,6 +297,9 @@ export const collectOwnedProjectsForExport = internalQuery
                     machineId: v.optional(v.string()),
                     path: v.optional(v.string()),
                     projectId: v.string(),
+                    // The computer, agent and folder id a personal project's next host thread starts on (`acp/lib/project-runner.ts`).
+                    // An organization project's default is each person's own, exported with their settings.
+                    runner: v.optional(v.object({ agentKey: v.string(), deviceId: v.string(), folderId: v.string() })),
                     sharingEnabled: v.boolean(),
                     subAgentRoles: v.optional(vSubAgentRoles),
                     title: v.string(),
@@ -314,11 +318,15 @@ export const collectOwnedProjectsForExport = internalQuery
         });
         const { readBytes } = result;
         const projects = result.page.map((row) => {
+            // No settings row: an organization project's per-person default is not on the project.
+            const runner = projectRunnerOf(row, null);
+
             return {
                 ...(row.context && { context: row.context }),
                 ...(row.machineId !== undefined && { machineId: row.machineId }),
                 ...(row.path !== undefined && { path: row.path }),
                 projectId: row._id,
+                ...(runner && { runner }),
                 sharingEnabled: row.isPublic === true,
                 ...(row.subAgentRoles !== undefined && { subAgentRoles: row.subAgentRoles }),
                 title: row.title,

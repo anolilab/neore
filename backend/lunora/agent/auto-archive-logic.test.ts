@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { type AutoArchiveCandidate, autoArchiveCutoff, isAutoArchiveDays, runArchivePass, selectAutoArchiveDue } from "./auto-archive-logic";
+import {
+    type AutoArchiveCandidate,
+    autoArchiveCutoff,
+    isAutoArchiveDays,
+    isOpenPullRequestForArchive,
+    keepsOpenPullRequestChats,
+    runArchivePass,
+    selectAutoArchiveDue,
+} from "./auto-archive-logic";
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = 1000 * DAY;
@@ -21,6 +29,23 @@ describe("isAutoArchiveDays", () => {
 
     it.each([undefined, 1, 6, 366, 7.5, -7])("refuses %s", (days) => {
         expect(isAutoArchiveDays(days)).toBe(false);
+    });
+});
+
+describe("the open pull request rule", () => {
+    it.each([
+        ["open", true],
+        [undefined, true],
+        ["closed", false],
+        ["merged", false],
+    ] as const)("treats a link with state %s as open: %s", (state, open) => {
+        expect(isOpenPullRequestForArchive({ state })).toBe(open);
+    });
+
+    it("keeps the setting on unless it is explicitly false", () => {
+        expect(keepsOpenPullRequestChats(undefined)).toBe(true);
+        expect(keepsOpenPullRequestChats(true)).toBe(true);
+        expect(keepsOpenPullRequestChats(false)).toBe(false);
     });
 });
 

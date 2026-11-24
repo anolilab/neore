@@ -11,6 +11,8 @@ import type { LocalChatMessage } from "./local-client";
 import { streamLocalChat } from "./local-client";
 import type { LocalErrorInfo } from "./local-errors";
 import { diagnoseLocalError } from "./local-errors";
+import type { ReplyStopKind } from "./reply-guard";
+import { createReplyGuard, dropTrailingHighSurrogate, LOCAL_IDLE_TIMEOUT_MS } from "./reply-guard";
 
 /** How many earlier messages go to the local model as context. */
 export const LOCAL_HISTORY_LIMIT = 40;
@@ -30,6 +32,8 @@ export interface SaveLocalTurnInput {
 
 export interface RunLocalTurnOptions {
     baseUrl: string;
+    /** The words saved as a failed reply's error when the server gave no detail, and for a reply guard stop. Defaults to the kind. */
+    describeError?: (info: LocalErrorInfo) => string;
     /** Diagnosis is injectable because the real one probes the network. */
     diagnose?: (error: unknown, baseUrl: string) => Promise<LocalErrorInfo>;
     fetchImpl?: typeof fetch;
@@ -68,9 +72,50 @@ export const buildLocalHistory = (messages: ReadonlyArray<HistoryMessage>, syste
 };
 
 export const runLocalTurn = async (options: RunLocalTurnOptions): Promise<RunLocalTurnResult> => {
-    const { baseUrl, diagnose = diagnoseLocalError, fetchImpl, history, modelId, onUpdate, prompt, save, signal, systemPrompt } = options;
+    const {
+        baseUrl,
+        describeError = (info: LocalErrorInfo) => info.kind,
+        diagnose = diagnoseLocalError,
+        fetchImpl,
+        history,
+        modelId,
+        onUpdate,
+        prompt,
+        save,
+        signal,
+        systemPrompt,
+    } = options;
     let text = "";
     let reasoning = "";
+    // The reply guard stops the stream through its own controller, so its stop reads as ours and not as the user's.
+    const stream = new AbortController();
+    const onUserAbort = () => {
+        stream.abort();
+    };
+    const guard = createReplyGuard();
+    // An object, not a `let`: the stop is set inside callbacks, which TypeScript does not follow.
+    const state: { failure?: { error: unknown }; idleTimer?: ReturnType<typeof setTimeout>; stop?: ReplyStopKind } = {};
+
+    const stopWith = (kind: ReplyStopKind) => {
+        if (state.stop) {
+            return;
+        }
+
+        state.stop = kind;
+        clearTimeout(state.idleTimer);
+        stream.abort();
+    };
+
+    const armIdle = () => {
+        clearTimeout(state.idleTimer);
+        state.idleTimer = setTimeout(stopWith, LOCAL_IDLE_TIMEOUT_MS, "idle");
+    };
+
+    if (signal.aborted) {
+        stream.abort();
+    } else {
+        signal.addEventListener("abort", onUserAbort, { once: true });
+    }
 
     try {
         await streamLocalChat({
@@ -78,15 +123,60 @@ export const runLocalTurn = async (options: RunLocalTurnOptions): Promise<RunLoc
             fetchImpl,
             messages: [...buildLocalHistory(history, systemPrompt), { content: prompt, role: "user" }],
             model: modelId,
+            // The idle clock starts when the server answers: a request that is still being accepted is not a silent model.
             onDelta: (delta) => {
-                text += delta.content;
-                reasoning += delta.reasoning;
+                // Tokens of a chunk that arrived after the stop are not part of the saved reply.
+                if (state.stop) {
+                    return;
+                }
+
+                // A chunk can carry the repeat that ends the reply, or the reasoning that passes its limit, and text past either:
+                // keep only what comes up to the stop, so the saved reply stays within its limits.
+                const repeat = guard.pushContent(delta.content);
+                const overflow = guard.pushReasoning(delta.reasoning);
+
+                text += repeat ? delta.content.slice(0, repeat.keep) : delta.content;
+                reasoning += overflow ? delta.reasoning.slice(0, overflow.keep) : delta.reasoning;
+
+                if (overflow) {
+                    // An earlier delta may have ended on a high surrogate whose low half the limit cut off.
+                    reasoning = dropTrailingHighSurrogate(reasoning);
+                }
+
                 onUpdate(text, reasoning);
+                armIdle();
+
+                const cause = repeat?.kind ?? overflow?.kind;
+
+                if (cause) {
+                    stopWith(cause);
+                }
             },
-            signal,
+            onOpen: armIdle,
+            signal: stream.signal,
         });
     } catch (error) {
-        const info = await diagnose(error, baseUrl);
+        state.failure = { error };
+    } finally {
+        clearTimeout(state.idleTimer);
+        signal.removeEventListener("abort", onUserAbort);
+    }
+
+    // A stream that ends on a repeat with no newline after it is still a loop: the guard checks its last line now.
+    if (!state.stop && !state.failure && guard.finish()) {
+        state.stop = "repeat-loop";
+    }
+
+    // The guard's stop wins over whatever the stream did next: a stream that ended on its own right after the stop is still a stop.
+    if (state.stop) {
+        const info: LocalErrorInfo = { kind: state.stop };
+        const { threadId } = await save({ error: describeError(info), outcome: "failed", prompt, reasoning, reply: text });
+
+        return { error: info, outcome: "failed", saved: true, threadId };
+    }
+
+    if (state.failure) {
+        const info = await diagnose(state.failure.error, baseUrl);
 
         if (info.kind === "aborted") {
             // A stop before the first token leaves nothing worth a thread entry.
@@ -104,7 +194,8 @@ export const runLocalTurn = async (options: RunLocalTurnOptions): Promise<RunLoc
             return { error: info, saved: false };
         }
 
-        const { threadId } = await save({ error: info.detail ?? info.kind, outcome: "failed", prompt, reasoning, reply: text });
+        // The server's own words when it sent any; otherwise the same sentence the thread shows for this kind, never a bare code.
+        const { threadId } = await save({ error: info.detail ?? describeError(info), outcome: "failed", prompt, reasoning, reply: text });
 
         return { error: info, outcome: "failed", saved: true, threadId };
     }

@@ -110,11 +110,15 @@ const NotificationSettings: FC = () => {
     });
 
     // The in-app toasts for chat events. Each defaults on: an absent setting keeps the toast.
-    const setChatToast = useMutation(crpc.notifications.chat_toast_settings.setChatToastEnabled.mutationOptions());
-    const chatToastMutation = (event: ChatToastEvent): SettingMutation => {
+    // One mutation observer per switch: a shared one would drop an earlier change's callbacks when a later change starts.
+    const chatToastOptions = crpc.notifications.chat_toast_settings.setChatToastEnabled.mutationOptions();
+    const setChatFinishedToast = useMutation(chatToastOptions);
+    const setChatFailedToast = useMutation(chatToastOptions);
+    const setChatInputToast = useMutation(chatToastOptions);
+    const chatToastMutation = (event: ChatToastEvent, observer: typeof setChatFinishedToast): SettingMutation => {
         return {
-            isPending: setChatToast.isPending,
-            mutate: (variables, options) => setChatToast.mutate({ enabled: variables.enabled, event }, options),
+            isPending: observer.isPending,
+            mutate: (variables, options) => observer.mutate({ enabled: variables.enabled, event }, options),
         };
     };
     const chatToastMessages = {
@@ -122,9 +126,24 @@ const NotificationSettings: FC = () => {
         off: t`Chat notification turned off`,
         on: t`Chat notification turned on`,
     };
-    const chatFinishedToast = useOptimisticSetting(userSettings.data?.chatFinishedToastEnabled, chatToastMutation("finished"), chatToastMessages, true);
-    const chatFailedToast = useOptimisticSetting(userSettings.data?.chatFailedToastEnabled, chatToastMutation("failed"), chatToastMessages, true);
-    const chatInputToast = useOptimisticSetting(userSettings.data?.chatInputToastEnabled, chatToastMutation("input"), chatToastMessages, true);
+    const chatFinishedToast = useOptimisticSetting(
+        userSettings.data?.chatFinishedToastEnabled,
+        chatToastMutation("finished", setChatFinishedToast),
+        chatToastMessages,
+        true,
+    );
+    const chatFailedToast = useOptimisticSetting(
+        userSettings.data?.chatFailedToastEnabled,
+        chatToastMutation("failed", setChatFailedToast),
+        chatToastMessages,
+        true,
+    );
+    const chatInputToast = useOptimisticSetting(
+        userSettings.data?.chatInputToastEnabled,
+        chatToastMutation("input", setChatInputToast),
+        chatToastMessages,
+        true,
+    );
 
     const pushAvailable = Boolean(config?.publicKey) && support === "supported";
     const dailyBrief = useOptimisticSetting(userSettings.data?.dailyBriefEnabled, setDailyBrief, {
