@@ -76,7 +76,9 @@ export const pollEvents = internalQuery
     .query(async ({ args, ctx }) => {
         const outcome = await pollLog(storeOn(ctx, args.userId), {
             fromSeq: args.fromSeq ?? null,
-            maxAgeMs: args.maxAgeMs,
+            // The window never reaches past retention: an event older than it is expired whether or not housekeeping has pruned it yet,
+            // so a dormant shard's backlog is never read back to a returning user.
+            maxAgeMs: args.maxAgeMs === undefined ? RETENTION_MS : Math.min(args.maxAgeMs, RETENTION_MS),
             maxEvents: args.maxEvents,
             name: args.name,
             now: ctx.now,
