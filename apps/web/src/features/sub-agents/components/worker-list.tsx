@@ -84,6 +84,7 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
     // so a dialog opened in one chat cannot archive a worker after the person has moved to another.
     const [archiveTarget, setArchiveTarget] = useState<{ leadThreadId: string | undefined; workerId: string } | undefined>(undefined);
     const pendingArchive = archiveTarget !== undefined && archiveTarget.leadThreadId === threadId ? archiveTarget.workerId : undefined;
+
     // Leaving a lead chat ends its pending archive, so returning to it does not reopen the dialog.
     useEffect(() => () => setArchiveTarget(undefined), [threadId]);
     const archiveWorker = (workerId: string) => {
