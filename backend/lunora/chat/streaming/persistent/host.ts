@@ -166,11 +166,6 @@ export const releaseThread = async (
 };
 
 /**
- * Ends a host stream in one write: its status, `hostState: ended` and why. Every terminal path goes through
- * here (the host's `turn_end`, the reaper, a revoked device, Stop), so none can leave a stream that reads as
- * live to one client and ended to another. Returns false when the stream was already over.
- */
-/**
  * The run end a host turn records: `succeeded` for a finished turn, `failed` for an error, timeout or revocation, and none
  * (`undefined`) for a stop, which writes no run event anywhere.
  */
@@ -183,6 +178,11 @@ const hostRunOutcome = (end: { reason: EndReason; status: "done" | "error" | "ti
     return end.reason === "finished" && end.status === "done" ? "succeeded" : "failed";
 };
 
+/**
+ * Ends a host stream in one write: its status, `hostState: ended` and why. Every terminal path goes through
+ * here (the host's `turn_end`, the reaper, a revoked device, Stop), so none can leave a stream that reads as
+ * live to one client and ended to another. Returns false when the stream was already over.
+ */
 export const endHostStream = async (
     ctx: Pick<MutationCtx, "db">,
     stream: Stream,
