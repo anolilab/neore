@@ -83,8 +83,9 @@ export const admitPinWrite = async (context: Pick<MutationCtx, "db">, userId: st
 };
 
 /**
- * Admits a pin write: checks the marker, renews the lease, checks the marker again. Returns whether the account is moving, in which case
- * the caller refuses the write. The second check closes the window where a move starts between the first check and the renewal.
+ * Admits a pin write: checks the marker once, then renews the lease. Returns whether the account is moving, in which case the caller
+ * refuses the write and renews nothing. An admitted write is not yet safe: it must call `refusesPinWrite` again as the last step before
+ * its insert, after its route write (`chat/pins/functions.ts`).
  */
 export const admitPinWriteUnlessMoving = async (context: MutationCtx, userId: string, now: number): Promise<boolean> => {
     if (await refusesPinWrite(context, userId, now)) {

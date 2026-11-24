@@ -629,7 +629,7 @@ describe("account deletion workflow: the owner-shard sweep", () => {
 });
 
 describe("account deletion workflow: the owner fences outlive the route drain", () => {
-    it("lifts the fences after the routes are drained, on every owner either sweep fenced", async () => {
+    it("lifts the fences before the routes are drained, on every owner either sweep fenced", async () => {
         // Both sweeps fence owner shards; the replay fake reports the owners it fenced.
         answer = (ref) => {
             if (ref === "gdpr_steps:erasePinsOnOwnerShards") {
@@ -645,9 +645,12 @@ describe("account deletion workflow: the owner fences outlive the route drain", 
         const drain = names.indexOf("delete-user-shared-pin-routes");
         const release = names.indexOf("release-pin-fences");
 
-        // A write refused by a fence is only safe to lift after no route names the shard: the release comes after the drain.
+        // The owners are known only while their routes exist, so the release comes after the second sweep and before the drain removes them.
+        const again = names.indexOf("erase-pins-on-owner-shards-again");
+
         expect(release).toBeGreaterThan(-1);
-        expect(release).toBeGreaterThan(drain);
+        expect(release).toBeGreaterThan(again);
+        expect(release).toBeLessThan(drain);
 
         const releaseRun = runs().find((entry) => entry.ref === "gdpr_steps:releasePinFences");
 

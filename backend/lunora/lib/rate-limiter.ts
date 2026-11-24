@@ -1011,11 +1011,15 @@ export const rateLimitGuard = async (
         const result = await limiter.limit(identifier, { count });
 
         if (!result.ok) {
+            const retryAfter = Math.max(0, result.reset - Date.now());
+
+            // `retryAfterMs` is the hint the Lunora client reads for its retry delay; `retryAfter` stays for the readers that already use it.
             throw new LunoraError("TOO_MANY_REQUESTS", "Rate limit exceeded. Please try again later.", {
                 data: {
                     code: "TOO_MANY_REQUESTS",
                     message: "Rate limit exceeded. Please try again later.",
-                    retryAfter: Math.max(0, result.reset - Date.now()),
+                    retryAfter,
+                    retryAfterMs: retryAfter,
                 },
             });
         }
@@ -1030,7 +1034,12 @@ export const rateLimitGuard = async (
 
         if (!result.ok) {
             throw new LunoraError("TOO_MANY_REQUESTS", "Rate limit exceeded. Please try again later.", {
-                data: { code: "TOO_MANY_REQUESTS", message: "Rate limit exceeded. Please try again later.", retryAfter: result.retryAfter },
+                data: {
+                    code: "TOO_MANY_REQUESTS",
+                    message: "Rate limit exceeded. Please try again later.",
+                    retryAfter: result.retryAfter,
+                    retryAfterMs: result.retryAfter,
+                },
             });
         }
     }
@@ -1126,7 +1135,12 @@ export const checkRateLimit = async (
 
         if (!result.ok && options.throws) {
             throw new LunoraError("TOO_MANY_REQUESTS", "Rate limit exceeded. Please try again later.", {
-                data: { code: "TOO_MANY_REQUESTS", message: "Rate limit exceeded. Please try again later.", retryAfter: result.retryAfter },
+                data: {
+                    code: "TOO_MANY_REQUESTS",
+                    message: "Rate limit exceeded. Please try again later.",
+                    retryAfter: result.retryAfter,
+                    retryAfterMs: result.retryAfter,
+                },
             });
         }
 

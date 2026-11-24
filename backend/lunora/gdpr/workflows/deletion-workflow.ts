@@ -229,12 +229,12 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     { userId: args.userId },
                     { dedupId: stepDedupId(scope, "erase-pins-on-owner-shards") },
                 ),
-        )) as { owners: string[] };
+        )) as { owners: string[] } | null;
 
-        // Owner shards named by a route are fenced before their sweep and stay fenced until the routes are drained (see below). A pin write on a
-        // fenced shard is refused in its own transaction, and a write that committed before its fence is swept. So a pin on a known owner
-        // shard cannot outlive the erasure. The grace sweep still runs: it picks up a pin on a shard whose route was written after the first
-        // route read. That gap has no fence, so it stays a timing assumption (not a guarantee).
+        // Owner shards named by a route are fenced before their sweep. A pin write on a fenced shard is refused in its own transaction, and a
+        // write that committed before its fence is swept. So a pin on a known owner shard cannot outlive the erasure. The grace sweep still
+        // runs: it picks up a pin on a shard whose route was written after the first route read. That gap has no fence, so it stays a timing
+        // assumption (not a guarantee).
         await context.step.sleep("erase-pins-grace", "2 minutes");
 
         const secondSweep = (await context.step.do(
@@ -245,7 +245,19 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     { userId: args.userId },
                     { dedupId: stepDedupId(scope, "erase-pins-on-owner-shards-again") },
                 ),
-        )) as { owners: string[] };
+        )) as { owners: string[] } | null;
+
+        // The owner shards are lifted now, from the owners both sweeps fenced, and before the routes go: the owners live only in those routes,
+        // so a fresh instance that restarts after the drain could not find them. Once lifted, a pin write of the account is still refused,
+        // because the erasing marker stays live until the erasure ends and every write checks it before its insert (`lib/account-moves.ts`).
+        // A null result (an earlier build's) names no owners.
+        const owners = [...new Set([...(firstSweep?.owners ?? []), ...(secondSweep?.owners ?? [])])];
+
+        await context.step.do(
+            "release-pin-fences",
+            async () =>
+                await context.run(internal.gdpr.steps.releasePinFences, { owners, userId: args.userId }, { dedupId: stepDedupId(scope, "release-pin-fences") }),
+        );
 
         await context.step.do(
             "delete-user-thread-metadata",
@@ -278,16 +290,6 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     { userId: args.userId },
                     { dedupId: stepDedupId(scope, "delete-user-shared-pin-routes", round) },
                 ),
-        );
-
-        // The owner shards stay fenced until no route names them: a pin write that commits on one of them while a route is left is refused.
-        // They are lifted now, from the owners both sweeps fenced (`gdpr/steps.ts#releasePinFences`).
-        const owners = [...new Set([...firstSweep.owners, ...secondSweep.owners])];
-
-        await context.step.do(
-            "release-pin-fences",
-            async () =>
-                await context.run(internal.gdpr.steps.releasePinFences, { owners, userId: args.userId }, { dedupId: stepDedupId(scope, "release-pin-fences") }),
         );
 
         await drain(
