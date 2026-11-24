@@ -670,9 +670,11 @@ export const deleteFiles = internalMutation
                 // Primary: a replica that lags could miss a row, and the export would then list a file that was deleted.
                 const { page: metadata } = await ctx.db.chatFileMetadata.findMany({ consistency: "primary", where: { fileId } });
 
-                // The file row goes first: if its delete fails, the metadata is still there and the file stays exportable, not hidden.
-                await ctx.db.delete("chatFiles", fileId);
+                // The metadata goes first, then the file row. A failed row delete leaves the file in the reaper's queue, so the next run
+                // retries it, and the file is hidden from exports only until then. The other order fails for good: a metadata delete
+                // that failed after the row went would leave an orphaned row, which no run finds again, and exports would list the file.
                 await Promise.all(metadata.map((row) => ctx.db.delete("chatFileMetadata", row._id)));
+                await ctx.db.delete("chatFiles", fileId);
 
                 return fileId;
             }),
