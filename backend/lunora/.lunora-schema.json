@@ -11,6 +11,8 @@
     "add-group-pause-file-ids",
     "add-headless-approved",
     "add-headless-resume-bounds",
+    "add-project-runner-thread-at",
+    "add-project-runner-thread-id",
     "add-purchase-look-browser",
     "add-run-args-impersonated",
     "add-run-args-system-context",
@@ -22680,6 +22682,12 @@
           "optional": true,
           "unique": false
         },
+        "organizationChangedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "organizationId": {
           "kind": "string",
           "nullable": false,
@@ -22721,6 +22729,43 @@
           ]
         },
         "publicAccessToken": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "runnerAgentKey": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "runnerDeviceId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "runnerFolderId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "runnerKind": {
+          "kind": "literal",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "literal": "\"host\""
+        },
+        "runnerThreadAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "runnerThreadId": {
           "kind": "string",
           "nullable": false,
           "optional": true,
@@ -33470,6 +33515,56 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "projectRunnerDefaults": {
+          "kind": "record",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "key": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          },
+          "of": {
+            "kind": "object",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "fields": {
+              "agentKey": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "deviceId": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "folderId": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "threadAt": {
+                "kind": "number",
+                "nullable": false,
+                "optional": true,
+                "unique": false
+              },
+              "threadId": {
+                "kind": "string",
+                "nullable": false,
+                "optional": true,
+                "unique": false
+              }
+            }
+          }
         },
         "resumeInterruptedRuns": {
           "kind": "boolean",

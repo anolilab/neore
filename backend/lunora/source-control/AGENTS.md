@@ -24,7 +24,8 @@
   quota); a host guide is a coding-agent turn in the user's checkout, started by ONE transaction (`beginHostGuide`:
   guide row, session, prompt; a refusal throws so none of it stays) and finished by `endHostTurn` →
   `settleHostGuide` → `finalizeHostGuide`, which re-reads the diff and refuses an answer for another head
-  (`head_moved`). The host prompt is capped in BYTES of the signed call's JSON (`hostPromptBytes`), not characters.
+  (`head_moved`). On a computer limited to some projects the guide is filed under the caller's own project that
+  lists the repository and is in its scope (`guideProjectOf`), else it is `out_of_scope`, never "busy". The host prompt is capped in BYTES of the signed call's JSON (`hostPromptBytes`), not characters.
 
 - **Develop freshness** (`backend/lunora/source-control/freshness*.ts`, `webhook.ts`) — the user
   CHOOSES the repositories (`watchedRepositories`, max 20); only those are polled, through the shard tick

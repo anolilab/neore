@@ -69,6 +69,73 @@ export const insertThread = async (db: Database, row: NewRow<"threads">): Promis
     await db.insert("threads", { ...row, createdAt: row.createdAt ?? Date.now() });
 
 /**
+ * Whether a runner from the thread started at `threadAt` with id `threadId` may replace the one stored with `stored`: a thread
+ * started later, or in the same millisecond, the one with the greater id, so two threads started in one millisecond keep the
+ * same runner whichever records first. The same thread (equal time and id) rewrites; a stored runner with no time is older than
+ * any, and one with no id loses a tie.
+ */
+export const runnerReplaces = (threadAt: number, threadId: string, stored: { threadAt?: number; threadId?: string } | undefined): boolean =>
+    stored?.threadAt === undefined || threadAt > stored.threadAt || (threadAt === stored.threadAt && threadId >= (stored.threadId ?? ""));
+
+/** How many times a runner write retries after another write changed the project in between. */
+const RUNNER_WRITE_ATTEMPTS = 3;
+
+/**
+ * Remembers the runner a host thread in a personal project started on (`acp/lib/project-runner.ts`), with that thread's start
+ * time. The row is its owner's, so no other member reads it. A thread started before the project's last move between spaces, or
+ * in its millisecond, records nothing: a project moved into an organization and back must not get a runner from before the moves.
+ * Each write is conditional on the organization, the move stamp, the owner and the runner stamp the row was read with: a
+ * `.global()` read and a later write are not one transaction, so a project moved in between must not take the owner's runner
+ * along, and a newer thread's runner recorded in between is not replaced. When another write got in first, the row as it now
+ * stands is checked again: the write is retried only while the project is still the same owner's personal project, has not
+ * moved since the thread started, and no thread newer than this one recorded its runner.
+ */
+export const setProjectRunnerDefault = async (
+    db: Database,
+    project: Doc<"projects">,
+    runner: { agentKey: string; deviceId: string; folderId: string },
+    threadAt: number,
+    threadId: string,
+): Promise<void> => {
+    let current: Doc<"projects"> | null = project;
+
+    for (let attempt = 0; attempt < RUNNER_WRITE_ATTEMPTS && current !== null; attempt += 1) {
+        if (
+            current.userId !== project.userId ||
+            current.organizationId ||
+            (current.organizationChangedAt ?? -Infinity) >= threadAt ||
+            !runnerReplaces(threadAt, threadId, { threadAt: current.runnerThreadAt ?? undefined, threadId: current.runnerThreadId ?? undefined })
+        ) {
+            return;
+        }
+
+        const { applied, doc } = await db.patchIf("projects", current._id, {
+            patch: {
+                runnerAgentKey: runner.agentKey,
+                runnerDeviceId: runner.deviceId,
+                runnerFolderId: runner.folderId,
+                runnerKind: "host",
+                runnerThreadAt: threadAt,
+                runnerThreadId: threadId,
+            },
+            where: {
+                organizationChangedAt: current.organizationChangedAt ?? null,
+                organizationId: current.organizationId ?? null,
+                runnerThreadAt: current.runnerThreadAt ?? null,
+                runnerThreadId: current.runnerThreadId ?? null,
+                userId: current.userId,
+            },
+        });
+
+        if (applied) {
+            return;
+        }
+
+        current = doc as Doc<"projects"> | null;
+    }
+};
+
+/**
  * The row a write that puts a thread back to `running`, or records a finished reply (`lastReplyAt`), must leave:
  * `awaitingInput` belongs to the pause that just ended. Every such write funnels through here or `agent/threads.ts#updateThread`, so no call site has to
  * remember to clear it.

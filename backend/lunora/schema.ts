@@ -2394,11 +2394,23 @@ export const schema = defineSchema({
         // The device the project's folder lives on (this computer, or an SSH server's device) and the absolute folder path on it.
         machineId: v.optional(v.id("devices")),
         order: v.optional(v.number()),
+        // When the project last changed organization: a person's runner default from a thread started before it no longer applies.
+        organizationChangedAt: v.optional(v.number()),
         organizationId: v.optional(v.string()),
         path: v.optional(v.string()),
         pinnedAt: v.optional(v.number()),
         projectType: v.optional(v.union(v.literal("chat"), v.literal("workflow"))),
         publicAccessToken: v.optional(v.string()),
+        // The runner a new thread here starts on by default: the computer, agent and folder id of its last host thread (`acp/lib/project-runner.ts`).
+        // Personal projects only; an organization project keeps each person's default on `userSettings.projectRunnerDefaults`. The folder path never leaves the desktop.
+        runnerAgentKey: v.optional(v.string()),
+        runnerDeviceId: v.optional(v.string()),
+        runnerFolderId: v.optional(v.string()),
+        runnerKind: v.optional(v.literal("host")),
+        // When the thread that recorded the runner started: an older thread opening a session later leaves it.
+        runnerThreadAt: v.optional(v.number()),
+        // That thread's id: of two threads started in the same millisecond, the one with the greater id keeps the runner.
+        runnerThreadId: v.optional(v.string()),
         // Per-project overrides of the owner's sub-agent roles (`sub-agents/roles.ts`).
         subAgentRoles: v.optional(vSubAgentRoles),
         title: v.string(),
@@ -4246,6 +4258,19 @@ export const schema = defineSchema({
         // (`auth/lib/personalization.ts`), and kept: a run with it gets no saved login. Server-written only.
         personalizationByImpersonator: v.optional(v.literal(true)),
         profession: v.optional(v.string()),
+        // The runner a new thread in each organization project starts on for this person, keyed by project id (`acp/lib/project-runner.ts`). Written server-side only, at most 200 projects.
+        projectRunnerDefaults: v.optional(
+            v.record(
+                v.string(),
+                v.object({
+                    agentKey: v.string(),
+                    deviceId: v.string(),
+                    folderId: v.string(),
+                    threadAt: v.optional(v.number()),
+                    threadId: v.optional(v.string()),
+                }),
+            ),
+        ),
         // A run whose worker died resumes from its last saved row, up to 3 times per reply (`chat/streaming/persistent/interrupted.ts`). Absent = on.
         resumeInterruptedRuns: v.optional(v.boolean()),
         // Opt-in: opening /chat lands on the most recent thread. Absent = off.
