@@ -4,14 +4,15 @@
  *
  * The sweep leases a bounded set of open links (stamping `stateCheckedAt` in the same transaction, so the next sweep
  * skips them) and schedules one action per link. The action asks the host with the person's token and records the
- * answer only while the link still exists. A failed or unlinked read leaves the state as it was.
- * The sweep does nothing while the person turned "Keep chats with an open pull request" off.
+ * answer only while its lease is still the link's current one, so a late answer never overwrites a newer check.
+ * A host read that finds no such pull request records it as closed; any other failure leaves the state as it was.
+ * The sweep does nothing unless auto-archive is on and the person keeps open-pull-request chats.
  */
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
-import { keepsOpenPullRequestChats, isOpenPullRequestForArchive } from "../agent/auto-archive-logic";
+import { isAutoArchiveDays, isOpenPullRequestForArchive, keepsOpenPullRequestChats } from "../agent/auto-archive-logic";
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { currentUserShard } from "../lib/shard-context";
 import { DEVELOP_DRIVER } from "./develop-driver";
@@ -19,14 +20,17 @@ import { readFromHost } from "./read-host";
 
 /** A link's state is re-read once it is this old. */
 export const PR_STATE_MAX_AGE_MS = 10 * 60 * 1000;
-/** Links read per sweep. Past them, the rest wait for a later sweep. */
-const SCAN_LIMIT = 200;
+/**
+ * Links read per sweep. The candidates are checked oldest-first, so a link past this window is reached as soon as the
+ * links ahead of it are fresh; only a user with more links than this waits longer.
+ */
+const SCAN_LIMIT = 500;
 /** Links checked per sweep, so one user's host calls stay bounded. */
 const CHECK_LIMIT = 20;
 
 const vState = v.union(v.literal("open"), v.literal("closed"), v.literal("merged"));
 
-/** Shard sweep: leases the open links whose state is stale and schedules one host read for each. */
+/** Shard sweep: leases the open links whose state is stale, oldest check first, and schedules one host read for each. */
 export const dispatchLinkedPullRequestChecks = internalMutation
     .input({})
     .output(v.object({ dispatched: v.number() }))
@@ -42,7 +46,10 @@ export const dispatchLinkedPullRequestChecks = internalMutation
             .withIndex("by_userId", (q) => q.eq("userId", userId))
             .unique();
 
-        if (!keepsOpenPullRequestChats(settings?.keepOpenPullRequestChats)) {
+        // The state is only read by auto-archive, so with auto-archive off there is nothing to keep fresh.
+        const autoArchiveOn = isAutoArchiveDays(settings?.autoArchiveAfterDays) && settings?.autoArchiveAfterDays !== 0;
+
+        if (!autoArchiveOn || !keepsOpenPullRequestChats(settings?.keepOpenPullRequestChats)) {
             return { dispatched: 0 };
         }
 
@@ -58,12 +65,14 @@ export const dispatchLinkedPullRequestChecks = internalMutation
                     isOpenPullRequestForArchive(link) &&
                     (link.stateCheckedAt === undefined || now - link.stateCheckedAt >= PR_STATE_MAX_AGE_MS),
             )
+            // Never-checked first, then the longest unchecked: a link is not starved by the ones checked before it.
+            .toSorted((a, b) => (a.stateCheckedAt ?? 0) - (b.stateCheckedAt ?? 0))
             .slice(0, CHECK_LIMIT);
 
         for (const link of due) {
-            // Stamped first: a sweep that runs again before the read lands skips this link.
+            // Stamped first: a sweep that runs again before the read lands skips this link. The stamp is the lease.
             await ctx.db.patch("pullRequestThreads", link._id, { stateCheckedAt: now });
-            await ctx.scheduler.runAfter(0, internal.source_control.pr_state.checkLinkedPullRequest, { linkId: link._id });
+            await ctx.scheduler.runAfter(0, internal.source_control.pr_state.checkLinkedPullRequest, { lease: now, linkId: link._id });
         }
 
         return { dispatched: due.length };
@@ -79,23 +88,26 @@ export const readLinkForStateCheck = internalQuery
         return link === null ? null : { number: link.number, repository: link.repository, userId: link.userId };
     });
 
-/** Records what the host said about a link, if the link is still there. */
+/**
+ * Records what the host said about a link, but only while `lease` is still the link's current check: a result from an
+ * older check that lands after a newer one is dropped.
+ */
 export const recordLinkState = internalMutation
-    .input({ linkId: v.id("pullRequestThreads"), state: vState })
+    .input({ lease: v.number(), linkId: v.id("pullRequestThreads"), state: vState })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const link = await ctx.db.get("pullRequestThreads", args.linkId);
 
-        if (link !== null) {
+        if (link !== null && link.stateCheckedAt === args.lease) {
             await ctx.db.patch("pullRequestThreads", link._id, { state: args.state, stateCheckedAt: ctx.now });
         }
 
         return null;
     });
 
-/** One host read for one link, with the person's own token. A read that fails changes nothing. */
+/** One host read for one link, with the person's own token. */
 export const checkLinkedPullRequest = internalAction
-    .input({ linkId: v.id("pullRequestThreads") })
+    .input({ lease: v.number(), linkId: v.id("pullRequestThreads") })
     .output(v.null())
     .action(async ({ args, ctx }) => {
         const target = await ctx.runQuery(internal.source_control.pr_state.readLinkForStateCheck, { linkId: args.linkId });
@@ -111,11 +123,12 @@ export const checkLinkedPullRequest = internalAction
             return { state: detail.state };
         });
 
-        if (outcome.status !== "ok") {
-            return null;
+        if (outcome.status === "ok") {
+            await ctx.runMutation(internal.source_control.pr_state.recordLinkState, { lease: args.lease, linkId: args.linkId, state: outcome.state });
+        } else if (outcome.status === "not_found") {
+            // The host has no such pull request any more (deleted, or its repository is gone): it is not open, so the chat is not kept for it.
+            await ctx.runMutation(internal.source_control.pr_state.recordLinkState, { lease: args.lease, linkId: args.linkId, state: "closed" });
         }
-
-        await ctx.runMutation(internal.source_control.pr_state.recordLinkState, { linkId: args.linkId, state: outcome.state });
 
         return null;
     });

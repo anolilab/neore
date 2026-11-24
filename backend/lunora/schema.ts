@@ -4251,7 +4251,6 @@ export const schema = defineSchema({
         // A message sent during a coding agent's turn interrupts that turn and goes next, instead of queueing behind it. Absent = queue.
         hostFollowUpSteer: v.optional(v.boolean()),
         isAdvancedUser: v.optional(v.boolean()),
-        // New composer chats are temporary by default. Absent = off.
         // Keep an idle chat out of auto-archive while it has a linked pull request that is open (`agent/auto-archive.ts`). Absent = on.
         keepOpenPullRequestChats: v.optional(v.boolean()),
         keyboardShortcuts: v.optional(v.any()),
@@ -4263,6 +4262,7 @@ export const schema = defineSchema({
         mermaidTheme: v.optional(v.string()),
         // The user's own names for models, model id → nickname (`auth/lib/model-nicknames.ts`). Absent = none.
         modelNicknames: v.optional(v.record(v.string(), v.string())),
+        // New composer chats are temporary by default. Absent = off.
         newChatsTemporary: v.optional(v.boolean()),
         nickname: v.optional(v.string()),
         onboardingCompleted: v.optional(v.boolean()),

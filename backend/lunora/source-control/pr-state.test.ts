@@ -1,6 +1,7 @@
 /**
  * The housekeeping sweep that keeps a linked pull request's stored state fresh (`pr-state.ts`). Only open links whose
- * state is stale are leased, and nothing is leased while the person keeps open-pull-request chats off.
+ * state is stale are leased, nothing is leased unless auto-archive is on and the person keeps open-pull-request chats,
+ * and a host answer lands only for the check that leased it.
  */
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -14,6 +15,9 @@ type Harness = ReturnType<typeof lunoraTest>;
 const OWNER = "user-owner";
 const NOW_LINK = { createdAt: 0, kind: "attached", title: "Add the thing", url: "https://example.test/acme/app/pull/7" } as const;
 
+/** Auto-archive on (30 days) and the keep setting absent (on): the state is read and kept fresh. */
+const ON = { days: 30 as number | undefined, keep: undefined as boolean | undefined };
+
 let harness: Harness;
 
 beforeEach(() => {
@@ -24,12 +28,20 @@ afterEach(() => {
     harness.close();
 });
 
-/** Inserts a thread with one link per entry, then runs the sweep as the owner's shard. */
-const sweepWith = (links: { state?: "open" | "closed" | "merged"; stateCheckedAt?: number; threadDeleted?: boolean }[], keepSetting?: boolean) =>
+interface LinkSeed {
+    state?: "open" | "closed" | "merged";
+    stateCheckedAt?: number;
+    threadDeleted?: boolean;
+}
+
+/** Inserts one thread and link per seed and the user's settings, then runs `sweeps` sweeps as the owner's shard. */
+const seedAndSweep = (links: LinkSeed[], settings: typeof ON, sweeps = 1) =>
     harness.run(async (ctx: any) => {
-        if (keepSetting !== undefined) {
-            await ctx.db.insert("userSettings", { keepOpenPullRequestChats: keepSetting, userId: OWNER });
-        }
+        await ctx.db.insert("userSettings", {
+            userId: OWNER,
+            ...(settings.days !== undefined && { autoArchiveAfterDays: settings.days }),
+            ...(settings.keep !== undefined && { keepOpenPullRequestChats: settings.keep }),
+        });
 
         const linkIds: string[] = [];
 
@@ -57,63 +69,120 @@ const sweepWith = (links: { state?: "open" | "closed" | "merged"; stateCheckedAt
             );
         }
 
-        const result = await runInShard(OWNER, () => ctx.runMutation(dispatchLinkedPullRequestChecks, {}));
+        const dispatched: number[] = [];
+
+        for (let sweep = 0; sweep < sweeps; sweep += 1) {
+            const result = await runInShard(OWNER, () => ctx.runMutation(dispatchLinkedPullRequestChecks, {}));
+
+            dispatched.push(result.dispatched);
+        }
+
         const stamped = await Promise.all(linkIds.map((id) => ctx.db.get("pullRequestThreads", id)));
 
-        return { dispatched: result.dispatched, stamped: stamped.map((row: any) => row?.stateCheckedAt) };
+        return { dispatched, stamped: stamped.map((row: any) => row?.stateCheckedAt) };
     });
 
 describe("dispatchLinkedPullRequestChecks", () => {
     it("leases an open link whose state was never read, and stamps it", async () => {
-        const { dispatched, stamped } = await sweepWith([{}]);
+        const { dispatched, stamped } = await seedAndSweep([{}], ON);
 
-        expect(dispatched).toBe(1);
+        expect(dispatched).toEqual([1]);
         expect(stamped[0]).toBeTypeOf("number");
     });
 
     it("leases nothing while the person keeps open-pull-request chats off", async () => {
-        const { dispatched, stamped } = await sweepWith([{}], false);
+        const { dispatched, stamped } = await seedAndSweep([{}], { days: 30, keep: false });
 
-        expect(dispatched).toBe(0);
+        expect(dispatched).toEqual([0]);
         expect(stamped[0]).toBeUndefined();
     });
 
-    it("skips a link whose state is closed or merged", async () => {
-        const { dispatched } = await sweepWith([{ state: "closed" }, { state: "merged" }]);
+    it("leases nothing while auto-archive is off, since nothing reads the state then", async () => {
+        const { dispatched } = await seedAndSweep([{}], { days: undefined, keep: true });
 
-        expect(dispatched).toBe(0);
+        expect(dispatched).toEqual([0]);
+    });
+
+    it("skips a link whose state is closed or merged", async () => {
+        const { dispatched } = await seedAndSweep([{ state: "closed" }, { state: "merged" }], ON);
+
+        expect(dispatched).toEqual([0]);
     });
 
     it("skips a link whose state was read recently, and leases one read long ago", async () => {
         const recent = Date.now() - 1000;
         const old = Date.now() - PR_STATE_MAX_AGE_MS - 1000;
-        const { dispatched } = await sweepWith([
-            { state: "open", stateCheckedAt: recent },
-            { state: "open", stateCheckedAt: old },
-        ]);
+        const { dispatched } = await seedAndSweep(
+            [
+                { state: "open", stateCheckedAt: recent },
+                { state: "open", stateCheckedAt: old },
+            ],
+            ON,
+        );
 
-        expect(dispatched).toBe(1);
+        expect(dispatched).toEqual([1]);
     });
 
     it("skips a link whose thread is deleted", async () => {
-        const { dispatched } = await sweepWith([{ threadDeleted: true }]);
+        const { dispatched } = await seedAndSweep([{ threadDeleted: true }], ON);
 
-        expect(dispatched).toBe(0);
+        expect(dispatched).toEqual([0]);
+    });
+
+    it("reaches every open link across sweeps, so the first 20 do not starve the rest", async () => {
+        const links = Array.from({ length: 25 }, () => {
+            return {};
+        });
+        const { dispatched, stamped } = await seedAndSweep(links, ON, 2);
+
+        // The first sweep leases 20; the second finds the other 5 unread and leases them.
+        expect(dispatched).toEqual([20, 5]);
+        expect(stamped.every((checkedAt) => typeof checkedAt === "number")).toBe(true);
     });
 });
 
 describe("recordLinkState", () => {
-    it("writes the state the host gave, and stamps when it was read", async () => {
+    it("writes the state the host gave when the lease is the link's current check", async () => {
         const state = await harness.run(async (ctx: any) => {
             const threadId = await ctx.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Thread", updatedAt: 1, userId: OWNER });
-            const linkId = await ctx.db.insert("pullRequestThreads", { ...NOW_LINK, number: 9, repository: "acme/app", threadId, userId: OWNER });
+            const linkId = await ctx.db.insert("pullRequestThreads", {
+                ...NOW_LINK,
+                number: 9,
+                repository: "acme/app",
+                stateCheckedAt: 500,
+                threadId,
+                userId: OWNER,
+            });
 
-            await ctx.runMutation(recordLinkState, { linkId, state: "merged" });
+            await ctx.runMutation(recordLinkState, { lease: 500, linkId, state: "merged" });
 
             return await ctx.db.get("pullRequestThreads", linkId);
         });
 
         expect(state.state).toBe("merged");
         expect(state.stateCheckedAt).toBeTypeOf("number");
+    });
+
+    it("drops a late answer from an older check, so it cannot overwrite a newer open state", async () => {
+        const state = await harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Thread", updatedAt: 1, userId: OWNER });
+            const linkId = await ctx.db.insert("pullRequestThreads", {
+                ...NOW_LINK,
+                number: 9,
+                repository: "acme/app",
+                state: "open",
+                stateCheckedAt: 900,
+                threadId,
+                userId: OWNER,
+            });
+
+            // The check leased at 400 finishes after the check leased at 900 was recorded.
+            await ctx.runMutation(recordLinkState, { lease: 400, linkId, state: "closed" });
+
+            return await ctx.db.get("pullRequestThreads", linkId);
+        });
+
+        expect(state.state).toBe("open");
+        expect(state.stateCheckedAt).toBe(900);
     });
 });
