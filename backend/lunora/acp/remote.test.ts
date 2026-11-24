@@ -32,6 +32,38 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
     };
 });
 
+// A read replica that still holds a project row the primary has changed: a project read that does not ask for the primary
+// gets `replica.project` while it is set, the way a lagging replica answers just after the project moved organization.
+// `replica.readable` is a project a replica still admits the caller to, the way it answers just after their membership was revoked.
+const { replica } = vi.hoisted(() => {
+    return { replica: {} as { project?: Record<string, unknown>; readable?: Record<string, unknown> } };
+});
+
+vi.mock("../projects/functions", async (importOriginal) => {
+    const original = await importOriginal<typeof import("../projects/functions")>();
+
+    return {
+        ...original,
+        readableProject: async (...args: Parameters<typeof original.readableProject>) =>
+            args[3]?.primary !== true && replica.readable?._id === args[1] ? (replica.readable as never) : await original.readableProject(...args),
+        writableProject: async (...args: Parameters<typeof original.writableProject>) =>
+            args[3]?.primary !== true && replica.project?._id === args[1] ? (replica.project as never) : await original.writableProject(...args),
+    };
+});
+
+// The shard each scheduled job is named onto, seen through the real helper (`runAfterOnShard` still schedules it).
+const { runAfterOnShard } = vi.hoisted(() => {
+    return { runAfterOnShard: vi.fn() };
+});
+
+vi.mock("../lib/shard-scheduler", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../lib/shard-scheduler")>();
+
+    runAfterOnShard.mockImplementation(actual.runAfterOnShard);
+
+    return { ...actual, runAfterOnShard };
+});
+
 const registry = vi.hoisted(() => new Map<string, unknown>());
 
 vi.mock("../_generated/internal", async (importOriginal) => {
@@ -48,13 +80,19 @@ vi.stubEnv("ENCRYPTION_KEY", btoa(String.fromCodePoint(...keyBytes)));
 const { registerModule } = await import("../../test/registered-api");
 const { default: schema } = await import("../schema");
 const devices = await import("../devices/functions");
+const agentProjects = await import("../agent/projects");
+const projectsGdpr = await import("../projects/gdpr");
+const projectRunner = await import("./lib/project-runner");
 const { signDevicePayload } = await import("../devices/lib/signing");
 const { ACP_CLAIM_LEASE_MS, ACP_CLAIM_WINDOW_MS, DEVICE_CALL_DEADLINE_MS } = await import("../devices/lib/constants");
 const { parseAcpOffers } = await import("../devices/lib/manifest");
-const { applyHostEvents } = await import("./ingest");
+const { applyHostEvents, recordOpenedRunner } = await import("./ingest");
+const { routeSchedule } = await import("../lib/shard-scheduler");
+const { internal } = await import("../_generated/internal");
 const { createAcpCall, createAcpCancelCall } = await import("../devices/lib/acp-call");
 const calls = await import("./calls");
 const remote = await import("./remote");
+const { isOutOfScopeStart } = await import("./lib/start");
 const send = await import("./send");
 const { getHostSession } = await import("./functions");
 const streaming = await import("../chat/streaming/index");
@@ -67,6 +105,8 @@ registerModule(registry, "agent_streams", await import("../agent/streams"));
 registerModule(registry, "chat_streaming_persistent_library", await import("../chat/streaming/persistent/library"));
 registerModule(registry, "lib_shard_routes", await import("../lib/shard-routes"));
 registerModule(registry, "lib_shard_housekeeping", await import("../lib/shard-housekeeping"));
+// Left as a path reference, so the harness scheduler dispatches the job an open schedules by its path (`functions` below).
+registry.delete("acp_ingest:recordOpenedRunner");
 
 type Harness = ReturnType<typeof lunoraTest>;
 type Row = Record<string, any>;
@@ -78,6 +118,19 @@ const NOT_APPROVED = /not approved/u;
 const NOT_ONLINE = /not online/u;
 const NOT_OFFERED = /did not offer/u;
 const NOT_FOUND = /not found/u;
+const ANOTHER_PROJECT = /another project/u;
+const NOT_IN_PROJECT = /not allowed in this project/u;
+const SOME_PROJECTS_ONLY = /only be used in some projects/u;
+const ACCESS_DENIED = /access denied/u;
+
+/** A fixed instant for cases that compare a thread's time to a stored one, so neither comes from the real clock. */
+const FIXED = Date.UTC(2026, 0, 1);
+
+/** Freezes `Date` at {@link FIXED}; `afterEach` restores the real clock. */
+const pinClock = (): void => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(FIXED);
+};
 
 const OFFER = { agentKey: "claude", agentLabel: "Claude Code", folderId: "f1", folderLabel: "neore" };
 const SESSION_OPEN = { ...OFFER, kind: "session_open" };
@@ -140,6 +193,12 @@ const fieldOf = async (id: string, key: string): Promise<unknown> => {
 
 const sessionStatus = async (): Promise<unknown> => {
     const [session] = await rows("acpSessions");
+
+    return session?.status;
+};
+
+const sessionStatusOf = async (threadId: string): Promise<unknown> => {
+    const [session] = await rows("acpSessions", { threadId });
 
     return session?.status;
 };
@@ -247,9 +306,12 @@ const addRequests = async (streamId: string, ids: string[]) => {
 };
 
 beforeEach(async () => {
-    harness = lunoraTest(schema as never);
+    harness = lunoraTest(schema as never, { functions: { "acp_ingest:recordOpenedRunner": recordOpenedRunner } } as never);
     ownerId = await insertUser();
+    runAfterOnShard.mockClear();
     activeOrganization.current = null;
+    delete replica.project;
+    delete replica.readable;
 });
 
 afterEach(() => {
@@ -825,6 +887,1048 @@ describe("a continue from the web", () => {
     });
 });
 
+describe("a project remembers its runner", () => {
+    const startIn = async (projectId: string, device: Device, clientId: string, overrides: Record<string, unknown> = {}) =>
+        await as(ownerId).mutation(
+            remote.startHostSession as never,
+            { agentKey: "claude", clientId, deviceId: device.deviceId, folderId: "f1", projectId, ...overrides } as never,
+        );
+
+    const defaultOf = async (projectId: string, userId = ownerId) => await as(userId).query(remote.getProjectRunnerDefault as never, { projectId } as never);
+
+    // The record a session's open schedules (`recordOpenedRunner`), run as the scheduler would: the scheduler is not run here.
+    // `openedAt` is the time the open wrote; a session that never opened has none, and is asked about with the time now.
+    const recordOf = async (session: Row | undefined, openedAt?: number) => {
+        const thread = await row(session?.threadId as string);
+        const stored = await row(session?._id as string);
+        const at = openedAt ?? (stored?.lastEventAt as number | undefined) ?? Date.now();
+
+        if (thread?.projectId) {
+            await run(async (ctx) => await ctx.runMutation(recordOpenedRunner, { openedAt: at, projectId: thread.projectId, sessionId: session?._id }));
+        }
+    };
+
+    // The desktop closes the session (an empty post with `close`).
+    const closeOf = async (device: Device, session: Row | undefined) => {
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(applyHostEvents, { close: true, deviceId: device.deviceId, events: [], sessionId: session?.hostSessionId as string }),
+        );
+    };
+
+    // The computer's agent opens the session, then its scheduled record runs.
+    const openAndRecord = async (device: Device, session: Row | undefined) => {
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: session?.hostSessionId as string }),
+        );
+        await recordOf(session);
+    };
+
+    // The computer's agent opens the session: the project's default is recorded then, not when the start is queued.
+    const startOpened = async (projectId: string, device: Device, clientId: string, overrides: Record<string, unknown> = {}) => {
+        const started = (await startIn(projectId, device, clientId, overrides)) as { threadId: string };
+        const [session] = await rows("acpSessions", { threadId: started.threadId });
+
+        await openAndRecord(device, session);
+
+        return started;
+    };
+
+    const insertProject = async (fields: Record<string, unknown>): Promise<string> =>
+        (await run(async (ctx) => await ctx.db.insert("projects", { createdAt: 0, title: "Billing", ...fields }))) as string;
+
+    const projectRow = async (projectId: string): Promise<Row | null> => await run(async (ctx) => await ctx.db.get("projects", projectId as never));
+
+    it("preselects the computer and agent of the last host thread started in the project, and the next one starts on them", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+
+        expect(await defaultOf(projectId)).toBeNull();
+
+        const first = await startOpened(projectId, device, "tap-p1");
+
+        expect(await row(first.threadId)).toMatchObject({ projectId, runner: "host" });
+        expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
+
+        const preselected = (await defaultOf(projectId)) as Row;
+        const second = (await as(ownerId).mutation(remote.startHostSession as never, { ...preselected, clientId: "tap-p2", projectId } as never)) as {
+            started: boolean;
+            threadId: string;
+        };
+
+        expect(second.started).toBe(true);
+        expect(await row(second.threadId)).toMatchObject({ projectId, runner: "host" });
+    });
+
+    it("keeps an organization project's default on the starter's own settings, out of a member's reach", async () => {
+        activeOrganization.current = { id: "org-a", name: "Org", role: "member", slug: null };
+        const member = await insertUser();
+
+        await run(async (ctx) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId });
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: member });
+            await ctx.db.insert("organizationPolicies", {
+                document: JSON.stringify({ permissionCap: "auto", schemaVersion: 1 }),
+                organizationId: "org-a",
+                revision: 1,
+                schemaVersion: 1,
+                updatedAt: Date.now(),
+            });
+        });
+
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ organizationId: "org-a", userId: ownerId });
+
+        await startOpened(projectId, device, "tap-o1");
+
+        const stored = await projectRow(projectId);
+
+        expect(stored?.runnerKind).toBeUndefined();
+        expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
+        expect(await defaultOf(projectId, member)).toBeNull();
+    });
+
+    it("drops the defaults of deleted projects before it pushes out a live one at the cap", async () => {
+        activeOrganization.current = { id: "org-a", name: "Org", role: "member", slug: null };
+        await run(async (ctx) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId });
+            await ctx.db.insert("organizationPolicies", {
+                document: JSON.stringify({ permissionCap: "auto", schemaVersion: 1 }),
+                organizationId: "org-a",
+                revision: 1,
+                schemaVersion: 1,
+                updatedAt: Date.now(),
+            });
+        });
+
+        const device = await pairedDevice(ownerId);
+        const live = await insertProject({ organizationId: "org-a", userId: ownerId });
+        const runner = { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" };
+
+        await startOpened(live, device, "tap-live");
+
+        // 199 projects that were deleted, recorded after the live one: the record is at the cap, and the live entry is the oldest.
+        await run(async (ctx) => {
+            const gone: string[] = [];
+
+            for (let index = 0; index < 199; index += 1) {
+                gone.push((await ctx.db.insert("projects", { createdAt: 0, organizationId: "org-a", title: "Gone", userId: ownerId })) as string);
+            }
+
+            for (const id of gone) {
+                await ctx.db.delete("projects", id as never);
+            }
+
+            const settings = await ctx.db.userSettings.findFirst({ where: { userId: ownerId } });
+
+            await ctx.db.patch(
+                "userSettings",
+                settings?._id as never,
+                {
+                    projectRunnerDefaults: { ...settings?.projectRunnerDefaults, ...Object.fromEntries(gone.map((id) => [id, runner])) },
+                } as never,
+            );
+        });
+
+        await startOpened(await insertProject({ organizationId: "org-a", userId: ownerId }), device, "tap-new");
+
+        expect(await defaultOf(live)).toEqual(runner);
+    });
+
+    it("hands no default to a member whose membership was revoked, though a replica still admits them", async () => {
+        activeOrganization.current = { id: "org-a", name: "Org", role: "member", slug: null };
+        const creator = await insertUser();
+
+        await run(async (ctx) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId });
+            await ctx.db.insert("organizationPolicies", {
+                document: JSON.stringify({ permissionCap: "auto", schemaVersion: 1 }),
+                organizationId: "org-a",
+                revision: 1,
+                schemaVersion: 1,
+                updatedAt: Date.now(),
+            });
+        });
+
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ organizationId: "org-a", userId: creator });
+
+        const project = (await projectRow(projectId)) as never;
+
+        await run(
+            async (ctx) =>
+                await projectRunner.rememberProjectRunner(
+                    ctx,
+                    project,
+                    ownerId,
+                    { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" },
+                    Date.now(),
+                    "thread-a",
+                ),
+        );
+
+        expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
+
+        const [membership] = await rows("member", { userId: ownerId });
+
+        await run(async (ctx) => await ctx.db.delete("member", membership?._id as never));
+        replica.readable = (await projectRow(projectId)) as Record<string, unknown>;
+
+        expect(await defaultOf(projectId)).toBeNull();
+    });
+
+    it("records nothing for a thread started before the project's last move", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ organizationChangedAt: 2000, organizationId: "org-a", userId: ownerId });
+        const project = (await projectRow(projectId)) as never;
+
+        await run(
+            async (ctx) =>
+                await projectRunner.rememberProjectRunner(
+                    ctx,
+                    project,
+                    ownerId,
+                    { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" },
+                    1000,
+                    "thread-a",
+                ),
+        );
+
+        const [settings] = await rows("userSettings", { userId: ownerId });
+
+        expect((settings?.projectRunnerDefaults as Record<string, unknown> | undefined)?.[projectId]).toBeUndefined();
+    });
+
+    it("drops defaults that can never be used again before it pushes out a live one at the cap", async () => {
+        pinClock();
+        activeOrganization.current = { id: "org-a", name: "Org", role: "member", slug: null };
+        await run(async (ctx) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId });
+            await ctx.db.insert("organizationPolicies", {
+                document: JSON.stringify({ permissionCap: "auto", schemaVersion: 1 }),
+                organizationId: "org-a",
+                revision: 1,
+                schemaVersion: 1,
+                updatedAt: Date.now(),
+            });
+        });
+
+        const device = await pairedDevice(ownerId);
+        const otherDevice = await pairedDevice(await insertUser());
+        const creator = await insertUser();
+        const runner = { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" };
+        const live = await insertProject({ organizationId: "org-a", userId: ownerId });
+
+        await startOpened(live, device, "tap-u0");
+
+        // Right after the live entry, one of each kind that can never be returned again: a project moved out of the organization,
+        // one moved after its thread started, one of an organization the person is not in, one on a computer that is not
+        // theirs, and one whose folder their computer no longer offers. Then live projects up to the cap, so the live entry is the oldest and every checked project still exists.
+        const unusable = await run(async (ctx) => {
+            const insert = async (fields: Record<string, unknown>) =>
+                (await ctx.db.insert("projects", { createdAt: 0, title: "Unusable", userId: ownerId, ...fields })) as string;
+
+            return [
+                [await insert({ organizationId: "" }), runner],
+                [await insert({ organizationChangedAt: 2000, organizationId: "org-a" }), { ...runner, threadAt: 1000 }],
+                [await insert({ organizationId: "org-b", userId: creator }), runner],
+                [await insert({ organizationId: "org-a" }), { ...runner, deviceId: otherDevice.deviceId }],
+                [await insert({ organizationId: "org-a" }), { ...runner, folderId: "no-longer-offered" }],
+            ] as [string, Record<string, unknown>][];
+        });
+
+        await run(async (ctx) => {
+            const others: [string, unknown][] = [];
+            // Recorded from threads started after the live entry's, so it stays the oldest of the live ones.
+            const later = { ...runner, threadAt: FIXED + 1000 };
+
+            for (let index = 0; index < 199 - unusable.length; index += 1) {
+                others.push([(await ctx.db.insert("projects", { createdAt: 0, organizationId: "org-a", title: "Live", userId: ownerId })) as string, later]);
+            }
+
+            const settings = await ctx.db.userSettings.findFirst({ where: { userId: ownerId } });
+
+            await ctx.db.patch(
+                "userSettings",
+                settings?._id as never,
+                { projectRunnerDefaults: { ...settings?.projectRunnerDefaults, ...Object.fromEntries([...unusable, ...others]) } } as never,
+            );
+        });
+
+        await startOpened(await insertProject({ organizationId: "org-a", userId: ownerId }), device, "tap-u1");
+
+        const [settings] = await rows("userSettings", { userId: ownerId });
+        const stored = settings?.projectRunnerDefaults as Record<string, unknown>;
+
+        expect(await defaultOf(live)).toEqual(runner);
+        expect(unusable.filter(([key]) => stored[key] !== undefined)).toEqual([]);
+        expect(Object.keys(stored)).toHaveLength(200 - unusable.length + 1);
+    });
+
+    it("looks up only the oldest few defaults at the cap, and drops the oldest when their projects all exist", async () => {
+        pinClock();
+        activeOrganization.current = { id: "org-a", name: "Org", role: "member", slug: null };
+        await run(async (ctx) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId });
+            await ctx.db.insert("organizationPolicies", {
+                document: JSON.stringify({ permissionCap: "auto", schemaVersion: 1 }),
+                organizationId: "org-a",
+                revision: 1,
+                schemaVersion: 1,
+                updatedAt: Date.now(),
+            });
+        });
+
+        const device = await pairedDevice(ownerId);
+        const runner = { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" };
+        const oldest = await insertProject({ organizationId: "org-a", userId: ownerId });
+
+        await startOpened(oldest, device, "tap-c0");
+
+        // 191 live projects after the oldest, then 8 deleted ones: the record is at the cap, and no deleted one is among the oldest.
+        // They come first in the stored object but from threads started later: the order is the threads', not the writes'.
+        await run(async (ctx) => {
+            const later = { ...runner, threadAt: FIXED + 1000 };
+            const live: string[] = [];
+            const gone: string[] = [];
+
+            for (let index = 0; index < 191; index += 1) {
+                live.push((await ctx.db.insert("projects", { createdAt: 0, organizationId: "org-a", title: "Live", userId: ownerId })) as string);
+            }
+
+            for (let index = 0; index < 8; index += 1) {
+                gone.push((await ctx.db.insert("projects", { createdAt: 0, organizationId: "org-a", title: "Gone", userId: ownerId })) as string);
+            }
+
+            for (const id of gone) {
+                await ctx.db.delete("projects", id as never);
+            }
+
+            const settings = await ctx.db.userSettings.findFirst({ where: { userId: ownerId } });
+
+            await ctx.db.patch(
+                "userSettings",
+                settings?._id as never,
+                {
+                    projectRunnerDefaults: { ...Object.fromEntries([...live, ...gone].map((id) => [id, later])), ...settings?.projectRunnerDefaults },
+                } as never,
+            );
+        });
+
+        const next = await insertProject({ organizationId: "org-a", userId: ownerId });
+
+        await startOpened(next, device, "tap-c1");
+
+        const [settings] = await rows("userSettings", { userId: ownerId });
+        const stored = settings?.projectRunnerDefaults as Record<string, unknown>;
+
+        expect(Object.keys(stored)).toHaveLength(200);
+        expect(stored[oldest]).toBeUndefined();
+        expect(stored[next]).toMatchObject(runner);
+    });
+
+    it.each([
+        ["a personal project", undefined],
+        ["an organization project", "org-a"],
+    ])("keeps a newer thread's runner in %s when an older thread's session opens later (a switch or /clear there)", async (_, organizationId) => {
+        if (organizationId) {
+            activeOrganization.current = { id: organizationId, name: "Org", role: "member", slug: null };
+            await run(async (ctx) => {
+                await ctx.db.insert("member", { createdAt: 0, organizationId, role: "member", userId: ownerId });
+                await ctx.db.insert("organizationPolicies", {
+                    document: JSON.stringify({ permissionCap: "auto", schemaVersion: 1 }),
+                    organizationId,
+                    revision: 1,
+                    schemaVersion: 1,
+                    updatedAt: Date.now(),
+                });
+            });
+        }
+
+        const device = await pairedDevice(ownerId, [OFFER, { ...OFFER, folderId: "f2", folderLabel: "Other" }]);
+        const projectId = await insertProject({ userId: ownerId, ...(organizationId && { organizationId }) });
+
+        vi.useFakeTimers({ toFake: ["Date"] });
+
+        const older = (await startIn(projectId, device, "tap-old", { folderId: "f2" })) as { threadId: string };
+
+        vi.setSystemTime(Date.now() + 1000);
+        await startOpened(projectId, device, "tap-new");
+
+        const [olderSession] = await rows("acpSessions", { threadId: older.threadId });
+
+        await openAndRecord(device, olderSession);
+
+        expect(await sessionStatusOf(older.threadId)).toBe("idle");
+        expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
+    });
+
+    it("opens the session before the default is recorded on the owner's shard, and records nothing for an open that never took", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const started = (await startIn(projectId, device, "tap-sched")) as { threadId: string };
+        const [session] = await rows("acpSessions", { threadId: started.threadId });
+
+        // An open that rolled back leaves the session starting: its record finds nothing to record.
+        await recordOf(session);
+
+        const unopened = await projectRow(projectId);
+
+        expect(unopened?.runnerDeviceId).toBeUndefined();
+
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: session?.hostSessionId as string }),
+        );
+
+        // The open stands on its own; the default comes with the record it scheduled.
+        expect(await sessionStatusOf(started.threadId)).toBe("idle");
+        expect(await defaultOf(projectId)).toBeNull();
+
+        // The record is named onto the device owner's shard, where the session lives, never left to the calling shard: the
+        // scheduler sends the key in its `/schedule` body, and the routing sends that job to the owner's lane even from `__root__`.
+        expect(runAfterOnShard).toHaveBeenCalledOnce();
+
+        const [, delay, target, args, shard] = runAfterOnShard.mock.calls[0]!;
+
+        expect([delay, target, shard]).toStrictEqual([0, internal.acp.ingest.recordOpenedRunner, ownerId]);
+        expect(args).toMatchObject({ projectId, sessionId: session?._id });
+        expect(routeSchedule("https://scheduler/schedule", { body: JSON.stringify({ args, shardKey: shard }) }, undefined)?.targetShard).toBe(ownerId);
+
+        // The scheduler runs the job it was handed: the default is saved.
+        const job = harness.scheduler.list().find((entry) => entry.functionPath === "acp_ingest:recordOpenedRunner");
+
+        expect(job?.args).toStrictEqual(args);
+        await harness.scheduler.runPending({ throwOnError: false });
+        expect(harness.scheduler.failures().filter((failure) => failure.functionPath === "acp_ingest:recordOpenedRunner")).toStrictEqual([]);
+        expect(harness.scheduler.list().some((entry) => entry.functionPath === "acp_ingest:recordOpenedRunner")).toBe(false);
+        expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
+    });
+
+    it("records the runner of a session the desktop closed before its record ran, and nothing for one closed without opening", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const unopened = (await startIn(projectId, device, "tap-fast-0")) as { threadId: string };
+        const [neverOpened] = await rows("acpSessions", { threadId: unopened.threadId });
+
+        // Closed while still starting: a record asked about it (whatever time it carries) records nothing.
+        await closeOf(device, neverOpened);
+        expect(await sessionStatusOf(unopened.threadId)).toBe("ended");
+        await recordOf(neverOpened, Date.now());
+        expect(await defaultOf(projectId)).toBeNull();
+
+        const started = (await startIn(projectId, device, "tap-fast-1")) as { threadId: string };
+        const [session] = await rows("acpSessions", { threadId: started.threadId });
+
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: session?.hostSessionId as string }),
+        );
+        const afterOpen = await row(session?._id as string);
+        const openedAt = afterOpen?.lastEventAt as number;
+
+        // The desktop closes it before the scheduled record runs: the runner that opened is still recorded.
+        await closeOf(device, session);
+        expect(await sessionStatusOf(started.threadId)).toBe("ended");
+        await recordOf(session, openedAt);
+        expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
+    });
+
+    it("records nothing for a thread started in the same millisecond as the project's last move, and reads no such entry", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ organizationChangedAt: 2000, organizationId: "org-a", userId: ownerId });
+        const project = (await projectRow(projectId)) as never;
+        const runner = { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" };
+
+        await run(async (ctx) => await projectRunner.rememberProjectRunner(ctx, project, ownerId, runner, 2000, "thread-a"));
+
+        const [settings] = await rows("userSettings", { userId: ownerId });
+
+        expect((settings?.projectRunnerDefaults as Record<string, unknown> | undefined)?.[projectId]).toBeUndefined();
+        expect(projectRunner.projectRunnerOf(project, { projectRunnerDefaults: { [projectId]: { ...runner, threadAt: 2000 } } })).toBeNull();
+        expect(projectRunner.projectRunnerOf(project, { projectRunnerDefaults: { [projectId]: { ...runner, threadAt: 2001 } } })).toEqual(runner);
+    });
+
+    it("saves no organization default when the project moves between its read and the settings write", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ organizationChangedAt: 1000, organizationId: "org-a", userId: ownerId });
+        const read = (await projectRow(projectId)) as never;
+
+        await run(async (ctx) => await ctx.db.patch("projects", projectId as never, { organizationChangedAt: 5000, organizationId: "org-b" }));
+        await run(
+            async (ctx) =>
+                await projectRunner.rememberProjectRunner(
+                    ctx,
+                    read,
+                    ownerId,
+                    { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" },
+                    3000,
+                    "thread-a",
+                ),
+        );
+
+        const [settings] = await rows("userSettings", { userId: ownerId });
+
+        expect((settings?.projectRunnerDefaults as Record<string, unknown> | undefined)?.[projectId]).toBeUndefined();
+    });
+
+    it("writes no settings row and no audit row when a reopen records the runner already saved, and writes when it changed", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ organizationId: "org-a", userId: ownerId });
+        const project = (await projectRow(projectId)) as never;
+        const runner = { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" };
+        const remember = async (recorded: typeof runner) =>
+            await run(async (ctx) => await projectRunner.rememberProjectRunner(ctx, project, ownerId, recorded, 3000, "thread-a"));
+        const settingsHistory = async () => {
+            const found = await rows("documentHistory", { tableName: "userSettings", userId: ownerId });
+
+            return found.length;
+        };
+
+        await remember(runner);
+
+        const [saved] = await rows("userSettings", { userId: ownerId });
+        const historyAfterFirst = await settingsHistory();
+
+        expect(historyAfterFirst).toBeGreaterThan(0);
+
+        await remember(runner);
+
+        const [reopened] = await rows("userSettings", { userId: ownerId });
+
+        expect(reopened?.updatedAt).toBe(saved?.updatedAt);
+        expect(reopened?.projectRunnerDefaults).toEqual(saved?.projectRunnerDefaults);
+        expect(await settingsHistory()).toBe(historyAfterFirst);
+
+        await remember({ ...runner, folderId: "f2" });
+
+        const [changed] = await rows("userSettings", { userId: ownerId });
+
+        expect((changed?.projectRunnerDefaults as Record<string, Row>)[projectId]).toMatchObject({ folderId: "f2", threadAt: 3000, threadId: "thread-a" });
+        expect(await settingsHistory()).toBe(historyAfterFirst + 1);
+
+        const history = await rows("documentHistory", { documentId: changed?._id, tableName: "userSettings" });
+        const [latest] = history.toSorted((a, b) => (b.ts as number) - (a.ts as number));
+
+        expect(latest?.doc).not.toHaveProperty("projectRunnerDefaults");
+        expect(latest?.oldDoc).not.toHaveProperty("projectRunnerDefaults");
+    });
+
+    it("offers no default once the computer stops offering that agent and folder", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+
+        await startOpened(projectId, device, "tap-p3");
+        await run(async (ctx) => await ctx.db.patch("devices", device.deviceId as never, { acpOffers: [] }));
+
+        expect(await defaultOf(projectId)).toBeNull();
+    });
+
+    it("keeps the default it had when a later start is refused by the computer after it was queued", async () => {
+        const device = await pairedDevice(ownerId, [OFFER, { ...OFFER, folderId: "f2", folderLabel: "Other" }]);
+        const projectId = await insertProject({ userId: ownerId });
+
+        await startOpened(projectId, device, "tap-p9");
+        const working = await defaultOf(projectId);
+
+        expect(working).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
+
+        const started = (await startIn(projectId, device, "tap-p10", { folderId: "f2" })) as { threadId: string };
+        const open = (await findRow("deviceCalls", { toolName: "acp_start" }, (call) => call.threadId === started.threadId)) as Row;
+
+        await claim(device, open._id);
+        await accept(device, open._id, { error: "refused: not approved on this computer", status: "failed" });
+
+        expect(await defaultOf(projectId)).toEqual(working);
+    });
+
+    it("exports the personal runner of the user's own projects, one moved out of an organization too, and no organization project's", async () => {
+        const device = await pairedDevice(ownerId);
+        const personal = await insertProject({ title: "Mine", userId: ownerId });
+        const movedOut = await insertProject({ organizationId: "", title: "Moved out", userId: ownerId });
+
+        await startOpened(personal, device, "tap-x1");
+        await startOpened(movedOut, device, "tap-x2");
+        const organization = await insertProject({
+            organizationId: "org-a",
+            runnerAgentKey: "claude",
+            runnerDeviceId: device.deviceId,
+            runnerFolderId: "f1",
+            runnerKind: "host",
+            title: "Org",
+            userId: ownerId,
+        });
+
+        const exported = (await run(async (ctx) => await ctx.runQuery(projectsGdpr.collectOwnedProjectsForExport, { userId: ownerId }))) as {
+            projects: Row[];
+        };
+        const runnerOf = (projectId: string) => exported.projects.find((project) => project.projectId === projectId)?.runner;
+        const runner = { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" };
+
+        expect(runnerOf(personal)).toEqual(runner);
+        expect(runnerOf(movedOut)).toEqual(runner);
+        expect(runnerOf(organization)).toBeUndefined();
+    });
+
+    it("refuses a start on a computer kept out of the project, and no longer offers it as the default there", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const otherId = await insertProject({ title: "Other", userId: ownerId });
+
+        await startOpened(projectId, device, "tap-s1");
+        await run(async (ctx) => await ctx.db.patch("devices", device.deviceId as never, { projectIds: [otherId] }));
+
+        expect(await defaultOf(projectId)).toBeNull();
+        await expect(startIn(projectId, device, "tap-s2")).rejects.toThrow(NOT_IN_PROJECT);
+        expect(await rows("acpSessions")).toHaveLength(1);
+    });
+
+    it("answers a lost-answer retry with the thread after the computer was kept out of the project", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const otherId = await insertProject({ title: "Other", userId: ownerId });
+        const first = (await startIn(projectId, device, "tap-s3")) as { threadId: string };
+
+        await run(async (ctx) => await ctx.db.patch("devices", device.deviceId as never, { projectIds: [otherId] }));
+
+        expect(await startIn(projectId, device, "tap-s3")).toEqual({ started: false, threadId: first.threadId });
+    });
+
+    it("records no personal runner on a project moved into an organization after it was read", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const read = (await projectRow(projectId)) as never;
+
+        await run(async (ctx) => await ctx.db.patch("projects", projectId as never, { organizationId: "org-a" }));
+        await run(
+            async (ctx) =>
+                await projectRunner.rememberProjectRunner(
+                    ctx,
+                    read,
+                    ownerId,
+                    { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" },
+                    Date.now(),
+                    "thread-a",
+                ),
+        );
+
+        const stored = await projectRow(projectId);
+
+        expect(stored?.runnerDeviceId).toBeUndefined();
+    });
+
+    it.each([
+        ["records the newer thread's runner when an older thread's write lands between its read and its write", 1000, 2000, 2000],
+        ["leaves a newer thread's runner that lands between an older thread's read and its write", 3000, 2000, 3000],
+    ])("%s", async (_, landedAt, threadAt, kept) => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const read = (await projectRow(projectId)) as never;
+        const runner = { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" };
+
+        await run(
+            async (ctx) =>
+                await ctx.db.patch("projects", projectId as never, {
+                    runnerAgentKey: "other",
+                    runnerDeviceId: device.deviceId,
+                    runnerFolderId: "f1",
+                    runnerKind: "host",
+                    runnerThreadAt: landedAt,
+                }),
+        );
+        await run(async (ctx) => await projectRunner.rememberProjectRunner(ctx, read, ownerId, runner, threadAt, "thread-a"));
+
+        expect(await projectRow(projectId)).toMatchObject({ runnerAgentKey: kept === threadAt ? "claude" : "other", runnerThreadAt: kept });
+    });
+
+    it.each([
+        ["personal", ["thread-a", "thread-b"]],
+        ["personal", ["thread-b", "thread-a"]],
+        ["organization", ["thread-a", "thread-b"]],
+        ["organization", ["thread-b", "thread-a"]],
+    ] as const)("keeps one runner for two %s threads started in the same millisecond, recorded in the order %j", async (space, order) => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ ...(space === "organization" && { organizationId: "org-a" }), userId: ownerId });
+        const agentOf = { "thread-a": "claude", "thread-b": "codex" } as const;
+
+        for (const threadId of order) {
+            // Read before each write: the personal writer's `patchIf` is conditional on the row it was handed.
+            const read = (await projectRow(projectId)) as never;
+
+            await run(
+                async (ctx) =>
+                    await projectRunner.rememberProjectRunner(
+                        ctx,
+                        read,
+                        ownerId,
+                        { agentKey: agentOf[threadId], deviceId: device.deviceId, folderId: "f1" },
+                        2000,
+                        threadId,
+                    ),
+            );
+        }
+
+        // The same thread records again: an equal time and id rewrites.
+        const again = (await projectRow(projectId)) as never;
+
+        await run(
+            async (ctx) =>
+                await projectRunner.rememberProjectRunner(
+                    ctx,
+                    again,
+                    ownerId,
+                    { agentKey: "codex", deviceId: device.deviceId, folderId: "f2" },
+                    2000,
+                    "thread-b",
+                ),
+        );
+
+        const [settings] = await rows("userSettings", { userId: ownerId });
+        const stored =
+            space === "organization"
+                ? (settings?.projectRunnerDefaults as Record<string, Record<string, unknown>> | undefined)?.[projectId]
+                : await projectRow(projectId);
+
+        expect(stored).toMatchObject(
+            space === "organization"
+                ? { agentKey: "codex", folderId: "f2", threadAt: 2000, threadId: "thread-b" }
+                : { runnerAgentKey: "codex", runnerFolderId: "f2", runnerThreadAt: 2000, runnerThreadId: "thread-b" },
+        );
+    });
+
+    it("saves no organization default for a starter whose membership was revoked before the session opened", async () => {
+        activeOrganization.current = { id: "org-a", name: "Org", role: "member", slug: null };
+        await run(async (ctx) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId });
+            await ctx.db.insert("organizationPolicies", {
+                document: JSON.stringify({ permissionCap: "auto", schemaVersion: 1 }),
+                organizationId: "org-a",
+                revision: 1,
+                schemaVersion: 1,
+                updatedAt: Date.now(),
+            });
+        });
+
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ organizationId: "org-a", userId: ownerId });
+        const started = (await startIn(projectId, device, "tap-revoked")) as { threadId: string };
+        const [session] = await rows("acpSessions", { threadId: started.threadId });
+        const [membership] = await rows("member", { userId: ownerId });
+
+        await run(async (ctx) => await ctx.db.delete("member", membership?._id as never));
+        await openAndRecord(device, session);
+
+        const [settings] = await rows("userSettings", { userId: ownerId });
+
+        expect((settings?.projectRunnerDefaults as Record<string, unknown> | undefined)?.[projectId]).toBeUndefined();
+    });
+
+    it("answers a lost-answer retry with the thread after its project was deleted", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const first = (await startIn(projectId, device, "tap-d1")) as { threadId: string };
+
+        await run(async (ctx) => await ctx.db.delete("projects", projectId as never));
+
+        expect(await startIn(projectId, device, "tap-d1")).toEqual({ started: false, threadId: first.threadId });
+        await expect(startIn(projectId, device, "tap-d2")).rejects.toThrow(NOT_FOUND);
+    });
+
+    it("leaves the owner's runner when a member's thread opens in a project moved out of the organization", async () => {
+        activeOrganization.current = { id: "org-a", name: "Org", role: "member", slug: null };
+        const member = await insertUser();
+
+        await run(async (ctx) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId });
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: member });
+            await ctx.db.insert("organizationPolicies", {
+                document: JSON.stringify({ permissionCap: "auto", schemaVersion: 1 }),
+                organizationId: "org-a",
+                revision: 1,
+                schemaVersion: 1,
+                updatedAt: Date.now(),
+            });
+        });
+
+        const ownerDevice = await pairedDevice(ownerId);
+        const memberDevice = await pairedDevice(member);
+        const projectId = await insertProject({ organizationId: "org-a", userId: ownerId });
+        const started = (await as(member).mutation(
+            remote.startHostSession as never,
+            { agentKey: "claude", clientId: "tap-m1", deviceId: memberDevice.deviceId, folderId: "f1" } as never,
+        )) as { threadId: string };
+        const ownerRunner = { runnerAgentKey: "claude", runnerDeviceId: ownerDevice.deviceId, runnerFolderId: "f1", runnerKind: "host" };
+
+        // The member's thread sits in the organization's project; the owner then takes the project back to their personal space,
+        // with a runner of their own, before the member's agent opens.
+        await run(async (ctx) => await ctx.db.patch("threads", started.threadId as never, { projectId: projectId as never }));
+        await run(async (ctx) => await ctx.db.patch("projects", projectId as never, { organizationId: "", ...ownerRunner }));
+        const [session] = await rows("acpSessions", { threadId: started.threadId });
+
+        await openAndRecord(memberDevice, session);
+
+        expect(await projectRow(projectId)).toMatchObject(ownerRunner);
+    });
+
+    it("forgets a personal runner when the project moves into an organization, so a move back restores nothing", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+
+        await startOpened(projectId, device, "tap-p8");
+        const opened = await projectRow(projectId);
+
+        expect(opened?.runnerDeviceId).toBe(device.deviceId);
+
+        activeOrganization.current = { id: "org-a", name: "A", role: "member", slug: null };
+        await run(async (ctx) => await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId }));
+        await run(async (ctx) => await ctx.runMutation(agentProjects.updateProject, { patch: { organizationId: "org-a" }, projectId: projectId as never }));
+
+        const moved = await projectRow(projectId);
+
+        // Emptied in a patch, not removed by a whole-row replace, so no personal id stays on the organization's row.
+        expect(moved).toMatchObject({ organizationId: "org-a", runnerAgentKey: "", runnerDeviceId: "", runnerFolderId: "" });
+
+        await run(async (ctx) => await ctx.runMutation(agentProjects.updateProject, { patch: { organizationId: "" }, projectId: projectId as never }));
+
+        const movedBack = await projectRow(projectId);
+
+        expect(movedBack?.runnerAgentKey).toBe("");
+        expect(await defaultOf(projectId)).toBeNull();
+    });
+
+    it("records no personal runner for a thread started before the project moved into an organization and back", async () => {
+        pinClock();
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const runner = { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" };
+        const startedAt = FIXED - 60_000;
+
+        activeOrganization.current = { id: "org-a", name: "A", role: "member", slug: null };
+        await run(async (ctx) => await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId }));
+        await run(async (ctx) => await ctx.runMutation(agentProjects.updateProject, { patch: { organizationId: "org-a" }, projectId: projectId as never }));
+        await run(async (ctx) => await ctx.runMutation(agentProjects.updateProject, { patch: { organizationId: "" }, projectId: projectId as never }));
+
+        const movedBack = (await projectRow(projectId)) as never;
+        const { organizationChangedAt: movedAt } = (await projectRow(projectId)) as { organizationChangedAt: number };
+        const runnerKeyAfter = async (threadAt: number): Promise<unknown> => {
+            await run(async (ctx) => await projectRunner.rememberProjectRunner(ctx, movedBack, ownerId, runner, threadAt, "thread-a"));
+            const stored = await projectRow(projectId);
+
+            return stored?.runnerAgentKey;
+        };
+
+        // Started before the moves, and in the move-back's own millisecond: nothing is saved.
+        expect(await runnerKeyAfter(startedAt)).toBe("");
+        expect(await runnerKeyAfter(movedAt)).toBe("");
+        // Started after the move-back: saved.
+        expect(await runnerKeyAfter(movedAt + 1)).toBe("claude");
+    });
+
+    it("records no personal runner when the project moves into an organization and back between its read and its write", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const read = (await projectRow(projectId)) as never;
+
+        await run(async (ctx) => await ctx.db.patch("projects", projectId as never, { organizationChangedAt: 5000, organizationId: "org-a" }));
+        await run(async (ctx) => await ctx.db.patch("projects", projectId as never, { organizationChangedAt: 6000, organizationId: "" }));
+        await run(
+            async (ctx) =>
+                await projectRunner.rememberProjectRunner(
+                    ctx,
+                    read,
+                    ownerId,
+                    { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" },
+                    3000,
+                    "thread-a",
+                ),
+        );
+
+        const stored = await projectRow(projectId);
+
+        expect(stored?.runnerDeviceId).toBeUndefined();
+    });
+
+    it("forgets a person's organization default when the project leaves the organization, so a move back restores nothing", async () => {
+        activeOrganization.current = { id: "org-a", name: "A", role: "member", slug: null };
+        await run(async (ctx) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId });
+            await ctx.db.insert("organizationPolicies", {
+                document: JSON.stringify({ permissionCap: "auto", schemaVersion: 1 }),
+                organizationId: "org-a",
+                revision: 1,
+                schemaVersion: 1,
+                updatedAt: Date.now(),
+            });
+        });
+
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ organizationId: "org-a", userId: ownerId });
+
+        vi.useFakeTimers({ toFake: ["Date"] });
+        await startOpened(projectId, device, "tap-o9");
+
+        expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
+
+        vi.setSystemTime(Date.now() + 1000);
+        await run(async (ctx) => await ctx.runMutation(agentProjects.updateProject, { patch: { organizationId: "" }, projectId: projectId as never }));
+        await run(async (ctx) => await ctx.runMutation(agentProjects.updateProject, { patch: { organizationId: "org-a" }, projectId: projectId as never }));
+
+        expect(await defaultOf(projectId)).toBeNull();
+
+        // A thread started after the move records the default again.
+        vi.setSystemTime(Date.now() + 1000);
+        await startOpened(projectId, device, "tap-o10");
+
+        expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
+    });
+
+    it("hands a retry the thread of the project its first try was filed under, and refuses one named for another project", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const otherId = await insertProject({ title: "Other", userId: ownerId });
+        const first = (await startIn(projectId, device, "tap-p5")) as { threadId: string };
+
+        expect(await startIn(projectId, device, "tap-p5")).toEqual({ started: false, threadId: first.threadId });
+        await expect(startIn(otherId, device, "tap-p5")).rejects.toThrow(ANOTHER_PROJECT);
+        expect(await rows("acpSessions")).toHaveLength(1);
+
+        // The same retry naming another project on another computer: that computer has no session of it, and it is still refused.
+        const second = await pairedDevice(ownerId);
+
+        await expect(startIn(otherId, second, "tap-p5")).rejects.toThrow(ANOTHER_PROJECT);
+    });
+
+    it("refuses a start with no project on a computer limited to some projects, and starts one on a computer that is not", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const start = async (clientId: string) =>
+            await as(ownerId).mutation(remote.startHostSession as never, { agentKey: "claude", clientId, deviceId: device.deviceId, folderId: "f1" } as never);
+
+        expect(await start("tap-np0")).toMatchObject({ started: true });
+
+        await run(async (ctx) => await ctx.db.patch("devices", device.deviceId as never, { projectIds: [projectId] }));
+
+        await expect(start("tap-np1")).rejects.toThrow(SOME_PROJECTS_ONLY);
+        expect(await rows("acpSessions")).toHaveLength(1);
+    });
+
+    it("marks a start refused for the computer's project scope, so a caller tells it from a busy computer", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const otherId = await insertProject({ title: "Other", userId: ownerId });
+        const refusal = async (start: Promise<unknown>): Promise<unknown> => {
+            try {
+                await start;
+
+                return null;
+            } catch (error) {
+                return error;
+            }
+        };
+
+        await run(async (ctx) => await ctx.db.patch("devices", device.deviceId as never, { projectIds: [projectId] }));
+
+        const withoutProject = await refusal(
+            as(ownerId).mutation(
+                remote.startHostSession as never,
+                { agentKey: "claude", clientId: "tap-oc1", deviceId: device.deviceId, folderId: "f1" } as never,
+            ),
+        );
+        const otherProject = await refusal(startIn(otherId, device, "tap-oc2"));
+
+        expect(isOutOfScopeStart(withoutProject)).toBe(true);
+        expect(isOutOfScopeStart(otherProject)).toBe(true);
+        expect(await rows("acpSessions")).toEqual([]);
+    });
+
+    it("starts in a project the limited computer is allowed in, filed under that project", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+
+        await run(async (ctx) => await ctx.db.patch("devices", device.deviceId as never, { projectIds: [projectId] }));
+
+        const started = (await startIn(projectId, device, "tap-ok1")) as { started: boolean; threadId: string };
+        const [thread] = await rows("threads", { _id: started.threadId });
+
+        expect(started.started).toBe(true);
+        expect(thread).toMatchObject({ projectId, runner: "host" });
+    });
+
+    it("refuses another person's project even when the computer's scope names it", async () => {
+        const device = await pairedDevice(ownerId);
+        const stranger = (await run(
+            async (ctx) => await ctx.db.insert("user", { createdAt: 0, email: "x@example.com", emailVerified: true, name: "X", updatedAt: 0 }),
+        )) as string;
+        const theirs = await insertProject({ userId: stranger });
+
+        await run(async (ctx) => await ctx.db.patch("devices", device.deviceId as never, { projectIds: [theirs] }));
+
+        await expect(startIn(theirs, device, "tap-st1")).rejects.toThrow(ACCESS_DENIED);
+        expect(await rows("acpSessions")).toEqual([]);
+    });
+
+    it("refuses a retry naming a project for a start claimed before claims recorded their project", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const first = (await as(ownerId).mutation(
+            remote.startHostSession as never,
+            { agentKey: "claude", clientId: "tap-p6", deviceId: device.deviceId, folderId: "f1" } as never,
+        )) as { threadId: string };
+
+        // A claim from before the project was recorded on it carries no result.
+        const [startClaim] = await rows("idempotencyClaims", { scope: "host-start" });
+        const { _id, claimedAt, expiresAt, key, scope, userId } = startClaim as Row;
+
+        await run(async (ctx) => {
+            await ctx.db.delete("idempotencyClaims", _id as never);
+            await ctx.db.insert("idempotencyClaims", { claimedAt, expiresAt, key, scope, userId });
+        });
+
+        await expect(startIn(projectId, device, "tap-p6")).rejects.toThrow(ANOTHER_PROJECT);
+        expect(
+            await as(ownerId).mutation(
+                remote.startHostSession as never,
+                { agentKey: "claude", clientId: "tap-p6", deviceId: device.deviceId, folderId: "f1" } as never,
+            ),
+        ).toEqual({ started: false, threadId: first.threadId });
+    });
+
+    it("answers a lost-answer retry with the thread even after that thread was moved to another project", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const otherId = await insertProject({ title: "Other", userId: ownerId });
+        const first = (await startIn(projectId, device, "tap-p7")) as { threadId: string };
+
+        await run(async (ctx) => await ctx.db.patch("threads", first.threadId as never, { projectId: otherId as never }));
+
+        expect(await startIn(projectId, device, "tap-p7")).toEqual({ started: false, threadId: first.threadId });
+        await expect(startIn(otherId, device, "tap-p7")).rejects.toThrow(ANOTHER_PROJECT);
+    });
+
+    it("records no default for a start the computer refuses at once, and leaves no thread behind", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+
+        await run(async (ctx) => await ctx.db.patch("devices", device.deviceId as never, { hostProtocol: MIN_DEVICE_PROTOCOL - 1 }));
+        await expect(startIn(projectId, device, "tap-p6")).rejects.toThrow(OUT_OF_DATE);
+
+        const stored = await projectRow(projectId);
+
+        expect(stored?.runnerAgentKey).toBeUndefined();
+        expect(await rows("threads", { runner: "host" })).toHaveLength(0);
+        expect(await rows("acpSessions")).toHaveLength(0);
+    });
+
+    it("refuses to file a thread into another person's project, and starts nothing", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: await insertUser() });
+
+        await expect(startIn(projectId, device, "tap-p4")).rejects.toThrow(NOT_FOUND);
+        expect(await rows("acpSessions")).toHaveLength(0);
+    });
+});
+
 describe("an organization's cap on coding agents", () => {
     const start = async (deviceId: string, clientId = "tap-org") =>
         await as(ownerId).mutation(remote.startHostSession as never, { agentKey: "claude", clientId, deviceId, folderId: "f1" } as never);
@@ -883,6 +1987,72 @@ describe("an organization's cap on coding agents", () => {
         expect(await rows("acpSessions")).toHaveLength(0);
         expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(0);
         expect(await rows("threads", { runner: "host" })).toHaveLength(0);
+    });
+
+    describe("an organization project's start from another space", () => {
+        const organizationProject = async (): Promise<string> =>
+            (await run(async (ctx) => await ctx.db.insert("projects", { createdAt: 0, organizationId: "org-a", title: "Billing", userId: ownerId }))) as string;
+
+        const startIn = async (deviceId: string, projectId: string) =>
+            await as(ownerId).mutation(
+                remote.startHostSession as never,
+                { agentKey: "claude", clientId: "tap-org-p", deviceId, folderId: "f1", projectId } as never,
+            );
+
+        it("refuses it when the project's organization holds agents below auto, though the caller is in another space", async () => {
+            const device = await pairedDevice(ownerId);
+            const projectId = await organizationProject();
+
+            await joinOrganization();
+            await capOrganization("ask");
+
+            await expect(startIn(device.deviceId, projectId)).rejects.toThrow(NOT_ALLOWED);
+            expect(await rows("acpSessions")).toHaveLength(0);
+            expect(await rows("threads", { runner: "host" })).toHaveLength(0);
+        });
+
+        it("holds a start into a project moved out of an organization to the caller's organization's cap", async () => {
+            const device = await pairedDevice(ownerId);
+            const projectId = (await run(
+                async (ctx) => await ctx.db.insert("projects", { createdAt: 0, organizationId: "", title: "Moved out", userId: ownerId }),
+            )) as string;
+
+            await joinOrganization();
+            await capOrganization("ask");
+            activeOrganization.current = { id: "org-a", name: "A", role: "member", slug: null };
+
+            await expect(startIn(device.deviceId, projectId)).rejects.toThrow(NOT_ALLOWED);
+            expect(await rows("threads", { runner: "host" })).toHaveLength(0);
+        });
+
+        it("holds a start to the cap of the organization the project moved into, though a replica still shows the one it left", async () => {
+            const device = await pairedDevice(ownerId);
+            const projectId = (await run(
+                async (ctx) => await ctx.db.insert("projects", { createdAt: 0, organizationId: "org-b", title: "Billing", userId: ownerId }),
+            )) as string;
+
+            await joinOrganization("org-a");
+            await joinOrganization("org-b");
+            await capOrganization("auto", "org-a");
+            await capOrganization("ask", "org-b");
+            replica.project = { ...(await run(async (ctx) => await ctx.db.get("projects", projectId as never))), organizationId: "org-a" };
+
+            await expect(startIn(device.deviceId, projectId)).rejects.toThrow(NOT_ALLOWED);
+            expect(await rows("threads", { runner: "host" })).toHaveLength(0);
+        });
+
+        it("files the thread under the project's organization, so its cap holds the chat in every space", async () => {
+            const device = await pairedDevice(ownerId);
+            const projectId = await organizationProject();
+
+            await joinOrganization();
+            await capOrganization("auto");
+
+            const result = (await startIn(device.deviceId, projectId)) as { started: boolean; threadId: string };
+
+            expect(result.started).toBe(true);
+            expect(await row(result.threadId)).toMatchObject({ organizationId: "org-a", projectId, runner: "host" });
+        });
     });
 
     it("refuses a send into a chat filed under an organization that has since tightened its cap, or that its owner left", async () => {

@@ -777,7 +777,7 @@ msgstr "{0} / {maxReferences} 個を選択中"
 #. placeholder {0}: offer.agentLabel
 #. placeholder {1}: offer.deviceName
 #. placeholder {2}: offer.folderLabel
-#: src/features/develop/components/guide-tab.tsx:181
+#: src/features/develop/components/guide-tab.tsx:182
 msgid "{0} on {1}, in {2}"
 msgstr "{2} の {1} 上の {0}"
 
@@ -828,7 +828,7 @@ msgstr "{0} 個のツールを検出しました"
 
 #. placeholder {0}: device.toolNames.length
 #. placeholder {1}: device.toolNames.join(", ")
-#: src/features/devices/components/devices-settings.tsx:291
+#: src/features/devices/components/devices-settings.tsx:353
 msgid "{0} tools: {1}"
 msgstr "{0} 個のツール: {1}"
 
@@ -1151,7 +1151,7 @@ msgid "{hostLabel} is not connected."
 msgstr "{hostLabel} に接続されていません。"
 
 #. placeholder {0}: current.leftOut
-#: src/features/develop/components/guide-tab.tsx:224
+#: src/features/develop/components/guide-tab.tsx:225
 msgid "{hostLabel} lists only part of this change; {0} files are not in the guide."
 msgstr "{hostLabel} はこの変更の一部しか一覧に表示していません。{0} 個のファイルはガイドに含まれていません。"
 
@@ -1589,7 +1589,7 @@ msgstr "{stateLabel} ハンズフリー音声モードを停止"
 msgid "{success, plural, one {# pull request linked.} other {# pull requests linked.}}"
 msgstr "{success, plural, other {# 件のプルリクエストをリンクしました。}}"
 
-#: src/features/devices/components/devices-settings.tsx:160
+#: src/features/devices/components/devices-settings.tsx:222
 msgid "{text} (gave up after {attempts} attempts)"
 msgstr "{text}（{attempts} 回試行して断念しました）"
 
@@ -2550,7 +2550,7 @@ msgstr "メモを追加..."
 msgid "Add a note…"
 msgstr "メモを追加…"
 
-#: src/features/devices/components/devices-settings.tsx:470
+#: src/features/devices/components/devices-settings.tsx:532
 msgid "Add a server over SSH"
 msgstr "SSH でサーバーを追加"
 
@@ -2895,7 +2895,7 @@ msgstr "スレッドに追加しました"
 msgid "Added to your review"
 msgstr "自分のレビューに追加しました"
 
-#: src/features/develop/components/guide-tab.tsx:130
+#: src/features/develop/components/guide-tab.tsx:131
 msgid "Added to your review. Nothing is posted until you submit the review."
 msgstr "自分のレビューに追加しました。レビューを送信するまで何も投稿されません。"
 
@@ -2913,7 +2913,7 @@ msgstr "ドキュメントを追加中… {0} / {1}"
 msgid "Adding the project…"
 msgstr "プロジェクトを追加しています…"
 
-#: src/features/devices/components/devices-settings.tsx:452
+#: src/features/devices/components/devices-settings.tsx:514
 msgid "Adding the server was cancelled on this computer."
 msgstr "このコンピュータでサーバーの追加がキャンセルされました。"
 
@@ -2926,7 +2926,7 @@ msgstr "以前の返信を追加しています…"
 msgid "Adding…"
 msgstr "追加中…"
 
-#: src/features/devices/components/devices-settings.tsx:483
+#: src/features/devices/components/devices-settings.tsx:545
 msgid "Address"
 msgstr "アドレス"
 
@@ -3173,7 +3173,7 @@ msgstr "ここで接続を有効化すると、Discord アプリ設定の Intera
 msgid "After activating the connection here, you'll get a webhook URL to set as the Request URL in your Slack App's Event Subscriptions."
 msgstr "ここで接続を有効化すると、Slack アプリの Event Subscriptions の Request URL に設定する Webhook URL が発行されます。"
 
-#: src/features/devices/components/devices-settings.tsx:399
+#: src/features/devices/components/devices-settings.tsx:461
 msgid "After outside content"
 msgstr "外部コンテンツ参照後"
 
@@ -6660,6 +6660,10 @@ msgstr ".md または .zip を選択"
 msgid "Choose a model for each kind of work the assistant hands to a sub-agent. A role with a model is offered to the assistant; one without stays off."
 msgstr "アシスタントがサブエージェントに任せる作業の種類ごとにモデルを選びます。モデルを設定したロールはアシスタントに提示され、設定していないロールはオフのままです。"
 
+#: src/features/devices/components/devices-settings.tsx:129
+msgid "Choose a project"
+msgstr "プロジェクトを選択"
+
 #: src/features/workflow/components/template-picker.tsx:111
 msgid "Choose a template to get started quickly. Templates provide pre-configured workflows for common tasks."
 msgstr "テンプレートを選んですばやく始めましょう。テンプレートには、一般的なタスク向けに設定済みのワークフローが用意されています。"
@@ -7285,7 +7289,7 @@ msgid "Coding agent runs"
 msgstr "コーディングエージェントの実行"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:91
+#: src/features/devices/components/devices-settings.tsx:146
 msgid "Coding agents you can start on {0}"
 msgstr "{0} で起動できるコーディングエージェント"
 
@@ -7935,7 +7939,7 @@ msgstr "パスワードを再入力してください"
 msgid "Conflicts with {base}"
 msgstr "{base} とのコンフリクト"
 
-#: src/features/devices/components/devices-settings.tsx:235
+#: src/features/devices/components/devices-settings.tsx:297
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:250
 #: src/features/skills/components/skill-builder-setup.tsx:136
 #: src/routes/auth/extension.tsx:156
@@ -7979,7 +7983,7 @@ msgstr "音声/ファイルノードを入力として接続してください"
 msgid "Connect an image node as input"
 msgstr "画像ノードを入力として接続してください"
 
-#: src/features/devices/components/devices-settings.tsx:501
+#: src/features/devices/components/devices-settings.tsx:563
 msgid "Connect and add"
 msgstr "接続して追加"
 
@@ -8158,7 +8162,7 @@ msgstr "接続に失敗"
 msgid "Connection failed"
 msgstr "接続に失敗しました"
 
-#: src/features/devices/components/devices-settings.tsx:313
+#: src/features/devices/components/devices-settings.tsx:375
 msgid "Connection lost"
 msgstr "接続が切断されました"
 
@@ -8601,12 +8605,12 @@ msgstr "コマンドをコピー：{label}"
 msgid "Copy content"
 msgstr "内容をコピー"
 
-#: src/features/devices/components/devices-settings.tsx:331
+#: src/features/devices/components/devices-settings.tsx:393
 msgid "Copy diagnostics"
 msgstr "診断情報をコピー"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:330
+#: src/features/devices/components/devices-settings.tsx:392
 msgid "Copy diagnostics for {0}"
 msgstr "{0} の診断情報をコピー"
 
@@ -8789,7 +8793,7 @@ msgstr "Gemini 2.5 の最下位ティアで信頼性の高い Google AI を必�
 msgid "Costa Rica"
 msgstr "コスタリカ"
 
-#: src/features/devices/components/devices-settings.tsx:462
+#: src/features/devices/components/devices-settings.tsx:524
 msgid "Could not add the server."
 msgstr "サーバーを追加できませんでした。"
 
@@ -8893,7 +8897,7 @@ msgstr "確認できませんでした。もう一度試す前に {hostLabel} �
 msgid "Could not confirm the change to auto-merge. Check on {hostLabel} before you try again."
 msgstr "自動マージの変更を確認できませんでした。もう一度試す前に {hostLabel} を確認してください。"
 
-#: src/features/devices/components/devices-settings.tsx:256
+#: src/features/devices/components/devices-settings.tsx:318
 msgid "Could not connect to the server."
 msgstr "サーバーに接続できませんでした。"
 
@@ -8920,7 +8924,7 @@ msgstr "シークレットをコピーできませんでした。選択して手
 
 #: src/features/auth/components/settings/api-key/use-copy-to-clipboard.ts:18
 #: src/features/chat/thread/copy-last-code-block.tsx:41
-#: src/features/devices/components/devices-settings.tsx:208
+#: src/features/devices/components/devices-settings.tsx:270
 msgid "Could not copy to the clipboard"
 msgstr "クリップボードにコピーできませんでした"
 
@@ -9100,7 +9104,7 @@ msgstr "ページとして開けませんでした"
 msgid "Could not open the pull request."
 msgstr "プルリクエストを作成できませんでした。"
 
-#: src/features/devices/components/devices-settings.tsx:566
+#: src/features/devices/components/devices-settings.tsx:628
 msgid "Could not pair this computer. Try again."
 msgstr "このコンピューターをペアリングできませんでした。もう一度お試しください。"
 
@@ -9160,7 +9164,7 @@ msgstr "下書きを改善できませんでした。もう一度お試しくだ
 msgid "Could not refresh this {requestNoun} from {0}. What you see may be out of date."
 msgstr "{0} からこの{requestNoun}を更新できませんでした。表示内容が古い可能性があります。"
 
-#: src/features/devices/components/devices-settings.tsx:347
+#: src/features/devices/components/devices-settings.tsx:409
 msgid "Could not remove the device."
 msgstr "デバイスを削除できませんでした。"
 
@@ -9168,7 +9172,7 @@ msgstr "デバイスを削除できませんでした。"
 msgid "Could not remove the participant"
 msgstr "参加者を削除できませんでした"
 
-#: src/features/devices/components/devices-settings.tsx:283
+#: src/features/devices/components/devices-settings.tsx:345
 msgid "Could not rename the device."
 msgstr "デバイス名を変更できませんでした。"
 
@@ -10581,8 +10585,8 @@ msgid "Delete Open Thread"
 msgstr "開いているスレッドを削除"
 
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:78
-msgid "Delete open thread (asks first)"
-msgstr "開いているスレッドを削除（確認あり）"
+msgid "Delete open thread"
+msgstr "開いているスレッドを削除"
 
 #: src/features/auth/components/organization/delete-organization-card.tsx:37
 #: src/features/auth/components/organization/delete-organization-card.tsx:42
@@ -10788,7 +10792,7 @@ msgstr "最大限の AI 性能と洗練された推論が最も重要となる�
 
 #: src/features/auth/components/device-approval.tsx:130
 #: src/features/auth/components/device-approval.tsx:134
-#: src/features/devices/components/devices-settings.tsx:384
+#: src/features/devices/components/devices-settings.tsx:446
 msgid "Denied"
 msgstr "拒否"
 
@@ -11094,24 +11098,24 @@ msgstr "オープンソースモデルで強力なコーディング能力と汎
 msgid "Development"
 msgstr "開発"
 
-#: src/features/devices/components/devices-settings.tsx:645
+#: src/features/devices/components/devices-settings.tsx:707
 msgid "Device activity"
 msgstr "デバイスのアクティビティ"
 
-#: src/features/devices/components/devices-settings.tsx:272
+#: src/features/devices/components/devices-settings.tsx:334
 msgid "Device name"
 msgstr "デバイス名"
 
-#: src/features/devices/components/devices-settings.tsx:350
+#: src/features/devices/components/devices-settings.tsx:412
 msgid "Device removed"
 msgstr "デバイスを削除しました"
 
-#: src/features/devices/components/devices-settings.tsx:578
+#: src/features/devices/components/devices-settings.tsx:640
 #: src/features/layout/lib/dashboard-page-names.ts:23
 msgid "Devices"
 msgstr "デバイス"
 
-#: src/features/devices/components/devices-settings.tsx:220
+#: src/features/devices/components/devices-settings.tsx:282
 msgid "Diagnostics copied"
 msgstr "診断情報をコピーしました"
 
@@ -11226,7 +11230,7 @@ msgstr "ルールファイルの変更を破棄しますか？"
 msgid "Discard the review"
 msgstr "レビューを破棄"
 
-#: src/features/devices/components/devices-settings.tsx:238
+#: src/features/devices/components/devices-settings.tsx:300
 #: src/features/settings/connectors/connector-card.tsx:189
 #: src/features/settings/connectors/connector-card.tsx:209
 msgid "Disconnect"
@@ -11263,7 +11267,7 @@ msgstr "Discord 公開鍵"
 #: src/features/chat/thread/ask-user-prompt.tsx:345
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
-#: src/features/devices/components/devices-settings.tsx:327
+#: src/features/devices/components/devices-settings.tsx:389
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "閉じる"
@@ -11425,7 +11429,7 @@ msgstr "このプロジェクトでは既定の指示を使わない"
 #: src/features/chat/thread/host-activity.tsx:78
 #: src/features/chat/thread/host-activity.tsx:133
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:184
-#: src/features/devices/components/devices-settings.tsx:383
+#: src/features/devices/components/devices-settings.tsx:445
 #: src/features/onboarding/components/setup-checklist.tsx:135
 #: src/features/skills/components/bundle-import-dialog.tsx:248
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:62
@@ -13410,7 +13414,7 @@ msgid "expired"
 msgstr "期限切れ"
 
 #: src/features/chat/thread-list/thread-node.tsx:344
-#: src/features/devices/components/devices-settings.tsx:385
+#: src/features/devices/components/devices-settings.tsx:447
 #: src/features/settings/connectors/connector-card.tsx:76
 msgid "Expired"
 msgstr "期限切れ"
@@ -13676,7 +13680,7 @@ msgstr "不合格"
 #: src/features/chat/thread/host-activity.tsx:139
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:181
 #: src/features/develop/components/checks-tab.tsx:77
-#: src/features/devices/components/devices-settings.tsx:386
+#: src/features/devices/components/devices-settings.tsx:448
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
 #: src/features/settings/components/chat/trigger-settings.tsx:181
@@ -15391,7 +15395,7 @@ msgstr "例：「タイトルは 4 語以内にする」「タイトルはドイ
 msgid "For example: how we write database migrations"
 msgstr "例: データベースのマイグレーションの書き方"
 
-#: src/features/develop/components/guide-tab.tsx:161
+#: src/features/develop/components/guide-tab.tsx:162
 msgid "For example: look hard at error handling, skip the generated files."
 msgstr "例：エラー処理を重点的に確認し、生成されたファイルは省略する。"
 
@@ -17228,6 +17232,10 @@ msgstr "ヒット率"
 msgid "HLS playback is not supported in this browser."
 msgstr "このブラウザーは HLS 再生に対応していません。"
 
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:32
+msgid "Hold Ctrl, Cmd or the middle mouse button to open it in the other place. The side panel needs Split View, turned on in Account settings."
+msgstr "Ctrl、Cmd、またはマウスの中ボタンを押しながらクリックすると、もう一方の場所で開きます。サイドパネルには分割ビューが必要です。アカウント設定でオンにしてください。"
+
 #: src/features/settings/components/personalization/memory-item.tsx:208
 msgid "Holds until"
 msgstr "有効期限"
@@ -18806,7 +18814,7 @@ msgstr "ケニア"
 msgid "Kept as yours"
 msgstr "自分のものとして保持しました"
 
-#: src/features/devices/components/devices-settings.tsx:495
+#: src/features/devices/components/devices-settings.tsx:557
 msgid "Key file (optional, absolute path)"
 msgstr "キーファイル（任意、絶対パス）"
 
@@ -19457,11 +19465,11 @@ msgstr "クイックチェックで低リスクの呼び出しを承認する"
 msgid "Let replies use tools"
 msgstr "返信でツールを使う"
 
-#: src/features/devices/components/devices-settings.tsx:576
+#: src/features/devices/components/devices-settings.tsx:638
 msgid "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 msgstr "Neore デスクトップアプリを通じて、エージェントがあなたのコンピューター上のファイル、ターミナル、ローカル MCP サーバーを使えるようにします。すべての操作はまずそのコンピューターで確認を求め、共有チャットやバックグラウンドタスクからは何も実行されません。"
 
-#: src/features/devices/components/devices-settings.tsx:636
+#: src/features/devices/components/devices-settings.tsx:698
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr "ご自身の SSH クライアントとキーで接続できるサーバー上で、エージェントに作業させます。Neore は初回にサーバーのキーを信頼するかどうかを確認し、すべての操作は送信前にこのコンピュータで確認されます。サーバーにはお客様のシークレットは保存されません。"
 
@@ -20020,6 +20028,10 @@ msgstr "ガイドを読み込み中"
 msgid "Loading the linked pull requests…"
 msgstr "リンクされたプルリクエストを読み込み中…"
 
+#: src/features/devices/components/devices-settings.tsx:110
+#~ msgid "Loading the projects this computer may be used in…"
+#~ msgstr "このコンピューターを使用できるプロジェクトを読み込んでいます…"
+
 #: src/features/sub-agents/components/sub-agent-approvals.tsx:48
 msgid "Loading the sub-agent's requests…"
 msgstr "サブエージェントのリクエストを読み込んでいます…"
@@ -20463,6 +20475,10 @@ msgstr "マジックリンク"
 #: src/features/auth/components/auth/forms/magic-link-form.tsx:76
 msgid "Magic link email sent"
 msgstr "マジックリンクのメールを送信しました"
+
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:21
+msgid "Main view"
+msgstr "メインビュー"
 
 #: src/features/workflow/components/nodes/style-ref-node.tsx:147
 msgid "Maintain original structure"
@@ -22026,11 +22042,11 @@ msgstr "スレッドをミュート"
 msgid "my data"
 msgstr "自分のデータ"
 
-#: src/features/devices/components/devices-settings.tsx:540
+#: src/features/devices/components/devices-settings.tsx:602
 msgid "My Linux computer"
 msgstr "マイ Linux コンピューター"
 
-#: src/features/devices/components/devices-settings.tsx:540
+#: src/features/devices/components/devices-settings.tsx:602
 msgid "My Mac"
 msgstr "マイ Mac"
 
@@ -22042,7 +22058,7 @@ msgstr "マイ MCP サーバー"
 msgid "My skills"
 msgstr "マイスキル"
 
-#: src/features/devices/components/devices-settings.tsx:540
+#: src/features/devices/components/devices-settings.tsx:602
 msgid "My Windows PC"
 msgstr "マイ Windows PC"
 
@@ -22068,7 +22084,7 @@ msgstr "名前"
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:478
 #: src/features/auth/components/settings/account/update-name-card.tsx:23
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:117
-#: src/features/devices/components/devices-settings.tsx:479
+#: src/features/devices/components/devices-settings.tsx:541
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
 #: src/features/projects/components/project-rule-files.tsx:262
@@ -22299,7 +22315,7 @@ msgid "Neore (timestamped)"
 msgstr "Neore（タイムスタンプ付き）"
 
 #. placeholder {0}: device.appVersion
-#: src/features/devices/components/devices-settings.tsx:296
+#: src/features/devices/components/devices-settings.tsx:358
 msgid "Neore {0}"
 msgstr "Neore {0}"
 
@@ -22363,7 +22379,7 @@ msgstr "Neore には 30 以上のモデルが含まれています。チャッ�
 msgid "Neore keeps these up to date and tells you when someone asks for your review."
 msgstr "Neore はこれらを最新の状態に保ち、誰かがあなたにレビューを依頼したときにお知らせします。"
 
-#: src/features/devices/components/devices-settings.tsx:305
+#: src/features/devices/components/devices-settings.tsx:367
 msgid "Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on."
 msgstr "このコンピュータの Neore は古いため、エージェントが使用できません。再び有効にするには、そこでアプリを更新してください。"
 
@@ -22375,11 +22391,11 @@ msgstr "お使いのコンピュータの Neore が古くなっています。�
 msgid "Neore use cases"
 msgstr "Neore のユースケース"
 
-#: src/features/devices/components/devices-settings.tsx:296
+#: src/features/devices/components/devices-settings.tsx:358
 msgid "Neore version not reported"
 msgstr "Neore のバージョンが報告されていません"
 
-#: src/features/develop/components/guide-tab.tsx:174
+#: src/features/develop/components/guide-tab.tsx:175
 msgid "Neore, from the diff"
 msgstr "Neore（差分から）"
 
@@ -22953,7 +22969,7 @@ msgstr "説明なし"
 msgid "No description provided."
 msgstr "説明はありません。"
 
-#: src/features/devices/components/devices-settings.tsx:630
+#: src/features/devices/components/devices-settings.tsx:692
 msgid "No devices paired."
 msgstr "ペアリングされたデバイスはありません。"
 
@@ -23024,7 +23040,7 @@ msgstr "ここにフォルダーはありません。"
 msgid "No goal"
 msgstr "目標なし"
 
-#: src/features/develop/components/guide-tab.tsx:210
+#: src/features/develop/components/guide-tab.tsx:211
 msgid "No guide"
 msgstr "ガイドなし"
 
@@ -23437,7 +23453,7 @@ msgstr "スレッドはまだありません"
 msgid "No tier data yet. Tier info is recorded for new requests after the gateway upgrade."
 msgstr "ティアデータはまだありません。ティア情報はゲートウェイのアップグレード後の新しいリクエストから記録されます。"
 
-#: src/features/devices/components/devices-settings.tsx:291
+#: src/features/devices/components/devices-settings.tsx:353
 msgid "No tools shared yet"
 msgstr "共有されているツールはまだありません"
 
@@ -23713,7 +23729,7 @@ msgstr "注: モジュールはメッセージ単位ではなく会話単位で�
 msgid "Nothing found"
 msgstr "見つかりません"
 
-#: src/features/devices/components/devices-settings.tsx:378
+#: src/features/devices/components/devices-settings.tsx:440
 msgid "Nothing has run on a device yet."
 msgstr "デバイスではまだ何も実行されていません。"
 
@@ -23882,7 +23898,7 @@ msgstr "公式"
 
 #: src/features/code/components/code-shell.tsx:81
 #: src/features/code/components/host-details.tsx:32
-#: src/features/devices/components/devices-settings.tsx:312
+#: src/features/devices/components/devices-settings.tsx:374
 #: src/routes/admin/gateway/index.tsx:37
 msgid "Offline"
 msgstr "オフライン"
@@ -24111,7 +24127,7 @@ msgstr "ワンタイムパスワードは必須です"
 
 #: src/features/code/components/code-shell.tsx:81
 #: src/features/code/components/host-details.tsx:32
-#: src/features/devices/components/devices-settings.tsx:312
+#: src/features/devices/components/devices-settings.tsx:374
 msgid "Online"
 msgstr "オンライン"
 
@@ -24427,7 +24443,7 @@ msgstr "モデルピッカーを開く"
 msgid "Open Model Picker"
 msgstr "モデルピッカーを開く"
 
-#: src/features/devices/components/devices-settings.tsx:582
+#: src/features/devices/components/devices-settings.tsx:644
 msgid "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 msgstr "このコンピューターをペアリングするには、デスクトップアプリで Neore を開いてください。これまでにペアリングしたデバイスは下に表示されます。"
 
@@ -24531,7 +24547,7 @@ msgstr "タスクを開く"
 msgid "Open terminal"
 msgstr "ターミナルを開く"
 
-#: src/features/develop/components/guide-tab.tsx:202
+#: src/features/develop/components/guide-tab.tsx:203
 msgid "Open the agent's conversation"
 msgstr "エージェントの会話を開く"
 
@@ -25425,7 +25441,7 @@ msgstr "このコンピューターをペアリングしますか？"
 msgid "Paired"
 msgstr "ペアリング済み"
 
-#: src/features/devices/components/devices-settings.tsx:615
+#: src/features/devices/components/devices-settings.tsx:677
 msgid "Paired devices"
 msgstr "ペアリング済みのデバイス"
 
@@ -25433,7 +25449,7 @@ msgstr "ペアリング済みのデバイス"
 msgid "Pairing request"
 msgstr "ペアリングのリクエスト"
 
-#: src/features/devices/components/devices-settings.tsx:556
+#: src/features/devices/components/devices-settings.tsx:618
 msgid "Pairing was cancelled on this computer."
 msgstr "このコンピューターでペアリングがキャンセルされました。"
 
@@ -26248,7 +26264,7 @@ msgstr "洗練されたハリウッド調"
 msgid "Popular"
 msgstr "人気"
 
-#: src/features/devices/components/devices-settings.tsx:491
+#: src/features/devices/components/devices-settings.tsx:553
 msgid "Port"
 msgstr "ポート"
 
@@ -26967,6 +26983,7 @@ msgstr "進捗"
 msgid "Progress of {toolName}"
 msgstr "{toolName} の進捗"
 
+#: src/features/devices/components/devices-settings.tsx:121
 #: src/features/projects/components/project-repo-picker.tsx:145
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:451
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:212
@@ -27944,7 +27961,7 @@ msgstr "{0} を再接続"
 msgid "Reconnect your Git host in settings to link a pull request."
 msgstr "プルリクエストをリンクするには、設定で Git ホストに再接続してください。"
 
-#: src/features/devices/components/devices-settings.tsx:314
+#: src/features/devices/components/devices-settings.tsx:376
 msgid "Reconnecting"
 msgstr "再接続中"
 
@@ -28334,8 +28351,8 @@ msgstr "サインイン状態を保持"
 #: src/features/chat/thread/composer-input.tsx:365
 #: src/features/chat/thread/composer-input.tsx:419
 #: src/features/chat/thread/composer-input.tsx:428
-#: src/features/devices/components/devices-settings.tsx:334
-#: src/features/devices/components/devices-settings.tsx:340
+#: src/features/devices/components/devices-settings.tsx:396
+#: src/features/devices/components/devices-settings.tsx:402
 #: src/features/projects/components/project-form-dialog.tsx:323
 #: src/features/projects/components/project-form-dialog.tsx:364
 #: src/features/settings/components/chat/custom-providers-settings.tsx:653
@@ -28352,7 +28369,7 @@ msgid "Remove \"{0}\"?"
 msgstr "「{0}」を削除しますか？"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:357
+#: src/features/devices/components/devices-settings.tsx:419
 msgid "Remove “{0}”?"
 msgstr "「{0}」を削除しますか？"
 
@@ -29101,7 +29118,7 @@ msgstr "再試行"
 #: src/features/chat/thread/chat-error.tsx:64
 #: src/features/chat/thread/request-secret-prompt.tsx:475
 #: src/features/chat/translation/message-translation.tsx:88
-#: src/features/devices/components/devices-settings.tsx:240
+#: src/features/devices/components/devices-settings.tsx:302
 #: src/features/local-models/components/ollama-model-manager.tsx:188
 #: src/features/onboarding/components/setup-checklist.tsx:238
 #: src/features/settings/components/chat/agent-settings.tsx:267
@@ -30801,7 +30818,7 @@ msgstr "送信中…"
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:283
 #: src/features/chat/guest-links/guest-link-panel.tsx:411
-#: src/features/devices/components/devices-settings.tsx:387
+#: src/features/devices/components/devices-settings.tsx:449
 msgid "Sent"
 msgstr "送信済み"
 
@@ -30869,7 +30886,7 @@ msgstr "セリフ"
 msgid "Served from cache"
 msgstr "キャッシュから提供"
 
-#: src/features/devices/components/devices-settings.tsx:459
+#: src/features/devices/components/devices-settings.tsx:521
 msgid "Server added. Choose which of its folders to share in the desktop app."
 msgstr "サーバーを追加しました。共有するフォルダはデスクトップアプリで選択してください。"
 
@@ -30889,7 +30906,7 @@ msgstr "サーバー名は必須です"
 msgid "server not reachable"
 msgstr "サーバーに接続できません"
 
-#: src/features/devices/components/devices-settings.tsx:311
+#: src/features/devices/components/devices-settings.tsx:373
 msgid "Server over SSH"
 msgstr "SSH 経由のサーバー"
 
@@ -30913,7 +30930,7 @@ msgstr "ブランチ機能付きのサーバーレス Postgres データベー�
 msgid "servers"
 msgstr "サーバー"
 
-#: src/features/devices/components/devices-settings.tsx:638
+#: src/features/devices/components/devices-settings.tsx:700
 msgid "Servers over SSH"
 msgstr "SSH 経由のサーバー"
 
@@ -31091,7 +31108,7 @@ msgstr "共有"
 msgid "Shared conversation"
 msgstr "共有された会話"
 
-#: src/features/devices/components/devices-settings.tsx:610
+#: src/features/devices/components/devices-settings.tsx:672
 msgid "Shared folders and local servers…"
 msgstr "共有フォルダーとローカルサーバー…"
 
@@ -31338,6 +31355,10 @@ msgstr "{totalRows} 行中 {firstShown}〜{lastShown} 行を表示"
 #: src/features/skills/components/skill-form-dialog.tsx:265
 msgid "Shown to the assistant so it knows when the skill applies."
 msgstr "スキルをいつ適用するかを判断できるよう、アシスタントに表示されます。"
+
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:22
+msgid "Side panel"
+msgstr "サイドパネル"
 
 #: src/features/chat/aside/aside-panel.tsx:208
 #: src/features/chat/aside/aside-panel.tsx:293
@@ -32414,7 +32435,7 @@ msgstr "開始"
 
 #. placeholder {0}: offer.agentLabel
 #. placeholder {1}: offer.folderLabel
-#: src/features/devices/components/devices-settings.tsx:113
+#: src/features/devices/components/devices-settings.tsx:174
 msgid "Start {0} in {1}"
 msgstr "{1} で {0} を開始"
 
@@ -32628,6 +32649,10 @@ msgstr "音声入力を開始しています…"
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:182
 msgid "Starting…"
 msgstr "開始しています…"
+
+#: src/features/devices/components/devices-settings.tsx:139
+msgid "Starts in {onlyProject}, the one project this computer may be used in."
+msgstr "{onlyProject} で開始します。このコンピューターを使用できる唯一のプロジェクトです。"
 
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:97
 msgid "starts with"
@@ -33330,7 +33355,7 @@ msgstr "候補があります。右矢印キーで確定します"
 msgid "suggestions"
 msgstr "提案"
 
-#: src/features/develop/components/guide-tab.tsx:231
+#: src/features/develop/components/guide-tab.tsx:232
 #: src/features/develop/components/guide-view.tsx:113
 msgid "Suggestions"
 msgstr "提案"
@@ -34223,7 +34248,7 @@ msgstr "評価ありがとうございます"
 msgid "Thanks! Your feedback was sent."
 msgstr "ありがとうございます！フィードバックを送信しました。"
 
-#: src/features/develop/components/guide-tab.tsx:110
+#: src/features/develop/components/guide-tab.tsx:111
 msgid "That agent session has ended."
 msgstr "そのエージェントセッションは終了しました。"
 
@@ -34243,6 +34268,10 @@ msgstr "そのコンピュータはビジー状態です。しばらくしてか
 msgid "That computer is not online."
 msgstr "そのコンピュータはオンラインではありません。"
 
+#: src/features/develop/components/guide-tab.tsx:108
+msgid "That computer may only be used in some projects, and none of them lists this repository. Add the repository to one of them, or change where the computer is offered in its settings."
+msgstr "このコンピューターは一部のプロジェクトでのみ使用でき、そのいずれにもこのリポジトリが含まれていません。いずれかのプロジェクトにリポジトリを追加するか、コンピューターの設定で提供先を変更してください。"
+
 #: src/features/auth/components/device-approval.tsx:171
 msgid "That did not go through. Try again."
 msgstr "送信できませんでした。もう一度お試しください。"
@@ -34252,7 +34281,7 @@ msgstr "送信できませんでした。もう一度お試しください。"
 msgid "That did not work. Please try again."
 msgstr "うまくいきませんでした。もう一度お試しください。"
 
-#: src/features/develop/components/guide-tab.tsx:146
+#: src/features/develop/components/guide-tab.tsx:147
 msgid "That did not work. Try again."
 msgstr "うまくいきませんでした。もう一度お試しください。"
 
@@ -34337,11 +34366,11 @@ msgstr "そのリクエストはもう待機していません。"
 msgid "that session no longer exists"
 msgstr "そのセッションはもう存在しません"
 
-#: src/features/develop/components/guide-tab.tsx:133
+#: src/features/develop/components/guide-tab.tsx:134
 msgid "That suggestion cannot be added any more."
 msgstr "その提案はもう追加できません。"
 
-#: src/features/develop/components/guide-tab.tsx:132
+#: src/features/develop/components/guide-tab.tsx:133
 msgid "That suggestion is gone."
 msgstr "その提案は存在しなくなりました。"
 
@@ -34349,7 +34378,7 @@ msgstr "その提案は存在しなくなりました。"
 msgid "The {requestNoun} changed while the guide was being written. Write it again."
 msgstr "ガイドの作成中に{requestNoun}が変更されました。もう一度作成してください。"
 
-#: src/features/develop/components/guide-tab.tsx:131
+#: src/features/develop/components/guide-tab.tsx:132
 msgid "The {requestNoun} has a newer commit. Write the guide again before adding its comments."
 msgstr "{requestNoun}に新しいコミットがあります。コメントを追加する前に、ガイドをもう一度作成してください。"
 
@@ -34367,7 +34396,7 @@ msgstr "エージェントの回答が遅れました: {0} は現在 {1} です�
 msgid "The agent asks before a risky action"
 msgstr "エージェントはリスクのある操作の前に確認します"
 
-#: src/features/devices/components/devices-settings.tsx:341
+#: src/features/devices/components/devices-settings.tsx:403
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "エージェントはこのデバイスに何も要求できなくなります。アクティビティログは期限切れになるまで残ります。"
 
@@ -34454,7 +34483,7 @@ msgstr "エージェントループは体系的なタスク実行のため常に
 msgid "The agent made no file changes."
 msgstr "エージェントはファイルを変更しませんでした。"
 
-#: src/features/develop/components/guide-tab.tsx:197
+#: src/features/develop/components/guide-tab.tsx:198
 msgid "The agent on your computer is reading the change…"
 msgstr "お使いのコンピュータ上のエージェントが変更を読み取っています…"
 
@@ -34649,7 +34678,7 @@ msgstr "条件はモデルに問い合わせずに確認され、条件が満た
 msgid "The connection could not be completed."
 msgstr "接続を完了できませんでした。"
 
-#: src/features/devices/components/devices-settings.tsx:157
+#: src/features/devices/components/devices-settings.tsx:219
 msgid "The connection was lost."
 msgstr "接続が切断されました。"
 
@@ -34812,8 +34841,8 @@ msgstr "ゲストリンクを読み込めませんでした。"
 msgid "The guest link was replaced or has ended."
 msgstr "ゲストリンクは置き換えられたか、終了しています。"
 
-#: src/features/develop/components/guide-tab.tsx:119
-#: src/features/develop/components/guide-tab.tsx:122
+#: src/features/develop/components/guide-tab.tsx:120
+#: src/features/develop/components/guide-tab.tsx:123
 msgid "The guide could not be started."
 msgstr "ガイドを開始できませんでした。"
 
@@ -35059,7 +35088,7 @@ msgstr "Anthropic の最新フロンティアの推論と能力を必要とす�
 msgid "The most review rounds before it stops"
 msgstr "停止するまでの最大レビューラウンド数"
 
-#: src/features/develop/components/guide-tab.tsx:108
+#: src/features/develop/components/guide-tab.tsx:109
 msgid "The Neore app on that computer is out of date. Update it, then try again."
 msgstr "そのコンピュータの Neore アプリが古くなっています。更新してから、もう一度お試しください。"
 
@@ -35651,7 +35680,7 @@ msgstr "この比較のモードはすべての列に適用されます。比較
 msgid "this computer"
 msgstr "このコンピュータ"
 
-#: src/features/devices/components/devices-settings.tsx:310
+#: src/features/devices/components/devices-settings.tsx:372
 #: src/features/projects/components/add-project-dialog.tsx:173
 #: src/features/projects/components/add-project-dialog.tsx:177
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
@@ -35670,22 +35699,30 @@ msgstr "このコンピューターはペアリングされなくなりました
 msgid "This computer is no longer paired. Pair it again in Settings → Devices."
 msgstr "このコンピューターはペアリングされていません。設定 → デバイスでもう一度ペアリングしてください。"
 
-#: src/features/devices/components/devices-settings.tsx:587
+#: src/features/devices/components/devices-settings.tsx:649
 msgid "This computer is not paired yet."
 msgstr "このコンピューターはまだペアリングされていません。"
 
 #. placeholder {0}: pairedHere.name
-#: src/features/devices/components/devices-settings.tsx:603
+#: src/features/devices/components/devices-settings.tsx:665
 msgid "This computer is paired as “{0}”."
 msgstr "このコンピューターは「{0}」としてペアリングされています。"
 
-#: src/features/devices/components/devices-settings.tsx:587
+#: src/features/devices/components/devices-settings.tsx:649
 msgid "This computer is paired with another account."
 msgstr "このコンピューターは別のアカウントとペアリングされています。"
 
-#: src/features/devices/components/devices-settings.tsx:563
+#: src/features/devices/components/devices-settings.tsx:625
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "このコンピューターはペアリングされました。共有するフォルダーはデスクトップアプリで選択してください。"
+
+#: src/features/devices/components/devices-settings.tsx:110
+msgid "This computer may only be used in some projects, and none of them is available to you. Change where it is offered below."
+msgstr "このコンピューターは一部のプロジェクトでのみ使用でき、そのいずれも利用できません。下で提供先を変更してください。"
+
+#: src/features/devices/components/devices-settings.tsx:112
+msgid "This computer may only be used in some projects. Choose the project to start the agent in."
+msgstr "このコンピューターは一部のプロジェクトでのみ使用できます。エージェントを開始するプロジェクトを選択してください。"
 
 #: src/features/projects/components/add-project-dialog.tsx:348
 msgid "This computer must be paired first."
@@ -35791,7 +35828,7 @@ msgstr "このファイルは大きすぎ（約 {0} トークン）、モデル�
 msgid "This folder cannot be read."
 msgstr "このフォルダーは読み取れません。"
 
-#: src/features/develop/components/guide-tab.tsx:218
+#: src/features/develop/components/guide-tab.tsx:219
 msgid "This guide was written for an earlier commit. The {requestNoun} has changed since: write it again to see the change as it is now."
 msgstr "このガイドは以前のコミットに対して作成されました。その後{requestNoun}が変更されています。現在の変更を確認するには、もう一度作成してください。"
 
@@ -38120,7 +38157,7 @@ msgstr "組織で許可されたモデルを使用"
 msgid "Use these keyboard shortcuts to navigate and interact with the data grid more efficiently."
 msgstr "これらのキーボードショートカットを使うと、データグリッドをより効率的に移動・操作できます。"
 
-#: src/features/devices/components/devices-settings.tsx:597
+#: src/features/devices/components/devices-settings.tsx:659
 msgid "Use this computer for agent tools"
 msgstr "このコンピューターをエージェントのツールに使う"
 
@@ -38160,7 +38197,7 @@ msgstr "ユーザー"
 #: src/features/auth/components/user-view.tsx:35
 #: src/features/auth/components/user-view.tsx:38
 #: src/features/auth/components/user-view.tsx:44
-#: src/features/devices/components/devices-settings.tsx:487
+#: src/features/devices/components/devices-settings.tsx:549
 #: src/features/layout/components/nav-user.tsx:373
 #: src/features/layout/components/nav-user.tsx:373
 #: src/features/layout/components/sidebar-shortcut.tsx:212
@@ -39052,7 +39089,7 @@ msgstr "{device} が受け取るのを待っています…"
 msgid "Waiting for {name}…"
 msgstr "{name} を待っています…"
 
-#: src/features/devices/components/devices-settings.tsx:382
+#: src/features/devices/components/devices-settings.tsx:444
 msgid "Waiting for approval"
 msgstr "承認待ち"
 
@@ -39408,11 +39445,11 @@ msgstr "エージェントに何をさせますか？"
 msgid "What should the AI call you?"
 msgstr "AI にどう呼んでほしいですか？"
 
-#: src/features/develop/components/guide-tab.tsx:154
+#: src/features/develop/components/guide-tab.tsx:155
 msgid "What should the guide pay attention to?"
 msgstr "ガイドで何に注目すべきですか？"
 
-#: src/features/devices/components/devices-settings.tsx:645
+#: src/features/devices/components/devices-settings.tsx:707
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "過去 30 日間にエージェントがあなたのデバイスに依頼した内容です。"
 
@@ -39536,6 +39573,10 @@ msgstr "委任のタイミング"
 msgid "When to read it"
 msgstr "読むタイミング"
 
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:29
+msgid "Where a sub-agent or side chat opens"
+msgstr "サブエージェントやサイドチャットを開く場所"
+
 #: src/features/tasks/components/task-form-dialog.tsx:586
 msgid "Where each run goes"
 msgstr "各実行の保存先"
@@ -39544,7 +39585,7 @@ msgstr "各実行の保存先"
 msgid "Where is the project?"
 msgstr "プロジェクトはどこにありますか？"
 
-#: src/features/develop/components/guide-tab.tsx:166
+#: src/features/develop/components/guide-tab.tsx:167
 msgid "Where the guide is written"
 msgstr "ガイドの作成先"
 
@@ -39651,7 +39692,7 @@ msgstr "メールアドレス/パスワード"
 msgid "With this, it fires when the text starts to contain the phrase, not on every change."
 msgstr "これを使うと、変更のたびにではなく、テキストにそのフレーズが含まれ始めたときに実行されます。"
 
-#: src/features/devices/components/devices-settings.tsx:497
+#: src/features/devices/components/devices-settings.tsx:559
 msgid "Without one, your SSH agent and default keys are used. Passwords are not supported yet."
 msgstr "指定しない場合は、SSH エージェントとデフォルトのキーが使用されます。パスワードはまだサポートされていません。"
 
@@ -39767,7 +39808,7 @@ msgstr "製品発表用の動画の説明文を書く"
 msgid "Write code with AI, run it in the sandbox, and document results — all in one thread."
 msgstr "AI でコードを書き、サンドボックスで実行し、結果をドキュメント化 — すべて 1 つのスレッドで。"
 
-#: src/features/develop/components/guide-tab.tsx:187
+#: src/features/develop/components/guide-tab.tsx:188
 msgid "Write it again"
 msgstr "もう一度作成"
 
@@ -39787,7 +39828,7 @@ msgstr "コードを書いて..."
 msgid "Write something"
 msgstr "何か書いてください"
 
-#: src/features/develop/components/guide-tab.tsx:187
+#: src/features/develop/components/guide-tab.tsx:188
 msgid "Write the guide"
 msgstr "ガイドを作成"
 
@@ -39813,7 +39854,7 @@ msgstr "コード、設定、スクリプトを書いたり変更したりしま
 msgid "Writing tests and checking that a change works."
 msgstr "テストを書き、変更が動作することを確認します。"
 
-#: src/features/develop/components/guide-tab.tsx:197
+#: src/features/develop/components/guide-tab.tsx:198
 msgid "Writing the guide…"
 msgstr "ガイドを作成中…"
 
@@ -40519,11 +40560,11 @@ msgstr "過去30日間のこのプロジェクトでのあなたの返信、ト�
 msgid "Your review"
 msgstr "あなたのレビュー"
 
-#: src/features/develop/components/guide-tab.tsx:135
+#: src/features/develop/components/guide-tab.tsx:136
 msgid "Your review already holds as many comments as {hostLabel} takes in one review."
 msgstr "レビューには、{hostLabel} が 1 回のレビューで受け付ける上限までコメントが含まれています。"
 
-#: src/features/develop/components/guide-tab.tsx:134
+#: src/features/develop/components/guide-tab.tsx:135
 msgid "Your review is being submitted. Try again when it is done."
 msgstr "レビューを送信中です。完了してからもう一度お試しください。"
 
@@ -40734,3 +40775,37 @@ msgstr "チューリッヒ"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ ポイント"
+
+msgid "Archive"
+msgstr "アーカイブ"
+
+msgid "Archive this chat?"
+msgstr "このチャットをアーカイブしますか？"
+
+msgid "Archived chats stay searchable, and you can restore them from the archive."
+msgstr "アーカイブしたチャットも検索でき、アーカイブから元に戻せます。"
+
+msgid "Asks before a chat is archived. Off: archiving happens on the first click."
+msgstr "チャットをアーカイブする前に確認します。オフ: 最初のクリックでアーカイブします。"
+
+msgid "Asks before a chat is deleted. Off: deleting happens on the first click."
+msgstr "チャットを削除する前に確認します。オフ: 最初のクリックで削除します。"
+
+msgid "Asks before a pinned chat is unpinned. Off: unpinning happens on the first click."
+msgstr "ピン留めされたチャットのピン留めを解除する前に確認します。オフ: 最初のクリックでピン留めを解除します。"
+
+msgid "Confirm before archiving a chat"
+msgstr "チャットをアーカイブする前に確認"
+
+msgid "Confirm before deleting a chat"
+msgstr "チャットを削除する前に確認"
+
+msgid "Confirm before unpinning a chat"
+msgstr "チャットのピン留めを解除する前に確認"
+
+msgid "The chat will no longer be pinned. You can pin it again from the list."
+msgstr "チャットのピン留めが解除されます。リストからいつでも再度ピン留めできます。"
+
+msgid "Unpin this chat?"
+msgstr "このチャットのピン留めを解除しますか？"
+

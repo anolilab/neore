@@ -93,6 +93,29 @@ describe("consumeOAuthState", () => {
         });
     });
 
+    it("keeps the advertised RFC 9207 iss flag on the flow it returns", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await call(harness, createOAuthState, {
+                authorizationResponseIssParameterSupported: true,
+                expiresAt: Date.now() + OAUTH_STATE_TTL_MS,
+                flow,
+                stateHash: "iss-flag",
+                target: { kind: "connector", slug: "notion" },
+                userId: "alice",
+            });
+
+            await expect(call(harness, consumeOAuthState, { stateHash: "iss-flag", userId: "alice" })).resolves.toMatchObject({
+                authorizationResponseIssParameterSupported: true,
+                flow: { issuer: "https://auth.example" },
+                ok: true,
+            });
+        } finally {
+            harness.close();
+        }
+    });
+
     it("reads a row written before `target` through its legacy slug and server columns", async () => {
         const harness = lunoraTest(schema as never);
 
