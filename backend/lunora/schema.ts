@@ -609,6 +609,22 @@ export const schema = defineSchema({
         .index("by_fileId_userId", ["fileId", "userId"])
         .index("by_userId", ["userId"]),
 
+    /**
+     * A chat file's export view: its name, type, hash and when it was stored. The GDPR export reads this instead of the file row, which
+     * holds the extracted text the export does not carry and which a read meters whole. Written with the file (`addFile`) and erased with
+     * it (the unused-file reaper), in the same mutation, so the two stay in step.
+     */
+    chatFileMetadata: defineTable({
+        createdAt: v.number(),
+        fileId: v.id("chatFiles"),
+        filename: v.optional(v.string()),
+        hash: v.string(),
+        mediaType: v.string(),
+    })
+        // `.global()`, like `chatFiles`: it is written and erased with the file row, so it lives where that row does.
+        .global()
+        .index("by_fileId", ["fileId"]),
+
     chatFiles: defineTable({
         extractedText: v.optional(v.string()),
         extractionError: v.optional(v.string()),

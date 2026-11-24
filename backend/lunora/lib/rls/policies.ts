@@ -433,6 +433,8 @@ export const UNPOLICED_TABLES: Record<string, string> = {
         "bot creator record, global: written by `createBot`, erased with its owner; read by the memory list (`listUserMemories` through `memory/bot-owner.ts`), which returns only whether a bot is someone else's and whether it was deleted, never the owner id",
     browserActions: "no owner column; read only after the parent browser session's owner check",
     changelogCache: "public changelog cache",
+    chatFileMetadata:
+        "the export view of a shared `chatFiles` row (name, type, hash, stored-at), written and erased with that row; read only by the GDPR export, which reads it for files the user holds a grant for or names in a message",
     chatFiles: "content-addressed and SHARED (same bytes, one row) — no owner; access is the `chatFileAccess` grant",
     chatFileThreads:
         "derived index of which of the owner's chats hold a chat file; read only as a yes/no by the lock gate, never returned, written by `changeMessageFiles` and the chat-file backfill (`agent/file-link-backfill.ts`), and deleted directly by `deleteChatFileLinksForThread` (permanent thread delete) and `eraseChatFileThreadsForUser` (account erasure)",

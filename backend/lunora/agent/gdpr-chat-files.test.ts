@@ -79,8 +79,8 @@ const store = async (userId: string, filename: string, hash: string): Promise<st
 };
 
 /** A bare file row, with neither a grant nor a message naming it. */
-const bareFile = async (ctx: any, hash: string): Promise<string> =>
-    await ctx.db.insert("chatFiles", {
+const bareFile = async (ctx: any, hash: string): Promise<string> => {
+    const fileId = await ctx.db.insert("chatFiles", {
         extractionStatus: "pending",
         filename: `${hash}.png`,
         hash,
@@ -89,6 +89,12 @@ const bareFile = async (ctx: any, hash: string): Promise<string> =>
         refcount: 1,
         storageId: `agent-files/${hash}`,
     });
+
+    // The export's view of the file, written with it, as `addFile` writes it.
+    await ctx.db.insert("chatFileMetadata", { createdAt: 1, fileId, filename: `${hash}.png`, hash, mediaType: "image/png" });
+
+    return fileId;
+};
 
 /**
  * A file that one of the user's messages names, with no grant: a large part stored with a message has no owner, so the message is the
@@ -223,7 +229,13 @@ describe("chat files in the GDPR export", () => {
     it("leaves out a grant whose file row is gone", async () => {
         const gone = await store(A, "gone.png", "hash-gone");
 
-        await harness.run(async (ctx: any) => await ctx.db.delete("chatFiles", gone));
+        // Erased as the reaper erases a file: its metadata and its row, in one mutation.
+        await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.chatFileMetadata.findMany({ where: { fileId: gone } });
+
+            await Promise.all(page.map(async (row: any) => await ctx.db.delete("chatFileMetadata", row._id)));
+            await ctx.db.delete("chatFiles", gone);
+        });
 
         const { files } = await exportedFor(A);
 
@@ -248,6 +260,20 @@ describe("chat files in the GDPR export", () => {
         const { files } = await exportedFor(A);
 
         expect(files.find((file) => file.id === longHashFile)?.hash).toHaveLength(CHAT_FILE_HASH_MAX);
+    });
+
+    it("reads the metadata, not the file row, so a large extracted text is not read", async () => {
+        const fileId = await store(A, "documented.png", "hash-documented");
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("chatFiles", fileId, { extractedText: "x".repeat(200_000) }));
+
+        const read = (await harness.run(async (ctx: any) => await ctx.runQuery(chatFileMetadataForExport, { fileIds: [fileId] }))) as {
+            readBytes: number;
+            rows: unknown[];
+        };
+
+        expect(read.rows).toHaveLength(1);
+        expect(read.readBytes).toBeLessThan(10_000);
     });
 
     it("reads every page of a user's files", async () => {

@@ -119,6 +119,15 @@ export async function addFileHandler(context: MutationContext, args: InferArgs<t
     });
     const fileId = insertedId as Id<"chatFiles">;
 
+    // The export's view of the file, written with it (`chatFileMetadata`): the export reads this, not the row that holds the text.
+    await context.db.insert("chatFileMetadata", {
+        createdAt: Date.now(),
+        fileId,
+        filename: args.filename,
+        hash: args.hash,
+        mediaType: args.mediaType,
+    });
+
     await grantFileAccess(context, fileId, args.userId);
 
     return {
@@ -629,6 +638,11 @@ export const deleteFiles = internalMutation
                 const { page: grants } = await ctx.db.chatFileAccess.findMany({ where: { fileId } });
 
                 await Promise.all(grants.map((grant) => ctx.db.delete("chatFileAccess", grant._id)));
+
+                // The export's view goes with the file row (`chatFileMetadata`), in the same mutation.
+                const { page: metadata } = await ctx.db.chatFileMetadata.findMany({ where: { fileId } });
+
+                await Promise.all(metadata.map((row) => ctx.db.delete("chatFileMetadata", row._id)));
                 await ctx.db.delete("chatFiles", fileId);
 
                 return fileId;

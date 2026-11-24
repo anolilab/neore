@@ -189,14 +189,15 @@ export const collectMessageFileIdsForExport = internalQuery
     });
 
 /**
- * The metadata of the given chat files, read in one query (the caller passes at most one chunk of ids). Metadata only, as a vault
- * file's is: the bytes stay out of the export. A file whose row is already gone is left out.
+ * The metadata of the given chat files, read in one query from `chatFileMetadata` (the caller passes at most one chunk of ids). Metadata
+ * only, as a vault file's is: the bytes stay out of the export, and the file row, which holds the extracted text, is not read. A file
+ * whose metadata is already gone is left out (its row is erased with it).
  */
 export const chatFileMetadataForExport = internalQuery
     .input({ fileIds: v.array(v.id("chatFiles")) })
     .output(
         v.object({
-            // The bytes the query read: each whole row, as stored. The export action meters its chunks against a budget with this.
+            // The bytes the query read: each metadata row, as stored. The export action meters its chunks against a budget with this.
             readBytes: v.number(),
             rows: v.array(
                 v.object({
@@ -216,21 +217,20 @@ export const chatFileMetadataForExport = internalQuery
         }
 
         // Primary, as the grants are: a file uploaded moments before the export must be in it.
-        const { page } = await ctx.db.chatFiles.findMany({ consistency: "primary", where: { _id: { in: fileIds } } });
-        const files = storedRows(page);
-        // The whole row is read, extracted text included, so the bytes read are the row's size as stored, not the metadata's.
-        const readBytes = files.reduce((total, file) => total + rowBytes(file), 0);
+        const { page } = await ctx.db.chatFileMetadata.findMany({ consistency: "primary", where: { fileId: { in: fileIds } } });
+        const rowsOf = storedRows(page);
+        const readBytes = rowsOf.reduce((total, row) => total + rowBytes(row), 0);
 
         return {
             readBytes,
-            rows: files.map((file) => {
+            rows: rowsOf.map((row) => {
                 return {
-                    createdAt: file._creationTime,
-                    filename: file.filename?.slice(0, CHAT_FILE_NAME_MAX),
-                    filenameCut: (file.filename?.length ?? 0) > CHAT_FILE_NAME_MAX,
-                    hash: file.hash.slice(0, CHAT_FILE_HASH_MAX),
-                    id: file._id,
-                    mediaType: file.mediaType.slice(0, CHAT_FILE_TYPE_MAX),
+                    createdAt: row.createdAt,
+                    filename: row.filename?.slice(0, CHAT_FILE_NAME_MAX),
+                    filenameCut: (row.filename?.length ?? 0) > CHAT_FILE_NAME_MAX,
+                    hash: row.hash.slice(0, CHAT_FILE_HASH_MAX),
+                    id: row.fileId,
+                    mediaType: row.mediaType.slice(0, CHAT_FILE_TYPE_MAX),
                 };
             }),
         };
