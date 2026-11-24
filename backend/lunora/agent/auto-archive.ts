@@ -131,11 +131,10 @@ const threadKeptForOpenPullRequest = async (ctx: MutationCtx, userId: string | u
 };
 
 /**
- * Archives one thread if, as read now, it is still due. The eligibility check runs
+ * Archives one thread if, as read now, it is still due at `cutoff`. The eligibility check runs
  * on the fresh row, its project's pin state, its live streams and any request waiting on the owner, in the same
  * transaction as the write, so nothing that happened after the scan is overwritten.
  */
-/** Archives one thread if, as read in this transaction, it is still due at `cutoff`. */
 const archiveThreadIfDue = async (ctx: MutationCtx, threadId: Id<"threads">, cutoff: number): Promise<boolean> => {
     const thread = await ctx.db.get("threads", threadId);
 
