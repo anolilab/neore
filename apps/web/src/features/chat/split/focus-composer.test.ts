@@ -113,6 +113,18 @@ describe("focusComposerWhenMounted", () => {
         expect(onSettled).toHaveBeenCalledWith(false);
     });
 
+    it("does not count a composer that cannot take focus, such as a disabled one, as focused", () => {
+        const { pane, update } = mountPane();
+        const onSettled = vi.fn();
+
+        focusComposerWhenMounted(pane, onSettled);
+        update(createElement("textarea", { "data-focus-area": "composer", disabled: true }));
+        runFrame();
+
+        expect(focusLog).toEqual([]);
+        expect(onSettled).toHaveBeenCalledWith(false);
+    });
+
     it("stops retrying when its cleanup runs, so a left pane does not take focus later", () => {
         const { pane, update } = mountPane();
         const onSettled = vi.fn();

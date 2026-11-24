@@ -61,7 +61,8 @@ export const focusComposerWhenMounted = (pane: { current: HTMLElement | null }, 
 
         if (editor) {
             editor.focus();
-            onSettled(true);
+            // A composer that cannot take focus (a disabled one, an archived chat) did not take it: the request is not consumed as done.
+            onSettled(document.activeElement === editor);
 
             return;
         }

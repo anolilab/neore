@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 
-import { hydrateSplitLayout, readSavedLayoutOrEmpty, survivingPaneAfterDelete, useSplitLayoutStore } from "./split-layout-store";
+import { hydrateSplitLayout, openThreadBesideFocusedPane, readSavedLayoutOrEmpty, survivingPaneAfterDelete, useSplitLayoutStore } from "./split-layout-store";
 
 const layoutOf = (panes: string[]) => {
     return { focus: 0, panes, sizes: {} };
@@ -100,6 +100,22 @@ describe("hydrateSplitLayout", () => {
         vi.spyOn(useSplitLayoutStore.persist, "rehydrate").mockResolvedValueOnce();
 
         await expect(hydrateSplitLayout()).rejects.toThrow("could not be read");
+    });
+});
+
+describe("a click a later one has overtaken", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it("changes no layout once it is overtaken while the saved layout is read", async () => {
+        vi.spyOn(useSplitLayoutStore.persist, "hasHydrated").mockReturnValue(true);
+        useSplitLayoutStore.setState({ layout: layoutOf(["a"]) });
+
+        const result = await openThreadBesideFocusedPane("b", undefined, () => false);
+
+        expect(result).toBe("superseded");
+        expect(useSplitLayoutStore.getState().layout.panes).toEqual(["a"]);
     });
 });
 

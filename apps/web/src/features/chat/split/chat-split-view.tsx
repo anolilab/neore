@@ -333,6 +333,9 @@ const ChatSplitView: FC<ChatSplitViewProps> = ({ headerSlot = null, initialMessa
     useEffect(
         () =>
             useSplitLayoutStore.persist.onFinishHydration(() => {
+                // The saved panes are checked as the initial load checks them: an invalid ID would otherwise occupy a slot.
+                dispatch({ isValid: (id) => isLunoraId(id), type: "prune" });
+
                 const route = routeRef.current;
 
                 if (route !== undefined) {

@@ -9,6 +9,7 @@ import type { ChatClick } from "./chat-open-place";
 import { chatOpenPlaceFor, readChatOpenPlace } from "./chat-open-place";
 import { isDesktopNow, useIsDesktop } from "./desktop-layout";
 import { requestComposerFocus } from "./focus-composer";
+import type { PaneOpenResult } from "./split-layout-store";
 import { openThreadBesideFocusedPane, showThreadInSplitView } from "./split-layout-store";
 
 /**
@@ -21,9 +22,9 @@ const openIntents = { latest: 0 };
 const isSplitViewOnNow = (): boolean => useUIStateStore.getState().preferences.splitViewEnabled === true;
 
 /** Shows the chat's pane. Resolves to whether it is shown: a saved layout that cannot be read leaves it hidden, and the route still opens the chat. */
-const showPaneQuietly = async (threadId: string): Promise<boolean> => {
+const showPaneQuietly = async (threadId: string, isLatest: () => boolean): Promise<boolean> => {
     try {
-        await showThreadInSplitView(threadId);
+        await showThreadInSplitView(threadId, isLatest);
 
         return true;
     } catch {
@@ -62,7 +63,7 @@ export const useOpenChatClick = (): ((threadId: string, click: ChatClick, origin
                     return;
                 }
 
-                const isShown = await showPaneQuietly(threadId);
+                const isShown = await showPaneQuietly(threadId, isLatest);
 
                 if (isShown && click.detail === 0 && isLatest()) {
                     requestComposerFocus(threadId);
@@ -86,10 +87,10 @@ export const useOpenChatClick = (): ((threadId: string, click: ChatClick, origin
 
             // Every pane taken, or the layout unreadable: the chat opens in the main view, where it always opened.
             const openBeside = async () => {
-                let result: "focused" | "full" | "opened" | undefined;
+                let result: PaneOpenResult | undefined;
 
                 try {
-                    result = await openThreadBesideFocusedPane(threadId, originThreadId);
+                    result = await openThreadBesideFocusedPane(threadId, originThreadId, isLatest);
                 } catch {
                     result = undefined;
                 }

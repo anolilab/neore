@@ -51,6 +51,7 @@ import { DEFAULT_PAGINATION_OPTS } from "@/features/chat/core/constants/query-op
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import type { ThreadLockMode } from "@/features/chat/lock/thread-lock-dialog";
 import { ThreadLockDialog } from "@/features/chat/lock/thread-lock-dialog";
+import type { PaneOpenResult } from "@/features/chat/split/split-layout-store";
 import { openThreadInSplitView, useSplitLayoutStore } from "@/features/chat/split/split-layout-store";
 import { useChatHasDraft } from "@/features/chat/split/use-chat-has-draft";
 import { THREAD_CATEGORY_LABELS } from "@/features/chat/tags/thread-categories";
@@ -284,7 +285,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     // On a page with no chat open there is no split view to add a pane to: the chat opens as the page's own, then.
     const handleOpenInSplitView = useCallback(() => {
         const open = async () => {
-            let result: "focused" | "full" | "opened" | undefined;
+            let result: PaneOpenResult | undefined;
 
             try {
                 result = await openThreadInSplitView(node.threadId);

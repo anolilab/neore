@@ -172,11 +172,17 @@ export const survivingPaneAfterDelete = async (
 export const routeIsOn = (threadIds: ReadonlyArray<string>): boolean => globalThis.location.pathname.split("/").some((part) => threadIds.includes(part));
 
 /** What opening a chat as a pane did: it was already open, it opened, or every pane is taken. */
-type PaneOpenResult = "focused" | "full" | "opened";
+/** What opening a chat as a pane did: it was already open, it opened, every pane is taken, or a later click has overtaken this one. */
+export type PaneOpenResult = "focused" | "full" | "opened" | "superseded";
 
 /** Dispatches one open action once the saved layout is in. */
-const openPane = async (threadId: string, type: "open" | "openBeside", after?: string): Promise<PaneOpenResult> => {
+const openPane = async (threadId: string, type: "open" | "openBeside", after: string | undefined, isCurrent: () => boolean): Promise<PaneOpenResult> => {
     await hydrateSplitLayout();
+
+    // A click a later one has overtaken changes nothing: the later click's pane is the one wanted.
+    if (!isCurrent()) {
+        return "superseded";
+    }
 
     const wasOpen = useSplitLayoutStore.getState().layout.panes.includes(threadId);
 
@@ -193,20 +199,23 @@ const openPane = async (threadId: string, type: "open" | "openBeside", after?: s
  * Opens a chat as a new pane at the end. `"focused"` when it was already open, `"full"` when every pane is taken (nothing changes).
  * Loads the saved layout first, so a click before the split view has mounted does not lose the panes saved earlier.
  */
-export const openThreadInSplitView = (threadId: string): Promise<PaneOpenResult> => openPane(threadId, "open");
+export const openThreadInSplitView = (threadId: string): Promise<PaneOpenResult> => openPane(threadId, "open", undefined, () => true);
 
 /**
  * Opens a chat as a pane right after `afterThreadId`'s pane, or after the focused one when that chat has no pane: the side panel a
  * sub-agent link opens. Same results as `openThreadInSplitView`.
  */
-export const openThreadBesideFocusedPane = (threadId: string, afterThreadId?: string): Promise<PaneOpenResult> =>
-    openPane(threadId, "openBeside", afterThreadId);
+export const openThreadBesideFocusedPane = (threadId: string, afterThreadId?: string, isCurrent: () => boolean = () => true): Promise<PaneOpenResult> =>
+    openPane(threadId, "openBeside", afterThreadId, isCurrent);
 
 /**
  * Shows a chat in the main view while the split view is on: focuses its pane, or puts it in place of the focused pane, as a route
  * change does. A route that already names the chat does not change, so the main view needs this to move focus to it.
  */
-export const showThreadInSplitView = async (threadId: string): Promise<void> => {
+export const showThreadInSplitView = async (threadId: string, isCurrent: () => boolean = () => true): Promise<void> => {
     await hydrateSplitLayout();
-    useSplitLayoutStore.getState().dispatch({ threadId, type: "show" });
+
+    if (isCurrent()) {
+        useSplitLayoutStore.getState().dispatch({ threadId, type: "show" });
+    }
 };
