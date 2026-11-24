@@ -18,8 +18,8 @@ export const LOCAL_REPEAT_MAX_BLOCK_LINES = 4;
 export const LOCAL_REPEAT_MIN_CHARS = 8;
 /** No token for this long, counted from the moment the server answers, ends the reply. A model that takes longer than this to produce its first token is stopped too: Continue asks again. */
 export const LOCAL_IDLE_TIMEOUT_MS = 120_000;
-/** Reasoning text past this many characters ends the reply. */
-export const LOCAL_REASONING_LIMIT_CHARS = 30_000;
+/** Reasoning text past this many characters ends the reply: a safety cap well above a long chain of thought (about 37k tokens), under the backend's 200k save limit. */
+export const LOCAL_REASONING_LIMIT_CHARS = 150_000;
 
 export type ReplyStopKind = "idle" | "reasoning-limit" | "repeat-loop";
 
