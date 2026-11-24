@@ -69,7 +69,8 @@ export const SelectionDisabled: Story = {
 export const BlockedItem: Story = {
     args: { items: [{ id: "x", nsfwStatus: "blocked", src: swatch("Hidden", "#000000"), type: "image" }, ...items.slice(0, 2)] },
     play: async ({ canvas }) => {
-        await expect(await canvas.findAllByRole("button", { name: /swatch/ })).toHaveLength(2);
+        // The preview buttons are named exactly "<alt>"; each save button is "Download <alt> (<n>)" and is not counted here.
+        await expect(await canvas.findAllByRole("button", { name: /^\w+ swatch$/ })).toHaveLength(2);
         await expect(canvas.getByText("Flagged")).toBeVisible();
     },
 };
