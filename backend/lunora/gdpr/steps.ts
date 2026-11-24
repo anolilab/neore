@@ -457,7 +457,7 @@ export const collectSharedPins = internalAction.input({ userId: v.string() }).ac
  */
 export const erasePinsOnOwnerShards = internalAction
     .input({ release: v.optional(v.boolean()), userId: v.string() })
-    .output(v.null())
+    .output(v.object({ routes: v.number() }))
     .action(async ({ args: { release, userId }, ctx: context }) => {
         const routes = await readAllPages(
             async (cursor) => await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, { cursor, userId }),
@@ -491,7 +491,8 @@ export const erasePinsOnOwnerShards = internalAction
             }
         }
 
-        return null;
+        // The route count tells the workflow whether a grace sweep is needed at all: no route means nothing was fenced or can be found.
+        return { routes: routes.length };
     });
 
 export const collectFiles = internalQuery

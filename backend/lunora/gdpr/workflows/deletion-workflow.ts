@@ -221,7 +221,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         }
 
         // The pins this user made on other owners' threads are removed from those owners' shards first: their routes are the only way to find them.
-        await context.step.do(
+        const firstSweep = (await context.step.do(
             "erase-pins-on-owner-shards",
             async () =>
                 await context.run(
@@ -229,21 +229,26 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     { userId: args.userId },
                     { dedupId: stepDedupId(scope, "erase-pins-on-owner-shards") },
                 ),
-        );
-        // A pin mutation can run longer than its lease, so a pin can commit after the sweep above. The owner shards are swept again after a
-        // grace period, before the routes go below: a late pin still has its route, since the route is written before the pin. This narrows
-        // the gap; it does not close it, since no wall-clock bound on a mutation is enforced.
-        await context.step.sleep("erase-pins-grace", "2 minutes");
-        await context.step.do(
-            "erase-pins-on-owner-shards-again",
-            async () =>
-                await context.run(
-                    internal.gdpr.steps.erasePinsOnOwnerShards,
-                    // The second sweep lifts the owner shards' fences: nothing after it can be refused a write it should keep.
-                    { release: true, userId: args.userId },
-                    { dedupId: stepDedupId(scope, "erase-pins-on-owner-shards-again") },
-                ),
-        );
+        )) as { routes: number };
+
+        // Only an account with shared-pin routes can have a pin on another owner's shard to find late. Without routes there is nothing to
+        // grace-sweep, so the two-minute wait is skipped: it made every deletion, including one with no shared pins, slower than the E2E budget.
+        if (firstSweep.routes > 0) {
+            // A pin mutation can run longer than its lease, so a pin can commit after the sweep above. The owner shards are swept again after a
+            // grace period, before the routes go below: a late pin still has its route, since the route is written before the pin. This narrows
+            // the gap; it does not close it, since no wall-clock bound on a mutation is enforced.
+            await context.step.sleep("erase-pins-grace", "2 minutes");
+            await context.step.do(
+                "erase-pins-on-owner-shards-again",
+                async () =>
+                    await context.run(
+                        internal.gdpr.steps.erasePinsOnOwnerShards,
+                        // The second sweep lifts the owner shards' fences: nothing after it can be refused a write it should keep.
+                        { release: true, userId: args.userId },
+                        { dedupId: stepDedupId(scope, "erase-pins-on-owner-shards-again") },
+                    ),
+            );
+        }
 
         await context.step.do(
             "delete-user-thread-metadata",
