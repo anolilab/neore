@@ -568,6 +568,21 @@ export const runShardTick = internalMutation
         const retentionDue = retention.failed || (retention.at !== undefined && retention.at !== NO_RETENTION_DUE && retention.at <= ctx.now);
         // Not yet due: the time is a wake of its own, so the shard is not left with none once this tick's other work is done.
         const retentionLater = !retentionDue && retention.at !== undefined && retention.at !== NO_RETENTION_DUE ? retention.at : undefined;
+
+        // The Events log's expired rows (`public-api/events.ts`), pruned before the retention sweep sets the shard's time, so that time
+        // counts only what is left. A dormant shard gets no housekeeping visit, so its expired events expire here, with its other rows.
+        if (retentionDue) {
+            await bestEffort("pruneMcpEvents", async () => {
+                for (let round = 0; round < MCP_EVENT_PRUNE_ROUNDS; round += 1) {
+                    const { hasMore } = await ctx.runMutation(internal.public_api.events.pruneMcpEvents, {});
+
+                    if (!hasMore) {
+                        break;
+                    }
+                }
+            });
+        }
+
         const pruned = retentionDue
             ? await bestEffort("pruneRetainedActivity", async () => {
                   await ctx.runMutation(internal.gdpr.retention.pruneRetainedActivity, {});
