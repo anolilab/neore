@@ -89,6 +89,12 @@ export const CHAT_FILE_NAME_MAX = 512;
 export const CHAT_FILE_TYPE_MAX = 255;
 
 /**
+ * Messages read per query when looking for their files. A message row is read whole (there is no index on `fileIds`), and a message can
+ * be large, so the page is small: each query stays well inside the export action's read budget.
+ */
+export const CHAT_FILE_MESSAGE_PAGE = 20;
+
+/**
  * One page of the ids of the files the user holds a grant for (`chatFileAccess`): their uploads and generated images. The grant is
  * what makes a file theirs; the row itself is shared by content and has no owner. The caller walks it to its end.
  *
@@ -156,7 +162,7 @@ export const collectMessageFileIdsForExport = internalQuery
         const page = await ctx.db
             .query("messages")
             .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
-            .paginate({ cursor: cursor ?? null, numItems: CHAT_FILE_EXPORT_PAGE });
+            .paginate({ cursor: cursor ?? null, numItems: CHAT_FILE_MESSAGE_PAGE });
 
         return {
             cursor: page.isDone ? null : page.continueCursor,
