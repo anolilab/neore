@@ -589,3 +589,56 @@ describe("github driver: bounds", () => {
         expect(calls.filter((call) => call.path === "/search/issues")).toHaveLength(2);
     });
 });
+
+describe("github driver: comparing a head with its base", () => {
+    const COMPARE = `/repos/octo/hello/compare/main...${SHA}`;
+
+    it.each([
+        [0, false],
+        [3, true],
+    ])("reads behind_by %d from the host's comparison of the base branch with the head commit", async (behindBy, behind) => {
+        const { calls, request } = fakeHost({
+            [COMPARE]: () => {
+                return { ahead_by: 2, behind_by: behindBy, status: behind ? "diverged" : "ahead" };
+            },
+        });
+        const comparison = await githubDriver.compareWithBase(request, REF, "main", SHA);
+
+        expect(comparison).toEqual({ aheadBy: 2, behindBy });
+        expect(comparison.behindBy > 0).toBe(behind);
+        // Only the counts are read: one commit per page.
+        expect(calls).toEqual([{ path: COMPARE, query: { per_page: 1 } }]);
+    });
+
+    it("compares a fork's head by its commit in the base repository, never by the fork's branch name", async () => {
+        const { calls, request } = fakeHost({
+            [COMPARE]: () => {
+                return { ahead_by: 1, behind_by: 4 };
+            },
+        });
+
+        await expect(githubDriver.compareWithBase(request, REF, "main", SHA)).resolves.toEqual({ aheadBy: 1, behindBy: 4 });
+        expect(calls.map((call) => call.path)).toEqual([COMPARE]);
+    });
+
+    it("encodes each part of a base branch with slashes", async () => {
+        const path = `/repos/octo/hello/compare/release/2%2B1...${SHA}`;
+        const { request } = fakeHost({
+            [path]: () => {
+                return { ahead_by: 0, behind_by: 1 };
+            },
+        });
+
+        await expect(githubDriver.compareWithBase(request, REF, "release/2+1", SHA)).resolves.toEqual({ aheadBy: 0, behindBy: 1 });
+    });
+
+    it.each([
+        ["a head that is not a commit id", "main", "feat/x"],
+        ["a base that could leave its path", "../main", SHA],
+    ])("asks nothing for %s", async (_case, base, head) => {
+        const { calls, request } = fakeHost({});
+
+        await expect(githubDriver.compareWithBase(request, REF, base, head)).rejects.toBeInstanceOf(HostApiError);
+        expect(calls).toEqual([]);
+    });
+});

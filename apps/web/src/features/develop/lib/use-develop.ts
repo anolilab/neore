@@ -125,6 +125,27 @@ export const usePullRequestChecks = (address: PullRequestAddress | undefined, he
     });
 };
 
+/**
+ * How far a pull request's head commit is behind its base branch, from the host comparing the two. Keyed by the base branch
+ * and the head commit, so a push or a retarget reads again instead of answering from another revision's cache.
+ */
+export const useBranchComparison = (address: PullRequestAddress | undefined, revision: { baseBranch: string; headSha: string } | undefined) => {
+    const client = useLunora();
+    const userId = useDevelopUser();
+    const options = createLunoraActionQueryOptions(client, api.source_control.functions.getBranchComparison, {
+        ...(address as PullRequestAddress),
+        ...(revision as { baseBranch: string; headSha: string }),
+    });
+
+    return useQuery({
+        ...READ,
+        ...options,
+        enabled: address !== undefined && revision !== undefined && userId !== undefined,
+        queryKey: [DEVELOP_QUERY_ROOT, userId, "compare", address, revision?.baseBranch, revision?.headSha],
+        staleTime: MINUTE_MS,
+    });
+};
+
 /** When each status read first answered "unknown" in a row; a known answer ends the row, so a later push starts a new one. */
 const mergeUnknownSince = new WeakMap<object, number>();
 

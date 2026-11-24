@@ -10,6 +10,7 @@
 import type { HostKind } from "./identity";
 import type { HostRequest } from "./origin-fetch";
 import type {
+    BranchComparison,
     CheckLog,
     CheckSummary,
     CommitPage,
@@ -58,6 +59,11 @@ export interface HostDriver {
      * `pullRequest.create` reads as unsupported.
      */
     createPullRequest?: (request: HostRequest, input: CreatePullRequestInput) => Promise<CreatedPullRequest>;
+    /**
+     * Compares the head commit `headSha` with the base branch `baseBranch` of the pull request's repository. By the commit,
+     * not the head's branch name: a fork's branch is not in this repository, its commit is in the host's network.
+     */
+    compareWithBase: (request: HostRequest, ref: PullRequestRef, baseBranch: string, headSha: string) => Promise<BranchComparison>;
     /** Changes the title and/or description; a field left out stays as it is. */
     editPullRequest: (request: HostRequest, ref: PullRequestRef, edit: PullRequestEdit) => Promise<void>;
     /**

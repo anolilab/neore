@@ -17,6 +17,7 @@ import { HostApiError } from "../origin-fetch";
 import type { HostRequest } from "../origin-fetch";
 import { discard, parse, readJson } from "../response";
 import type {
+    BranchComparison,
     CheckLog,
     CheckRun,
     CheckState,
@@ -1009,6 +1010,24 @@ const branchPath = (branch: string): string | undefined => {
     }
 };
 
+const comparisonSchema = z.object({ ahead_by: z.int().nonnegative(), behind_by: z.int().nonnegative() });
+
+/**
+ * `GET /repos/{o}/{r}/compare/{base}...{sha}`: the head by its commit, which the host finds in a fork too (a fork shares the
+ * base repository's network). One commit per page: only the counts are read.
+ */
+const compareWithBase = async (request: HostRequest, ref: PullRequestRef, baseBranch: string, headSha: string): Promise<BranchComparison> => {
+    const base = branchPath(baseBranch);
+
+    if (base === undefined || !SHA.test(headSha)) {
+        throw new HostApiError("Not a branch and commit to compare", 404);
+    }
+
+    const comparison = parse(comparisonSchema, await readJson(await request(`${repoPath(ref)}/compare/${base}...${headSha}`, { query: { per_page: 1 } })));
+
+    return { aheadBy: comparison.ahead_by, behindBy: comparison.behind_by };
+};
+
 const createdPullRequestSchema = z.object({ html_url: z.string().nullable().optional(), number: z.int().positive() });
 
 /**
@@ -1737,6 +1756,7 @@ const revertPullRequest = async (request: HostRequest, ref: PullRequestRef, reve
 
 export const githubDriver: HostDriver = {
     apiOrigin: GITHUB_API_ORIGIN,
+    compareWithBase,
     createPullRequest,
     editPullRequest,
     findOpenPullRequest,

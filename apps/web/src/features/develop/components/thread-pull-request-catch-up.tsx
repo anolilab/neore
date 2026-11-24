@@ -8,20 +8,20 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { prefillComposer, useComposerTakesPrefill } from "@/features/chat/thread/composer-prefill";
 
 import { catchUpPrompt, catchUpRunId, hostOfPullRequestUrl, isPlainBranchName, isPlainRepo } from "../lib/catch-up-prompt";
-import { usePullRequest } from "../lib/use-develop";
+import { useBranchComparison, usePullRequest } from "../lib/use-develop";
 
 /**
  * Shows "Behind <base>" and a Catch up button beside an open linked pull request whose branch is behind its base. The button puts a
- * rebase prompt in this thread's composer and sends nothing. Reads only the pull request, the same cached query as Develop: its
- * state, base, head and the host's mergeability (`mergeState`) all come from that one host response, so they always describe
- * the same revision and no second read is made. Shows only when the host's overall state is `behind`: the host gives one state,
- * and a pull request it reports as blocked or unstable gets no Catch up even when its branch is also behind. Shows nothing while
- * there is no answer, on a failure (a failed refresh too: a cached "behind" is not known to hold), or once the pull request is
- * merged or closed; a draft is not offered Catch up (the host reports a draft as `draft`, never `behind`). A background refresh
- * that has not failed keeps it, so it does not flicker. While it shows, the end of an agent turn in this thread reads the pull
- * request again: that turn may have pushed the caught-up branch. Nor for a branch name that is not plain enough to put in a
- * command. Whether the prompt pushes is the host's word on the head's repository, never a guess from names or commits: a
- * fork's branch is not pushed.
+ * rebase prompt in this thread's composer and sends nothing. Behind is the host's COMPARISON of the head commit with the base
+ * branch (`behindBy > 0`), not its mergeability: that says `behind` only where branch protection asks for an up-to-date branch, so a
+ * blocked, unstable or clean pull request may be behind too. The comparison is read only for an open, non-draft pull request
+ * whose read answered, is keyed by its base branch and head commit, and counts only when it names that same branch and commit:
+ * a push or a retarget reads again. Shows nothing while either read has no answer, on a failure (a failed refresh too: a cached
+ * "behind" is not known to hold), or once the pull request is merged or closed. A background refresh that has not failed keeps
+ * it, so it does not flicker. While it shows, the end of an agent turn in this thread reads the pull request and the comparison
+ * again: that turn may have pushed the caught-up branch. Nor for a branch name that is not plain enough to put in a command.
+ * Whether the prompt pushes is the host's word on the head's repository, never a guess from names or commits: a fork's branch
+ * is not pushed.
  */
 const CatchUpControl = ({ isRunning, link, threadId }: { isRunning: boolean; link: { number: number; repository: string }; threadId: string }) => {
     const { t } = useLingui();
@@ -30,11 +30,25 @@ const CatchUpControl = ({ isRunning, link, threadId }: { isRunning: boolean; lin
     const address = { number: link.number, repository: link.repository };
     const pull = usePullRequest(address);
     const detail = pull.data?.status === "ok" ? pull.data.detail : undefined;
-    const behind = detail?.state === "open" && !detail.draft && detail.mergeState === "behind";
+    const open = detail?.state === "open" && !detail.draft;
+    const comparison = useBranchComparison(address, open ? { baseBranch: detail.baseBranch, headSha: detail.headSha } : undefined);
+    const compared = comparison.data?.status === "ok" ? comparison.data : undefined;
+    const behind =
+        open &&
+        !comparison.isError &&
+        compared !== undefined &&
+        compared.baseBranch === detail.baseBranch &&
+        compared.headSha === detail.headSha &&
+        compared.behindBy > 0;
     const reread = useEffectEvent(() => {
-        if (behind) {
-            void pull.refetch();
+        if (!behind) {
+            return;
         }
+
+        void pull.refetch();
+        // The same head after the turn keeps the same key: the base may have moved, so this reads it again too. A new head is a
+        // new key, read once the pull request answers with it.
+        void comparison.refetch();
     });
     const wasRunning = useRef(isRunning);
 

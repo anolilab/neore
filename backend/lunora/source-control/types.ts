@@ -163,6 +163,17 @@ export const MERGE_METHODS = ["merge", "squash", "rebase"] as const;
 
 export type MergeMethod = (typeof MERGE_METHODS)[number];
 
+/**
+ * How a pull request's head commit compares with its base branch, from the host comparing the two (not the host's
+ * mergeability, which says `behind` only where branch protection asks for an up-to-date branch).
+ */
+export interface BranchComparison {
+    /** Commits on the head that the base does not have. */
+    aheadBy: number;
+    /** Commits on the base that the head does not have: above 0, the branch is behind. */
+    behindBy: number;
+}
+
 /** What the host says of the change's mergeability; the host's rules, not ours, decide at merge time. */
 export type MergeState = "behind" | "blocked" | "clean" | "conflicting" | "draft" | "unknown" | "unstable";
 

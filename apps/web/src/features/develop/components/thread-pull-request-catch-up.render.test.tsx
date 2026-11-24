@@ -1,6 +1,7 @@
 /**
- * The Catch up control shows only for an open linked pull request the host reports as behind its base, on the pull request's
- * own read (no second host read), and fills the thread's composer without sending.
+ * The Catch up control shows only for an open linked pull request whose head commit the host's comparison puts behind its base
+ * branch (whatever the host's mergeability says), for the revision the pull request's read shows, and fills the thread's
+ * composer without sending.
  */
 
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -9,8 +10,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ThreadPullRequestCatchUp from "./thread-pull-request-catch-up";
 
-const { composer, prefill, pull, reads, refetch } = vi.hoisted(() => {
+const { compare, compareRefetch, compared, composer, prefill, pull, reads, refetch } = vi.hoisted(() => {
     return {
+        compare: {
+            current: {} as {
+                data?: { aheadBy?: number; baseBranch?: string; behindBy?: number; headSha?: string; status: string };
+                isError?: boolean;
+            },
+        },
+        compareRefetch: vi.fn(async () => {}),
+        compared: vi.fn(),
         composer: { takes: true },
         prefill: vi.fn(),
         reads: vi.fn(),
@@ -61,9 +70,14 @@ vi.mock("@/features/chat/thread/composer-prefill", () => {
     return { prefillComposer: prefill, useComposerTakesPrefill: () => composer.takes };
 });
 
-// The only host read the control makes; a mergeability read would fail here, as `use-merge` is not reachable.
+// The control's two host reads; a mergeability read would fail here, as `use-merge` is not reachable.
 vi.mock("../lib/use-develop", () => {
     return {
+        useBranchComparison: (_address: unknown, revision: unknown) => {
+            compared(revision);
+
+            return { ...compare.current, refetch: compareRefetch };
+        },
         usePullRequest: () => {
             reads();
 
@@ -82,8 +96,18 @@ vi.mock("../lib/use-merge", () => {
 
 const BUTTON = { name: "Catch up octo/hello#7 with main" };
 
-/** `head` is what the host said of the head's repository: the same as the base unless a case says otherwise. */
+/** The host's comparison of the head commit with the base branch, for the revision `given` shows unless a case says otherwise. */
+const comparedAs = (behindBy: number, revision: { baseBranch?: string; headSha?: string } = {}) => {
+    compare.current = { data: { aheadBy: 1, baseBranch: "main", behindBy, headSha: "abc123", status: "ok", ...revision } };
+};
+
+/**
+ * `head` is what the host said of the head's repository: the same as the base unless a case says otherwise. `mergeState` is the
+ * host's mergeability, which Catch up does not read: "behind" there is how a repository that asks for up-to-date branches says
+ * it, and the comparison is set to match unless a case sets its own.
+ */
 const given = (state: string, mergeState: string | undefined, headBranch = "feat/x", head?: { draft?: boolean; headInBaseRepository?: boolean }) => {
+    comparedAs(mergeState === "behind" ? 2 : 0);
     pull.current = {
         data: {
             detail: {
@@ -109,6 +133,8 @@ describe("ThreadPullRequestCatchUp", () => {
         prefill.mockReset();
         reads.mockClear();
         refetch.mockClear();
+        compareRefetch.mockClear();
+        compared.mockClear();
         composer.takes = true;
     });
 
@@ -164,27 +190,58 @@ describe("ThreadPullRequestCatchUp", () => {
         expect(taken[0]).toMatch(REBASE_ON_RUN_BASE);
     });
 
-    it.each([
-        ["merged", "behind"],
-        ["closed", "behind"],
-        ["open", "clean"],
-        ["open", "conflicting"],
-        ["open", "unknown"],
-        ["open", undefined],
-    ])("shows nothing for a %s pull request the host reports as %s", (state, mergeState) => {
-        given(state, mergeState);
+    it.each(["clean", "blocked", "unstable", "unknown", undefined])(
+        "shows Catch up for an open pull request the host's mergeability reports as %s when the comparison puts it behind",
+        (mergeState) => {
+            given("open", mergeState);
+            comparedAs(3);
+            render(control());
+
+            expect(screen.getByText("Behind main")).toBeTruthy();
+            expect(screen.getByRole("button", BUTTON)).toBeTruthy();
+            expect(compared).toHaveBeenCalledWith({ baseBranch: "main", headSha: "abc123" });
+        },
+    );
+
+    it.each(["behind", "clean", "conflicting"])("shows nothing when the comparison is 0 commits behind, even when the host reports %s", (mergeState) => {
+        given("open", mergeState);
+        comparedAs(0);
         render(control());
 
         expect(screen.queryByRole("button", BUTTON)).toBeNull();
         expect(screen.queryByText("Behind main")).toBeNull();
     });
 
-    it("shows nothing for an open draft", () => {
+    it.each(["merged", "closed"])("shows nothing for a %s pull request and compares nothing", (state) => {
+        given(state, "behind");
+        render(control());
+
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
+        expect(compared).toHaveBeenLastCalledWith(undefined);
+    });
+
+    it.each([
+        ["no answer yet", {}],
+        ["a failed comparison", { isError: true }],
+        ["a comparison the host refused", { data: { status: "not_found" } }],
+        ["a comparison of another head commit", { data: { baseBranch: "main", behindBy: 2, headSha: "def456", status: "ok" } }],
+        ["a comparison with another base branch", { data: { baseBranch: "develop", behindBy: 2, headSha: "abc123", status: "ok" } }],
+    ])("shows nothing on %s", (_case, state) => {
+        given("open", "behind");
+        compare.current = state;
+        render(control());
+
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
+        expect(screen.queryByText("Behind main")).toBeNull();
+    });
+
+    it("shows nothing for an open draft and compares nothing", () => {
         given("open", "behind", "feat/x", { draft: true, headInBaseRepository: true });
         render(control());
 
         expect(screen.queryByRole("button", BUTTON)).toBeNull();
         expect(screen.queryByText("Behind main")).toBeNull();
+        expect(compared).toHaveBeenLastCalledWith(undefined);
     });
 
     it("hides a cached open and behind state once a read of the pull request failed", () => {
@@ -216,6 +273,7 @@ describe("ThreadPullRequestCatchUp", () => {
         view.rerender(control(false));
 
         expect(refetch).toHaveBeenCalledTimes(1);
+        expect(compareRefetch).toHaveBeenCalledTimes(1);
 
         // The host's answer after the push.
         given("open", "clean");
@@ -233,6 +291,7 @@ describe("ThreadPullRequestCatchUp", () => {
         view.rerender(control(false));
 
         expect(refetch).not.toHaveBeenCalled();
+        expect(compareRefetch).not.toHaveBeenCalled();
     });
 
     it("shows nothing for a branch name that could shape the prompt", () => {
