@@ -12,6 +12,8 @@ import { omit } from "../../lib/collections";
 
 // Embedding fields definition
 const embeddings = {
+    // Set on thread title/summary vectors only (`agent/thread-search.ts`): a Vectorize metadata field on `embeddings_1024`.
+    archived: v.optional(v.boolean()),
     model: v.string(),
     // `model|table|threadId` / `model|table|userId`: ONE string each, because a
     // Vectorize metadata filter matches a string, number or boolean — never an
