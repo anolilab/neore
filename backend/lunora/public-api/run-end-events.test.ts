@@ -5,6 +5,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { closeGroupTurnStream } from "../chat/group/run";
 import { addChunk } from "../chat/streaming/persistent/library";
 import schema from "../schema";
 import { pruneMcpEvents } from "./events";
@@ -137,5 +138,48 @@ describe("retention of the Events log", () => {
         const events = await eventsOf();
 
         expect(events.map((event) => event.eventId)).toStrictEqual(["run:recent"]);
+    });
+});
+
+describe("a group turn's end in the Events log", () => {
+    // The harness runs function references, not the `internal.*` reference the group runner passes. `closeGroupTurnStream` calls only
+    // `addChunk`, so the wrapper runs that function with the same args.
+    const groupEnd = async (): Promise<void> =>
+        await harness.run(
+            async (ctx: any) =>
+                await closeGroupTurnStream({ runMutation: async (_ref: unknown, args: unknown) => await ctx.runMutation(addChunk, args) } as never, {
+                    streamId,
+                }),
+        );
+
+    it("writes one run.completed when the group turn finishes normally", async () => {
+        await groupEnd();
+
+        const events = await eventsOf();
+
+        expect(events).toHaveLength(1);
+        expect(events[0]).toMatchObject({ eventId: `run:${streamId}`, name: "run.completed", seq: 1, userId: OWNER });
+        expect(JSON.parse(events[0]!.data)).toMatchObject({ outcome: "succeeded", threadId });
+    });
+
+    it("closes with the succeeded final chunk the repeated-call guard's turn also closes with", async () => {
+        // The guard ends a speaker's reply, then the turn breaks out of the speaker loop into the same closing call, so one chunk is what it writes.
+        const chunks: unknown[] = [];
+        const recording = {
+            runMutation: async (_ref: unknown, args: unknown) => {
+                chunks.push(args);
+            },
+        };
+
+        await closeGroupTurnStream(recording as never, { streamId });
+
+        expect(chunks).toStrictEqual([{ final: true, runEnd: "succeeded", streamId, text: "" }]);
+    });
+
+    it("writes one run.completed when the closing chunk is redelivered, because the stream refuses the second end", async () => {
+        await groupEnd();
+        await expect(groupEnd()).rejects.toThrow();
+
+        expect(await eventsOf()).toHaveLength(1);
     });
 });

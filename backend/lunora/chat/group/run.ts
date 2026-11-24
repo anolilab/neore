@@ -649,12 +649,7 @@ const runQueue = async (
 
     // Every way past the speaker loop that is not a pause or a stop lands here, the repeated-call guard's included: the turn
     // succeeded, so its end is recorded in the Events log by the chunk that closes the stream.
-    await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
-        final: true,
-        runEnd: "succeeded",
-        streamId: turn.streamId as Id<"persistentStreams">,
-        text: "",
-    });
+    await closeGroupTurnStream(ctx, turn);
 
     await setThreadStatus(ctx, turn.threadId, "active", { replied: true });
     // The turn is over for good (a pause or a stop returned before this): its saved references go with it.
@@ -741,6 +736,19 @@ const loadTurnContext = async (
         userId,
         userProviderKeys: runContext.userProviderKeys,
     };
+};
+
+/**
+ * The chunk that closes a group turn which finished, normally or by the repeated-call guard. It is the only write that records
+ * the turn's end in the Events log (`run.completed`). A paused or stopped turn returns before this is called, so it writes nothing.
+ */
+export const closeGroupTurnStream = async (ctx: Pick<ActionCtx, "runMutation">, turn: Pick<TurnContext, "streamId">): Promise<void> => {
+    await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
+        final: true,
+        runEnd: "succeeded",
+        streamId: turn.streamId as Id<"persistentStreams">,
+        text: "",
+    });
 };
 
 /**
