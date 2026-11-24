@@ -572,6 +572,32 @@ describe("runStreamingAgent: a reply that spends its step cap", () => {
         expect(state.streamStatus).toBe("done");
     }, 20_000);
 
+    it("leaves no failed row of its own when the wrap-up call is rejected, and the reply stands", async () => {
+        const steps = probeSteps(CAP);
+        let calls = 0;
+
+        modelState.model = new MockLanguageModelV3({
+            doStream: async () => {
+                calls += 1;
+
+                if (calls <= CAP) {
+                    return { stream: simulateReadableStream({ chunkDelayInMs: null, chunks: steps[calls - 1]!, initialDelayInMs: null }) };
+                }
+
+                throw new Error("provider rejected the tool-less call");
+            },
+        });
+
+        await run();
+
+        const state = await readState();
+
+        expect(calls).toBe(CAP + 1);
+        expect(state.replies.filter((row: { status?: string }) => row.status === "failed")).toHaveLength(0);
+        expect(state.streamStatus).toBe("done");
+        expect(state.threadStatus).toBe("active");
+    });
+
     it("makes no wrap-up call when the reply finishes in text before the cap", async () => {
         modelState.model = scriptedModel([probeSteps(1)[0]!, textStep("Done, after one probe.")]);
 

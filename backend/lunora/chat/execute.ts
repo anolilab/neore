@@ -198,6 +198,8 @@ export const runStreamingAgent = internalAction
             let stampSavedCalls: (() => Promise<void>) | undefined;
             // The rows of the wrap-up written when the reply spent its step cap (`lib/cap-wrap-up.ts`): usage counts them with the reply.
             let wrapUpRows: typeof priorRows = [];
+            // The wrap-up call once it has started: its own placeholder row and abort hook, settled on every exit (`finally`).
+            let wrapUpCall: { getPendingMessageId: () => string | undefined; settleAbort: () => Promise<void> } | undefined;
             // Aborted when a newer run took the stream (`onReplaced`) or a sidebar stop ends this one.
             const stopping = new AbortController();
             let beat: ReturnType<typeof setInterval> | undefined;
@@ -931,16 +933,25 @@ export const runStreamingAgent = internalAction
                         }
                     }, STOP_POLL_MS);
 
+                    let wrapUpPlaceholderId: string | undefined;
+
                     try {
+                        // Sized for the call as it is: no tools, so the backup model and compression are chosen for a tool-less call.
+                        const wrapUpArgs: any = buildRunStreamArgs({
+                            backupModelId,
+                            hasTools: false,
+                            model,
+                            reasoningEffort: threadReasoningEffort,
+                            shouldAutoContinue: isAutoContinue,
+                        });
                         const wrapUp = await threadObject.streamText(
                             {
-                                ...streamTextArgs,
+                                ...wrapUpArgs,
                                 abortSignal: AbortSignal.any([stopping.signal, wrapUpStop.signal]),
-                                // No tool can be called: the model is told so, and the call offers none.
-                                onStepFinish: undefined,
                                 promptMessageId: lastSavedRowId,
                                 stopWhen: stopWhenStopped(ctx, streamId, 1),
                                 system: [streamTextArgs.system ?? agent.options.instructions, CAP_WRAP_UP_INSTRUCTION].filter(Boolean).join("\n\n"),
+                                // No tool can be called: the model is told so, and the call offers none.
                                 toolChoice: "none",
                                 tools: {},
                             },
@@ -951,6 +962,10 @@ export const runStreamingAgent = internalAction
                                 takeSteer: steering.takeSteer,
                             },
                         );
+
+                        wrapUpCall = wrapUp;
+                        // Read now: the agent clears this id once the call's row is marked failed, so a failed call cannot read it later.
+                        wrapUpPlaceholderId = wrapUp.getPendingMessageId();
 
                         await wrapUp.consumeStream();
                         wrapUpRows = wrapUp.savedMessages ?? [];
@@ -967,6 +982,22 @@ export const runStreamingAgent = internalAction
                         }
                     } finally {
                         clearInterval(watchForStop);
+                    }
+
+                    // The call's own row, if it is still an empty placeholder, goes: a call rejected inside the stream (not thrown) is
+                    // marked failed, and its error would otherwise show beside the reply's answer. A successful call filled its row,
+                    // so nothing is removed. Settled first, so the agent has marked the row; best effort, never failing the reply.
+                    await wrapUpCall?.settleAbort().catch(() => undefined);
+
+                    if (wrapUpPlaceholderId !== undefined && !replaced) {
+                        await ctx
+                            .runMutation(internal.chat.streaming.persistent.library.removeWrapUpPlaceholder, {
+                                placeholderId: wrapUpPlaceholderId,
+                                threadId: threadId as Id<"threads">,
+                            })
+                            .catch((cleanupError: unknown) => {
+                                streamLogger.warn(`[BgAgent] Stream ${streamId}: could not remove the wrap-up's own row:`, cleanupError);
+                            });
                     }
                 }
 
@@ -1126,6 +1157,8 @@ export const runStreamingAgent = internalAction
                 }
             } finally {
                 clearInterval(beat);
+                // The wrap-up call, if one started, is settled too: a replaced or failed wrap-up never outlives the run.
+                await wrapUpCall?.settleAbort().catch(() => undefined);
                 await closeMCPClientsThenSettle(mcpClients, settleAbort);
             }
         },
