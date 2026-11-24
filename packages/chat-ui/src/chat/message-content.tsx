@@ -78,6 +78,23 @@ const IMAGE_GENERATING_MARKER = "__IMAGE_GENERATING__";
 const VIDEO_GENERATING_MARKER = "__VIDEO_GENERATING__";
 const AUDIO_GENERATING_MARKER = "__AUDIO_GENERATING__";
 
+/**
+ * The error kinds older builds saved for a local reply in place of a sentence (`unreachable`, `stream`). Matched exactly: a server
+ * message that merely looks like a code is shown as written.
+ */
+const LEGACY_LOCAL_ERROR_CODES: ReadonlySet<string> = new Set([
+    "aborted",
+    "cors",
+    "http",
+    "mixed-content",
+    "not-found",
+    "permission-denied",
+    "stream",
+    "timeout",
+    "unknown",
+    "unreachable",
+]);
+
 /** Where an image sits in its message, so an `Image` override can act on that one image (pin it, open it). */
 export interface ImagePlace {
     /** The image's place among the message's images (`utils/image-ordinals.ts`), which a reply edit leaves as it is. */
@@ -1243,27 +1260,36 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
         renderedParts.unshift(<SourceGroup key={`${message.id}-sources`} sources={sourceParts} />);
     }
 
-    // If no parts rendered, show placeholder for streaming or error for failed
-    if (renderedParts.length === 0) {
-        if (isAnimating) {
-            renderedParts.push(
-                <span className="text-muted-foreground animate-pulse" key="loading">
-                    {t`Thinking...`}
-                </span>,
-            );
-        } else if (message.status === "failed") {
-            const errorMessage = message.error || t`An error occurred while generating the response.`;
+    // A placeholder while nothing has rendered yet
+    if (renderedParts.length === 0 && isAnimating) {
+        renderedParts.push(
+            <span className="text-muted-foreground animate-pulse" key="loading">
+                {t`Thinking...`}
+            </span>,
+        );
+    }
 
-            renderedParts.push(
-                <div
-                    className="mb-2 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300"
-                    key="error"
-                >
-                    <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                    <span>{errorMessage}</span>
-                </div>,
-            );
-        }
+    // A failed reply with text shows its cause beside the partial reply, but only for a local reply: a gateway failure already
+    // shows its error in the chat banner, so repeating it in the thread would show it twice.
+    const isLocalReply = message.localReply === true;
+
+    if (message.status === "failed" && !isAnimating && (renderedParts.length === 0 || isLocalReply)) {
+        // An error that is only an old kind code (`unreachable`) is what older builds saved for a local reply: never show the code.
+        // A gateway failure keeps the error it saved, as before.
+        const errorMessage =
+            message.error && !(isLocalReply && LEGACY_LOCAL_ERROR_CODES.has(message.error))
+                ? message.error
+                : t`An error occurred while generating the response.`;
+
+        renderedParts.push(
+            <div
+                className="mb-2 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300"
+                key="error"
+            >
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <span>{errorMessage}</span>
+            </div>,
+        );
     }
 
     const containerRef = useRef<HTMLDivElement>(null);

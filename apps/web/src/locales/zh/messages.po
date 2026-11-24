@@ -3324,7 +3324,7 @@ msgstr "AI 视频生成"
 msgid "AI-assisted bug triage with full recording context"
 msgstr "借助完整录制上下文进行 AI 辅助的缺陷分诊"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:417
+#: ../../packages/chat-ui/src/chat/message-content.tsx:434
 msgid "AI-generated"
 msgstr "AI生成"
 
@@ -3812,7 +3812,7 @@ msgstr "附加的图片未被接受。请移除它，或附加 PNG、JPEG、WebP
 msgid "An Encrypt Key is required: Feishu only signs events when one is set, and unsigned events are refused."
 msgstr "需要 Encrypt Key：只有设置了它，Feishu 才会对事件签名，未签名的事件会被拒绝。"
 
-#: src/features/chat/thread/chat-error.tsx:49
+#: src/features/chat/thread/chat-error.tsx:57
 msgid "An error occurred"
 msgstr "发生错误"
 
@@ -3820,7 +3820,7 @@ msgstr "发生错误"
 msgid "An error occurred during One Tap sign in"
 msgstr "One Tap 登录时出错"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1255
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1282
 msgid "An error occurred while generating the response."
 msgstr "生成回复时发生错误。"
 
@@ -4580,7 +4580,7 @@ msgstr "助手（无技能）"
 msgid "Assistant replied:"
 msgstr "助手回复："
 
-#: src/features/chat/thread/message-item.tsx:209
+#: src/features/chat/thread/message-item.tsx:210
 #: src/features/chat/thread/streaming-placeholder.tsx:763
 #: src/features/chat/thread/streaming-placeholder.tsx:804
 msgid "Assistant Reply:"
@@ -5616,13 +5616,13 @@ msgstr "浏览并恢复工作流的历史版本。"
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "浏览、复刻并改编社区分享的工作流"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:807
+#: ../../packages/chat-ui/src/chat/message-content.tsx:824
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1028
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1205
 msgid "Browser"
 msgstr "浏览器"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:830
+#: ../../packages/chat-ui/src/chat/message-content.tsx:847
 msgid "Browser action failed"
 msgstr "浏览器操作失败"
 
@@ -5638,7 +5638,7 @@ msgstr "浏览器点击设置已更新"
 msgid "Browser Clicks"
 msgstr "浏览器点击"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:828
+#: ../../packages/chat-ui/src/chat/message-content.tsx:845
 msgid "Browser error"
 msgstr "浏览器错误"
 
@@ -5647,7 +5647,7 @@ msgid "Browser notes"
 msgstr "浏览器说明"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:262
-#: ../../packages/chat-ui/src/chat/message-content.tsx:785
+#: ../../packages/chat-ui/src/chat/message-content.tsx:802
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:72
 msgid "Browser screenshot"
 msgstr "浏览器截图"
@@ -5656,7 +5656,7 @@ msgstr "浏览器截图"
 msgid "Browser Session"
 msgstr "浏览器会话"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:734
+#: ../../packages/chat-ui/src/chat/message-content.tsx:751
 msgid "Browser working..."
 msgstr "浏览器运行中..."
 
@@ -6591,7 +6591,7 @@ msgstr "检查中"
 msgid "Checking code, a draft or a plan for mistakes."
 msgstr "检查代码、草稿或计划中的错误。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:434
+#: ../../packages/chat-ui/src/chat/message-content.tsx:451
 msgid "Checking image safety..."
 msgstr "正在检查图片安全性..."
 
@@ -7014,7 +7014,7 @@ msgstr "点击编辑"
 msgid "Click to edit..."
 msgstr "点击编辑..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:726
+#: ../../packages/chat-ui/src/chat/message-content.tsx:743
 msgid "Clicking element..."
 msgstr "正在点击元素..."
 
@@ -7174,7 +7174,7 @@ msgstr "Cloudflare Workers AI 模型在 Cloudflare 有可用容量的任何地�
 msgid "Code"
 msgstr "代码"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:150
+#: ../../packages/chat-ui/src/chat/message-content.tsx:167
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:333
 msgid "Code block"
 msgstr "代码块"
@@ -7187,7 +7187,7 @@ msgstr "代码执行"
 msgid "Code execution and sandbox files"
 msgstr "代码执行和沙盒文件"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:702
+#: ../../packages/chat-ui/src/chat/message-content.tsx:719
 msgid "Code execution failed"
 msgstr "代码执行失败"
 
@@ -7211,7 +7211,7 @@ msgstr "你的账号暂时无法使用代码模式。"
 msgid "Code navigation"
 msgstr "代码导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:654
+#: ../../packages/chat-ui/src/chat/message-content.tsx:671
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:76
 msgid "Code output"
 msgstr "代码输出"
@@ -8353,6 +8353,7 @@ msgstr "上下文感知生成"
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
 #: src/features/auth/components/device-code-parts.tsx:189
 #: src/features/chat/host/host-composer.tsx:969
+#: src/features/chat/thread/message-item.tsx:546
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
 msgstr "继续"
@@ -8560,7 +8561,7 @@ msgstr "已复制到剪贴板"
 
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:95
-#: src/features/chat/thread/message-item.tsx:356
+#: src/features/chat/thread/message-item.tsx:357
 #: src/features/prompts/components/prompt-item.tsx:261
 msgid "Copied!"
 msgstr "已复制！"
@@ -8571,7 +8572,7 @@ msgstr "已复制！"
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
 #: src/features/chat/guest-links/guest-link-panel.tsx:365
 #: src/features/chat/sharing/thread-share-button.tsx:399
-#: src/features/chat/thread/message-item.tsx:356
+#: src/features/chat/thread/message-item.tsx:357
 #: src/features/chat/thread/text-selection-menu.tsx:525
 #: src/features/settings/components/chat/trigger-settings.tsx:782
 #: src/features/skills/components/bundle-import-dialog.tsx:207
@@ -8588,7 +8589,7 @@ msgstr "复制 {0} 到剪贴板"
 msgid "Copy as Markdown"
 msgstr "复制为 Markdown"
 
-#: src/features/chat/thread/message-item.tsx:373
+#: src/features/chat/thread/message-item.tsx:374
 msgid "Copy as plain text"
 msgstr "复制为纯文本"
 
@@ -9643,7 +9644,7 @@ msgstr "正在创建机器人…"
 msgid "Creating branch..."
 msgstr "正在创建分支..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:344
+#: ../../packages/chat-ui/src/chat/message-content.tsx:361
 msgid "Creating slides..."
 msgstr "正在创建幻灯片..."
 
@@ -11267,7 +11268,7 @@ msgstr "关闭"
 msgid "Dismiss digest"
 msgstr "关闭摘要"
 
-#: src/features/chat/thread/chat-error.tsx:66
+#: src/features/chat/thread/chat-error.tsx:74
 msgid "Dismiss error"
 msgstr "关闭错误提示"
 
@@ -11364,7 +11365,7 @@ msgid "Do you want to add more rows?"
 msgstr "要添加更多行吗？"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:44
-#: ../../packages/chat-ui/src/chat/message-content.tsx:319
+#: ../../packages/chat-ui/src/chat/message-content.tsx:336
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:115
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:182
 msgid "Document"
@@ -11479,7 +11480,7 @@ msgid "Download — Neore Desktop"
 msgstr "下载 — Neore Desktop"
 
 #. placeholder {0}: part.filename
-#: ../../packages/chat-ui/src/chat/message-content.tsx:475
+#: ../../packages/chat-ui/src/chat/message-content.tsx:492
 msgid "Download {0}"
 msgstr "下载 {0}"
 
@@ -11518,7 +11519,7 @@ msgstr "下载模型"
 msgid "Download as CSV"
 msgstr "下载为 CSV"
 
-#: src/features/chat/thread/message-item.tsx:377
+#: src/features/chat/thread/message-item.tsx:378
 msgid "Download as Markdown"
 msgstr "下载为 Markdown"
 
@@ -11538,7 +11539,7 @@ msgstr "下载文档"
 msgid "Download Export"
 msgstr "下载导出"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:514
+#: ../../packages/chat-ui/src/chat/message-content.tsx:531
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:88
 msgid "Download file"
 msgstr "下载文件"
@@ -11548,8 +11549,8 @@ msgstr "下载文件"
 msgid "Download for {0}"
 msgstr "下载 {0} 版"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:475
-#: ../../packages/chat-ui/src/chat/message-content.tsx:482
+#: ../../packages/chat-ui/src/chat/message-content.tsx:492
+#: ../../packages/chat-ui/src/chat/message-content.tsx:499
 msgid "Download image"
 msgstr "下载图像"
 
@@ -11949,7 +11950,7 @@ msgstr "边缘引导生成"
 #: src/features/chat/host/host-composer.tsx:1060
 #: src/features/chat/thread-list/group-header.tsx:138
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
-#: src/features/chat/thread/message-item.tsx:396
+#: src/features/chat/thread/message-item.tsx:397
 #: src/features/develop/components/draft-comment-card.tsx:51
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:212
@@ -12977,7 +12978,7 @@ msgstr "错误率"
 msgid "Error trace:"
 msgstr "错误追踪："
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:280
+#: ../../packages/chat-ui/src/chat/message-content.tsx:297
 msgid "Error:"
 msgstr "错误："
 
@@ -13261,7 +13262,7 @@ msgstr "正在执行工具..."
 msgid "Execution"
 msgstr "执行"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:692
+#: ../../packages/chat-ui/src/chat/message-content.tsx:709
 msgid "Execution failed"
 msgstr "执行失败"
 
@@ -13609,11 +13610,11 @@ msgstr "提取页面"
 msgid "Extract subject"
 msgstr "提取主体"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:798
+#: ../../packages/chat-ui/src/chat/message-content.tsx:815
 msgid "Extracted"
 msgstr "已提取"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:727
+#: ../../packages/chat-ui/src/chat/message-content.tsx:744
 msgid "Extracting content..."
 msgstr "正在提取内容..."
 
@@ -15445,7 +15446,7 @@ msgstr "复刻"
 msgid "Fork {0} to edit a copy"
 msgstr "复刻 {0} 以编辑副本"
 
-#: src/features/chat/thread/message-item.tsx:408
+#: src/features/chat/thread/message-item.tsx:409
 msgid "Fork conversation"
 msgstr "复刻对话"
 
@@ -15977,7 +15978,7 @@ msgstr "根据描述生成"
 msgid "Generate ideas for a creative writing story"
 msgstr "为创意写作故事构思点子"
 
-#: src/features/chat/thread/message-item.tsx:427
+#: src/features/chat/thread/message-item.tsx:428
 msgid "Generate image"
 msgstr "生成图像"
 
@@ -16003,7 +16004,7 @@ msgstr "生成随机种子"
 msgid "Generate unique business ideas for 2025"
 msgstr "为 2025 年构思独特的商业点子"
 
-#: src/features/chat/thread/message-item.tsx:437
+#: src/features/chat/thread/message-item.tsx:438
 msgid "Generate video"
 msgstr "生成视频"
 
@@ -16016,7 +16017,7 @@ msgstr "生成视频"
 msgid "Generate videos from text or images"
 msgstr "根据文本或图像生成视频"
 
-#: src/features/chat/thread/message-item.tsx:447
+#: src/features/chat/thread/message-item.tsx:448
 msgid "Generate voice"
 msgstr "生成语音"
 
@@ -16049,7 +16050,7 @@ msgstr "生成的视频"
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成的视频将显示在这里。在下方输入框中描述你想创作的内容即可开始。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:529
+#: ../../packages/chat-ui/src/chat/message-content.tsx:546
 msgid "Generating audio..."
 msgstr "正在生成音频..."
 
@@ -16057,12 +16058,12 @@ msgstr "正在生成音频..."
 msgid "Generating draft…"
 msgstr "正在生成草稿…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:530
+#: ../../packages/chat-ui/src/chat/message-content.tsx:547
 #: src/features/chat/thread/media-gallery-view.tsx:405
 msgid "Generating image..."
 msgstr "正在生成图像..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:341
+#: ../../packages/chat-ui/src/chat/message-content.tsx:358
 msgid "Generating presentation..."
 msgstr "正在生成演示文稿..."
 
@@ -16070,7 +16071,7 @@ msgstr "正在生成演示文稿..."
 msgid "Generating response"
 msgstr "正在生成回复"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:531
+#: ../../packages/chat-ui/src/chat/message-content.tsx:548
 #: src/features/chat/thread/media-gallery-view.tsx:405
 msgid "Generating video..."
 msgstr "正在生成视频..."
@@ -17488,7 +17489,7 @@ msgid "illustration"
 msgstr "插画"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
-#: ../../packages/chat-ui/src/chat/message-content.tsx:466
+#: ../../packages/chat-ui/src/chat/message-content.tsx:483
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:755
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
@@ -18168,7 +18169,7 @@ msgstr "输入模板"
 msgid "Input tokens"
 msgstr "输入 token"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:257
+#: ../../packages/chat-ui/src/chat/message-content.tsx:274
 msgid "Input:"
 msgstr "输入："
 
@@ -18591,7 +18592,7 @@ msgstr "它打开的会话与自己的不同，因此已移交对话"
 msgid "It was not saved. Paste it again and save."
 msgstr "未保存。请再次粘贴并保存。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:440
+#: ../../packages/chat-ui/src/chat/message-content.tsx:457
 msgid "It will be visible once approved by a moderator"
 msgstr "经审核员批准后即可显示"
 
@@ -19789,6 +19790,11 @@ msgstr "加载新提示词"
 msgid "Load preset"
 msgstr "加载预设"
 
+#: src/features/chat/thread/chat-error.tsx:47
+#: src/features/chat/thread/message-item.tsx:525
+msgid "Load the earlier messages, then try again: this reply's prompt is not loaded."
+msgstr "请先加载更早的消息，然后重试：此回复对应的提问尚未加载。"
+
 #. placeholder {0}: listed.length
 #. placeholder {1}: Math.min(fileCount, fileLimit)
 #: src/features/develop/components/files-tab.tsx:430
@@ -19864,7 +19870,7 @@ msgstr "正在加载编辑器…"
 msgid "Loading feedback"
 msgstr "正在加载反馈"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:363
+#: ../../packages/chat-ui/src/chat/message-content.tsx:380
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:67
 msgid "Loading file…"
 msgstr "正在加载文件…"
@@ -20080,7 +20086,7 @@ msgstr "正在加载你的服务器、连接器和电脑…"
 msgid "Loading..."
 msgstr "正在加载..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:366
+#: ../../packages/chat-ui/src/chat/message-content.tsx:383
 #: src/features/admin/components/admin-provider-cache-row.tsx:85
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
@@ -20102,11 +20108,11 @@ msgid "Local models are text only. Remove the attachments to send."
 msgstr "本地模型仅支持文本。请移除附件后再发送。"
 
 #. placeholder {0}: info.detail
-#: src/features/local-models/lib/local-errors.ts:204
+#: src/features/local-models/lib/local-errors.ts:218
 msgid "Local request failed: {0}"
 msgstr "本地请求失败：{0}"
 
-#: src/features/local-models/lib/local-errors.ts:204
+#: src/features/local-models/lib/local-errors.ts:218
 msgid "Local request failed."
 msgstr "本地请求失败。"
 
@@ -21720,7 +21726,7 @@ msgstr "更多操作"
 msgid "More actions for {0}"
 msgstr "{0} 的更多操作"
 
-#: src/features/chat/thread/message-item.tsx:365
+#: src/features/chat/thread/message-item.tsx:366
 msgid "More copy options"
 msgstr "更多复制选项"
 
@@ -22225,11 +22231,11 @@ msgstr "浏览对话"
 msgid "navigate within each column"
 msgstr "在每列中导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:799
+#: ../../packages/chat-ui/src/chat/message-content.tsx:816
 msgid "Navigated"
 msgstr "已导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:734
+#: ../../packages/chat-ui/src/chat/message-content.tsx:751
 msgid "Navigating to {target}..."
 msgstr "正在导航到 {target}..."
 
@@ -23710,7 +23716,7 @@ msgstr "尚未在任何设备上运行过操作。"
 msgid "Nothing here."
 msgstr "这里没有内容。"
 
-#: src/features/local-models/lib/local-errors.ts:201
+#: src/features/local-models/lib/local-errors.ts:215
 msgid "Nothing is listening at that address. Start Ollama or LM Studio's server, check the port, and make sure the URL ends in /v1."
 msgstr "该地址上没有服务在监听。请启动 Ollama 或 LM Studio 的服务器，检查端口，并确保 URL 以 /v1 结尾。"
 
@@ -24273,7 +24279,7 @@ msgstr "哎呀！出错了"
 msgid "Opacity"
 msgstr "不透明度"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:779
+#: ../../packages/chat-ui/src/chat/message-content.tsx:796
 #: src/components/command-palette.tsx:998
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
@@ -25211,7 +25217,7 @@ msgstr "已过时"
 msgid "Outpaint"
 msgstr "扩图"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:629
+#: ../../packages/chat-ui/src/chat/message-content.tsx:646
 #: ../../packages/ui/src/components/ai-elements/context.tsx:277
 #: src/components/model-picker/model-picker.tsx:261
 #: src/features/devices/components/device-tool-call.tsx:174
@@ -25271,8 +25277,8 @@ msgstr "输出类型"
 msgid "Output-format focused"
 msgstr "侧重输出格式"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:265
-#: ../../packages/chat-ui/src/chat/message-content.tsx:273
+#: ../../packages/chat-ui/src/chat/message-content.tsx:282
+#: ../../packages/chat-ui/src/chat/message-content.tsx:290
 msgid "Output:"
 msgstr "输出："
 
@@ -25316,7 +25322,7 @@ msgstr "owner/name"
 msgid "Pacific Time (US & Canada)"
 msgstr "太平洋时间（美国和加拿大）"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:733
+#: ../../packages/chat-ui/src/chat/message-content.tsx:750
 msgid "page"
 msgstr "页面"
 
@@ -26021,7 +26027,7 @@ msgstr "置顶记忆"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:144
 #: ../../packages/chat-ui/src/chat/message-item.tsx:193
-#: src/features/chat/thread/message-item.tsx:384
+#: src/features/chat/thread/message-item.tsx:385
 msgid "Pin message"
 msgstr "置顶消息"
 
@@ -28126,7 +28132,7 @@ msgid "Refresh installed models"
 msgstr "刷新已安装的模型"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:198
-#: src/features/chat/thread/message-item.tsx:390
+#: src/features/chat/thread/message-item.tsx:391
 msgid "Regenerate"
 msgstr "重新生成"
 
@@ -29081,7 +29087,7 @@ msgid "retry"
 msgstr "重试"
 
 #: src/features/chat/host/host-composer.tsx:1093
-#: src/features/chat/thread/chat-error.tsx:56
+#: src/features/chat/thread/chat-error.tsx:64
 #: src/features/chat/thread/request-secret-prompt.tsx:475
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:240
@@ -29565,7 +29571,7 @@ msgstr "运行你的工作流后，可在此查看执行历史。"
 msgid "Running"
 msgstr "运行中"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:590
+#: ../../packages/chat-ui/src/chat/message-content.tsx:607
 msgid "Running code..."
 msgstr "正在运行代码..."
 
@@ -29573,7 +29579,7 @@ msgstr "正在运行代码..."
 msgid "Running on {device}…"
 msgstr "正在 {device} 上运行…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:234
+#: ../../packages/chat-ui/src/chat/message-content.tsx:251
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:258
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
@@ -29655,7 +29661,7 @@ msgstr "俄语（俄罗斯）"
 msgid "S&P Global financial metrics, company data, and market info"
 msgstr "S&P Global 财务指标、公司数据和市场信息"
 
-#: src/features/local-models/lib/local-errors.ts:186
+#: src/features/local-models/lib/local-errors.ts:194
 msgid "Safari blocks this secure page from calling http://localhost. Use Chrome, Edge or Firefox for local models."
 msgstr "Safari 会阻止此安全页面调用 http://localhost。请使用 Chrome、Edge 或 Firefox 运行本地模型。"
 
@@ -29988,7 +29994,7 @@ msgid "Screen capture failed. Please try again."
 msgstr "屏幕截取失败。请重试。"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:118
-#: ../../packages/chat-ui/src/chat/message-content.tsx:775
+#: ../../packages/chat-ui/src/chat/message-content.tsx:792
 msgid "Screenshot"
 msgstr "截图"
 
@@ -30544,6 +30550,11 @@ msgstr "选择 AI 回复的语言。这决定了助手生成回复时使用的�
 #: src/features/chat/components/cinema-studio/cinema-studio-controls.tsx:31
 msgid "Select the lens characteristics"
 msgstr "选择镜头特性"
+
+#: src/features/chat/thread/chat-error.tsx:49
+#: src/features/chat/thread/message-item.tsx:528
+msgid "Select the model that wrote this reply to continue it."
+msgstr "请选择生成此回复的模型以继续。"
 
 #: src/features/chat/forward/message-select-checkbox.tsx:46
 msgid "Select this reply"
@@ -31771,7 +31782,7 @@ msgstr "幻灯片 {streamingSlideNumber}"
 msgid "Slide title"
 msgstr "幻灯片标题"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1188
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1205
 msgid "Slide updated"
 msgstr "幻灯片已更新"
 
@@ -31929,7 +31940,7 @@ msgstr "扎实的通用能力"
 msgid "Solid performance across most task types"
 msgstr "在大多数任务类型上表现扎实"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:684
+#: ../../packages/chat-ui/src/chat/message-content.tsx:701
 msgid "Some images from this run could not be saved."
 msgstr "此次运行中的部分图像无法保存。"
 
@@ -32028,7 +32039,7 @@ msgstr "已开启音效"
 msgid "Source"
 msgstr "来源"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1325
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1351
 #: src/features/chat/thread/message-content.tsx:161
 msgid "Source {index}"
 msgstr "来源 {index}"
@@ -32821,7 +32832,7 @@ msgstr "已停止：运行失败"
 msgid "Stopped: you sent a new message"
 msgstr "已停止：你发送了新消息"
 
-#: src/features/local-models/lib/local-errors.ts:175
+#: src/features/local-models/lib/local-errors.ts:180
 msgid "Stopped."
 msgstr "已停止。"
 
@@ -33550,7 +33561,7 @@ msgstr "系统（默认）"
 msgid "System default"
 msgstr "系统默认"
 
-#: src/features/chat/thread/message-item.tsx:236
+#: src/features/chat/thread/message-item.tsx:237
 msgid "System message:"
 msgstr "系统消息："
 
@@ -33657,7 +33668,7 @@ msgstr "轮流发言"
 msgid "Taking control is not available while impersonating."
 msgstr "模拟登录期间无法接管控制。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:728
+#: ../../packages/chat-ui/src/chat/message-content.tsx:745
 msgid "Taking screenshot..."
 msgstr "正在截图..."
 
@@ -34928,30 +34939,42 @@ msgid "The live view is not available right now."
 msgstr "实时画面暂时不可用。"
 
 #. placeholder {0}: info.detail
-#: src/features/local-models/lib/local-errors.ts:195
+#: src/features/local-models/lib/local-errors.ts:209
 msgid "The local model reported an error: {0}"
 msgstr "本地模型报告错误：{0}"
 
-#: src/features/local-models/lib/local-errors.ts:195
+#: src/features/local-models/lib/local-errors.ts:209
 msgid "The local model reported an error."
 msgstr "本地模型报告了一个错误。"
 
+#: src/features/local-models/lib/local-errors.ts:206
+msgid "The local model stopped: it kept repeating the same text. Continue to ask again."
+msgstr "本地模型已停止：它一直重复同一段文字。点击“继续”即可再次提问。"
+
+#: src/features/local-models/lib/local-errors.ts:191
+msgid "The local model stopped: it sent nothing for {IDLE_SECONDS} seconds. Continue to ask again."
+msgstr "本地模型已停止：{IDLE_SECONDS} 秒内没有输出。点击“继续”即可再次提问。"
+
+#: src/features/local-models/lib/local-errors.ts:203
+msgid "The local model stopped: its reasoning ran too long. Continue to ask again."
+msgstr "本地模型已停止：推理时间过长。点击“继续”即可再次提问。"
+
 #. placeholder {0}: info.status ?? 0
 #. placeholder {1}: info.detail
-#: src/features/local-models/lib/local-errors.ts:182
+#: src/features/local-models/lib/local-errors.ts:187
 msgid "The local server answered HTTP {0}: {1}"
 msgstr "本地服务器返回 HTTP {0}：{1}"
 
 #. placeholder {0}: info.status ?? 0
-#: src/features/local-models/lib/local-errors.ts:183
+#: src/features/local-models/lib/local-errors.ts:188
 msgid "The local server answered HTTP {0}."
 msgstr "本地服务器返回 HTTP {0}。"
 
-#: src/features/local-models/lib/local-errors.ts:198
+#: src/features/local-models/lib/local-errors.ts:212
 msgid "The local server did not answer in time. Is it still loading the model?"
 msgstr "本地服务器未及时响应。它是否仍在加载模型？"
 
-#: src/features/local-models/lib/local-errors.ts:189
+#: src/features/local-models/lib/local-errors.ts:197
 msgid "The local server does not have this model. Pull it first (Ollama: ollama pull <model>) or pick another one."
 msgstr "本地服务器上没有此模型。请先拉取（Ollama：ollama pull <model>），或选择其他模型。"
 
@@ -35213,7 +35236,7 @@ msgstr "规则文件夹中还有 {0, plural, other {# 个}}文件未在此列表
 msgid "The run goes where you chose: a new chat each time, the same chat as before, or the same chat with a fresh context."
 msgstr "运行将按你的选择进行：每次新建聊天、沿用之前的聊天，或沿用同一聊天但使用全新上下文。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:810
+#: ../../packages/chat-ui/src/chat/message-content.tsx:827
 msgid "The screenshot could not be saved."
 msgstr "无法保存屏幕截图。"
 
@@ -35453,7 +35476,7 @@ msgid "Thinking-enabled vision-language model"
 msgstr "支持思考的视觉语言模型"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1251
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1267
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:114
 #: src/features/chat/thread/streaming-placeholder.tsx:808
 msgid "Thinking..."
@@ -35781,7 +35804,7 @@ msgstr "此主机被 ~/.ssh/config 中的 Match 规则使用，Neore 不会对�
 msgid "This host uses {key} in ~/.ssh/config, which Neore does not support."
 msgstr "此主机在 ~/.ssh/config 中使用了 {key}，Neore 不支持该设置。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:439
+#: ../../packages/chat-ui/src/chat/message-content.tsx:456
 msgid "This image has been flagged for review"
 msgstr "此图像已被标记待审核"
 
@@ -37031,7 +37054,7 @@ msgstr "重试"
 msgid "Try Again"
 msgstr "重试"
 
-#: src/features/chat/thread/chat-error.tsx:62
+#: src/features/chat/thread/chat-error.tsx:70
 msgid "Try again in {retryMinutes}m"
 msgstr "{retryMinutes} 分钟后重试"
 
@@ -37215,7 +37238,7 @@ msgstr "输入你的消息..."
 msgid "Typeface for the whole interface. Code blocks always stay monospace."
 msgstr "整个界面的字体。代码块始终保持等宽。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:729
+#: ../../packages/chat-ui/src/chat/message-content.tsx:746
 msgid "Typing text..."
 msgstr "正在输入文本..."
 
@@ -37726,11 +37749,11 @@ msgstr "更新的 OpenAI 前沿性能"
 msgid "Updated reasoning capabilities over the original R1"
 msgstr "相比原版 R1 推理能力更新"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1186
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1203
 msgid "Updated slide"
 msgstr "已更新幻灯片"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1186
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1203
 msgid "Updated slide {slideNumber}"
 msgstr "已更新第 {slideNumber} 张幻灯片"
 
@@ -40221,7 +40244,7 @@ msgstr "你的机器人"
 msgid "Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept."
 msgstr "无法加载你的机器人。加载完成后才能保存对已保存登录信息的更改，以便保留其机器人。"
 
-#: src/features/local-models/lib/local-errors.ts:192
+#: src/features/local-models/lib/local-errors.ts:200
 msgid "Your browser blocked access to local network devices for this site. Allow \"Local network access\" in the site settings (the icon left of the address bar), then try again."
 msgstr "你的浏览器阻止了此网站访问本地网络设备。请在网站设置（地址栏左侧的图标）中允许“本地网络访问”，然后重试。"
 
@@ -40366,7 +40389,7 @@ msgstr "上次导入在完成前已停止。继续导入即可导入剩余的对
 msgid "Your latest changes are not saved yet."
 msgstr "你最新的更改尚未保存。"
 
-#: src/features/local-models/lib/local-errors.ts:178
+#: src/features/local-models/lib/local-errors.ts:183
 msgid "Your local server answered, but refused this site (CORS). Allow this site's origin — for Ollama set OLLAMA_ORIGINS, for LM Studio turn on \"Enable CORS\" — then restart the server."
 msgstr "你的本地服务器有响应，但拒绝了此网站（CORS）。请允许此网站的来源——Ollama 设置 OLLAMA_ORIGINS，LM Studio 开启“Enable CORS”——然后重启服务器。"
 
@@ -40390,7 +40413,7 @@ msgstr "你的消息包含不当内容，无法发送。"
 msgid "Your message waits for the owner of this conversation. Nothing happens until they send it."
 msgstr "你的消息正在等待此对话的所有者。在对方发送之前不会有任何操作。"
 
-#: src/features/chat/thread/message-item.tsx:181
+#: src/features/chat/thread/message-item.tsx:182
 msgid "Your message:"
 msgstr "你的消息："
 
