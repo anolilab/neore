@@ -582,7 +582,7 @@ export const createThread = authMutation
             // The mode is read before the thread exists, so a failed read writes nothing. A chat with a bot starts in the bot's mode and
             // never in the owner's default: a bot with no stored mode is Auto, which stores nothing. An admin acting as the owner cannot
             // set a mode, so their chat never takes `full` from the bot or the default.
-            const impersonated = await callerRestrictsFull(context, context.user);
+            const impersonated = await callerRestrictsFull(context);
             const botMode = bot?.permissionMode && !(bot.permissionMode === "full" && impersonated) ? bot.permissionMode : undefined;
             const startMode = bot ? botMode : await ownerNewChatMode(context, userId, impersonated);
 

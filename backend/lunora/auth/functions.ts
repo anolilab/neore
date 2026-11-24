@@ -989,7 +989,7 @@ export const updateUserSettings = authMutation
 
         // The default mode of new chats is the owner's to set by hand: neither an admin acting as them nor a grant session (an app or the
         // browser extension) may change it, since the default would then reach every chat they start (`callerRestrictsFull`).
-        if (options.args.defaultPermissionMode !== undefined && (await callerRestrictsFull(ctx, ctx.user))) {
+        if (options.args.defaultPermissionMode !== undefined && (await callerRestrictsFull(ctx))) {
             throw new LunoraError("FORBIDDEN", "The default permission mode cannot be changed from an impersonated or grant session");
         }
 

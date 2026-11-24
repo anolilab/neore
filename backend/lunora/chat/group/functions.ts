@@ -307,7 +307,7 @@ export const createGroupChat = authMutation
         const { userId } = ctx.user;
         const organizationId = ctx.user.activeOrganization?.id;
 
-        const permissionMode = await ownerNewChatMode(ctx, userId, await callerRestrictsFull(ctx, ctx.user));
+        const permissionMode = await ownerNewChatMode(ctx, userId, await callerRestrictsFull(ctx));
 
         const created = await insertGroupChat(
             ctx,
@@ -386,7 +386,7 @@ export const createGroupChatFromTemplate = authMutation
         });
 
         // The owner's default mode is read before any skill is written: a failed read here must not leave global skill rows behind.
-        const permissionMode = await ownerNewChatMode(ctx, userId, await callerRestrictsFull(ctx, ctx.user));
+        const permissionMode = await ownerNewChatMode(ctx, userId, await callerRestrictsFull(ctx));
 
         // The caller's own skills (found by slug, or created now), each with an
         // enabled link — usable by construction, so no usability re-check here.

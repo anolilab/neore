@@ -170,7 +170,7 @@ export const startWorkOnPullRequest = authMutation
         const url = pullRequestUrl(address.repository, address.number);
         const { now } = ctx;
         // A new chat starts in the owner's default mode (`ownerNewChatMode`), read before the thread is written.
-        const permissionMode = await ownerNewChatMode(ctx, userId, await callerRestrictsFull(ctx, ctx.user));
+        const permissionMode = await ownerNewChatMode(ctx, userId, await callerRestrictsFull(ctx));
         const threadId = await insertThread(ctx.db, {
             createdBy: userId,
             mode: "text",

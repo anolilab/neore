@@ -263,7 +263,7 @@ export const saveLocalTurn = authMutation
     .output(v.object({ assistantMessageId: v.string(), threadId: v.string(), userMessageId: v.string() }))
     .mutation(async ({ args, ctx }) => {
         // A new thread starts in the owner's default mode (`ownerNewChatMode`); a turn on an existing thread keeps its own.
-        const newThreadMode = args.threadId === undefined ? await ownerNewChatMode(ctx, ctx.user.userId, await callerRestrictsFull(ctx, ctx.user)) : undefined;
+        const newThreadMode = args.threadId === undefined ? await ownerNewChatMode(ctx, ctx.user.userId, await callerRestrictsFull(ctx)) : undefined;
         const result = await saveLocalTurnHandler(ctx, ctx.user.userId, args, { newThreadMode, sessionMarks: await callerSessionMarks(ctx) });
 
         ctx.log.event("chat.save_local_turn", { branched: args.branch !== undefined, newThread: args.threadId === undefined, outcome: args.outcome });
