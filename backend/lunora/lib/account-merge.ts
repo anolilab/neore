@@ -125,6 +125,12 @@ const KEEP_NEW_USERS = new Set(["aiUserPreferences", "userSettings"]);
 const NOT_MOVED = new Set(["cronRuns", "idempotencyClaims", "rateLimits"]);
 
 /**
+ * Dropped with the guest's shard, never copied: a scan position into the guest's pull-request links, which the merge
+ * re-inserts under new ids, so a carried cursor would point at nothing. The new account's sweep starts from its first link.
+ */
+const NOT_COPIED = new Set(["pullRequestStateScans"]);
+
+/**
  * The tables whose rows live on a user's shard — everything but `.global()` — sorted, but `threads` just before
  * `messages`: a thread is on the new shard before its messages come, so the messages trigger there counts each one it
  * imports (`userTurnCount`, {@link DERIVED_FIELDS}), and the guest's thread is cleared before its messages, whose
@@ -1560,7 +1566,7 @@ export const deleteShardRows = internalMutation
 
             if (row === null) {
                 gone.push(id);
-            } else if ((await rowDigest(args.table, row)) === digest) {
+            } else if (NOT_COPIED.has(args.table) || (await rowDigest(args.table, row)) === digest) {
                 await db.delete(args.table, id);
                 deleted = true;
             } else {
@@ -2381,6 +2387,13 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
             return false;
         }
 
+        // Skipped, not copied: the clear phase still drops the guest's rows of it.
+        if (NOT_COPIED.has(table)) {
+            nextTable(state, tables, "clear");
+
+            return false;
+        }
+
         state.calls -= 1;
         const page: { continueCursor: string | null; isDone: boolean; page: Record<string, unknown>[] } = await call(
             references.list,
@@ -2964,6 +2977,24 @@ const clearPage = async (
 
     if (rows.length === 0) {
         return { calls: 1, kept: [], outcome: "empty" };
+    }
+
+    // Never copied, so there is no copy to confirm: the rows go off the guest's shard, fenced by the lease like any clear.
+    if (NOT_COPIED.has(table)) {
+        await call(
+            references.deleteRows,
+            {
+                from,
+                generation,
+                rows: rows.map((row) => {
+                    return { digest: "", id: String(row._id) };
+                }),
+                table,
+            },
+            from,
+        );
+
+        return { calls: 2, kept: [], outcome: "page" };
     }
 
     const {

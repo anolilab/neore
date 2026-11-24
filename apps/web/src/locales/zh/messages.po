@@ -650,7 +650,7 @@ msgstr "{0} 个失败"
 
 #. placeholder {0}: modeLabels[mode]
 #. placeholder {1}: tool.name
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:95
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:97
 msgid "{0} for {1}"
 msgstr "{1} 的{0}"
 
@@ -1558,7 +1558,7 @@ msgstr "{selectedCount, plural, other {已选中 # 个对话}}"
 msgid "{selectedCount} of {MAX_PARALLEL} selected"
 msgstr "已选择 {selectedCount}/{MAX_PARALLEL}"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:206
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:208
 msgid "{server} · until {until}"
 msgstr "{server} · 截至 {until}"
 
@@ -3697,8 +3697,8 @@ msgstr "允许此网站（{0}）"
 msgid "Allowed AI Models"
 msgstr "允许的 AI 模型"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:194
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:195
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:196
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:197
 msgid "Allowed for a limited time"
 msgstr "限时允许"
 
@@ -3780,6 +3780,10 @@ msgstr "阿姆斯特丹"
 #: src/features/settings/components/chat/native-providers-settings.tsx:245
 msgid "An access key id starts with AKIA and is 20 characters"
 msgstr "访问密钥 ID 以 AKIA 开头，共 20 个字符"
+
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:92
+msgid "An admin acting as you cannot change this default."
+msgstr "以你的身份操作的管理员无法更改此默认设置。"
 
 #: src/features/settings/connectors/connector-card.tsx:135
 msgid "An administrator needs to register an OAuth app for this connector before it can be used."
@@ -4067,6 +4071,7 @@ msgid "Anyone with the link can view this thread"
 msgstr "任何拥有链接的人都可以查看此对话"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:49
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:49
 msgid "Anything that is not a plain lookup asks first"
 msgstr "凡非单纯查询的操作均需先询问"
 
@@ -4528,7 +4533,7 @@ msgstr "询问"
 
 #: src/features/chat/aside/aside-panel.tsx:306
 #: src/features/chat/sidebar/thread-sidebar.tsx:355
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:61
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:63
 msgid "Ask"
 msgstr "询问"
 
@@ -4777,7 +4782,8 @@ msgstr "自动"
 #: src/features/chat/thread/media-gallery-view.tsx:65
 #: src/features/chat/thread/media-gallery-view.tsx:511
 #: src/features/settings/components/chat/bots-settings.tsx:132
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:61
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:41
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:63
 msgid "Auto"
 msgstr "自动"
 
@@ -4793,6 +4799,10 @@ msgstr "自动定价"
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:72
 msgid "Auto-archive inactive chats"
 msgstr "自动归档不活跃的聊天"
+
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:110
+msgid "Auto-archive skips a chat while it is linked to a pull request that is still open."
+msgstr "只要聊天关联的拉取请求仍处于打开状态，自动归档就会跳过该聊天。"
 
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:81
 msgid "Auto-archive turned off"
@@ -4841,7 +4851,7 @@ msgstr "自动朗读回复"
 msgid "Auto-save"
 msgstr "自动保存"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:361
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:363
 msgid "Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so \"Ask\" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only."
 msgstr "自动：无需询问直接运行。询问：暂停等待你批准/拒绝。关闭：助手完全看不到该工具。自动化（触发器、消息机器人、工作流）无法询问，因此“询问”类工具在那里不可用。MCP 工具默认为“询问”，除非服务器将其标记为只读。"
 
@@ -5191,7 +5201,7 @@ msgstr "Bedrock 控制台 → API 密钥。加密存储，不会再次显示。"
 msgid "Before"
 msgstr "之前"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:246
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:248
 msgid "Before a connected tool set to Ask pauses the chat, a short model check reads the call. It only looks at tools from MCP servers and connectors you have marked as trusted, and only those whose name starts with a read verb such as get, list, search or fetch, and never after the chat has read your knowledge base, memories, project context, a tool result, an attached file, document or web page, or while any skill is enabled. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Everything else still asks you. Off by default."
 msgstr "在设为“询问”的已连接工具暂停聊天之前，会由一个简短的模型检查读取该调用。它只检查来自你标记为受信任的 MCP 服务器和连接器的工具，且仅限名称以 get、list、search 或 fetch 等读取类动词开头的工具；聊天读取过你的知识库、记忆、项目上下文、工具结果、附件、文档或网页之后，或任何技能处于启用状态时，则不会检查。如果判定该调用风险较低，调用会直接运行，聊天中会注明已自动批准及原因。其余情况仍会询问你。默认关闭。"
 
@@ -5208,7 +5218,7 @@ msgstr "入门"
 msgid "Behavior"
 msgstr "行为"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:127
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:137
 msgid "Behind {base}"
 msgstr "落后于 {base}"
 
@@ -5422,11 +5432,11 @@ msgstr "已屏蔽的提供商"
 msgid "Blocked Regions"
 msgstr "已屏蔽的地区"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:106
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:128
 msgid "Blocked websites for web search"
 msgstr "网页搜索屏蔽的网站"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:127
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:149
 msgid "Blocked websites saved"
 msgstr "已保存屏蔽的网站"
 
@@ -5780,8 +5790,8 @@ msgstr "内置画布编辑器"
 msgid "Built-in reasoning before generating"
 msgstr "生成前内置推理"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:370
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:371
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:374
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:375
 #: src/features/settings/lib/settings-keywords.ts:102
 msgid "Built-in tools"
 msgstr "内置工具"
@@ -6276,11 +6286,11 @@ msgstr "加泰罗尼亚语（西班牙）"
 msgid "catalog"
 msgstr "目录"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:150
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:160
 msgid "Catch up"
 msgstr "追上"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:117
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:127
 msgid "Catch up {pullRequest} with {base}"
 msgstr "让 {pullRequest} 追上 {base}"
 
@@ -6576,6 +6586,14 @@ msgstr "聊天将在上下文窗口的 {0} 时压缩"
 msgid "Chats will not be compacted automatically"
 msgstr "聊天不会自动压缩"
 
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:120
+msgid "Chats with an open pull request are kept"
+msgstr "有打开的拉取请求的聊天会被保留"
+
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:120
+msgid "Chats with an open pull request can be archived"
+msgstr "有打开的拉取请求的聊天可以被归档"
+
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:75
 msgid "Chats with no activity for this long are archived. Archived chats stay searchable."
 msgstr "超过这段时间没有活动的聊天会被归档。已归档的聊天仍可搜索。"
@@ -6781,7 +6799,7 @@ msgstr "为你的镜头选择相机系统"
 msgid "Choose the project's folder, or type a path."
 msgstr "选择项目文件夹，或输入路径。"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:355
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:357
 msgid "Choose which tools the assistant may use on its own, which need your approval, and which are off."
 msgstr "选择哪些工具助手可以自行使用、哪些需要你批准、哪些关闭。"
 
@@ -8192,7 +8210,7 @@ msgstr "已连接。你可以关闭此窗口。"
 msgid "Connecting {pairingHost}…"
 msgstr "正在连接 {pairingHost}…"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:392
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:396
 msgid "Connecting to your MCP servers..."
 msgstr "正在连接你的 MCP 服务器..."
 
@@ -9117,7 +9135,7 @@ msgstr "无法加载此项目的仓库。"
 msgid "Could not load this project's usage."
 msgstr "无法加载此项目的用量。"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:139
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:141
 msgid "Could not load tools: {error}"
 msgstr "无法加载工具：{error}"
 
@@ -9262,6 +9280,10 @@ msgstr "无法保存机器人的工具。其工具未改变。"
 #: src/features/notifications/components/notification-settings.tsx:110
 msgid "Could not save the Daily Brief setting."
 msgstr "无法保存每日简报设置。"
+
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:73
+msgid "Could not save the default permission mode"
+msgstr "无法保存默认权限模式"
 
 #: src/features/notifications/components/notification-settings.tsx:103
 msgid "Could not save the email setting."
@@ -9409,7 +9431,7 @@ msgstr "按完整的周（周一至周日，UTC）在每周结束后统计，因
 msgid "country"
 msgstr "国家/地区"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:254
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:256
 msgid "Covers only tools from MCP servers and connectors you trust for auto-approval (a switch on each server in your MCP settings and on each connector), left at their default Ask, in chats only you can write to. A trusted server's tool descriptions reach the model and can influence what is approved, so trust only servers you would let act for you. Changing a server's address ends its trust."
 msgstr "仅涵盖你信任其自动批准的 MCP 服务器和连接器中的工具（在 MCP 设置中的每个服务器上以及每个连接器上都有一个开关），这些工具保持默认的“询问”，且仅限只有你能写入的聊天。受信任服务器的工具描述会传给模型，并可能影响批准结果，因此只信任你愿意让其代为操作的服务器。更改服务器地址会终止对它的信任。"
 
@@ -9951,7 +9973,7 @@ msgid "Custom rate limits"
 msgstr "自定义速率限制"
 
 #. placeholder {0}: modeLabels[tool.defaultMode]
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:75
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:77
 msgid "Custom setting (default: {0})"
 msgstr "自定义设置（默认：{0}）"
 
@@ -10318,7 +10340,7 @@ msgstr "默认"
 
 #: src/features/appearance/components/appearance-controls.tsx:185
 #: src/features/projects/components/project-repositories.tsx:342
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:75
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:77
 msgid "Default"
 msgstr "默认"
 
@@ -10357,6 +10379,10 @@ msgstr "默认听写语言"
 #: src/features/settings/components/account/account-settings.tsx:267
 msgid "Default dictation language for new threads (BCP 47 code)."
 msgstr "新对话的默认听写语言（BCP 47 代码）。"
+
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:55
+msgid "Default for new chats"
+msgstr "新聊天的默认设置"
 
 #: src/features/settings/components/account/account-settings.tsx:242
 msgid "Default language for AI responses in new threads (BCP 47 code)."
@@ -11075,7 +11101,7 @@ msgstr "设计涉及多个部分的系统或更改。"
 msgid "Desktop"
 msgstr "桌面"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:71
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:73
 msgid "destructive"
 msgstr "破坏性"
 
@@ -11915,7 +11941,7 @@ msgstr "每个操作都会把一条提示词填入此对话的消息框。请先
 msgid "Each case runs once, one after another. Every case counts toward your daily message and task limits, and the run stops when it reaches its cost cap."
 msgstr "每个用例依次运行一次。每个用例都会计入你每日的消息和任务限额，运行达到费用上限时会停止。"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:258
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:260
 msgid "Each check is one small model call on your account and is rate-limited. If it fails or runs out of time, you are asked as usual."
 msgstr "每次检查都是在你的账号上进行的一次小型模型调用，并受速率限制。如果失败或超时，仍会像往常一样询问你。"
 
@@ -13194,6 +13220,7 @@ msgid "Every Sunday at midnight"
 msgstr "每周日午夜"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:48
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:48
 msgid "Every tool runs without asking, except those that need your answer"
 msgstr "除需要你作答的工具外，所有工具均无需询问即可运行"
 
@@ -14223,7 +14250,7 @@ msgstr "撤销会话失败"
 msgid "Failed to revoke sessions"
 msgstr "撤销会话失败"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:322
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:324
 msgid "Failed to revoke the allow"
 msgstr "撤销允许失败"
 
@@ -14470,7 +14497,7 @@ msgstr "更新标签失败"
 msgid "Failed to update the case"
 msgstr "无法更新用例"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:310
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:312
 msgid "Failed to update the quick check"
 msgstr "更新快速检查失败"
 
@@ -14482,7 +14509,7 @@ msgstr "更新受信任服务器失败"
 msgid "Failed to update thread visibility"
 msgstr "更新对话可见性失败"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:298
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:300
 msgid "Failed to update tool permission"
 msgstr "更新工具权限失败"
 
@@ -15862,6 +15889,7 @@ msgstr "完整 1080p 高清视频输出"
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
 #: src/features/chat/thread/composer-permission-mode.tsx:42
 #: src/features/settings/components/chat/bots-settings.tsx:133
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:42
 msgid "Full access"
 msgstr "完全访问"
 
@@ -18829,6 +18857,10 @@ msgstr "继续接受旧密钥 24 小时"
 msgid "Keep as mine"
 msgstr "保留为我的"
 
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:107
+msgid "Keep chats with an open pull request"
+msgstr "保留有打开的拉取请求的聊天"
+
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1071
 msgid "Keep control"
 msgstr "保持控制"
@@ -19520,7 +19552,7 @@ msgstr "镜头类型"
 msgid "Less"
 msgstr "少"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:243
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:245
 msgid "Let a quick check approve low-risk calls"
 msgstr "让快速检查批准低风险调用"
 
@@ -20157,7 +20189,7 @@ msgstr "正在加载你的服务器、连接器和电脑…"
 #: src/features/settings/components/chat/custom-providers-settings.tsx:343
 #: src/features/settings/components/chat/default-models-settings.tsx:185
 #: src/features/settings/components/chat/native-providers-settings.tsx:396
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:289
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:291
 #: src/features/settings/components/chat/trigger-settings.tsx:974
 #: src/features/settings/components/privacy/data-access.tsx:25
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:229
@@ -20872,7 +20904,7 @@ msgstr "MCP"
 msgid "MCP Registry"
 msgstr "MCP 注册表"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:398
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:402
 msgid "MCP server"
 msgstr "MCP 服务器"
 
@@ -20913,8 +20945,8 @@ msgstr "MCP 服务器"
 msgid "MCP servers provide additional tools that the AI can use during conversations. Tools from connected servers are automatically available when chatting."
 msgstr "MCP 服务器提供额外的工具，供 AI 在对话中使用。已连接服务器的工具会在聊天时自动可用。"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:387
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:388
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:391
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:392
 #: src/features/settings/lib/settings-keywords.ts:103
 msgid "MCP tools"
 msgstr "MCP 工具"
@@ -22509,15 +22541,15 @@ msgstr "从未"
 msgid "Never"
 msgstr "从不"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:256
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:258
 msgid "Never covers a call after the chat has read web pages, attached files, documents or pages, knowledge or other tool results: those can carry hidden instructions."
 msgstr "在聊天读取过网页、附件、文档或页面、知识库或其他工具结果之后，永远不会涵盖任何调用：这些内容可能携带隐藏指令。"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:257
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:259
 msgid "Never covers a call while any skill is enabled or invoked. Skills can come from the marketplace, an organization or an import, and there is no reliable way to tell yours apart, so switch your skills off to use the quick check."
 msgstr "在任何技能处于启用或被调用时，永远不会涵盖任何调用。技能可能来自市场、组织或导入，无法可靠地区分哪些是你自己的，因此请关闭你的技能以使用快速检查。"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:255
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:257
 msgid "Never covers a tool you set to Ask yourself, built-in tools, device tools, questions to you, sub-agents or coding agents, or anything that sends, publishes, pays or deletes."
 msgstr "永远不涵盖你自行设为“询问”的工具、内置工具、设备工具、向你提出的问题、子智能体或编码智能体，也不涵盖任何会发送、发布、付款或删除的操作。"
 
@@ -22581,6 +22613,10 @@ msgstr "新聊天"
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:57
 msgid "New chats are deleted automatically after the retention period above. You can make one permanent from its menu."
 msgstr "新聊天会在上述保留期限后自动删除。你可以从其菜单中将某个聊天设为永久保留。"
+
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:57
+msgid "New chats start in this permission mode. A chat that already exists keeps its own mode, and you can still change a chat's mode in its composer."
+msgstr "新聊天将以此权限模式开始。已有的聊天保留其自身的模式，你仍可在输入框中更改某个聊天的模式。"
 
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:65
 msgid "New chats start permanent"
@@ -23048,7 +23084,7 @@ msgstr "此版本没有可用的差异数据"
 msgid "No emoji found"
 msgstr "未找到表情"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:395
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:399
 msgid "No enabled MCP servers."
 msgstr "没有已启用的 MCP 服务器。"
 
@@ -23528,7 +23564,7 @@ msgstr "暂无套餐等级数据。网关升级后，新请求会记录等级信
 msgid "No tools shared yet"
 msgstr "尚未共享任何工具"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:142
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:144
 msgid "No tools."
 msgstr "没有工具。"
 
@@ -23685,7 +23721,7 @@ msgstr "未附加："
 msgid "Not changed"
 msgstr "未更改"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:72
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:74
 msgid "not configured"
 msgstr "未配置"
 
@@ -23939,7 +23975,7 @@ msgstr "关"
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:90
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:97
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:277
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:61
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:63
 msgid "Off"
 msgstr "关闭"
 
@@ -24140,7 +24176,7 @@ msgstr "一个 API。<0/><1>所有 LLM。</1>"
 msgid "One deployment name per line, exactly as in Azure AI Foundry → Deployments."
 msgstr "每行一个部署名称，与 Azure AI Foundry → 部署中的名称完全一致。"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:109
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:131
 msgid "One domain per line, for example example.com. Results from these sites and their subdomains are never shown, even if the assistant asks for them."
 msgstr "每行一个域名，例如 example.com。即使助手要求，也不会显示来自这些网站及其子域名的结果。"
 
@@ -27468,11 +27504,11 @@ msgstr "此浏览器上的推送通知"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "将多个各具角色的智能体放在同一对话中。审查小组可从安全和性能角度检查更改，辩论则可在综合前论证双方观点。"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:156
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:166
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
 msgstr "在输入框中填入一条提示，将此分支变基到 {base}、解决冲突、检查构建和测试并推送。不会发送任何内容。"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:157
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:167
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "在输入框中填入一条提示，在本地副本中将此复刻的分支变基到 {base}、解决冲突并检查构建和测试。不会推送。不会发送任何内容。"
 
@@ -27775,7 +27811,7 @@ msgstr "阅读指南"
 msgid "Read the page"
 msgstr "阅读页面"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:70
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:72
 msgid "read-only"
 msgstr "只读"
 
@@ -28980,12 +29016,12 @@ msgstr "重新发送验证邮件"
 #: src/features/chat/components/cinema-studio/cinema-panel.tsx:88
 #: src/features/settings/components/chat/models-settings.tsx:617
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:269
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:108
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:110
 msgid "Reset"
 msgstr "重置"
 
 #. placeholder {0}: tool.name
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:102
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:104
 msgid "Reset {0} to default"
 msgstr "将 {0} 重置为默认"
 
@@ -29354,7 +29390,7 @@ msgstr "审核备注"
 #: src/features/auth/components/settings/account/account-cell.tsx:140
 #: src/features/chat/guest-links/use-guest-link-revoke.tsx:105
 #: src/features/pages/components/page-share-dialog.tsx:209
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:215
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:217
 msgid "Revoke"
 msgstr "撤销"
 
@@ -29370,11 +29406,11 @@ msgstr "撤销链接"
 msgid "Revoke Session"
 msgstr "撤销会话"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:209
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:211
 msgid "Revoke the allow for {tool}"
 msgstr "撤销对 {tool} 的允许"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:209
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:211
 msgid "Revoke the allow for {tool} on {server}"
 msgstr "撤销对 {server} 上 {tool} 的允许"
 
@@ -29876,7 +29912,7 @@ msgstr "保存为评测用例"
 msgid "Save as preset"
 msgstr "保存为预设"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:133
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:155
 msgid "Save blocked websites"
 msgstr "保存屏蔽的网站"
 
@@ -33541,6 +33577,7 @@ msgstr "对复杂视觉概念的理解出众"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:43
 #: src/features/settings/components/chat/bots-settings.tsx:134
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:43
 msgid "Supervised"
 msgstr "监督模式"
 
@@ -35567,7 +35604,7 @@ msgstr "这些提供商将永远不会用于处理你的请求。"
 msgid "These rule files were changed meanwhile. Discard your changes to see the saved ones, then edit again."
 msgstr "这些规则文件在此期间已被更改。请放弃你的更改以查看已保存的版本，然后重新编辑。"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:196
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:198
 msgid "These tools run without asking until the time shown. Revoke one to be asked again from your next message."
 msgstr "这些工具在所示时间之前无需询问即可运行。撤销其中一个后，从你的下一条消息起会再次询问。"
 
@@ -36831,7 +36868,7 @@ msgstr "工具调用"
 msgid "Tool output's share of the stored size"
 msgstr "工具输出占存储大小的比例"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:354
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:356
 #: src/features/settings/lib/settings-navigation.ts:96
 msgid "Tool Permissions"
 msgstr "工具权限"
@@ -36863,6 +36900,7 @@ msgid "Tools for {0}"
 msgstr "{0} 的工具"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:47
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:47
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr "工具按各自的设置运行；快速检查可放行低风险调用"
 
@@ -37766,7 +37804,7 @@ msgstr "至 {0}"
 msgid "Until {0}"
 msgstr "截至 {0}"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:206
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:208
 msgid "Until {until}"
 msgstr "截至 {until}"
 

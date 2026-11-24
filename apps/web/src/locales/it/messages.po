@@ -650,7 +650,7 @@ msgstr "{0} non riuscite"
 
 #. placeholder {0}: modeLabels[mode]
 #. placeholder {1}: tool.name
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:95
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:97
 msgid "{0} for {1}"
 msgstr "{0} per {1}"
 
@@ -1558,7 +1558,7 @@ msgstr "{selectedCount, plural, one {# conversazione selezionata} other {# conve
 msgid "{selectedCount} of {MAX_PARALLEL} selected"
 msgstr "{selectedCount} di {MAX_PARALLEL} selezionati"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:206
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:208
 msgid "{server} · until {until}"
 msgstr "{server} · fino a {until}"
 
@@ -3697,8 +3697,8 @@ msgstr "Consenti questo sito ({0})"
 msgid "Allowed AI Models"
 msgstr "Modelli IA consentiti"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:194
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:195
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:196
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:197
 msgid "Allowed for a limited time"
 msgstr "Consentito per un periodo limitato"
 
@@ -3780,6 +3780,10 @@ msgstr "Amsterdam"
 #: src/features/settings/components/chat/native-providers-settings.tsx:245
 msgid "An access key id starts with AKIA and is 20 characters"
 msgstr "Un ID chiave di accesso inizia con AKIA ed è lungo 20 caratteri"
+
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:92
+msgid "An admin acting as you cannot change this default."
+msgstr "Un amministratore che agisce al tuo posto non può modificare questo predefinito."
 
 #: src/features/settings/connectors/connector-card.tsx:135
 msgid "An administrator needs to register an OAuth app for this connector before it can be used."
@@ -4067,6 +4071,7 @@ msgid "Anyone with the link can view this thread"
 msgstr "Chiunque abbia il link può visualizzare questa conversazione"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:49
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:49
 msgid "Anything that is not a plain lookup asks first"
 msgstr "Tutto ciò che non è una semplice consultazione chiede prima"
 
@@ -4528,7 +4533,7 @@ msgstr "chiedi"
 
 #: src/features/chat/aside/aside-panel.tsx:306
 #: src/features/chat/sidebar/thread-sidebar.tsx:355
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:61
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:63
 msgid "Ask"
 msgstr "Chiedi"
 
@@ -4777,7 +4782,8 @@ msgstr "auto"
 #: src/features/chat/thread/media-gallery-view.tsx:65
 #: src/features/chat/thread/media-gallery-view.tsx:511
 #: src/features/settings/components/chat/bots-settings.tsx:132
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:61
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:41
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:63
 msgid "Auto"
 msgstr "Auto"
 
@@ -4793,6 +4799,10 @@ msgstr "Prezzi automatici"
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:72
 msgid "Auto-archive inactive chats"
 msgstr "Archivia automaticamente le chat inattive"
+
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:110
+msgid "Auto-archive skips a chat while it is linked to a pull request that is still open."
+msgstr "L’archiviazione automatica salta una chat finché è collegata a una pull request ancora aperta."
 
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:81
 msgid "Auto-archive turned off"
@@ -4841,7 +4851,7 @@ msgstr "Leggi le risposte automaticamente"
 msgid "Auto-save"
 msgstr "Salvataggio automatico"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:361
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:363
 msgid "Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so \"Ask\" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only."
 msgstr "Auto: viene eseguito senza chiedere. Chiedi: si ferma in attesa del tuo Approva / Rifiuta. Off: l'assistente non vede mai lo strumento. Le automazioni (trigger, bot di messaggistica, workflow) non possono chiedere, quindi lì gli strumenti impostati su \"Chiedi\" non sono disponibili. Gli strumenti MCP sono impostati su Chiedi, a meno che il server non li contrassegni come di sola lettura."
 
@@ -5191,7 +5201,7 @@ msgstr "Console di Bedrock → Chiavi API. Crittografata a riposo e mai più mos
 msgid "Before"
 msgstr "Prima"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:246
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:248
 msgid "Before a connected tool set to Ask pauses the chat, a short model check reads the call. It only looks at tools from MCP servers and connectors you have marked as trusted, and only those whose name starts with a read verb such as get, list, search or fetch, and never after the chat has read your knowledge base, memories, project context, a tool result, an attached file, document or web page, or while any skill is enabled. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Everything else still asks you. Off by default."
 msgstr "Prima che uno strumento connesso impostato su Chiedi metta in pausa la chat, un breve controllo del modello legge la chiamata. Esamina solo gli strumenti dei server MCP e dei connettori che hai contrassegnato come attendibili, e solo quelli il cui nome inizia con un verbo di lettura come get, list, search o fetch, e mai dopo che la chat ha letto la tua base di conoscenza, i ricordi, il contesto del progetto, il risultato di uno strumento, un file allegato, un documento o una pagina web, né mentre è attiva una skill. Se giudica la chiamata a basso rischio, la chiamata viene eseguita e la chat annota che è stata approvata automaticamente, con il motivo. Tutto il resto ti viene ancora chiesto. Disattivato per impostazione predefinita."
 
@@ -5208,7 +5218,7 @@ msgstr "principiante"
 msgid "Behavior"
 msgstr "Comportamento"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:127
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:137
 msgid "Behind {base}"
 msgstr "Indietro rispetto a {base}"
 
@@ -5422,11 +5432,11 @@ msgstr "Provider bloccati"
 msgid "Blocked Regions"
 msgstr "Regioni bloccate"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:106
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:128
 msgid "Blocked websites for web search"
 msgstr "Siti web bloccati per la ricerca web"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:127
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:149
 msgid "Blocked websites saved"
 msgstr "Siti web bloccati salvati"
 
@@ -5780,8 +5790,8 @@ msgstr "Editor canvas integrato"
 msgid "Built-in reasoning before generating"
 msgstr "Ragionamento integrato prima della generazione"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:370
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:371
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:374
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:375
 #: src/features/settings/lib/settings-keywords.ts:102
 msgid "Built-in tools"
 msgstr "Strumenti integrati"
@@ -6276,11 +6286,11 @@ msgstr "Catalano (Spagna)"
 msgid "catalog"
 msgstr "catalogo"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:150
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:160
 msgid "Catch up"
 msgstr "Allinea"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:117
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:127
 msgid "Catch up {pullRequest} with {base}"
 msgstr "Allinea {pullRequest} con {base}"
 
@@ -6576,6 +6586,14 @@ msgstr "Le chat verranno compattate al {0} della finestra di contesto"
 msgid "Chats will not be compacted automatically"
 msgstr "Le chat non verranno compattate automaticamente"
 
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:120
+msgid "Chats with an open pull request are kept"
+msgstr "Le chat con una pull request aperta vengono mantenute"
+
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:120
+msgid "Chats with an open pull request can be archived"
+msgstr "Le chat con una pull request aperta possono essere archiviate"
+
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:75
 msgid "Chats with no activity for this long are archived. Archived chats stay searchable."
 msgstr "Le chat senza attività per questo periodo vengono archiviate. Le chat archiviate restano ricercabili."
@@ -6781,7 +6799,7 @@ msgstr "Scegli il sistema di ripresa per la tua inquadratura"
 msgid "Choose the project's folder, or type a path."
 msgstr "Scegli la cartella del progetto oppure digita un percorso."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:355
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:357
 msgid "Choose which tools the assistant may use on its own, which need your approval, and which are off."
 msgstr "Scegli quali strumenti l'assistente può usare da solo, quali richiedono la tua approvazione e quali sono disattivati."
 
@@ -8192,7 +8210,7 @@ msgstr "Connesso. Puoi chiudere questa finestra."
 msgid "Connecting {pairingHost}…"
 msgstr "Connessione a {pairingHost}…"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:392
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:396
 msgid "Connecting to your MCP servers..."
 msgstr "Connessione ai tuoi server MCP..."
 
@@ -9117,7 +9135,7 @@ msgstr "Impossibile caricare i repository di questo progetto."
 msgid "Could not load this project's usage."
 msgstr "Impossibile caricare l'utilizzo di questo progetto."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:139
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:141
 msgid "Could not load tools: {error}"
 msgstr "Impossibile caricare gli strumenti: {error}"
 
@@ -9262,6 +9280,10 @@ msgstr "Impossibile salvare gli strumenti del bot. I suoi strumenti restano inva
 #: src/features/notifications/components/notification-settings.tsx:110
 msgid "Could not save the Daily Brief setting."
 msgstr "Impossibile salvare l'impostazione del Daily Brief."
+
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:73
+msgid "Could not save the default permission mode"
+msgstr "Impossibile salvare la modalità di autorizzazione predefinita"
 
 #: src/features/notifications/components/notification-settings.tsx:103
 msgid "Could not save the email setting."
@@ -9409,7 +9431,7 @@ msgstr "Conteggiato per settimane intere (da lunedì a domenica, UTC) al termine
 msgid "country"
 msgstr "paese"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:254
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:256
 msgid "Covers only tools from MCP servers and connectors you trust for auto-approval (a switch on each server in your MCP settings and on each connector), left at their default Ask, in chats only you can write to. A trusted server's tool descriptions reach the model and can influence what is approved, so trust only servers you would let act for you. Changing a server's address ends its trust."
 msgstr "Riguarda solo gli strumenti dei server MCP e dei connettori di cui ti fidi per l’approvazione automatica (un interruttore su ogni server nelle impostazioni MCP e su ogni connettore), lasciati sul valore predefinito Chiedi, in chat in cui solo tu puoi scrivere. Le descrizioni degli strumenti di un server attendibile arrivano al modello e possono influenzare ciò che viene approvato, quindi considera attendibili solo i server a cui lasceresti agire al posto tuo. Cambiare l’indirizzo di un server ne revoca l’attendibilità."
 
@@ -9951,7 +9973,7 @@ msgid "Custom rate limits"
 msgstr "Limiti di frequenza personalizzati"
 
 #. placeholder {0}: modeLabels[tool.defaultMode]
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:75
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:77
 msgid "Custom setting (default: {0})"
 msgstr "Impostazione personalizzata (predefinita: {0})"
 
@@ -10318,7 +10340,7 @@ msgstr "predefinito"
 
 #: src/features/appearance/components/appearance-controls.tsx:185
 #: src/features/projects/components/project-repositories.tsx:342
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:75
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:77
 msgid "Default"
 msgstr "Predefinito"
 
@@ -10357,6 +10379,10 @@ msgstr "Lingua di dettatura predefinita"
 #: src/features/settings/components/account/account-settings.tsx:267
 msgid "Default dictation language for new threads (BCP 47 code)."
 msgstr "Lingua di dettatura predefinita per le nuove conversazioni (codice BCP 47)."
+
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:55
+msgid "Default for new chats"
+msgstr "Predefinito per le nuove chat"
 
 #: src/features/settings/components/account/account-settings.tsx:242
 msgid "Default language for AI responses in new threads (BCP 47 code)."
@@ -11075,7 +11101,7 @@ msgstr "Progettare un sistema o una modifica che coinvolge più parti."
 msgid "Desktop"
 msgstr "Desktop"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:71
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:73
 msgid "destructive"
 msgstr "distruttivo"
 
@@ -11915,7 +11941,7 @@ msgstr "Ogni azione inserisce un prompt nella casella dei messaggi di questa cha
 msgid "Each case runs once, one after another. Every case counts toward your daily message and task limits, and the run stops when it reaches its cost cap."
 msgstr "Ogni caso viene eseguito una volta, uno dopo l'altro. Ogni caso conta ai fini dei tuoi limiti giornalieri di messaggi e attività e l'esecuzione si ferma quando raggiunge il limite di costo."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:258
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:260
 msgid "Each check is one small model call on your account and is rate-limited. If it fails or runs out of time, you are asked as usual."
 msgstr "Ogni controllo è una piccola chiamata al modello sul tuo account e ha un limite di frequenza. Se fallisce o scade il tempo, ti viene chiesto come al solito."
 
@@ -13194,6 +13220,7 @@ msgid "Every Sunday at midnight"
 msgstr "Ogni domenica a mezzanotte"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:48
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:48
 msgid "Every tool runs without asking, except those that need your answer"
 msgstr "Ogni strumento viene eseguito senza chiedere, tranne quelli che richiedono la tua risposta"
 
@@ -14223,7 +14250,7 @@ msgstr "Impossibile revocare la sessione"
 msgid "Failed to revoke sessions"
 msgstr "Impossibile revocare le sessioni"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:322
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:324
 msgid "Failed to revoke the allow"
 msgstr "Impossibile revocare il consenso"
 
@@ -14470,7 +14497,7 @@ msgstr "Impossibile aggiornare i tag"
 msgid "Failed to update the case"
 msgstr "Impossibile aggiornare il caso"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:310
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:312
 msgid "Failed to update the quick check"
 msgstr "Impossibile aggiornare il controllo rapido"
 
@@ -14482,7 +14509,7 @@ msgstr "Impossibile aggiornare i server attendibili"
 msgid "Failed to update thread visibility"
 msgstr "Impossibile aggiornare la visibilità della conversazione"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:298
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:300
 msgid "Failed to update tool permission"
 msgstr "Impossibile aggiornare il permesso dello strumento"
 
@@ -15862,6 +15889,7 @@ msgstr "Output video in alta definizione Full 1080p"
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
 #: src/features/chat/thread/composer-permission-mode.tsx:42
 #: src/features/settings/components/chat/bots-settings.tsx:133
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:42
 msgid "Full access"
 msgstr "Accesso completo"
 
@@ -18829,6 +18857,10 @@ msgstr "Continua ad accettare il vecchio segreto per 24 ore"
 msgid "Keep as mine"
 msgstr "Mantieni come mio"
 
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:107
+msgid "Keep chats with an open pull request"
+msgstr "Mantieni le chat con una pull request aperta"
+
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1071
 msgid "Keep control"
 msgstr "Mantieni il controllo"
@@ -19520,7 +19552,7 @@ msgstr "Tipo di obiettivo"
 msgid "Less"
 msgstr "Meno"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:243
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:245
 msgid "Let a quick check approve low-risk calls"
 msgstr "Lascia che un controllo rapido approvi le chiamate a basso rischio"
 
@@ -20157,7 +20189,7 @@ msgstr "Caricamento di server, connettori e computer…"
 #: src/features/settings/components/chat/custom-providers-settings.tsx:343
 #: src/features/settings/components/chat/default-models-settings.tsx:185
 #: src/features/settings/components/chat/native-providers-settings.tsx:396
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:289
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:291
 #: src/features/settings/components/chat/trigger-settings.tsx:974
 #: src/features/settings/components/privacy/data-access.tsx:25
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:229
@@ -20872,7 +20904,7 @@ msgstr "MCP"
 msgid "MCP Registry"
 msgstr "Registro MCP"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:398
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:402
 msgid "MCP server"
 msgstr "Server MCP"
 
@@ -20913,8 +20945,8 @@ msgstr "Server MCP"
 msgid "MCP servers provide additional tools that the AI can use during conversations. Tools from connected servers are automatically available when chatting."
 msgstr "I server MCP forniscono strumenti aggiuntivi che l'IA può usare durante le conversazioni. Gli strumenti dei server collegati sono disponibili automaticamente in chat."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:387
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:388
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:391
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:392
 #: src/features/settings/lib/settings-keywords.ts:103
 msgid "MCP tools"
 msgstr "Strumenti MCP"
@@ -22509,15 +22541,15 @@ msgstr "mai"
 msgid "Never"
 msgstr "Mai"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:256
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:258
 msgid "Never covers a call after the chat has read web pages, attached files, documents or pages, knowledge or other tool results: those can carry hidden instructions."
 msgstr "Non copre mai una chiamata dopo che la chat ha letto pagine web, file allegati, documenti o pagine, conoscenza o altri risultati di strumenti: possono contenere istruzioni nascoste."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:257
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:259
 msgid "Never covers a call while any skill is enabled or invoked. Skills can come from the marketplace, an organization or an import, and there is no reliable way to tell yours apart, so switch your skills off to use the quick check."
 msgstr "Non copre mai una chiamata mentre una skill è attiva o invocata. Le skill possono provenire dal marketplace, da un’organizzazione o da un’importazione, e non c’è un modo affidabile per distinguere le tue, quindi disattiva le tue skill per usare il controllo rapido."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:255
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:257
 msgid "Never covers a tool you set to Ask yourself, built-in tools, device tools, questions to you, sub-agents or coding agents, or anything that sends, publishes, pays or deletes."
 msgstr "Non copre mai uno strumento che hai impostato tu su Chiedi, gli strumenti integrati, gli strumenti del dispositivo, le domande rivolte a te, i sub-agenti o gli agenti di programmazione, né qualsiasi cosa che invii, pubblichi, paghi o elimini."
 
@@ -22581,6 +22613,10 @@ msgstr "Nuova chat"
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:57
 msgid "New chats are deleted automatically after the retention period above. You can make one permanent from its menu."
 msgstr "Le nuove chat vengono eliminate automaticamente dopo il periodo di conservazione indicato sopra. Puoi renderne permanente una dal suo menu."
+
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:57
+msgid "New chats start in this permission mode. A chat that already exists keeps its own mode, and you can still change a chat's mode in its composer."
+msgstr "Le nuove chat iniziano in questa modalità di autorizzazione. Una chat esistente mantiene la propria modalità; la modalità di una chat si può ancora cambiare dal suo composer."
 
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:65
 msgid "New chats start permanent"
@@ -23048,7 +23084,7 @@ msgstr "Nessuna differenza disponibile per questa versione"
 msgid "No emoji found"
 msgstr "Nessuna emoji trovata"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:395
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:399
 msgid "No enabled MCP servers."
 msgstr "Nessun server MCP attivo."
 
@@ -23528,7 +23564,7 @@ msgstr "Ancora nessun dato sui piani. Le informazioni sul piano vengono registra
 msgid "No tools shared yet"
 msgstr "Nessuno strumento condiviso"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:142
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:144
 msgid "No tools."
 msgstr "Nessuno strumento."
 
@@ -23685,7 +23721,7 @@ msgstr "Non allegato:"
 msgid "Not changed"
 msgstr "Non modificato"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:72
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:74
 msgid "not configured"
 msgstr "non configurato"
 
@@ -23939,7 +23975,7 @@ msgstr "disattivato"
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:90
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:97
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:277
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:61
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:63
 msgid "Off"
 msgstr "Off"
 
@@ -24140,7 +24176,7 @@ msgstr "Un'unica API.<0/><1>Ogni LLM.</1>"
 msgid "One deployment name per line, exactly as in Azure AI Foundry → Deployments."
 msgstr "Un nome di distribuzione per riga, esattamente come in Azure AI Foundry → Distribuzioni."
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:109
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:131
 msgid "One domain per line, for example example.com. Results from these sites and their subdomains are never shown, even if the assistant asks for them."
 msgstr "Un dominio per riga, ad esempio example.com. I risultati di questi siti e dei loro sottodomini non vengono mai mostrati, anche se l’assistente li richiede."
 
@@ -27468,11 +27504,11 @@ msgstr "Notifiche push su questo browser"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "Metti più agenti con ruoli propri in un solo thread. Un pannello di revisione può controllare una modifica dal punto di vista della sicurezza e delle prestazioni, e un dibattito può sostenere entrambe le tesi prima di una sintesi."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:156
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:166
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
 msgstr "Inserisce nel composer un prompt per fare il rebase di questo branch su {base}, risolvere i conflitti, verificare build e test e fare push. Non viene inviato nulla."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:157
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:167
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "Inserisce nel composer un prompt per fare il rebase del branch di questo fork su {base} in una copia locale, risolvere i conflitti e verificare build e test. Non viene fatto push. Non viene inviato nulla."
 
@@ -27775,7 +27811,7 @@ msgstr "Leggi la guida"
 msgid "Read the page"
 msgstr "Leggi la pagina"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:70
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:72
 msgid "read-only"
 msgstr "sola lettura"
 
@@ -28980,12 +29016,12 @@ msgstr "Invia di nuovo l'email di verifica"
 #: src/features/chat/components/cinema-studio/cinema-panel.tsx:88
 #: src/features/settings/components/chat/models-settings.tsx:617
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:269
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:108
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:110
 msgid "Reset"
 msgstr "Ripristina"
 
 #. placeholder {0}: tool.name
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:102
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:104
 msgid "Reset {0} to default"
 msgstr "Ripristina {0} al valore predefinito"
 
@@ -29354,7 +29390,7 @@ msgstr "Nota del revisore"
 #: src/features/auth/components/settings/account/account-cell.tsx:140
 #: src/features/chat/guest-links/use-guest-link-revoke.tsx:105
 #: src/features/pages/components/page-share-dialog.tsx:209
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:215
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:217
 msgid "Revoke"
 msgstr "Revoca"
 
@@ -29370,11 +29406,11 @@ msgstr "Revoca link"
 msgid "Revoke Session"
 msgstr "Revoca sessione"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:209
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:211
 msgid "Revoke the allow for {tool}"
 msgstr "Revoca il consenso per {tool}"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:209
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:211
 msgid "Revoke the allow for {tool} on {server}"
 msgstr "Revoca il consenso per {tool} su {server}"
 
@@ -29876,7 +29912,7 @@ msgstr "Salva come caso di valutazione"
 msgid "Save as preset"
 msgstr "Salva come preset"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:133
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:155
 msgid "Save blocked websites"
 msgstr "Salva i siti web bloccati"
 
@@ -33541,6 +33577,7 @@ msgstr "Comprensione superiore di concetti visivi complessi"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:43
 #: src/features/settings/components/chat/bots-settings.tsx:134
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:43
 msgid "Supervised"
 msgstr "Supervisionato"
 
@@ -35567,7 +35604,7 @@ msgstr "Questi provider non verranno mai usati per le tue richieste."
 msgid "These rule files were changed meanwhile. Discard your changes to see the saved ones, then edit again."
 msgstr "Questi file di regole sono stati modificati nel frattempo. Scarta le tue modifiche per vedere quelli salvati, poi modificali di nuovo."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:196
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:198
 msgid "These tools run without asking until the time shown. Revoke one to be asked again from your next message."
 msgstr "Questi strumenti vengono eseguiti senza chiedere fino all’ora indicata. Revocane uno per ricevere di nuovo la richiesta dal prossimo messaggio."
 
@@ -36831,7 +36868,7 @@ msgstr "Chiamata di strumenti"
 msgid "Tool output's share of the stored size"
 msgstr "Quota dell’output degli strumenti sulla dimensione memorizzata"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:354
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:356
 #: src/features/settings/lib/settings-navigation.ts:96
 msgid "Tool Permissions"
 msgstr "Permessi degli strumenti"
@@ -36863,6 +36900,7 @@ msgid "Tools for {0}"
 msgstr "Strumenti di {0}"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:47
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:47
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr "Gli strumenti girano con le loro impostazioni; un controllo rapido può sbloccare le chiamate a basso rischio"
 
@@ -37766,7 +37804,7 @@ msgstr "fino al {0}"
 msgid "Until {0}"
 msgstr "Fino al {0}"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:206
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:208
 msgid "Until {until}"
 msgstr "Fino a {until}"
 

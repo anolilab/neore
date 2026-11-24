@@ -712,6 +712,31 @@ describe("mergeGuestInto", () => {
         expect(calls.indexOf("listShardRowsPage")).toBeGreaterThan(calls.indexOf("handOverOrganizationContributors"));
     });
 
+    it("drops the guest's pull-request scan position rather than copying it, since its cursor names links that are re-inserted", async () => {
+        const { call, shards } = fakeShards({
+            guest: { pullRequestStateScans: [{ _id: "s1", cursor: "old-cursor", userId: "guest" }] },
+            user: {},
+        });
+
+        await mergeToEnd(call, "guest", "user");
+
+        expect(shards.get("user")?.get("pullRequestStateScans") ?? []).toStrictEqual([]);
+        expect(shards.get("guest")?.get("pullRequestStateScans")).toStrictEqual([]);
+    });
+
+    it("leaves the new account's own scan position alone when both accounts have one", async () => {
+        const own = { _id: "s-user", cursor: "user-cursor", userId: "user" };
+        const { call, shards } = fakeShards({
+            guest: { pullRequestStateScans: [{ _id: "s-guest", cursor: "guest-cursor", userId: "guest" }] },
+            user: { pullRequestStateScans: [own] },
+        });
+
+        await mergeToEnd(call, "guest", "user");
+
+        expect(shards.get("user")?.get("pullRequestStateScans")).toStrictEqual([own]);
+        expect(shards.get("guest")?.get("pullRequestStateScans")).toStrictEqual([]);
+    });
+
     it("deletes the guest once its shard is empty, on the guest's shard", async () => {
         const { call, deletedGuests } = fakeShards({
             guest: {

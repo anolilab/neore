@@ -64,6 +64,8 @@ export const userSettingsFieldsWithoutUserId = {
     contrast: v.optional(v.union(v.literal("system"), v.literal("standard"), v.literal("high"))),
     customInstructions: v.optional(v.string().max(MAX_LENGTH.document)), // Custom instructions for how AI should respond (max 3000 chars)
     dailyBriefEnabled: v.optional(v.boolean()), // Opt-in morning summary notification. OPT-IN: absent means off.
+    // The permission mode a new chat starts with (`chat/lib/thread-permission-mode.ts`, `newChatPermissionMode`). Absent = auto.
+    defaultPermissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
     // Appearance: UI spacing preset (`apps/web/src/features/appearance/lib/display-preferences.ts`). Absent = comfortable.
     density: v.optional(v.union(v.literal("compact"), v.literal("comfortable"), v.literal("spacious"))),
     dictationLanguage: v.optional(v.string().max(MAX_LENGTH.short)), // Default dictation language for new threads (BCP 47 code, e.g., "en-US", "es-ES")
@@ -74,6 +76,8 @@ export const userSettingsFieldsWithoutUserId = {
     hostFollowUpSteer: v.optional(v.boolean()), // A message sent during a coding agent's turn interrupts it and goes next. Absent means queue.
     id: v.optional(v.string().max(MAX_LENGTH.id)),
     isAdvancedUser: v.optional(v.boolean()),
+    // Keep an idle chat out of auto-archive while it has a linked pull request that is open. Absent = on (`agent/auto-archive.ts`).
+    keepOpenPullRequestChats: v.optional(v.boolean()),
     keyboardShortcuts: v.optional(
         v.object({
             archiveThread: v.optional(v.string().max(MAX_LENGTH.short)),
