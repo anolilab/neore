@@ -178,6 +178,35 @@ describe("dispatchLinkedPullRequestChecks", () => {
     });
 });
 
+describe("dispatchLinkedPullRequestChecks paging", () => {
+    it("reaches the next page when the page before it has more open idle links than one sweep checks", async () => {
+        // A link checked in one sweep is stale again ten minutes later, so page one never drains; the scan still moves on.
+        const open = Array.from({ length: 500 }, (): LinkSeed => {
+            return { state: "open" };
+        });
+        const { dispatched } = await seedAndSweep([...open, {}], ON, 2);
+
+        expect(dispatched).toEqual([20, 1]);
+    });
+
+    it("restarts the scan from the first page when the saved cursor is one the server no longer reads", async () => {
+        const dispatched = await harness.run(async (ctx: any) => {
+            await ctx.db.insert("userSettings", { autoArchiveAfterDays: 30, userId: OWNER });
+
+            const threadId = await ctx.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Thread", updatedAt: 1, userId: OWNER });
+
+            await ctx.db.insert("pullRequestThreads", { ...NOW_LINK, number: 1, repository: "acme/app", threadId, userId: OWNER });
+            await ctx.db.insert("pullRequestStateScans", { cursor: "cursor-from-an-older-build", userId: OWNER });
+
+            const result = await runInShard(OWNER, () => ctx.runMutation(dispatchLinkedPullRequestChecks, {}));
+
+            return result.dispatched;
+        });
+
+        expect(dispatched).toBe(1);
+    });
+});
+
 describe("scheduleArchiveAfterClose", () => {
     it("schedules the chat's archive job at once, which reads the owner's setting when it runs", () => {
         const runAfter = vi.fn(async () => "job");

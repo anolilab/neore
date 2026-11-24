@@ -9,7 +9,7 @@
  * private repository the token cannot see, and a closed link is never read again.
  * The sweep does nothing unless auto-archive is on and the person keeps open-pull-request chats.
  */
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
@@ -30,8 +30,8 @@ import { readFromHost } from "./read-host";
 /** A link's state is re-read once it is this old. */
 export const PR_STATE_MAX_AGE_MS = 10 * 60 * 1000;
 /**
- * Links read per sweep: one page of the person's links. The scan resumes at the page after the last one it finished
- * (`pullRequestStateScans`), so a user with more links than this is reached a page at a time.
+ * Links read per sweep: one page of the person's links. The scan moves to the next page after each sweep
+ * (`pullRequestStateScans`), so a user with more links than this is reached one page per sweep.
  */
 const SCAN_LIMIT = 500;
 /** Links checked per sweep, so one user's host calls stay bounded. */
@@ -62,6 +62,24 @@ const candidateOf = (thread: {
 };
 
 const vState = v.union(v.literal("open"), v.literal("closed"), v.literal("merged"));
+
+/**
+ * One page of the person's links at `cursor`. A cursor the server no longer reads (`INVALID_CURSOR`: minted by an older build)
+ * restarts the scan from the first page, so a deployment does not stop the refresh for anyone.
+ */
+const linksPageAt = async (ctx: MutationCtx, userId: string, cursor: string | null) => {
+    const links = () => ctx.db.query("pullRequestThreads").withIndex("by_user_and_repository_number", (q) => q.eq("userId", userId));
+
+    try {
+        return await links().paginate({ cursor, numItems: SCAN_LIMIT });
+    } catch (error) {
+        if (cursor === null || !(error instanceof LunoraError) || error.code !== "INVALID_CURSOR") {
+            throw error;
+        }
+
+        return await links().paginate({ cursor: null, numItems: SCAN_LIMIT });
+    }
+};
 
 /** Writes the scan position only when it moved, so a page that is still unfinished costs no write. */
 const saveScan = async (ctx: MutationCtx, scan: Doc<"pullRequestStateScans"> | null, userId: string, cursor: string | null): Promise<void> => {
@@ -106,10 +124,7 @@ export const dispatchLinkedPullRequestChecks = internalMutation
             .query("pullRequestStateScans")
             .withIndex("by_userId", (q) => q.eq("userId", userId))
             .unique();
-        const page = await ctx.db
-            .query("pullRequestThreads")
-            .withIndex("by_user_and_repository_number", (q) => q.eq("userId", userId))
-            .paginate({ cursor: scan?.cursor ?? null, numItems: SCAN_LIMIT });
+        const page = await linksPageAt(ctx, userId, scan?.cursor ?? null);
         // Never-checked first, then the longest unchecked: a link is not starved by the ones checked before it.
         const stale = page.page
             .filter(
@@ -121,7 +136,6 @@ export const dispatchLinkedPullRequestChecks = internalMutation
             .toSorted((a, b) => (a.stateCheckedAt ?? 0) - (b.stateCheckedAt ?? 0));
         const cutoff = autoArchiveCutoff(now, days);
         const due: typeof stale = [];
-        let examined = 0;
 
         // Only a link whose chat auto-archive would consider idle is read: the state of any other chat is never used.
         const lookups = stale.slice(0, CHECK_LIMIT * THREAD_LOOKUP_FACTOR);
@@ -131,7 +145,6 @@ export const dispatchLinkedPullRequestChecks = internalMutation
                 break;
             }
 
-            examined += 1;
             const thread = await ctx.db.get("threads", link.threadId);
 
             if (thread !== null && selectAutoArchiveDue([candidateOf(thread)], cutoff, NO_EXCLUSIONS, 1).length === 1) {
@@ -142,15 +155,10 @@ export const dispatchLinkedPullRequestChecks = internalMutation
             }
         }
 
-        // A page is finished before the scan moves on. A page with stale links past this sweep's budget is scanned again
-        // next sweep: the links checked now are fresh by then, so the rest come up. Nothing stale is ever skipped.
-        let resumeAt = scan?.cursor ?? null;
-
-        if (examined === stale.length) {
-            resumeAt = page.isDone ? null : page.continueCursor;
-        }
-
-        await saveScan(ctx, scan, userId, resumeAt);
+        // The scan moves to the next page after every sweep, so each page takes its turn. A link past this sweep's budget is
+        // read on its page's next turn. Waiting on the same page until it drains would never end: a link checked now is stale
+        // again ten minutes later, so a page with more open idle links than one sweep checks would never drain.
+        await saveScan(ctx, scan, userId, page.isDone ? null : page.continueCursor);
 
         for (const link of due) {
             // Stamped first: a sweep that runs again before the read lands skips this link. The stamp is the lease.
