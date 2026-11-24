@@ -343,6 +343,22 @@ describe("chat files in the GDPR export", () => {
         expect(chunk.truncated).toBe(true);
     });
 
+    it("flags a chunk whose last repair overshoots the budget, even with no file left", async () => {
+        const chunk = await readChunkMetadata(
+            ["a"],
+            5,
+            async () => {
+                return { readBytes: 0, rows: [] };
+            },
+            async (id) => {
+                return { readBytes: 10, rows: [{ id }] };
+            },
+        );
+
+        expect(chunk.rows).toEqual([{ id: "a" }]);
+        expect(chunk.truncated).toBe(true);
+    });
+
     it("exports a file stored before its export metadata was written, and writes that metadata", async () => {
         // A file row with a grant and no metadata row: what a store before `chatFileMetadata` looked like.
         const legacy = (await harness.run(async (ctx: any) => {
