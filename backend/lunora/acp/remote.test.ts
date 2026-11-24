@@ -51,6 +51,19 @@ vi.mock("../projects/functions", async (importOriginal) => {
     };
 });
 
+// The shard each scheduled job is named onto, seen through the real helper (`runAfterOnShard` still schedules it).
+const { runAfterOnShard } = vi.hoisted(() => {
+    return { runAfterOnShard: vi.fn() };
+});
+
+vi.mock("../lib/shard-scheduler", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../lib/shard-scheduler")>();
+
+    runAfterOnShard.mockImplementation(actual.runAfterOnShard);
+
+    return { ...actual, runAfterOnShard };
+});
+
 const registry = vi.hoisted(() => new Map<string, unknown>());
 
 vi.mock("../_generated/internal", async (importOriginal) => {
@@ -74,6 +87,8 @@ const { signDevicePayload } = await import("../devices/lib/signing");
 const { ACP_CLAIM_LEASE_MS, ACP_CLAIM_WINDOW_MS, DEVICE_CALL_DEADLINE_MS } = await import("../devices/lib/constants");
 const { parseAcpOffers } = await import("../devices/lib/manifest");
 const { applyHostEvents, recordOpenedRunner } = await import("./ingest");
+const { routeSchedule } = await import("../lib/shard-scheduler");
+const { internal } = await import("../_generated/internal");
 const { createAcpCall, createAcpCancelCall } = await import("../devices/lib/acp-call");
 const calls = await import("./calls");
 const remote = await import("./remote");
@@ -90,6 +105,8 @@ registerModule(registry, "agent_streams", await import("../agent/streams"));
 registerModule(registry, "chat_streaming_persistent_library", await import("../chat/streaming/persistent/library"));
 registerModule(registry, "lib_shard_routes", await import("../lib/shard-routes"));
 registerModule(registry, "lib_shard_housekeeping", await import("../lib/shard-housekeeping"));
+// Left as a path reference, so the harness scheduler dispatches the job an open schedules by its path (`functions` below).
+registry.delete("acp_ingest:recordOpenedRunner");
 
 type Harness = ReturnType<typeof lunoraTest>;
 type Row = Record<string, any>;
@@ -289,8 +306,9 @@ const addRequests = async (streamId: string, ids: string[]) => {
 };
 
 beforeEach(async () => {
-    harness = lunoraTest(schema as never);
+    harness = lunoraTest(schema as never, { functions: { "acp_ingest:recordOpenedRunner": recordOpenedRunner } } as never);
     ownerId = await insertUser();
+    runAfterOnShard.mockClear();
     activeOrganization.current = null;
     delete replica.project;
     delete replica.readable;
@@ -1246,7 +1264,7 @@ describe("a project remembers its runner", () => {
         expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
     });
 
-    it("opens the session before the default is recorded, and records nothing for an open that never took", async () => {
+    it("opens the session before the default is recorded on the owner's shard, and records nothing for an open that never took", async () => {
         const device = await pairedDevice(ownerId);
         const projectId = await insertProject({ userId: ownerId });
         const started = (await startIn(projectId, device, "tap-sched")) as { threadId: string };
@@ -1268,12 +1286,23 @@ describe("a project remembers its runner", () => {
         expect(await sessionStatusOf(started.threadId)).toBe("idle");
         expect(await defaultOf(projectId)).toBeNull();
 
-        // The record the open scheduled, run with the arguments it was scheduled with (only that job: the scheduler is not run here).
-        // The harness leaves `functionPath` empty for a function reference: the job is the one carrying the open's time.
-        const job = harness.scheduler.list().find((entry) => "openedAt" in entry.args);
+        // The record is named onto the device owner's shard, where the session lives, never left to the calling shard: the
+        // scheduler sends the key in its `/schedule` body, and the routing sends that job to the owner's lane even from `__root__`.
+        expect(runAfterOnShard).toHaveBeenCalledOnce();
 
-        expect(job?.args).toMatchObject({ projectId, sessionId: session?._id });
-        await run(async (ctx) => await ctx.runMutation(recordOpenedRunner, job?.args));
+        const [, delay, target, args, shard] = runAfterOnShard.mock.calls[0]!;
+
+        expect([delay, target, shard]).toStrictEqual([0, internal.acp.ingest.recordOpenedRunner, ownerId]);
+        expect(args).toMatchObject({ projectId, sessionId: session?._id });
+        expect(routeSchedule("https://scheduler/schedule", { body: JSON.stringify({ args, shardKey: shard }) }, undefined)?.targetShard).toBe(ownerId);
+
+        // The scheduler runs the job it was handed: the default is saved.
+        const job = harness.scheduler.list().find((entry) => entry.functionPath === "acp_ingest:recordOpenedRunner");
+
+        expect(job?.args).toStrictEqual(args);
+        await harness.scheduler.runPending({ throwOnError: false });
+        expect(harness.scheduler.failures().filter((failure) => failure.functionPath === "acp_ingest:recordOpenedRunner")).toStrictEqual([]);
+        expect(harness.scheduler.list().some((entry) => entry.functionPath === "acp_ingest:recordOpenedRunner")).toBe(false);
         expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
     });
 

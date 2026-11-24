@@ -36,6 +36,7 @@ import {
 import { logger } from "../lib/logger";
 import { patchRow } from "../lib/patch";
 import { noteShardDue } from "../lib/shard-housekeeping";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
 import { confirmedOf, mergeAgentState, sameReportedFields, settledBy } from "./lib/agent-state";
@@ -155,13 +156,16 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         // The catch sees only a refusal inside the transaction; the job is handed to the scheduler after the commit, and a failed
         // handoff there (kept in Lunora's outbox and retried) answers this post with an error. The desktop posts the open again
         // (`session-link.ts`), and the session is no longer `starting`, so the retry is answered with the thread and schedules nothing.
+        // The job is named onto the device owner's shard, where the session lives: a job with no shard key may run on `__root__`.
         if (opened && thread?.projectId) {
             try {
-                await ctx.scheduler.runAfter(0, internal.acp.ingest.recordOpenedRunner, {
-                    openedAt: now,
-                    projectId: thread.projectId,
-                    sessionId: existing._id,
-                });
+                await runAfterOnShard(
+                    ctx.scheduler,
+                    0,
+                    internal.acp.ingest.recordOpenedRunner,
+                    { openedAt: now, projectId: thread.projectId, sessionId: existing._id },
+                    device.userId,
+                );
             } catch (error) {
                 logger.warn("acp: the project's runner default was not scheduled", {
                     error: error instanceof Error ? error.message : String(error),
