@@ -1473,6 +1473,37 @@ describe("importShardRows for the organization ledger", () => {
             harness.close();
         }
     });
+
+    it("holds an older organization row that is re-owned in place on a shared store, as the insert path holds it", async () => {
+        const now = 10 * ORGANIZATION_RECORD_LATE_MS;
+        const harness = lunoraTest(schemaWithShardedTables(["shardActivity"]) as never, { now } as never);
+        const oldRow = {
+            _id: "old",
+            at: now - ORGANIZATION_RECORD_LATE_MS - 1,
+            costMicrodollars: 100,
+            organizationId: "org-1",
+            projectKey: "p",
+            replyKey: "old",
+            tokens: 1,
+            userId: "guest",
+        };
+
+        try {
+            // The row is already on this shard under its id (a shared store), owned by the guest, with no contributor entry handed over.
+            await harness.run(async (context: any) => {
+                await context.db.insert("usageOrganizationReplies", oldRow, { allowExplicitId: true });
+                await context.runMutation(importShardRows, { from: "guest", rows: [oldRow], table: "usageOrganizationReplies", to: "user" });
+            });
+
+            const stored = await harness.run(
+                async (context: any) => await context.db.usageOrganizationReplies.findMany({ where: { organizationId: "org-1" } }),
+            );
+
+            expect(stored.page).toStrictEqual([expect.objectContaining({ heldFrom: "guest", userId: "user" })]);
+        } finally {
+            harness.close();
+        }
+    });
 });
 
 describe("merging a guest's organization usage", () => {

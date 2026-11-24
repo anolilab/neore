@@ -31,6 +31,7 @@
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
+import type { MutationCtx } from "../_generated/server";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { mergeSkippedSteps } from "../auth/lib/setup-step-limits";
 import { authLogger } from "./logger";
@@ -229,6 +230,37 @@ const carrySetupSteps = async (ctx: { db: unknown }, guestRows: Record<string, u
     }
 };
 
+/**
+ * The `heldFrom` an organization ledger row takes as it moves to `to`, on the insert path and the in-place re-own alike. An older row
+ * counts only in the cohort it was counted in: where the guest's entry became the new account's (`handOverOrganizationContributors`),
+ * every cell stays as it was. Elsewhere it would change a released week by the guest's spend, so it moves held: the account keeps it in
+ * its export, and the view never counts it. Undefined for any other row.
+ */
+const heldFieldOf = async (
+    ctx: Pick<MutationCtx, "db" | "now">,
+    table: string,
+    row: Record<string, unknown>,
+    from: string,
+    to: string,
+    handedOver: Map<string, boolean>,
+): Promise<{ heldFrom: string } | undefined> => {
+    if (table !== "usageOrganizationReplies" || typeof row["at"] !== "number" || ctx.now - row["at"] <= ORGANIZATION_RECORD_LATE_MS) {
+        return undefined;
+    }
+
+    const organizationId = String(row["organizationId"]);
+    let same = handedOver.get(organizationId);
+
+    if (same === undefined) {
+        const entry = await ctx.db.usageOrganizationContributors.findFirst({ consistency: "primary", where: { organizationId, userId: to } });
+
+        same = entry?.mergedFrom === from;
+        handedOver.set(organizationId, same);
+    }
+
+    return same ? undefined : { heldFrom: typeof row["heldFrom"] === "string" ? row["heldFrom"] : from };
+};
+
 /** On the NEW user's shard: insert `rows` of `table` under their own ids, re-owned. */
 export const importShardRows = internalMutation
     .input({ from: v.string(), rows: v.array(v.any()), table: v.string(), to: v.string() })
@@ -276,36 +308,13 @@ export const importShardRows = internalMutation
                 // The guest's own row is re-owned. Another user's row (a collaborator's comment on the guest's page) moves as it
                 // is: its owner stays and nothing in it is rewritten, so it still belongs to the page once the page moves.
                 const guestOwned = ownerField === undefined || row[ownerField] === args.from;
-                let moved: Record<string, unknown> = guestOwned ? rewriteOwner(row, args.from, args.to) : row;
-
-                // An organization ledger row older than `ORGANIZATION_RECORD_LATE_MS` is in a week the organization view may already show. It
-                // counts only in the cohort it was counted in: where the guest's entry became the new account's
-                // (`handOverOrganizationContributors`), every cell stays as it was. Elsewhere (the account has its own entry, or the guest had
-                // none yet) it would change a released week by the guest's spend: it still moves, held (`heldFrom`), so the account keeps it
-                // in its export until retention prunes it, and the view never counts it. Nothing of the guest's is left behind to be deleted.
-                if (args.table === "usageOrganizationReplies" && typeof row["at"] === "number" && ctx.now - row["at"] > ORGANIZATION_RECORD_LATE_MS) {
-                    const organizationId = String(row["organizationId"]);
-                    let same = handedOver.get(organizationId);
-
-                    if (same === undefined) {
-                        const entry = await ctx.db.usageOrganizationContributors.findFirst({
-                            consistency: "primary",
-                            where: { organizationId, userId: args.to },
-                        });
-
-                        same = entry?.mergedFrom === args.from;
-                        handedOver.set(organizationId, same);
-                    }
-
-                    if (!same) {
-                        moved = { ...moved, heldFrom: typeof row["heldFrom"] === "string" ? row["heldFrom"] : args.from };
-                    }
-                }
+                const heldField = await heldFieldOf(ctx, args.table, row, args.from, args.to, handedOver);
+                const moved: Record<string, unknown> = { ...(guestOwned ? rewriteOwner(row, args.from, args.to) : row), ...heldField };
 
                 await db.insert(args.table, moved, { allowExplicitId: true });
                 imported += 1;
 
-                if (typeof moved["heldFrom"] === "string") {
+                if (heldField !== undefined) {
                     held += 1;
                 }
 
@@ -338,10 +347,17 @@ export const importShardRows = internalMutation
                     .filter(([key, value]) => key !== "_id" && value === args.from && isUserReferenceField(key))
                     .map(([key]) => [key, args.to]),
             );
+            // The same hold as the insert path: an older organization row re-owned in place is held too, unless its cohort is the new account's.
+            const heldField = await heldFieldOf(ctx, args.table, existing, args.from, args.to, handedOver);
+            const patch = { ...guestFields, ...heldField };
 
-            if (Object.keys(guestFields).length > 0) {
-                await db.patch(args.table, id, guestFields);
+            if (Object.keys(patch).length > 0) {
+                await db.patch(args.table, id, patch);
                 imported += 1;
+
+                if (heldField !== undefined) {
+                    held += 1;
+                }
             }
         }
 
