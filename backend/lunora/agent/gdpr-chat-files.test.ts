@@ -264,6 +264,11 @@ describe("chat files in the GDPR export", () => {
 
     it("completes the export's view of a file whose metadata write did not land, on the next store of the same bytes", async () => {
         const fileId = await store(A, "retried.png", "hash-retried");
+        const storedAt = (await harness.run(async (ctx: any) => {
+            const file = await ctx.db.chatFiles.findFirst({ where: { _id: fileId } });
+
+            return file._creationTime;
+        })) as number;
 
         await harness.run(async (ctx: any) => {
             const { page } = await ctx.db.chatFileMetadata.findMany({ where: { fileId } });
@@ -279,6 +284,8 @@ describe("chat files in the GDPR export", () => {
         const after = await exportedFor(A);
 
         expect(after.files.map((file) => file.id)).toContain(fileId);
+        // Dated as the file was stored, not as it was repaired.
+        expect(after.files.find((file) => file.id === fileId)?.createdAt).toBe(storedAt);
     });
 
     it("reads the metadata, not the file row, so a large extracted text is not read", async () => {

@@ -97,7 +97,7 @@ export const addFile = internalMutation
  */
 const ensureChatFileMetadata = async (
     context: MutationContext,
-    file: { _id: Id<"chatFiles">; filename?: string; hash: string; mediaType: string },
+    file: { _creationTime: number; _id: Id<"chatFiles">; filename?: string; hash: string; mediaType: string },
 ): Promise<void> => {
     const { page } = await context.db.chatFileMetadata.findMany({ where: { fileId: file._id } });
 
@@ -105,8 +105,9 @@ const ensureChatFileMetadata = async (
         return;
     }
 
+    // The file's own creation time, not the repair's: the export dates a file by it.
     await context.db.insert("chatFileMetadata", {
-        createdAt: Date.now(),
+        createdAt: file._creationTime,
         fileId: file._id,
         filename: file.filename,
         hash: file.hash,
