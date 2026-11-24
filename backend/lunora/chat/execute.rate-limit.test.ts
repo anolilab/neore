@@ -1700,4 +1700,39 @@ describe("the usage-limit settings of a rate-limited run", () => {
         expect(resumed).toBe(true);
         expect(await snoozedUntil()).toBeUndefined();
     });
+
+    it("stopping the whole chat with two paused replies in one call leaves it visible", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        expect(await pauseSecondReply(5)).toMatchObject({ paused: true });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(stopActiveForThread, { threadId: ids.threadId }));
+
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("stopping the reply that holds the snooze hands it on, and the last paused reply lifts it", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        expect(await pauseSecondReply(5)).toMatchObject({ paused: true });
+
+        // The later reply holds the chat's snooze; stopping it leaves the first, still paused, to hold it.
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: "other-message", onlyNamed: true, threadId: ids.threadId }),
+        );
+
+        expect(await snoozedUntil()).toBeDefined();
+
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: ids.messageId, onlyNamed: true, threadId: ids.threadId }),
+        );
+
+        expect(await snoozedUntil()).toBeUndefined();
+    });
 });

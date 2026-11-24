@@ -323,11 +323,6 @@ export const stopActiveForThread = internalMutation
                 ...(waiting && { pausedRun: undefined }),
             });
 
-            // A stopped wait gives its chat back: the snooze the pause put on it ends with the stop.
-            if (stream.pause !== undefined) {
-                await liftPauseSnooze(ctx, stream);
-            }
-
             // No run is left to end this reply and drop what it was holding: one that never started, or one waiting out a limit.
             if (waiting || stream.runClaimedAt === undefined) {
                 const threadId = stream.threadId as Id<"threads">;
@@ -338,6 +333,16 @@ export const stopActiveForThread = internalMutation
                     // Nothing will spend them now: a late spend reads `abandoned`, not `used`.
                     await discardThreadSecrets(ctx, { abandon: true, replyKey, threadId });
                 }
+            }
+        }
+
+        // The snoozes the stopped waits put on their chats end with the stops. Lifted after every stream above is closed, and
+        // each read fresh, so a snooze handed over earlier in this call is seen; the streams stopped here do not take one over.
+        for (const stream of streams) {
+            const current = await ctx.db.get("persistentStreams", stream._id);
+
+            if (current !== null && current.pause !== undefined) {
+                await liftPauseSnooze(ctx, current, stopping);
             }
         }
 
