@@ -273,6 +273,30 @@ describe("a coding-agent turn's end in the Events log", () => {
     });
 });
 
+describe("a run whose thread has no owner in the Events log", () => {
+    it("records the end for the run's starter, when the thread's owner is gone", async () => {
+        const orphanThread = await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "Orphan" }));
+        const orphanStream = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    messageId: "orphan-prompt",
+                    status: "streaming",
+                    streamingConfig: { contentType: "text", model: "test-model" },
+                    threadId: orphanThread,
+                    userId: OWNER,
+                }),
+        );
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(addChunk, { final: true, runEnd: "succeeded", streamId: orphanStream, text: "Done." }));
+
+        const events = await eventsOf();
+
+        expect(events).toHaveLength(1);
+        expect(events[0]).toMatchObject({ eventId: `run:${orphanStream}`, name: "run.completed", userId: OWNER });
+    });
+});
+
 describe("a run that ends without its own final chunk in the Events log", () => {
     it("writes one run.failed when a live stream is set to error", async () => {
         await harness.run(async (ctx: any) => await ctx.runMutation(setStreamStatus, { status: "error", streamId }));

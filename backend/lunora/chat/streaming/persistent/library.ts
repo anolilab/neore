@@ -209,7 +209,7 @@ export const addChunk = internalMutation
 
         // The run's end: one event per reply, keyed by its stream. A redelivered end finds the event and writes nothing more.
         if (args.final && args.runEnd !== undefined) {
-            await recordRunEnd(ctx, { outcome: args.runEnd, streamId: args.streamId, threadId: stream.threadId });
+            await recordRunEnd(ctx, { outcome: args.runEnd, starterId: stream.userId, streamId: args.streamId, threadId: stream.threadId });
         }
     });
 
@@ -241,7 +241,7 @@ export const setStreamStatus = internalMutation
 
         // A live stream set to error is a failed run: its final chunk may have been refused, so the end is recorded here.
         if (args.status === "error") {
-            await recordRunEnd(ctx, { outcome: "failed", streamId: args.streamId, threadId: stream.threadId });
+            await recordRunEnd(ctx, { outcome: "failed", starterId: stream.userId, streamId: args.streamId, threadId: stream.threadId });
         }
     });
 

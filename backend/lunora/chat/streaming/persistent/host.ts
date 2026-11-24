@@ -206,7 +206,7 @@ export const endHostStream = async (
     const outcome = hostRunOutcome(end);
 
     if (outcome !== undefined) {
-        await recordRunEnd({ db: ctx.db, now }, { outcome, streamId: stream._id, threadId: stream.threadId });
+        await recordRunEnd({ db: ctx.db, now }, { outcome, starterId: stream.userId, streamId: stream._id, threadId: stream.threadId });
     }
 
     return true;

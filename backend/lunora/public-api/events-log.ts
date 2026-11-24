@@ -58,15 +58,17 @@ export const recordMcpEvent = async (ctx: Pick<MutationCtx, "db" | "now">, input
 /**
  * Records how a reply's run ended, for the thread's owner. Keyed by the stream, so one reply has one end event however often
  * the end is written: the final chunk, a live stream set to error, and a timed-out stream all go through here.
+ *
+ * A thread with no owner (its owner's account was removed) falls back to the run's starter, as the tool approval path does, so
+ * the end still reaches a log. Nothing is recorded when neither is known.
  */
 export const recordRunEnd = async (
     ctx: Pick<MutationCtx, "db" | "now">,
-    input: { outcome: "succeeded" | "failed"; streamId: string; threadId: string },
+    input: { outcome: "succeeded" | "failed"; starterId?: string; streamId: string; threadId: string },
 ): Promise<void> => {
     const thread = await ctx.db.get("threads", input.threadId as Id<"threads">);
-    const owner = thread?.userId;
+    const owner = thread?.userId ?? input.starterId;
 
-    // A thread with no owner has no log to write to.
     if (owner === undefined) {
         return;
     }
