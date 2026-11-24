@@ -22,6 +22,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import { internalMutation } from "../_generated/server";
 import { noteShardDue, setRetentionDue } from "../lib/shard-housekeeping";
+import { RETENTION_MS as EVENT_RETENTION_MS } from "../public-api/events-log";
 import { pruneSubAgentRunsBefore } from "../sub-agents/gdpr";
 import { pruneOrganizationRepliesBefore, pruneUsageDaysBefore } from "../usage/gdpr";
 
@@ -82,9 +83,15 @@ export const pruneRetainedActivity = internalMutation
         // From the primary: a lagging replica that misses a row left would leave the shard with no wake for it.
         const oldestDays = await ctx.db.usageDaily.findMany({ consistency: "primary", limit: 1, orderBy: [{ date: "asc" }] });
         const oldestLedgerRows = await ctx.db.usageOrganizationReplies.findMany({ consistency: "primary", limit: 1, orderBy: [{ at: "asc" }] });
+        const oldestEvents = await ctx.db.mcpEvents.findMany({ consistency: "primary", limit: 1, orderBy: [{ createdAt: "asc" }] });
         const [oldestDay] = oldestDays.page;
         const [oldestLedgerRow] = oldestLedgerRows.page;
-        const expiresAt = retentionDueAfterPrune(now, { ledgerAt: oldestLedgerRow?.at, usageDate: oldestDay?.date });
+        const [oldestEvent] = oldestEvents.page;
+        // The Events log (`public-api/events.ts`) shares this shard's one retention time, so its oldest event's expiry counts too.
+        const usageDue = retentionDueAfterPrune(now, { ledgerAt: oldestLedgerRow?.at, usageDate: oldestDay?.date });
+        const eventDue = oldestEvent === undefined ? undefined : oldestEvent.createdAt + EVENT_RETENTION_MS;
+        const dues = [usageDue, eventDue].filter((due): due is number => due !== undefined);
+        const expiresAt = dues.length === 0 ? undefined : Math.min(...dues);
 
         // The census: when the tick should prune (`retentionDueAt`, cleared when nothing is left), and the wake for it. If either write fails the
         // prune fails, which rolls back its deletes, so the tick retries it soon and the rows are not left without a wake.
