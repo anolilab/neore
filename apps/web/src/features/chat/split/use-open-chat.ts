@@ -64,7 +64,11 @@ export const useOpenChatClick = (): ((threadId: string, click: ChatClick, origin
                     result = undefined;
                 }
 
-                if (result !== "focused" && result !== "opened") {
+                // The split view may have been turned off while the layout was read: a pane then sits in a hidden layout, so the
+                // chat opens in the main view instead.
+                const isPaneVisible = (result === "focused" || result === "opened") && useUIStateStore.getState().preferences.splitViewEnabled === true;
+
+                if (!isPaneVisible) {
                     if (isSplitViewOn) {
                         await showPaneQuietly(threadId);
                     }

@@ -96,7 +96,6 @@ type UserPreferencesHookReturn = UserPreferences & {
     setShowTimestamps: (showTimestamps: boolean) => void;
     setSoundEffects: (soundEffects: boolean) => void;
     setSplitViewEnabled: (splitViewEnabled: boolean) => void;
-    setSubAgentOpenPlace: (subAgentOpenPlace: UserPreferences["subAgentOpenPlace"]) => void;
     setTemporaryChatRetentionHours: (hours: number) => void;
     setUserPreferences: (preferences: Partial<UserPreferences>) => void;
     temporaryChatRetentionHours: number;
@@ -332,7 +331,6 @@ export const useUserPreferences = (): UserPreferencesHookReturn => {
         setShowTimestamps: (showTimestamps: boolean) => setUserPreferencesAction({ showTimestamps }),
         setSoundEffects: (soundEffects: boolean) => setUserPreferencesAction({ soundEffects }),
         setSplitViewEnabled: (splitViewEnabled: boolean) => setUserPreferencesAction({ splitViewEnabled }),
-        setSubAgentOpenPlace: (subAgentOpenPlace: UserPreferences["subAgentOpenPlace"]) => setUserPreferencesAction({ subAgentOpenPlace }),
         setTemporaryChatRetentionHours: (hours: number) => {
             updateUserSettings({ temporaryChatRetentionHours: hours });
         },

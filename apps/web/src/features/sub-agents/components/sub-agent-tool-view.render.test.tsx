@@ -56,9 +56,13 @@ vi.mock("@tanstack/react-router", () => {
 });
 
 vi.mock("@/features/layout/stores/ui-state-store", () => {
-    return {
-        useUIStateStore: (selector: (state: { preferences: unknown }) => unknown) => selector({ preferences: harness.preferences }),
-    };
+    const useUIStateStore = Object.assign((selector: (state: { preferences: unknown }) => unknown) => selector({ preferences: harness.preferences }), {
+        getState: () => {
+            return { preferences: harness.preferences };
+        },
+    });
+
+    return { useUIStateStore };
 });
 
 vi.mock("@/features/chat/split/desktop-layout", () => {
@@ -258,6 +262,21 @@ describe("where a sub-agent's chat opens", () => {
     it("still opens the main view when showing the pane fails on the main view", async () => {
         harness.preferences = { splitViewEnabled: true, subAgentOpenPlace: "main" };
         harness.showInSplitView.mockRejectedValueOnce(new Error("storage unavailable"));
+        const { link } = renderRunningCard();
+
+        fireEvent.click(link);
+
+        await vi.waitFor(() => {
+            expect(harness.navigate).toHaveBeenCalledWith(MAIN_VIEW);
+        });
+    });
+
+    it("opens the main view when the split view is turned off while its pane opens, so the chat stays visible", async () => {
+        harness.openBeside.mockImplementationOnce(async () => {
+            harness.preferences = { splitViewEnabled: false, subAgentOpenPlace: undefined };
+
+            return "opened";
+        });
         const { link } = renderRunningCard();
 
         fireEvent.click(link);
