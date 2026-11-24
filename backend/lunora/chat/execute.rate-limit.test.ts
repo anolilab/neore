@@ -1762,4 +1762,19 @@ describe("the usage-limit settings of a rate-limited run", () => {
 
         expect(after.streamStatus).toBe("done");
     });
+
+    it("a Retry now that resumes both replies, when the earlier-created reply holds the later reset, leaves the chat visible", async () => {
+        // The first reply, created first, holds the snooze to its later reset; the second, with an earlier reset, holds none.
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited(5 * 60_000)]);
+
+        await run();
+
+        await pauseSecondReply(0.5);
+
+        const resumed = await harness.run(async (ctx: any) => await ctx.runMutation(retryPausedRunsNow, { threadId: ids.threadId }));
+
+        expect(resumed).toBe(true);
+        expect(await snoozedUntil()).toBeUndefined();
+    });
 });
