@@ -175,7 +175,8 @@ export const releaseThread = async (
  * (`undefined`) for a stop, which writes no run event anywhere.
  */
 const hostRunOutcome = (end: { reason: EndReason; status: "done" | "error" | "timeout" }): "succeeded" | "failed" | undefined => {
-    if (end.reason === "stopped") {
+    // A stop, from either side: the person's, or the computer cancelling the turn it was running.
+    if (end.reason === "stopped" || end.reason === "cancelled") {
         return undefined;
     }
 

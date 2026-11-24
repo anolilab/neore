@@ -263,6 +263,14 @@ describe("a coding-agent turn's end in the Events log", () => {
 
         expect(await eventsOf()).toStrictEqual([]);
     });
+
+    it("writes nothing when the computer cancels the turn, which is a stop from its side", async () => {
+        const id = await hostTurn();
+
+        await endTurn(id, { reason: "cancelled", status: "done" });
+
+        expect(await eventsOf()).toStrictEqual([]);
+    });
 });
 
 describe("a run that ends without its own final chunk in the Events log", () => {
