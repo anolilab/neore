@@ -32,22 +32,25 @@ export const eraseSharedPinRoutesBatch = async (ctx: MutationCtx, userId: string
 };
 
 /**
- * The user's pins and tags (relationships, grants and passcodes are `agent/gdpr.ts`; goals go in batches
- * with the run state, {@link erasePersistentStreamsForUser}).
+ * One batch of the user's pins and tags (relationships, grants and passcodes are `agent/gdpr.ts`; goals go in batches with the run
+ * state, {@link erasePersistentStreamsForUser}). The deletion workflow drains it (`gdpr/steps/deletion-steps.ts`), so no call holds an
+ * unbounded set.
  */
-export const eraseThreadPinsAndTagsForUser = async (ctx: MutationCtx, userId: string): Promise<void> => {
+export const eraseThreadPinsAndTagsBatch = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
     const [pins, threadTags] = await Promise.all([
         ctx.db
             .query("threadPins")
             .withIndex("by_user_and_thread", (q) => q.eq("userId", userId))
-            .collect(),
+            .take(BATCH),
         ctx.db
             .query("threadTags")
             .withIndex("by_user_and_order", (q) => q.eq("userId", userId))
-            .collect(),
+            .take(BATCH),
     ]);
 
     await Promise.all([...pins.map((p) => ctx.db.delete("threadPins", p._id)), ...threadTags.map((tag) => ctx.db.delete("threadTags", tag._id))]);
+
+    return { hasMore: pins.length >= BATCH || threadTags.length >= BATCH };
 };
 
 /**
@@ -190,33 +193,24 @@ export const erasePinsNamingDocuments = async (ctx: MutationCtx, documents: Read
 
 /**
  * A deleted thread takes its pins and the collaborator routes that name it: both sit on the thread owner's shard (the routes in the
- * global table), so the owner's hard delete removes them. Each loop deletes one batch per pass, so no pass grows with the thread.
+ * global table), so the owner's hard delete removes them. One batch of each per call, so no call grows with the thread: the caller
+ * repeats it while `hasMore` (the thread's delete chain, `agent/threads.ts`, reschedules itself).
  */
-export const eraseThreadPinsAndRoutes = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<void> => {
-    for (;;) {
-        const pins = await ctx.db
-            .query("threadPins")
-            .withIndex("by_thread", (q) => q.eq("threadId", threadId))
-            .take(BATCH);
+export const eraseThreadPinsAndRoutesBatch = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<BatchResult> => {
+    const pins = await ctx.db
+        .query("threadPins")
+        .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+        .take(BATCH);
 
-        for (const pin of pins) {
-            await ctx.db.delete("threadPins", pin._id);
-        }
-
-        if (pins.length < BATCH) {
-            break;
-        }
+    for (const pin of pins) {
+        await ctx.db.delete("threadPins", pin._id);
     }
 
-    for (;;) {
-        const { page } = await ctx.db.sharedPinRoutes.findMany({ consistency: "primary", limit: BATCH, where: { threadId } });
+    const { page } = await ctx.db.sharedPinRoutes.findMany({ consistency: "primary", limit: BATCH, where: { threadId } });
 
-        for (const route of page) {
-            await ctx.db.delete("sharedPinRoutes", route._id);
-        }
-
-        if (page.length < BATCH) {
-            break;
-        }
+    for (const route of page) {
+        await ctx.db.delete("sharedPinRoutes", route._id);
     }
+
+    return { hasMore: pins.length >= BATCH || page.length >= BATCH };
 };

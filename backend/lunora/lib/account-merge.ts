@@ -21,7 +21,9 @@
  * 3. `.global()` rows naming the guest are re-pointed ({@link reassignGlobalRows}),
  *    its thread follows a page per mutation ({@link reassignThreadFollowsPage}),
  *    and its pins on other owners' threads on each owner's shard, each thread's
- *    pin route moving only after its pins ({@link moveSharedPinRouteOf});
+ *    pin route moving only after its pins ({@link moveSharedPinRouteOf}); a
+ *    second pass over the new account's routes then reaches a pin an owner's
+ *    parallel merge moved to another shard in between;
  * 4. once the guest's shard is empty, the guest itself is deleted
  *    (`auth/hooks.ts#deleteMergedGuest`, which first looks again: a row written
  *    to a table after its clear sends the merge back to clear it), as the anonymous plugin does when a
@@ -44,6 +46,12 @@
  * where it stopped ({@link MergeProgress}), so no guest is too large to finish
  * and no job is acknowledged with rows left behind.
  *
+ * Every run, under its lease, marks the guest as merging and the new account as
+ * importing (`lib/account-moves.ts`, {@link beginMergeRun}): the guest's pin
+ * writes are refused, the run waits while one may still be in flight, an erasure
+ * of either account stops the merge, and the new account's erasure waits for it.
+ * The markers go with the last page of import markers.
+ *
  * The new account's own seeded `userSettings`/`aiUserPreferences` win over the
  * guest's. Re-running after a partial failure is safe: an id already on the new
  * shard is brought up to the guest's row unless the account changed it, and
@@ -55,6 +63,7 @@ import { internal } from "../_generated/internal";
 import type { MutationCtx } from "../_generated/server";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { mergeSkippedSteps } from "../auth/lib/setup-step-limits";
+import { beginAccountMove, endAccountMove, isErasing, pinWritesInFlightUntil } from "./account-moves";
 import { AUDIT_TABLES } from "./audit-triggers";
 import { releaseClaimsWithPrefix } from "./claim-once";
 import { authLogger } from "./logger";
@@ -133,10 +142,14 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
 /** `.global()` tables with a `userId` the generic re-pointing loop deliberately leaves alone, and why. */
 export const GLOBAL_USER_TABLES_NOT_REASSIGNED: Readonly<Record<string, string>> = {
     account: "better-auth links the anonymous user itself",
+    accountMoves:
+        "the move marker of the account being merged or erased: it refuses pin writes from that account and names no content, and that account ends with the move, so nothing re-points it",
     deviceCode: "a guest cannot approve a code, and a pending one lapses in 30 minutes",
     documentHistory: "an audit trail records who acted; it is not re-attributed",
     member: "a guest joins no organization",
     memberCredits: "a guest joins no organization",
+    pinWriteLeases:
+        "the in-flight pin-write lease of the account being merged or erased: it names no content, and the move removes it when it ends, so nothing re-points it",
     pushDevices:
         "tied to the guest's session, which ends with the guest: the notifications module drops them, and the phone registers again under the new sign-in",
     session: "better-auth's own; the guest's sessions end with the guest",
@@ -427,8 +440,11 @@ export const MERGE_GENERATION_SCOPE = "guest-merge-generation";
 /** How long a run holds the lease without a write; each import renews it. Far past one run's calls. */
 export const MERGE_LEASE_MS = 5 * 60 * 1000;
 
-/** The cross-shard calls a run spends on its lease: take it, note its generation on the guest's shard, give it back. */
-export const MERGE_LEASE_CALLS = 3;
+/**
+ * The cross-shard calls a run spends around its steps: take the lease, note its generation on the guest's shard, mark the
+ * two accounts ({@link beginMergeRun}), give the lease back.
+ */
+export const MERGE_LEASE_CALLS = 4;
 
 /** The row of `(scope, key)`, expired or not. */
 const storedClaim = async (db: MutationCtx["db"], scope: string, key: string) =>
@@ -652,7 +668,8 @@ export const importShardRows = internalMutation
  * On the NEW user's shard: once the guest's merge is done, fence it ({@link MERGE_FENCE_SCOPE}) and drop a page of its
  * import markers; `hasMore` while some may remain. The fence goes in with the first page, so no import ever runs
  * between a marker's drop and the fence. Markers and fence are this shard's own rows, not D1's: a page of deletes costs
- * no D1 statement. `fenced` when another delivery holds the lease: that one finishes the merge.
+ * no D1 statement. With the last page the merge's account-move markers ({@link beginMergeRun}) go. `fenced` when another
+ * delivery holds the lease: that one finishes the merge.
  */
 export const dropImportMarkersPage = internalMutation
     .input({ from: v.string(), generation: v.number(), to: v.string() })
@@ -679,7 +696,15 @@ export const dropImportMarkersPage = internalMutation
             });
         }
 
-        return { fenced: false, hasMore: await releaseClaimsWithPrefix(ctx, IMPORT_MARKER_SCOPE, `${args.from}:`) };
+        const hasMore = await releaseClaimsWithPrefix(ctx, IMPORT_MARKER_SCOPE, `${args.from}:`);
+
+        if (!hasMore) {
+            // The merge is over: its account-move markers go with the last page, so they end exactly when it does.
+            await endAccountMove(ctx, args.to, "importing");
+            await endAccountMove(ctx, args.from, "merging");
+        }
+
+        return { fenced: false, hasMore };
     });
 
 /**
@@ -826,6 +851,39 @@ export const moveSharedPinRouteOf = internalMutation
         return null;
     });
 
+/**
+ * On the NEW user's shard, at the start of each run, while the run holds the lease: mark the guest as merging and the new
+ * account as importing (`lib/account-moves.ts`), renewed every run so a long merge keeps them live. A merging marker refuses
+ * the guest's pin writes; an importing one holds back the new account's erasure. Each side writes its marker before it
+ * reads the other's, so a merge and an erasure always see each other. Then:
+ *
+ * - `finished`: the merge's fence is here, so another delivery finished it; nothing is marked;
+ * - `stopped`: either account is being erased, which has priority; the markers go and the merge ends;
+ * - `pinWritesUntil`: a pin write of the guest's may still be in flight until then; the run waits for it.
+ */
+export const beginMergeRun = internalMutation
+    .input({ from: v.string(), to: v.string() })
+    .output(v.object({ finished: v.boolean(), pinWritesUntil: v.union(v.number(), v.null()), stopped: v.boolean() }))
+    .mutation(async ({ args, ctx }) => {
+        const { now } = ctx;
+
+        if (await mergeFinished(ctx.db, args.from, now)) {
+            return { finished: true, pinWritesUntil: null, stopped: false };
+        }
+
+        await beginAccountMove(ctx, args.from, "merging", now);
+        await beginAccountMove(ctx, args.to, "importing", now);
+
+        if ((await isErasing(ctx, args.to)) || (await isErasing(ctx, args.from))) {
+            await endAccountMove(ctx, args.to, "importing");
+            await endAccountMove(ctx, args.from, "merging");
+
+            return { finished: false, pinWritesUntil: null, stopped: true };
+        }
+
+        return { finished: false, pinWritesUntil: await pinWritesInFlightUntil(ctx, args.from, now), stopped: false };
+    });
+
 /** A caller into a named shard, as `createShardClient(...).call` is. */
 export type ShardCall = <R>(reference: { __lunoraRef: string }, args: Record<string, unknown>, shardKey: string) => Promise<R>;
 
@@ -843,13 +901,15 @@ export const MERGE_CALLS_PER_RUN = 40;
 export const MAX_MERGE_RUNS = 1000;
 
 /** The merge's steps, in order. */
-export type MergePhase = "clear" | "copy" | "follows" | "global" | "guest" | "markers" | "pins";
+export type MergePhase = "clear" | "copy" | "follows" | "global" | "guest" | "markers" | "pins" | "repins";
 
 /** Where a merge run stopped, for the next run to start from: the step, its table and that table's copy cursor. */
 export interface MergeProgress {
     cursor: string | null;
     moved: number;
     phase: MergePhase;
+    /** The route of the page at `cursor` the `repins` step stopped at; another phase ignores it. */
+    route?: number;
     /** Runs taken so far. */
     run: number;
     /** The table the copy or the clear stopped in; another phase ignores it. */
@@ -863,6 +923,7 @@ interface MergeState {
     index: number;
     moved: number;
     phase: MergePhase;
+    route: number;
 }
 
 interface MergeContext {
@@ -876,13 +937,14 @@ interface MergeContext {
 }
 
 /** The most cross-shard calls one step of each phase makes: a run stops before a step it could not finish. */
-const STEP_CALLS: Readonly<Record<MergePhase, number>> = { clear: 3, copy: 2, follows: 1, global: 1, guest: 1, markers: 1, pins: 3 };
+const STEP_CALLS: Readonly<Record<MergePhase, number>> = { clear: 3, copy: 2, follows: 1, global: 1, guest: 1, markers: 1, pins: 3, repins: 2 };
 
 /** Moves `state` to the first table of `phase`. */
 const enter = (state: MergeState, phase: MergePhase): void => {
     state.phase = phase;
     state.index = 0;
     state.cursor = null;
+    state.route = 0;
 };
 
 /** Moves `state` past its table, and on to `phase` after the last one, so a run never stops between them. */
@@ -1023,7 +1085,7 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
         const route: { ownerId: string; threadId: string } | null = await call(references.nextPinRoute, { from }, to);
 
         if (route === null) {
-            enter(state, "guest");
+            enter(state, "repins");
 
             return false;
         }
@@ -1034,6 +1096,38 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
         if (!hasMore) {
             state.calls -= 1;
             await call(references.movePinRoute, { from, threadId: route.threadId, to }, to);
+        }
+
+        return false;
+    },
+    // A second pass over every route the new account holds, its own and the guest's moved ones, a route per step: an owner's
+    // parallel merge can move a thread's shard, and so the guest's pins on it, after the pins step read the route and before
+    // it moved them. The route has followed the owner by now, so this pass reaches the pins where they are.
+    repins: async ({ call, from, references, to }, state) => {
+        state.calls -= 1;
+        const routes: { continueCursor: string | null; isDone: boolean; page: { ownerId: string; threadId: string }[] } = await call(
+            references.listPinRoutes,
+            { cursor: state.cursor, userId: to },
+            to,
+        );
+        const route = routes.page[state.route];
+
+        if (route === undefined) {
+            if (routes.isDone || routes.continueCursor === null) {
+                enter(state, "guest");
+            } else {
+                state.cursor = routes.continueCursor;
+                state.route = 0;
+            }
+
+            return false;
+        }
+
+        state.calls -= 1;
+        const { hasMore }: { hasMore: boolean } = await call(references.reassignPins, { from, threadId: route.threadId, to }, route.ownerId);
+
+        if (!hasMore) {
+            state.route += 1;
         }
 
         return false;
@@ -1055,7 +1149,7 @@ export const mergeGuestInto = async (
     from: string,
     to: string,
     { budget = MERGE_CALLS_PER_RUN, maxRuns = MAX_MERGE_RUNS, resume }: { budget?: number; maxRuns?: number; resume?: MergeProgress } = {},
-): Promise<{ busyUntil?: number; moved: number; next: MergeProgress | null }> => {
+): Promise<{ busyUntil?: number; moved: number; next: MergeProgress | null; stopped?: boolean }> => {
     const run = resume?.run ?? 0;
 
     if (run >= maxRuns) {
@@ -1078,6 +1172,20 @@ export const mergeGuestInto = async (
         return { moved: resume?.moved ?? 0, next: null };
     }
 
+    const begun: { finished: boolean; pinWritesUntil: number | null; stopped: boolean } = await call(references.beginRun, { from, to }, to);
+
+    if (begun.finished || begun.stopped || begun.pinWritesUntil !== null) {
+        await call(references.releaseLease, { from, generation }, to);
+
+        // A pin write of the guest's may still be in flight: the run is tried again from where it was once it has run out, one
+        // extra second for clock skew between the writer and this job. The markers stay meanwhile, so no new write gets in.
+        if (begun.pinWritesUntil !== null) {
+            return { busyUntil: begun.pinWritesUntil + 1000, moved: resume?.moved ?? 0, next: null };
+        }
+
+        return { moved: resume?.moved ?? 0, next: null, ...(begun.stopped && { stopped: true }) };
+    }
+
     const tables = shardLocalTables();
     // A table no longer in the schema (a deploy between runs): its phase starts over, which is safe for both.
     const index = resume === undefined ? 0 : Math.max(0, tables.indexOf(resume.table));
@@ -1087,21 +1195,34 @@ export const mergeGuestInto = async (
         index,
         moved: resume?.moved ?? 0,
         phase: resume?.phase ?? "copy",
+        route: resume?.route ?? 0,
     };
     const context: MergeContext = { call, from, generation, references, tables, to };
     let done = false;
 
-    while (!done && state.calls >= STEP_CALLS[state.phase]) {
-        done = await STEPS[state.phase](context, state);
+    try {
+        while (!done && state.calls >= STEP_CALLS[state.phase]) {
+            done = await STEPS[state.phase](context, state);
+        }
+    } finally {
+        // Given back before the next run is queued, so it need not wait for the lease to lapse. A run that threw gives it
+        // back too: its redelivery takes the next generation at once and counts against the queue's retries, instead of
+        // finding the lease busy and queueing itself again without end. Should the release fail, the lease lapses.
+        await call(references.releaseLease, { from, generation }, to);
     }
-
-    // Given back before the next run is queued, so it need not wait for the lease to lapse. A run that threw keeps it
-    // until then: its redelivery tries again after it.
-    await call(references.releaseLease, { from, generation }, to);
 
     return {
         moved: state.moved,
-        next: done ? null : { cursor: state.cursor, moved: state.moved, phase: state.phase, run: run + 1, table: tables[state.index] ?? "" },
+        next: done
+            ? null
+            : {
+                  cursor: state.cursor,
+                  moved: state.moved,
+                  phase: state.phase,
+                  ...(state.route > 0 && { route: state.route }),
+                  run: run + 1,
+                  table: tables[state.index] ?? "",
+              },
     };
 };
 
@@ -1159,12 +1280,14 @@ const clearPage = async (
 /** The generated references `mergeGuestInto` calls (passed in, so this module does not import `_generated/api`). */
 export interface MergeReferences {
     acquireLease: { __lunoraRef: string };
+    beginRun: { __lunoraRef: string };
     deleteGuest: { __lunoraRef: string };
     deleteRows: { __lunoraRef: string };
     dropMarkers: { __lunoraRef: string };
     importRows: { __lunoraRef: string };
     list: { __lunoraRef: string };
     listClear: { __lunoraRef: string };
+    listPinRoutes: { __lunoraRef: string };
     movePinRoute: { __lunoraRef: string };
     nextPinRoute: { __lunoraRef: string };
     noteGeneration: { __lunoraRef: string };
@@ -1198,7 +1321,9 @@ export const runGuestMerge = internalAction
                     v.literal("guest"),
                     v.literal("markers"),
                     v.literal("pins"),
+                    v.literal("repins"),
                 ),
+                route: v.optional(v.number()),
                 run: v.number(),
                 table: v.string(),
             }),
@@ -1207,16 +1332,18 @@ export const runGuestMerge = internalAction
     })
     .output(v.object({ done: v.boolean(), moved: v.number() }))
     .action(async ({ args }) => {
-        const { busyUntil, moved, next } = await mergeGuestInto(
+        const { busyUntil, moved, next, stopped } = await mergeGuestInto(
             async (reference, callArgs, shardKey) => (await callOnShard(reference as never, callArgs as never, { shardKey })) as never,
             {
                 acquireLease: internal.lib.account_merge.acquireMergeLease,
+                beginRun: internal.lib.account_merge.beginMergeRun,
                 deleteGuest: internal.auth.hooks.deleteMergedGuest,
                 deleteRows: internal.lib.account_merge.deleteShardRows,
                 dropMarkers: internal.lib.account_merge.dropImportMarkersPage,
                 importRows: internal.lib.account_merge.importShardRows,
                 list: internal.lib.account_merge.listShardRowsPage,
                 listClear: internal.lib.account_merge.listShardRowsToClear,
+                listPinRoutes: internal.chat.pins.functions.listSharedPinRoutesForExport,
                 movePinRoute: internal.lib.account_merge.moveSharedPinRouteOf,
                 nextPinRoute: internal.lib.account_merge.nextSharedPinRoute,
                 noteGeneration: internal.lib.account_merge.noteMergeGeneration,
@@ -1231,8 +1358,8 @@ export const runGuestMerge = internalAction
         );
 
         if (busyUntil !== undefined) {
-            // Another delivery is running this merge. Tried again once its lease would lapse, never dropped: should that
-            // one die, this is what carries the merge on.
+            // Another delivery is running this merge, or a pin write of the guest's is still in flight. Tried again once
+            // that has lapsed, never dropped: should the other delivery die, this is what carries the merge on.
             await enqueueJob(internal.lib.account_merge.runGuestMerge, args, { delayMs: Math.max(1000, busyUntil - Date.now()), shardKey: args.to });
 
             return { done: false, moved };
@@ -1243,6 +1370,12 @@ export const runGuestMerge = internalAction
             await enqueueJob(internal.lib.account_merge.runGuestMerge, { from: args.from, resume: next, to: args.to }, { shardKey: args.to });
 
             return { done: false, moved };
+        }
+
+        if (stopped === true) {
+            authLogger.info(`[auth] stopped the merge of guest ${args.from} into ${args.to}: an erasure of either account has begun`);
+
+            return { done: true, moved };
         }
 
         authLogger.info(`[auth] moved ${String(moved)} rows from guest ${args.from} to ${args.to}`);
