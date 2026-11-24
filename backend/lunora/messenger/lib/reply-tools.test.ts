@@ -25,15 +25,13 @@ describe(planReplyTools, () => {
 
     it("enables every group when none were picked", () => {
         expect(planReplyTools({ enabled: true })).toStrictEqual({
-            additionalTools: ["imageGeneration"],
-            allowlist: ["webSearch", "retrieve", "imageGeneration", "codeExecution", "shellExecution", "fileOperations", "knowledgeSearch", "dateTime"],
+            allowlist: ["webSearch", "retrieve", "codeExecution", "shellExecution", "fileOperations", "knowledgeSearch", "dateTime"],
             keepMcpTools: true,
         });
     });
 
     it("narrows to the picked groups and keeps MCP tools only for `connectors`", () => {
         expect(planReplyTools({ enabled: true, groups: ["dateTime", "webSearch"] })).toStrictEqual({
-            additionalTools: [],
             allowlist: ["webSearch", "dateTime"],
             keepMcpTools: false,
         });

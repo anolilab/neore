@@ -199,7 +199,6 @@ const generateReply = async (ctx: ActionCtx, threadId: Id<"threads">, userId: st
         thread: { threadId },
         ...(replyTools
             ? {
-                  additionalTools: replyTools.additionalTools,
                   system: MESSENGER_TOOL_SYSTEM,
                   toolAllowlist: replyTools.allowlist,
                   toolAllowlistKeepsMcp: replyTools.keepMcpTools,

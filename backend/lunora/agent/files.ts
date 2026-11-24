@@ -91,6 +91,34 @@ export const addFile = internalMutation
     )
     .mutation(async ({ args, ctx }) => await addFileHandler(ctx, args));
 
+/**
+ * The export's view of a file (`chatFileMetadata`), written only if it is missing. The file row and this row are two writes, so a store
+ * whose second write did not land leaves a file the export cannot see; the next store of the same bytes finds the row and completes this.
+ */
+export const ensureChatFileMetadata = async (
+    context: MutationContext,
+    file: { _creationTime: number; _id: Id<"chatFiles">; filename?: string; hash: string; mediaType: string },
+): Promise<number> => {
+    // Primary: a lagging replica that misses the row writes a second one (the export lists a file once, but the row is waste).
+    const { page } = await context.db.chatFileMetadata.findMany({ consistency: "primary", where: { fileId: file._id } });
+
+    if (page.length > 0) {
+        // The bytes of the row read, so a caller that meters its reads counts them too.
+        return new TextEncoder().encode(JSON.stringify(page)).byteLength;
+    }
+
+    // The file's own creation time, not the repair's: the export dates a file by it.
+    await context.db.insert("chatFileMetadata", {
+        createdAt: file._creationTime,
+        fileId: file._id,
+        filename: file.filename,
+        hash: file.hash,
+        mediaType: file.mediaType,
+    });
+
+    return 0;
+};
+
 export async function addFileHandler(context: MutationContext, args: InferArgs<typeof addFileFields>) {
     // Use compound index when filename is provided, otherwise use hash index
     const existingFile = await findChatFile(context, args.hash, args.filename);
@@ -99,6 +127,7 @@ export async function addFileHandler(context: MutationContext, args: InferArgs<t
         // A store that raced another for the same bytes: the row is shared, and only the messages that save it count
         // it (`changeRefcount`), as for a new row and for `useExistingFile`. Counting it here too kept it forever.
         await context.db.patch("chatFiles", existingFile._id, { lastTouchedAt: Date.now() });
+        await ensureChatFileMetadata(context, storedRow(existingFile));
         await grantFileAccess(context, existingFile._id, args.userId);
 
         return {
@@ -118,6 +147,15 @@ export async function addFileHandler(context: MutationContext, args: InferArgs<t
         storageId: args.storageId,
     });
     const fileId = insertedId as Id<"chatFiles">;
+
+    // The export's view of the file, written with it (`chatFileMetadata`): the export reads this, not the row that holds the text.
+    await context.db.insert("chatFileMetadata", {
+        createdAt: Date.now(),
+        fileId,
+        filename: args.filename,
+        hash: args.hash,
+        mediaType: args.mediaType,
+    });
 
     await grantFileAccess(context, fileId, args.userId);
 
@@ -430,6 +468,7 @@ export const useExistingFile = internalMutation
         }
 
         await ctx.db.patch("chatFiles", file._id, { lastTouchedAt: ctx.now });
+        await ensureChatFileMetadata(ctx, storedRow(file));
         await grantFileAccess(ctx, file._id, args.userId);
 
         return { fileId: file._id, storageId: file.storageId };
@@ -629,7 +668,21 @@ export const deleteFiles = internalMutation
                 const { page: grants } = await ctx.db.chatFileAccess.findMany({ where: { fileId } });
 
                 await Promise.all(grants.map((grant) => ctx.db.delete("chatFileAccess", grant._id)));
+
+                // The export's view goes with the file row (`chatFileMetadata`), in the same mutation.
+                // Primary: a replica that lags could miss a row, and the export would then list a file that was deleted.
+                const { page: metadata } = await ctx.db.chatFileMetadata.findMany({ consistency: "primary", where: { fileId } });
+
+                // The metadata goes first, then the file row. A failed row delete leaves the file in the reaper's queue, so the next run
+                // retries it, and the file is hidden from exports only until then. The other order fails for good: a metadata delete
+                // that failed after the row went would leave an orphaned row, which no run finds again, and exports would list the file.
+                await Promise.all(metadata.map((row) => ctx.db.delete("chatFileMetadata", row._id)));
                 await ctx.db.delete("chatFiles", fileId);
+
+                // A repair or a reuse that wrote the metadata between the two deletes left a row for a file that is now gone: clear it.
+                const { page: late } = await ctx.db.chatFileMetadata.findMany({ consistency: "primary", where: { fileId } });
+
+                await Promise.all(late.map((row) => ctx.db.delete("chatFileMetadata", row._id)));
 
                 return fileId;
             }),

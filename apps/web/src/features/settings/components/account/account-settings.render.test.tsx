@@ -12,6 +12,8 @@ import AccountSettings from "./account-settings";
 
 const HIDE_PERSONAL_INFO = /Hide Personal Information/;
 const VIM_KEYS = /Vim keys in the composer/;
+const RESUME_AFTER_LIMIT = /Resume after a usage limit/;
+const SNOOZE_UNTIL_RESET = /Snooze chats until the limit resets/;
 
 // The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
 vi.mock("@lingui/core/macro", () => {
@@ -39,16 +41,19 @@ vi.mock("sonner", () => {
 });
 
 const mutate = vi.fn();
+const updateLatest = vi.fn((_build: () => Record<string, unknown>, _options?: { failFast: boolean }) => Promise.resolve());
 const setHidePersonalInfo = vi.fn();
 const setLayoutDirection = vi.fn();
+/** The saved settings the account page reads; each test sets the ones it needs. */
+const savedSettings: Record<string, unknown> = { temporaryChatRetentionHours: 24 };
 
 vi.mock("@/features/auth/hooks/use-user-settings", () => {
     return {
         useUpdateUserSettings: () => {
-            return { mutate };
+            return { mutate, updateLatest };
         },
         useUserSettings: () => {
-            return { data: { temporaryChatRetentionHours: 24 } };
+            return { data: savedSettings };
         },
     };
 });
@@ -138,5 +143,52 @@ describe("AccountSettings", () => {
         fireEvent.click(screen.getByRole("switch", { name: VIM_KEYS }));
 
         expect(mutate).toHaveBeenCalledWith({ composerVimMode: true }, expect.objectContaining({ onSuccess: expect.any(Function) }));
+    });
+
+    describe("usage-limit settings", () => {
+        beforeEach(() => {
+            for (const key of Object.keys(savedSettings)) {
+                delete savedSettings[key];
+            }
+
+            savedSettings.temporaryChatRetentionHours = 24;
+        });
+
+        it("resumes after a usage limit by default, and saving the switch off turns it off", () => {
+            render(<AccountSettings />);
+
+            const resume = screen.getByRole("switch", { name: RESUME_AFTER_LIMIT });
+
+            expect(resume.getAttribute("aria-checked")).toBe("true");
+
+            fireEvent.click(resume);
+
+            // The write goes through the ordered queue (`updateLatest`), so a quick second toggle cannot be overtaken by this one.
+            expect(updateLatest).toHaveBeenLastCalledWith(expect.any(Function), { failFast: true });
+            expect(updateLatest.mock.lastCall?.[0]()).toEqual({ resumeAfterUsageLimit: false });
+        });
+
+        it("does not snooze chats by default, and saving the switch on turns it on", () => {
+            render(<AccountSettings />);
+
+            const snooze = screen.getByRole("switch", { name: SNOOZE_UNTIL_RESET });
+
+            expect(snooze.getAttribute("aria-checked")).toBe("false");
+
+            fireEvent.click(snooze);
+
+            expect(updateLatest).toHaveBeenLastCalledWith(expect.any(Function), { failFast: true });
+            expect(updateLatest.mock.lastCall?.[0]()).toEqual({ snoozeUntilUsageLimitReset: true });
+        });
+
+        it("shows the saved values of both switches", () => {
+            savedSettings.resumeAfterUsageLimit = false;
+            savedSettings.snoozeUntilUsageLimitReset = true;
+
+            render(<AccountSettings />);
+
+            expect(screen.getByRole("switch", { name: RESUME_AFTER_LIMIT }).getAttribute("aria-checked")).toBe("false");
+            expect(screen.getByRole("switch", { name: SNOOZE_UNTIL_RESET }).getAttribute("aria-checked")).toBe("true");
+        });
     });
 });

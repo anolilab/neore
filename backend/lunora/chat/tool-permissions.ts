@@ -55,7 +55,7 @@ import { claimToolApproval, findPendingApprovalOnLatestTurn, SUB_AGENT_RUN_ENDED
 import { denyToolApprovalRun, purgeExpiredToolApprovalRunsForUser } from "./lib/tool-approval-cleanup";
 import { listBuiltInTools } from "./lib/tool-builder";
 import type { ToolPermissionMode } from "./lib/tool-permissions";
-import { defaultToolPermission, toolPermissionKey } from "./lib/tool-permissions";
+import { defaultToolPermission, isAlwaysAllowRefused, toolPermissionKey } from "./lib/tool-permissions";
 import { resumeClaimedRun } from "./lib/tool-approval-resume";
 import { connectorTrustId, liveTrustedServers, MAX_TRUSTED_SERVERS, mcpTrustId } from "./lib/low-risk-trust";
 import { vToolRunConfig } from "./lib/tool-run-config";
@@ -864,8 +864,8 @@ export const recordPendingToolApprovals = internalMutation
     );
 
 /**
- * What an answer leaves behind for next time: `always` stores `auto` for the tool, `hour` / `today` a time-boxed
- * allow. `key` is the permission key recorded when the tool was built; a snapshot without one approves a plain or
+ * What an answer leaves behind for next time: `always` stores `auto` for the tool (refused for the tools in
+ * `ALWAYS_ALLOW_REFUSED_BUILTINS`), `hour` / `today` a time-boxed allow. `key` is the permission key recorded when the tool was built; a snapshot without one approves a plain or
  * "always" answer once and stores nothing rather than guessing, and refuses `hour` / `today`, which it could not keep.
  */
 export const recordApprovalPreference = async (ctx: PreferenceCtx, decision: ToolApprovalDecision, key: string | undefined): Promise<void> => {
@@ -880,6 +880,18 @@ export const recordApprovalPreference = async (ctx: PreferenceCtx, decision: Too
     }
 
     if (decision === "always") {
+        // A tool that spends money or sends out as the person is never stored as `auto`: the throw rolls the claim back,
+        // so the call still waits for an answer. Hour and today allows are not refused here.
+        if (isAlwaysAllowRefused(key)) {
+            // A person-only tool takes no timed allow either, so the message offers only the single approval.
+            throw new LunoraError(
+                "BAD_REQUEST",
+                isGrantableKey(key)
+                    ? "This tool asks every time: approve this call, or allow it for an hour or today"
+                    : "This tool asks every time: approve this call",
+            );
+        }
+
         await writeToolPermission(ctx, key, "auto");
         await writeToolGrant(ctx, key, null);
     } else if (decision === "hour" || decision === "today") {

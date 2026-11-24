@@ -230,9 +230,12 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     { dedupId: stepDedupId(scope, "erase-pins-on-owner-shards") },
                 ),
         );
+
         // A pin mutation can run longer than its lease, so a pin can commit after the sweep above. The owner shards are swept again after a
         // grace period, before the routes go below: a late pin still has its route, since the route is written before the pin. This narrows
-        // the gap; it does not close it, since no wall-clock bound on a mutation is enforced.
+        // the gap; it does not close it, since no wall-clock bound on a mutation is enforced. The wait runs even when the first sweep found no
+        // route: a write admitted before the erasure can create one after that sweep. The first sweep's result is not read, so a result an
+        // earlier build persisted (null) replays without failing.
         await context.step.sleep("erase-pins-grace", "2 minutes");
         await context.step.do(
             "erase-pins-on-owner-shards-again",

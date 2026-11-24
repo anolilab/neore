@@ -11,15 +11,23 @@ vi.mock("@lingui/react/macro", () => {
         },
     };
 });
-const { access, queueStore } = vi.hoisted(() => {
-    return { access: { permission: undefined as "admin" | "read" | "write" | undefined }, queueStore: { setPaused: vi.fn() } };
+const { access, mutateSpy, queueStore } = vi.hoisted(() => {
+    return {
+        access: { permission: undefined as "admin" | "read" | "write" | undefined },
+        mutateSpy: vi.fn(),
+        queueStore: { setPaused: vi.fn() },
+    };
+});
+
+vi.mock("@neore/client-runtime", () => {
+    return { useUnlockProof: () => "proof-1" };
 });
 
 vi.mock("@tanstack/react-query", () => {
     return {
         skipToken: Symbol("skipToken"),
         useMutation: () => {
-            return { isPending: false, mutate: vi.fn() };
+            return { isPending: false, mutate: mutateSpy };
         },
         useQuery: () => {
             return { data: access.permission ? { permission: access.permission } : undefined };
@@ -67,8 +75,12 @@ vi.mock("@/lib/toast", () => {
 const { OVERDUE_MS, RateLimitPauseNotice, RateLimitPauseNoticeView } = await import("./rate-limit-pause-notice");
 
 const START = Date.parse("2026-10-31T12:00:00.000Z");
+const LIMIT_RESETS = /limit resets/;
+const WAITING_FOR_YOU = /Waiting for you/;
 
-const mount = (overrides: { canControl?: boolean; isRetrying?: boolean; provider?: string; retryInMs?: number } = {}) => {
+const mount = (
+    overrides: { awaitsPerson?: boolean; canControl?: boolean; isRetrying?: boolean; provider?: string; resetUnreported?: boolean; retryInMs?: number } = {},
+) => {
     const onRetryNow = vi.fn();
     const onStop = vi.fn();
 
@@ -80,6 +92,8 @@ const mount = (overrides: { canControl?: boolean; isRetrying?: boolean; provider
             onRetryNow={onRetryNow}
             onStop={onStop}
             pause={{
+                ...(overrides.awaitsPerson !== undefined && { awaitsPerson: overrides.awaitsPerson }),
+                ...(overrides.resetUnreported === true && { resetUnreported: true }),
                 provider: "provider" in overrides ? overrides.provider : "anthropic",
                 reason: "rate_limit",
                 retryAt: START + (overrides.retryInMs ?? 42_000),
@@ -190,6 +204,84 @@ describe("rate limit pause notice", () => {
         expect((screen.getByRole("button", { name: "Retry now" }) as HTMLButtonElement).disabled).toBe(true);
     });
 
+    describe("when the person resumes the run after a limit", () => {
+        it("says the run waits for the person while the limit resets, and offers no resume yet", () => {
+            mount({ awaitsPerson: true });
+
+            expect(
+                screen.getByText(
+                    "Rate limited, the limit resets in 0:42. Waiting for you to resume. A message you send here is queued, and it is sent after you resume the reply.",
+                ),
+            ).toBeTruthy();
+            expect(screen.getByRole("status").textContent).toBe(
+                "Rate limited. The limit resets in about 1:00. Waiting for you to resume. A message you send here is queued, and it is sent after you resume the reply.",
+            );
+            expect((screen.getByRole("button", { name: "Resume" }) as HTMLButtonElement).disabled).toBe(true);
+            expect(screen.queryByRole("button", { name: "Retry now" })).toBeNull();
+        });
+
+        it("says so once the limit has reset, and resumes from the button", () => {
+            const { onRetryNow } = mount({ awaitsPerson: true, retryInMs: 3000 });
+
+            tick(3000);
+
+            expect(
+                screen.getByText(
+                    "The limit has reset. Waiting for you to resume. A message you send here is queued, and it is sent after you resume the reply.",
+                    { selector: "p" },
+                ),
+            ).toBeTruthy();
+            expect(screen.getByRole("status").textContent).toBe(
+                "The limit has reset. Waiting for you to resume. A message you send here is queued, and it is sent after you resume the reply.",
+            );
+
+            fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+            expect(onRetryNow).toHaveBeenCalledOnce();
+        });
+
+        it("does not call a default wait a reset: the provider gave no time, so Resume is offered at once", () => {
+            const { onRetryNow } = mount({ awaitsPerson: true, resetUnreported: true });
+
+            expect(screen.getByRole("status").textContent).toBe(
+                "Rate limited. Waiting for you to resume. A message you send here is queued, and it is sent after you resume the reply.",
+            );
+            expect(screen.queryByText(LIMIT_RESETS)).toBeNull();
+            expect((screen.getByRole("button", { name: "Resume" }) as HTMLButtonElement).disabled).toBe(false);
+
+            fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+            expect(onRetryNow).toHaveBeenCalledOnce();
+        });
+
+        it("does not call the wait overdue after the reset: nothing was queued to be late", () => {
+            mount({ awaitsPerson: true, retryInMs: 3000 });
+
+            tick(3000 + OVERDUE_MS + 10_000);
+
+            expect(screen.getByRole("status").textContent).toBe(
+                "The limit has reset. Waiting for you to resume. A message you send here is queued, and it is sent after you resume the reply.",
+            );
+            expect((screen.getByRole("button", { name: "Resume" }) as HTMLButtonElement).disabled).toBe(false);
+        });
+
+        it("tells a read-only viewer the limit's state, not that the run waits for them, and gives no buttons", () => {
+            mount({ awaitsPerson: true, canControl: false });
+
+            expect(screen.getByText("Rate limited, the limit resets in 0:42")).toBeTruthy();
+            expect(screen.getByRole("status").textContent).toBe("Rate limited. The limit resets in about 1:00");
+            expect(screen.queryByText(WAITING_FOR_YOU)).toBeNull();
+            expect(screen.queryByRole("button")).toBeNull();
+        });
+
+        it("tells a read-only viewer once the limit has reset, without asking anyone to resume", () => {
+            mount({ awaitsPerson: true, canControl: false, retryInMs: 3000 });
+
+            tick(3000);
+
+            expect(screen.getByRole("status").textContent).toBe("The limit has reset");
+            expect(screen.queryByText(WAITING_FOR_YOU)).toBeNull();
+        });
+    });
+
     describe("wired to the thread", () => {
         const wired = () => {
             render(<RateLimitPauseNotice pause={{ reason: "rate_limit", retryAt: START + 42_000, status: 429 }} threadId="t1" />);
@@ -201,6 +293,33 @@ describe("rate limit pause notice", () => {
 
             expect(screen.getByRole("button", { name: "Retry now" })).toBeTruthy();
             expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy();
+        });
+
+        it("a manual Resume names its own reply, and Retry now does not", () => {
+            access.permission = "write";
+            render(
+                <RateLimitPauseNotice pause={{ awaitsPerson: true, reason: "rate_limit", retryAt: START + 1000, status: 429 }} streamId="s1" threadId="t1" />,
+            );
+
+            tick(2000);
+            fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+
+            expect(mutateSpy).toHaveBeenLastCalledWith(expect.objectContaining({ streamId: "s1", threadId: "t1" }), expect.anything());
+
+            mutateSpy.mockClear();
+            wired();
+            fireEvent.click(screen.getByRole("button", { name: "Retry now" }));
+
+            expect(mutateSpy.mock.calls[0]![0]).not.toHaveProperty("streamId");
+        });
+
+        it("sends the unlock proof with Retry now, so a locked chat resumes for its owner", () => {
+            access.permission = "write";
+            wired();
+
+            fireEvent.click(screen.getByRole("button", { name: "Retry now" }));
+
+            expect(mutateSpy).toHaveBeenCalledWith(expect.objectContaining({ threadId: "t1", unlockProof: "proof-1" }), expect.anything());
         });
 
         it("Stop keeps the queued prompts from auto-sending, as the composer's Stop does", () => {

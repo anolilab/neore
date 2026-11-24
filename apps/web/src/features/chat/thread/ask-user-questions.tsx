@@ -62,7 +62,8 @@ export const AskUserQuestionFields: FC<{
                     maxLength={ASK_USER_ANSWER_MAX}
                     onChange={(event) => onChange(index, { note: event.target.value })}
                     placeholder={entry.choices.length > 0 ? t`Add a note (optional)…` : t`Type your answer…`}
-                    required={entry.choices.length === 0}
+                    // A multi-select question may go out with nothing picked, so only a single-choice one without choices needs its note.
+                    required={entry.choices.length === 0 && !entry.multiSelect}
                     rows={2}
                     size="sm"
                     value={current.note}
@@ -83,7 +84,7 @@ export const AskUserAnswerList: FC<{ entries: ReadonlyArray<AskUserAnswerEntry> 
                     <p className="text-muted-foreground text-xs whitespace-pre-wrap">{entry.question}</p>
                     <p className="whitespace-pre-wrap">
                         <span className="sr-only">{t`Your answer:`} </span>
-                        {[entry.selected.join(", "), entry.note].filter(Boolean).join(" — ")}
+                        {[entry.selected.join(", "), entry.note].filter(Boolean).join(" — ") || t`None`}
                     </p>
                 </li>
             ))}

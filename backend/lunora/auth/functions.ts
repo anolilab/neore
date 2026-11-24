@@ -1177,7 +1177,9 @@ export const getUserPreferencesQuery = internalQuery
             nickname: v.optional(v.string()),
             personalizationByImpersonator: v.boolean(),
             profession: v.optional(v.string()),
+            resumeAfterUsageLimit: v.optional(v.boolean()),
             resumeInterruptedRuns: v.optional(v.boolean()),
+            snoozeUntilUsageLimitReset: v.optional(v.boolean()),
             threadSummariesEnabled: v.boolean(),
             threadTitleInstructions: v.optional(v.string()),
             timezone: v.optional(v.string()),
@@ -1202,7 +1204,9 @@ export const getUserPreferencesQuery = internalQuery
                 nickname: userSettings?.nickname ?? undefined,
                 personalizationByImpersonator: userSettings?.personalizationByImpersonator === true,
                 profession: userSettings?.profession ?? undefined,
+                resumeAfterUsageLimit: userSettings?.resumeAfterUsageLimit ?? undefined,
                 resumeInterruptedRuns: userSettings?.resumeInterruptedRuns ?? undefined,
+                snoozeUntilUsageLimitReset: userSettings?.snoozeUntilUsageLimitReset ?? undefined,
                 threadSummariesEnabled: userSettings?.threadSummariesEnabled === true, // Opt-in; see agent/thread-summaries.ts
                 threadTitleInstructions: userSettings?.threadTitleInstructions ?? undefined,
                 timezone: userSettings?.timezone ?? undefined,
@@ -1220,6 +1224,8 @@ export const getUserPreferencesQuery = internalQuery
                 // A failed read carries no personalization, so nothing an admin wrote reaches the prompt.
                 personalizationByImpersonator: false,
                 profession: undefined,
+                // A failed read resumes as an absent setting does (`readUsageLimitPreferences`): on, with no snooze.
+                resumeAfterUsageLimit: true,
                 // A failed read is not an absent setting: the resume is off for it (`readResumeInterruptedRuns`).
                 resumeInterruptedRuns: false,
                 threadSummariesEnabled: false,
