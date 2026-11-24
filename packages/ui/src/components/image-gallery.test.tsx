@@ -126,6 +126,12 @@ describe("media gallery save control", () => {
         expect(saveFromUrl).toHaveBeenCalledWith("https://files.test/ref-1.png", undefined, "image-ref-1");
     });
 
+    it("offers no save for an item marked not saveable, as a reference picker's are", () => {
+        renderGallery([{ ...cat, id: "picker-1", saveable: false }], () => {});
+
+        expect(saveButton("cat.png (1)")).toBeNull();
+    });
+
     it("offers a save for an image the classifier cleared", () => {
         renderGallery([withStatus("safe")], () => {});
 

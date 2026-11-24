@@ -25,6 +25,8 @@ export interface GalleryItem {
     modelName?: string; // display name of the model used for generation
     nsfwStatus?: string; // NSFW classification status
     prompt?: string;
+    /** `false`: the tile offers no save. A picker holds items whose screening status it does not carry. */
+    saveable?: boolean;
     src: string;
     thumbnail?: string;
     type: "image" | "video";
@@ -34,7 +36,7 @@ export interface GalleryItem {
  * Whether a tile offers to save its file. A file the classifier has not cleared is not saved: `pending`, `checking`,
  * `failed` and `blocked` are withheld. An absent status is cleared, as the backend treats it (`fork-copy.ts`).
  */
-const canSaveItem = (item: GalleryItem): boolean => item.nsfwStatus === undefined || item.nsfwStatus === "safe";
+const canSaveItem = (item: GalleryItem): boolean => item.saveable !== false && (item.nsfwStatus === undefined || item.nsfwStatus === "safe");
 
 // Root component
 interface ImageGalleryProps {
