@@ -26,6 +26,8 @@ import { agentSwitchRowContent } from "./agent-switch-logic";
 import { contextResetRowContent } from "./context-reset-shape";
 import type { AgentSwitchPart } from "./agent-switch-validators";
 import { findVectorTable, type VectorTableName } from "./vector/tables";
+import { typedTextColumn } from "./shared";
+import type { Message } from "./validators";
 
 type Database = MutationCtx["db"];
 type NewRow<T extends "messages" | "threadRelationships" | "threads"> = Omit<Doc<T>, "_creationTime" | "_id">;
@@ -245,8 +247,11 @@ export const setThreadSnooze = async (db: Database, thread: Doc<"threads">, unti
  * (no branch parent, no leaf advance, no embedding) — what messenger and the
  * chat import have always done. Prefer `addMessagesHandler` for anything new.
  */
-export const insertMessageRow = async (db: Database, row: NewRow<"messages">): Promise<Id<"messages">> =>
-    await db.insert("messages", { ...row, createdAt: row.createdAt ?? Date.now() });
+export const insertMessageRow = async (db: Database, row: Omit<NewRow<"messages">, "typedText">): Promise<Id<"messages">> => {
+    const typedText = typedTextColumn(row.message as Message | undefined, row.text);
+
+    return await db.insert("messages", { ...row, createdAt: row.createdAt ?? Date.now(), ...(typedText !== undefined && { typedText }) });
+};
 
 /**
  * The row that records an agent switch: a `system` row with no text (`agent-switch-logic.ts`),
@@ -301,7 +306,23 @@ export const patchAgentSwitchRow = async (db: Database, messageId: Id<"messages"
 };
 
 export const patchMessage = async (db: Database, messageId: Id<"messages">, fields: MessagePatch): Promise<void> => {
-    await db.patch("messages", messageId, withoutUndefined(fields));
+    if (fields.message === undefined && fields.text === undefined) {
+        await db.patch("messages", messageId, withoutUndefined(fields));
+
+        return;
+    }
+
+    // New content or text: the typed words the prompt search indexes follow it, removed when there are none any more.
+    const row = await db.get("messages", messageId);
+
+    if (!row) {
+        return;
+    }
+
+    const changes = withoutUndefined(fields);
+    const typedText = typedTextColumn((changes.message ?? row.message) as Message | undefined, "text" in changes ? changes.text : row.text);
+
+    await patchRow(db, "messages", row, typedText !== undefined || row.typedText !== undefined ? { ...changes, typedText } : changes);
 };
 
 export const patchTemporaryThread = async (db: Database, rowId: Id<"temporaryThreads">, fields: TemporaryThreadPatch): Promise<void> => {

@@ -73,6 +73,13 @@ describe("resolveShortcuts", () => {
         expect(keysOf("focusSearch")).toEqual(["Ctrl", "Shift", "F"]);
     });
 
+    it("lists the composer's Ctrl+R prompt search with the literal Control key", () => {
+        const keysOf = (isMac: boolean) => resolveShortcuts(defaultKeyboardShortcuts, isMac).find((item) => item.entry.id === "promptSearch")?.keys;
+
+        expect(keysOf(false)).toEqual(["Ctrl", "R"]);
+        expect(keysOf(true)).toEqual(["⌃", "R"]);
+    });
+
     it("leaves out actions that are unbound", () => {
         const resolved = resolveShortcuts(defaultKeyboardShortcuts, false);
 

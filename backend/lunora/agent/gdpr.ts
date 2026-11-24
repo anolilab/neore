@@ -6,15 +6,17 @@
  */
 import { v } from "lunorash/server";
 
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
 import { BATCH, type BatchResult, deleteParentsWithChildren, full } from "../gdpr/batch";
 import { gdprLogger } from "../lib/logger";
+import { patchRow } from "../lib/patch";
 import { storedRow, storedRows } from "../lib/stored-row";
+import { countedWorkflowFileIds } from "../workflow/images";
+import { changeRefcount, ensureChatFileMetadata } from "./files";
 import { MAX_LENGTH } from "../lib/validators";
 import { eraseProjectRuleFilesForUser, eraseProjectsRuleFiles, markProjectsRuleFilesErasing, RULE_FILE_ROWS_PER_PAGE } from "../projects/gdpr";
 import { erasePinsNamingDocuments } from "../chat/gdpr";
-import { ensureChatFileMetadata } from "./files";
 import { deleteVectorRow } from "./table-writes";
 import type { VectorTableName } from "./vector/tables";
 
@@ -395,6 +397,54 @@ export const eraseProjectsForUser = async (ctx: MutationCtx, userId: string): Pr
     }
 
     return await eraseProjectRuleFilesForUser(ctx, userId);
+};
+
+/** A workflow with no nodes: what a project's workflow becomes once its chat files are released. */
+const EMPTY_WORKFLOW = { edges: [], nodes: [] };
+
+/** The projects one round releases, so a large account stays inside one mutation. The next round picks up the rest. */
+const PROJECTS_RELEASED_PER_ROUND = 20;
+
+/**
+ * The chat files the user's projects hold (image nodes and reference media), released while the owner still holds their grants: a file
+ * is counted only while the owner holds a grant for it (`workflow/images.ts#countedWorkflowFileIds`), so this runs before
+ * `eraseChatFileAccessForUser`. Once it does, nothing is counted and the release is a no-op. A project whose files are released has its
+ * workflow emptied in the same write, so a retried round releases nothing twice. The project rows go in `eraseProjectsForUser`.
+ */
+export const releaseProjectImagesForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
+    let cursor: string | null = null;
+    let released = 0;
+    let more = true;
+
+    while (more) {
+        const page = (await ctx.db.projects.findMany({ consistency: "primary", cursor, limit: BATCH, where: { userId } })) as {
+            continueCursor: string;
+            isDone: boolean;
+            page: Doc<"projects">[];
+        };
+
+        for (const project of page.page) {
+            const { previous } = await countedWorkflowFileIds(ctx.db, userId, project.workflowContent, undefined);
+
+            if (previous.length === 0) {
+                continue;
+            }
+
+            await changeRefcount(ctx, previous, []);
+            await patchRow(ctx.db, "projects", project, { workflowContent: EMPTY_WORKFLOW });
+
+            released += 1;
+
+            if (released >= PROJECTS_RELEASED_PER_ROUND) {
+                return { hasMore: true };
+            }
+        }
+
+        more = !page.isDone;
+        cursor = page.isDone ? null : page.continueCursor;
+    }
+
+    return { hasMore: false };
 };
 
 /** Deletes a batch of executions, each after its node rows; `true` when one was left for the next round. */

@@ -45,26 +45,25 @@ const isLiveMarker = (row: { createdAt: number; kind: AccountMoveKind }, now: nu
     row.kind === "erasing" || row.createdAt > now - MERGE_MARKER_MAX_AGE_MS;
 
 /**
- * Marks the account as moving for one operation. Idempotent for that operation: a retry or a redelivery leaves its marker in place. Another
+ * Marks the account as moving for one operation. Idempotent for that operation: a retry or a redelivery keeps its one marker, renewed, so a
+ * move that runs over several jobs (a guest merge marks again at each run) stays live past {@link MERGE_MARKER_MAX_AGE_MS}. Another
  * operation's marker is left alone, so an overlapping move adds its own.
  */
 export const beginAccountMove = async (context: Pick<MutationCtx, "db">, userId: string, kind: AccountMoveKind, now: number): Promise<void> => {
     const { page } = await context.db.accountMoves.findMany({ consistency: "primary", where: { userId } });
 
-    const sameKind = page.filter((row) => row.kind === kind);
+    const marker = page.find((row) => row.kind === kind);
 
-    if (sameKind.some((row) => isLiveMarker(row, now))) {
-        return;
-    }
-
-    if (sameKind.length === 0) {
+    if (marker === undefined) {
         await context.db.insert("accountMoves", { createdAt: now, kind, userId });
 
         return;
     }
 
-    // A marker of this kind that has gone stale no longer fences the account: it is renewed, so a late delivery of the move fences again.
-    await context.db.patch("accountMoves", sameKind[0]!._id, { createdAt: now });
+    // A stale marker no longer fences the account: renewing it fences again. A live one is renewed so it does not lapse mid-move.
+    if (marker.createdAt < now) {
+        await context.db.patch("accountMoves", marker._id, { createdAt: now });
+    }
 };
 
 /**
@@ -175,6 +174,13 @@ export const beginAccountMoveFor = internalMutation
 
         return null;
     });
+
+/** Whether the account still holds a marker of `kind`, live or not: a finished guest merge checks that its own are gone. */
+export const hasAccountMove = async (context: Pick<QueryCtx, "db">, userId: string, kind: AccountMoveKind): Promise<boolean> => {
+    const { page } = await context.db.accountMoves.findMany({ consistency: "primary", where: { userId } });
+
+    return page.some((row) => row.kind === kind);
+};
 
 /** Whether an erasure of the account is active. A guest merge checks it before it moves a pin: an erasure removes those pins. */
 export const isErasing = async (context: Pick<QueryCtx, "db">, userId: string): Promise<boolean> => {

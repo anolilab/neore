@@ -299,6 +299,25 @@ table is in `schema.ts` and is owned by `chat/module.ts`.
 
 All five are `authQuery` / `authMutation`.
 
+## AGENT COLUMNS
+
+Long form of two `backend/lunora/agent/AGENTS.md` bullets.
+
+**`messages.typedText`.** `text` stays the message as it was sent; `typedText` holds only what the person typed
+(`typedTextColumn` over `typedTextOf`: no attachment, quote, guest note or placeholder) and is what the composer's prompt
+search indexes (`typed_text_search`). Every writer of a user row's `text` sets it beside it: `addMessagesHandler`,
+`updateMessage`, and `insertMessageRow`/`patchMessage` (`table-writes.ts`) for the others (the reply rewrite in
+`branches.ts` edits assistant rows only). A new writer goes through one of them, or the index and `text` disagree. It is
+server-only: not in `vMessageDocFields`, stripped by `publicMessage` from every message read; the search reads it as
+`vTypedPromptRow` (`typedTextSearch`, `typedPromptRow`).
+
+**Archived flag on thread vectors.** It is a row column because Lunora's vector sync writes metadata after commit, so
+keeping it current is a row patch. A failed schedule from the threads update trigger fails the write; the job retries
+forever, as nothing re-queues it. An idle shard is not swept. The backfill's place is on an `idempotencyClaims` row that
+never expires, the chain's lease inside; only the step whose chain, kind and cursor equal the place runs, and nothing
+runs once account deletion is underway. Writers read the thread's current status. Vectorize indexes a property only for
+vectors written after its index; a failed upsert is logged, not retried (`lunora-upstream.md`).
+
 ## DOCUMENTATION & RESOURCES
 
 - **Lunora**: `@lunora/*` packages, pinned in `pnpm-workspace.yaml` (`catalog:lunora`).
