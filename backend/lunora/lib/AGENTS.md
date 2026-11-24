@@ -70,7 +70,8 @@
   writes guest data on the new account's side checks both erasing markers first (`stoppedForErasure`); what moved
   before stays the new account's. A copy of a row the guest deleted (before or during the clear) is taken back only
   while it matches its import marker; the marker stays. Trigger- or sync-kept fields (`DERIVED_FIELDS`) stay out of
-  digests and keep the new shard's value. A run-cap stop leaves a stop record, read before any lease or record.
+  digests and keep the new shard's value. A run-cap stop leaves a stop record, read before any lease or record. A row
+  the new shard keeps (`kept`) is read past, and the `guest` step then stops for good, keeping the guest.
 
 - **Secret detection** — `lib/secret-redaction.ts` (`redactSecrets`, `containsSecret`)
   is the one detector for provider keys, JWTs, `Bearer` values, private key blocks,

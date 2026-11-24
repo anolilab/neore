@@ -66,6 +66,15 @@ A reconcile page that finds an uncleared copy's row still on the guest's shard s
 clear instead of moving on: the clear reads the row again (and records it), or finds the table empty and the next
 reconcile finds the row gone, so a guest deletion after the absence check still takes the copy back.
 
+An id the new shard already holds with other content and no import marker (a copy by the merge code before markers,
+which the guest edited since) is never overwritten, so the guest's row is never confirmed: `importShardRows` reports it
+as `kept`. The clear reads past it (`listShardRowsToClear`'s `skip`, carried in the progress as `kept` for the table it
+is on) and goes on, so the table still empties and every later table, the global rows, follows and pins still move. The
+progress then carries `guestKept`: the `guest` step, after its global re-check, stops the merge for good
+(`stopMergeKeepingGuest` with `dropLease`, which leaves the stop record) instead of deleting the guest, never back to the
+clear, which would meet the row again until the run cap. More than `MERGE_KEPT_ROWS` such rows in one table stop it at
+once the same way. Either way the guest keeps that row, and an unconfirmed id that is not `kept` still throws.
+
 The `guest` step calls `reassignGlobalRows` again before `deleteMergedGuest` (a second call, so the deletion keeps its
 own D1 budget): a `.global()` row the guest wrote after the `global` step (a project made meanwhile) is moved there, and
 when it moved any (or is not done) the merge goes back to the `global` step and keeps the guest until the next pass

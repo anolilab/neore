@@ -441,13 +441,14 @@ const withinClearBytes = (rows: Record<string, unknown>[]): Record<string, unkno
 
 /**
  * On the GUEST's shard: the first page of `table`, whole rows with each one's digest — for the clear, which imports
- * each page again before it deletes it, and deletes a row only while its digest still holds. With `ownedBy`, only that user's rows: `userSettings` and `aiUserPreferences` (the tables the new account
+ * each page again before it deletes it, and deletes a row only while its digest still holds. `skip` names rows the new
+ * shard keeps (`kept` of {@link importShardRows}): they stay here, and the page is read past them. With `ownedBy`, only that user's rows: `userSettings` and `aiUserPreferences` (the tables the new account
  * keeps its own row of) are cleared of the guest's row alone, so a shard that also holds the new account's row (one
  * shard serving both, as local routing can) keeps it. Every other table is listed whole, on the guest's own shard only
  * ({@link onGuestShard}): nothing on one that serves other users too.
  */
 export const listShardRowsToClear = internalQuery
-    .input({ from: v.string(), ownedBy: v.optional(v.string()), table: v.string() })
+    .input({ from: v.string(), ownedBy: v.optional(v.string()), skip: v.optional(v.array(v.string())), table: v.string() })
     .output(v.object({ digests: v.array(v.string()), rows: v.array(v.any()) }))
     .query(async ({ args, ctx }) => {
         if (!onGuestShard(args.from)) {
@@ -455,7 +456,12 @@ export const listShardRowsToClear = internalQuery
         }
 
         const limit = pageSizeFor(args.table);
-        const withDigests = async (rows: Record<string, unknown>[]) => {
+        const skip = new Set(args.skip);
+        // `skip.size` more read, so a page still holds `limit` rows wherever the skipped ones are.
+        const read = limit + skip.size;
+        const withDigests = async (all: Record<string, unknown>[]) => {
+            const rows = withinClearBytes(all.filter((row) => !skip.has(row._id as string)).slice(0, limit));
+
             return { digests: await Promise.all(rows.map(async (row) => await rowDigest(args.table, row))), rows };
         };
 
@@ -464,12 +470,12 @@ export const listShardRowsToClear = internalQuery
                 string,
                 { findMany: (options: { limit: number; where: { userId: string } }) => Promise<{ page: Record<string, unknown>[] }> }
             >;
-            const { page } = await facades[args.table]!.findMany({ limit, where: { userId: args.ownedBy } });
+            const { page } = await facades[args.table]!.findMany({ limit: read, where: { userId: args.ownedBy } });
 
-            return await withDigests(withinClearBytes(page));
+            return await withDigests(page);
         }
 
-        return await withDigests(withinClearBytes(await rawDb(ctx).query(args.table).take(limit)));
+        return await withDigests(await rawDb(ctx).query(args.table).take(read));
     });
 
 /**
@@ -567,7 +573,8 @@ export const MERGE_FENCE_SCOPE = "guest-merge-done";
 export const MERGE_FENCE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 
 /**
- * The claim scope of a merge stopped for good at its run cap ({@link MAX_MERGE_RUNS}), on the NEW account's shard: one
+ * The claim scope of a merge stopped for good at its run cap ({@link MAX_MERGE_RUNS}) or for a row it can never move
+ * ({@link MERGE_KEPT_ROWS}), on the NEW account's shard: one
  * row per guest, tagged with the new account, so its erasure takes it, and never by time. It outlives the lease and the
  * progress record the stop drops: a late delivery (a requeued duplicate, the hand-over repeated) finds it before it takes
  * a lease or writes a record ({@link acquireMergeLease}, {@link recordGuestMerge}), so nothing starts the merge again.
@@ -630,6 +637,8 @@ export const MERGE_STOP_CALLS = 1;
 /** The fields of {@link MergeProgress}, spread into each validator that takes one. */
 const vMergeProgressFields = {
     cursor: v.union(v.string(), v.null()),
+    guestKept: v.optional(v.boolean()),
+    kept: v.optional(v.array(v.string())),
     moved: v.number(),
     phase: v.union(
         v.literal("clear"),
@@ -1285,14 +1294,24 @@ const stoppedForErasure = async (ctx: Pick<MutationCtx, "db">, from: string, to:
  * and an id whose marker remains but whose row is gone (the account deleted it) is not written again. `present` names
  * every id the guest's shard may now delete: each is on this shard as the merge or the account left it, or (for the
  * tables the new account keeps its own row of) handled. An id here with other content and no marker is left out: the
- * guest's row stays on its shard, never deleted unseen. Once the guest's merge has finished ({@link MERGE_FENCE_SCOPE}),
+ * guest's row stays on its shard, never deleted unseen, and `kept` names it: the clear reads past it, and the merge keeps
+ * its guest ({@link MERGE_KEPT_ROWS}). Once the guest's merge has finished ({@link MERGE_FENCE_SCOPE}),
  * or another delivery has taken the merge's lease since this one did ({@link MERGE_LEASE_SCOPE}: its rows may be newer
  * than these), it writes nothing and confirms nothing: `fenced` tells the stale delivery to stop. Nor once an erasure of
  * either account has begun ({@link stoppedForErasure}): `erasing`, and the merge has stopped keeping the guest.
  */
 export const importShardRows = internalMutation
     .input({ clearing: v.optional(v.boolean()), from: v.string(), generation: v.number(), rows: v.array(v.any()), table: v.string(), to: v.string() })
-    .output(v.object({ erasing: v.optional(v.boolean()), fenced: v.boolean(), held: v.number(), imported: v.number(), present: v.array(v.string()) }))
+    .output(
+        v.object({
+            erasing: v.optional(v.boolean()),
+            fenced: v.boolean(),
+            held: v.number(),
+            imported: v.number(),
+            kept: v.optional(v.array(v.string())),
+            present: v.array(v.string()),
+        }),
+    )
     .mutation(async ({ args, ctx }) => {
         const db = rawDb(ctx);
         const rows = args.rows as Record<string, unknown>[];
@@ -1322,6 +1341,8 @@ export const importShardRows = internalMutation
         let usageWritten = false;
         /** The ids the guest's shard may delete: none whose content is on this shard neither as the guest's nor by the account's choice. */
         const present: string[] = [];
+        /** The ids the new account holds other content under, with no marker: never confirmed, whichever import reads them. */
+        const kept: string[] = [];
         // Per organization: whether the new account's entry there is the guest's, handed over with its cohort.
         const handedOver = new Map<string, boolean>();
 
@@ -1400,8 +1421,9 @@ export const importShardRows = internalMutation
                 } else if (written === null) {
                     // Here with other content and no marker (a copy by the merge code before markers, which the guest edited
                     // since, or a row nothing of the merge wrote): neither is overwritten, so the guest's row is not confirmed
-                    // and stays on its shard; the guest is kept with it (`rowsRemain`).
+                    // and stays on its shard; the guest is kept with it (`kept`).
                     authLogger.warn(`[auth] kept ${args.table} row ${id} of guest ${args.from}: the new account holds other content under its id`);
+                    kept.push(id);
 
                     continue;
                 }
@@ -1450,7 +1472,7 @@ export const importShardRows = internalMutation
             await noteShardDue(ctx, now);
         }
 
-        return { fenced: false, held, imported, present };
+        return { fenced: false, held, imported, present, ...(kept.length > 0 && { kept }) };
     });
 
 /**
@@ -2145,6 +2167,10 @@ export type MergePhase = "clear" | "contributors" | "copy" | "follows" | "global
 /** Where a merge run stopped, for the next run to start from: the step, its table and that table's copy cursor. */
 export interface MergeProgress {
     cursor: string | null;
+    /** A row of the guest's the new shard keeps was met ({@link MERGE_KEPT_ROWS}): the `guest` step stops, keeping the guest. */
+    guestKept?: boolean;
+    /** Those rows of `table`, which the clear reads past; another table ignores them. */
+    kept?: string[];
     moved: number;
     phase: MergePhase;
     /** The route of the page at `cursor` the `repins` step stopped at; another phase ignores it. */
@@ -2166,7 +2192,9 @@ interface MergeState {
     cursor: string | null;
     /** Set by a step that must wait: the run stops, and the next one is queued this many milliseconds later. */
     deferMs: number | null;
+    guestKept: boolean;
     index: number;
+    kept: string[];
     moved: number;
     phase: MergePhase;
     route: number;
@@ -2205,11 +2233,20 @@ const STEP_CALLS: Readonly<Record<MergePhase, number>> = {
     repins: 4,
 };
 
+/**
+ * The most rows of one table the new shard may keep (`kept` of {@link importShardRows}: other content under the guest
+ * row's id, with no import marker) before the merge stops for good, keeping the guest: the clear reads past each one,
+ * and their ids go with every page read and every saved progress. Any kept row keeps the guest: its `guest` step stops
+ * the merge for good instead of deleting it, once everything else has moved.
+ */
+export const MERGE_KEPT_ROWS = 100;
+
 /** Moves `state` to the first table of `phase`. */
 const enter = (state: MergeState, phase: MergePhase): void => {
     state.phase = phase;
     state.index = 0;
     state.cursor = null;
+    state.kept = [];
     state.route = 0;
     state.routeThread = null;
 };
@@ -2218,6 +2255,7 @@ const enter = (state: MergeState, phase: MergePhase): void => {
 const nextTable = (state: MergeState, tables: string[], phase: MergePhase): void => {
     state.index += 1;
     state.cursor = null;
+    state.kept = [];
 
     if (state.index >= tables.length) {
         enter(state, phase);
@@ -2227,11 +2265,17 @@ const nextTable = (state: MergeState, tables: string[], phase: MergePhase): void
 /**
  * An owner shard refused to move the guest's pins (`erasing`): an erasure of either account began after this run's start,
  * and it has priority; or the guest's own shard is one other users share. The merge stops and keeps its guest; its markers end and its record goes
- * ({@link stopMergeKeepingGuest}), unless a later delivery holds the lease (`superseded`). One call.
+ * ({@link stopMergeKeepingGuest}), unless a later delivery holds the lease (`superseded`). `forGood` (a row the merge can
+ * never move, {@link MERGE_KEPT_ROWS}): its lease goes and its stop record stays, so no later delivery starts it again.
+ * One call.
  */
-const stopKeepingGuest = async ({ call, from, generation, references, to }: MergeContext, state: MergeState): Promise<boolean> => {
+const stopKeepingGuest = async (
+    { call, from, generation, references, to }: MergeContext,
+    state: MergeState,
+    { forGood = false }: { forGood?: boolean } = {},
+): Promise<boolean> => {
     state.calls -= 1;
-    const { superseded }: { superseded: boolean } = await call(references.stopKeepingGuest, { from, generation, to }, to);
+    const { superseded }: { superseded: boolean } = await call(references.stopKeepingGuest, { ...(forGood && { dropLease: true }), from, generation, to }, to);
 
     state.stopped = !superseded;
     state.superseded = superseded;
@@ -2252,7 +2296,8 @@ const stoppedByErasure = (state: MergeState): boolean => {
 /** One step of each phase; `true` once the merge is done. */
 const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeState) => Promise<boolean>>> = {
     // A page of the table: cleared, and read again until the guest's shard holds none of its rows.
-    clear: async ({ call, from, generation, references, tables, to }, state) => {
+    clear: async (context, state) => {
+        const { call, from, generation, references, tables, to } = context;
         const table = tables[state.index];
 
         if (table === undefined) {
@@ -2261,9 +2306,19 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
             return false;
         }
 
-        const { calls, outcome } = await clearPage(call, references, table, { from, generation, to });
+        // Too many rows the new shard keeps to carry past: the merge stops here, and they stay with the guest.
+        if (state.kept.length >= MERGE_KEPT_ROWS) {
+            return await stopKeepingGuest(context, state, { forGood: true });
+        }
+
+        const { calls, kept, outcome } = await clearPage(call, references, table, { from, generation, skip: state.kept, to });
 
         state.calls -= calls;
+
+        if (kept.length > 0) {
+            state.kept = [...new Set([...state.kept, ...kept])];
+            state.guestKept = true;
+        }
 
         if (outcome === "erasing") {
             return stoppedByErasure(state);
@@ -2444,6 +2499,12 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
             enter(state, "global");
 
             return false;
+        }
+
+        // A row the new shard keeps is still the guest's: everything else has moved, and the merge stops with the guest kept,
+        // never sent back to the clear, which would only meet that row again.
+        if (state.guestKept) {
+            return await stopKeepingGuest(context, state, { forGood: true });
         }
 
         state.calls -= 1;
@@ -2761,7 +2822,9 @@ export const mergeGuestInto = async (
         calls: budget - MERGE_LEASE_CALLS - MERGE_STOP_CALLS,
         cursor: resume !== undefined && tables[index] === resume.table ? resume.cursor : null,
         deferMs: null,
+        guestKept: resume?.guestKept === true,
         index,
+        kept: resume !== undefined && tables[index] === resume.table ? (resume.kept ?? []) : [],
         moved: resume?.moved ?? 0,
         phase: resume?.phase ?? "contributors",
         route: resume?.route ?? 0,
@@ -2776,6 +2839,8 @@ export const mergeGuestInto = async (
     const progress = (): MergeProgress => {
         return {
             cursor: state.cursor,
+            ...(state.guestKept && { guestKept: true }),
+            ...(state.kept.length > 0 && { kept: state.kept }),
             moved: state.moved,
             phase: state.phase,
             ...(state.route > 0 && { route: state.route }),
@@ -2866,25 +2931,31 @@ export const mergeGuestInto = async (
  * changed it since. `empty` when the table holds none of the guest's rows any more (one call), `page` after a page (three
  * calls, four with a row gone or changed since the read), `fenced` when another delivery already finished the merge,
  * `erasing` when its import found an erasure begun and stopped the merge ({@link stoppedForErasure}).
- * `calls`: how many it made.
+ * `calls`: how many it made. `kept`: the page's rows the new shard keeps (other content under their ids): they stay on the
+ * guest's shard, and the next read passes them (`skip`), so the table can empty all the same.
  */
 const clearPage = async (
     call: ShardCall,
     references: MergeReferences,
     table: string,
-    { from, generation, to }: { from: string; generation: number; to: string },
-): Promise<{ calls: number; outcome: "empty" | "erasing" | "fenced" | "page" }> => {
+    { from, generation, skip, to }: { from: string; generation: number; skip: string[]; to: string },
+): Promise<{ calls: number; kept: string[]; outcome: "empty" | "erasing" | "fenced" | "page" }> => {
     const { digests, rows }: { digests: string[]; rows: Record<string, unknown>[] } = await call(
         references.listClear,
-        KEEP_NEW_USERS.has(table) ? { from, ownedBy: from, table } : { from, table },
+        { from, ...(KEEP_NEW_USERS.has(table) && { ownedBy: from }), ...(skip.length > 0 && { skip }), table },
         from,
     );
 
     if (rows.length === 0) {
-        return { calls: 1, outcome: "empty" };
+        return { calls: 1, kept: [], outcome: "empty" };
     }
 
-    const { erasing, fenced, present }: { erasing?: boolean; fenced: boolean; present: string[] } = await call(
+    const {
+        erasing,
+        fenced,
+        kept = [],
+        present,
+    }: { erasing?: boolean; fenced: boolean; kept?: string[]; present: string[] } = await call(
         references.importRows,
         { clearing: true, from, generation, rows, table, to },
         to,
@@ -2892,12 +2963,12 @@ const clearPage = async (
 
     // An erasure began since the run's start: the merge stopped in that import, and the guest's rows of this page stay on its shard.
     if (erasing === true) {
-        return { calls: 2, outcome: "erasing" };
+        return { calls: 2, kept: [], outcome: "erasing" };
     }
 
     // Another delivery finished this merge or took it over: nothing of this page is confirmed, so nothing of it is deleted.
     if (fenced) {
-        return { calls: 2, outcome: "fenced" };
+        return { calls: 2, kept: [], outcome: "fenced" };
     }
 
     const confirmed = new Set(present);
@@ -2919,7 +2990,7 @@ const clearPage = async (
         calls += 1;
 
         if (deleted.fenced) {
-            return { calls, outcome: "fenced" };
+            return { calls, kept, outcome: "fenced" };
         }
 
         // Gone from the guest's shard since the read: the import just wrote what the guest no longer has. Changed since: the
@@ -2934,16 +3005,16 @@ const clearPage = async (
             calls += 1;
 
             if (dropped.fenced) {
-                return { calls, outcome: "fenced" };
+                return { calls, kept, outcome: "fenced" };
             }
         }
     }
 
-    if (deletable.length < rows.length) {
+    if (deletable.length + kept.length < rows.length) {
         throw new Error(`the new shard of ${to} did not confirm ${String(rows.length - deletable.length)} ${table} rows of guest ${from}; they stay`);
     }
 
-    return { calls, outcome: "page" };
+    return { calls, kept, outcome: "page" };
 };
 
 /** The generated references `mergeGuestInto` calls (passed in, so this module does not import `_generated/api`). */

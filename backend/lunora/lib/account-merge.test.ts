@@ -36,6 +36,7 @@ import {
     MERGE_PAGE_SIZE,
     MERGE_PROGRESS_SCOPE,
     MERGE_STALL_MS,
+    MERGE_STOPPED_SCOPE,
     MERGE_SWEEP_CENSUS_STATEMENTS,
     MERGE_SWEEP_RECORD_STATEMENTS,
     MERGE_SWEEP_STATEMENTS,
@@ -2108,6 +2109,48 @@ describe("mergeGuestInto across two real shards", () => {
             expect(deletedAfterCheck).toBe(true);
             expect(await merge.threadsOn("user")).toStrictEqual([]);
             expect(await merge.threadsOn("guest")).toStrictEqual([]);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("moves past a row the new account holds other content under, then stops for good keeping the guest and that row", async () => {
+        const merge = twoShards();
+
+        try {
+            // First in the table, so every read of its head meets it.
+            const keptId = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("the guest's")))) as string;
+            const moved: string[] = [];
+
+            for (const title of ["one", "two", "three"]) {
+                moved.push((await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread(title)))) as string);
+            }
+
+            // Content under the same id with no import marker (a copy by the merge code before markers): never overwritten.
+            await merge.shards.user.run(
+                async (context: any) => await context.db.insert("threads", { _id: keptId, ...thread("the account's", "user") }, { allowExplicitId: true }),
+            );
+
+            // It ends, never throwing at each clear of that table until the run cap; the later tables are cleared too.
+            const { runs } = await mergeToEnd(merge.call, "guest", "user");
+
+            expect(runs.at(-1)).toMatchObject({ guestKept: true });
+            expect(shardLocalTables().indexOf(runs.at(-1)!.table)).toBeGreaterThan(shardLocalTables().indexOf("threads"));
+            expect(runs.length).toBeLessThan(shardLocalTables().length);
+            expect(await merge.threadsOn("user")).toStrictEqual(
+                [
+                    { _id: keptId, title: "the account's", userId: "user" },
+                    ...moved.map((id, index) => {
+                        return { _id: id, title: ["one", "two", "three"][index], userId: "user" };
+                    }),
+                ].toSorted(byId),
+            );
+            expect(await merge.threadsOn("guest")).toStrictEqual([{ _id: keptId, title: "the guest's", userId: "guest" }]);
+            // The guest is kept with its row, and its stop record refuses a later delivery.
+            expect(merge.guestDeletions).toStrictEqual([]);
+            expect(await claimKeysOf(merge.shards.user, MERGE_STOPPED_SCOPE)).toStrictEqual(["guest"]);
+            expect(await progressRecordOf(merge.shards.user, "guest")).toBeNull();
+            await expect(mergeGuestInto(merge.call, REFERENCES, "guest", "user")).resolves.toMatchObject({ next: null, stopped: true });
         } finally {
             merge.close();
         }
@@ -4597,7 +4640,7 @@ describe("importShardRows over a row copied before import markers", () => {
             });
 
             // The guest's edit is not on the new shard: its row is not confirmed, so the guest's shard keeps it.
-            expect(edited).toStrictEqual({ fenced: false, held: 0, imported: 0, present: [] });
+            expect(edited).toStrictEqual({ fenced: false, held: 0, imported: 0, kept: ["r"], present: [] });
             expect(kept).toMatchObject({ costMicrodollars: 100, userId: "user" });
             // The same content as the copy is the guest's row already there: confirmed.
             expect(same).toStrictEqual({ fenced: false, held: 0, imported: 0, present: ["r"] });
