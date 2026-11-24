@@ -515,6 +515,26 @@ describe("command palette thread delete confirmation", () => {
         expect(useCommandDialogStore.getState().isOpen).toBe(true);
     });
 
+    it("brings the palette back with its search text when its archive confirmation is backed out of", async () => {
+        harness.updateThread.mockClear();
+        renderPalette();
+        const input = await openPalette();
+
+        fireEvent.change(input, { target: { value: "alpha" } });
+        fireEvent.click(await screen.findByRole("button", { name: "Archive thread" }));
+
+        expect(useCommandDialogStore.getState().isOpen).toBe(false);
+
+        const options = harness.updateThread.mock.calls[0]?.[3] as { onCancel: () => void };
+
+        act(() => {
+            options.onCancel();
+        });
+
+        expect(useCommandDialogStore.getState().isOpen).toBe(true);
+        expect((screen.getByRole("combobox") as HTMLInputElement).value).toBe("alpha");
+    });
+
     it("drops a pending delete of the open chat once another chat is open, so a confirm cannot delete the chat it left", async () => {
         harness.currentThreadId = "thread-1";
         const view = renderPalette();

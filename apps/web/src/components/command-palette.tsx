@@ -535,9 +535,17 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         close();
     };
 
-    // The palette closes for a confirmation it asked for; backing out of that confirmation brings it back.
-    const reopenPalette = () => {
+    // Closing the palette clears its search text, scope and project. A confirmation it asks for keeps them: the caller takes this
+    // snapshot when it asks, and backing out of the confirmation reopens the palette with it.
+    const snapshotPalette = () => {
+        return { projectFilter, scope, searchInput };
+    };
+
+    const reopenPaletteWith = (kept: ReturnType<typeof snapshotPalette>) => () => {
         setOpen(true);
+        setSearchInput(kept.searchInput);
+        setScope(kept.scope);
+        setProjectFilter(kept.projectFilter);
     };
 
     const handlePinUnpinThread = () => {
@@ -548,7 +556,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         const currentThread = allThreads.find((candidate) => candidate.id === currentThreadId);
 
         if (currentThread?.isPinned && handleUnpinThread) {
-            handleUnpinThread(currentThreadId, { onCancel: reopenPalette });
+            handleUnpinThread(currentThreadId, { onCancel: reopenPaletteWith(snapshotPalette()) });
         } else if (!currentThread?.isPinned && handlePinThread) {
             handlePinThread(currentThreadId);
         }
@@ -602,7 +610,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
 
         if (currentThread && updateThread) {
             updateThread(currentThreadId, currentThreadModel, currentThread.status === "archived" ? "active" : "archived", {
-                onCancel: reopenPalette,
+                onCancel: reopenPaletteWith(snapshotPalette()),
             });
             close();
         }
@@ -1015,7 +1023,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                                                                                 item.threadId!,
                                                                                 currentThreadModel,
                                                                                 item.status === "archived" ? "active" : "archived",
-                                                                                { onCancel: reopenPalette },
+                                                                                { onCancel: reopenPaletteWith(snapshotPalette()) },
                                                                             );
                                                                             close();
                                                                         }
