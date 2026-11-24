@@ -6,7 +6,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@neore/ui/
 import cn from "@neore/ui/utils/cn";
 import { CrosshairIcon, XIcon } from "lucide-react";
 import type { FC } from "react";
-import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import TooltipIconButton from "@/features/chat/components/tooltip-icon-button";
@@ -19,34 +19,18 @@ import Thread from "@/features/chat/thread/thread";
 import { useThreadPaneState } from "@/features/chat/thread/use-thread-pane-state";
 
 import { setSplitViewMounted } from "./composer-drafts";
+import { useIsDesktop } from "./desktop-layout";
 import { leaveSplitView, restoreLiveComposerFor, syncFocusedModel, watchPaneFocus } from "./pane-state";
 import { MIN_PANE_PX } from "./split-layout";
 import { hydrateSplitLayout, useSplitLayoutStore } from "./split-layout-store";
 import { useChatHasDraft } from "./use-chat-has-draft";
 
-/** Below this the split is off and one chat shows (the app's `md` breakpoint). */
-const DESKTOP_QUERY = "(min-width: 768px)";
 /** The space between two panes: the resize handle itself, so there is no line between them. */
 const GAP_PX = 8;
 /** How many frames to wait for the composer's editor (it loads lazily) before giving up on moving focus into it. */
 const FOCUS_FRAMES = 60;
 /** The composer's input: the chat editor, or a worker's textarea (which has no textbox role). */
 const COMPOSER_INPUT = '[role="textbox"], textarea[data-focus-area="composer"]';
-
-const subscribeDesktop = (notify: () => void): (() => void) => {
-    const media = globalThis.matchMedia(DESKTOP_QUERY);
-
-    media.addEventListener("change", notify);
-
-    return () => media.removeEventListener("change", notify);
-};
-
-const useIsDesktop = (): boolean =>
-    useSyncExternalStore(
-        subscribeDesktop,
-        () => globalThis.matchMedia(DESKTOP_QUERY).matches,
-        () => true,
-    );
 
 /**
  * Makes the focused pane's chat the one the global model state describes. Every pane's provider loads its chat's model into

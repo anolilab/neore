@@ -8,6 +8,7 @@ import type { ExplicitAppearance } from "@/features/appearance/lib/native-appear
 import { SYSTEM_ACCENT } from "@/features/appearance/lib/native-appearance";
 import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
+import { readChatOpenPlace } from "@/features/chat/split/chat-open-place";
 
 import type { AppearanceSettings, KeyboardShortcuts, LayoutState, SearchState, SidebarStateValue, UserPreferences } from "../stores/ui-state-store";
 import { useUIStateStore } from "../stores/ui-state-store";
@@ -293,8 +294,7 @@ export const useUserPreferences = (): UserPreferencesHookReturn => {
             showTimestamps: uiPreferences.showTimestamps,
             soundEffects: uiPreferences.soundEffects,
             splitViewEnabled: uiPreferences.splitViewEnabled === true,
-            // A browser that saved preferences before this key existed has none: it reads as the default.
-            subAgentOpenPlace: uiPreferences.subAgentOpenPlace === "main" ? "main" : "side",
+            subAgentOpenPlace: readChatOpenPlace(uiPreferences.subAgentOpenPlace),
         };
     }, [uiPreferences, userSettings]);
 

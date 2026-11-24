@@ -142,6 +142,11 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
                         openChat(childThreadId, event);
                     }}
                     onClick={(event) => {
+                        // Shift and Alt are not placement keys: the browser keeps its own action (a new window, a download).
+                        if (event.shiftKey || event.altKey) {
+                            return;
+                        }
+
                         event.preventDefault();
                         openChat(childThreadId, event);
                     }}

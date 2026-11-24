@@ -9,11 +9,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => {
     return {
-        navigate: vi.fn(),
-        openThreadInSplitView: vi.fn(async (_threadId: string) => "opened" as string),
+        isDesktop: true,
+        navigate: vi.fn(async (_options: unknown) => undefined),
+        openBeside: vi.fn(async (_threadId: string) => "opened" as string),
         preferences: { splitViewEnabled: true, subAgentOpenPlace: undefined as unknown },
         run: undefined as Record<string, unknown> | undefined,
-        showWarning: vi.fn(),
+        showInSplitView: vi.fn(async (_threadId: string) => undefined),
     };
 });
 
@@ -60,9 +61,14 @@ vi.mock("@/features/layout/stores/ui-state-store", () => {
     };
 });
 
+vi.mock("@/features/chat/split/desktop-layout", () => {
+    return { useIsDesktop: () => harness.isDesktop };
+});
+
 vi.mock("@/features/chat/split/split-layout-store", () => {
     return {
-        openThreadInSplitView: (threadId: string) => harness.openThreadInSplitView(threadId),
+        openThreadBesideFocusedPane: (threadId: string) => harness.openBeside(threadId),
+        showThreadInSplitView: (threadId: string) => harness.showInSplitView(threadId),
     };
 });
 
@@ -79,7 +85,7 @@ vi.mock("@/lib/lunora/crpc", () => {
 });
 
 vi.mock("@/lib/toast", () => {
-    return { showError: () => {}, showWarning: (message: unknown) => harness.showWarning(message) };
+    return { showError: () => {} };
 });
 
 vi.mock("@/features/chat/core/context/chat-context", () => {
@@ -140,61 +146,73 @@ describe("a sub-agent's card", () => {
 
 describe("where a sub-agent's chat opens", () => {
     beforeEach(() => {
+        harness.isDesktop = true;
         harness.navigate.mockClear();
-        harness.openThreadInSplitView.mockClear();
-        harness.openThreadInSplitView.mockResolvedValue("opened");
-        harness.showWarning.mockClear();
+        harness.openBeside.mockClear();
+        harness.openBeside.mockResolvedValue("opened");
+        harness.showInSplitView.mockClear();
         harness.preferences = { splitViewEnabled: true, subAgentOpenPlace: undefined };
     });
 
-    it("opens the side panel on a click by default, when the split view is on", async () => {
+    it("opens the side panel on a click by default, when the split view is on", () => {
         const { link } = renderRunningCard();
 
         // The click is taken by the card, so the browser does not follow the link.
         expect(fireEvent.click(link)).toBe(false);
 
-        expect(harness.openThreadInSplitView).toHaveBeenCalledWith("child-1");
+        expect(harness.openBeside).toHaveBeenCalledWith("child-1");
         expect(harness.navigate).not.toHaveBeenCalled();
     });
 
-    it("opens the main view by default when the split view is off, since there is no side panel", () => {
+    it("opens the main view by default when the split view is off, since there is no side panel", async () => {
         harness.preferences = { splitViewEnabled: false, subAgentOpenPlace: undefined };
         const { link } = renderRunningCard();
 
         fireEvent.click(link);
 
-        expect(harness.navigate).toHaveBeenCalledWith(MAIN_VIEW);
-        expect(harness.openThreadInSplitView).not.toHaveBeenCalled();
+        await vi.waitFor(() => {
+            expect(harness.navigate).toHaveBeenCalledWith(MAIN_VIEW);
+        });
+        expect(harness.openBeside).not.toHaveBeenCalled();
     });
 
-    it("reads a browser that saved no value for the setting as the default", () => {
-        harness.preferences = { splitViewEnabled: true, subAgentOpenPlace: undefined };
+    it("opens the main view by default on a narrow screen, where the side panel is not laid out beside the chat", async () => {
+        harness.isDesktop = false;
         const { link } = renderRunningCard();
 
         fireEvent.click(link);
 
-        expect(harness.openThreadInSplitView).toHaveBeenCalledWith("child-1");
+        await vi.waitFor(() => {
+            expect(harness.navigate).toHaveBeenCalledWith(MAIN_VIEW);
+        });
+        expect(harness.openBeside).not.toHaveBeenCalled();
     });
 
-    it("opens the main view on a click once the setting is the main view", () => {
+    it("opens the main view on a click once the setting is the main view, and focuses the chat's pane first", async () => {
         harness.preferences = { splitViewEnabled: true, subAgentOpenPlace: "main" };
         const { link } = renderRunningCard();
 
         fireEvent.click(link);
 
-        expect(harness.navigate).toHaveBeenCalledWith(MAIN_VIEW);
-        expect(harness.openThreadInSplitView).not.toHaveBeenCalled();
+        await vi.waitFor(() => {
+            expect(harness.navigate).toHaveBeenCalledWith(MAIN_VIEW);
+        });
+        // A route that already names the chat does not move focus: the pane is shown before the route is read.
+        expect(harness.showInSplitView).toHaveBeenCalledWith("child-1");
+        expect(harness.openBeside).not.toHaveBeenCalled();
     });
 
-    it("takes the main view with Ctrl or Cmd when the side panel is the setting", () => {
+    it("takes the main view with Ctrl or Cmd when the side panel is the setting", async () => {
         const { link } = renderRunningCard();
 
         fireEvent.click(link, { ctrlKey: true });
         fireEvent.click(link, { metaKey: true });
 
-        expect(harness.navigate).toHaveBeenCalledTimes(2);
+        await vi.waitFor(() => {
+            expect(harness.navigate).toHaveBeenCalledTimes(2);
+        });
         expect(harness.navigate).toHaveBeenCalledWith(MAIN_VIEW);
-        expect(harness.openThreadInSplitView).not.toHaveBeenCalled();
+        expect(harness.openBeside).not.toHaveBeenCalled();
     });
 
     it("takes the side panel with Ctrl or Cmd when the main view is the setting", () => {
@@ -204,17 +222,19 @@ describe("where a sub-agent's chat opens", () => {
         fireEvent.click(link, { ctrlKey: true });
         fireEvent.click(link, { metaKey: true });
 
-        expect(harness.openThreadInSplitView).toHaveBeenCalledTimes(2);
+        expect(harness.openBeside).toHaveBeenCalledTimes(2);
         expect(harness.navigate).not.toHaveBeenCalled();
     });
 
-    it("takes the main view with the middle button when the side panel is the setting, and stops the browser's new tab", () => {
+    it("takes the main view with the middle button when the side panel is the setting, and stops the browser's new tab", async () => {
         const { link } = renderRunningCard();
 
         expect(auxClick(link, 1)).toBe(false);
 
-        expect(harness.navigate).toHaveBeenCalledWith(MAIN_VIEW);
-        expect(harness.openThreadInSplitView).not.toHaveBeenCalled();
+        await vi.waitFor(() => {
+            expect(harness.navigate).toHaveBeenCalledWith(MAIN_VIEW);
+        });
+        expect(harness.openBeside).not.toHaveBeenCalled();
     });
 
     it("takes the side panel with the middle button when the main view is the setting", () => {
@@ -223,28 +243,37 @@ describe("where a sub-agent's chat opens", () => {
 
         expect(auxClick(link, 1)).toBe(false);
 
-        expect(harness.openThreadInSplitView).toHaveBeenCalledWith("child-1");
+        expect(harness.openBeside).toHaveBeenCalledWith("child-1");
         expect(harness.navigate).not.toHaveBeenCalled();
     });
 
-    it("leaves the other mouse buttons to the browser, so a right click still opens its menu", () => {
+    it("leaves the right button to the browser, so its menu still opens", () => {
         const { link } = renderRunningCard();
 
         expect(auxClick(link, 2)).toBe(true);
 
         expect(harness.navigate).not.toHaveBeenCalled();
-        expect(harness.openThreadInSplitView).not.toHaveBeenCalled();
+        expect(harness.openBeside).not.toHaveBeenCalled();
     });
 
-    it("warns when every pane is taken, and opens nothing", async () => {
-        harness.openThreadInSplitView.mockResolvedValue("full");
+    it("leaves Shift-click and Alt-click to the browser, so a new window or a download still happens", () => {
+        const { link } = renderRunningCard();
+
+        expect(fireEvent.click(link, { shiftKey: true })).toBe(true);
+        expect(fireEvent.click(link, { altKey: true })).toBe(true);
+
+        expect(harness.navigate).not.toHaveBeenCalled();
+        expect(harness.openBeside).not.toHaveBeenCalled();
+    });
+
+    it("opens the main view when every pane is taken, where the chat always opened", async () => {
+        harness.openBeside.mockResolvedValue("full");
         const { link } = renderRunningCard();
 
         fireEvent.click(link);
-        await vi.waitFor(() => {
-            expect(harness.showWarning).toHaveBeenCalledWith("Split view is full. Close a chat first.");
-        });
 
-        expect(harness.navigate).not.toHaveBeenCalled();
+        await vi.waitFor(() => {
+            expect(harness.navigate).toHaveBeenCalledWith(MAIN_VIEW);
+        });
     });
 });

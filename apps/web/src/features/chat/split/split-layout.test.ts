@@ -290,3 +290,29 @@ describe("opening a pane keeps the widths already chosen (#6)", () => {
         expect(splitLayoutReducer(layout, { threadId: "c", type: "open" }).sizes).toEqual({});
     });
 });
+
+describe("openBeside", () => {
+    it("adds the chat as the pane right after the focused one, and focuses it", () => {
+        const layout = splitLayoutReducer({ ...opened("a", "b"), focus: 0 }, { threadId: "c", type: "openBeside" });
+
+        expect(layout.panes).toEqual(["a", "c", "b"]);
+        expect(layout.focus).toBe(1);
+    });
+
+    it("starts the layout with the chat when there are no panes", () => {
+        expect(splitLayoutReducer(initialSplitLayout(), { threadId: "a", type: "openBeside" })).toEqual({ focus: 0, panes: ["a"], sizes: {} });
+    });
+
+    it("only focuses a chat that is already open, without moving it", () => {
+        const layout = splitLayoutReducer(opened("a", "b"), { threadId: "b", type: "openBeside" });
+
+        expect(layout.panes).toEqual(["a", "b"]);
+        expect(layout.focus).toBe(1);
+    });
+
+    it("refuses a fourth pane and returns the same layout", () => {
+        const full = opened("a", "b", "c");
+
+        expect(splitLayoutReducer(full, { threadId: "d", type: "openBeside" })).toBe(full);
+    });
+});

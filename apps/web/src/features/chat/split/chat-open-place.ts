@@ -17,10 +17,13 @@ export type ChatClick = { button: number; ctrlKey: boolean; metaKey: boolean };
 
 const otherPlace = (place: ChatOpenPlace): ChatOpenPlace => (place === "side" ? "main" : "side");
 
-/** The place one click opens the chat in. */
-export const chatOpenPlaceFor = (chosen: ChatOpenPlace, click: ChatClick, isSplitViewOn: boolean): ChatOpenPlace => {
+/**
+ * The place one click opens the chat in. `isSideAvailable` is the split view on and laid out side by side: below the desktop breakpoint
+ * only the focused pane shows, so a pane beside it would not be seen.
+ */
+export const chatOpenPlaceFor = (chosen: ChatOpenPlace, click: ChatClick, isSideAvailable: boolean): ChatOpenPlace => {
     const takesOtherPlace = click.button === 1 || click.ctrlKey || click.metaKey;
     const place = takesOtherPlace ? otherPlace(chosen) : chosen;
 
-    return place === "side" && !isSplitViewOn ? "main" : place;
+    return place === "side" && !isSideAvailable ? "main" : place;
 };
