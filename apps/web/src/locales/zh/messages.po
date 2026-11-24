@@ -15433,6 +15433,10 @@ msgstr "查找文件"
 msgid "Find in table..."
 msgstr "在表格中查找..."
 
+#: src/features/chat/aside/find/aside-find-bar.tsx:139
+msgid "Find in side questions"
+msgstr "在旁支问题中查找"
+
 #: src/features/chat/thread/find/thread-find-bar.tsx:192
 #: src/features/chat/thread/find/thread-find-bar.tsx:200
 #: src/features/chat/thread/find/thread-find-bar.tsx:206

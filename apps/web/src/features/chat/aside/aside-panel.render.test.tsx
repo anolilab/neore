@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { ASIDE_FIND_EVENT } from "@/features/keyboard/lib/aside-find-target";
 
 import AsidePanel from "./aside-panel";
 import { useAsideStore } from "./aside-store";
@@ -203,5 +205,33 @@ describe("AsidePanel", () => {
 
         expect(screen.getByText("Start a conversation to ask a side question.")).toBeTruthy();
         expect(screen.queryByLabelText("Your side question")).toBeNull();
+    });
+
+    it("finds the word in the questions and answers, and steps through the hits", () => {
+        useAsideStore.setState({
+            byThread: {
+                "thread-1": [
+                    { answer: "Safe to repeat: idempotent calls.", id: "a", question: "What is idempotent?", status: "answered", token: "tok" },
+                    { id: "b", question: "Is retry idempotent too?", status: "pending" },
+                ],
+            },
+        });
+        render(<AsidePanel threadId="thread-1" />);
+
+        expect(screen.queryByRole("search")).toBeNull();
+        act(() => {
+            globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+        });
+        const input = screen.getByRole("textbox", { name: "Find in side questions" });
+
+        fireEvent.change(input, { target: { value: "idempotent" } });
+        expect(screen.getByText("1 of 3")).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("button", { name: "Next match" }));
+        expect(screen.getByText("2 of 3")).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("button", { name: "Previous match" }));
+        fireEvent.click(screen.getByRole("button", { name: "Previous match" }));
+        expect(screen.getByText("3 of 3")).toBeTruthy();
     });
 });

@@ -19,6 +19,7 @@ import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
 import type { AsideEntry } from "./aside-store";
 import { useAsideStore } from "./aside-store";
+import AsideFindBar from "./find/aside-find-bar";
 import { ASIDE_INPUT_ID } from "./open-aside";
 
 const errorCodeOf = (error: unknown): string | undefined => {
@@ -112,9 +113,11 @@ const AsideItem: FC<AsideItemProps> = ({ entry, isRunning, onAdd, onDismiss }) =
     const addErrorKind = asideErrorKind({ code: entry.addErrorCode });
 
     return (
-        <li className="border-sidebar-border bg-sidebar-accent/30 space-y-2 rounded-md border p-3 text-sm">
+        <li className="border-sidebar-border bg-sidebar-accent/30 space-y-2 rounded-md border p-3 text-sm" data-aside-entry-id={entry.id}>
             <div className="flex items-start gap-2">
-                <p className="text-foreground grow font-medium break-words whitespace-pre-line">{entry.question}</p>
+                <p className="text-foreground grow font-medium break-words whitespace-pre-line" data-find-text="">
+                    {entry.question}
+                </p>
                 <Button
                     aria-label={
                         entry.status === "pending"
@@ -143,7 +146,7 @@ const AsideItem: FC<AsideItemProps> = ({ entry, isRunning, onAdd, onDismiss }) =
             )}
             {(entry.status === "answered" || entry.status === "added") && entry.answer !== undefined && (
                 <>
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <div className="prose prose-sm dark:prose-invert max-w-none" data-find-text="">
                         <AnswerText text={entry.answer} />
                     </div>
                     {entry.withThread === false && (
@@ -289,8 +292,10 @@ const AsidePanel: FC<{ threadId?: string }> = ({ threadId }) => {
     };
 
     return (
-        <section aria-labelledby={headingId} className="space-y-3 py-4 pr-2 pl-1">
+        // Focus lands on this section when a click hits its text, so the Find shortcut knows the panel has it (`aside-find-target.ts`).
+        <section aria-labelledby={headingId} className="space-y-3 py-4 pr-2 pl-1 outline-none" data-aside-find-host="" tabIndex={-1}>
             <h2 className="text-foreground text-base font-semibold" id={headingId}>{t`Side question`}</h2>
+            <AsideFindBar entries={entries} />
             <p className="text-muted-foreground text-xs">{t`Ask something without interrupting the reply. The question and the answer stay here unless you add them to the thread.`}</p>
             <form className="space-y-2" onSubmit={handleSubmit}>
                 <label className="sr-only" htmlFor={ASIDE_INPUT_ID}>{t`Your side question`}</label>

@@ -15432,6 +15432,10 @@ msgstr "Find files"
 msgid "Find in table..."
 msgstr "Find in table..."
 
+#: src/features/chat/aside/find/aside-find-bar.tsx:139
+msgid "Find in side questions"
+msgstr "Find in side questions"
+
 #: src/features/chat/thread/find/thread-find-bar.tsx:192
 #: src/features/chat/thread/find/thread-find-bar.tsx:200
 #: src/features/chat/thread/find/thread-find-bar.tsx:206
