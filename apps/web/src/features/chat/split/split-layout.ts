@@ -15,7 +15,7 @@ export type SplitLayout = {
 
 export type SplitAction =
     | { threadId: string; type: "open" }
-    | { threadId: string; type: "openBeside" }
+    | { after?: string; threadId: string; type: "openBeside" }
     | { threadId: string; type: "show" }
     | { index: number; type: "focus" }
     | { index: number; type: "close" }
@@ -73,10 +73,10 @@ const open = (layout: SplitLayout, threadId: string): SplitLayout => {
 };
 
 /**
- * Adds the chat as a pane right after the focused one and focuses it; a chat already open is only focused. Refuses past `MAX_PANES`,
- * so a chat opened from a pane sits beside that pane, not at the end of the row.
+ * Adds the chat as a pane right after `after`'s pane (or the focused one, when `after` is not open) and focuses it; a chat already open is
+ * only focused. Refuses past `MAX_PANES`, so a chat opened from a pane sits beside that pane, not at the end of the row.
  */
-const openBeside = (layout: SplitLayout, threadId: string): SplitLayout => {
+const openBeside = (layout: SplitLayout, threadId: string, after?: string): SplitLayout => {
     const existing = layout.panes.indexOf(threadId);
 
     if (existing !== -1) {
@@ -87,7 +87,12 @@ const openBeside = (layout: SplitLayout, threadId: string): SplitLayout => {
         return layout;
     }
 
-    const at = layout.panes.length === 0 ? 0 : layout.focus + 1;
+    const origin = after === undefined ? -1 : layout.panes.indexOf(after);
+    let at = layout.panes.length === 0 ? 0 : layout.focus + 1;
+
+    if (origin !== -1) {
+        at = origin + 1;
+    }
 
     return {
         focus: at,
@@ -187,7 +192,7 @@ export const splitLayoutReducer = (layout: SplitLayout, action: SplitAction): Sp
             return open(layout, action.threadId);
         }
         case "openBeside": {
-            return openBeside(layout, action.threadId);
+            return openBeside(layout, action.threadId, action.after);
         }
         case "prune": {
             return prune(layout, action.isValid);

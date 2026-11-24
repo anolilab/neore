@@ -112,12 +112,12 @@ export const routeIsOn = (threadIds: ReadonlyArray<string>): boolean => globalTh
 type PaneOpenResult = "focused" | "full" | "opened";
 
 /** Dispatches one open action once the saved layout is in. */
-const openPane = async (threadId: string, type: "open" | "openBeside"): Promise<PaneOpenResult> => {
+const openPane = async (threadId: string, type: "open" | "openBeside", after?: string): Promise<PaneOpenResult> => {
     await hydrateSplitLayout();
 
     const wasOpen = useSplitLayoutStore.getState().layout.panes.includes(threadId);
 
-    useSplitLayoutStore.getState().dispatch({ threadId, type });
+    useSplitLayoutStore.getState().dispatch(type === "open" ? { threadId, type } : { after, threadId, type });
 
     if (wasOpen) {
         return "focused";
@@ -132,8 +132,12 @@ const openPane = async (threadId: string, type: "open" | "openBeside"): Promise<
  */
 export const openThreadInSplitView = (threadId: string): Promise<PaneOpenResult> => openPane(threadId, "open");
 
-/** Opens a chat as a pane right after the focused one, the side panel a sub-agent link opens. Same results as `openThreadInSplitView`. */
-export const openThreadBesideFocusedPane = (threadId: string): Promise<PaneOpenResult> => openPane(threadId, "openBeside");
+/**
+ * Opens a chat as a pane right after `afterThreadId`'s pane, or after the focused one when that chat has no pane: the side panel a
+ * sub-agent link opens. Same results as `openThreadInSplitView`.
+ */
+export const openThreadBesideFocusedPane = (threadId: string, afterThreadId?: string): Promise<PaneOpenResult> =>
+    openPane(threadId, "openBeside", afterThreadId);
 
 /**
  * Shows a chat in the main view while the split view is on: focuses its pane, or puts it in place of the focused pane, as a route

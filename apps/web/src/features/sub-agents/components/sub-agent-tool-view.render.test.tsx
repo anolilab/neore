@@ -11,7 +11,7 @@ const harness = vi.hoisted(() => {
     return {
         isDesktop: true,
         navigate: vi.fn(async (_options: unknown) => undefined),
-        openBeside: vi.fn(async (_threadId: string) => "opened" as string),
+        openBeside: vi.fn(async (_threadId: string, _originThreadId?: string) => "opened" as string),
         preferences: { splitViewEnabled: true, subAgentOpenPlace: undefined as unknown },
         run: undefined as Record<string, unknown> | undefined,
         showInSplitView: vi.fn(async (_threadId: string) => undefined),
@@ -67,7 +67,7 @@ vi.mock("@/features/chat/split/desktop-layout", () => {
 
 vi.mock("@/features/chat/split/split-layout-store", () => {
     return {
-        openThreadBesideFocusedPane: (threadId: string) => harness.openBeside(threadId),
+        openThreadBesideFocusedPane: (threadId: string, originThreadId?: string) => harness.openBeside(threadId, originThreadId),
         showThreadInSplitView: (threadId: string) => harness.showInSplitView(threadId),
     };
 });
@@ -160,7 +160,7 @@ describe("where a sub-agent's chat opens", () => {
         // The click is taken by the card, so the browser does not follow the link.
         expect(fireEvent.click(link)).toBe(false);
 
-        expect(harness.openBeside).toHaveBeenCalledWith("child-1");
+        expect(harness.openBeside).toHaveBeenCalledWith("child-1", "parent-1");
         expect(harness.navigate).not.toHaveBeenCalled();
     });
 
@@ -207,7 +207,7 @@ describe("where a sub-agent's chat opens", () => {
 
         fireEvent.click(link, { ctrlKey: true });
 
-        expect(harness.openBeside).toHaveBeenCalledWith("child-1");
+        expect(harness.openBeside).toHaveBeenCalledWith("child-1", "parent-1");
         expect(harness.navigate).not.toHaveBeenCalled();
     });
 
@@ -239,6 +239,29 @@ describe("where a sub-agent's chat opens", () => {
 
         expect(harness.navigate).not.toHaveBeenCalled();
         expect(harness.openBeside).not.toHaveBeenCalled();
+    });
+
+    it("opens the main view when the saved layout cannot be read, so the link still works", async () => {
+        harness.openBeside.mockRejectedValueOnce(new Error("storage unavailable"));
+        const { link } = renderRunningCard();
+
+        fireEvent.click(link);
+
+        await vi.waitFor(() => {
+            expect(harness.navigate).toHaveBeenCalledWith(MAIN_VIEW);
+        });
+    });
+
+    it("still opens the main view when showing the pane fails on the main view", async () => {
+        harness.preferences = { splitViewEnabled: true, subAgentOpenPlace: "main" };
+        harness.showInSplitView.mockRejectedValueOnce(new Error("storage unavailable"));
+        const { link } = renderRunningCard();
+
+        fireEvent.click(link);
+
+        await vi.waitFor(() => {
+            expect(harness.navigate).toHaveBeenCalledWith(MAIN_VIEW);
+        });
     });
 
     it("opens the main view when every pane is taken, where the chat always opened, showing its pane first", async () => {

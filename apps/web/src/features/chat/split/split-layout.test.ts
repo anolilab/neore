@@ -303,6 +303,19 @@ describe("openBeside", () => {
         expect(splitLayoutReducer(initialSplitLayout(), { threadId: "a", type: "openBeside" })).toEqual({ focus: 0, panes: ["a"], sizes: {} });
     });
 
+    it("places the chat beside the pane it was opened from, even when another pane is focused", () => {
+        const layout = splitLayoutReducer({ ...opened("a", "b"), focus: 1 }, { after: "a", threadId: "c", type: "openBeside" });
+
+        expect(layout.panes).toEqual(["a", "c", "b"]);
+        expect(layout.focus).toBe(1);
+    });
+
+    it("falls back to the focused pane when the pane it was opened from is not open", () => {
+        const layout = splitLayoutReducer({ ...opened("a", "b"), focus: 0 }, { after: "z", threadId: "c", type: "openBeside" });
+
+        expect(layout.panes).toEqual(["a", "c", "b"]);
+    });
+
     it("only focuses a chat that is already open, without moving it", () => {
         const layout = splitLayoutReducer(opened("a", "b"), { threadId: "b", type: "openBeside" });
 

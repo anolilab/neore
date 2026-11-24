@@ -139,7 +139,7 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
                         }
 
                         event.preventDefault();
-                        openChat(childThreadId, event);
+                        openChat(childThreadId, event, threadId);
                     }}
                     onClick={(event) => {
                         // Shift and Alt are not placement keys: the browser keeps its own action (a new window, a download).
@@ -148,7 +148,7 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
                         }
 
                         event.preventDefault();
-                        openChat(childThreadId, event);
+                        openChat(childThreadId, event, threadId);
                     }}
                     params={{ threadId: childThreadId }}
                     to="/chat/$threadId"
