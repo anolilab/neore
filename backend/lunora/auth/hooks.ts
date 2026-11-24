@@ -201,7 +201,8 @@ export const deleteMergedGuest = internalMutation
             return { deleted: false, fenced: true };
         }
 
-        const user = (await ctx.db.user.findFirst({ where: { _id: guestId } })) as {
+        // Primary: a replica that has not seen the guest yet would pass as its deletion, and the guest would stay.
+        const user = (await ctx.db.user.findFirst({ consistency: "primary", where: { _id: guestId } })) as {
             _id: Id<"user">;
             isAnonymous?: boolean | null;
         } | null;

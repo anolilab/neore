@@ -29,6 +29,7 @@ const REFERENCES: MergeReferences = {
     beginRun: reference("beginMergeRun"),
     deleteGuest: reference("deleteMergedGuest"),
     deleteRows: reference("deleteShardRows"),
+    dropGone: reference("dropRowsGoneFromGuest"),
     dropMarkers: reference("dropImportMarkersPage"),
     handOverContributors: reference("handOverOrganizationContributors"),
     importRows: reference("importShardRows"),

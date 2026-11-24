@@ -34,6 +34,14 @@ re-reads its route's owner (primary) after the signal check and follows a route 
 
 The import copies re-point only `USER_REFERENCE_FIELDS`; content equal to the guest's id stays.
 
+A guest row the clear read but the guest deleted before `deleteShardRows` ran is reported back as `gone`, never taken as
+deleted by the merge: the clear's import may just have written it on the new shard. `dropRowsGoneFromGuest` removes that
+copy there only while it still matches its import marker (the account never changed it), and keeps the marker, so no
+later import writes it again. An absent source row is never a confirmation of the copy that was read from it.
+
+`auth/hooks.ts#deleteMergedGuest` reads the guest's `user` row from the primary: a replica that has not seen it yet
+would pass for the anonymous plugin's deletion and the guest would stay.
+
 The root dispatch clears a shard's due time only while it still holds the value it read, and puts it back (never
 throwing) when the tick's send fails; a merge's save (`noteShardDue`'s `rearmPassed` only) moves a passed one so it is
 not cleared; the tick replaces only the one it read (`consumed`).

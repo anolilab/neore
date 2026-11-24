@@ -1349,31 +1349,36 @@ export const dropImportMarkersPage = internalMutation
 
 /**
  * On the GUEST's shard: delete the moved rows. A row whose digest no longer matches was changed after the clear read
- * it, so the new shard holds an older copy: it stays, and the clear's next page reads and imports it again. Nothing is
- * deleted for a delivery whose generation is no longer this shard's newest (`fenced`).
+ * it, so the new shard holds an older copy: it stays, and the clear's next page reads and imports it again. `gone` names
+ * each id already deleted here since the clear read it: the new shard holds a copy of a row the guest no longer has,
+ * which the clear takes back there ({@link dropRowsGoneFromGuest}). Nothing is deleted for a delivery whose generation
+ * is no longer this shard's newest (`fenced`).
  */
 export const deleteShardRows = internalMutation
     .input({ from: v.string(), generation: v.number(), rows: v.array(v.object({ digest: v.string(), id: v.string() })), table: v.string() })
-    .output(v.object({ fenced: v.boolean() }))
+    .output(v.object({ fenced: v.boolean(), gone: v.array(v.string()) }))
     .mutation(async ({ args, ctx }) => {
         const db = rawDb(ctx);
         const { now } = ctx;
 
         if (!(await mergeGenerationCurrent(ctx.db, args.from, args.generation))) {
-            return { fenced: true };
+            return { fenced: true, gone: [] };
         }
 
         // A shard serving other users too: none of its rows is the merge's to delete.
         if (!onGuestShard(args.from)) {
-            return { fenced: false };
+            return { fenced: false, gone: [] };
         }
 
         let deleted = false;
+        const gone: string[] = [];
 
         for (const { digest, id } of args.rows) {
             const row = (await db.get(args.table, id)) as Record<string, unknown> | null;
 
-            if (row !== null && (await rowDigest(row)) === digest) {
+            if (row === null) {
+                gone.push(id);
+            } else if ((await rowDigest(row)) === digest) {
                 await db.delete(args.table, id);
                 deleted = true;
             }
@@ -1385,7 +1390,48 @@ export const deleteShardRows = internalMutation
             await writeClaim(ctx.db, MERGE_PINS_LEFT_SCOPE, args.from, now, { expiresAt: IMPORT_MARKER_EXPIRES_AT, result: "", userId: args.from });
         }
 
-        return { fenced: false };
+        return { fenced: false, gone };
+    });
+
+/**
+ * On the NEW user's shard: take back the copies of rows the guest deleted on its shard after the clear read them
+ * ({@link deleteShardRows}' `gone`). Only a row that still holds what the merge last wrote (its import marker) goes:
+ * one the account changed since, or one no merge wrote, stays. The marker stays too, so no later import of the id writes
+ * it again; it goes with the merge's end. `fenced` as for {@link importShardRows}.
+ */
+export const dropRowsGoneFromGuest = internalMutation
+    .input({ from: v.string(), generation: v.number(), ids: v.array(v.string()), table: v.string(), to: v.string() })
+    .output(v.object({ dropped: v.number(), fenced: v.boolean() }))
+    .mutation(async ({ args, ctx }) => {
+        const db = rawDb(ctx);
+        const { now } = ctx;
+
+        if ((await mergeFinished(ctx.db, args.from, now)) || !(await holdMergeLease(ctx.db, args.from, args.generation, now))) {
+            return { dropped: 0, fenced: true };
+        }
+
+        let dropped = 0;
+
+        // One at a time: an audited table's delete writes its history row to D1.
+        for (const id of args.ids) {
+            const existing = (await db.get(args.table, id)) as Record<string, unknown> | null;
+
+            if (existing === null) {
+                continue;
+            }
+
+            const marker = await ctx.db
+                .query("idempotencyClaims")
+                .withIndex("by_scope_key", (q) => q.eq("scope", IMPORT_MARKER_SCOPE).eq("key", markerKey(args.from, args.table, id)))
+                .first();
+
+            if (marker !== null && marker.result === (await rowDigest(existing))) {
+                await db.delete(args.table, id);
+                dropped += 1;
+            }
+        }
+
+        return { dropped, fenced: false };
     });
 
 /**
@@ -1901,7 +1947,7 @@ interface MergeContext {
 
 /** The most cross-shard calls one step of each phase makes: a run stops before a step it could not finish. */
 const STEP_CALLS: Readonly<Record<MergePhase, number>> = {
-    clear: 3,
+    clear: 4,
     contributors: 1,
     copy: 2,
     follows: 1,
@@ -1958,18 +2004,17 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
             return false;
         }
 
-        state.calls -= 1;
-        const cleared = await clearPage(call, references, table, { from, generation, to });
+        const { calls, outcome } = await clearPage(call, references, table, { from, generation, to });
 
-        if (cleared === "fenced") {
+        state.calls -= calls;
+
+        if (outcome === "fenced") {
             state.superseded = true;
 
             return true;
         }
 
-        if (cleared === "page") {
-            state.calls -= 2;
-        } else {
+        if (outcome === "empty") {
             nextTable(state, tables, "global");
         }
 
@@ -2440,16 +2485,17 @@ export const mergeGuestInto = async (
 
 /**
  * Clear one page of `table` on the guest's shard: the page is imported again before it is deleted, so a row written or
- * edited there since the table was copied arrives as it is now; only ids the new shard confirms are deleted. `empty`
- * when the table holds none of the guest's rows any more (one call), `page` after a page (three calls), `fenced` when
- * another delivery already finished the merge (two calls, nothing deleted).
+ * edited there since the table was copied arrives as it is now; only ids the new shard confirms are deleted. A row the
+ * guest deleted after the read is gone before the delete: its copy is taken back from the new shard, unless the account
+ * changed it since. `empty` when the table holds none of the guest's rows any more (one call), `page` after a page (three
+ * calls, four with such a row), `fenced` when another delivery already finished the merge. `calls`: how many it made.
  */
 const clearPage = async (
     call: ShardCall,
     references: MergeReferences,
     table: string,
     { from, generation, to }: { from: string; generation: number; to: string },
-): Promise<"empty" | "fenced" | "page"> => {
+): Promise<{ calls: number; outcome: "empty" | "fenced" | "page" }> => {
     const { digests, rows }: { digests: string[]; rows: Record<string, unknown>[] } = await call(
         references.listClear,
         KEEP_NEW_USERS.has(table) ? { from, ownedBy: from, table } : { from, table },
@@ -2457,14 +2503,14 @@ const clearPage = async (
     );
 
     if (rows.length === 0) {
-        return "empty";
+        return { calls: 1, outcome: "empty" };
     }
 
     const { fenced, present }: { fenced: boolean; present: string[] } = await call(references.importRows, { from, generation, rows, table, to }, to);
 
     // Another delivery finished this merge or took it over: nothing of this page is confirmed, so nothing of it is deleted.
     if (fenced) {
-        return "fenced";
+        return { calls: 2, outcome: "fenced" };
     }
 
     const confirmed = new Set(present);
@@ -2474,11 +2520,26 @@ const clearPage = async (
         })
         .filter(({ id }) => confirmed.has(id));
 
+    let calls = 2;
+
     if (deletable.length > 0) {
-        const deleted: { fenced: boolean } = await call(references.deleteRows, { from, generation, rows: deletable, table }, from);
+        const deleted: { fenced: boolean; gone: string[] } = await call(references.deleteRows, { from, generation, rows: deletable, table }, from);
+
+        calls += 1;
 
         if (deleted.fenced) {
-            return "fenced";
+            return { calls, outcome: "fenced" };
+        }
+
+        // Gone from the guest's shard since the read: the import just wrote what the guest no longer has.
+        if (deleted.gone.length > 0) {
+            const dropped: { fenced: boolean } = await call(references.dropGone, { from, generation, ids: deleted.gone, table, to }, to);
+
+            calls += 1;
+
+            if (dropped.fenced) {
+                return { calls, outcome: "fenced" };
+            }
         }
     }
 
@@ -2486,7 +2547,7 @@ const clearPage = async (
         throw new Error(`the new shard of ${to} did not confirm ${String(rows.length - deletable.length)} ${table} rows of guest ${from}; they stay`);
     }
 
-    return "page";
+    return { calls, outcome: "page" };
 };
 
 /** The generated references `mergeGuestInto` calls (passed in, so this module does not import `_generated/api`). */
@@ -2496,6 +2557,7 @@ export interface MergeReferences {
     beginRun: { __lunoraRef: string };
     deleteGuest: { __lunoraRef: string };
     deleteRows: { __lunoraRef: string };
+    dropGone: { __lunoraRef: string };
     dropMarkers: { __lunoraRef: string };
     handOverContributors: { __lunoraRef: string };
     importRows: { __lunoraRef: string };
@@ -2540,6 +2602,7 @@ export const runGuestMerge = internalAction
                 beginRun: internal.lib.account_merge.beginMergeRun,
                 deleteGuest: internal.auth.hooks.deleteMergedGuest,
                 deleteRows: internal.lib.account_merge.deleteShardRows,
+                dropGone: internal.lib.account_merge.dropRowsGoneFromGuest,
                 dropMarkers: internal.lib.account_merge.dropImportMarkersPage,
                 handOverContributors: internal.lib.account_merge.handOverOrganizationContributors,
                 importRows: internal.lib.account_merge.importShardRows,

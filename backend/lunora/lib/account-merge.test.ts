@@ -19,6 +19,7 @@ import {
     canonicalValue,
     deleteShardRows,
     dropImportMarkersPage,
+    dropRowsGoneFromGuest,
     importShardRows,
     listShardRowsPage,
     listShardRowsToClear,
@@ -130,6 +131,7 @@ const REFERENCES: MergeReferences = {
     beginRun: ref("beginMergeRun"),
     deleteGuest: { __lunoraRef: "auth_hooks:deleteMergedGuest" },
     deleteRows: ref("deleteShardRows"),
+    dropGone: ref("dropRowsGoneFromGuest"),
     dropMarkers: ref("dropImportMarkersPage"),
     handOverContributors: ref("handOverOrganizationContributors"),
     importRows: ref("importShardRows"),
@@ -293,7 +295,7 @@ const fakeShards = (
             }
             case "deleteShardRows": {
                 if (stuck) {
-                    return { fenced: false } as never;
+                    return { fenced: false, gone: [] } as never;
                 }
 
                 const shard = shards.get(shardKey) ?? new Map<string, Row[]>();
@@ -305,7 +307,7 @@ const fakeShards = (
                     (shard.get(table) ?? []).filter((row) => !ids.has(row._id)),
                 );
 
-                return { fenced: false } as never;
+                return { fenced: false, gone: [] } as never;
             }
             case "dropImportMarkersPage": {
                 return { fenced: false, hasMore: false } as never;
@@ -1336,6 +1338,34 @@ describe("deleteMergedGuest", () => {
         }
     });
 
+    it("reads the guest's `user` row from the primary, so a replica that has not seen it yet never passes for its deletion", async () => {
+        const harness = harnessWithUsers();
+
+        try {
+            const guest = await insertUser(harness, true);
+
+            await harness.run(async (context: any) => await context.runMutation(noteMergeGeneration, { from: guest, generation: 1 }));
+
+            const result = await harness.run(async (context: any) => {
+                // A lagging replica: every `user` read that does not ask for the primary finds no row.
+                const lagging = (options: { consistency?: string }) =>
+                    options.consistency === "primary" ? context.db.user.findFirst(options) : Promise.resolve(null);
+                const db = new Proxy(context.db, {
+                    get: (target, key) =>
+                        key === "user" ? new Proxy(target.user, { get: (table, name) => (name === "findFirst" ? lagging : table[name]) }) : target[key],
+                });
+                const ctx = Object.assign(Object.create(Object.getPrototypeOf(context) as object), context, { db });
+
+                return await (deleteMergedGuest as any).handler(ctx, { generation: 1, userId: guest });
+            });
+
+            expect(result).toStrictEqual({ deleted: true });
+            await expect(userExists(harness, guest)).resolves.toBe(false);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("deletes a guest and its sessions", async () => {
         const harness = harnessWithUsers();
 
@@ -1694,6 +1724,7 @@ describe("mergeGuestInto across two real shards", () => {
         beginMergeRun: { fn: beginMergeRun, kind: "mutation" },
         deleteShardRows: { fn: deleteShardRows, kind: "mutation" },
         dropImportMarkersPage: { fn: dropImportMarkersPage, kind: "mutation" },
+        dropRowsGoneFromGuest: { fn: dropRowsGoneFromGuest, kind: "mutation" },
         handOverOrganizationContributors: { fn: handOverOrganizationContributors, kind: "mutation" },
         importShardRows: { fn: importShardRows, kind: "mutation" },
         listShardRowsPage: { fn: listShardRowsPage, kind: "query" },
@@ -1986,6 +2017,50 @@ describe("mergeGuestInto across two real shards", () => {
 
             expect(await documentOn(merge, "user", id)).toBeNull();
             expect(await documentOn(merge, "guest", id)).toBeNull();
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("never brings over a row the guest wrote after the copy and deleted between the clear's read and its import", async () => {
+        const merge = twoShards();
+
+        try {
+            const copied = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("before")))) as string;
+            let late = "";
+
+            merge.onceBefore("listShardRowsToClear", async () => {
+                late = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("written, then deleted")))) as string;
+                // The clear reads it; the guest deletes it before the read page is imported on the new shard.
+                merge.onceBefore("importShardRows", async () => {
+                    await merge.shards.guest.run(async (context: any) => await context.db.delete("threads", late));
+                });
+            });
+
+            await mergeToEnd(merge.call, "guest", "user");
+
+            expect(late).not.toBe("");
+            expect(await merge.threadsOn("user")).toStrictEqual([{ _id: copied, title: "before", userId: "user" }]);
+            expect(await merge.threadsOn("guest")).toStrictEqual([]);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("keeps the account's edit of a moved row the guest deleted between the clear's import and its delete", async () => {
+        const merge = twoShards();
+
+        try {
+            const id = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("guest title")))) as string;
+
+            merge.onceBefore("deleteShardRows", async () => {
+                await merge.shards.guest.run(async (context: any) => await context.db.delete("threads", id));
+                await merge.shards.user.run(async (context: any) => await context.db.patch("threads", id, { title: "the account's title", updatedAt: 2 }));
+            });
+
+            await mergeToEnd(merge.call, "guest", "user");
+
+            expect(await merge.threadsOn("user")).toStrictEqual([{ _id: id, title: "the account's title", userId: "user" }]);
         } finally {
             merge.close();
         }
