@@ -278,6 +278,24 @@ describe("rate limit pause notice", () => {
             expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy();
         });
 
+        it("a manual Resume names its own reply, and Retry now does not", () => {
+            access.permission = "write";
+            render(
+                <RateLimitPauseNotice pause={{ awaitsPerson: true, reason: "rate_limit", retryAt: START + 1000, status: 429 }} streamId="s1" threadId="t1" />,
+            );
+
+            tick(2000);
+            fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+
+            expect(mutateSpy).toHaveBeenLastCalledWith(expect.objectContaining({ streamId: "s1", threadId: "t1" }), expect.anything());
+
+            mutateSpy.mockClear();
+            wired();
+            fireEvent.click(screen.getByRole("button", { name: "Retry now" }));
+
+            expect(mutateSpy.mock.calls[0]![0]).not.toHaveProperty("streamId");
+        });
+
         it("sends the unlock proof with Retry now, so a locked chat resumes for its owner", () => {
             access.permission = "write";
             wired();

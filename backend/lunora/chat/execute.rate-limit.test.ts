@@ -1735,4 +1735,46 @@ describe("the usage-limit settings of a rate-limited run", () => {
 
         expect(await snoozedUntil()).toBeUndefined();
     });
+
+    it("a manual Resume that names its reply resumes that reply only, not the chat's other waits", async () => {
+        modelState.model = planned([rateLimited(), rateLimited(), textStep("Hello there.")]);
+
+        await run();
+
+        await pauseSecondReply(5);
+
+        const before = enqueued.length;
+        const resumed = await harness.run(async (ctx: any) => await ctx.runMutation(retryPausedRunsNow, { streamId: ids.streamId, threadId: ids.threadId }));
+
+        expect(resumed).toBe(true);
+        expect(enqueued).toHaveLength(before + 1);
+        expect(enqueued[before]!.args).toMatchObject({ streamId: ids.streamId });
+    });
+
+    it("the reply that took over a stopped reply's snooze lifts it when it resumes by itself", async () => {
+        const { claimRunResume } = await import("./streaming/persistent/library");
+
+        // The first reply holds the chat's snooze; the second, with an earlier reset, holds none of its own.
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        await pauseSecondReply(0.5);
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: ids.messageId, onlyNamed: true, threadId: ids.threadId }),
+        );
+
+        expect(await snoozedUntil()).toBeDefined();
+
+        const waiting = await harness.run(async (ctx: any) => {
+            const streams = await ctx.db.query("persistentStreams").collect();
+
+            return streams.find((stream: any) => stream.messageId === "other-message");
+        });
+
+        const claim = await harness.run(async (ctx: any) => await ctx.runMutation(claimRunResume, { pauseId: waiting.pause.id, streamId: waiting._id }));
+
+        expect(claim).not.toBeNull();
+        expect(await snoozedUntil()).toBeUndefined();
+    });
 });

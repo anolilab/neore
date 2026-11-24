@@ -1174,6 +1174,9 @@ export const claimRunResume = internalMutation
         // (The watchdog's resume decision already moved the epoch: `inspectRun` fences the run it judged dead.)
         const epoch = stream.pauseCause === "interrupted" ? epochOf(stream) : epochOf(stream) + 1;
 
+        // The reply runs again: a snooze this wait took over from a stopped reply ends with the wait, so the chat is not left hidden.
+        await liftPauseSnooze(ctx, stream, new Set<string>([String(stream._id)]));
+
         // The run is about to write again: it gets a fresh expiry, the pause's (set for the wait) would cut it short.
         await patchRow(ctx.db, "persistentStreams", stream, {
             beatAt: ctx.now,
@@ -1212,7 +1215,11 @@ export const claimRunResume = internalMutation
  * waited the whole pause out gets no such allowance.
  */
 export const retryPausedRunsNow = internalMutation
-    .input({ threadId: v.string().max(MAX_LENGTH.id) })
+    .input({
+        /** Only this paused reply, when the caller means one reply's own wait (a manual Resume); absent: every paused reply of the thread. */
+        streamId: v.optional(v.string().max(MAX_LENGTH.id)),
+        threadId: v.string().max(MAX_LENGTH.id),
+    })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         const live = await liveStreamsOf(ctx, args.threadId);
@@ -1221,6 +1228,10 @@ export const retryPausedRunsNow = internalMutation
 
         for (const stream of live) {
             const { pause } = stream;
+
+            if (args.streamId !== undefined && String(stream._id) !== args.streamId) {
+                continue;
+            }
 
             // An interrupted run's resume is the watchdog's (`interrupted.ts`): there is no wait to end early.
             if (!pause || stream.pauseCause !== undefined) {

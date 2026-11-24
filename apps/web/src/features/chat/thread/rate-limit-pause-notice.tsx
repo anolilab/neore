@@ -152,11 +152,13 @@ export const RateLimitPauseNoticeView: FC<RateLimitPauseNoticeViewProps> = ({ ca
 interface RateLimitPauseNoticeProps {
     className?: string;
     pause: RateLimitPause;
+    /** The paused reply this notice belongs to: a manual Resume resumes only that reply, not the chat's other waits. */
+    streamId?: string;
     threadId: string;
 }
 
 /** The notice wired to the thread: "Retry now" ends the wait, "Stop" is the ordinary stop of the reply; both need write access. */
-export const RateLimitPauseNotice: FC<RateLimitPauseNoticeProps> = ({ className, pause, threadId }) => {
+export const RateLimitPauseNotice: FC<RateLimitPauseNoticeProps> = ({ className, pause, streamId, threadId }) => {
     const crpc = useCRPC();
     const { t } = useLingui();
     const { isPending: isRetrying, mutate: retryNow } = useMutation(crpc.chat.rate_limit_retry.retryRateLimitedRun.mutationOptions());
@@ -174,7 +176,10 @@ export const RateLimitPauseNotice: FC<RateLimitPauseNoticeProps> = ({ className,
             isStopping={isStopping}
             onRetryNow={() => {
                 // The proof of the unlocked chat: a locked chat's Resume or Retry now is refused without it.
-                retryNow({ threadId: threadId as never, unlockProof }, { onError: () => showError(t`Could not retry. Please try again.`) });
+                // A manual Resume names its own reply, so the other waits on the chat keep waiting.
+                const scope = pause.awaitsPerson === true && streamId !== undefined ? { streamId } : {};
+
+                retryNow({ threadId: threadId as never, unlockProof, ...scope }, { onError: () => showError(t`Could not retry. Please try again.`) });
             }}
             onStop={() => {
                 // Like the composer's Stop: a manual stop keeps the queued prompts, and nothing auto-sends them.

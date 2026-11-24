@@ -17,14 +17,22 @@ import { threadGateOutcome, throwUnlessGranted } from "./lib/thread-gate";
  */
 export const retryRateLimitedRun = authMutation
     .use(rateLimit("chat/stream"))
-    .input({ threadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
+    .input({
+        /** The one paused reply a manual Resume is for; absent: every paused reply of the thread (Retry now). */
+        streamId: v.optional(v.string().max(MAX_LENGTH.id)),
+        threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+    })
     .output(v.object({ resumed: v.boolean() }))
-    .mutation(async ({ args: { threadId, unlockProof }, ctx }) => {
+    .mutation(async ({ args: { streamId, threadId, unlockProof }, ctx }) => {
         const { userId } = ctx.user;
 
         throwUnlessGranted(await threadGateOutcome(ctx, { level: "write", threadId, unlockProof, userId }), "Write access denied to this thread");
 
-        const resumed = await ctx.runMutation(internal.chat.streaming.persistent.library.retryPausedRunsNow, { threadId });
+        const resumed = await ctx.runMutation(internal.chat.streaming.persistent.library.retryPausedRunsNow, {
+            threadId,
+            ...(streamId !== undefined && { streamId }),
+        });
 
         ctx.log.event("chat.retry_rate_limited_run", { resumed });
 
