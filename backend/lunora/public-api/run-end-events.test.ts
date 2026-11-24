@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { closeGroupTurnStream } from "../chat/group/run";
 import { cleanupExpiredStreams } from "../chat/streaming/persistent/crons";
+import { endHostStream } from "../chat/streaming/persistent/host";
 import { addChunk, setStreamStatus } from "../chat/streaming/persistent/library";
 import schema from "../schema";
 import { pruneMcpEvents } from "./events";
@@ -209,6 +210,58 @@ describe("a group turn's end in the Events log", () => {
         await expect(groupEnd()).rejects.toThrow();
 
         expect(await eventsOf()).toHaveLength(1);
+    });
+});
+
+describe("a coding-agent turn's end in the Events log", () => {
+    const hostTurn = async (): Promise<string> =>
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    hostState: "running",
+                    messageId: "host-prompt",
+                    producer: "host",
+                    status: "streaming",
+                    streamingConfig: { contentType: "text", model: "test-model" },
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+    const endTurn = async (id: string, end: { reason: string; status: string }): Promise<void> =>
+        await harness.run(async (ctx: any) => {
+            const stream = await ctx.db.get("persistentStreams", id);
+
+            await endHostStream(ctx, stream, end as never, Date.now());
+        });
+
+    it("writes one run.completed when the host turn finishes", async () => {
+        const id = await hostTurn();
+
+        await endTurn(id, { reason: "finished", status: "done" });
+
+        const events = await eventsOf();
+
+        expect(events.map((event) => [event.eventId, event.name])).toStrictEqual([[`run:${id}`, "run.completed"]]);
+    });
+
+    it("writes one run.failed when the host turn times out", async () => {
+        const id = await hostTurn();
+
+        await endTurn(id, { reason: "timeout", status: "timeout" });
+
+        const events = await eventsOf();
+
+        expect(events.map((event) => event.name)).toStrictEqual(["run.failed"]);
+    });
+
+    it("writes nothing when the host turn is stopped", async () => {
+        const id = await hostTurn();
+
+        await endTurn(id, { reason: "stopped", status: "done" });
+
+        expect(await eventsOf()).toStrictEqual([]);
     });
 });
 
