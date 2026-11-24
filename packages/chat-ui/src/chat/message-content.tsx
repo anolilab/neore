@@ -79,6 +79,9 @@ const VIDEO_GENERATING_MARKER = "__VIDEO_GENERATING__";
 const AUDIO_GENERATING_MARKER = "__AUDIO_GENERATING__";
 
 /** Where an image sits in its message, so an `Image` override can act on that one image (pin it, open it). */
+/** A bare lowercase code with no spaces or punctuation: an error kind, not a sentence a person can read. */
+const BARE_ERROR_CODE = /^[a-z][a-z-]*$/u;
+
 export interface ImagePlace {
     /** The image's place among the message's images (`utils/image-ordinals.ts`), which a reply edit leaves as it is. */
     imageIndex?: number;
@@ -1257,7 +1260,8 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
     const isLocalReply = message.localReply === true;
 
     if (message.status === "failed" && !isAnimating && (renderedParts.length === 0 || isLocalReply)) {
-        const errorMessage = message.error || t`An error occurred while generating the response.`;
+        // An error that is only a code (`unreachable`, `stream`) is what older builds saved for a local reply: never show the code.
+        const errorMessage = message.error && !BARE_ERROR_CODE.test(message.error) ? message.error : t`An error occurred while generating the response.`;
 
         renderedParts.push(
             <div
