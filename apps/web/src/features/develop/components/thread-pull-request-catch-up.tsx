@@ -49,7 +49,8 @@ const Shown = ({ children, onFocusLost }: { children: ReactNode; onFocusLost: ()
  * "behind" is not known to hold), or once the pull request is merged or closed. A background refresh that has not failed keeps
  * it, so it does not flicker. While it shows, or while a failed read hides it after the host said behind, the end of an agent turn in this thread reads the pull request and the comparison
  * again: that turn may have pushed the caught-up branch. The end comes from the chat's own stream state (`turn-ended.ts`), not
- * from the header's read of the thread, so a turn that ends before that read answers still counts. Nor for a branch name that is not plain enough to put in a command.
+ * from the header's read of the thread, so a turn that ends before that read answers still counts. A pull request whose branch names or repository are not plain enough to put in a command never shows, and
+ * so never reads again at a turn's end.
  * Whether the prompt pushes is the host's word on the head's repository, never a guess from names or commits: a fork's branch
  * is not pushed. When it goes away holding focus, focus moves to `returnFocusTo` (the pull request's link).
  */
@@ -78,10 +79,16 @@ const CatchUpControl = ({
     const comparisonAnswered =
         open && !comparison.isError && compared !== undefined && compared.baseBranch === detail.baseBranch && compared.headSha === detail.headSha;
     const behind = comparisonAnswered && compared.behindBy > 0;
-    const settled = !pull.isError && detail !== undefined && (!open || (comparisonAnswered && !behind));
+    // Only names plain enough for a command make a prompt; a pull request whose names are not shows nothing, behind or not.
+    const host = open ? hostOfPullRequestUrl(detail.url) : undefined;
+    const promptable =
+        open && host !== undefined && isPlainBranchName(detail.baseBranch) && isPlainBranchName(detail.headBranch) && isPlainRepo(link.repository);
+    const shows = behind && promptable && !pull.isError;
+    const settled = !pull.isError && detail !== undefined && (!open || !promptable || (comparisonAnswered && !behind));
 
-    // Whether a turn's end reads again (`heard`, so a remount knows it too): set by a read that confirmed behind, cleared only by
-    // one that confirmed the pull request closed, merged, a draft or caught up. A failed read hides the control but leaves this as
+    // Whether a turn's end reads again (`heard`, so a remount knows it too): set by a read that confirmed behind for names that make
+    // a prompt (so the control shows), cleared only by one that confirmed the pull request closed, merged, a draft, caught up or
+    // named so that no prompt is made. A failed read hides the control but leaves this as
     // it was, so the next turn's end reads again and the control comes back once the host answers behind.
     useEffect(() => {
         // While a missed turn's read has not answered, the cached reads say nothing new.
@@ -91,7 +98,7 @@ const CatchUpControl = ({
 
         const generation = heard.get(key)?.generation ?? turnEndedGeneration(threadId);
 
-        if (behind && !pull.isError) {
+        if (shows) {
             heard.set(key, { generation, rereads: true });
         } else if (settled || !heard.has(key)) {
             heard.set(key, { generation, rereads: false });
@@ -122,7 +129,7 @@ const CatchUpControl = ({
 
         heard.set(key, { generation: turnEndedGeneration(threadId), rereads });
 
-        return (rereads || (stale && behind)) && pull.data !== undefined ? readAgain() : undefined;
+        return (rereads || (stale && shows)) && pull.data !== undefined ? readAgain() : undefined;
     });
     const lostFocus = useRef(false);
 
@@ -162,18 +169,12 @@ const CatchUpControl = ({
         [key, threadId],
     );
 
-    if (stale || pull.isError || !behind) {
+    if (stale || !shows || host === undefined) {
         return null;
     }
 
     const base = detail.baseBranch;
     const head = detail.headBranch;
-
-    const host = hostOfPullRequestUrl(detail.url);
-
-    if (!isPlainBranchName(base) || !isPlainBranchName(head) || !isPlainRepo(link.repository) || host === undefined) {
-        return null;
-    }
 
     const pullRequest = `${link.repository}#${String(link.number)}`;
     const label = t`Catch up ${pullRequest} with ${base}`;

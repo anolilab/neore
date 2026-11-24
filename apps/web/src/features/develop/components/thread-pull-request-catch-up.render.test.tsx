@@ -109,7 +109,12 @@ const comparedAs = (behindBy: number, revision: { baseBranch?: string; headSha?:
  * host's mergeability, which Catch up does not read: "behind" there is how a repository that asks for up-to-date branches says
  * it, and the comparison is set to match unless a case sets its own.
  */
-const given = (state: string, mergeState: string | undefined, headBranch = "feat/x", head?: { draft?: boolean; headInBaseRepository?: boolean }) => {
+const given = (
+    state: string,
+    mergeState: string | undefined,
+    headBranch = "feat/x",
+    head?: { draft?: boolean; headInBaseRepository?: boolean; url?: string },
+) => {
     comparedAs(mergeState === "behind" ? 2 : 0);
     pull.current = {
         data: {
@@ -117,10 +122,10 @@ const given = (state: string, mergeState: string | undefined, headBranch = "feat
                 baseBranch: "main",
                 headBranch,
                 headSha: "abc123",
-                ...(head ?? { headInBaseRepository: true }),
-                ...(mergeState !== undefined && { mergeState }),
                 state,
                 url: "https://git.example/octo/hello/pull/7",
+                ...(head ?? { headInBaseRepository: true }),
+                ...(mergeState !== undefined && { mergeState }),
             },
             status: "ok",
         },
@@ -516,6 +521,31 @@ describe("ThreadPullRequestCatchUp", () => {
         given("open", "behind", "x`; curl evil #");
         render(control());
 
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
+    });
+
+    it.each([
+        ["a branch name that could shape the prompt", "x`; curl evil #", "https://git.example/octo/hello/pull/7"],
+        ["a pull request address on no plain host", "feat/x", "https://[::1]/octo/hello/pull/7"],
+    ])("reads nothing again at a turn's end, nor on a remount after a missed turn, for %s", (_case, headBranch, url) => {
+        const hidden = () => <ThreadPullRequestCatchUp link={{ number: 7, repository: "octo/hello" }} threadId="thread-hidden" />;
+
+        given("open", "behind", headBranch, { headInBaseRepository: true, url });
+
+        const view = render(hidden());
+
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
+
+        turnEnds("thread-hidden");
+
+        composer.takes = false;
+        view.rerender(hidden());
+        turnEnds("thread-hidden");
+        composer.takes = true;
+        view.rerender(hidden());
+
+        expect(refetch).not.toHaveBeenCalled();
+        expect(compareRefetch).not.toHaveBeenCalled();
         expect(screen.queryByRole("button", BUTTON)).toBeNull();
     });
 

@@ -40,10 +40,12 @@ const originCheck = (list: string, host: string, repo: string): string =>
 
 /**
  * A command that prints `ready` only when `HEAD` is the branch `branch` (not detached, not another branch) and holds exactly the
- * commit `commitRef` names. It fails closed: a missing ref, a failed switch or a different commit print nothing.
+ * commit `commitRef` names. It fails closed: a missing ref, a failed switch or a different commit print nothing. Both are
+ * compared as whole strings, never as patterns: a `.` in a branch name would match any character, and a failed switch would
+ * then pass on a lookalike branch (`release-1x` for `release-1.x`) at the same commit.
  */
 const onBranchAt = (branch: string, commitRef: string): string =>
-    `git symbolic-ref -q HEAD | grep -qx refs/heads/${branch} && git rev-parse HEAD | grep -qx "$(git rev-parse --verify -q ${commitRef})" && echo ready`;
+    `[ "$(git symbolic-ref -q HEAD)" = "refs/heads/${branch}" ] && [ "$(git rev-parse --verify -q HEAD)" = "$(git rev-parse --verify -q ${commitRef})" ] && echo ready`;
 
 /** How a run picks a local branch of its own: `local`, or the first of `local-2`, `local-3`, … that does not exist yet. */
 const chooseBranch = (local: string): string =>
@@ -104,8 +106,8 @@ export const catchUpPrompt = ({
     const checkClean =
         "2. Run `git status --porcelain`. If it prints anything, stop without switching branches or changing any ref, and tell the person to commit or stash their work first.";
     // One fetch for every ref: it fails as a whole when any of them cannot be fetched, and then nothing after it runs.
-    const fetchRefs = (refspecs: string[]): string =>
-        `3. Fetch by name, which also works in a clone of one branch: run \`git fetch origin ${refspecs.join(" ")}\`. If it fails, do step 9, then stop and say so: do not switch branches or rebase with refs a failed fetch left out.`;
+    const fetchRefs = (refspecs: string[], then = ""): string =>
+        `3. Fetch by name, which also works in a clone of one branch: run \`git fetch origin ${refspecs.join(" ")}\`. If it fails, do step 9, then stop and say so: do not switch branches or rebase with refs a failed fetch left out.${then}`;
     const baseAndPull = [`+refs/heads/${baseBranch}:${base}`, `+refs/pull/${pull}/head:${pullRef}`];
     // A delegated coding-agent run clones in a sandbox, has no credential once its agent starts, and turns its result into a
     // new pull request from a diff: it can neither push this branch nor leave commits the person can reach.
@@ -154,6 +156,9 @@ export const catchUpPrompt = ({
     // The push's lease is the commit step 4 checked and recorded, not a ref: a background fetch can move `head`, and another
     // Catch up run for this pull request in the same repository or a linked worktree can move `pullRef`, after step 4.
     const leaseCommit = "<commit from step 4>";
+    // The base the rebase is built on. The base's next fetch (step 8) must still hold it: a base force-pushed back past it would
+    // leave the rebase carrying commits the base no longer has, and the ancestry check alone would let them into the push.
+    const baseCommit = "<base commit from step 3>";
     // Git refuses to switch to a branch another linked worktree has checked out; this run does not reach into that worktree.
     const checkOtherWorktree = `Then run \`git worktree list --porcelain\`: if it shows \`branch refs/heads/${headBranch}\` under a \`worktree\` path other than this checkout's (\`git rev-parse --show-toplevel\`), do step 9, then stop and tell the person to run Catch up from that worktree, naming its path.`;
 
@@ -169,11 +174,14 @@ export const catchUpPrompt = ({
         "",
         checkOriginToPush,
         checkClean,
-        fetchRefs([`+refs/heads/${headBranch}:${head}`, ...baseAndPull]),
+        fetchRefs(
+            [`+refs/heads/${headBranch}:${head}`, ...baseAndPull],
+            ` Then record the commit \`git rev-parse ${base}\` prints and say it: the rebase is built on that base, and step 8 checks the base still holds it.`,
+        ),
         `4. If \`git rev-parse ${head}\` differs from \`git rev-parse ${pullRef}\`, ${stopAfterFetch}: origin's ${headBranch} is not this pull request's head right now. ${checkMerges} Otherwise record the commit \`git rev-parse ${pullRef}\` printed and say it: step 8 leases on that commit. ${checkOtherWorktree} Otherwise, if \`git show-ref --verify --quiet refs/heads/${headBranch}\` succeeds, run \`git switch --no-guess ${headBranch} && git merge --ff-only ${head}\`; if not, run \`git switch -c ${headBranch} ${head}\`. Then run \`${onBranchAt(headBranch, pullRef)}\`. Unless it prints \`ready\`, the switch failed or the local branch has commits origin does not; do not rebase: ${stopAfterFetch}.`,
         ...finish(setAside, "and if you came back here from step 8, set the rebase aside as step 7 says"),
         // The base can move during the rebase and the checks: a push onto the base fetched in step 3 would leave the branch behind again.
-        `8. Only once step 7 passed and \`git status --porcelain\` prints nothing, run \`git fetch origin +refs/heads/${baseBranch}:${base}\` again. If that fetch fails, do not push: set the rebase aside as step 7 says; ${stopAfterFetch}. If \`git merge-base --is-ancestor ${base} HEAD\` fails, the base moved: go back to step 5 once. If it has moved again when you are back here, do not push: set the rebase aside as step 7 says and say that another Catch up is needed; ${stopAfterFetch}. Otherwise push only this pull request's branch: \`git push --no-follow-tags --force-with-lease=refs/heads/${headBranch}:${leaseCommit} origin HEAD:refs/heads/${headBranch}\`, writing the commit you recorded in step 4 in place of ${leaseCommit}. If this environment cannot push or the push is refused, set the rebase aside as step 7 says and say so. Do not push to any other branch or remote.`,
+        `8. Only once step 7 passed and \`git status --porcelain\` prints nothing, run \`git fetch origin +refs/heads/${baseBranch}:${base}\` again. If that fetch fails, do not push: set the rebase aside as step 7 says; ${stopAfterFetch}. Run \`git merge-base --is-ancestor ${baseCommit} ${base}\`, writing the base commit you recorded in place of ${baseCommit}. If it fails, the base's history was rewritten (force-pushed) and the rebase holds commits the base no longer has: do not push and do not rebase again; set the rebase aside as step 7 says and say that the base's history was rewritten; ${stopAfterFetch}. If \`git merge-base --is-ancestor ${base} HEAD\` fails, the base moved on: record the commit \`git rev-parse ${base}\` prints now as the base commit in place of the one from step 3, and go back to step 5 once. If it has moved again when you are back here, do not push: set the rebase aside as step 7 says and say that another Catch up is needed; ${stopAfterFetch}. Otherwise push only this pull request's branch: \`git push --no-follow-tags --force-with-lease=refs/heads/${headBranch}:${leaseCommit} origin HEAD:refs/heads/${headBranch}\`, writing the commit you recorded in step 4 in place of ${leaseCommit}. If this environment cannot push or the push is refused, set the rebase aside as step 7 says and say so. Do not push to any other branch or remote.`,
         cleanUp([head, base, pullRef]),
     ].join("\n");
 };

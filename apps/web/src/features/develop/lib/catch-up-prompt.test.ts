@@ -12,7 +12,8 @@ const BARE_FORK_BRANCH = /\bpr-42\b(?!-)/u;
 
 const STEP = /^(\d)\. /u;
 
-const GIT_COMMAND = /`(git [^`]+)`/gu;
+// A command is a `git …` call, or a test of what git prints (`[ "$(git …)" = … ]`).
+const GIT_COMMAND = /`((?:git |\[ "\$\(git )[^`]+)`/gu;
 
 const FETCH_FROM_ORIGIN = "git fetch origin ";
 
@@ -59,7 +60,7 @@ interface Command {
     readonly step: number;
 }
 
-/** Every `git …` command the prompt writes between backticks, in the order it names them, with the step it is in. */
+/** Every git command the prompt writes between backticks, in the order it names them, with the step it is in. */
 const commandsOf = (prompt: string): Command[] =>
     [...stepsOf(prompt)].flatMap(([step, text]: [number, string]) =>
         [...text.matchAll(GIT_COMMAND)].map((match: RegExpExecArray) => {
@@ -182,7 +183,8 @@ describe(catchUpPrompt, () => {
         const commands = commandsOf(SAME_REPO);
         const switchTo = firstIndex(commands, "git switch --no-guess feat/x");
 
-        expect(commandsMatching(commands, "git rev-parse refs/neore/").slice(0, 2)).toEqual([
+        expect(commandsMatching(commands, "git rev-parse refs/neore/").slice(0, 3)).toEqual([
+            { command: "git rev-parse refs/neore/pull-42-a1b2c3d4-base", step: 3 },
             { command: "git rev-parse refs/neore/pull-42-a1b2c3d4-branch", step: 4 },
             { command: "git rev-parse refs/neore/pull-42-a1b2c3d4-head", step: 4 },
         ]);
@@ -198,7 +200,7 @@ describe(catchUpPrompt, () => {
         // A local branch ahead of origin merges as "Already up to date", and a failed switch leaves another branch checked
         // out: only checking the branch and the commit HEAD holds catches both, and the rebase waits for that check.
         expect(commands[switchTo + 2]?.command).toBe(
-            'git symbolic-ref -q HEAD | grep -qx refs/heads/feat/x && git rev-parse HEAD | grep -qx "$(git rev-parse --verify -q refs/neore/pull-42-a1b2c3d4-head)" && echo ready',
+            '[ "$(git symbolic-ref -q HEAD)" = "refs/heads/feat/x" ] && [ "$(git rev-parse --verify -q HEAD)" = "$(git rev-parse --verify -q refs/neore/pull-42-a1b2c3d4-head)" ] && echo ready',
         );
         expect(firstIndex(commands, "git rebase ")).toBe(switchTo + 3);
     });
@@ -212,13 +214,17 @@ describe(catchUpPrompt, () => {
             { command: "git push --no-follow-tags --force-with-lease=refs/heads/feat/x:<commit from step 4> origin HEAD:refs/heads/feat/x", step: 8 },
         ]);
         expect(stepsOf(SAME_REPO).get(8)).toMatch(STEP_EIGHT_GATE);
-        // The base can move during the rebase and the checks: it is fetched again, and a moved base sends the run back to step 5.
-        expect(stepEight.slice(0, 4)).toEqual([
+        // The base can move during the rebase and the checks: it is fetched again; a base that no longer holds the commit the
+        // rebase was built on (recorded in step 3) stops the run, and one that only moved on sends it back to step 5.
+        expect(stepEight.slice(0, 6)).toEqual([
             "git status --porcelain",
             "git fetch origin +refs/heads/release/2.0:refs/neore/pull-42-a1b2c3d4-base",
+            "git merge-base --is-ancestor <base commit from step 3> refs/neore/pull-42-a1b2c3d4-base",
             "git merge-base --is-ancestor refs/neore/pull-42-a1b2c3d4-base HEAD",
+            "git rev-parse refs/neore/pull-42-a1b2c3d4-base",
             commands[push]?.command,
         ]);
+        expect(commandsMatching(commands, "git rev-parse refs/neore/pull-42-a1b2c3d4-base")[0]?.step).toBe(3);
         expect(stepsOf(SAME_REPO).get(8)).toContain("go back to step 5 once");
         // The lease is a commit, not a ref: a background fetch or another run can move this run's refs after step 4.
         const [, leasedRef, expected = ""] = LEASE.exec(commands[push]?.command ?? "") ?? [];
@@ -243,8 +249,8 @@ describe(catchUpPrompt, () => {
         ]);
         expect(steps.get(7)).toContain("start with pr-42-a1b2c3d4,");
         expect(commandsMatching(commands, "git update-ref refs/heads/")).toHaveLength(1);
-        // The base moving twice, a refused push, and an aborted repeat rebase all set the rebase aside the same way.
-        expect(steps.get(8)?.match(SET_ASIDE_AS_STEP_SEVEN)).toHaveLength(3);
+        // A failed re-fetch, a rewritten base, the base moving twice and a refused push all set the rebase aside the same way.
+        expect(steps.get(8)?.match(SET_ASIDE_AS_STEP_SEVEN)).toHaveLength(4);
         expect(steps.get(6)).toContain("as step 7 says");
         expect(SAME_REPO).not.toContain("leave the rebased commits in place");
         expect(SAME_REPO).not.toMatch(FORCED_BRANCH_MOVE);
@@ -265,7 +271,7 @@ describe(catchUpPrompt, () => {
         expect(commandsMatching(commands, "git switch")).toEqual([
             {
                 command:
-                    'git switch -c <name> refs/neore/pull-42-a1b2c3d4-head && git symbolic-ref -q HEAD | grep -qx refs/heads/<name> && git rev-parse HEAD | grep -qx "$(git rev-parse --verify -q refs/neore/pull-42-a1b2c3d4-head)" && echo ready',
+                    'git switch -c <name> refs/neore/pull-42-a1b2c3d4-head && [ "$(git symbolic-ref -q HEAD)" = "refs/heads/<name>" ] && [ "$(git rev-parse --verify -q HEAD)" = "$(git rev-parse --verify -q refs/neore/pull-42-a1b2c3d4-head)" ] && echo ready',
                 step: 4,
             },
         ]);

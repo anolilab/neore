@@ -112,7 +112,7 @@ describe("catchUpPrompt's fetch and switch, run against a scratch origin", () =>
         const fetch = (): string => commandOf(prompt, "git fetch origin ");
         const switchExisting = (): string => commandOf(prompt, "git switch --no-guess ");
         const switchNew = (): string => commandOf(prompt, "git switch -c feat/x ");
-        const ready = (): string => commandOf(prompt, "git symbolic-ref ");
+        const ready = (): string => commandOf(prompt, "[ ");
 
         it("fails the fetch when origin no longer has the branch", () => {
             const work = cloneOrigin("same-missing-branch");
@@ -148,12 +148,88 @@ describe("catchUpPrompt's fetch and switch, run against a scratch origin", () =>
             expect(sh(work, ready()).output).toBe("");
         });
 
+        it("prints no ready on a lookalike branch for a name with a dot, at the same commit, and ready on the branch itself", () => {
+            const work = cloneOrigin("same-lookalike");
+            const dotted = catchUpPrompt({ ...PULL, headBranch: "release-1.x", headInBaseRepository: true, number: 42 });
+            const dottedReady = commandOf(dotted, "[ ");
+
+            // The switch to release-1.x failed and left release-1-x, a `.` apart, checked out at the pull request's head.
+            git(work, "update-ref", `${REF_PREFIX}-head`, "origin/feat/x");
+            git(work, "switch", "--quiet", "-c", "release-1-x", "origin/feat/x");
+
+            expect(sh(work, dottedReady)).toStrictEqual({ output: "", status: 1 });
+
+            git(work, "switch", "--quiet", "-c", "release-1.x", "origin/feat/x");
+
+            expect(sh(work, dottedReady)).toStrictEqual({ output: "ready\n", status: 0 });
+        });
+
         it("prints ready once the new branch is at the pull request's head", () => {
             const work = cloneOrigin("same-ok");
 
             expect(sh(work, fetch()).status).toBe(0);
             expect(sh(work, switchNew()).status).toBe(0);
             expect(sh(work, ready())).toStrictEqual({ output: "ready\n", status: 0 });
+        });
+    });
+
+    describe("step 8's base re-check, for a head in the base repository", () => {
+        const prompt = catchUpPrompt({ ...PULL, headInBaseRepository: true, number: 42 });
+        const BASE = `${REF_PREFIX}-base`;
+
+        /** A clone of an origin of its own, fetched as step 3 does, on a rebase of the branch onto the base it recorded. */
+        const rebased = (name: string): { origin: string; recorded: string; work: string } => {
+            const origin = join(root, `${name}.git`);
+
+            git(root, "clone", "--quiet", "--bare", join(root, "origin.git"), origin);
+            git(origin, "update-ref", "refs/pull/42/head", git(origin, "rev-parse", "refs/heads/feat/x"));
+
+            const work = join(root, name);
+
+            git(root, "clone", "--quiet", origin, work);
+
+            expect(sh(work, commandOf(prompt, "git fetch origin +refs/heads/feat/x:")).status).toBe(0);
+
+            const recorded = sh(work, commandOf(prompt, `git rev-parse ${BASE}`)).output.trim();
+
+            git(work, "switch", "--quiet", "-c", "feat/x", recorded);
+            git(work, "commit", "--quiet", "--allow-empty", "-m", "change, rebased");
+
+            return { origin, recorded, work };
+        };
+
+        const refetchBase = (work: string): number | null => sh(work, commandOf(prompt, "git fetch origin +refs/heads/main:")).status;
+        const stillHolds = (work: string, recorded: string): number | null =>
+            sh(
+                work,
+                commandOf(prompt, "git merge-base --is-ancestor <base commit from step 3> ").replaceAll("<base commit from step 3>", () => recorded),
+            ).status;
+        const baseInHead = (work: string): number | null => sh(work, commandOf(prompt, `git merge-base --is-ancestor ${BASE} HEAD`)).status;
+
+        it("fails the base check when the base was force-pushed back past the commit the rebase was built on", () => {
+            const { origin, recorded, work } = rebased("base-rewritten");
+
+            git(origin, "update-ref", "refs/heads/main", `${recorded}~1`);
+
+            expect(refetchBase(work)).toBe(0);
+            // The rebase still contains the rewound base, so the ancestry check alone would let the dropped commit into the push.
+            expect(baseInHead(work)).toBe(0);
+            expect(stillHolds(work, recorded)).not.toBe(0);
+        });
+
+        it("passes the base check for a base that only moved on, and the ancestry check sends the run back to rebase", () => {
+            const { origin, recorded, work } = rebased("base-advanced");
+
+            git(
+                origin,
+                "update-ref",
+                "refs/heads/main",
+                git(origin, "commit-tree", "-p", recorded, "-m", "landed later", git(origin, "show", "--no-patch", "--format=%T", recorded)),
+            );
+
+            expect(refetchBase(work)).toBe(0);
+            expect(stillHolds(work, recorded)).toBe(0);
+            expect(baseInHead(work)).not.toBe(0);
         });
     });
 });
