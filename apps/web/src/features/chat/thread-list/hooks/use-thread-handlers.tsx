@@ -412,7 +412,6 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
 
     return {
         // Delete is not gated here: each caller asks in its own dialog, so a gate here would ask twice.
-        askFirst,
         confirmBeforeDelete: confirmations.delete,
         confirmDialog,
         handleBulkDeleteThreads,

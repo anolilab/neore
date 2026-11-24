@@ -14,7 +14,6 @@ import GlobalCommandPalette from "./command-palette";
 
 const harness = vi.hoisted(() => {
     return {
-        askFirst: vi.fn(),
         confirmBeforeDelete: true,
         // Set by the delete-confirmation tests; `undefined` keeps the thread manager's delete unavailable, as before them.
         /** The chat the palette acts on; `undefined` shows no current-thread actions. */
@@ -192,7 +191,6 @@ vi.mock("@/features/chat/thread-list/hooks/use-thread-handlers", () => {
     return {
         default: () => {
             return {
-                askFirst: harness.askFirst,
                 confirmBeforeDelete: harness.confirmBeforeDelete,
                 confirmDialog: null,
                 handleCreateBranch: vi.fn(),
@@ -393,7 +391,6 @@ describe("command palette thread delete confirmation", () => {
     beforeEach(() => {
         Element.prototype.getAnimations = () => [];
         stubResizeObserver();
-        harness.askFirst.mockReset();
         harness.confirmBeforeDelete = true;
         harness.deleteBranch = vi.fn(async () => {
             return { deletedIds: [], threadDeleted: true };
@@ -415,7 +412,6 @@ describe("command palette thread delete confirmation", () => {
         fireEvent.click(await screen.findByRole("button", { name: "Delete thread" }));
 
         expect(harness.deleteBranch).not.toHaveBeenCalled();
-        expect(harness.askFirst).not.toHaveBeenCalled();
         // The same destructive dialog the sidebar row opens; nothing deletes until its delete button is pressed.
         expect(await screen.findByText("Delete thread?")).toBeTruthy();
 
@@ -431,7 +427,6 @@ describe("command palette thread delete confirmation", () => {
 
         fireEvent.click(await screen.findByRole("button", { name: "Delete thread" }));
 
-        expect(harness.askFirst).not.toHaveBeenCalled();
         expect(harness.deleteBranch).toHaveBeenCalledWith("thread-1");
     });
 
@@ -443,7 +438,6 @@ describe("command palette thread delete confirmation", () => {
         fireEvent.click(await screen.findByRole("option", { name: "Delete thread" }));
 
         expect(harness.deleteBranch).not.toHaveBeenCalled();
-        expect(harness.askFirst).not.toHaveBeenCalled();
         expect(await screen.findByText("Delete thread?")).toBeTruthy();
 
         fireEvent.click(screen.getByRole("button", { name: "Delete" }));
@@ -459,7 +453,6 @@ describe("command palette thread delete confirmation", () => {
 
         fireEvent.click(await screen.findByRole("option", { name: "Delete thread" }));
 
-        expect(harness.askFirst).not.toHaveBeenCalled();
         expect(harness.deleteBranch).toHaveBeenCalledWith("thread-1");
     });
 });
