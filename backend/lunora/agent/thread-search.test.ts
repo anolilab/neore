@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { internal } from "../_generated/internal";
 import schema from "../schema";
 import { addMessagesHandler, updateMessage } from "./messages";
-import { MEANING_MIN_CHARS } from "./thread-search-plan";
+import { MEANING_MIN_CHARS, MEANING_SEARCH_REFUSED } from "./thread-search-plan";
 import { SYNC_RETRY } from "./thread-search-triggers";
 import { runThreadSearchSync, searchThreadsByMeaningFor, visibleThreadsForSearch } from "./thread-search";
 
@@ -18,6 +18,9 @@ const mocks = vi.hoisted(() => {
         embeddingModelAllowed: vi.fn(() => true),
         embedMany: vi.fn(async (_ctx: unknown, { values }: { values: string[] }) => {
             return { embeddings: values.map(() => Array.from({ length: 1024 }, (_unused, index) => (index === 0 ? 1 : 0))) };
+        }),
+        loadModelFilterRules: vi.fn(async () => {
+            return {};
         }),
         searchVectors: vi.fn(async (_ctx: unknown, _vector: number[], _args: { table: string }) => [] as { _id: string; _score: number }[]),
     };
@@ -33,9 +36,7 @@ vi.mock("../chat/lib/gateway-embedding-model", () => {
 });
 vi.mock("../chat/lib/model-filter-rules", () => {
     return {
-        loadModelFilterRules: async () => {
-            return {};
-        },
+        loadModelFilterRules: mocks.loadModelFilterRules,
     };
 });
 vi.mock("../lib/services", () => {
@@ -329,6 +330,61 @@ describe(searchThreadsByMeaningFor, () => {
         expect(await searchThreadsByMeaningFor(ctx as never, { query: "the invoice bug", userId: "user-1" })).toEqual([
             { archived: false, score: 0.6, threadId: "thread-pdf", title: "PDF totals off by one" },
         ]);
+    });
+
+    it("with archivedOnly, fills the results with archived matches ranked below more active ones than the limit", async () => {
+        const active = Array.from({ length: 12 }, (_, index) => {
+            return { archived: false, threadId: `thread-active-${String(index)}`, title: `Active ${String(index)}` };
+        });
+        const hits = [
+            ...active.map((_row, index) => {
+                return { _id: `vec-active-${String(index)}`, _score: 0.95 - index * 0.001 };
+            }),
+            { _id: "vec-archived", _score: 0.6 },
+        ];
+
+        mocks.searchVectors.mockImplementation(async (_ctx, _vector, args) => (args.table === "threadTitle" ? hits : []));
+        const ctx = makeCtx({
+            threadIdsForVectors: [
+                ...active.map((row, index) => {
+                    return { threadId: row.threadId, vectorId: `vec-active-${String(index)}` };
+                }),
+                { threadId: "thread-old", vectorId: "vec-archived" },
+            ],
+            visibleThreads: [...active, { archived: true, threadId: "thread-old", title: "Old invoice run" }],
+        });
+
+        expect(await searchThreadsByMeaningFor(ctx as never, { query: "the invoice bug", userId: "user-1" })).not.toContainEqual(
+            expect.objectContaining({ threadId: "thread-old" }),
+        );
+        expect(await searchThreadsByMeaningFor(ctx as never, { archivedOnly: true, query: "the invoice bug", userId: "user-1" })).toEqual([
+            { archived: true, score: 0.6, threadId: "thread-old", title: "Old invoice run" },
+        ]);
+    });
+
+    it("rejects when the query embedding fails, so the palette can say so", async () => {
+        mocks.embedMany.mockRejectedValueOnce(new Error("gateway unavailable"));
+
+        await expect(searchThreadsByMeaningFor(makeCtx({}) as never, { query: "the invoice bug", userId: "user-1" })).rejects.toThrow("gateway unavailable");
+        expect(mocks.searchVectors).not.toHaveBeenCalled();
+    });
+
+    it("throws FORBIDDEN with its own code when the model rules refuse the embedding model, not an empty list", async () => {
+        mocks.embeddingModelAllowed.mockReturnValue(false);
+
+        await expect(searchThreadsByMeaningFor(makeCtx({}) as never, { query: "the invoice bug", userId: "user-1" })).rejects.toMatchObject({
+            code: "FORBIDDEN",
+            data: { code: MEANING_SEARCH_REFUSED },
+        });
+        expect(mocks.embedMany).not.toHaveBeenCalled();
+        expect(mocks.searchVectors).not.toHaveBeenCalled();
+    });
+
+    it("reads the person's model rules once per search", async () => {
+        await searchThreadsByMeaningFor(makeCtx({}) as never, { query: "the invoice bug", userId: "user-1" });
+
+        expect(mocks.loadModelFilterRules).toHaveBeenCalledTimes(1);
+        expect(mocks.embedMany).toHaveBeenCalledTimes(1);
     });
 
     it("answers nothing for a query too short to embed", async () => {
