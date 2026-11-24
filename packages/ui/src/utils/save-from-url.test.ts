@@ -36,6 +36,8 @@ describe(saveName, () => {
     it.each([
         ["report.pdf", "application/pdf", "report.pdf"],
         ["chart", "image/png", "chart.png"],
+        ["voice", "audio/ogg", "voice.ogg"],
+        ["clip", "video/quicktime", "clip.mov"],
         ["Report", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "Report.docx"],
         ["Budget", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Budget.xlsx"],
         ["manifest.webmanifest", "application/json", "manifest.webmanifest"],

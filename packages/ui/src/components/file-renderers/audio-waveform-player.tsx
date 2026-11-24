@@ -12,6 +12,7 @@
  */
 
 import { useLingui } from "@lingui/react/macro";
+import SaveFileButton from "@ui/components/save-file-button";
 import cn from "@ui/utils/cn";
 import { Pause, Play } from "lucide-react";
 import type { FC } from "react";
@@ -83,6 +84,8 @@ const AudioWaveformPlayer: FC<AudioWaveformPlayerProps> = memo(({ className, fil
             <div className={cn("my-2 rounded-lg border p-4 text-center", className)}>
                 <p className="text-muted-foreground text-sm">{t`Failed to load audio`}</p>
                 {filename && <p className="text-muted-foreground mt-1 text-xs">{filename}</p>}
+                {/* A file that will not play can still be saved. */}
+                <SaveFileButton className="mt-2" fallbackName="audio" filename={filename} url={url} />
             </div>
         );
     }
@@ -107,6 +110,7 @@ const AudioWaveformPlayer: FC<AudioWaveformPlayerProps> = memo(({ className, fil
                     <span>{duration > 0 ? formatTime(duration) : "--:--"}</span>
                 </div>
             </div>
+            <SaveFileButton className="shrink-0" fallbackName="audio" filename={filename} url={url} />
         </div>
     );
 });
