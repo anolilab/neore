@@ -6,6 +6,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { describe, expect, it, vi } from "vitest";
 
+import { hasEnoughTurns } from "../agent/thread-search-plan";
 import { deleteMergedGuest } from "../auth/hooks";
 import { FOLLOW_MERGE_PAGE_SIZE } from "../chat/follows/follow-writes";
 import { requireOwnCollectionId } from "../knowledge/documents-shared";
@@ -1742,6 +1743,7 @@ describe("mergeGuestInto across two real shards", () => {
         noteMergeGeneration: { fn: noteMergeGeneration, kind: "mutation" },
         releaseMergeLease: { fn: releaseMergeLease, kind: "mutation" },
         resolvePinsLeft: { fn: resolvePinsLeft, kind: "mutation" },
+        stopMergeKeepingGuest: { fn: stopMergeKeepingGuest, kind: "mutation" },
     };
 
     const thread = (title: string, userId = "guest") => {
@@ -1905,6 +1907,80 @@ describe("mergeGuestInto across two real shards", () => {
         } finally {
             merge.close();
         }
+    });
+
+    describe("a thread's user-turn count, which the messages triggers keep on each shard", () => {
+        const userTurn = (threadId: string, order: number) => {
+            return {
+                message: { content: `turn ${String(order)}`, role: "user" },
+                order,
+                status: "success",
+                stepOrder: 0,
+                text: `turn ${String(order)}`,
+                threadId,
+                tool: false,
+                userId: "guest",
+            };
+        };
+
+        const guestThreadWithTurns = async (merge: ReturnType<typeof twoShards>, turns: number): Promise<string> =>
+            (await merge.shards.guest.run(async (context: any) => {
+                const id = (await context.db.insert("threads", thread("five turns"))) as string;
+
+                for (let order = 0; order < turns; order += 1) {
+                    await context.db.insert("messages", userTurn(id, order));
+                }
+
+                return id;
+            })) as string;
+
+        const threadOn = async (merge: ReturnType<typeof twoShards>, id: string) =>
+            (await merge.shards.user.run(async (context: any) => await context.db.get("threads", id))) as Row | null;
+
+        it("keeps a converted guest's thread at its user-turn count, so it stays in palette search", async () => {
+            const merge = twoShards();
+
+            try {
+                const id = await guestThreadWithTurns(merge, 5);
+
+                const onGuest = (await merge.shards.guest.run(async (context: any) => await context.db.get("threads", id))) as Row | null;
+
+                expect(onGuest?.userTurnCount).toBe(5);
+
+                await mergeToEnd(merge.call, "guest", "user");
+
+                const moved = await threadOn(merge, id);
+
+                expect(moved?.userTurnCount).toBe(5);
+                expect(hasEnoughTurns(moved?.userTurnCount as number)).toBe(true);
+            } finally {
+                merge.close();
+            }
+        });
+
+        it("brings over a guest edit to a thread made after its copy, when a later user turn of it is imported too", async () => {
+            const merge = twoShards();
+
+            try {
+                const id = await guestThreadWithTurns(merge, 5);
+
+                merge.onceBefore("listShardRowsToClear", async () => {
+                    await merge.shards.guest.run(async (context: any) => {
+                        await context.db.insert("messages", userTurn(id, 5));
+                        await context.db.patch("threads", id, { title: "renamed during the merge", updatedAt: 2 });
+                    });
+                });
+
+                await mergeToEnd(merge.call, "guest", "user");
+
+                const moved = await threadOn(merge, id);
+
+                expect(moved?.title).toBe("renamed during the merge");
+                expect(moved?.userTurnCount).toBe(6);
+            } finally {
+                merge.close();
+            }
+        });
     });
 
     it("keeps a row edited between the clear's import and its delete, and moves it with the edit", async () => {
@@ -2209,12 +2285,13 @@ describe("mergeGuestInto across two real shards", () => {
             let newer: MergeProgress | null = null;
 
             // The first delivery has read the row and pauses past its lease. The guest edits the row, and a redelivery takes
-            // the lease over, imports the edit and deletes the guest's copy; its chain has more runs to go.
+            // the lease over and spends one clear step on it: it imports the edit and deletes the guest's copy; its chain has
+            // more runs to go.
             merge.onceBefore("importShardRows", async () => {
                 await merge.lapseLease();
                 await merge.shards.guest.run(async (context: any) => await context.db.patch("threads", id, { title: "edited during the merge", updatedAt: 2 }));
                 ({ next: newer } = await mergeGuestInto(merge.call, REFERENCES, "guest", "user", {
-                    budget: MERGE_LEASE_CALLS + 3,
+                    budget: MERGE_LEASE_CALLS + 4,
                     resume: { cursor: null, moved: 0, phase: "clear", run: 1, table: "threads" },
                 }));
             });
@@ -2430,6 +2507,47 @@ describe("mergeGuestInto across two real shards", () => {
                 expect(await sweep(merge)).toStrictEqual({ dropped: 1, resumed: 0 });
                 expect(transport.queued).toStrictEqual([]);
                 expect(await progressOf(merge)).toBeNull();
+            } finally {
+                merge.close();
+            }
+        });
+
+        it("never starts a merge stopped at its run cap again: a late delivery or hand-over writes no lease or record, across sweeps", async () => {
+            const merge = twoShards();
+
+            try {
+                await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("kept")));
+
+                // A first run saves where it stopped (run 1); a delivery that meets the cap there stops the merge for good.
+                const { next } = await mergeGuestInto(merge.call, REFERENCES, "guest", "user", { budget: MERGE_LEASE_CALLS + 2 });
+
+                expect(next?.run).toBe(1);
+                await expect(mergeGuestInto(merge.call, REFERENCES, "guest", "user", { maxRuns: 1 })).rejects.toThrow("did not finish in 1 runs");
+                expect(await progressOf(merge)).toBeNull();
+
+                const leaseOf = async () =>
+                    await merge.shards.user.run(
+                        async (context: any) =>
+                            await context.db
+                                .query("idempotencyClaims")
+                                .withIndex("by_scope_key", (q: any) => q.eq("scope", MERGE_LEASE_SCOPE).eq("key", "guest"))
+                                .first(),
+                    );
+
+                for (let pass = 0; pass < 3; pass += 1) {
+                    // A busy-requeued duplicate with the full cap, and the hand-over repeated.
+                    expect(await mergeGuestInto(merge.call, REFERENCES, "guest", "user")).toMatchObject({ next: null, stopped: true });
+                    await merge.shards.user.run(async (context: any) => await context.runMutation(recordGuestMerge, { from: "guest", to: "user" }));
+
+                    expect(await leaseOf()).toBeNull();
+                    expect(await progressOf(merge)).toBeNull();
+                    expect(await sweep(merge)).toStrictEqual({ dropped: 0, resumed: 0 });
+                    expect(transport.queued).toStrictEqual([]);
+                }
+
+                // The guest and its rows stay.
+                expect(await merge.threadsOn("guest")).toHaveLength(1);
+                expect(merge.guestDeletions).toStrictEqual([]);
             } finally {
                 merge.close();
             }

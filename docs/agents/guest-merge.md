@@ -34,6 +34,18 @@ re-reads its route's owner (primary) after the signal check and follows a route 
 
 The import copies re-point only `USER_REFERENCE_FIELDS`; content equal to the guest's id stays.
 
+`DERIVED_FIELDS` are kept by each shard itself: `threads`' `SEARCH_INTERNAL_FIELDS` (the messages triggers' `userTurnCount`,
+the palette sync's vector ids, claim and refusal). They stay out of every digest, so a trigger's or a sync's write is never
+taken for an edit (the guest's clear counts `userTurnCount` down as it deletes messages; an imported late message counts
+the copy up). A replaced row keeps the new shard's values; an inserted thread gets the user turns the new shard already
+holds for it (`countUserTurns`). `shardLocalTables` puts `threads` just before `messages` (still after `embeddings*`), so a
+thread is nearly always there before its messages and the new shard's trigger counts each one.
+
+A merge stopped at its run cap leaves a stop record (`guest-merge-stopped`, tagged with the new account, no time to live).
+`acquireMergeLease` and `recordGuestMerge` read it before they write a lease or a record: a late delivery or a repeated
+hand-over stops at once, and the sweep has no record to restart. Without it a late delivery took generation 1 after the
+stop dropped the lease, wrote a fresh record, and the sweep restarted it until its generation passed the guest shard's.
+
 A guest row the clear read but the guest deleted before `deleteShardRows` ran is reported back as `gone`, never taken as
 deleted by the merge: the clear's import may just have written it on the new shard. `dropRowsGoneFromGuest` removes that
 copy there only while it still matches its import marker (the account never changed it), and keeps the marker, so no

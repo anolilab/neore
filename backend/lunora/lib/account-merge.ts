@@ -76,6 +76,7 @@
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
+import type { Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { isMergeDestination, mergeSourceState } from "../auth/lib/merge-destination";
@@ -94,6 +95,8 @@ import { mergeThreadFollowsPage } from "../chat/follows/follow-writes";
 import { firstPinRouteOf, moveSharedPinRoute, pinRouteOwnerOf } from "../chat/pins/pin-route-writes";
 import { ORGANIZATION_RECORD_LATE_MS } from "../usage/activity-logic";
 import { patchRow } from "./patch";
+import { SEARCH_INTERNAL_FIELDS } from "../agent/thread-search-plan";
+import { countUserTurns } from "../agent/thread-search-triggers";
 
 /** Rows moved per round trip. */
 export const MERGE_PAGE_SIZE = 100;
@@ -121,12 +124,41 @@ const KEEP_NEW_USERS = new Set(["aiUserPreferences", "userSettings"]);
 /** Ephemeral bookkeeping that is not the guest's content. */
 const NOT_MOVED = new Set(["cronRuns", "idempotencyClaims", "rateLimits"]);
 
-/** The tables whose rows live on a user's shard — everything but `.global()`. */
-export const shardLocalTables = (source: unknown = schema): string[] =>
-    Object.entries((source as { tables: Record<string, { shardMode?: { kind?: string } }> }).tables)
+/**
+ * The tables whose rows live on a user's shard — everything but `.global()` — sorted, but `threads` just before
+ * `messages`: a thread is on the new shard before its messages come, so the messages trigger there counts each one it
+ * imports (`userTurnCount`, {@link DERIVED_FIELDS}), and the guest's thread is cleared before its messages, whose
+ * deletes then count nothing down. Still after the `embeddings*` tables, so a cleared thread's vector cleanup never runs
+ * on vectors the clear has yet to read.
+ */
+export const shardLocalTables = (source: unknown = schema): string[] => {
+    const tables = Object.entries((source as { tables: Record<string, { shardMode?: { kind?: string } }> }).tables)
         .filter(([name, table]) => table.shardMode?.kind !== "global" && !NOT_MOVED.has(name))
         .map(([name]) => name)
+        .filter((name) => name !== "threads")
         .toSorted((a, b) => a.localeCompare(b));
+    const messages = tables.indexOf("messages");
+
+    return messages === -1 ? tables : tables.toSpliced(messages, 0, "threads");
+};
+
+/**
+ * Per table, the fields each shard keeps itself and the merge never compares or carries over a row it replaces: the
+ * thread's user-turn count (the messages triggers, which count down as the clear deletes the guest's messages and up as
+ * the import adds them on the new shard) and the palette sync's vector ids, claim and refusal. A change to one is no
+ * edit: they stay out of every digest ({@link rowDigest}), a replaced row keeps the new shard's values, and an inserted
+ * thread's count is the new shard's own ({@link countUserTurns}).
+ */
+const DERIVED_FIELDS: Readonly<Record<string, ReadonlyArray<string>>> = { threads: SEARCH_INTERNAL_FIELDS };
+
+const withoutDerived = (table: string, row: Record<string, unknown>): Record<string, unknown> => {
+    const derived = DERIVED_FIELDS[table];
+
+    return derived === undefined ? row : Object.fromEntries(Object.entries(row).filter(([key]) => !derived.includes(key)));
+};
+
+const derivedOf = (table: string, row: Record<string, unknown>): Record<string, unknown> =>
+    Object.fromEntries((DERIVED_FIELDS[table] ?? []).filter((key) => row[key] !== undefined).map((key) => [key, row[key]]));
 
 /**
  * `.global()` columns that name a user, by table. `shardActivity` is not here:
@@ -377,9 +409,12 @@ export const canonicalValue = (value: unknown): string => {
     throw new TypeError(`a guest merge cannot compare a stored ${Object.prototype.toString.call(value)}`);
 };
 
-/** A row's content as it is stored ({@link canonicalValue} of its own fields), so a change between two reads shows. */
-const rowDigest = async (row: Record<string, unknown>): Promise<string> =>
-    hex(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonicalValue(ownFields(row))))));
+/**
+ * A row's content as it is stored ({@link canonicalValue} of its own fields, without the {@link DERIVED_FIELDS} of its
+ * table), so a change between two reads shows.
+ */
+const rowDigest = async (table: string, row: Record<string, unknown>): Promise<string> =>
+    hex(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonicalValue(withoutDerived(table, ownFields(row)))))));
 
 /**
  * `rows` from the first, cut where their {@link canonicalValue} passes {@link CLEAR_PAGE_BYTES}; never fewer than one.
@@ -420,7 +455,7 @@ export const listShardRowsToClear = internalQuery
 
         const limit = pageSizeFor(args.table);
         const withDigests = async (rows: Record<string, unknown>[]) => {
-            return { digests: await Promise.all(rows.map(async (row) => await rowDigest(row))), rows };
+            return { digests: await Promise.all(rows.map(async (row) => await rowDigest(args.table, row))), rows };
         };
 
         if (args.ownedBy !== undefined) {
@@ -510,6 +545,20 @@ export const MERGE_FENCE_SCOPE = "guest-merge-done";
 
 /** Far past any delivery a queue would still retry; the fence then lapses with the claim purge. */
 export const MERGE_FENCE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
+
+/**
+ * The claim scope of a merge stopped for good at its run cap ({@link MAX_MERGE_RUNS}), on the NEW account's shard: one
+ * row per guest, tagged with the new account, so its erasure takes it, and never by time. It outlives the lease and the
+ * progress record the stop drops: a late delivery (a requeued duplicate, the hand-over repeated) finds it before it takes
+ * a lease or writes a record ({@link acquireMergeLease}, {@link recordGuestMerge}), so nothing starts the merge again.
+ */
+export const MERGE_STOPPED_SCOPE = "guest-merge-stopped";
+
+const markMergeStopped = async (db: MutationCtx["db"], from: string, to: string, now: number): Promise<void> => {
+    await writeClaim(db, MERGE_STOPPED_SCOPE, from, now, { expiresAt: IMPORT_MARKER_EXPIRES_AT, result: "", userId: to });
+};
+
+const mergeStopped = async (db: QueryCtx["db"], from: string): Promise<boolean> => (await storedClaim(db, MERGE_STOPPED_SCOPE, from)) !== null;
 
 /** The guest's merge into this shard has finished: its fence is here and not lapsed. */
 const mergeFinished = async (db: MutationCtx["db"], from: string, now: number): Promise<boolean> => {
@@ -728,7 +777,8 @@ export const dropMergeGeneration = async (db: MutationCtx["db"], from: string): 
  * A merge that stops for good with no run holding its lease: into an account that is gone (erased, so every claim tagged
  * with it went too), or one the stalled-merge sweep drops (an erasure, the run cap). This merge's markers end, so the
  * guest's pin writes are refused no longer, and its progress record and lease go, so nothing tagged with an erased account
- * is left on its shard; a late delivery then takes generation 1, below the one the guest's shard holds, and does nothing.
+ * is left on its shard. A merge at its run cap keeps its stop record ({@link MERGE_STOPPED_SCOPE}), which refuses a late
+ * delivery before it takes a lease.
  * The guest and its rows stay, as for any merge that stops. `to` is unknown only for a record written without its tag.
  */
 const endStoppedMerge = async (ctx: Pick<MutationCtx, "db">, from: string, to: string | undefined, now: number): Promise<void> => {
@@ -751,8 +801,9 @@ const endStoppedMerge = async (ctx: Pick<MutationCtx, "db">, from: string, to: s
  * holds it. The generation counts on from the last one even after a lease lapsed. `saved` is the merge's progress record
  * ({@link MERGE_PROGRESS_SCOPE}): a delivery whose payload is behind it goes on from the record, never back. `finished`:
  * the merge and its end are over (its fence is here): nothing is written and the delivery stops. `stopped`:
- * the new account is gone ({@link isMergeDestination}); nothing is written and the merge ends, so a late job (a delayed
- * successor, a requeued duplicate) never starts it again on an erased account's shard.
+ * the new account is gone ({@link isMergeDestination}), or the merge stopped for good at its run cap
+ * ({@link MERGE_STOPPED_SCOPE}); nothing is written and the merge ends, so a late job (a delayed successor, a requeued
+ * duplicate) never starts it again.
  */
 export const acquireMergeLease = internalMutation
     .input({ from: v.string(), to: v.string() })
@@ -777,6 +828,11 @@ export const acquireMergeLease = internalMutation
         // Its fence is here and its end is over: a late delivery takes no lease, so it writes nothing that would outlive the merge.
         if ((await mergeFinished(ctx.db, args.from, now)) && !(await mergeCleanupPending(ctx, args.from, args.to))) {
             return { finished: true, generation: 0 };
+        }
+
+        // Stopped for good at its run cap: no lease and no record, so neither this delivery nor the sweep starts it again.
+        if (await mergeStopped(ctx.db, args.from)) {
+            return { generation: 0, stopped: true };
         }
 
         const row = await storedClaim(ctx.db, MERGE_LEASE_SCOPE, args.from);
@@ -976,9 +1032,12 @@ const dropMergeProgress = async (db: MutationCtx["db"], from: string): Promise<v
     }
 };
 
-/** A record for a merge that has none yet, from the start; one already here keeps its progress, a finished merge gets none. */
+/**
+ * A record for a merge that has none yet, from the start; one already here keeps its progress, a finished merge or one
+ * stopped for good ({@link MERGE_STOPPED_SCOPE}) gets none.
+ */
 const recordMergeStart = async (ctx: Pick<MutationCtx, "db">, from: string, to: string, now: number): Promise<void> => {
-    if ((await storedClaim(ctx.db, MERGE_PROGRESS_SCOPE, from)) === null && !(await mergeFinished(ctx.db, from, now))) {
+    if ((await storedClaim(ctx.db, MERGE_PROGRESS_SCOPE, from)) === null && !(await mergeFinished(ctx.db, from, now)) && !(await mergeStopped(ctx.db, from))) {
         await saveMergeProgress(ctx, from, to, null, now);
     }
 };
@@ -1085,7 +1144,11 @@ export const resumeStalledMerges = async (ctx: MutationCtx): Promise<{ dropped: 
         if (stopped) {
             // Its markers end with the record, so a merge that stopped here (the run cap, an erasure) no longer refuses the
             // guest's pin writes; the guest and its rows stay. Ended before its `global` step: another merge waiting on its
-            // pins-left signal stops instead of waiting on.
+            // pins-left signal stops instead of waiting on. One at its run cap stays stopped ({@link MERGE_STOPPED_SCOPE}).
+            if (to !== undefined && progress !== null && progress.run >= MAX_MERGE_RUNS) {
+                await markMergeStopped(ctx.db, from, to, now);
+            }
+
             await endStoppedMerge(ctx, from, to, now);
             await abandonPinsLeftOf(from);
             dropped += 1;
@@ -1241,7 +1304,7 @@ export const importShardRows = internalMutation
                 }
             }
 
-            const wanted = await rowDigest(reowned);
+            const wanted = await rowDigest(args.table, reowned);
             const marker = await ctx.db
                 .query("idempotencyClaims")
                 .withIndex("by_scope_key", (q) => q.eq("scope", IMPORT_MARKER_SCOPE).eq("key", key))
@@ -1255,7 +1318,11 @@ export const importShardRows = internalMutation
                 write = written === null;
 
                 if (write) {
-                    await db.insert(args.table, reowned, { allowExplicitId: true });
+                    // The guest's count is its shard's, moved by its own trigger: here it is the user turns this shard
+                    // already holds for the thread, and this shard's trigger counts each one imported after.
+                    const own = args.table === "threads" ? { userTurnCount: await countUserTurns(ctx.db, id as Id<"threads">) } : {};
+
+                    await db.insert(args.table, { ...reowned, ...own }, { allowExplicitId: true });
                     imported += 1;
 
                     if (typeof reowned["heldFrom"] === "string") {
@@ -1263,13 +1330,13 @@ export const importShardRows = internalMutation
                     }
                 }
             } else {
-                const current = await rowDigest(existing);
+                const current = await rowDigest(args.table, existing);
 
                 if (current === wanted) {
                     // Already the guest's row: remember it, so a later guest edit may still follow.
                     write = written !== wanted;
                 } else if (written === current) {
-                    await db.replace(args.table, id, ownFields(reowned));
+                    await db.replace(args.table, id, { ...withoutDerived(args.table, ownFields(reowned)), ...derivedOf(args.table, existing) });
                     write = true;
                 } else if (written === null) {
                     // Here with other content and no marker (a copy by the merge code before markers, which the guest edited
@@ -1404,7 +1471,7 @@ export const deleteShardRows = internalMutation
 
             if (row === null) {
                 gone.push(id);
-            } else if ((await rowDigest(row)) === digest) {
+            } else if ((await rowDigest(args.table, row)) === digest) {
                 await db.delete(args.table, id);
                 deleted = true;
             } else {
@@ -1465,7 +1532,7 @@ export const dropRowsGoneFromGuest = internalMutation
                 .withIndex("by_scope_key", (q) => q.eq("scope", IMPORT_MARKER_SCOPE).eq("key", markerKey(args.from, args.table, id)))
                 .first();
 
-            if (marker !== null && marker.result === (await rowDigest(existing))) {
+            if (marker !== null && marker.result === (await rowDigest(args.table, existing))) {
                 await db.delete(args.table, id);
                 dropped += 1;
             }
@@ -1874,7 +1941,9 @@ export const stopMergeKeepingGuest = internalMutation
         await dropMergeProgress(ctx.db, args.from);
 
         if (args.dropLease === true) {
-            // A merge stopped for good (its run cap): a late delivery takes generation 1, below the guest shard's, and does nothing.
+            // A merge stopped for good (its run cap): the stop record refuses every later delivery before it takes a lease.
+            await markMergeStopped(ctx.db, args.from, args.to, now);
+
             const lease = await storedClaim(ctx.db, MERGE_LEASE_SCOPE, args.from);
 
             if (lease !== null) {
@@ -2485,7 +2554,7 @@ export const mergeGuestInto = async (
     }
 
     if (lease.stopped === true) {
-        // The new account is gone: no lease was taken, so there is none to give back.
+        // The new account is gone, or the merge stopped at its run cap: no lease was taken, so there is none to give back.
         await abandonPins();
 
         return { moved: payload?.moved ?? 0, next: null, stopped: true };

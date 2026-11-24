@@ -68,6 +68,8 @@
   lease generation first. Import markers, progress records and the pins-left signal never get a time to live. Every
   stop (cap, sweep drop, erasure, gone account, shared store) ends its markers and keeps the guest. A copy of a row the
   guest deleted (before or during the clear) is taken back only while it matches its import marker; the marker stays.
+  Trigger- or sync-kept fields (`DERIVED_FIELDS`) stay out of digests and keep the new shard's value. A run-cap stop
+  leaves a stop record, read before any lease or record.
 
 - **Secret detection** — `lib/secret-redaction.ts` (`redactSecrets`, `containsSecret`)
   is the one detector for provider keys, JWTs, `Bearer` values, private key blocks,
