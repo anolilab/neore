@@ -19,6 +19,7 @@ const { compare, compareRefetch, compared, composer, prefill, pull, reads, refet
             current: {} as {
                 data?: { aheadBy?: number; baseBranch?: string; behindBy?: number; headSha?: string; status: string };
                 isError?: boolean;
+                isFetching?: boolean;
             },
         },
         compareRefetch: vi.fn(async () => {}),
@@ -317,6 +318,82 @@ describe("ThreadPullRequestCatchUp", () => {
             expect(compareRefetch).toHaveBeenCalledTimes(1);
         });
         expect(refetch).toHaveBeenCalledTimes(1);
+    });
+
+    // A first read that started before an agent pushed may answer with the earlier state after the turn ended.
+    it("reads again after a first read that was pending when a turn ended, and shows nothing until that read answers", async () => {
+        pull.current = { isFetching: true };
+        compare.current = {};
+
+        const view = render(control());
+
+        turnEnds();
+
+        expect(refetch).not.toHaveBeenCalled();
+
+        // The pending read answers with the state from before the turn: behind.
+        given("open", "behind");
+
+        let answer: (value: { data?: unknown }) => void = () => {};
+
+        refetch.mockImplementationOnce(
+            async () =>
+                new Promise<{ data?: unknown }>((resolve: (value: { data?: unknown }) => void) => {
+                    answer = resolve;
+                }),
+        );
+        view.rerender(control());
+
+        expect(refetch).toHaveBeenCalledTimes(1);
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
+
+        // The read after the turn: the agent caught the branch up.
+        given("open", "clean");
+        await act(async () => {
+            answer({ data: pull.current.data });
+        });
+
+        expect(compareRefetch).toHaveBeenCalledTimes(1);
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
+        expect(refetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("reads again after a first comparison that was pending when a turn ended, then shows the host's answer", async () => {
+        given("open", "behind");
+        compare.current = { isFetching: true };
+
+        const view = render(control());
+
+        turnEnds();
+
+        expect(refetch).not.toHaveBeenCalled();
+
+        // The pending comparison answers behind, from before the turn.
+        comparedAs(2);
+        view.rerender(control());
+
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
+
+        await vi.waitFor(() => {
+            expect(compareRefetch).toHaveBeenCalledTimes(1);
+        });
+        expect(refetch).toHaveBeenCalledTimes(1);
+        // Still behind after the turn: the control shows.
+        expect(await screen.findByRole("button", BUTTON)).toBeTruthy();
+    });
+
+    it("drops the read a turn's end owed when the pending first read answers with a pull request that cannot show", () => {
+        pull.current = { isFetching: true };
+        compare.current = {};
+
+        const view = render(control());
+
+        turnEnds();
+        given("open", "behind", "feat/x", { draft: true, headInBaseRepository: true });
+        view.rerender(control());
+
+        expect(refetch).not.toHaveBeenCalled();
+        expect(compareRefetch).not.toHaveBeenCalled();
     });
 
     it("reads nothing again for another thread's turn, nor after it unmounts", () => {

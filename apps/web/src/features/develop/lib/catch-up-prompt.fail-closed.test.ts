@@ -173,6 +173,49 @@ describe("catchUpPrompt's fetch and switch, run against a scratch origin", () =>
         });
     });
 
+    describe("step 7's set-aside, for a head in the base repository", () => {
+        const prompt = catchUpPrompt({ ...PULL, headInBaseRepository: true, number: 42 });
+        const setAside = (name: string, lease: string): string =>
+            commandOf(prompt, "git switch -c <name> && ")
+                .replaceAll("<name>", () => name)
+                .replaceAll("<commit from step 4>", () => lease);
+
+        /** A clone on feat/x with one commit past origin's, as a rebase leaves it; `lease` is origin's commit step 4 recorded. */
+        const rebased = (name: string): { lease: string; tip: string; work: string } => {
+            const work = cloneOrigin(name);
+            const lease = git(work, "rev-parse", "origin/feat/x");
+
+            git(work, "switch", "--quiet", "feat/x");
+            git(work, "commit", "--quiet", "--allow-empty", "-m", "change, rebased");
+
+            return { lease, tip: git(work, "rev-parse", "HEAD"), work };
+        };
+
+        it.each([
+            ["a name that already exists", "pr-42-a1b2c3d4", true],
+            ["an invalid name", "pr-42..a1b2c3d4", false],
+        ])("stops without moving the pull request's branch when the switch fails for %s", (_case: string, name: string, exists: boolean) => {
+            const { lease, tip, work } = rebased(`set-aside-${exists ? "taken" : "invalid"}`);
+
+            if (exists) {
+                git(work, "branch", name, lease);
+            }
+
+            expect(sh(work, setAside(name, lease)).status).not.toBe(0);
+            expect(git(work, "rev-parse", "refs/heads/feat/x")).toBe(tip);
+            expect(git(work, "symbolic-ref", "HEAD")).toBe("refs/heads/feat/x");
+        });
+
+        it("moves the pull request's branch back to origin's commit once the new branch holds the rebase", () => {
+            const { lease, tip, work } = rebased("set-aside-ok");
+
+            expect(sh(work, setAside("pr-42-a1b2c3d4", lease)).status).toBe(0);
+            expect(git(work, "rev-parse", "refs/heads/pr-42-a1b2c3d4")).toBe(tip);
+            expect(git(work, "symbolic-ref", "HEAD")).toBe("refs/heads/pr-42-a1b2c3d4");
+            expect(git(work, "rev-parse", "refs/heads/feat/x")).toBe(lease);
+        });
+    });
+
     describe("step 8's base re-check, for a head in the base repository", () => {
         const prompt = catchUpPrompt({ ...PULL, headInBaseRepository: true, number: 42 });
         const BASE = `${REF_PREFIX}-base`;

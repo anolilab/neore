@@ -165,8 +165,10 @@ export const catchUpPrompt = ({
     // A run that does not push must not leave the rebase on the pull request's branch: the next run's step 4 fast-forwards from origin's tip
     // and stops on a branch origin does not have. Step 4 made sure the branch held only origin's commit, so moving it back to
     // that commit drops nothing: the rebase and any fixes stay on a branch of this run's own, and `update-ref` moves the branch
-    // only while it still holds exactly what was set aside. No reset, no `branch -f`: nothing else may move it.
-    const setAside = `set the rebase aside, so ${headBranch} is back on origin's commit and the next Catch up starts from it: ${chooseBranch(`pr-${pull}-${run}`)} Run \`git switch -c <name>\` with the name you chose, then \`git update-ref refs/heads/${headBranch} ${leaseCommit} HEAD\`, writing the commit you recorded in step 4 in place of ${leaseCommit}, and name the branch that now holds the rebase`;
+    // only while it still holds exactly what was set aside. No reset, no `branch -f`: nothing else may move it. The move is chained
+    // on the new branch: unless the switch made it, HEAD is on it and it holds the pull request's branch's commit, the pull
+    // request's branch stays where it is, holding the rebase, and nothing else moves it.
+    const setAside = `set the rebase aside, so ${headBranch} is back on origin's commit and the next Catch up starts from it: ${chooseBranch(`pr-${pull}-${run}`)} Run \`git switch -c <name> && ${onBranchAt("<name>", `refs/heads/${headBranch}`)} && git update-ref refs/heads/${headBranch} ${leaseCommit} refs/heads/<name>\` as one command, with the name you chose in place of <name> and the commit you recorded in step 4 in place of ${leaseCommit}. If it fails at any point, stop there: do not move ${headBranch} in any other way, leave the rebase where it is and say which branch holds it (\`git branch --show-current\`). Otherwise name the branch that now holds the rebase`;
 
     return [
         `The branch ${headBranch} of ${repository}#${pull} is behind ${baseBranch}. Bring it up to date.`,

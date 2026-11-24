@@ -244,11 +244,12 @@ describe(catchUpPrompt, () => {
         // still holds exactly the commits just set aside: the next run's fast-forward from origin's tip then works.
         expect(stepSeven).toEqual([
             "git show-ref --verify --quiet refs/heads/<name>",
-            "git switch -c <name>",
-            "git update-ref refs/heads/feat/x <commit from step 4> HEAD",
+            // One chain: the pull request's branch moves only once the new branch exists, is checked out and holds its commit.
+            'git switch -c <name> && [ "$(git symbolic-ref -q HEAD)" = "refs/heads/<name>" ] && [ "$(git rev-parse --verify -q HEAD)" = "$(git rev-parse --verify -q refs/heads/feat/x)" ] && echo ready && git update-ref refs/heads/feat/x <commit from step 4> refs/heads/<name>',
         ]);
+        expect(steps.get(7)).toContain("If it fails at any point, stop there: do not move feat/x in any other way, leave the rebase where it is");
         expect(steps.get(7)).toContain("start with pr-42-a1b2c3d4,");
-        expect(commandsMatching(commands, "git update-ref refs/heads/")).toHaveLength(1);
+        expect(commands.filter(({ command }: Command) => command.includes("git update-ref refs/heads/"))).toHaveLength(1);
         // A failed re-fetch, a rewritten base, the base moving twice and a refused push all set the rebase aside the same way.
         expect(steps.get(8)?.match(SET_ASIDE_AS_STEP_SEVEN)).toHaveLength(4);
         expect(steps.get(6)).toContain("as step 7 says");
