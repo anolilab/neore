@@ -3,6 +3,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
+import { useState } from "react";
 
 import { prefillComposer, useComposerTakesPrefill } from "@/features/chat/thread/composer-prefill";
 
@@ -23,6 +24,8 @@ import { useMergeStatus } from "../lib/use-merge";
  */
 const CatchUpControl = ({ link, threadId }: { link: { number: number; repository: string }; threadId: string }) => {
     const { t } = useLingui();
+    // One run per mounted control: a second click makes the same prompt, and the composer adds the same text only once.
+    const [run] = useState(catchUpRunId);
     const address = { number: link.number, repository: link.repository };
     const pull = usePullRequest(address);
     const detail = pull.data?.status === "ok" ? pull.data.detail : undefined;
@@ -65,7 +68,7 @@ const CatchUpControl = ({ link, threadId }: { link: { number: number; repository
                                         headInBaseRepository: sameRepo,
                                         host,
                                         ...address,
-                                        run: catchUpRunId(),
+                                        run,
                                     }),
                                 )
                             }

@@ -149,8 +149,6 @@ const renderCatchUp = async () => {
 
 const REBASE_ON_RUN_BASE = /`git rebase refs\/neore\/pull-7-[\da-f]{8}-base`/u;
 
-const RUN_OF_BASE = /refs\/neore\/pull-7-([\da-f]{8})-base/u;
-
 describe("ThreadPullRequestCatchUp", () => {
     beforeEach(() => {
         prefill.mockClear();
@@ -177,13 +175,40 @@ describe("ThreadPullRequestCatchUp", () => {
         expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringMatching(REBASE_ON_RUN_BASE));
         expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringContaining("origin HEAD:refs/heads/feat/x`"));
 
-        // Each click fetches into refs of its own: a second Catch up never force-fetches over the first one's refs.
+        // A second click makes the very same prompt, so the composer's duplicate check adds it only once.
         fireEvent.click(button);
 
-        const runOf = (call: number): string | undefined => RUN_OF_BASE.exec(String(prefill.mock.calls[call]?.[1]))?.[1];
+        expect(prefill).toHaveBeenCalledTimes(2);
+        expect(prefill.mock.calls[1]).toEqual(prefill.mock.calls[0]);
+    });
 
-        expect(runOf(1)).toBeDefined();
-        expect(runOf(1)).not.toBe(runOf(0));
+    it("puts one prompt in the composer for two clicks", async () => {
+        const real = await vi.importActual<typeof import("@/features/chat/thread/composer-prefill")>("@/features/chat/thread/composer-prefill");
+
+        real.resetComposerPrefillForTests();
+        prefill.mockImplementation(real.prefillComposer);
+        given("open", "behind");
+        await renderCatchUp();
+
+        const button = screen.getByRole("button", BUTTON);
+
+        fireEvent.click(button);
+        fireEvent.click(button);
+
+        const taken: string[] = [];
+        const Composer = () => {
+            real.useComposerPrefill("thread-1", (text: string) => {
+                taken.push(text);
+            });
+
+            return null;
+        };
+
+        render(<Composer />);
+
+        expect(taken).toHaveLength(1);
+        expect(taken[0]).toMatch(REBASE_ON_RUN_BASE);
+        prefill.mockReset();
     });
 
     it.each([

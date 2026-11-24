@@ -24,7 +24,7 @@ export const hostOfPullRequestUrl = (url: string): string | undefined => {
 /** An `owner/name` repository made of the same plain characters, so it reads the same in prose and in a command. */
 export const isPlainRepo = (repo: string): boolean => PLAIN_REPO.test(repo) && !repo.includes("..");
 
-/** A fresh run tag for {@link catchUpPrompt}: eight hex digits, so its refs read short and never match an earlier run's. */
+/** A run tag for {@link catchUpPrompt}: eight hex digits, so its refs read short and differ from another control's run. */
 export const catchUpRunId = (): string => crypto.randomUUID().replaceAll("-", "").slice(0, 8);
 
 /**
@@ -33,9 +33,9 @@ export const catchUpRunId = (): string => crypto.randomUUID().replaceAll("-", ""
  * ref is fetched by name: a single-branch clone has none of them until then. Each is fetched into its own flat name under
  * `refs/neore/` (`pull-<n>-<run>-head`, `-base`, `-branch`), apart from `refs/remotes/origin/`: no branch of origin can
  * overwrite one, and a stale tracking ref (`origin/release` after its branch was deleted) cannot block one (`origin/release/2.0`).
- * The names hold no branch name and nest nothing, so none is ever both a ref and a directory. `run` is new for each click, so the
- * forced fetches never replace a ref the checkout already has (an earlier run's, or one of the person's own), and the last step
- * deletes them again.
+ * The names hold no branch name and nest nothing, so none is ever both a ref and a directory. `run` is one per mounted Catch up
+ * control, so a second click puts the same text in the composer and its duplicate check skips it; the forced fetches never
+ * replace a ref of the person's own, and the last step deletes them again.
  *
  * Whether the head may be pushed is decided only by `headInBaseRepository`, the host's repository identity: a fork's branch can
  * share a name and even a commit with one of origin's. Then the only push is to `refs/heads/<headBranch>` of origin, after origin
@@ -62,7 +62,7 @@ export const catchUpPrompt = ({
     host: string;
     number: number;
     repository: string;
-    /** Unique to this click ({@link catchUpRunId}): no ref this run force-fetches can already exist in the checkout. */
+    /** One per mounted control ({@link catchUpRunId}): repeated clicks give the same text, which the composer adds once. */
     run: string;
 }): string => {
     const pull = String(number);
@@ -98,6 +98,7 @@ export const catchUpPrompt = ({
             checkOrigin,
             checkClean,
             `3. Fetch by name, which also works in a clone of one branch: ${fetchBaseAndPull}.`,
+            // Branches are shared by every linked worktree: a pr-<n> checked out in another one already exists here too.
             `4. Run \`git switch -c pr-${pull} ${pullRef}\` (if a branch pr-${pull} already exists, ${stopAfterFetch}).`,
             ...finish,
             `8. Only once step 7 passed and \`git status --porcelain\` prints nothing: leave the rebased commits on pr-${pull} and say so, for the person to bring to the fork. Do not push to any branch or remote.`,
@@ -109,6 +110,8 @@ export const catchUpPrompt = ({
     // The push's lease is the commit step 4 checked and recorded, not a ref: a background fetch can move `head`, and another
     // Catch up run for this pull request in the same repository or a linked worktree can move `pullRef`, after step 4.
     const leaseCommit = "<commit from step 4>";
+    // Git refuses to switch to a branch another linked worktree has checked out; this run does not reach into that worktree.
+    const checkOtherWorktree = `Then run \`git worktree list --porcelain\`: if it shows \`branch refs/heads/${headBranch}\` under a \`worktree\` path other than this checkout's (\`git rev-parse --show-toplevel\`), do step 9, then stop and tell the person to run Catch up from that worktree, naming its path.`;
 
     return [
         `The branch ${headBranch} of ${repository}#${pull} is behind ${baseBranch}. Bring it up to date.`,
@@ -117,7 +120,7 @@ export const catchUpPrompt = ({
         checkOrigin,
         checkClean,
         `3. Fetch by name, which also works in a clone of one branch: \`git fetch origin +refs/heads/${headBranch}:${head}\`, ${fetchBaseAndPull}.`,
-        `4. If \`git rev-parse ${head}\` differs from \`git rev-parse ${pullRef}\`, ${stopAfterFetch}: origin's ${headBranch} is not this pull request's head right now. Otherwise record the commit \`git rev-parse ${pullRef}\` printed and say it: step 8 leases on that commit. Then run \`git switch --no-guess ${headBranch}\` (\`git switch -c ${headBranch} ${head}\` when there is no local branch of that name), then \`git merge --ff-only ${head}\`. If that fails, or \`git rev-parse HEAD\` then differs from \`git rev-parse ${head}\`, the local branch has commits origin does not: ${stopAfterFetch}.`,
+        `4. If \`git rev-parse ${head}\` differs from \`git rev-parse ${pullRef}\`, ${stopAfterFetch}: origin's ${headBranch} is not this pull request's head right now. Otherwise record the commit \`git rev-parse ${pullRef}\` printed and say it: step 8 leases on that commit. ${checkOtherWorktree} Otherwise run \`git switch --no-guess ${headBranch}\` (\`git switch -c ${headBranch} ${head}\` when there is no local branch of that name), then \`git merge --ff-only ${head}\`. If that fails, or \`git rev-parse HEAD\` then differs from \`git rev-parse ${head}\`, the local branch has commits origin does not: ${stopAfterFetch}.`,
         ...finish,
         `8. Only once step 7 passed and \`git status --porcelain\` prints nothing, push only this pull request's branch: \`git push --no-follow-tags --force-with-lease=refs/heads/${headBranch}:${leaseCommit} origin HEAD:refs/heads/${headBranch}\`, writing the commit you recorded in step 4 in place of ${leaseCommit}. If this environment cannot push or the push is refused, leave the rebased commits in place and say so. Do not push to any other branch or remote.`,
         cleanUp([head, base, pullRef]),

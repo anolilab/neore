@@ -72,7 +72,7 @@ describe(catchUpPrompt, () => {
         expect(prompt).toContain("the local branch has commits origin does not: do step 9, then stop and say so.");
         // The lease is the commit checked here: another run's fetch of refs/neore/pull-42-a1b2c3d4-head after this step cannot move it.
         expect(prompt).toContain(
-            "Otherwise record the commit `git rev-parse refs/neore/pull-42-a1b2c3d4-head` printed and say it: step 8 leases on that commit. Then run `git switch --no-guess feat/x`",
+            "Otherwise record the commit `git rev-parse refs/neore/pull-42-a1b2c3d4-head` printed and say it: step 8 leases on that commit. Then run `git worktree list --porcelain`",
         );
         // Not --track: a ref outside refs/remotes is no upstream, and git refuses to track it.
         expect(prompt).toContain("(`git switch -c feat/x refs/neore/pull-42-a1b2c3d4-branch` when there is no local branch of that name)");
@@ -116,6 +116,24 @@ describe(catchUpPrompt, () => {
         expectSafeFinish(prompt, ["refs/neore/pull-42-a1b2c3d4-base", "refs/neore/pull-42-a1b2c3d4-head"]);
     });
 
+    it("for a head in the base repository, stops before the switch when another linked worktree has its branch checked out", () => {
+        const prompt = catchUpPrompt({ ...PULL, headInBaseRepository: true });
+        const guard =
+            "Then run `git worktree list --porcelain`: if it shows `branch refs/heads/feat/x` under a `worktree` path other than this checkout's (`git rev-parse --show-toplevel`), do step 9, then stop and tell the person to run Catch up from that worktree, naming its path. Otherwise run `git switch --no-guess feat/x`";
+
+        expect(prompt).toContain(guard);
+        // After the head check (so the refs are fetched and step 9 deletes them), before anything switches or rebases.
+        expect(prompt.indexOf("step 8 leases on that commit.")).toBeLessThan(prompt.indexOf("`git worktree list --porcelain`"));
+        expect(prompt.indexOf("`git worktree list --porcelain`")).toBeLessThan(prompt.indexOf("`git switch --no-guess feat/x`"));
+    });
+
+    it("for a fork, needs no worktree check: a pr-<n> checked out in another worktree already exists, and the switch stops", () => {
+        const prompt = catchUpPrompt({ ...PULL, headInBaseRepository: false });
+
+        expect(prompt).not.toContain("git worktree");
+        expect(prompt).toContain("(if a branch pr-42 already exists, do step 9, then stop and say so)");
+    });
+
     it("for a head named like the pull request's own ref, still pushes only that branch and keeps the pull request's head apart", () => {
         const prompt = catchUpPrompt({ ...PULL, headBranch: "pr-42", headInBaseRepository: true });
 
@@ -126,7 +144,7 @@ describe(catchUpPrompt, () => {
 });
 
 describe(catchUpRunId, () => {
-    it("makes a short plain tag, new each time, so no run force-fetches over an earlier run's refs", () => {
+    it("makes a short plain tag, new for each control, so two controls' runs fetch into refs of their own", () => {
         const first = catchUpRunId();
 
         expect(first).toMatch(RUN_TAG);
