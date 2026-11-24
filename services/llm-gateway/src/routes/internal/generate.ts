@@ -276,9 +276,12 @@ generateRouter.openapi(
             const apiKey = resolveApiKey(body.provider, c.env, body.providerApiKey);
             const model = await createProviderModelForEnv(c.env, body.provider, body.modelApiId, apiKey, filterRules, body.customProvider);
 
-            // Inject prompt caching hints for Anthropic models (90% cache discount)
+            // Cache the system prompt for Anthropic models (90% cache discount). This route is one-shot and never
+            // reads its own prefix back, so the end of the conversation is not hinted (it would only add cache writes).
             // Use pre-flight messages (may be middle-out compressed)
-            const { messages: cachedMessages } = injectPromptCaching(preflightMessages as import("ai").ModelMessage[], body.provider);
+            const { messages: cachedMessages } = injectPromptCaching(preflightMessages as import("ai").ModelMessage[], body.provider, undefined, {
+                endOfConversation: false,
+            });
 
             const filteredCallParams = filterCallParameters({ maxOutputTokens: body.maxTokens, temperature: body.temperature }, body.modelApiId);
             const filteredProviderOptions = stripReasoningOptions(

@@ -37,6 +37,15 @@ const tools: ToolDefinition[] = [
     { description: "Fetch a page", name: "fetch", parameters: { type: "object" } },
 ];
 
+const toolResult = (toolCallId: string) => {
+    return {
+        output: { type: "text", value: "ok" },
+        toolCallId,
+        toolName: "search",
+        type: "tool-result",
+    };
+};
+
 const breakpointsOn = (messages: ModelMessage[]): number[] =>
     messages.flatMap((message, index) => (message.providerOptions?.anthropic?.cacheControl === undefined ? [] : [index]));
 
@@ -154,6 +163,45 @@ describe("injectPromptCaching", () => {
         expect(result.messages).toBe(messages);
         expect(result.tools).toBe(tools);
         expect(breakpointsOn(result.messages)).toEqual([]);
+    });
+
+    it("does not count content-part hints on assistant messages, since OpenRouter ignores them", () => {
+        const hintedCall = { input: {}, providerOptions: { anthropic: { cacheControl: CACHE } }, toolCallId: "call", toolName: "search", type: "tool-call" };
+        const assistant = { content: [hintedCall, hintedCall, hintedCall, hintedCall], role: "assistant" } as ModelMessage;
+        const messages: ModelMessage[] = [system, assistant, { content: "latest", role: "user" }];
+        const result = injectPromptCaching(messages, "openrouter", tools);
+
+        expect(breakpointsOn(result.messages)).toEqual([0, 2]);
+    });
+
+    it("hints the last tool result rather than the tool message, so one hint is one breakpoint", () => {
+        const toolMessage = { content: [toolResult("1"), toolResult("2"), toolResult("3"), toolResult("4")], role: "tool" } as ModelMessage;
+        const messages: ModelMessage[] = [system, { content: "calls", role: "assistant" }, toolMessage];
+        const result = injectPromptCaching(messages, "openrouter", tools);
+        const parts = result.messages.at(-1)?.content as { providerOptions?: { anthropic?: { cacheControl?: unknown } } }[];
+
+        expect(result.messages.at(-1)?.providerOptions).toBeUndefined();
+        expect(parts.map((part) => part.providerOptions?.anthropic?.cacheControl !== undefined)).toEqual([false, false, false, true]);
+        expect(breakpointsOn(result.messages)).toEqual([0]);
+    });
+
+    it("counts a message-level hint on a multi-result tool message once per result", () => {
+        const hintedTools = {
+            content: [toolResult("1"), toolResult("2"), toolResult("3")],
+            providerOptions: { anthropic: { cacheControl: CACHE } },
+            role: "tool",
+        } as ModelMessage;
+        const messages: ModelMessage[] = [system, hintedTools, { content: "latest", role: "user" }];
+        const result = injectPromptCaching(messages, "openrouter", tools);
+
+        // Three results emit three breakpoints, so one slot is left: the system prompt takes it and the conversation end gets none.
+        expect(breakpointsOn(result.messages)).toEqual([0, 1]);
+    });
+
+    it("skips the end-of-conversation breakpoint when told the call is one-shot", () => {
+        const result = injectPromptCaching(growingConversation(3), "openrouter", tools, { endOfConversation: false });
+
+        expect(breakpointsOn(result.messages)).toEqual([0]);
     });
 
     it("returns undefined tools for an out-of-scope provider that sent none", () => {
