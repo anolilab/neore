@@ -15,6 +15,15 @@ const MAX_CACHE_BREAKPOINTS = 4;
 
 const hasMessageBreakpoint = (message: ModelMessage): boolean => message.providerOptions?.anthropic?.cacheControl !== undefined;
 
+/** Breakpoints a message already carries: one on the message, plus one on each content part that has one. */
+const countMessageBreakpoints = (message: ModelMessage): number => {
+    const partBreakpoints = Array.isArray(message.content)
+        ? message.content.filter((part) => "providerOptions" in part && part.providerOptions?.anthropic?.cacheControl !== undefined).length
+        : 0;
+
+    return (hasMessageBreakpoint(message) ? 1 : 0) + partBreakpoints;
+};
+
 /**
  * Put a cache breakpoint on a message through the AI SDK's message-level provider options.
  * Existing provider options on the message are kept; only `anthropic.cacheControl` is added.
@@ -53,7 +62,7 @@ export const injectPromptCaching = (
         return { messages, tools: toolSchemas };
     }
 
-    let budget = MAX_CACHE_BREAKPOINTS - messages.filter((message) => hasMessageBreakpoint(message)).length;
+    let budget = MAX_CACHE_BREAKPOINTS - messages.reduce((total, message) => total + countMessageBreakpoints(message), 0);
 
     const result = [...messages];
 

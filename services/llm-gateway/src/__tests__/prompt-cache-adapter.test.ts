@@ -69,6 +69,16 @@ describe("injectPromptCaching", () => {
         expect(breakpointsOn(result.messages)).toEqual([0, 1, 2, 3]);
     });
 
+    it("counts breakpoints on incoming content parts against the limit", () => {
+        const part = { providerOptions: { anthropic: { cacheControl: CACHE } }, text: "chunk", type: "text" as const };
+        const messages: ModelMessage[] = [system, { content: [part, part, part], role: "user" }, { content: "latest", role: "user" }];
+        const result = injectPromptCaching(messages, "openrouter", tools);
+
+        // Three part-level breakpoints leave one slot: the system prompt takes it, the conversation end gets none.
+        expect(result.messages[0]?.providerOptions?.anthropic?.cacheControl).toEqual(CACHE);
+        expect(result.messages.at(-1)?.providerOptions).toBeUndefined();
+    });
+
     it("fills the remaining budget with the system prompt and the conversation end, and stops at four", () => {
         const messages: ModelMessage[] = [system, hinted("a", "assistant"), hinted("b", "assistant"), { content: "latest", role: "user" }];
         const result = injectPromptCaching(messages, "openrouter", tools);
