@@ -105,6 +105,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+    vi.useRealTimers();
     harness.close();
 });
 
@@ -260,11 +261,15 @@ describe("beginHostGuide", () => {
 
         it("files the guide under the oldest such project, even when it listed the repository after a newer one", async () => {
             const deviceId = await pairedDevice(ownerId);
-            const older = await insertProject("Older");
+            // A pinned clock: two inserts in one millisecond would share a creation time, and then neither is the older one.
             const olderAt = Date.now();
 
-            // Two inserts in one millisecond share a creation time, and then neither is the older one.
-            await vi.waitUntil(() => Date.now() > olderAt, { interval: 1 });
+            vi.useFakeTimers({ toFake: ["Date"] });
+            vi.setSystemTime(olderAt);
+
+            const older = await insertProject("Older");
+
+            vi.setSystemTime(olderAt + 1000);
 
             const newer = await insertProject("Newer");
 
