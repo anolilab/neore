@@ -11,7 +11,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
-import { addFile } from "./files";
+import { addFile, useExistingFile } from "./files";
 import {
     CHAT_FILE_EXPORT_BYTES,
     CHAT_FILE_METADATA_CHUNK,
@@ -286,6 +286,23 @@ describe("chat files in the GDPR export", () => {
         expect(after.files.map((file) => file.id)).toContain(fileId);
         // Dated as the file was stored, not as it was repaired.
         expect(after.files.find((file) => file.id === fileId)?.createdAt).toBe(storedAt);
+    });
+
+    it("repairs the export's view of a file on the reuse path, as a store of the same bytes does", async () => {
+        const fileId = await store(A, "reused.png", "hash-reused");
+
+        await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.chatFileMetadata.findMany({ where: { fileId } });
+
+            await Promise.all(page.map(async (row: any) => await ctx.db.delete("chatFileMetadata", row._id)));
+        });
+
+        // The client's store of bytes the workspace already holds takes this path (`agent/client/files.ts`).
+        await harness.run(async (ctx: any) => await ctx.runMutation(useExistingFile, { filename: "reused.png", hash: "hash-reused", userId: A }));
+
+        const after = await exportedFor(A);
+
+        expect(after.files.map((file) => file.id)).toContain(fileId);
     });
 
     it("lists a file once when two stores of the same bytes each wrote its metadata", async () => {
