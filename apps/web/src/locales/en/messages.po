@@ -41167,3 +41167,7 @@ msgstr "Δ points"
 #: src/features/chat/thread/rate-limit-pause-notice.tsx
 msgid "A message you send here is queued, and it is sent after you resume the reply."
 msgstr "A message you send here is queued, and it is sent after you resume the reply."
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx
+msgid "{spoken}. {queuedNote}"
+msgstr "{spoken}. {queuedNote}"

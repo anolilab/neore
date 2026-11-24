@@ -41234,3 +41234,7 @@ msgstr "上限がリセットされました。再開はあなたの操作を待
 #: src/features/chat/thread/rate-limit-pause-notice.tsx
 msgid "A message you send here is queued, and it is sent after you resume the reply."
 msgstr "ここで送ったメッセージはキューに入り、返信を再開した後に送信されます。"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx
+msgid "{spoken}. {queuedNote}"
+msgstr "{spoken}。{queuedNote}"

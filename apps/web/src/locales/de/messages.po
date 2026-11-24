@@ -41234,3 +41234,7 @@ msgstr "Das Limit wurde zurückgesetzt. Warten auf dich, um fortzusetzen"
 #: src/features/chat/thread/rate-limit-pause-notice.tsx
 msgid "A message you send here is queued, and it is sent after you resume the reply."
 msgstr "Eine Nachricht, die du hier sendest, wird eingereiht und nach dem Fortsetzen der Antwort gesendet."
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx
+msgid "{spoken}. {queuedNote}"
+msgstr "{spoken}. {queuedNote}"

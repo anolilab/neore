@@ -128,9 +128,10 @@ export const RateLimitPauseNoticeView: FC<RateLimitPauseNoticeViewProps> = ({ ca
         shown = t`Rate limited, retrying in ${countdown}`;
     }
 
+    // The joining punctuation is part of each message, so a locale sets its own (Japanese uses a full stop, for one).
     if (queuedNote !== undefined) {
-        spoken += `. ${queuedNote}`;
-        shown += `. ${queuedNote}`;
+        spoken = t`${spoken}. ${queuedNote}`;
+        shown = t`${shown}. ${queuedNote}`;
     }
 
     return (
