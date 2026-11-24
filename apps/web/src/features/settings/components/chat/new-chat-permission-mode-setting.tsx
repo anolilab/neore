@@ -25,13 +25,15 @@ const NewChatPermissionModeSetting: FC = () => {
     const titleId = useId();
     const descriptionId = useId();
 
-    // An absent value is the defaults, which is Auto.
+    // An absent value is the defaults, which is Auto. Until the settings load, the saved value is unknown, so the control shows Auto
+    // only as a placeholder and stays locked: a choice made now would overwrite a default the person has not seen.
+    const settingsLoaded = userSettings !== undefined;
     const saved = userSettings?.defaultPermissionMode;
     const current: ThreadPermissionMode = isThreadPermissionMode(saved) ? saved : "auto";
     // Locked until the session confirms the user is not impersonating: while that is unknown (still loading, or failed) the server's
     // refusal must not be reachable from the control. The note only says so once the session confirms it.
     const impersonating = impersonation?.isImpersonating === true;
-    const locked = impersonation?.isImpersonating !== false;
+    const locked = impersonation?.isImpersonating !== false || !settingsLoaded;
 
     const labels: Record<ThreadPermissionMode, string> = {
         auto: t`Auto`,

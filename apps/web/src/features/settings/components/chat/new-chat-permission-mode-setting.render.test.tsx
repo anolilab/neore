@@ -74,6 +74,14 @@ describe("NewChatPermissionModeSetting", () => {
         expect(screen.getByRole("button", { name: "Auto" }).getAttribute("aria-pressed")).toBe("true");
     });
 
+    it("stays locked while the saved default is still loading, so no mode can overwrite an unseen one", () => {
+        state.settings = undefined;
+
+        render(<NewChatPermissionModeSetting />);
+
+        expect((screen.getByRole("button", { name: "Full access" }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
     it("saves the mode the owner picks as the default", async () => {
         state.settings = { defaultPermissionMode: "auto" };
 
