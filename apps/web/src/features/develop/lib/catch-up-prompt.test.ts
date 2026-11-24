@@ -169,7 +169,7 @@ describe(catchUpPrompt, () => {
 
             for (const { command } of urlReads) {
                 expect(command.split(" | ").at(-1)).toContain('print (n == 1 && !bad) ? "match" : "mismatch"');
-                expect(command).toContain("want='git.example/octo/hello'");
+                expect(command).toContain("awk -v h='git.example' -v r='octo/hello'");
             }
         });
 

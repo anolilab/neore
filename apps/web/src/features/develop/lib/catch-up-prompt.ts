@@ -28,12 +28,15 @@ export const isPlainRepo = (repo: string): boolean => PLAIN_REPO.test(repo) && !
 export const catchUpRunId = (): string => crypto.randomUUID().replaceAll("-", "").slice(0, 8);
 
 /**
- * A command that checks one of origin's URL lists without printing any URL: each URL loses its scheme, user and password, port
- * and `.git`, an scp-like `host:owner/name` reads as `host/owner/name`, and the filter prints `match` only when the list holds
- * exactly one URL and that one is `host/repository` (ignoring case). `host` and `repo` are plain ({@link isPlainRepo}).
+ * A command that checks one of origin's URL lists without printing any URL. A URL passes only in one of three forms, so a fetch
+ * or push cannot go through another transport or service on the same host: `https://[userinfo@]host[:443]/repository`,
+ * `ssh://git@host[:22]/repository` or the scp-like `git@host:repository`, each with an optional `.git` and trailing `/`, and
+ * with host and repository compared ignoring case. Another scheme (`http://`, `git://`, `file://`), another port, another ssh
+ * user or a path prints `mismatch`, as does a list that does not hold exactly one URL. `host` and `repo` are plain
+ * ({@link isPlainRepo}), so they read the same inside the quotes.
  */
 const originCheck = (list: string, host: string, repo: string): string =>
-    String.raw`git remote get-url ${list} origin | tr '[:upper:]' '[:lower:]' | sed -E 's#^[a-z][a-z0-9+.-]*://##; s#^[^@/]*@##; s#^([^/:]+):[0-9]+/#\1/#; s#^([^/:]+):#\1/#; s#/+$##; s#\.git$##' | awk -v want='${host}/${repo.toLowerCase()}' '{ n++; if ($0 != want) bad++ } END { print (n == 1 && !bad) ? "match" : "mismatch" }'`;
+    String.raw`git remote get-url ${list} origin | awk -v h='${host}' -v r='${repo.toLowerCase()}' '{ n++; u = tolower($0); sub(/\/+$/, "", u); sub(/\.git$/, "", u); if (sub(/^https:\/\/([^@\/]*@)?/, "", u)) ok = (u == h "/" r) || (u == h ":443/" r); else if (sub(/^ssh:\/\/git@/, "", u)) ok = (u == h "/" r) || (u == h ":22/" r); else if (sub(/^git@/, "", u)) ok = (u == h ":" r); else ok = 0; if (!ok) bad++ } END { print (n == 1 && !bad) ? "match" : "mismatch" }'`;
 
 /**
  * A command that prints `ready` only when `HEAD` is the branch `branch` (not detached, not another branch) and holds exactly the
