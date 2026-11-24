@@ -10,12 +10,17 @@ import { chatOpenPlaceFor, readChatOpenPlace } from "./chat-open-place";
 import { useIsDesktop } from "./desktop-layout";
 import { openThreadBesideFocusedPane, requestComposerFocus, showThreadInSplitView } from "./split-layout-store";
 
-/** Shows the chat's pane, if the saved layout can be read. The route still opens the chat when it cannot. */
-const showPaneQuietly = async (threadId: string): Promise<void> => {
+/** Whether the split view is on now. Read when it is needed: it can be turned off while a saved layout is being read. */
+const isSplitViewOnNow = (): boolean => useUIStateStore.getState().preferences.splitViewEnabled === true;
+
+/** Shows the chat's pane. Resolves to whether it is shown: a saved layout that cannot be read leaves it hidden, and the route still opens the chat. */
+const showPaneQuietly = async (threadId: string): Promise<boolean> => {
     try {
         await showThreadInSplitView(threadId);
+
+        return true;
     } catch {
-        // The saved layout could not be read: the caller's navigation still opens the chat.
+        return false;
     }
 };
 
@@ -35,17 +40,27 @@ export const useOpenChatClick = (): ((threadId: string, click: ChatClick, origin
                 await navigate({ params: { threadId }, search: {}, to: "/chat/$threadId" });
             };
 
+            // With the split view on, the chat's pane is shown first. A keyboard activation (`detail` 0) then moves focus into it, which
+            // only a shown pane can take: a pane that is not shown never gets the request.
+            const showPane = async (): Promise<void> => {
+                if (!isSplitViewOnNow()) {
+                    return;
+                }
+
+                const isShown = await showPaneQuietly(threadId);
+
+                if (isShown && click.detail === 0) {
+                    requestComposerFocus(threadId);
+                }
+            };
+
             // Below the breakpoint, or with the split view off, there is no side panel to open into.
             const place = chatOpenPlaceFor(chosenPlace, click, isSplitViewOn && isDesktop);
 
             if (place === "main") {
-                // With the split view on, the main view is a pane too: a route that already names the chat does not move focus, so
-                // the pane is shown first. A layout that cannot be read still opens the chat in the main view.
+                // A route that already names the chat does not move focus, so the pane is shown before the route is read.
                 const showInMainView = async () => {
-                    if (isSplitViewOn) {
-                        await showPaneQuietly(threadId);
-                    }
-
+                    await showPane();
                     await openInMainView();
                 };
 
@@ -64,24 +79,20 @@ export const useOpenChatClick = (): ((threadId: string, click: ChatClick, origin
                     result = undefined;
                 }
 
-                // The split view may have been turned off while the layout was read: a pane then sits in a hidden layout, so the
-                // chat opens in the main view instead.
-                const isPaneVisible = (result === "focused" || result === "opened") && useUIStateStore.getState().preferences.splitViewEnabled === true;
+                // The split view may have been turned off while the layout was read: a pane then sits in a hidden layout, so the chat opens
+                // in the main view instead.
+                const isPaneVisible = (result === "focused" || result === "opened") && isSplitViewOnNow();
 
-                if (!isPaneVisible) {
-                    if (isSplitViewOn) {
-                        await showPaneQuietly(threadId);
+                if (isPaneVisible) {
+                    if (click.detail === 0) {
+                        requestComposerFocus(threadId);
                     }
-
-                    await openInMainView();
 
                     return;
                 }
 
-                // A keyboard activation (`detail` 0) leaves focus on the link: the opened pane takes it, so the user reaches the chat.
-                if (click.detail === 0) {
-                    requestComposerFocus(threadId);
-                }
+                await showPane();
+                await openInMainView();
             };
 
             void openBeside();

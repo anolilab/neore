@@ -20,6 +20,7 @@ import { useThreadPaneState } from "@/features/chat/thread/use-thread-pane-state
 
 import { setSplitViewMounted } from "./composer-drafts";
 import { useIsDesktop } from "./desktop-layout";
+import { COMPOSER_INPUT, focusComposerWhenMounted } from "./focus-composer";
 import { leaveSplitView, restoreLiveComposerFor, syncFocusedModel, watchPaneFocus } from "./pane-state";
 import { MIN_PANE_PX } from "./split-layout";
 import { clearComposerFocusRequest, readSavedLayoutOrEmpty, useSplitLayoutStore } from "./split-layout-store";
@@ -27,39 +28,6 @@ import { useChatHasDraft } from "./use-chat-has-draft";
 
 /** The space between two panes: the resize handle itself, so there is no line between them. */
 const GAP_PX = 8;
-/** How many frames to wait for the composer's editor (it loads lazily) before giving up on moving focus into it. */
-const FOCUS_FRAMES = 60;
-/** The composer's input: the chat editor, or a worker's textarea (which has no textbox role). */
-const COMPOSER_INPUT = '[role="textbox"], textarea[data-focus-area="composer"]';
-
-/**
- * Moves focus into a pane's composer once it has mounted (it loads lazily); gives up after `FOCUS_FRAMES` frames. `onFocused` runs once
- * the composer has taken focus.
- */
-const focusComposerWhenMounted = (paneRef: { current: HTMLElement | null }, onFocused: () => void): (() => void) => {
-    let frame = 0;
-    let frames = 0;
-    const focusEditor = () => {
-        const editor = paneRef.current?.querySelector<HTMLElement>(COMPOSER_INPUT);
-
-        if (editor) {
-            editor.focus();
-            onFocused();
-
-            return;
-        }
-
-        frames += 1;
-
-        if (frames < FOCUS_FRAMES) {
-            frame = requestAnimationFrame(focusEditor);
-        }
-    };
-
-    focusEditor();
-
-    return () => cancelAnimationFrame(frame);
-};
 
 /**
  * Makes the focused pane's chat the one the global model state describes. Every pane's provider loads its chat's model into
@@ -166,8 +134,10 @@ const Pane: FC<PaneProps> = ({
             return undefined;
         }
 
-        return focusComposerWhenMounted(paneRef, () => {
-            focusComposerRef.current = false;
+        return focusComposerWhenMounted(paneRef, (focused) => {
+            if (focused) {
+                focusComposerRef.current = false;
+            }
         });
     }, [isFocused]);
 
@@ -179,9 +149,14 @@ const Pane: FC<PaneProps> = ({
             return undefined;
         }
 
-        // Cleared only once the composer has taken focus: clearing it earlier would re-run this effect and cancel the focus loop.
-        return focusComposerWhenMounted(paneRef, clearComposerFocusRequest);
-    }, [composerRequested, isFocused]);
+        // The request is cleared once the composer has taken focus or has given up; a pane left meanwhile clears it too.
+        const cancel = focusComposerWhenMounted(paneRef, () => clearComposerFocusRequest(threadId));
+
+        return () => {
+            cancel();
+            clearComposerFocusRequest(threadId);
+        };
+    }, [composerRequested, isFocused, threadId]);
 
     const activate = () => {
         focusComposerRef.current = true;

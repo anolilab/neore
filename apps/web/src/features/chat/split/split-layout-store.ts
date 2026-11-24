@@ -178,9 +178,11 @@ export const requestComposerFocus = (threadId: string): void => {
     useSplitLayoutStore.setState({ composerFocusThreadId: threadId });
 };
 
-/** Clears the request once the pane has taken it. */
-export const clearComposerFocusRequest = (): void => {
-    useSplitLayoutStore.setState({ composerFocusThreadId: undefined });
+/** Clears the request, if it is still for `threadId`: a pane that is done or gone must not clear another pane's request. */
+export const clearComposerFocusRequest = (threadId: string): void => {
+    if (useSplitLayoutStore.getState().composerFocusThreadId === threadId) {
+        useSplitLayoutStore.setState({ composerFocusThreadId: undefined });
+    }
 };
 
 /** What opening a chat as a pane did: it was already open, it opened, or every pane is taken. */
