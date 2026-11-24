@@ -5229,7 +5229,7 @@ msgstr "beginner"
 msgid "Behavior"
 msgstr "Behavior"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:142
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:192
 msgid "Behind {base}"
 msgstr "Behind {base}"
 
@@ -6297,11 +6297,11 @@ msgstr "Catalan (Spain)"
 msgid "catalog"
 msgstr "catalog"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:165
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:215
 msgid "Catch up"
 msgstr "Catch up"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:132
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:182
 msgid "Catch up {pullRequest} with {base}"
 msgstr "Catch up {pullRequest} with {base}"
 
@@ -27531,11 +27531,11 @@ msgstr "Push notifications on this browser"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:171
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:221
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
 msgstr "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:172
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:222
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 

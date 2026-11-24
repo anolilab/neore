@@ -5230,7 +5230,7 @@ msgstr "iniciante"
 msgid "Behavior"
 msgstr "Comportamento"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:142
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:192
 msgid "Behind {base}"
 msgstr "Atrás de {base}"
 
@@ -6298,11 +6298,11 @@ msgstr "Catalão (Espanha)"
 msgid "catalog"
 msgstr "catálogo"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:165
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:215
 msgid "Catch up"
 msgstr "Atualizar"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:132
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:182
 msgid "Catch up {pullRequest} with {base}"
 msgstr "Atualizar {pullRequest} com {base}"
 
@@ -27532,11 +27532,11 @@ msgstr "Notificações push neste navegador"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "Coloque vários agentes com papéis próprios em uma mesma conversa. Um painel de revisão pode verificar uma alteração pelos ângulos de segurança e desempenho, e um debate pode argumentar os dois lados antes de uma síntese."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:171
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:221
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
 msgstr "Coloca um prompt no compositor para fazer rebase deste branch em {base}, resolver conflitos, verificar o build e os testes e fazer push. Nada é enviado."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:172
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:222
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "Coloca um prompt no compositor para fazer rebase do branch deste fork em {base} numa cópia local, resolver conflitos e verificar o build e os testes. Não é feito push. Nada é enviado."
 
