@@ -24298,6 +24298,48 @@
       "relations": {},
       "shardMode": "shardBy:userId"
     },
+    "pullRequestStateScans": {
+      "commitOrdered": false,
+      "fields": {
+        "cursor": {
+          "kind": "union",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "members": [
+            {
+              "kind": "null",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            }
+          ]
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
     "pullRequestThreads": {
       "commitOrdered": false,
       "fields": {
@@ -24358,6 +24400,41 @@
           "kind": "string",
           "nullable": false,
           "optional": false,
+          "unique": false
+        },
+        "state": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"closed\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"merged\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"open\""
+            }
+          ]
+        },
+        "stateCheckedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
           "unique": false
         },
         "threadDeleted": {
@@ -33444,6 +33521,12 @@
           "unique": false
         },
         "isAdvancedUser": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "keepOpenPullRequestChats": {
           "kind": "boolean",
           "nullable": false,
           "optional": true,
