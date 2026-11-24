@@ -14,12 +14,13 @@ type ConfirmSettingKey = "confirmBeforeArchiveChat" | "confirmBeforeDeleteChat" 
 interface ConfirmRowProperties {
     checked: boolean;
     description: string;
+    disabled: boolean;
     id: string;
     label: string;
     onChange: (checked: boolean) => void;
 }
 
-const ConfirmRow: FC<ConfirmRowProperties> = ({ checked, description, id, label, onChange }) => (
+const ConfirmRow: FC<ConfirmRowProperties> = ({ checked, description, disabled, id, label, onChange }) => (
     <div className="flex items-center justify-between">
         <div className="space-y-0.5">
             <Label className="text-base font-medium" htmlFor={id}>
@@ -29,13 +30,14 @@ const ConfirmRow: FC<ConfirmRowProperties> = ({ checked, description, id, label,
                 {description}
             </p>
         </div>
-        <Switch aria-describedby={`${id}-description`} checked={checked} id={id} onCheckedChange={onChange} />
+        <Switch aria-describedby={`${id}-description`} checked={checked} disabled={disabled} id={id} onCheckedChange={onChange} />
     </div>
 );
 
 /**
  * Whether unpinning, archiving and deleting a chat asks first, mounted in the chat card. Each switch saves on its own,
- * through the settings write queue, so quick toggles of one switch land in the order they were made.
+ * through the settings write queue, so quick toggles of one switch land in the order they were made. The switches stay
+ * disabled until the settings have loaded, so a change is never made against defaults that are not the saved values.
  * "Off" is sent as `false`, never `undefined`, because the server's patch treats `undefined` as "leave alone".
  */
 const ChatActionConfirmControls: FC = () => {
@@ -43,6 +45,7 @@ const ChatActionConfirmControls: FC = () => {
     const { data: userSettings } = useUserSettings();
     const updateUserSettings = useUpdateUserSettings();
     const confirmations = chatActionConfirmations(userSettings);
+    const loading = userSettings === undefined;
 
     const save = (key: ConfirmSettingKey, checked: boolean) => {
         updateUserSettings
@@ -64,6 +67,7 @@ const ChatActionConfirmControls: FC = () => {
             <ConfirmRow
                 checked={confirmations.unpin}
                 description={t`Asks before a pinned chat is unpinned. Off: unpinning happens on the first click.`}
+                disabled={loading}
                 id="confirm-before-unpin-chat"
                 label={t`Confirm before unpinning a chat`}
                 onChange={(checked) => save("confirmBeforeUnpinChat", checked)}
@@ -71,6 +75,7 @@ const ChatActionConfirmControls: FC = () => {
             <ConfirmRow
                 checked={confirmations.archive}
                 description={t`Asks before a chat is archived. Off: archiving happens on the first click.`}
+                disabled={loading}
                 id="confirm-before-archive-chat"
                 label={t`Confirm before archiving a chat`}
                 onChange={(checked) => save("confirmBeforeArchiveChat", checked)}
@@ -78,6 +83,7 @@ const ChatActionConfirmControls: FC = () => {
             <ConfirmRow
                 checked={confirmations.delete}
                 description={t`Asks before a chat is deleted. Off: deleting happens on the first click.`}
+                disabled={loading}
                 id="confirm-before-delete-chat"
                 label={t`Confirm before deleting a chat`}
                 onChange={(checked) => save("confirmBeforeDeleteChat", checked)}

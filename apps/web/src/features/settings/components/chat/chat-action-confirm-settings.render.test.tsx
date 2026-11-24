@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const userSettings = vi.hoisted(() => {
-    return { value: undefined as Record<string, boolean> | undefined };
+    return { loading: false, value: undefined as Record<string, boolean> | undefined };
 });
 const updateLatest = vi.hoisted(() => vi.fn<(build: (current: unknown) => unknown) => Promise<void>>(() => Promise.resolve()));
 
@@ -24,7 +24,7 @@ vi.mock("@/features/auth/hooks/use-user-settings", () => {
             return { updateLatest };
         },
         useUserSettings: () => {
-            return { data: userSettings.value };
+            return { data: userSettings.loading ? undefined : (userSettings.value ?? null) };
         },
     };
 });
@@ -47,7 +47,25 @@ const lastPatch = (): unknown => {
 describe("ChatActionConfirmControls", () => {
     beforeEach(() => {
         updateLatest.mockClear();
+        userSettings.loading = false;
         userSettings.value = undefined;
+    });
+
+    it("disables the switches while the settings load, so a change is never made against defaults", () => {
+        userSettings.loading = true;
+        render(<ChatActionConfirmControls />);
+
+        for (const name of [UNPIN, ARCHIVE, DELETE]) {
+            expect(screen.getByRole("switch", { name }).matches(":disabled, [data-disabled]")).toBe(true);
+        }
+    });
+
+    it("enables the switches once the settings have loaded", () => {
+        render(<ChatActionConfirmControls />);
+
+        for (const name of [UNPIN, ARCHIVE, DELETE]) {
+            expect(screen.getByRole("switch", { name }).matches(":disabled, [data-disabled]")).toBe(false);
+        }
     });
 
     it("starts unpinning and archiving asking nothing, and deleting asking", () => {
