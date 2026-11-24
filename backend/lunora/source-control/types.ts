@@ -67,6 +67,8 @@ export interface PullRequestDetail extends PullRequestRef {
      */
     headInBaseRepository: boolean;
     headSha: string;
+    /** When the host merged it, if it did. Absent until then. */
+    mergedAt?: number;
     /** Whether it merges cleanly, when the host says so on this same read (`unknown` while the host still works it out). */
     mergeState?: MergeState;
     state: "closed" | "merged" | "open";

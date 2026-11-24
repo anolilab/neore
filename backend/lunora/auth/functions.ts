@@ -986,6 +986,11 @@ export const updateUserSettings = authMutation
     .input(userSettingsFieldsWithoutUserId)
     .mutation(async (options) => {
         const { ctx } = options;
+        const { userId } = ctx.user;
+        const before = await ctx.db
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .unique();
 
         // The default mode of new chats is the owner's to set by hand: neither an admin acting as them nor a grant session (an app or the
         // browser extension) may change it, since the default would then reach every chat they start (`callerRestrictsFull`).
@@ -994,6 +999,18 @@ export const updateUserSettings = authMutation
         }
 
         const result = await settingsUpsert("userSettings", options);
+
+        // Turning the merged-chat archive on stamps when: only merges from then on archive a chat (`agent/auto-archive.ts`).
+        if (options.args.autoArchiveMergedChats === true && before?.autoArchiveMergedChats !== true) {
+            const after = await ctx.db
+                .query("userSettings")
+                .withIndex("by_userId", (q) => q.eq("userId", userId))
+                .unique();
+
+            if (after) {
+                await patchRow(ctx.db, "userSettings", after, { autoArchiveMergedChatsSince: ctx.now });
+            }
+        }
 
         ctx.log.event("auth.update_user_settings", { fieldCount: Object.keys(options.args).length });
 

@@ -4828,6 +4828,22 @@ msgstr "自动媒体补充"
 msgid "Auto pricing"
 msgstr "自动定价"
 
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:107
+msgid "Auto-archive merged chats"
+msgstr "自动归档已合并的聊天"
+
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:111
+msgid "Archive a chat when its linked pull request is merged. Archived chats stay searchable."
+msgstr "当关联的拉取请求（PR）合并后归档该聊天。已归档的聊天仍可搜索。"
+
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:118
+msgid "Merged chats will be archived"
+msgstr "已合并的聊天将被归档"
+
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:118
+msgid "Merged chats stay as they are"
+msgstr "已合并的聊天保持不变"
+
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:72
 msgid "Auto-archive inactive chats"
 msgstr "自动归档不活跃的聊天"

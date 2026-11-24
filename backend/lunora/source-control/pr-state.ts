@@ -7,7 +7,7 @@
  * answer only while its lease is still the link's current one, so a late answer never overwrites a newer check.
  * A failed read leaves the state as it was. A 404 is not taken for a closed pull request: GitHub also answers it for a
  * private repository the token cannot see, and a closed link is never read again.
- * The sweep does nothing unless auto-archive is on and the person keeps open-pull-request chats.
+ * The sweep does nothing unless the person keeps open-pull-request chats and either auto-archive or merged-chat archiving is on.
  */
 import { LunoraError, v } from "lunorash/server";
 
@@ -26,6 +26,7 @@ import { resolveGithubToken } from "../connectors/lib/github-token";
 import { currentUserShard } from "../lib/shard-context";
 import { DEVELOP_DRIVER } from "./develop-driver";
 import { readFromHost } from "./read-host";
+import { someLinkOfThread } from "./pr-thread-links";
 
 /** A link's state is re-read once it is this old. */
 export const PR_STATE_MAX_AGE_MS = 10 * 60 * 1000;
@@ -122,10 +123,12 @@ export const dispatchLinkedPullRequestChecks = internalMutation
             .withIndex("by_userId", (q) => q.eq("userId", userId))
             .unique();
 
-        // The state is only read by auto-archive, so with auto-archive off there is nothing to keep fresh.
+        // The state is read by auto-archive (idle, or a merge the chat owes), so with neither on there is nothing to keep fresh.
         const days = settings?.autoArchiveAfterDays;
+        const idleDays = isAutoArchiveDays(days) && days !== 0 ? days : undefined;
+        const mergedOn = settings?.autoArchiveMergedChats === true && settings.autoArchiveMergedChatsSince !== undefined;
 
-        if (!isAutoArchiveDays(days) || days === 0 || !keepsOpenPullRequestChats(settings?.keepOpenPullRequestChats)) {
+        if (!keepsOpenPullRequestChats(settings?.keepOpenPullRequestChats) || (idleDays === undefined && !mergedOn)) {
             return { dispatched: 0 };
         }
 
@@ -144,10 +147,10 @@ export const dispatchLinkedPullRequestChecks = internalMutation
                     (link.stateCheckedAt === undefined || now - link.stateCheckedAt >= PR_STATE_MAX_AGE_MS),
             )
             .toSorted((a, b) => (a.stateCheckedAt ?? 0) - (b.stateCheckedAt ?? 0));
-        const cutoff = autoArchiveCutoff(now, days);
+        const cutoff = idleDays === undefined ? undefined : autoArchiveCutoff(now, idleDays);
         const due: typeof stale = [];
 
-        // Only a link whose chat auto-archive would consider idle is read: the state of any other chat is never used.
+        // Only a link whose chat auto-archive would consider idle, or whose chat owes a merge that can archive it, is read.
         const lookups = stale.slice(0, CHECK_LIMIT * THREAD_LOOKUP_FACTOR);
 
         for (const link of lookups) {
@@ -156,8 +159,10 @@ export const dispatchLinkedPullRequestChecks = internalMutation
             }
 
             const thread = await ctx.db.get("threads", link.threadId);
+            const idleDue = thread !== null && cutoff !== undefined && selectAutoArchiveDue([candidateOf(thread)], cutoff, NO_EXCLUSIONS, 1).length === 1;
+            const mergeOwed = thread !== null && mergedOn && (await ownsMergeTo(ctx, userId, link.threadId));
 
-            if (thread !== null && selectAutoArchiveDue([candidateOf(thread)], cutoff, NO_EXCLUSIONS, 1).length === 1) {
+            if (idleDue || mergeOwed) {
                 due.push(link);
             } else {
                 // Stamped as checked without a host read, so it moves behind the others instead of holding the front of the order.
@@ -178,6 +183,10 @@ export const dispatchLinkedPullRequestChecks = internalMutation
 
         return { dispatched: due.length };
     });
+
+/** Whether the chat owes a merge: one recorded for it and not yet settled. */
+const ownsMergeTo = async (ctx: MutationCtx, userId: string, threadId: Id<"threads">): Promise<boolean> =>
+    await someLinkOfThread(ctx, userId, threadId, (row) => row.mergedAt !== undefined && row.mergeSettledAt === undefined);
 
 /**
  * A link just recorded as closed or merged makes its chat due for archive now, not at the next housekeeping pass: the sweep
@@ -207,8 +216,10 @@ export const recordLinkState = internalMutation
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const link = await ctx.db.get("pullRequestThreads", args.linkId);
+        // A merge recorded on the link is final: an older check that still reads it open cannot undo it before the archive runs.
+        const recordedMerged = link !== null && (link.mergedAt !== undefined || link.state === "merged");
 
-        if (link !== null && link.stateCheckedAt === args.lease) {
+        if (link !== null && link.stateCheckedAt === args.lease && !(recordedMerged && args.state === "open")) {
             await ctx.db.patch("pullRequestThreads", link._id, { state: args.state, stateCheckedAt: ctx.now });
 
             if (args.state !== "open") {

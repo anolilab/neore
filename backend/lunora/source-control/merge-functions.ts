@@ -19,6 +19,8 @@ import { MAX_LENGTH } from "../lib/validators";
 import { isHostCapabilityAvailable } from "./capabilities";
 import { requireCapability } from "./capability-gate";
 import { DEVELOP_DRIVER } from "./develop-driver";
+import { recordMergedPullRequest } from "./pr-merged";
+import { MERGE_TIME_PRECISION_MS } from "./pr-threads";
 import { readFromHost } from "./read-host";
 import { vFailed, vMergeMethod, vWriteFailed } from "./validators";
 import { writeToHost } from "./write-host";
@@ -88,6 +90,24 @@ export const rerunCheck = authAction
         return outcome;
     });
 
+/** The host's merge time of a pull request that has merged, read once after the merge. Absent when the read fails. */
+const hostMergedAt = async (token: Parameters<typeof readFromHost>[1], ref: { number: number; repository: string }): Promise<number | undefined> => {
+    try {
+        const outcome = await readFromHost(DEVELOP_DRIVER, token, async (request) => {
+            const detail = await DEVELOP_DRIVER.getPullRequest(request, ref);
+
+            return { mergedAt: detail.mergedAt, state: detail.state };
+        });
+
+        return outcome.status === "ok" && outcome.state === "merged" ? outcome.mergedAt : undefined;
+    } catch (error) {
+        // The merge already happened on the host: a failed timestamp read must not fail the merge or skip recording it.
+        console.error("[source-control] could not read a merged pull request's merge time", error);
+
+        return undefined;
+    }
+};
+
 /** Merges now. The host's rules may refuse it: that is a `rejected` answer carrying the host's reason. */
 export const mergePullRequest = authAction
     .use(rateLimit("sourceControl/write"))
@@ -97,6 +117,8 @@ export const mergePullRequest = authAction
         requireCapability("merge.now");
 
         const token = await resolveGithubToken(ctx, ctx.user.userId);
+        // Taken before the merge is asked for, so it is never later than the host's merge time.
+        const requestedAt = Date.now();
         const outcome = await writeToHost(
             DEVELOP_DRIVER,
             token,
@@ -104,6 +126,23 @@ export const mergePullRequest = authAction
         );
 
         ctx.log.event("source_control.merge", { method: args.method, status: outcome.status });
+
+        // An unconfirmed answer (the host may have merged, but its reply could not be read) is recorded only when a host read
+        // confirms the merge: the read returns a merge time only for a merged pull request.
+        const ref = { number: args.number, repository: args.repository };
+        const hostAt = outcome.status === "ok" || outcome.status === "unconfirmed" ? await hostMergedAt(token, ref) : undefined;
+
+        if (outcome.status === "ok" || (outcome.status === "unconfirmed" && hostAt !== undefined)) {
+            // The host's time is whole seconds, so the merge lies in the second it names; the request time is precise and never
+            // after the merge. The later of the two orders a merge this request completed against the owner's opt-in (a merge after
+            // opt-in inside the same second still archives). A pull request that had merged clearly before this request (a retry of an
+            // old merge) keeps its historical time, so it is judged as it was. The upper bound is the end of the host's second.
+            const historical = hostAt !== undefined && hostAt + MERGE_TIME_PRECISION_MS <= requestedAt ? hostAt : undefined;
+            const mergedAt = historical ?? Math.max(hostAt ?? 0, requestedAt);
+            const mergedBefore = hostAt === undefined ? undefined : hostAt + MERGE_TIME_PRECISION_MS;
+
+            await recordMergedPullRequest(ctx, ctx.user.userId, ref, mergedAt, mergedBefore);
+        }
 
         return outcome;
     });

@@ -2610,12 +2610,21 @@ export const schema = defineSchema({
         headBranch: v.optional(v.string()),
         // `attached`: a thread started on the pull request. `linked`: an existing thread linked by hand. `opened`: a run opened it.
         kind: v.union(v.literal("attached"), v.literal("linked"), v.literal("opened")),
+        // The last archive attempt for this merge that found the chat busy. The next read tries the least recently attempted links first.
+        mergeAttemptedAt: v.optional(v.number()),
+        // Set once the pull request is seen merged (`source-control/pr-threads.ts#recordPullRequestMerged`). Written once: a merge is terminal.
+        mergedAt: v.optional(v.number()),
+        // Set once this merge's archive attempt for the link finished: archived, or declined by a guard or the setting. Until then a read retries it.
+        mergeSettledAt: v.optional(v.number()),
         number: v.number(),
         repository: v.string(),
         // The host's state of the pull request, as the last refresh read it (`source-control/pr-state.ts`). Absent until the
         // first read: an unknown state keeps the thread out of auto-archive, like an open one.
         state: v.optional(v.union(v.literal("open"), v.literal("closed"), v.literal("merged"))),
         stateCheckedAt: v.optional(v.number()),
+        // The last time a chat's view read this pull request's state from the host. The header reads the least recently read
+        // links first, so a link past the first few still gets its merge seen (`source-control/pr-status.ts`).
+        statusReadAt: v.optional(v.number()),
         // Set while the thread is soft-deleted, so the sidebar count reads these rows alone. Kept in step by the thread's delete and restore.
         threadDeleted: v.optional(v.boolean()),
         threadId: v.id("threads"),
@@ -4261,6 +4270,11 @@ export const schema = defineSchema({
         accentColor: v.optional(v.string()),
         // Auto-archive threads idle this many days (`agent/auto-archive.ts`). Absent or 0 = off; 7-365 otherwise.
         autoArchiveAfterDays: v.optional(v.number()),
+        // Archive a chat when a pull request it is linked to merges (`agent/auto-archive.ts#archiveMergedThread`). Absent = off.
+        autoArchiveMergedChats: v.optional(v.boolean()),
+        // When the owner last turned `autoArchiveMergedChats` on (set by the settings write, never by the client). Only a merge at or
+        // after it archives a chat: a merge from before the opt-in, first seen after it, does not.
+        autoArchiveMergedChatsSince: v.optional(v.number()),
         // Compact a thread's model context before a reply once it fills this percentage of the model's window (`agent/thread-compaction.ts`). Absent or 0 = off; 50-95 otherwise.
         autoCompactThreshold: v.optional(v.number()),
         // Opt-in: speak every finished reply aloud (`features/chat/voice-mode`). Absent = off.

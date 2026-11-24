@@ -23,6 +23,7 @@ import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import { GITHUB_WEB_ORIGIN, splitGithubRepo } from "./drivers/github";
 import { rereadRelinkedLink } from "./pr-state";
+import { noteMergeAttemptRow, pullRequestLinksOf, settleMergedLinkRow, someLinkOfThread } from "./pr-thread-links";
 
 /** Threads kept per pull request: a list, not a history. The newest are the ones anyone is working in. */
 export const MAX_THREADS_PER_PULL_REQUEST = 50;
@@ -41,6 +42,7 @@ export const vPullRequestThread = v.object({
     kind: v.union(v.literal("attached"), v.literal("linked"), v.literal("opened")),
     number: v.number(),
     repository: v.string(),
+    statusReadAt: v.optional(v.number()),
     threadId: v.string(),
     title: v.string(),
     url: v.string(),
@@ -69,6 +71,7 @@ export const toOutput = (row: PullRequestThread, thread?: Pick<Doc<"threads">, "
         kind: row.kind,
         number: row.number,
         repository: row.repository,
+        ...(row.statusReadAt !== undefined && { statusReadAt: row.statusReadAt }),
         threadId: row.threadId,
         title: shownTitle(row, thread),
         url: row.url,
@@ -321,4 +324,141 @@ export const recordOpenedPullRequest = internalMutation
         });
 
         return { created: true, threadId: args.threadId };
+    });
+
+/** A link stamped this recently is not rewritten by a repeat view: it already sits at the back of the rotation. */
+const STATUS_STAMP_WINDOW_MS = 5 * 60 * 1000;
+
+/**
+ * Stamps the links to one pull request as read from the host, now. The chat header reads the least recently read links
+ * first, so every link is reached over the views of its chat. The address is canonical (the caller canonicalizes it).
+ */
+export const recordStatusRead = internalMutation
+    .input({
+        number: v.number(),
+        /** When the host was asked: a link created after it was not part of that read, so it is not stamped. */
+        readStartedAt: v.optional(v.number()),
+        repository: v.string().max(MAX_LENGTH.short),
+        threadId: v.string().max(MAX_LENGTH.id),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        // Only the viewing chat's own links are stamped, so they are read through that chat's index, paged, and the pull
+        // request's other links are never touched.
+        await someLinkOfThread(ctx, args.userId, args.threadId as Id<"threads">, async (link) => {
+            if (link.repository !== args.repository || link.number !== args.number) {
+                return false;
+            }
+
+            // A row stamped inside the window already sits at the back of the rotation: a repeat view does not rewrite it.
+            const stampedRecently = link.statusReadAt !== undefined && ctx.now - link.statusReadAt < STATUS_STAMP_WINDOW_MS;
+
+            // A link made after the host was asked was not part of its answer, so it is not marked as read.
+            const madeAfterRead = args.readStartedAt !== undefined && link.createdAt > args.readStartedAt;
+
+            if (!stampedRecently && !madeAfterRead) {
+                await ctx.db.patch("pullRequestThreads", link._id, { statusReadAt: ctx.now });
+            }
+
+            return false;
+        });
+
+        return null;
+    });
+
+/**
+ * Notes that an owed link's archive attempt failed before it could answer, so the next read's batch reaches the other owed
+ * chats first. Internal: the caller runs it after the attempt's own transaction rolled back, so only the stamp is written.
+ */
+export const noteMergeAttempt = internalMutation
+    .input({ linkId: v.id("pullRequestThreads") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await noteMergeAttemptRow(ctx, args.linkId, ctx.now);
+
+        return null;
+    });
+
+/**
+ * The host's merge time is whole seconds: the real merge fell in the second it names. A link made inside that second may
+ * predate the merge, so only a link made at or after the end of that second is treated as made after it.
+ */
+export const MERGE_TIME_PRECISION_MS = 1000;
+
+/**
+ * Records that a pull request was seen merged, on each link made before the merge. Internal: called by the merge action
+ * and the status read, both with the merge time (the host's, or the time before the merge request), so a link made after
+ * the merge is neither marked nor returned. Returns the links still owed an archive attempt for this merge: ones just
+ * marked, and ones marked by an earlier read whose attempt never settled.
+ */
+export const recordPullRequestMerged = internalMutation
+    .input({
+        /** The merge's lower-bound time: the setting's opt-in is compared with it. */
+        mergedAt: v.optional(v.number()),
+        /** The merge's upper-bound time: a link created at or after it was not part of the merge. Absent: `mergedAt` plus a second. */
+        mergedBefore: v.optional(v.number()),
+        number: v.number(),
+        repository: v.string().max(MAX_LENGTH.short),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.array(v.object({ linkId: v.id("pullRequestThreads"), threadId: v.id("threads") })))
+    .mutation(async ({ args, ctx }) => {
+        const mergedAt = args.mergedAt ?? ctx.now;
+        const mergedBefore = args.mergedBefore ?? mergedAt + MERGE_TIME_PRECISION_MS;
+        const owed: { lastAttemptAt: number; linkId: Id<"pullRequestThreads">; threadId: Id<"threads"> }[] = [];
+        const links = await pullRequestLinksOf(ctx, args.userId, args.repository, args.number);
+        const settings = await ctx.db
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+            .unique();
+        const since = settings?.autoArchiveMergedChatsSince;
+        const settingOn = settings?.autoArchiveMergedChats === true && since !== undefined;
+
+        for (const link of links) {
+            if (link.mergedAt === undefined) {
+                if (link.createdAt >= mergedBefore) {
+                    // Made after the merge, so it owes no archive; the host's merge still holds for its pull request, so its state
+                    // says merged and it does not keep another chat open (`pr-state.ts`).
+                    if (link.state !== "merged") {
+                        await ctx.db.patch("pullRequestThreads", link._id, { state: "merged" });
+                    }
+
+                    continue;
+                }
+
+                // The host's merge time when the read had it, else now: the export shows when the merge happened, not when it was seen.
+                // The host said merged: the link's state says so too, so the open-pull-request rule (`pr-state.ts`) no longer keeps its chat.
+                await ctx.db.patch("pullRequestThreads", link._id, { mergedAt, state: "merged" });
+            } else {
+                // A link marked earlier keeps its merge time. A relink may have reset its state to open, but the host's merge still
+                // holds, so the state is restored before the link is skipped or judged.
+                if (link.state !== "merged") {
+                    await ctx.db.patch("pullRequestThreads", link._id, { state: "merged" });
+                }
+
+                if (link.mergeSettledAt !== undefined) {
+                    continue;
+                }
+            }
+
+            // Judged on the link's own merge time, once stored: a later read with a less precise time cannot retract a merge that
+            // already proved it came after the opt-in. With the setting off (or the merge before the opt-in), the link settles here,
+            // so a later opt-in cannot archive a chat for a merge that came before it.
+            const eligibleAt = link.mergedAt ?? mergedAt;
+
+            if (!settingOn || since === undefined || eligibleAt < since) {
+                await settleMergedLinkRow(ctx, link._id, ctx.now);
+                continue;
+            }
+
+            owed.push({ lastAttemptAt: link.mergeAttemptedAt ?? 0, linkId: link._id, threadId: link.threadId });
+        }
+
+        // Least recently attempted first: a read's bounded batch reaches every owed chat, not just the first busy ones.
+        owed.sort((a, b) => a.lastAttemptAt - b.lastAttemptAt);
+
+        return owed.map((link) => {
+            return { linkId: link.linkId, threadId: link.threadId };
+        });
     });

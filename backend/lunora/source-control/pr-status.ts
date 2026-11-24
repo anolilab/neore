@@ -6,11 +6,15 @@
  */
 import { v } from "lunorash/server";
 
+import { internal } from "../_generated/internal";
+import type { ActionCtx } from "../_generated/server";
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { DEVELOP_DRIVER } from "./develop-driver";
+import { recordMergedPullRequest } from "./pr-merged";
 import { readFromHost } from "./read-host";
+import { requireAddress } from "./pr-threads";
 import type { CheckRun, PullRequestReview } from "./types";
 import { vFailed } from "./validators";
 
@@ -115,19 +119,52 @@ const vOpen = v.object({
     url: v.string(),
 });
 
+/** Records that the links to this pull request were read now. Never throws: the read's answer is what the caller gets. */
+const stampStatusRead = async (
+    ctx: Pick<ActionCtx, "runMutation">,
+    userId: string,
+    ref: { number: number; repository: string },
+    threadId: string,
+    readStartedAt: number,
+): Promise<void> => {
+    try {
+        const address = requireAddress(ref.repository, ref.number);
+
+        await ctx.runMutation(internal.source_control.pr_threads.recordStatusRead, {
+            number: address.number,
+            // Only links that existed when the host was asked were part of this read: a link made since is left for the next one.
+            readStartedAt,
+            repository: address.repository,
+            threadId,
+            userId,
+        });
+    } catch (error) {
+        console.error("[source-control] could not record a status read", error);
+    }
+};
+
 /** The problems on one open pull request; a closed or merged one is reported as such, with no further host call. */
 export const getPullRequestStatus = authAction
-    .input({ number: v.number(), repository: v.string().max(MAX_LENGTH.short) })
+    // `threadId`: the chat whose header asks, so its own link rows are the ones stamped as read.
+    .input({ number: v.number(), repository: v.string().max(MAX_LENGTH.short), threadId: v.optional(v.string().max(MAX_LENGTH.id)) })
     .use(rateLimit("sourceControl/read"))
-    .output(v.union(vOpen, v.object({ state: v.union(v.literal("closed"), v.literal("merged")), status: v.literal("ok") }), vFailed))
+    .output(
+        v.union(
+            vOpen,
+            v.object({ mergedAt: v.optional(v.number()), state: v.union(v.literal("closed"), v.literal("merged")), status: v.literal("ok") }),
+            vFailed,
+        ),
+    )
     .action(async ({ args, ctx }) => {
         const token = await resolveGithubToken(ctx, ctx.user.userId);
         const ref = { number: args.number, repository: args.repository };
+        // Taken before the host is asked: a link made after this moment was not part of what the host answered.
+        const readStartedAt = Date.now();
         const outcome = await readFromHost(DEVELOP_DRIVER, token, async (request) => {
             const detail = await DEVELOP_DRIVER.getPullRequest(request, ref);
 
             if (detail.state !== "open") {
-                return { state: detail.state };
+                return { mergedAt: detail.mergedAt, state: detail.state };
             }
 
             // The merge state comes with the pull request when the host answers it there; only otherwise is it asked for.
@@ -159,6 +196,18 @@ export const getPullRequestStatus = authAction
         });
 
         ctx.log.event("source_control.get_pull_request_status", { status: outcome.status });
+
+        // Only a host answer moves this chat's links to the back of its read rotation: a failed read stays eligible for the next view.
+        if (outcome.status === "ok" && args.threadId !== undefined) {
+            await stampStatusRead(ctx, ctx.user.userId, ref, args.threadId, readStartedAt);
+        }
+
+        // A merge made outside the app is seen here, when the chat's pull request is read (`pr-merged.ts`).
+        // Without the host's merge time the merge cannot be ordered against the owner's opt-in, so it is not recorded at the
+        // sighting time (which could archive chats for a merge that came before the opt-in).
+        if (outcome.status === "ok" && outcome.state === "merged" && outcome.mergedAt !== undefined) {
+            await recordMergedPullRequest(ctx, ctx.user.userId, ref, outcome.mergedAt);
+        }
 
         return outcome;
     });
