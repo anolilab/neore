@@ -364,15 +364,26 @@ Audit history supports configurable retention via the vacuum feature:
 `gdpr/retention.ts#pruneRetainedActivity` runs in every shard's housekeeping
 sweep (`lib/shard-housekeeping.ts`), a bounded batch per table per run:
 
-| Table          | Kept                                               | Why                                                                           |
-| -------------- | -------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `usageDaily`   | 400 days                                           | The usage page's per-day rollup; a year plus a month of history is enough.    |
-| `subAgentRuns` | 90 days, finished runs only (`succeeded`/`failed`) | The answer was already posted into the parent thread; the row is bookkeeping. |
+| Table                      | Kept                                               | Why                                                                                                                                                                          |
+| -------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `usageDaily`               | 400 days                                           | The usage page's per-day rollup; a year plus a month of history is enough.                                                                                                   |
+| `usageOrganizationReplies` | 400 days, pruned at the next UTC midnight          | Replies recorded under an organization's projects, read by the organization view; the same window as the rollup. Its contributor list drops a user once their rows are gone. |
+| `subAgentRuns`             | 90 days, finished runs only (`succeeded`/`failed`) | The answer was already posted into the parent thread; the row is bookkeeping.                                                                                                |
 
 Both are also in the export and deleted with the account in their own batched
 steps (`deleteUserUsageDaily`, `deleteUserSubAgentRuns`). A failed delete fails
 its step, so the retry removes what is left. `subAgentRuns` is read with
 `collectActivityForExport`, with `knowledgeCollections`.
+
+`usageOrganizationReplies` is erased with the rest of the usage tables
+(`usage/gdpr.ts#eraseUsageForUser`). The user's entries in
+`usageOrganizationContributors` go only in the batch after their ledger rows are
+all gone: until then the organization view still reads the member, sees the
+erasure underway and withholds their cohort's weeks. Once the entry is gone the
+cohort shows with the members it has (an accepted departure, owner's decision
+of 2026-11-23); a cohort left with fewer than three members is withheld
+(`MIN_MEMBERS_SHORT_COHORT`: with two, a member reading the view subtracts
+their own spend and sees the other's).
 
 `usageDaily` is exported in durable steps (`gdpr/usage-export-steps.ts`): a page
 of 900 rows (`USAGE_EXPORT_PAGE`, below a mutation's write limit), then a recount of the closed days (two days before the user's latest

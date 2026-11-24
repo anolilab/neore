@@ -65,6 +65,7 @@ export const getDefinitionForOAuth = internalQuery
 
 export const createOAuthState = internalMutation
     .input({
+        authorizationResponseIssParameterSupported: v.optional(v.boolean()),
         expiresAt: v.number(),
         flow: vOAuthFlow,
         stateHash: v.string(),
@@ -72,7 +73,7 @@ export const createOAuthState = internalMutation
         userId: v.string(),
     })
     .output(v.null())
-    .mutation(async ({ args: { expiresAt, flow, stateHash, target, userId }, ctx }) => {
+    .mutation(async ({ args: { authorizationResponseIssParameterSupported, expiresAt, flow, stateHash, target, userId }, ctx }) => {
         const { now } = ctx;
         const open = await ctx.db
             .query("oauthStates")
@@ -85,7 +86,14 @@ export const createOAuthState = internalMutation
         const evict = [...open.filter((row) => row.expiresAt <= now), ...live.slice(0, Math.max(0, live.length - (MAX_OPEN_FLOWS_PER_USER - 1)))];
 
         await Promise.all(evict.map((row) => ctx.db.delete("oauthStates", row._id)));
-        await ctx.db.insert("oauthStates", { expiresAt, flow, state: stateHash, target, userId });
+        await ctx.db.insert("oauthStates", {
+            ...(authorizationResponseIssParameterSupported !== undefined && { authorizationResponseIssParameterSupported }),
+            expiresAt,
+            flow,
+            state: stateHash,
+            target,
+            userId,
+        });
 
         return null;
     });
@@ -113,7 +121,12 @@ export const consumeOAuthState = internalMutation
     .input({ stateHash: v.string(), userId: v.string() })
     .output(
         v.union(
-            v.object({ flow: vOAuthFlow, ok: v.literal(true), target: vOAuthTarget }),
+            v.object({
+                authorizationResponseIssParameterSupported: v.optional(v.boolean()),
+                flow: vOAuthFlow,
+                ok: v.literal(true),
+                target: vOAuthTarget,
+            }),
             v.object({ ok: v.literal(false), reason: v.union(v.literal("expired"), v.literal("not_found"), v.literal("wrong_user")) }),
         ),
     )
@@ -143,7 +156,14 @@ export const consumeOAuthState = internalMutation
             return { ok: false as const, reason: "not_found" as const };
         }
 
-        return { flow: stored.flow, ok: true as const, target };
+        return {
+            ...(stored.authorizationResponseIssParameterSupported !== undefined && {
+                authorizationResponseIssParameterSupported: stored.authorizationResponseIssParameterSupported,
+            }),
+            flow: stored.flow,
+            ok: true as const,
+            target,
+        };
     });
 
 // ---------------------------------------------------------------------------

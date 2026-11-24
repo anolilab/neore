@@ -158,6 +158,25 @@ describe("createProject machine and folder", () => {
             expect(project).not.toHaveProperty("path");
         });
 
+        it("hides the owner's runner from a member, and keeps it for the owner", async () => {
+            const { member, owner, projectId } = await seed();
+            const runner = { runnerKind: "host", runnerThreadAt: 7, runnerThreadId: "thread-1" };
+
+            // What a move into the organization leaves on the row (`updateProject` empties only the device, agent and folder).
+            await harness.run(
+                async (ctx: any) => await ctx.db.patch("projects", projectId, { ...runner, runnerAgentKey: "", runnerDeviceId: "", runnerFolderId: "" }),
+            );
+
+            const seen = (await as(member).query(getProject as never, { projectId } as never)) as Record<string, unknown>;
+            const own = (await as(owner).query(getProject as never, { projectId } as never)) as Record<string, unknown>;
+
+            for (const key of ["runnerAgentKey", "runnerDeviceId", "runnerFolderId", "runnerKind", "runnerThreadAt", "runnerThreadId"]) {
+                expect(seen).not.toHaveProperty(key);
+            }
+
+            expect(own).toMatchObject(runner);
+        });
+
         it.each([
             ["projects", listProjects, listPinnedProjects],
             ["agent", listAgentProjects, listAgentPinnedProjects],

@@ -47,6 +47,8 @@ export const MEANING_RESULT_LIMIT = 10;
 export const MEANING_MIN_SCORE = 0.5;
 /** Shorter queries are too vague to embed usefully. */
 export const MEANING_MIN_CHARS = 3;
+/** `data.code` of the `FORBIDDEN` error a meaning search throws when the person's model rules refuse the embedding model. */
+export const MEANING_SEARCH_REFUSED = "MEANING_SEARCH_REFUSED";
 
 /** The thread fields this module reads. A `threads` row satisfies it. */
 export interface SearchRow {
@@ -58,6 +60,8 @@ export interface SearchRow {
     lockedAt?: number | null;
     /** When a sync last found the owner's model rules refusing the embedding model. */
     searchRefusedAt?: number;
+    /** `archived` sets the flag on the thread's vectors (`thread-vector-archived.ts`). */
+    status?: string;
     summary?: string;
     summaryVectorId?: string;
     title?: string;

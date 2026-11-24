@@ -1003,6 +1003,7 @@ export const schema = defineSchema({
         }),
 
     embeddings_128: defineTable({
+        archived: v.optional(v.boolean()),
         model: v.string(),
         model_table_threadId: v.optional(v.string()),
         model_table_userId: v.optional(v.string()),
@@ -1025,6 +1026,7 @@ export const schema = defineSchema({
         }),
 
     embeddings_256: defineTable({
+        archived: v.optional(v.boolean()),
         model: v.string(),
         model_table_threadId: v.optional(v.string()),
         model_table_userId: v.optional(v.string()),
@@ -1047,6 +1049,7 @@ export const schema = defineSchema({
         }),
 
     embeddings_512: defineTable({
+        archived: v.optional(v.boolean()),
         model: v.string(),
         model_table_threadId: v.optional(v.string()),
         model_table_userId: v.optional(v.string()),
@@ -1069,6 +1072,7 @@ export const schema = defineSchema({
         }),
 
     embeddings_768: defineTable({
+        archived: v.optional(v.boolean()),
         model: v.string(),
         model_table_threadId: v.optional(v.string()),
         model_table_userId: v.optional(v.string()),
@@ -1091,6 +1095,8 @@ export const schema = defineSchema({
         }),
 
     embeddings_1024: defineTable({
+        // Thread title/summary vectors only (`agent/thread-search.ts`): whether the thread is archived, for a filter on it.
+        archived: v.optional(v.boolean()),
         model: v.string(),
         model_table_threadId: v.optional(v.string()),
         model_table_userId: v.optional(v.string()),
@@ -1108,11 +1114,13 @@ export const schema = defineSchema({
             dimensions: 1024,
             embed,
             index: "embeddings-1024",
-            metadata: ["model_table_userId", "model_table_threadId"],
+            // `archived` only here: thread vectors live in this table alone (bge-m3, `agent/thread-search-plan.ts`).
+            metadata: ["model_table_userId", "model_table_threadId", "archived"],
             metric: "cosine",
         }),
 
     embeddings_1408: defineTable({
+        archived: v.optional(v.boolean()),
         model: v.string(),
         model_table_threadId: v.optional(v.string()),
         model_table_userId: v.optional(v.string()),
@@ -1135,6 +1143,7 @@ export const schema = defineSchema({
         }),
 
     embeddings_1536: defineTable({
+        archived: v.optional(v.boolean()),
         model: v.string(),
         model_table_threadId: v.optional(v.string()),
         model_table_userId: v.optional(v.string()),
@@ -1846,6 +1855,8 @@ export const schema = defineSchema({
     // the provider; `flow` carries what completion needs (PKCE verifier and any
     // DCR client secret encrypted). Single-use: completion deletes the row.
     oauthStates: defineTable({
+        // RFC 9207: the server advertised `iss` on its responses, so the callback refuses one without it.
+        authorizationResponseIssParameterSupported: v.optional(v.boolean()),
         // Legacy target encoding (a slug, or `mcp:<name>` plus `mcpServer`), read
         // only for rows written before `target`; new rows carry `target` alone.
         connectorSlug: v.optional(v.string()),
@@ -2380,11 +2391,23 @@ export const schema = defineSchema({
         // The device the project's folder lives on (this computer, or an SSH server's device) and the absolute folder path on it.
         machineId: v.optional(v.id("devices")),
         order: v.optional(v.number()),
+        // When the project last changed organization: a person's runner default from a thread started before it no longer applies.
+        organizationChangedAt: v.optional(v.number()),
         organizationId: v.optional(v.string()),
         path: v.optional(v.string()),
         pinnedAt: v.optional(v.number()),
         projectType: v.optional(v.union(v.literal("chat"), v.literal("workflow"))),
         publicAccessToken: v.optional(v.string()),
+        // The runner a new thread here starts on by default: the computer, agent and folder id of its last host thread (`acp/lib/project-runner.ts`).
+        // Personal projects only; an organization project keeps each person's default on `userSettings.projectRunnerDefaults`. The folder path never leaves the desktop.
+        runnerAgentKey: v.optional(v.string()),
+        runnerDeviceId: v.optional(v.string()),
+        runnerFolderId: v.optional(v.string()),
+        runnerKind: v.optional(v.literal("host")),
+        // When the thread that recorded the runner started: an older thread opening a session later leaves it.
+        runnerThreadAt: v.optional(v.number()),
+        // That thread's id: of two threads started in the same millisecond, the one with the greater id keeps the runner.
+        runnerThreadId: v.optional(v.string()),
         // Per-project overrides of the owner's sub-agent roles (`sub-agents/roles.ts`).
         subAgentRoles: v.optional(vSubAgentRoles),
         title: v.string(),
@@ -2786,6 +2809,12 @@ export const schema = defineSchema({
          * dormant-shard sweep that leaves the table empty (`lib/shard-housekeeping.ts`).
          */
         rateLimitsPending: v.optional(v.boolean()),
+        /**
+         * When the shard's oldest retained rows expire (`gdpr/retention.ts`), or `NO_RETENTION_DUE` when it holds none (a number, not an absent
+         * field, so clearing it is one field write). The shard tick prunes only once this has come, so a tick for other work does not read the
+         * retained rows.
+         */
+        retentionDueAt: v.optional(v.number()),
         shardKey: v.string(),
     })
         .global()
@@ -4014,6 +4043,7 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_userId", ["userId"])
         .index("by_request_project", ["requestId", "pass", "projectId"]),
+
     // One small row per export run: its key, its owner, when it began, and the key of the usage JSON object it stored, if any. The
     // row is that object's record: kept until the object is confirmed deleted, so the sweep can retry the purge from it. `deleteAt` is
     // the time the sweep next acts on the run: each sweep that finds the run live sets it one time to live ahead, so a dead run's pieces
@@ -4033,6 +4063,61 @@ export const schema = defineSchema({
         .index("by_deleteAt", ["deleteAt"])
         .index("by_userId", ["userId"])
         .index("by_requestId", ["requestId"]),
+    // One claimed booking slot per contributor booked under an organization (`usage/cohorts.ts`). The unique slot is the claim: two bookings
+    // cannot take the same one. Holds no user, so it carries no one's usage.
+    usageOrganizationCohortSlots: defineTable({
+        // When the slot was claimed: the organization view counts a cohort sealed only once its last slot has settled (`SLOT_SETTLE_MS`).
+        claimedAt: v.number(),
+        // Set once the slot's contributor row has landed: a cohort is sealed only when each of its slots is (`sealedCohortsOf`).
+        filled: v.optional(v.literal(true)),
+        organizationId: v.string(),
+        slot: v.number(),
+    })
+        .global()
+        .index("by_organization_and_slot", ["organizationId", "slot"], { unique: true }),
+
+    // Everyone with ledger rows under an organization, whether or not they are still a member: the organization view lists these, so a
+    // member who leaves keeps counting. Global, so the live path, the view and erasure reach it from any shard.
+    usageOrganizationContributors: defineTable({
+        // The stable cohort the contributor was booked into (`usage/cohorts.ts`); it never changes once set.
+        cohort: v.number(),
+        createdAt: v.number(),
+        // Set while a guest's merge into this account runs (`lib/account-merge.ts#handOverOrganizationContributors`): the guest whose entry,
+        // and cohort, this became, so the merge moves that guest's closed-week ledger rows with it. Cleared once the merge has moved them.
+        mergedFrom: v.optional(v.string()),
+        organizationId: v.string(),
+        userId: v.string(),
+    })
+        .global()
+        // Unique: a member has one entry under an organization, so two first replies booked at once cannot place them in two cohorts.
+        .index("by_organization_and_user", ["organizationId", "userId"], { unique: true })
+        .index("by_organization_and_cohort", ["organizationId", "cohort", "userId"])
+        // The entry a merging guest was handed over to: the guest is not booked again while the merge runs (`insertContributor`).
+        .index("by_organization_and_merged_from", ["organizationId", "mergedFrom"])
+        .index("by_user", ["userId"]),
+
+    // One row per reply filed under a project the user's organization owns, when the reply is recorded. The organization view sums
+    // these by instant, so a project moved into an organization later does not expose its earlier usage, and a reply stays with the
+    // organization it was recorded under. Sharded with the member, so erasure and the member's view read the member's shard.
+    usageOrganizationReplies: defineTable({
+        // The reply's instant (epoch ms), as recorded.
+        at: v.number(),
+        costMicrodollars: v.number(),
+        // Set by a guest merge (`lib/account-merge.ts#importShardRows`) on a guest's row of a week the view may already show that could not
+        // move into the cohort that counted it: the guest whose row it was. The row stays the account's record (export, erasure, retention
+        // prune by `at`), and the organization view and the contributor reconcile never read it, so no released week changes by it.
+        heldFrom: v.optional(v.string()),
+        organizationId: v.string(),
+        projectKey: v.string(),
+        replyKey: v.string(),
+        tokens: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_organization_and_at", ["organizationId", "at"])
+        // The retention sweep (`gdpr/retention.ts`), which reads a shard's rows by age.
+        .index("by_at", ["at"])
+        .index("by_user_and_reply", ["userId", "replyKey"]),
 
     // The replies already in `usageDaily`, keyed by the reply's first row id:
     // what makes `recordReplyUsage` and the backfill count a reply once.
@@ -4136,6 +4221,10 @@ export const schema = defineSchema({
         composerAutocompleteEnabled: v.optional(v.boolean()),
         // Opt-in Vim keys in the chat composer. Absent = off.
         composerVimMode: v.optional(v.boolean()),
+        // Ask before a chat is archived, deleted or unpinned in the web app. Archive and unpin: absent = off; delete: absent = on.
+        confirmBeforeArchiveChat: v.optional(v.boolean()),
+        confirmBeforeDeleteChat: v.optional(v.boolean()),
+        confirmBeforeUnpinChat: v.optional(v.boolean()),
         // Appearance: contrast mode (accepted values: `auth/fields.ts`). Absent = follow the system.
         contrast: v.optional(v.string()),
         customInstructions: v.optional(v.string()),
@@ -4170,6 +4259,19 @@ export const schema = defineSchema({
         // (`auth/lib/personalization.ts`), and kept: a run with it gets no saved login. Server-written only.
         personalizationByImpersonator: v.optional(v.literal(true)),
         profession: v.optional(v.string()),
+        // The runner a new thread in each organization project starts on for this person, keyed by project id (`acp/lib/project-runner.ts`). Written server-side only, at most 200 projects.
+        projectRunnerDefaults: v.optional(
+            v.record(
+                v.string(),
+                v.object({
+                    agentKey: v.string(),
+                    deviceId: v.string(),
+                    folderId: v.string(),
+                    threadAt: v.optional(v.number()),
+                    threadId: v.optional(v.string()),
+                }),
+            ),
+        ),
         // A run whose worker died resumes from its last saved row, up to 3 times per reply (`chat/streaming/persistent/interrupted.ts`). Absent = on.
         resumeInterruptedRuns: v.optional(v.boolean()),
         // Opt-in: opening /chat lands on the most recent thread. Absent = off.

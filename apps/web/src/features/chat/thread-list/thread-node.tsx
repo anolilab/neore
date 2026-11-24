@@ -51,12 +51,14 @@ import { DEFAULT_PAGINATION_OPTS } from "@/features/chat/core/constants/query-op
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import type { ThreadLockMode } from "@/features/chat/lock/thread-lock-dialog";
 import { ThreadLockDialog } from "@/features/chat/lock/thread-lock-dialog";
+import type { PaneOpenResult } from "@/features/chat/split/split-layout-store";
 import { openThreadInSplitView, useSplitLayoutStore } from "@/features/chat/split/split-layout-store";
 import { useChatHasDraft } from "@/features/chat/split/use-chat-has-draft";
 import { THREAD_CATEGORY_LABELS } from "@/features/chat/tags/thread-categories";
 import ThreadTagChips from "@/features/chat/tags/thread-tag-chips";
 import ThreadTagsMenu from "@/features/chat/tags/thread-tags-menu";
 import { usePullRequestCount } from "@/features/develop/components/pull-request-counts";
+import { focusThreadSearchToggle } from "@/features/keyboard/lib/thread-search-target";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { useHasOpened } from "@/hooks/use-has-opened";
 import { LOAD_MARKS, useLoadMarkWhenVisible } from "@/lib/analytics/load-marks";
@@ -66,6 +68,7 @@ import { showError, showWarning } from "@/lib/toast";
 
 import { useIsKeyboardSelected } from "./contexts/keyboard-selection-context";
 import useCanHover from "./hooks/use-can-hover";
+import { useConfirmBeforeDelete } from "./hooks/use-confirm-before-delete";
 import { useThreadStateActions } from "./hooks/use-thread-state-actions";
 import { releaseBlinkWindow } from "./lib/needs-you-blink";
 import { hasUnreadReply, isSnoozed } from "./lib/thread-state-rules";
@@ -241,6 +244,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     // Mounted on first open only: rendered closed in every row, the lazy dialog loaded on first paint.
     const hasOpenedMoveToProject = useHasOpened(showMoveToProjectDialog);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const confirmBeforeDelete = useConfirmBeforeDelete();
     const [lockMode, setLockMode] = useState<ThreadLockMode | null>(null);
     // An admin acting as the owner may not lock, archive or delete: the server refuses each, as each withdraws the guest link.
     const isImpersonating = useImpersonating();
@@ -284,7 +288,14 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     // On a page with no chat open there is no split view to add a pane to: the chat opens as the page's own, then.
     const handleOpenInSplitView = useCallback(() => {
         const open = async () => {
-            const result = await openThreadInSplitView(node.threadId);
+            let result: PaneOpenResult | undefined;
+
+            try {
+                result = await openThreadInSplitView(node.threadId);
+            } catch {
+                // The saved layout could not be read: the chat opens in the main view below.
+                result = undefined;
+            }
 
             if (result === "full") {
                 showWarning(t`Split view is full. Close a chat first.`);
@@ -293,7 +304,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
             }
 
             // Read at the click, not subscribed to: only this handler needs to know whether a chat is open.
-            if (!CHAT_THREAD_PATH_RE.test(router.state.location.pathname)) {
+            if (result === undefined || !CHAT_THREAD_PATH_RE.test(router.state.location.pathname)) {
                 await router.navigate({ params: { threadId: node.threadId }, search: {}, to: "/chat/$threadId" });
             }
         };
@@ -1084,7 +1095,16 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                         disabled={isDeleting}
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            setShowDeleteDialog(true);
+
+                                            if (confirmBeforeDelete) {
+                                                setShowDeleteDialog(true);
+
+                                                return;
+                                            }
+
+                                            // The row leaves at once and takes this button with it, so focus goes to the search toggle first, which stays.
+                                            focusThreadSearchToggle();
+                                            handleDeleteThread(node.threadId);
                                         }}
                                         size="icon-sm"
                                         variant="ghost"
@@ -1109,6 +1129,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
 
                                 handleDeleteThread(node.threadId);
                                 setShowDeleteDialog(false);
+                                // The dialog returns focus to the button that opened it on close, and that button leaves with the row: the toggle gets focus after the return.
+                                globalThis.setTimeout(focusThreadSearchToggle, 0);
                             }}
                             onOpenChange={setShowDeleteDialog}
                             open={showDeleteDialog}

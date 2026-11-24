@@ -15,7 +15,8 @@
  */
 import { lunoraTest } from "@lunora/testing";
 import { enabledModelOf, MODEL_REGISTRY } from "@neore/ai/models";
-import { MockLanguageModelV3 } from "ai/test";
+import { jsonSchema } from "ai";
+import { MockLanguageModelV3, simulateReadableStream } from "ai/test";
 import { v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -23,7 +24,8 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import { jobsQueueMessages } from "../../test/stubs/cloudflare-workers";
 import { internalQuery } from "../_generated/server";
 import schema from "../schema";
-import { scriptedModel, textStep } from "./group/test-models";
+import { scriptedModel, textStep, toolCallStep } from "./group/test-models";
+import { CAP_WRAP_UP_INSTRUCTION } from "./lib/cap-wrap-up";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -51,6 +53,8 @@ const { autoState, groupState, modelState, prefsState, registry, skillState, too
             ctx: undefined as { runTurn?: unknown } | undefined,
             options: undefined as { untrustedContext?: Promise<boolean> | boolean } | undefined,
             removesInstructionRead: false,
+            /** When set, the tools the run is given, in place of the rule-file tool. */
+            tools: undefined as Record<string, unknown> | undefined,
         },
     };
 });
@@ -133,7 +137,9 @@ vi.mock("./lib/agent-tools", async (importOriginal) => {
 
                 // Offered as a candidate, kept unless the gates remove it (`agent-tools.bot-selection.test.ts`).
                 const listed = (await options.instructions) ?? [];
-                const tools = listed.length > 0 && !toolsState.removesInstructionRead ? { instruction_read: { description: "read", inputSchema: {} } } : {};
+                const tools =
+                    toolsState.tools ??
+                    (listed.length > 0 && !toolsState.removesInstructionRead ? { instruction_read: { description: "read", inputSchema: {} } } : {});
 
                 return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, repeatable: [], tools };
             },
@@ -160,6 +166,9 @@ vi.mock("./lib/get-agent", () => {
                 languageModel: modelState.model as never,
                 maxSteps: options.maxSteps ?? 5,
                 name: model,
+                // Offered to the model only by a suite that sets `toolsState.tools` (the step-cap suite's probe): the placeholder
+                // `instruction_read` has no schema a model can take, so the other suites keep their agent tool-less.
+                tools: toolsState.tools === undefined ? undefined : (options.tools as never),
             });
         },
     };
@@ -169,6 +178,7 @@ const { scheduleReplyUsage } = await import("../usage/schedule");
 const { runGroupTurn } = await import("./group/run");
 const { runStreamingAgent } = await import("./execute");
 const { finishRun, loadRunContext } = await import("./lib/agent-run");
+const { stopActiveForThread } = await import("./streaming/persistent/library");
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -248,6 +258,7 @@ beforeEach(async () => {
     skillState.calls = [];
     skillState.answer = { enabledSkills: [], invocation: null };
     toolsState.allowTools = false;
+    toolsState.tools = undefined;
     toolsState.ctx = undefined;
     toolsState.options = undefined;
     toolsState.removesInstructionRead = false;
@@ -452,6 +463,161 @@ describe("runStreamingAgent: a project's rule files read when needed", () => {
 
         expect(tools).not.toContain("instruction_read");
         expect(system).not.toContain("instruction_read");
+    });
+});
+
+describe("runStreamingAgent: a reply that spends its step cap", () => {
+    // The default cap for a run that is not auto-continuing: five steps. Five tool steps reach it, so the next model call is the wrap-up.
+    const CAP = 5;
+    const probeSteps = (count: number) => Array.from({ length: count }, (_, index) => toolCallStep("probe", `c${index + 1}`));
+    const modelCalls = () => (modelState.model as MockLanguageModelV3).doStreamCalls;
+    const offeredTools = (call: { tools?: unknown[] }) => call.tools ?? [];
+
+    let probeRuns = 0;
+
+    beforeEach(() => {
+        probeRuns = 0;
+        toolsState.allowTools = true;
+        // Each run answers something new: three identical calls in a row are a loop to the repeated-call guard, which would end the run first.
+        toolsState.tools = {
+            probe: {
+                description: "probe",
+                execute: async () => {
+                    probeRuns += 1;
+
+                    return `probed ${probeRuns}`;
+                },
+                inputSchema: jsonSchema({ properties: {}, type: "object" }),
+            },
+        };
+    });
+
+    it("makes exactly one wrap-up call, with no tools offered, and saves its text under the reply", async () => {
+        modelState.model = scriptedModel([...probeSteps(CAP), textStep("Wrap-up: probed five times, nothing left.")]);
+
+        await run();
+
+        const calls = modelCalls();
+
+        // The five tool steps each offered the tool; the sixth call is the wrap-up and offers none.
+        expect(calls).toHaveLength(CAP + 1);
+        expect(calls.slice(0, CAP).every((call) => offeredTools(call).length === 1)).toBe(true);
+        expect(offeredTools(calls[CAP]!)).toHaveLength(0);
+        expect(JSON.stringify(calls[CAP]!.prompt)).toContain(CAP_WRAP_UP_INSTRUCTION);
+
+        const state = await readState();
+
+        expect(JSON.stringify(state.replies)).toContain("Wrap-up: probed five times");
+        expect(state.streamStatus).toBe("done");
+        expect(state.threadStatus).toBe("active");
+    });
+
+    it("makes no wrap-up call when the person stopped the reply on its cap", async () => {
+        let calls = 0;
+
+        modelState.model = scriptedModel([...probeSteps(CAP), textStep("Wrap-up that must not run.")], async () => {
+            calls += 1;
+
+            // Stop lands while the cap's last tool step is being generated.
+            if (calls === CAP) {
+                await harness.run(async (ctx: any) => await ctx.runMutation(stopActiveForThread, { threadId: ids.threadId }));
+            }
+        });
+
+        await run();
+
+        // Every call that ran offered the tool: none was the tool-less wrap-up.
+        expect(modelCalls().every((call) => offeredTools(call).length > 0)).toBe(true);
+        const state = await readState();
+
+        expect(JSON.stringify(state.replies)).not.toContain("Wrap-up that must not run");
+    });
+
+    it("aborts a wrap-up that a stop reaches while it generates, and saves none of its text", async () => {
+        const steps = probeSteps(CAP);
+        let calls = 0;
+
+        modelState.model = new MockLanguageModelV3({
+            doStream: async ({ abortSignal }) => {
+                calls += 1;
+
+                if (calls <= CAP) {
+                    return { stream: simulateReadableStream({ chunkDelayInMs: null, chunks: steps[calls - 1]!, initialDelayInMs: null }) };
+                }
+
+                // The wrap-up: a stop lands while it generates, and its text waits for the abort that the stop causes.
+                await harness.run(async (ctx: any) => await ctx.runMutation(stopActiveForThread, { threadId: ids.threadId }));
+
+                return {
+                    stream: new ReadableStream({
+                        start(controller) {
+                            controller.enqueue({ type: "stream-start", warnings: [] });
+                            controller.enqueue({ id: "t", type: "text-start" });
+                            controller.enqueue({ delta: "Wrap-up a stop must end.", id: "t", type: "text-delta" });
+                            abortSignal?.addEventListener("abort", () => {
+                                controller.error(new Error("aborted"));
+                            });
+                        },
+                    }) as never,
+                };
+            },
+        });
+
+        await run();
+
+        const state = await readState();
+
+        expect(calls).toBe(CAP + 1);
+        expect(JSON.stringify(state.replies)).not.toContain("Wrap-up a stop must end");
+        expect(state.streamStatus).toBe("done");
+    }, 20_000);
+
+    it("leaves no failed row of its own when the wrap-up call is rejected, and the reply stands", async () => {
+        const steps = probeSteps(CAP);
+        let calls = 0;
+
+        modelState.model = new MockLanguageModelV3({
+            doStream: async () => {
+                calls += 1;
+
+                if (calls <= CAP) {
+                    return { stream: simulateReadableStream({ chunkDelayInMs: null, chunks: steps[calls - 1]!, initialDelayInMs: null }) };
+                }
+
+                throw new Error("provider rejected the tool-less call");
+            },
+        });
+
+        await run();
+
+        const state = await readState();
+
+        expect(calls).toBe(CAP + 1);
+        expect(state.replies.filter((row: { status?: string }) => row.status === "failed")).toHaveLength(0);
+        expect(state.streamStatus).toBe("done");
+        expect(state.threadStatus).toBe("active");
+    });
+
+    it("makes no wrap-up call when the reply finishes in text before the cap", async () => {
+        modelState.model = scriptedModel([probeSteps(1)[0]!, textStep("Done, after one probe.")]);
+
+        await run();
+
+        const calls = modelCalls();
+
+        // Exactly the calls the loop itself makes: the tool step, then the text answer. No extra call.
+        expect(calls).toHaveLength(2);
+        expect(calls.every((call) => offeredTools(call).length > 0)).toBe(true);
+
+        const state = await readState();
+
+        expect(JSON.stringify(state.replies)).toContain("Done, after one probe.");
+    });
+
+    it("makes no wrap-up call for a reply that answers in text at once", async () => {
+        await run();
+
+        expect(modelCalls()).toHaveLength(1);
     });
 });
 

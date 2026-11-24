@@ -19,6 +19,15 @@ export const webSessionId = async (userId: string, clientId: string, scope: { ki
 /** What a person is told when their computer runs a Neore build older than this backend serves. */
 export const OUTDATED_NOTICE = "The Neore app on that computer is out of date. Update it, then try again.";
 
+/**
+ * `error.data.code` of a start refused because the computer is limited to some projects and the start is in none of them
+ * (`remote.ts#startHostSessionFor`), so a caller can tell it from a busy or offline computer.
+ */
+export const HOST_START_OUT_OF_SCOPE = "HOST_START_OUT_OF_SCOPE";
+
+/** Whether `error` is the refusal {@link HOST_START_OUT_OF_SCOPE} names. */
+export const isOutOfScopeStart = (error: unknown): boolean => (error as { data?: { code?: unknown } } | null)?.data?.code === HOST_START_OUT_OF_SCOPE;
+
 /** What a refused `acp_start` call tells the person who asked. */
 export const startFailureMessage = (error: Extract<AcpCallResult, { error: string }>["error"]): string => {
     if (error === "busy") {
