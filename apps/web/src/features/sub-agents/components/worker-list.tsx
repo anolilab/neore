@@ -167,8 +167,11 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
                 confirmLabel={t`Archive`}
                 description={t`Archived chats stay searchable, and you can restore them from the archive.`}
                 onConfirm={() => {
-                    if (pendingArchive !== undefined) {
-                        archiveWorker(pendingArchive);
+                    // Checked again now: the dialog can stay open while the worker starts working, and an active worker is never archived.
+                    const worker = workers.find((candidate) => candidate.workerId === pendingArchive);
+
+                    if (worker !== undefined && worker.state === "idle" && !worker.stopping && !worker.archived && !isImpersonating) {
+                        archiveWorker(worker.workerId);
                     }
 
                     setArchiveTarget(undefined);
