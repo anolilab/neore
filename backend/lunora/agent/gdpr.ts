@@ -296,6 +296,9 @@ export const repairChatFileMetadataForExport = internalMutation
             // row again, at primary, and take the metadata back if it is gone. (The reaper also clears its file's metadata after the row.)
             const stillThere = storedRow(await ctx.db.chatFiles.findFirst({ consistency: "primary", where: { _id: fileId } }));
 
+            // This read is a whole row too, and the same mutation: its bytes count against the export's budget like the first.
+            readBytes += stillThere ? rowBytes(stillThere) : 0;
+
             if (!stillThere) {
                 const { page: orphans } = await ctx.db.chatFileMetadata.findMany({ consistency: "primary", where: { fileId } });
 
