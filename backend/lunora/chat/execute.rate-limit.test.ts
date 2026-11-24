@@ -1515,48 +1515,6 @@ describe("the usage-limit settings of a rate-limited run", () => {
         expect(await snoozedUntil()).toBe(ownerUntil);
     });
 
-    it("stopping one paused reply keeps the chat snoozed for another paused reply on it", async () => {
-        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
-        modelState.model = planned([rateLimited()]);
-
-        await run();
-
-        expect(await snoozedUntil()).toBeDefined();
-
-        // A second paused reply on the same chat, which the first reply's stop must not expose.
-        await harness.run(
-            async (ctx: any) =>
-                await ctx.db.insert("persistentStreams", {
-                    expiresAt: Date.now() + 60_000,
-                    messageId: "other-message",
-                    pause: {
-                        from: ids.messageId,
-                        id: "other-pause",
-                        reason: "rate_limit",
-                        retryAt: Date.now() + RETRY_IN_MS,
-                        run: {
-                            messageId: "other-message",
-                            streamId: "other-stream",
-                            streamingConfig: { contentType: "text", model: "test-model" },
-                            threadId: ids.threadId,
-                            userId: OWNER,
-                        },
-                        status: 429,
-                    },
-                    status: "pending",
-                    streamingConfig: { contentType: "text", model: "test-model" },
-                    threadId: ids.threadId,
-                    userId: OWNER,
-                }),
-        );
-
-        await harness.run(
-            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: ids.messageId, onlyNamed: true, threadId: ids.threadId }),
-        );
-
-        expect(await snoozedUntil()).toBeDefined();
-    });
-
     /** A second paused reply on the same chat, waiting for the same reset (the reply `messageId` "other-message"). */
     const addSecondPausedReply = async (retryAt: number) =>
         await harness.run(
@@ -1776,5 +1734,32 @@ describe("the usage-limit settings of a rate-limited run", () => {
 
         expect(claim).not.toBeNull();
         expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("a new reply on the chat ends the manual wait it moves past, instead of leaving it waiting", async () => {
+        const { createStream } = await import("./streaming/persistent/library");
+
+        modelState.usagePrefs = { resumeAfterUsageLimit: false };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const waiting = await readState();
+
+        expect(waiting.pauseAwaitsPerson).toBe(true);
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(createStream, {
+                    messageId: ids.messageId,
+                    streamingConfig: { contentType: "text", model: "test-model" },
+                    threadId: ids.threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        const after = await readState();
+
+        expect(after.streamStatus).toBe("done");
     });
 });

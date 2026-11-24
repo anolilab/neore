@@ -47,7 +47,7 @@ const LIVE_STREAM_PAGE = 50;
 
 /** The pending row a run writes into; `createStream` and a goal's next round (`chat/goals/internal.ts`) both start one. */
 export const insertPersistentStream = async (
-    ctx: Pick<MutationCtx, "db" | "now">,
+    ctx: MutationCtx,
     {
         messageId,
         streamingConfig,
@@ -59,8 +59,8 @@ export const insertPersistentStream = async (
         threadId: string;
         userId: string;
     },
-): Promise<Id<"persistentStreams">> =>
-    (await ctx.db.insert("persistentStreams", {
+): Promise<Id<"persistentStreams">> => {
+    const streamId = (await ctx.db.insert("persistentStreams", {
         expiresAt: ctx.now + STREAM_TTL_MS,
         messageId,
         status: "pending",
@@ -68,6 +68,30 @@ export const insertPersistentStream = async (
         threadId,
         userId,
     })) as Id<"persistentStreams">;
+
+    await endSupersededManualWaits(ctx, threadId, streamId);
+
+    return streamId;
+};
+
+/**
+ * A manual wait (`pauseAwaitsPerson`) that the new reply moves the conversation past ends with it. Nothing else does: a manual
+ * wait queues no resume, so the `claimRunResume` supersede check never runs for it, and it would stay live (the thread
+ * running, its notice showing) until it timed out. Read after the new stream is inserted, so the chat is still held running.
+ */
+const endSupersededManualWaits = async (ctx: MutationCtx, threadId: string, newStreamId: Id<"persistentStreams">): Promise<void> => {
+    const live = await liveStreamsOf(ctx, threadId);
+
+    for (const stream of live) {
+        if (stream._id === newStreamId || stream.pauseAwaitsPerson !== true || stream.pause === undefined) {
+            continue;
+        }
+
+        if (await isSuperseded(ctx, stream, stream.pause.from)) {
+            await endPausedRun(ctx, stream);
+        }
+    }
+};
 
 export const createStream = internalMutation
     .input({
