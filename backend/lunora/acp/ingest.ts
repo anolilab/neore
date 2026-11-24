@@ -19,6 +19,7 @@ import { v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import { internal } from "../_generated/internal";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { addMessagesHandler } from "../agent/messages";
 import { insertThread } from "../agent/table-writes";
@@ -32,8 +33,10 @@ import {
     nextHostSeq,
     updateHostStream,
 } from "../chat/streaming/persistent/host";
+import { logger } from "../lib/logger";
 import { patchRow } from "../lib/patch";
 import { noteShardDue } from "../lib/shard-housekeeping";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
 import { confirmedOf, mergeAgentState, sameReportedFields, settledBy } from "./lib/agent-state";
@@ -41,6 +44,7 @@ import { MAX_EVENTS_PER_POST } from "./lib/constants";
 import { endLiveHostTurns, finishHostTurn } from "./lib/finish";
 import { isHostRunThread } from "./lib/host-thread";
 import { applyImportTurns, isImportEvent, openImport } from "./lib/import";
+import { rememberOpenedRunner } from "./lib/project-runner";
 import { reapExpiredHostStreams } from "./lib/reap";
 import { markReattachFailed, nativeIdFits, reattachFailureOf } from "./lib/reattach";
 import { sessionOfThread, touchSession } from "./lib/sessions";
@@ -145,6 +149,30 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
                 ...(learnedNativeId !== undefined && { nativeSessionId: learnedNativeId }),
                 ...(opened && { lastEventAt: now, status: opening ? ("busy" as const) : ("idle" as const) }),
             });
+        }
+
+        // The runner a project remembers is the one that opened: a start the computer refused or never opened records nothing.
+        // Its own mutation: the record reads `.global()` rows and writes settings, and none of that may roll this open back.
+        // The catch sees only a refusal inside the transaction; the job is handed to the scheduler after the commit, and a failed
+        // handoff there (kept in Lunora's outbox and retried) answers this post with an error. The desktop posts the open again
+        // (`session-link.ts`), and the session is no longer `starting`, so the retry is answered with the thread and schedules nothing.
+        // The job is named onto the device owner's shard, where the session lives: a job with no shard key may run on `__root__`.
+        if (opened && thread?.projectId) {
+            try {
+                await runAfterOnShard(
+                    ctx.scheduler,
+                    0,
+                    internal.acp.ingest.recordOpenedRunner,
+                    { openedAt: now, projectId: thread.projectId, sessionId: existing._id },
+                    device.userId,
+                );
+            } catch (error) {
+                logger.warn("acp: the project's runner default was not scheduled", {
+                    error: error instanceof Error ? error.message : String(error),
+                    sessionId: existing._id,
+                    threadId: existing.threadId,
+                });
+            }
         }
 
         return { ended: existing.status === "ended", next: 0, outcome: "applied", threadId: existing.threadId as string };
@@ -547,6 +575,34 @@ export const applyHostEvents = internalMutation
             { events: args.events, firstSeq: args.firstSeq, hostSessionId: args.sessionId, threadId: args.threadId, turnId: args.turnId },
             now,
         );
+    });
+
+/**
+ * Records the runner of a host session that opened as its project's default (`lib/project-runner.ts`), scheduled by the
+ * session's open so a failure here leaves the open as it was. Only for a session that opened: not `starting`, and with the
+ * `lastEventAt` the open wrote (`openedAt`) or a later one, so a session the desktop closed before this ran still records the
+ * runner that opened, and one ended without opening (a refused start) records nothing. Its thread must still be in the project
+ * it was in at the open.
+ */
+export const recordOpenedRunner = internalMutation
+    .input({ openedAt: v.number(), projectId: v.id("projects"), sessionId: v.id("acpSessions") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const session = await ctx.db.get("acpSessions", args.sessionId);
+
+        if (!session || session.status === "starting" || (session.lastEventAt ?? -Infinity) < args.openedAt) {
+            return null;
+        }
+
+        const thread = await ctx.db.get("threads", session.threadId as Id<"threads">);
+
+        if (!thread || thread.deleted || thread.projectId !== args.projectId) {
+            return null;
+        }
+
+        await rememberOpenedRunner(ctx, { ...thread, projectId: args.projectId }, session);
+
+        return null;
     });
 
 /**
