@@ -27,6 +27,8 @@ import { saveEditedSiblingHandler } from "../agent/branches";
 import { addMessagesHandler } from "../agent/messages";
 import { insertThread, patchThread } from "../agent/table-writes";
 import { authMutation, rateLimit } from "../lib/crpc";
+import { callerRestrictsFull, ownerNewChatMode } from "./lib/new-chat-mode";
+import type { ThreadPermissionMode } from "./lib/thread-permission-mode";
 import { isWorkerThread } from "../sub-agents/functions";
 import { storedRetentionHours } from "../lib/temporary-retention";
 import { MAX_LENGTH } from "../lib/validators";
@@ -93,7 +95,7 @@ export const saveLocalTurnHandler = async (
     userId: string,
     args: SaveLocalTurnArgs,
     /** What the caller's sign-in marks (`auth/lib/caller-session.ts#callerSessionMarks`): the prompt is saved with them, as `/chat/start` saves theirs. */
-    { sessionMarks = {} }: { sessionMarks?: NotTypedMarks } = {},
+    { newThreadMode, sessionMarks = {} }: { newThreadMode?: ThreadPermissionMode; sessionMarks?: NotTypedMarks } = {},
 ): Promise<SaveLocalTurnResult> => {
     // The browser sends what the person typed or said; hidden characters never become a saved turn.
     const prompt = stripHiddenText(args.prompt).text;
@@ -156,6 +158,7 @@ export const saveLocalTurnHandler = async (
             lastReplyAt: now,
             mode: "text",
             model: args.model,
+            ...(newThreadMode && { permissionMode: newThreadMode }),
             status: "active",
             tags: ["chat", "local"],
             title: deriveLocalThreadTitle(prompt),
@@ -259,7 +262,9 @@ export const saveLocalTurn = authMutation
     })
     .output(v.object({ assistantMessageId: v.string(), threadId: v.string(), userMessageId: v.string() }))
     .mutation(async ({ args, ctx }) => {
-        const result = await saveLocalTurnHandler(ctx, ctx.user.userId, args, { sessionMarks: await callerSessionMarks(ctx) });
+        // A new thread starts in the owner's default mode (`ownerNewChatMode`); a turn on an existing thread keeps its own.
+        const newThreadMode = args.threadId === undefined ? await ownerNewChatMode(ctx, ctx.user.userId, await callerRestrictsFull(ctx, ctx.user)) : undefined;
+        const result = await saveLocalTurnHandler(ctx, ctx.user.userId, args, { newThreadMode, sessionMarks: await callerSessionMarks(ctx) });
 
         ctx.log.event("chat.save_local_turn", { branched: args.branch !== undefined, newThread: args.threadId === undefined, outcome: args.outcome });
 
