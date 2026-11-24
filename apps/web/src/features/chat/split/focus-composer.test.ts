@@ -98,6 +98,21 @@ describe("focusComposerWhenMounted", () => {
         expect(focusLog).toEqual([]);
     });
 
+    it("does not take focus back from where the person moved it while the composer was loading", () => {
+        const { pane, update } = mountPane(createElement("div", null, createElement("button", null, "Start"), createElement("button", null, "Moved")));
+        const onSettled = vi.fn();
+
+        screen.getByRole("button", { name: "Start" }).focus();
+        focusComposerWhenMounted(pane, onSettled);
+        screen.getByRole("button", { name: "Moved" }).focus();
+
+        update(createElement("div", null, createElement("button", null, "Start"), createElement("button", null, "Moved"), composer()));
+        runFrame();
+
+        expect(focusLog.at(-1)).toBe(screen.getByRole("button", { name: "Moved" }));
+        expect(onSettled).toHaveBeenCalledWith(false);
+    });
+
     it("stops retrying when its cleanup runs, so a left pane does not take focus later", () => {
         const { pane, update } = mountPane();
         const onSettled = vi.fn();

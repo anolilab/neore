@@ -45,7 +45,18 @@ export const COMPOSER_INPUT = '[role="textbox"], textarea[data-focus-area="compo
 export const focusComposerWhenMounted = (pane: { current: HTMLElement | null }, onSettled: (focused: boolean) => void): (() => void) => {
     let frame = 0;
     let frames = 0;
+    // Focus is taken only from where it was when the request began, or from the page: once the person has moved it elsewhere, the composer
+    // leaves it there.
+    const startedFrom = document.activeElement;
     const focusEditor = () => {
+        const current = document.activeElement;
+
+        if (current !== startedFrom && current !== document.body && current !== null) {
+            onSettled(false);
+
+            return;
+        }
+
         const editor = pane.current?.querySelector<HTMLElement>(COMPOSER_INPUT);
 
         if (editor) {
