@@ -171,6 +171,15 @@ describe("events/poll over a log", () => {
         expect(outcome.nextSeq).toBe(2);
     });
 
+    it("does not report a gap for an old event of another name or thread, which the caller never asked for", async () => {
+        const log = logOf([run(1, 5000, "t1", RUN_FAILED_EVENT), run(2, 5100, "t2"), run(3, 9500)]);
+        const outcome = await pollEvents(log, { fromSeq: 0, maxAgeMs: 1000, maxEvents: 50, name: RUN_COMPLETED_EVENT, now: NOW, threadId: "t1" });
+
+        expect(outcome.events.map((event) => event.eventId)).toStrictEqual(["run:3"]);
+        expect(outcome.truncated).toBe(false);
+        expect(outcome.nextSeq).toBe(3);
+    });
+
     it("stops a scan that matches nothing and reports hasMore, so one poll cannot read the whole log", async () => {
         const rows = Array.from({ length: 1200 }, (_, index) => run(index + 1, 100, "other"));
         const outcome = await pollEvents(logOf(rows), { fromSeq: 0, maxEvents: 50, name: RUN_COMPLETED_EVENT, now: NOW, threadId: "t1" });

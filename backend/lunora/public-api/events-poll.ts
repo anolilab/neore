@@ -99,8 +99,12 @@ export const pollEvents = async (store: EventLogStore, query: PollQuery): Promis
             scanned += 1;
 
             if (floor !== undefined && event.timestamp < floor) {
-                // Older than the window the caller asked for: skipped, and that is a gap.
-                truncated = true;
+                // Older than the window the caller asked for. A gap only when it is an event the caller asked for: another name or
+                // thread in that window was never the caller's to receive.
+                if (matches(event, query)) {
+                    truncated = true;
+                }
+
                 from = event.seq;
                 continue;
             }
