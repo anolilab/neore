@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import type { FC, ReactNode } from "react";
 import { memo, useCallback, useState } from "react";
+import { toast } from "sonner";
 
 import { useChatActions, useChatThreadIdentity } from "@/features/chat/core/context/chat-context";
 import { useThreadManager } from "@/features/chat/core/hooks/use-thread-manager";
@@ -514,9 +515,16 @@ const MessageItem: FC<MessageItemProps> = memo(
             copyMessage(message.id, "plain");
         }, [copyMessage, message.id]);
 
-        const handleReload = useCallback(() => {
-            reloadMessage(message.id);
-        }, [reloadMessage, message.id]);
+        const { t } = useLingui();
+
+        const handleReload = useCallback(async () => {
+            const started = await reloadMessage(message.id);
+
+            // The prompt is on a page that is not loaded: say so, rather than doing nothing.
+            if (started === false) {
+                toast.error(t`Load the earlier messages, then try again: this reply's prompt is not loaded.`);
+            }
+        }, [reloadMessage, message.id, t]);
 
         const handleEdit = useCallback(() => {
             useChatUIStore.getState().startEditing(message.id, message.role === "user" ? getVisibleUserText(message) : message.text);

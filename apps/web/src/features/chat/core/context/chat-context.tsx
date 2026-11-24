@@ -818,10 +818,10 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             if (mustSignIn) {
                 openLoginPrompt();
 
-                return;
+                return undefined;
             }
 
-            await runReloadMessage(
+            return runReloadMessage(
                 {
                     authHeader,
                     defaultLanguage,

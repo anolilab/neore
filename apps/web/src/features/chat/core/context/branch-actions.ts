@@ -65,7 +65,7 @@ export const runReloadMessage = async (env: ReloadMessageEnv, messageId: string)
     setError(null);
 
     if (!threadId || !isAuthenticated) {
-        return;
+        return undefined;
     }
 
     // Through the ref, so the actions context (every message row reads it)
@@ -74,7 +74,7 @@ export const runReloadMessage = async (env: ReloadMessageEnv, messageId: string)
     const messageIndex = currentMessages.findIndex((m) => m.id === messageId);
 
     if (messageIndex === -1) {
-        return;
+        return undefined;
     }
 
     let userMessageIndex = -1;
@@ -86,14 +86,15 @@ export const runReloadMessage = async (env: ReloadMessageEnv, messageId: string)
         }
     }
 
+    // The prompt is on a page that is not loaded: nothing to ask again from here. `false` tells the caller, so it can say so.
     if (userMessageIndex === -1) {
-        return;
+        return false;
     }
 
     const userMessage = currentMessages[userMessageIndex];
 
     if (!userMessage) {
-        return;
+        return undefined;
     }
 
     const turn = startTurn();
@@ -137,7 +138,7 @@ export const runReloadMessage = async (env: ReloadMessageEnv, messageId: string)
             threadId,
         });
 
-        return;
+        return true;
     }
 
     // Set optimistic regenerating state to show "Thinking..." immediately
@@ -216,6 +217,8 @@ export const runReloadMessage = async (env: ReloadMessageEnv, messageId: string)
 
         handleError(error_);
     }
+
+    return true;
 };
 
 /** The body of the provider's `editMessage`: replaces the user message `messageId` and answers the new text as a sibling branch. */

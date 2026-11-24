@@ -120,7 +120,8 @@ export interface ChatActionsContextValue {
     jwtToken: string;
     lunora: ReturnType<typeof useLunora>;
     regenerate: () => Promise<void>;
-    reloadMessage: (messageId: string) => Promise<void>;
+    /** Resolves `false` when the reply's prompt is not among the loaded messages, so nothing was asked again. */
+    reloadMessage: (messageId: string) => Promise<boolean | undefined>;
     /** Resolves once the send has started or failed: a guest note's failure comes back here, not in the chat's error banner. */
     sendMessage: (text: string, attachments?: PendingAttachment[], options?: SendMessageOptions) => Promise<SendOutcome>;
 }
