@@ -1,5 +1,5 @@
-import { Autocomplete } from "@base-ui/react/autocomplete";
 import { useLingui } from "@lingui/react/macro";
+import { api } from "@neore/backend/api";
 import {
     Command,
     CommandCollection,
@@ -17,9 +17,11 @@ import {
     CommandShortcut,
 } from "@neore/ui/components/command";
 import { Kbd, KbdGroup } from "@neore/ui/components/kbd";
+import { Toggle } from "@neore/ui/components/toggle";
 import useIsHydrated from "@neore/ui/hooks/use-hydrated";
 import { formatShortcutForDisplay } from "@neore/ui/utils/keyboard-shortcuts";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import type { Query } from "@tanstack/react-query";
+import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import {
     Archive,
@@ -30,12 +32,14 @@ import {
     CornerDownRightIcon,
     File,
     FileText,
+    Folder,
     GitBranch,
     Hourglass,
     MessageSquare,
     Pin,
     PinOff,
     Settings,
+    Sparkles,
     Trash2,
 } from "lucide-react";
 import type { FC } from "react";
@@ -43,24 +47,39 @@ import React, { useEffect, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 
 import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
 import useAllThreadsData from "@/features/chat/core/hooks/use-all-threads-data";
 import useCurrentModel from "@/features/chat/core/hooks/use-current-model";
 import { useThreadManager } from "@/features/chat/core/hooks/use-thread-manager";
 import { useCurrentThreadId, useThreadMetadata } from "@/features/chat/core/stores/thread-store-hooks";
+import { errorCode } from "@/features/chat/guest-links/error-code";
 import { scrollToMessage } from "@/features/chat/thread/message-list";
 import useThreadHandlers from "@/features/chat/thread-list/hooks/use-thread-handlers";
 import type { ThreadState } from "@/features/chat/thread-list/lib/derived-sections";
 import { nextSnoozeWake, threadStateOf } from "@/features/chat/thread-list/lib/derived-sections";
 import { compareByStateRank, parseStateQuery } from "@/features/chat/thread-list/lib/state-query";
+import { isThreadLocked } from "@/features/chat/thread-list/thread-lock";
 import { buildMatchSnippet } from "@/features/chat/thread-list/utilities";
 import convertShortcutToHotkeysHook from "@/features/keyboard/lib/shortcut-converter";
 import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
+import { useProjectList } from "@/features/projects/hooks/use-projects";
 import useDebouncedValue from "@/hooks/use-debounced-value";
-import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
+import type { ApiPath } from "@/lib/lunora/crpc";
+import { useAction, useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
 import { useCommandDialogActions, useCommandDialogState, useCommandDialogStore } from "./command-dialog-store";
+import type { PaletteScope } from "./command-palette-scope";
+import {
+    isPaletteScoped,
+    matchesWithinWords,
+    NO_PALETTE_SCOPE,
+    projectRowsVisible,
+    threadRowsVisible,
+    threadRowVisible,
+    unscopedRowsVisible,
+} from "./command-palette-scope";
 
 ("use client");
 
@@ -68,8 +87,65 @@ import { useCommandDialogActions, useCommandDialogState, useCommandDialogStore }
 const MESSAGE_SEARCH_MIN_CHARS = 2;
 const MESSAGE_SEARCH_DEBOUNCE_MS = 250;
 const MAX_MESSAGE_HITS = 8;
+/** The meaning search embeds the query, so it waits for a few characters, as the backend does (`agent/thread-search-plan.ts`). */
+const MEANING_SEARCH_MIN_CHARS = 3;
+/** The longest query `searchThreadsByMeaning` accepts (`agent/thread-search.ts`); a longer one is not sent. */
+const MEANING_SEARCH_MAX_CHARS = 2000;
+const MAX_MEANING_HITS = 10;
+/** The meaning hits' key prefix, removed when the palette closes. */
+const MEANING_QUERY_KEY = ["command-palette", "meaning"] as const;
+/** How long a query's meaning hits are reused while the palette is open, so editing back to it does not embed it again. */
+const MEANING_CACHE_MS = 60_000;
 /** The longest delay setTimeout accepts; a timer capped by it re-arms when it fires (the effect reads `now`). */
 const MAX_TIMEOUT_MS = 2_147_483_647;
+
+interface ThreadWriteArgs {
+    status?: unknown;
+    threadId?: unknown;
+    threadIds?: unknown;
+    title?: unknown;
+}
+
+/** Which cached meaning queries a write marks stale: every one, only the archived-only ones, or none. */
+type MeaningHitsChange = "all" | "archived" | undefined;
+
+/**
+ * Which meaning hits a finished write changes (a hit's title, archived state or existence), told apart by the function it called
+ * (its `mutationKey`, `lunoraMutationKey`). Hiding a thread (delete) matters only for a listed one. An archive hides a listed
+ * thread and adds one to every archived-only search, where a thread just archived cannot be listed yet. A rename, a restore from
+ * the archive or an undone delete can add a hit anywhere, so each marks every query stale. Anything else, a sent message or a
+ * model change, keeps them, so it never pays for the embedding again.
+ */
+const changesMeaningHits = (mutationKey: ReadonlyArray<unknown> | undefined, variables: unknown, listedIds: ReadonlySet<string>): MeaningHitsChange => {
+    if (mutationKey?.[0] !== "lunora" || typeof variables !== "object" || variables === null) {
+        return undefined;
+    }
+
+    const args = variables as ThreadWriteArgs;
+    const isListed = (id: unknown): boolean => typeof id === "string" && listedIds.has(id);
+
+    switch (mutationKey[1] as ApiPath) {
+        case "chat_functions:deleteThreads": {
+            return Array.isArray(args.threadIds) && args.threadIds.some((id: unknown) => isListed(id)) ? "all" : undefined;
+        }
+        case "chat_functions:softDeleteThread": {
+            return isListed(args.threadId) ? "all" : undefined;
+        }
+        case "chat_functions:undoDeleteThread": {
+            return "all";
+        }
+        case "chat_functions:updateThread": {
+            if (args.title !== undefined || args.status === "active" || (args.status === "archived" && isListed(args.threadId))) {
+                return "all";
+            }
+
+            return args.status === "archived" ? "archived" : undefined;
+        }
+        default: {
+            return undefined;
+        }
+    }
+};
 
 interface MessageSearchThread {
     _id: string;
@@ -114,6 +190,7 @@ interface Item {
     detail?: string;
     icon?: React.ReactNode;
     isCurrent?: boolean;
+    isMeaningHit?: boolean;
     isMessageHit?: boolean;
     label: string;
     onClick?: () => void;
@@ -130,9 +207,18 @@ interface Group {
 
 interface ThreadItem {
     id: string;
+    /** A locked chat's list row is a stub without its project, so a project filter cannot place it. */
+    isLocked?: boolean;
     isPinned?: boolean;
+    projectId?: string;
     state: ThreadState;
     status: "active" | "archived";
+    title: string;
+}
+
+/** A project the palette is narrowed to: its thread rows only. */
+interface ProjectFilter {
+    id: string;
     title: string;
 }
 
@@ -147,13 +233,13 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     const { keyboardShortcuts } = useKeyboardShortcuts();
     const { isOpen } = useCommandDialogState();
     const { close, setOpen } = useCommandDialogActions();
+    const queryClient = useQueryClient();
 
     const currentThreadId = useCurrentThreadId();
     const threadMetadata = useThreadMetadata();
     const currentThreadModel = useCurrentModel();
     const { isAuthenticated, isLoading: isAuthLoading } = useLunoraAuth();
     const router = useRouter();
-    const { contains } = Autocomplete.useFilter();
 
     const isAuthReady = isAuthenticated && !isAuthLoading;
     const shouldQuery = isOpen && isAuthReady;
@@ -162,12 +248,54 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     const { deleteBranch, switchToBranch } = useThreadManager(shouldQuery);
     const { data: pinnedThreads } = useQuery(crpc.chat.functions.getPinnedThreads.queryOptions(shouldQuery ? {} : skipToken));
 
-    // The palette's input is uncontrolled; mirror it so message search can follow it.
+    // The palette's input text: message search follows it, and picking a project clears it.
     const [searchInput, setSearchInput] = useState("");
+    // The filters and the project the palette is narrowed to. Each closes with the palette.
+    const [scope, setScope] = useState<PaletteScope>(NO_PALETTE_SCOPE);
+    const [projectFilter, setProjectFilter] = useState<ProjectFilter | undefined>(undefined);
 
-    if (!isOpen && searchInput !== "") {
+    if (!isOpen && (searchInput !== "" || isPaletteScoped(scope) || projectFilter !== undefined)) {
         setSearchInput("");
+        setScope(NO_PALETTE_SCOPE);
+        setProjectFilter(undefined);
     }
+
+    // The meaning hits are kept a minute so editing a query back does not embed it again, but not past the open palette.
+    useEffect(() => {
+        if (!isOpen) {
+            queryClient.removeQueries({ queryKey: MEANING_QUERY_KEY });
+        }
+    }, [isOpen, queryClient]);
+
+    // A renamed, archived, restored or deleted thread changes the hits, wherever the edit was made, so such a write marks them stale
+    // once it succeeds (`changesMeaningHits`). The listed threads are those of every meaning query still cached.
+    useEffect(
+        () =>
+            queryClient.getMutationCache().subscribe((event) => {
+                if (event.type !== "updated" || event.action.type !== "success") {
+                    return;
+                }
+
+                const listedIds = new Set(
+                    queryClient
+                        .getQueriesData<{ threadId: string }[]>({ queryKey: MEANING_QUERY_KEY })
+                        .flatMap(([, hits]: [unknown, { threadId: string }[] | undefined]) => (hits ?? []).map((hit: { threadId: string }) => hit.threadId)),
+                );
+
+                const change = changesMeaningHits(event.mutation.options.mutationKey, event.mutation.state.variables, listedIds);
+
+                if (change === "all") {
+                    void queryClient.invalidateQueries({ queryKey: MEANING_QUERY_KEY });
+                } else if (change === "archived") {
+                    // The key's `scope.archived` (after the account): an archived-only search.
+                    void queryClient.invalidateQueries({
+                        predicate: (query: Query) => query.queryKey[MEANING_QUERY_KEY.length + 1] === true,
+                        queryKey: MEANING_QUERY_KEY,
+                    });
+                }
+            }),
+        [queryClient],
+    );
 
     // Message search is a full-text query: it waits for the palette to be open, for
     // two characters and for the typing to pause, and is never live (NEVER_LIVE).
@@ -176,12 +304,47 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     const debouncedSearch = useDebouncedValue(trimmedSearch, MESSAGE_SEARCH_DEBOUNCE_MS);
     // A state tag narrows to threads and drops message hits, so a tagged input never needs the full-text query.
     const isStateTagged = parseStateQuery(trimmedSearch).state !== undefined;
-    const isMessageSearchCurrent = shouldQuery && !isStateTagged && trimmedSearch.length >= MESSAGE_SEARCH_MIN_CHARS && trimmedSearch === debouncedSearch;
+    // A filter narrows the palette to its kinds: navigation, actions and message hits show only without one.
+    const unscopedRows = unscopedRowsVisible(scope) && projectFilter === undefined;
+    const isMessageSearchCurrent =
+        shouldQuery && unscopedRows && !isStateTagged && trimmedSearch.length >= MESSAGE_SEARCH_MIN_CHARS && trimmedSearch === debouncedSearch;
     const { data: messageSearchResults } = useQuery(
         crpc.chat.functions.searchMessages.queryOptions(
             isMessageSearchCurrent ? { paginationOpts: THREAD_LIST_PAGINATION_OPTS, searchQuery: debouncedSearch } : skipToken,
         ),
     );
+
+    // Search by meaning embeds the query on the server, so it waits as message search does. Its hits are threads, so it is not
+    // asked for while the palette is narrowed to a project or to project rows.
+    const searchMeaning = useAction(api.agent.thread_search.searchThreadsByMeaning);
+    // The hits are one account's thread titles: the key names the account, so a switch never shows the previous one's.
+    const { data: sessionData } = useAuthSession();
+    const sessionUserId = sessionData?.user.id;
+    const isMeaningSearchCurrent =
+        shouldQuery &&
+        !isStateTagged &&
+        threadRowsVisible(scope) &&
+        projectFilter === undefined &&
+        sessionUserId !== undefined &&
+        trimmedSearch.length >= MEANING_SEARCH_MIN_CHARS &&
+        trimmedSearch.length <= MEANING_SEARCH_MAX_CHARS &&
+        trimmedSearch === debouncedSearch;
+    const {
+        data: meaningHits,
+        error: meaningSearchError,
+        isError: isMeaningSearchFailed,
+    } = useQuery({
+        // The hits are a user's own thread titles: kept briefly while the palette is open, removed when it closes (above).
+        gcTime: MEANING_CACHE_MS,
+        queryFn: isMeaningSearchCurrent ? () => searchMeaning({ archivedOnly: scope.archived, query: debouncedSearch }) : skipToken,
+        queryKey: [...MEANING_QUERY_KEY, sessionUserId, scope.archived, debouncedSearch],
+        // Each try embeds the query again, so a failure is said (below) and never retried on its own; a refusal by the
+        // account's model rules would only be refused again.
+        retry: false,
+        staleTime: MEANING_CACHE_MS,
+    });
+    // Project rows show only under the Projects filter, so the list is read only then.
+    const { hasMore: hasMoreProjects, isError: isProjectListFailed, projects } = useProjectList(shouldQuery && scope.projects);
 
     const setLoadingStates = () => {};
     const { handleCreateBranch, handlePinThread, handleUnpinThread, updateThread } = useThreadHandlers(setLoadingStates);
@@ -248,7 +411,9 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
 
                 threads.push({
                     id: threadId,
+                    isLocked: isThreadLocked((thread as { lockedAt?: unknown }).lockedAt),
                     isPinned: pinnedThreadIds.has(threadId),
+                    projectId: (thread as { projectId?: string }).projectId,
                     state: threadStateOf(
                         {
                             awaitingInput: row.awaitingInput,
@@ -415,6 +580,9 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     // A leading `#state` tag narrows the thread lists to that state; the rest of the input searches their titles.
     const stateFilter = parseStateQuery(searchInput).state;
     const visibleThreads = stateFilter === undefined ? allThreads : allThreads.filter((candidate) => candidate.state === stateFilter);
+    // A locked chat's stub does not say its project, so under a chosen project it cannot be listed or ruled out.
+    const projectMayMissLocked =
+        projectFilter !== undefined && visibleThreads.some((candidate) => candidate.isLocked === true && threadRowVisible(scope, candidate.status));
 
     const groupedItems = (() => {
         const groups: Group[] = [];
@@ -446,7 +614,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
             },
         ];
 
-        if (navigationItems.length > 0) {
+        if (unscopedRows && navigationItems.length > 0) {
             groups.push({ items: navigationItems, value: t`Navigation` });
         }
 
@@ -504,11 +672,38 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
             }
         }
 
-        groups.push({ items: threadActions, value: t`Thread Actions` });
+        if (unscopedRows) {
+            groups.push({ items: threadActions, value: t`Thread Actions` });
+        }
+
+        // The thread rows the filters and the project let through; a row is listed only when its title matches the typed text.
+        const shownThreads = visibleThreads.filter(
+            (candidate) => threadRowVisible(scope, candidate.status) && (projectFilter === undefined || candidate.projectId === projectFilter.id),
+        );
+
+        if (projectRowsVisible(scope) && projectFilter === undefined && projects.length > 0) {
+            groups.push({
+                items: projects.map((project) => {
+                    return {
+                        icon: <Folder aria-hidden="true" className="size-4" />,
+                        label: project.title,
+                        onClick: () => {
+                            setProjectFilter({ id: project._id, title: project.title });
+                            // Only the Projects filter is done; Threads and Archived still narrow the project's threads.
+                            setScope({ ...scope, projects: false });
+                            // The text found the project; left in place it would narrow the project's threads by the project's name.
+                            setSearchInput("");
+                        },
+                        value: `project-${project._id}`,
+                    };
+                }),
+                value: t`Projects`,
+            });
+        }
 
         if (allThreads.length > 0) {
-            const activeThreads = visibleThreads.filter((candidate) => candidate.status === "active");
-            const archivedThreads = visibleThreads.filter((candidate) => candidate.status === "archived");
+            const activeThreads = shownThreads.filter((candidate) => candidate.status === "active");
+            const archivedThreads = shownThreads.filter((candidate) => candidate.status === "archived");
 
             if (activeThreads.length > 0) {
                 groups.push({
@@ -545,7 +740,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
             }
         }
 
-        const messageHits = isMessageSearchCurrent ? collectMessageHits(messageSearchResults?.page as MessageSearchThread[] | undefined) : [];
+        const messageHits = isMessageSearchCurrent && unscopedRows ? collectMessageHits(messageSearchResults?.page as MessageSearchThread[] | undefined) : [];
 
         if (messageHits.length > 0) {
             groups.push({
@@ -560,6 +755,30 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                     };
                 }),
                 value: t`Messages`,
+            });
+        }
+
+        // Meaning hits come after the exact matches. A thread whose title already matches the typed text is listed above, not again.
+        // The hits are shown only for the query they were asked for: the debounced one may still be behind the input.
+        const exactIds = new Set(shownThreads.filter((candidate) => matchesWithinWords(candidate.title, trimmedSearch)).map((candidate) => candidate.id));
+        const meaningRows = (isMeaningSearchCurrent ? (meaningHits ?? []) : [])
+            .filter((hit) => !exactIds.has(hit.threadId) && threadRowVisible(scope, hit.archived ? "archived" : "active"))
+            .slice(0, MAX_MEANING_HITS);
+
+        if (meaningRows.length > 0) {
+            groups.push({
+                items: meaningRows.map((hit) => {
+                    return {
+                        icon: <Sparkles aria-hidden="true" className="size-4" />,
+                        isMeaningHit: true,
+                        label: hit.title ?? t`Untitled Thread`,
+                        onClick: () => handleSwitchThread(hit.threadId),
+                        status: hit.archived ? ("archived" as const) : ("active" as const),
+                        threadId: hit.threadId,
+                        value: `meaning-${hit.threadId}`,
+                    };
+                }),
+                value: t`Related threads`,
             });
         }
 
@@ -583,10 +802,11 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
 
         // With a state tag the input narrows by title only; the tag already picked the threads.
         if (state !== undefined) {
-            return text === "" || contains(candidate, text, (value) => value.label);
+            return matchesWithinWords(candidate.label, text);
         }
 
-        return candidate.isMessageHit === true || contains(candidate, query, (value) => value.label);
+        // Message and meaning hits were matched on the server, not by their label, so the typed text does not drop them.
+        return candidate.isMessageHit === true || candidate.isMeaningHit === true || matchesWithinWords(candidate.label, query);
     };
 
     const handleCommandPaletteToggle = (event: KeyboardEvent) => {
@@ -614,6 +834,19 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         [isMounted, keyboardShortcuts.commandPalette, handleCommandPaletteToggle],
     );
 
+    // A read the shown rows depend on that failed, said in place of "No results found.".
+    let listFailure: string | undefined;
+
+    if (isMeaningSearchCurrent && isMeaningSearchFailed) {
+        // `MEANING_SEARCH_REFUSED` (`agent/thread-search-plan.ts`): the account's model rules refuse the embedding model.
+        listFailure =
+            errorCode(meaningSearchError) === "MEANING_SEARCH_REFUSED"
+                ? t`Search by meaning isn't available under your account's model rules, so related threads are not listed.`
+                : t`Search by meaning failed, so related threads are not listed. Try again in a moment.`;
+    } else if (projectRowsVisible(scope) && projectFilter === undefined && isProjectListFailed) {
+        listFailure = t`Your projects could not be loaded. Try again in a moment.`;
+    }
+
     return (
         <CommandDialog
             onOpenChange={(newOpen) => {
@@ -622,16 +855,63 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
             open={isOpen}
         >
             <CommandDialogPopup>
-                <Command filter={filterItem} items={groupedItems} onValueChange={setSearchInput}>
+                <Command filter={filterItem} items={groupedItems} onValueChange={setSearchInput} value={searchInput}>
                     <CommandInput placeholder={t`Search threads, navigate, or perform actions...`} />
+                    <div aria-label={t`Filter results`} className="flex flex-wrap items-center gap-1.5 px-3 pt-2" role="group">
+                        <Toggle onPressedChange={(pressed) => setScope({ ...scope, threads: pressed })} pressed={scope.threads} size="sm" variant="outline">
+                            {t`Threads`}
+                        </Toggle>
+                        <Toggle
+                            onPressedChange={(pressed) => {
+                                setScope({ ...scope, projects: pressed });
+
+                                // Project rows hide under a chosen project, and the Projects filter hides thread rows: together they list nothing.
+                                if (pressed) {
+                                    setProjectFilter(undefined);
+                                }
+                            }}
+                            pressed={scope.projects}
+                            size="sm"
+                            variant="outline"
+                        >
+                            {t`Projects`}
+                        </Toggle>
+                        <Toggle onPressedChange={(pressed) => setScope({ ...scope, archived: pressed })} pressed={scope.archived} size="sm" variant="outline">
+                            {t`Archived`}
+                        </Toggle>
+                        {projectFilter !== undefined && (
+                            <Toggle onPressedChange={() => setProjectFilter(undefined)} pressed size="sm" variant="outline">
+                                {t`Project: ${projectFilter.title}`}
+                            </Toggle>
+                        )}
+                    </div>
                     <CommandPanel>
-                        {/* A state tag filters the threads loaded here, one page of them: say so when there are more, so an empty or short list is not taken as complete. */}
-                        {stateFilter !== undefined && allThreadsData.hasMore && (
+                        {/* A state tag, the Archived filter and a chosen project filter the threads loaded here, one page of them: say so when there are more, so an empty or short list is not taken as complete. */}
+                        {(stateFilter !== undefined || scope.archived || projectFilter !== undefined) && allThreadsData.hasMore && (
                             <p className="text-muted-foreground px-3 pt-2 text-xs">
-                                {t`Only the ${allThreadsData.lunora.length} threads loaded here are filtered by state; older ones are not included.`}
+                                {t`Only the ${allThreadsData.lunora.length} threads loaded here are filtered; older ones are not included.`}
                             </p>
                         )}
-                        <CommandEmpty>{t`No results found.`}</CommandEmpty>
+                        {projectMayMissLocked && (
+                            <p className="text-muted-foreground px-3 pt-2 text-xs">{t`Locked chats do not reveal their project, so some may be missing here.`}</p>
+                        )}
+                        {projectRowsVisible(scope) && projectFilter === undefined && hasMoreProjects && (
+                            <p className="text-muted-foreground px-3 pt-2 text-xs">{t`Only the first ${projects.length} projects are listed here.`}</p>
+                        )}
+                        {/* The archived hits are what is left of the closest matches overall, so archived threads ranked below many active ones can be missing. */}
+                        {isMeaningSearchCurrent && scope.archived && !isMeaningSearchFailed && (
+                            <p className="text-muted-foreground px-3 pt-2 text-xs">
+                                {t`Related archived threads are picked from the closest matches across all your threads, so some may not be listed.`}
+                            </p>
+                        )}
+                        {/* A failed read is said, so an empty or short list is not taken for "nothing there". */}
+                        {listFailure === undefined ? (
+                            <CommandEmpty>{t`No results found.`}</CommandEmpty>
+                        ) : (
+                            <p className="text-destructive px-3 pt-2 text-xs" role="alert">
+                                {listFailure}
+                            </p>
+                        )}
                         <CommandList>
                             {(group: Group, index: number) => (
                                 <React.Fragment key={group.value}>

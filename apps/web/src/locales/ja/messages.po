@@ -892,7 +892,7 @@ msgstr "{activeCount, plural, other {# 件のメッセンジャーが接続さ�
 msgid "{activeCount} of {0} MCP servers active"
 msgstr "{0} 個中 {activeCount} 個の MCP サーバーが有効"
 
-#: src/features/develop/components/thread-pull-requests.tsx:167
+#: src/features/develop/components/thread-pull-requests.tsx:177
 msgid "{address}: {reason}"
 msgstr "{address}: {reason}"
 
@@ -1132,8 +1132,8 @@ msgstr "{hiddenRemoved, plural, other {メッセージから # 個の不可視�
 msgid "{hostLabel} could not be reached. Try again in a moment."
 msgstr "{hostLabel} に接続できませんでした。しばらくしてからもう一度お試しください。"
 
-#: src/features/develop/components/merge-panel.tsx:72
-#: src/features/develop/components/merge-panel.tsx:147
+#: src/features/develop/components/merge-panel.tsx:70
+#: src/features/develop/components/merge-panel.tsx:145
 msgid "{hostLabel} does not show which ways of merging this repository allows to your account."
 msgstr "{hostLabel} では、このリポジトリでお使いのアカウントに許可されているマージ方法を確認できません。"
 
@@ -1141,7 +1141,7 @@ msgstr "{hostLabel} では、このリポジトリでお使いのアカウント
 msgid "{hostLabel} has no batched review: your comments are posted one after another when you submit."
 msgstr "{hostLabel} にはまとめてレビューする機能がないため、送信時にコメントが順番に投稿されます。"
 
-#: src/features/develop/components/merge-panel.tsx:80
+#: src/features/develop/components/merge-panel.tsx:78
 msgid "{hostLabel} has rules this {requestNoun} does not meet yet. You can still try: {hostLabel} will say what is missing."
 msgstr "この{requestNoun}はまだ {hostLabel} のルールを満たしていません。それでも試すことはできます。足りないものは {hostLabel} が表示します。"
 
@@ -1167,7 +1167,7 @@ msgstr "ガイドの作成中に {hostLabel} またはお使いのコンピュ�
 msgid "{hostLabel} refused this request."
 msgstr "{hostLabel} がこのリクエストを拒否しました。"
 
-#: src/features/develop/components/merge-panel.tsx:81
+#: src/features/develop/components/merge-panel.tsx:79
 msgid "{hostLabel} says this is ready to merge."
 msgstr "{hostLabel} によると、マージの準備ができています。"
 
@@ -1181,7 +1181,7 @@ msgstr "{hostLabel} は、この{requestNoun}を閲覧できるすべての人�
 
 #. placeholder {0}: methodLabels[method]
 #. placeholder {1}: headSha.slice(0, 7)
-#: src/features/develop/components/merge-panel.tsx:124
+#: src/features/develop/components/merge-panel.tsx:122
 msgid "{hostLabel} will merge this {requestNoun} with “{0}” once its rules are met. It is turned on for the commit {1}: if the branch has changed since you opened this page, {hostLabel} refuses. You can turn this off until then."
 msgstr "ルールが満たされると、{hostLabel} は「{0}」でこの{requestNoun}をマージします。この設定はコミット {1} に対して有効です。このページを開いた後にブランチが変更された場合、{hostLabel} は拒否します。それまではオフにできます。"
 
@@ -1505,7 +1505,7 @@ msgstr "{renamed, plural, other {# 件の名前が、ファイルを ID で指�
 msgid "{requestCount} req"
 msgstr "{requestCount} 件"
 
-#: src/features/develop/components/pull-request-view.tsx:143
+#: src/features/develop/components/pull-request-view.tsx:136
 msgid "{requestNoun} views"
 msgstr "{requestNoun}ビュー"
 
@@ -1585,7 +1585,7 @@ msgstr "{star, plural, other {星 # つ}}"
 msgid "{stateLabel} Stop hands-free voice mode"
 msgstr "{stateLabel} ハンズフリー音声モードを停止"
 
-#: src/features/develop/components/thread-pull-requests.tsx:257
+#: src/features/develop/components/thread-pull-requests.tsx:273
 msgid "{success, plural, one {# pull request linked.} other {# pull requests linked.}}"
 msgstr "{success, plural, other {# 件のプルリクエストをリンクしました。}}"
 
@@ -2487,7 +2487,7 @@ msgstr "アクティブ日数"
 msgid "Active Sessions ({0})"
 msgstr "アクティブなセッション（{0}）"
 
-#: src/components/command-palette.tsx:526
+#: src/components/command-palette.tsx:721
 msgid "Active Threads"
 msgstr "アクティブなスレッド"
 
@@ -2733,7 +2733,7 @@ msgstr "プロンプトを追加"
 msgid "Add Provider"
 msgstr "プロバイダーを追加"
 
-#: src/features/develop/components/thread-pull-requests.tsx:235
+#: src/features/develop/components/thread-pull-requests.tsx:251
 msgid "Add pull requests that already exist to this thread. Each one is read from the host with your own connection first."
 msgstr "既存のプルリクエストをこのスレッドに追加します。それぞれ、まずご自身の接続でホストから読み取られます。"
 
@@ -3721,7 +3721,7 @@ msgstr "アルファベット順"
 msgid "Already have an account?"
 msgstr "アカウントをお持ちですか？"
 
-#: src/features/develop/components/thread-pull-requests.tsx:101
+#: src/features/develop/components/thread-pull-requests.tsx:111
 msgid "Already linked to this thread."
 msgstr "すでにこのスレッドにリンクされています。"
 
@@ -4345,12 +4345,13 @@ msgid "Archive the open thread, or restore it when it is archived ({0})"
 msgstr "開いているスレッドをアーカイブします。アーカイブ済みなら解除します（{0}）"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:98
-#: src/components/command-palette.tsx:493
-#: src/components/command-palette.tsx:655
+#: src/components/command-palette.tsx:661
+#: src/components/command-palette.tsx:935
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Archive thread"
 msgstr "スレッドをアーカイブ"
 
+#: src/components/command-palette.tsx:880
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:644
 #: src/features/sub-agents/components/worker-list.tsx:86
 #: src/features/tasks/components/goal-form-dialog.tsx:47
@@ -4362,7 +4363,7 @@ msgstr "アーカイブ済み"
 msgid "Archived for at least"
 msgstr "アーカイブ後の経過期間（以上）"
 
-#: src/components/command-palette.tsx:543
+#: src/components/command-palette.tsx:738
 msgid "Archived Threads"
 msgstr "アーカイブ済みのスレッド"
 
@@ -4787,15 +4788,15 @@ msgstr "自動レイアウト"
 msgid "Auto-layout (L)"
 msgstr "自動レイアウト（L）"
 
-#: src/features/develop/components/merge-panel.tsx:115
+#: src/features/develop/components/merge-panel.tsx:113
 msgid "Auto-merge is off."
 msgstr "自動マージはオフです。"
 
-#: src/features/develop/components/merge-panel.tsx:183
+#: src/features/develop/components/merge-panel.tsx:181
 msgid "Auto-merge is on: it merges once {hostLabel}'s rules are met."
 msgstr "自動マージはオンです。{hostLabel} のルールが満たされるとマージされます。"
 
-#: src/features/develop/components/merge-panel.tsx:115
+#: src/features/develop/components/merge-panel.tsx:113
 msgid "Auto-merge is on."
 msgstr "自動マージはオンです。"
 
@@ -5174,7 +5175,7 @@ msgstr "初級"
 msgid "Behavior"
 msgstr "動作"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:52
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:70
 msgid "Behind {base}"
 msgstr "{base} より遅れています"
 
@@ -6242,11 +6243,11 @@ msgstr "カタルーニャ語（スペイン）"
 msgid "catalog"
 msgstr "カタログ"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:75
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:93
 msgid "Catch up"
 msgstr "追いつく"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:46
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:64
 msgid "Catch up {pullRequest} with {base}"
 msgstr "{pullRequest} を {base} に追いつかせる"
 
@@ -6634,7 +6635,7 @@ msgstr "チェック"
 msgid "Checks passed"
 msgstr "チェックに合格"
 
-#: src/features/develop/components/merge-panel.tsx:85
+#: src/features/develop/components/merge-panel.tsx:83
 msgid "Checks that are not required are failing."
 msgstr "必須ではないチェックが失敗しています。"
 
@@ -7067,12 +7068,12 @@ msgstr "クローンまたは新規作成…"
 #: ../../packages/ui/src/components/dialog.tsx:84
 #: ../../packages/ui/src/components/image-editor.tsx:264
 #: ../../packages/ui/src/components/sheet.tsx:75
-#: src/components/command-palette.tsx:726
+#: src/components/command-palette.tsx:1006
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:835
 #: src/features/canvas/pdf-preview-panel.tsx:105
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
-#: src/features/develop/components/thread-pull-requests.tsx:280
+#: src/features/develop/components/thread-pull-requests.tsx:296
 #: src/features/evals/components/save-eval-case-action.tsx:95
 #: src/features/prompts/components/prompt-history-dialog.tsx:195
 #: src/features/settings/components/chat/custom-providers-settings.tsx:441
@@ -8083,7 +8084,7 @@ msgstr "WhatsApp を接続"
 msgid "Connect your {label} account to see what needs your review, what is yours, and what is ready to merge."
 msgstr "{label} アカウントに接続すると、レビューが必要なもの、自分のもの、マージ可能なものを確認できます。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:106
+#: src/features/develop/components/thread-pull-requests.tsx:116
 msgid "Connect your Git host in settings to link a pull request."
 msgstr "プルリクエストをリンクするには、設定で Git ホストに接続してください。"
 
@@ -8892,7 +8893,7 @@ msgstr "ボットのツールが保存されたか確認できませんでした
 msgid "Could not confirm that the review was submitted. Check on {hostLabel} before you try again. Your review is kept here."
 msgstr "レビューが送信されたことを確認できませんでした。もう一度試す前に {hostLabel} を確認してください。レビューはここに保持されています。"
 
-#: src/features/develop/components/merge-panel.tsx:99
+#: src/features/develop/components/merge-panel.tsx:97
 msgid "Could not confirm that this was merged. Check on {hostLabel} before you try again."
 msgstr "マージされたことを確認できませんでした。もう一度試す前に {hostLabel} を確認してください。"
 
@@ -8900,7 +8901,7 @@ msgstr "マージされたことを確認できませんでした。もう一度
 msgid "Could not confirm that. Check on {hostLabel} before you try again."
 msgstr "確認できませんでした。もう一度試す前に {hostLabel} を確認してください。"
 
-#: src/features/develop/components/merge-panel.tsx:113
+#: src/features/develop/components/merge-panel.tsx:111
 msgid "Could not confirm the change to auto-merge. Check on {hostLabel} before you try again."
 msgstr "自動マージの変更を確認できませんでした。もう一度試す前に {hostLabel} を確認してください。"
 
@@ -8996,7 +8997,7 @@ msgstr "ワークフローをインポートできませんでした"
 msgid "Could not keep this as yours. Try again."
 msgstr "自分のものとして保持できませんでした。もう一度お試しください。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:183
+#: src/features/develop/components/thread-pull-requests.tsx:193
 msgid "Could not link. Try again."
 msgstr "リンクできませんでした。もう一度お試しください。"
 
@@ -9017,7 +9018,7 @@ msgstr "これ以上プロジェクトを読み込めませんでした。"
 msgid "Could not load statistics for this thread."
 msgstr "このスレッドの統計を読み込めませんでした。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:201
+#: src/features/develop/components/thread-pull-requests.tsx:211
 msgid "Could not load the linked pull requests."
 msgstr "リンクされたプルリクエストを読み込めませんでした。"
 
@@ -9484,7 +9485,7 @@ msgstr "API キーを作成"
 msgid "Create bot"
 msgstr "ボットを作成"
 
-#: src/components/command-palette.tsx:477
+#: src/components/command-palette.tsx:645
 #: src/features/chat/thread-list/thread-node.tsx:743
 #: src/features/chat/thread-list/thread-node.tsx:766
 msgid "Create branch"
@@ -9796,7 +9797,7 @@ msgstr "キューバ"
 msgid "Currency Conversion"
 msgstr "通貨換算"
 
-#: src/components/command-palette.tsx:651
+#: src/components/command-palette.tsx:931
 #: src/features/auth/components/settings/security/session-cell.tsx:80
 #: src/features/projects/components/move-to-project-dialog.tsx:84
 #: src/features/prompts/components/prompt-history-dialog.tsx:136
@@ -10700,8 +10701,8 @@ msgid "Delete this login?"
 msgstr "このログインを削除しますか？"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
-#: src/components/command-palette.tsx:499
-#: src/components/command-palette.tsx:679
+#: src/components/command-palette.tsx:667
+#: src/components/command-palette.tsx:959
 #: src/features/chat/thread-list/thread-node.tsx:1082
 #: src/features/chat/thread-list/thread-node.tsx:1100
 #: src/features/pages/components/page-comments-panel.tsx:188
@@ -12723,7 +12724,7 @@ msgstr "組織名を入力"
 msgid "Enter organization slug"
 msgstr "組織のスラッグを入力"
 
-#: src/features/develop/components/thread-pull-requests.tsx:125
+#: src/features/develop/components/thread-pull-requests.tsx:135
 msgid "Enter pull requests as owner/name#123."
 msgstr "プルリクエストは owner/name#123 の形式で入力してください。"
 
@@ -13893,10 +13894,10 @@ msgstr "データセットを削除できませんでした"
 msgid "Failed to delete the thread. {0, plural, one {# branch was deleted.} other {# branches were deleted.}}"
 msgstr "スレッドを削除できませんでした。{0, plural, other {# 件のブランチが削除されました。}}"
 
-#: src/components/command-palette.tsx:333
-#: src/components/command-palette.tsx:341
-#: src/components/command-palette.tsx:384
-#: src/components/command-palette.tsx:391
+#: src/components/command-palette.tsx:498
+#: src/components/command-palette.tsx:506
+#: src/components/command-palette.tsx:549
+#: src/components/command-palette.tsx:556
 msgid "Failed to delete thread"
 msgstr "スレッドを削除できませんでした"
 
@@ -15096,6 +15097,10 @@ msgstr "種類でメモリを絞り込み"
 msgid "Filter path"
 msgstr "フィルターのパス"
 
+#: src/components/command-palette.tsx:860
+msgid "Filter results"
+msgstr "結果を絞り込む"
+
 #: src/features/settings/components/chat/model-filter-settings.tsx:55
 #: src/features/settings/components/chat/model-filter-settings.tsx:66
 msgid "Filter rules updated"
@@ -16270,7 +16275,7 @@ msgstr "ツールを切り替えずに、アイデアから完成品まで。テ
 msgid "Go to chat"
 msgstr "チャットへ移動"
 
-#: src/components/command-palette.tsx:425
+#: src/components/command-palette.tsx:593
 #: src/routes/(public)/invite/$inviteToken.tsx:70
 msgid "Go to Chat"
 msgstr "チャットへ移動"
@@ -16313,7 +16318,7 @@ msgstr "ペアリングへ移動"
 msgid "Go to previous page"
 msgstr "前のページへ"
 
-#: src/components/command-palette.tsx:431
+#: src/components/command-palette.tsx:599
 msgid "Go to Prompts"
 msgstr "プロンプトへ移動"
 
@@ -16325,7 +16330,7 @@ msgstr "返信に移動"
 msgid "Go to servers"
 msgstr "サーバーへ移動"
 
-#: src/components/command-palette.tsx:443
+#: src/components/command-palette.tsx:611
 msgid "Go to Settings"
 msgstr "設定へ移動"
 
@@ -16350,7 +16355,7 @@ msgstr "スライド {slideNumber} へ移動"
 msgid "Go to step {0}"
 msgstr "ステップ {0} へ移動"
 
-#: src/components/command-palette.tsx:437
+#: src/components/command-palette.tsx:605
 msgid "Go to Vault"
 msgstr "ボールトへ移動"
 
@@ -17340,7 +17345,7 @@ msgstr "タイトルはどのように書きますか？"
 msgid "How the agent's browser presses buttons and links"
 msgstr "エージェントのブラウザがボタンとリンクをクリックする方法"
 
-#: src/features/develop/components/merge-panel.tsx:151
+#: src/features/develop/components/merge-panel.tsx:149
 msgid "How to merge"
 msgstr "マージ方法"
 
@@ -19613,7 +19618,7 @@ msgstr "有効な JSON ではない行"
 
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:340
 #: src/features/auth/components/settings/providers/provider-cell.tsx:113
-#: src/features/develop/components/thread-pull-requests.tsx:282
+#: src/features/develop/components/thread-pull-requests.tsx:298
 msgid "Link"
 msgstr "リンク"
 
@@ -19621,7 +19626,7 @@ msgstr "リンク"
 msgid "Link active until {expiresAt}"
 msgstr "{expiresAt} までリンクが有効です"
 
-#: src/features/develop/components/thread-pull-requests.tsx:137
+#: src/features/develop/components/thread-pull-requests.tsx:147
 msgid "Link at most {MAX_PULL_REQUESTS_PER_ATTACH} pull requests at a time."
 msgstr "一度にリンクできるプルリクエストは最大 {MAX_PULL_REQUESTS_PER_ATTACH} 件です。"
 
@@ -19639,11 +19644,11 @@ msgstr "リンクプレビュー"
 msgid "Link previews"
 msgstr "リンクプレビュー"
 
-#: src/features/develop/components/thread-pull-requests.tsx:215
+#: src/features/develop/components/thread-pull-requests.tsx:231
 msgid "Link pull request"
 msgstr "プルリクエストをリンク"
 
-#: src/features/develop/components/thread-pull-requests.tsx:234
+#: src/features/develop/components/thread-pull-requests.tsx:250
 msgid "Link pull requests"
 msgstr "プルリクエストをリンク"
 
@@ -19655,7 +19660,7 @@ msgstr "手動でリンク"
 msgid "Linked pull requests: {linkedPullRequests}"
 msgstr "リンクされたプルリクエスト: {linkedPullRequests}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:102
+#: src/features/develop/components/thread-pull-requests.tsx:112
 msgid "Linked to this thread."
 msgstr "このスレッドにリンクされています。"
 
@@ -19663,8 +19668,8 @@ msgstr "このスレッドにリンクされています。"
 msgid "LinkedIn Post"
 msgstr "LinkedIn 投稿"
 
-#: src/features/develop/components/thread-pull-requests.tsx:263
-#: src/features/develop/components/thread-pull-requests.tsx:282
+#: src/features/develop/components/thread-pull-requests.tsx:279
+#: src/features/develop/components/thread-pull-requests.tsx:298
 msgid "Linking…"
 msgstr "リンク中…"
 
@@ -20019,7 +20024,7 @@ msgstr "ゲストリンクを読み込んでいます…"
 msgid "Loading the guide"
 msgstr "ガイドを読み込み中"
 
-#: src/features/develop/components/thread-pull-requests.tsx:196
+#: src/features/develop/components/thread-pull-requests.tsx:206
 msgid "Loading the linked pull requests…"
 msgstr "リンクされたプルリクエストを読み込み中…"
 
@@ -20170,6 +20175,10 @@ msgstr "このチャットをロック"
 #: src/features/chat/thread-list/thread-node.tsx:260
 msgid "Locked chat"
 msgstr "ロックされたチャット"
+
+#: src/components/command-palette.tsx:896
+msgid "Locked chats do not reveal their project, so some may be missing here."
+msgstr "ロックされたチャットはプロジェクトを表示しないため、ここに一部が表示されない場合があります。"
 
 #. placeholder {0}: getModelModeName(anchorMode)
 #: src/components/model-picker/model-picker.tsx:1397
@@ -21035,8 +21044,8 @@ msgstr "メンションのみ"
 msgid "Menu"
 msgstr "メニュー"
 
-#: src/features/develop/components/merge-panel.tsx:133
-#: src/features/develop/components/merge-panel.tsx:143
+#: src/features/develop/components/merge-panel.tsx:131
+#: src/features/develop/components/merge-panel.tsx:141
 msgid "Merge"
 msgstr "マージ"
 
@@ -21044,7 +21053,7 @@ msgstr "マージ"
 msgid "Merge cells"
 msgstr "セルを結合"
 
-#: src/features/develop/components/merge-panel.tsx:77
+#: src/features/develop/components/merge-panel.tsx:75
 msgid "Merge commit"
 msgstr "マージコミット"
 
@@ -21060,16 +21069,16 @@ msgstr "マージリクエストがマージされました"
 msgid "Merge request opened"
 msgstr "マージリクエストが作成されました"
 
-#: src/features/develop/components/merge-panel.tsx:135
+#: src/features/develop/components/merge-panel.tsx:133
 msgid "Merge this {requestNoun}?"
 msgstr "この{requestNoun}をマージしますか？"
 
-#: src/features/develop/components/merge-panel.tsx:123
-#: src/features/develop/components/merge-panel.tsx:173
+#: src/features/develop/components/merge-panel.tsx:121
+#: src/features/develop/components/merge-panel.tsx:171
 msgid "Merge when ready"
 msgstr "準備ができたらマージ"
 
-#: src/features/develop/components/merge-panel.tsx:125
+#: src/features/develop/components/merge-panel.tsx:123
 msgid "Merge when ready?"
 msgstr "準備ができたらマージしますか？"
 
@@ -21078,11 +21087,11 @@ msgstr "準備ができたらマージしますか？"
 msgid "Merged"
 msgstr "マージ済み"
 
-#: src/features/develop/components/merge-panel.tsx:101
+#: src/features/develop/components/merge-panel.tsx:99
 msgid "Merged on {hostLabel}."
 msgstr "{hostLabel} 上でマージされました。"
 
-#: src/features/develop/components/merge-panel.tsx:168
+#: src/features/develop/components/merge-panel.tsx:166
 msgid "Merging…"
 msgstr "マージ中…"
 
@@ -21137,7 +21146,7 @@ msgstr "メッセージのバージョン"
 msgid "Message..."
 msgstr "メッセージ..."
 
-#: src/components/command-palette.tsx:562
+#: src/components/command-palette.tsx:757
 #: src/features/chat/sharing/shared-thread-page.tsx:151
 #: src/features/chat/thread-list/search-bar.tsx:57
 msgid "Messages"
@@ -22214,7 +22223,7 @@ msgid "navigate"
 msgstr "移動"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:110
-#: src/components/command-palette.tsx:712
+#: src/components/command-palette.tsx:992
 msgid "Navigate"
 msgstr "移動"
 
@@ -22243,7 +22252,7 @@ msgid "Navigating to {target}..."
 msgstr "{target} に移動しています..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:132
-#: src/components/command-palette.tsx:450
+#: src/components/command-palette.tsx:618
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:68
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:59
 msgid "Navigation"
@@ -22615,7 +22624,7 @@ msgstr "新しい一時チャット"
 msgid "New Temporary Chat"
 msgstr "新しい一時チャット"
 
-#: src/components/command-palette.tsx:466
+#: src/components/command-palette.tsx:634
 msgid "New temporary thread"
 msgstr "新しい一時スレッド"
 
@@ -22623,7 +22632,7 @@ msgstr "新しい一時スレッド"
 msgid "New this week"
 msgstr "今週の新着"
 
-#: src/components/command-palette.tsx:459
+#: src/components/command-palette.tsx:627
 msgid "New thread"
 msgstr "新しいスレッド"
 
@@ -22947,7 +22956,7 @@ msgstr "データセットはまだありません"
 msgid "No description"
 msgstr "説明なし"
 
-#: src/features/develop/components/pull-request-view.tsx:153
+#: src/features/develop/components/pull-request-view.tsx:146
 msgid "No description provided."
 msgstr "説明はありません。"
 
@@ -23311,7 +23320,7 @@ msgstr "結果が見つかりません"
 msgid "No results found for “{searchTerm}”"
 msgstr "“{searchTerm}” の結果が見つかりません"
 
-#: src/components/command-palette.tsx:634
+#: src/components/command-palette.tsx:909
 #: src/features/chat/thread/widgets/wolfram-widget.tsx:34
 msgid "No results found."
 msgstr "結果が見つかりません。"
@@ -23627,7 +23636,7 @@ msgstr "リードに配信されませんでした"
 msgid "Not found"
 msgstr "見つかりません"
 
-#: src/features/develop/components/thread-pull-requests.tsx:268
+#: src/features/develop/components/thread-pull-requests.tsx:284
 msgid "Not linked"
 msgstr "リンクされていません"
 
@@ -23639,7 +23648,7 @@ msgstr "読み込まれませんでした: このページの差分はすでに�
 msgid "not measured"
 msgstr "未測定"
 
-#: src/features/develop/components/merge-panel.tsx:190
+#: src/features/develop/components/merge-panel.tsx:188
 msgid "Not merged"
 msgstr "未マージ"
 
@@ -24184,8 +24193,18 @@ msgstr "このチャットに書き込める人だけがブラウザーを操作
 
 #. placeholder {0}: allThreadsData.lunora.length
 #: src/components/command-palette.tsx:631
-msgid "Only the {0} threads loaded here are filtered by state; older ones are not included."
-msgstr "状態で絞り込まれるのは、ここに読み込まれた {0} 件のスレッドのみです。それより古いスレッドは含まれません。"
+#~ msgid "Only the {0} threads loaded here are filtered by state; older ones are not included."
+#~ msgstr "状態で絞り込まれるのは、ここに読み込まれた {0} 件のスレッドのみです。それより古いスレッドは含まれません。"
+
+#. placeholder {0}: allThreadsData.lunora.length
+#: src/components/command-palette.tsx:892
+msgid "Only the {0} threads loaded here are filtered; older ones are not included."
+msgstr "ここに読み込まれた {0} 件のスレッドのみが絞り込まれます。古いスレッドは含まれません。"
+
+#. placeholder {0}: projects.length
+#: src/components/command-palette.tsx:899
+msgid "Only the first {0} projects are listed here."
+msgstr "ここには最初の {0} 件のプロジェクトのみが表示されます。"
 
 #: src/features/knowledge/hooks/use-knowledge-import.ts:156
 msgid "Only the first {MAX_DOCUMENTS_PER_IMPORT} documents were imported."
@@ -24273,7 +24292,7 @@ msgid "Opacity"
 msgstr "不透明度"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:796
-#: src/components/command-palette.tsx:718
+#: src/components/command-palette.tsx:998
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
 #: src/features/develop/components/pull-request-view.tsx:75
@@ -24539,7 +24558,7 @@ msgstr "コンポーザーのモデルピッカーを開く（{0}）"
 
 #. placeholder {0}: link.repository
 #. placeholder {1}: link.number
-#: src/features/develop/components/thread-pull-requests.tsx:40
+#: src/features/develop/components/thread-pull-requests.tsx:50
 msgid "Open the pull request {0}#{1}"
 msgstr "プルリクエスト {0}#{1} を開く"
 
@@ -26025,7 +26044,7 @@ msgid "Pin message"
 msgstr "メッセージをピン留め"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
-#: src/components/command-palette.tsx:483
+#: src/components/command-palette.tsx:651
 #: src/features/chat/thread-list/thread-node.tsx:117
 msgid "Pin thread"
 msgstr "スレッドをピン留め"
@@ -26980,6 +26999,13 @@ msgstr "プロジェクトは利用できなくなりました"
 msgid "Project repository"
 msgstr "プロジェクトのリポジトリ"
 
+#. placeholder {0}: projectFilter.title
+#: src/components/command-palette.tsx:884
+msgid "Project: {0}"
+msgstr "プロジェクト: {0}"
+
+#: src/components/command-palette.tsx:700
+#: src/components/command-palette.tsx:877
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:606
 msgid "Projects"
 msgstr "プロジェクト"
@@ -27291,7 +27317,7 @@ msgid "Pull request settings updated"
 msgstr "プルリクエストの設定を更新しました"
 
 #: src/features/code/components/code-shell.tsx:95
-#: src/features/develop/components/thread-pull-requests.tsx:238
+#: src/features/develop/components/thread-pull-requests.tsx:254
 msgid "Pull requests"
 msgstr "プルリクエスト"
 
@@ -27347,11 +27373,11 @@ msgstr "このブラウザーでのプッシュ通知"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "役割の異なる複数のエージェントを 1 つのスレッドに配置できます。レビューパネルはセキュリティとパフォーマンスの観点から変更を確認でき、ディベートでは統合の前に両方の立場を議論できます。"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:81
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:99
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
 msgstr "このブランチを {base} にリベースし、コンフリクトを解消し、ビルドとテストを確認してプッシュするプロンプトをコンポーザーに入力します。送信はされません。"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:82
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:100
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "このフォークのブランチをローカルのコピーで {base} にリベースし、コンフリクトを解消し、ビルドとテストを確認するプロンプトをコンポーザーに入力します。プッシュはされません。送信はされません。"
 
@@ -27882,7 +27908,7 @@ msgstr "推論: {effortLabel}"
 msgid "Reasons through the prompt before generating"
 msgstr "生成前にプロンプトを推論します"
 
-#: src/features/develop/components/merge-panel.tsx:77
+#: src/features/develop/components/merge-panel.tsx:75
 msgid "Rebase and merge"
 msgstr "リベースしてマージ"
 
@@ -27923,7 +27949,7 @@ msgstr "再接続"
 msgid "Reconnect {0}"
 msgstr "{0} を再接続"
 
-#: src/features/develop/components/thread-pull-requests.tsx:105
+#: src/features/develop/components/thread-pull-requests.tsx:115
 msgid "Reconnect your Git host in settings to link a pull request."
 msgstr "プルリクエストをリンクするには、設定で Git ホストに再接続してください。"
 
@@ -28186,6 +28212,14 @@ msgstr "拒否"
 #: src/features/marketing/use-cases/use-case-data.ts:27
 msgid "Rejecting a result in review marks the run as failed. The rejected answer stays on record."
 msgstr "レビューで結果を却下すると、実行は失敗として記録されます。却下された回答は記録に残ります。"
+
+#: src/components/command-palette.tsx:904
+msgid "Related archived threads are picked from the closest matches across all your threads, so some may not be listed."
+msgstr "関連するアーカイブ済みスレッドは、すべてのスレッドの中で最も近い一致から選ばれるため、表示されないものがある場合があります。"
+
+#: src/components/command-palette.tsx:781
+msgid "Related threads"
+msgstr "関連スレッド"
 
 #: src/features/devices/lib/device-diagnostics.ts:69
 msgid "relay (another paired computer)"
@@ -30030,6 +30064,14 @@ msgstr "学術論文や PDF を検索"
 msgid "Search across the entire internet"
 msgstr "インターネット全体を検索"
 
+#: src/components/command-palette.tsx:845
+msgid "Search by meaning failed, so related threads are not listed. Try again in a moment."
+msgstr "意味による検索に失敗したため、関連するスレッドは表示されていません。しばらくしてからもう一度お試しください。"
+
+#: src/components/command-palette.tsx:844
+msgid "Search by meaning isn't available under your account's model rules, so related threads are not listed."
+msgstr "アカウントのモデルルールにより意味による検索は利用できないため、関連するスレッドは表示されていません。"
+
 #: src/features/admin/components/users-management-card.tsx:122
 msgid "Search by name or email..."
 msgstr "名前またはメールアドレスで検索..."
@@ -30236,7 +30278,7 @@ msgstr "スレッドを検索"
 msgid "Search threads ({focusSearchShortcut})"
 msgstr "スレッドを検索（{focusSearchShortcut}）"
 
-#: src/components/command-palette.tsx:626
+#: src/components/command-palette.tsx:859
 msgid "Search threads, navigate, or perform actions..."
 msgstr "スレッドの検索、移動、操作の実行..."
 
@@ -32269,7 +32311,7 @@ msgstr "正方形"
 msgid "Square post"
 msgstr "正方形の投稿"
 
-#: src/features/develop/components/merge-panel.tsx:77
+#: src/features/develop/components/merge-panel.tsx:75
 msgid "Squash and merge"
 msgstr "スカッシュしてマージ"
 
@@ -34644,7 +34686,7 @@ msgstr "コスト上限には正のドル金額を指定してください。"
 msgid "The dataset, its cases and every run of it are removed."
 msgstr "データセット、そのケース、およびすべての実行が削除されます。"
 
-#: src/features/develop/components/pull-request-view.tsx:155
+#: src/features/develop/components/pull-request-view.tsx:148
 msgid "The description is cut short."
 msgstr "説明が途中で切れています。"
 
@@ -34808,7 +34850,7 @@ msgstr "ホスト"
 msgid "the host did not answer"
 msgstr "ホストが応答しませんでした"
 
-#: src/features/develop/components/thread-pull-requests.tsx:104
+#: src/features/develop/components/thread-pull-requests.tsx:114
 msgid "The host did not answer. Try again."
 msgstr "ホストから応答がありませんでした。もう一度お試しください。"
 
@@ -34820,11 +34862,11 @@ msgstr "ホストから応答がありませんでした。後でもう一度試
 msgid "the host did not change the option"
 msgstr "ホストはそのオプションを変更しませんでした"
 
-#: src/features/develop/components/thread-pull-requests.tsx:107
+#: src/features/develop/components/thread-pull-requests.tsx:117
 msgid "The host has no pull request at that address."
 msgstr "ホストには、そのアドレスにプルリクエストがありません。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:109
+#: src/features/develop/components/thread-pull-requests.tsx:119
 msgid "The host is limiting requests. Try again shortly."
 msgstr "ホストがリクエストを制限しています。しばらくしてからもう一度お試しください。"
 
@@ -35468,11 +35510,11 @@ msgstr "考えています..."
 msgid "Thinking…"
 msgstr "考え中…"
 
-#: src/features/develop/components/merge-panel.tsx:83
+#: src/features/develop/components/merge-panel.tsx:81
 msgid "This {requestNoun} is still a draft."
 msgstr "この{requestNoun}はまだドラフトです。"
 
-#: src/features/develop/components/merge-panel.tsx:129
+#: src/features/develop/components/merge-panel.tsx:127
 msgid "This {requestNoun} will no longer merge by itself."
 msgstr "この{requestNoun}は自動ではマージされなくなります。"
 
@@ -35500,11 +35542,11 @@ msgstr "このボットのツールは別の場所で変更されました。こ
 msgid "This bot's tools were changed elsewhere. They are shown as saved now; make your change again."
 msgstr "このボットのツールは別の場所で変更されました。保存済みの内容を表示しています。もう一度変更してください。"
 
-#: src/features/develop/components/merge-panel.tsx:82
+#: src/features/develop/components/merge-panel.tsx:80
 msgid "This branch has conflicts with its base branch."
 msgstr "このブランチはベースブランチとコンフリクトしています。"
 
-#: src/features/develop/components/merge-panel.tsx:79
+#: src/features/develop/components/merge-panel.tsx:77
 msgid "This branch is behind its base branch."
 msgstr "このブランチはベースブランチより遅れています。"
 
@@ -35766,7 +35808,7 @@ msgstr "このガイドは以前のコミットに対して作成されました
 msgid "This host does not offer an inbox yet."
 msgstr "このホストはまだ受信トレイを提供していません。"
 
-#: src/features/develop/components/pull-request-view.tsx:140
+#: src/features/develop/components/pull-request-view.tsx:133
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr "このホストはまだ{requestNoun}のビューを提供していません。"
 
@@ -35875,7 +35917,7 @@ msgstr "このメモリはその後削除されました。"
 
 #. placeholder {0}: headSha.slice(0, 7)
 #. placeholder {1}: methodLabels[method]
-#: src/features/develop/components/merge-panel.tsx:134
+#: src/features/develop/components/merge-panel.tsx:132
 msgid "This merges the commit {0} into the base branch with “{1}” on {hostLabel}. If the branch has changed since you opened this page, {hostLabel} refuses."
 msgstr "{hostLabel} で、コミット {0} を「{1}」でベースブランチにマージします。このページを開いた後にブランチが変更された場合、{hostLabel} は拒否します。"
 
@@ -35995,7 +36037,7 @@ msgstr "このプロンプトはすべてのメッセージで使用されます
 msgid "This prompt will configure:"
 msgstr "このプロンプトで設定される内容："
 
-#: src/features/develop/components/thread-pull-requests.tsx:108
+#: src/features/develop/components/thread-pull-requests.tsx:118
 msgid "This pull request already has as many threads linked as it can keep."
 msgstr "このプルリクエストには、保持できる上限までスレッドがリンクされています。"
 
@@ -36108,7 +36150,7 @@ msgstr "このテキストは非表示の文字だけなので、保存する内
 msgid "This thread"
 msgstr "このスレッド"
 
-#: src/features/develop/components/thread-pull-requests.tsx:110
+#: src/features/develop/components/thread-pull-requests.tsx:120
 msgid "This thread already has as many pull requests linked as it can keep."
 msgstr "このスレッドには、保持できる上限までプルリクエストがリンクされています。"
 
@@ -36214,7 +36256,7 @@ msgstr "スレッド"
 msgid "Thread"
 msgstr "スレッド"
 
-#: src/components/command-palette.tsx:507
+#: src/components/command-palette.tsx:676
 msgid "Thread Actions"
 msgstr "スレッドの操作"
 
@@ -36312,6 +36354,7 @@ msgstr "スレッド変数"
 msgid "Thread will auto-delete in {0}"
 msgstr "スレッドは {0} 後に自動削除されます"
 
+#: src/components/command-palette.tsx:862
 #: src/features/admin/components/admin-shard-footprint-row.tsx:125
 #: src/features/admin/components/admin-shard-footprint-row.tsx:142
 #: src/features/admin/components/admin-shard-footprint-row.tsx:163
@@ -37011,7 +37054,7 @@ msgstr "検索キーワードを変えてみてください。"
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
-#: src/features/develop/components/thread-pull-requests.tsx:203
+#: src/features/develop/components/thread-pull-requests.tsx:213
 #: src/features/home/components/home-page.tsx:154
 #: src/features/projects/components/computer-rule-file-import.tsx:495
 #: src/features/projects/components/project-repo-picker.tsx:190
@@ -37101,15 +37144,15 @@ msgstr "任意の GitHub リポジトリをリモート MCP エンドポイン�
 msgid "Turn it on"
 msgstr "オンにする"
 
-#: src/features/develop/components/merge-panel.tsx:128
+#: src/features/develop/components/merge-panel.tsx:126
 msgid "Turn off"
 msgstr "オフにする"
 
-#: src/features/develop/components/merge-panel.tsx:178
+#: src/features/develop/components/merge-panel.tsx:176
 msgid "Turn off auto-merge"
 msgstr "自動マージをオフにする"
 
-#: src/features/develop/components/merge-panel.tsx:130
+#: src/features/develop/components/merge-panel.tsx:128
 msgid "Turn off auto-merge?"
 msgstr "自動マージをオフにしますか？"
 
@@ -37317,8 +37360,8 @@ msgstr "超広角、建築的"
 msgid "unarchive"
 msgstr "アーカイブ解除"
 
-#: src/components/command-palette.tsx:493
-#: src/components/command-palette.tsx:655
+#: src/components/command-palette.tsx:661
+#: src/components/command-palette.tsx:935
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Unarchive thread"
 msgstr "スレッドのアーカイブを解除"
@@ -37525,7 +37568,7 @@ msgid "Unpin memory"
 msgstr "メモリのピン留めを解除"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
-#: src/components/command-palette.tsx:483
+#: src/components/command-palette.tsx:651
 #: src/features/chat/thread-list/thread-node.tsx:117
 msgid "Unpin thread"
 msgstr "スレッドのピン留めを解除"
@@ -37593,9 +37636,10 @@ msgstr "無題"
 msgid "Untitled chat"
 msgstr "無題のチャット"
 
-#: src/components/command-palette.tsx:265
-#: src/components/command-palette.tsx:278
-#: src/components/command-palette.tsx:554
+#: src/components/command-palette.tsx:430
+#: src/components/command-palette.tsx:443
+#: src/components/command-palette.tsx:749
+#: src/components/command-palette.tsx:774
 #: src/features/chat/core/hooks/use-thread-manager.ts:254
 msgid "Untitled Thread"
 msgstr "無題のスレッド"
@@ -40000,7 +40044,7 @@ msgstr "このページは閲覧できますが、編集はできません。"
 msgid "You cannot ask a side question in this chat."
 msgstr "このチャットではサイドクエスチョンはできません。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:103
+#: src/features/develop/components/thread-pull-requests.tsx:113
 msgid "You cannot see that pull request on the host."
 msgstr "そのプルリクエストはホスト上で表示できません。"
 
@@ -40458,6 +40502,10 @@ msgstr "あなたのプラン"
 #: src/features/auth/components/organization/billing-settings-card.tsx:148
 msgid "Your plan and credit allowance follow your subscription."
 msgstr "プランとクレジット枠はサブスクリプションに応じて決まります。"
+
+#: src/components/command-palette.tsx:847
+msgid "Your projects could not be loaded. Try again in a moment."
+msgstr "プロジェクトを読み込めませんでした。しばらくしてからもう一度お試しください。"
 
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:162
 msgid "Your rating"

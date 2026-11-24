@@ -892,7 +892,7 @@ msgstr "{activeCount, plural, one {Hai # app di messaggistica collegata} other {
 msgid "{activeCount} of {0} MCP servers active"
 msgstr "{activeCount} di {0} server MCP attivi"
 
-#: src/features/develop/components/thread-pull-requests.tsx:167
+#: src/features/develop/components/thread-pull-requests.tsx:177
 msgid "{address}: {reason}"
 msgstr "{address}: {reason}"
 
@@ -1132,8 +1132,8 @@ msgstr "{hiddenRemoved, plural, one {# carattere invisibile è stato rimosso dal
 msgid "{hostLabel} could not be reached. Try again in a moment."
 msgstr "Impossibile raggiungere {hostLabel}. Riprova tra un attimo."
 
-#: src/features/develop/components/merge-panel.tsx:72
-#: src/features/develop/components/merge-panel.tsx:147
+#: src/features/develop/components/merge-panel.tsx:70
+#: src/features/develop/components/merge-panel.tsx:145
 msgid "{hostLabel} does not show which ways of merging this repository allows to your account."
 msgstr "{hostLabel} non mostra quali modalità di unione di questo repository sono consentite al tuo account."
 
@@ -1141,7 +1141,7 @@ msgstr "{hostLabel} non mostra quali modalità di unione di questo repository so
 msgid "{hostLabel} has no batched review: your comments are posted one after another when you submit."
 msgstr "{hostLabel} non ha una revisione in blocco: i tuoi commenti vengono pubblicati uno dopo l’altro quando invii."
 
-#: src/features/develop/components/merge-panel.tsx:80
+#: src/features/develop/components/merge-panel.tsx:78
 msgid "{hostLabel} has rules this {requestNoun} does not meet yet. You can still try: {hostLabel} will say what is missing."
 msgstr "{hostLabel} ha regole che questa {requestNoun} non soddisfa ancora. Puoi comunque provare: {hostLabel} ti dirà cosa manca."
 
@@ -1167,7 +1167,7 @@ msgstr "Impossibile raggiungere {hostLabel} o il tuo computer durante la scrittu
 msgid "{hostLabel} refused this request."
 msgstr "{hostLabel} ha rifiutato questa richiesta."
 
-#: src/features/develop/components/merge-panel.tsx:81
+#: src/features/develop/components/merge-panel.tsx:79
 msgid "{hostLabel} says this is ready to merge."
 msgstr "{hostLabel} indica che è pronta per essere unita."
 
@@ -1181,7 +1181,7 @@ msgstr "{hostLabel} mostra il nuovo titolo e la nuova descrizione a chiunque pos
 
 #. placeholder {0}: methodLabels[method]
 #. placeholder {1}: headSha.slice(0, 7)
-#: src/features/develop/components/merge-panel.tsx:124
+#: src/features/develop/components/merge-panel.tsx:122
 msgid "{hostLabel} will merge this {requestNoun} with “{0}” once its rules are met. It is turned on for the commit {1}: if the branch has changed since you opened this page, {hostLabel} refuses. You can turn this off until then."
 msgstr "{hostLabel} unirà questa {requestNoun} con “{0}” quando le sue regole saranno rispettate. È attivato per il commit {1}: se il branch è cambiato da quando hai aperto questa pagina, {hostLabel} la rifiuta. Fino ad allora puoi disattivarlo."
 
@@ -1505,7 +1505,7 @@ msgstr "{renamed, plural, one {# nome iniziava con id:, che indica un file trami
 msgid "{requestCount} req"
 msgstr "{requestCount} rich."
 
-#: src/features/develop/components/pull-request-view.tsx:143
+#: src/features/develop/components/pull-request-view.tsx:136
 msgid "{requestNoun} views"
 msgstr "Viste della {requestNoun}"
 
@@ -1585,7 +1585,7 @@ msgstr "{star, plural, one {# stella} other {# stelle}}"
 msgid "{stateLabel} Stop hands-free voice mode"
 msgstr "{stateLabel} Interrompi la modalità vocale a mani libere"
 
-#: src/features/develop/components/thread-pull-requests.tsx:257
+#: src/features/develop/components/thread-pull-requests.tsx:273
 msgid "{success, plural, one {# pull request linked.} other {# pull requests linked.}}"
 msgstr "{success, plural, one {# pull request collegata.} other {# pull request collegate.}}"
 
@@ -2487,7 +2487,7 @@ msgstr "Giorni attivi"
 msgid "Active Sessions ({0})"
 msgstr "Sessioni attive ({0})"
 
-#: src/components/command-palette.tsx:526
+#: src/components/command-palette.tsx:721
 msgid "Active Threads"
 msgstr "Conversazioni attive"
 
@@ -2733,7 +2733,7 @@ msgstr "Aggiungi prompt"
 msgid "Add Provider"
 msgstr "Aggiungi provider"
 
-#: src/features/develop/components/thread-pull-requests.tsx:235
+#: src/features/develop/components/thread-pull-requests.tsx:251
 msgid "Add pull requests that already exist to this thread. Each one is read from the host with your own connection first."
 msgstr "Aggiungi a questo thread le pull request già esistenti. Ognuna viene prima letta dall’host con la tua connessione."
 
@@ -3721,7 +3721,7 @@ msgstr "Alfabetico"
 msgid "Already have an account?"
 msgstr "Hai già un account?"
 
-#: src/features/develop/components/thread-pull-requests.tsx:101
+#: src/features/develop/components/thread-pull-requests.tsx:111
 msgid "Already linked to this thread."
 msgstr "Già collegata a questo thread."
 
@@ -4345,12 +4345,13 @@ msgid "Archive the open thread, or restore it when it is archived ({0})"
 msgstr "Archivia la conversazione aperta, o la ripristina se è già archiviata ({0})"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:98
-#: src/components/command-palette.tsx:493
-#: src/components/command-palette.tsx:655
+#: src/components/command-palette.tsx:661
+#: src/components/command-palette.tsx:935
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Archive thread"
 msgstr "Archivia conversazione"
 
+#: src/components/command-palette.tsx:880
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:644
 #: src/features/sub-agents/components/worker-list.tsx:86
 #: src/features/tasks/components/goal-form-dialog.tsx:47
@@ -4362,7 +4363,7 @@ msgstr "Archiviate"
 msgid "Archived for at least"
 msgstr "Archiviate da almeno"
 
-#: src/components/command-palette.tsx:543
+#: src/components/command-palette.tsx:738
 msgid "Archived Threads"
 msgstr "Conversazioni archiviate"
 
@@ -4787,15 +4788,15 @@ msgstr "Layout automatico"
 msgid "Auto-layout (L)"
 msgstr "Layout automatico (L)"
 
-#: src/features/develop/components/merge-panel.tsx:115
+#: src/features/develop/components/merge-panel.tsx:113
 msgid "Auto-merge is off."
 msgstr "L’unione automatica è disattivata."
 
-#: src/features/develop/components/merge-panel.tsx:183
+#: src/features/develop/components/merge-panel.tsx:181
 msgid "Auto-merge is on: it merges once {hostLabel}'s rules are met."
 msgstr "L’unione automatica è attiva: avviene quando le regole di {hostLabel} sono rispettate."
 
-#: src/features/develop/components/merge-panel.tsx:115
+#: src/features/develop/components/merge-panel.tsx:113
 msgid "Auto-merge is on."
 msgstr "L’unione automatica è attiva."
 
@@ -5174,7 +5175,7 @@ msgstr "principiante"
 msgid "Behavior"
 msgstr "Comportamento"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:52
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:70
 msgid "Behind {base}"
 msgstr "Indietro rispetto a {base}"
 
@@ -6242,11 +6243,11 @@ msgstr "Catalano (Spagna)"
 msgid "catalog"
 msgstr "catalogo"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:75
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:93
 msgid "Catch up"
 msgstr "Allinea"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:46
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:64
 msgid "Catch up {pullRequest} with {base}"
 msgstr "Allinea {pullRequest} con {base}"
 
@@ -6634,7 +6635,7 @@ msgstr "Controlli"
 msgid "Checks passed"
 msgstr "Controlli superati"
 
-#: src/features/develop/components/merge-panel.tsx:85
+#: src/features/develop/components/merge-panel.tsx:83
 msgid "Checks that are not required are failing."
 msgstr "I controlli non obbligatori non sono riusciti."
 
@@ -7067,12 +7068,12 @@ msgstr "Clona o crea nuovo…"
 #: ../../packages/ui/src/components/dialog.tsx:84
 #: ../../packages/ui/src/components/image-editor.tsx:264
 #: ../../packages/ui/src/components/sheet.tsx:75
-#: src/components/command-palette.tsx:726
+#: src/components/command-palette.tsx:1006
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:835
 #: src/features/canvas/pdf-preview-panel.tsx:105
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
-#: src/features/develop/components/thread-pull-requests.tsx:280
+#: src/features/develop/components/thread-pull-requests.tsx:296
 #: src/features/evals/components/save-eval-case-action.tsx:95
 #: src/features/prompts/components/prompt-history-dialog.tsx:195
 #: src/features/settings/components/chat/custom-providers-settings.tsx:441
@@ -8083,7 +8084,7 @@ msgstr "Connetti WhatsApp"
 msgid "Connect your {label} account to see what needs your review, what is yours, and what is ready to merge."
 msgstr "Connetti il tuo account {label} per vedere cosa richiede la tua revisione, cosa è tuo e cosa è pronto per essere unito."
 
-#: src/features/develop/components/thread-pull-requests.tsx:106
+#: src/features/develop/components/thread-pull-requests.tsx:116
 msgid "Connect your Git host in settings to link a pull request."
 msgstr "Connetti il tuo host Git nelle impostazioni per collegare una pull request."
 
@@ -8892,7 +8893,7 @@ msgstr "Impossibile confermare che gli strumenti del bot siano stati salvati. Co
 msgid "Could not confirm that the review was submitted. Check on {hostLabel} before you try again. Your review is kept here."
 msgstr "Impossibile confermare che la revisione sia stata inviata. Controlla su {hostLabel} prima di riprovare. La tua revisione resta salvata qui."
 
-#: src/features/develop/components/merge-panel.tsx:99
+#: src/features/develop/components/merge-panel.tsx:97
 msgid "Could not confirm that this was merged. Check on {hostLabel} before you try again."
 msgstr "Impossibile confermare che l’unione sia avvenuta. Controlla su {hostLabel} prima di riprovare."
 
@@ -8900,7 +8901,7 @@ msgstr "Impossibile confermare che l’unione sia avvenuta. Controlla su {hostLa
 msgid "Could not confirm that. Check on {hostLabel} before you try again."
 msgstr "Impossibile confermarlo. Controlla su {hostLabel} prima di riprovare."
 
-#: src/features/develop/components/merge-panel.tsx:113
+#: src/features/develop/components/merge-panel.tsx:111
 msgid "Could not confirm the change to auto-merge. Check on {hostLabel} before you try again."
 msgstr "Impossibile confermare la modifica dell’unione automatica. Controlla su {hostLabel} prima di riprovare."
 
@@ -8996,7 +8997,7 @@ msgstr "Impossibile importare il workflow"
 msgid "Could not keep this as yours. Try again."
 msgstr "Impossibile mantenerlo come tuo. Riprova."
 
-#: src/features/develop/components/thread-pull-requests.tsx:183
+#: src/features/develop/components/thread-pull-requests.tsx:193
 msgid "Could not link. Try again."
 msgstr "Impossibile collegare. Riprova."
 
@@ -9017,7 +9018,7 @@ msgstr "Impossibile caricare altri progetti."
 msgid "Could not load statistics for this thread."
 msgstr "Impossibile caricare le statistiche di questo thread."
 
-#: src/features/develop/components/thread-pull-requests.tsx:201
+#: src/features/develop/components/thread-pull-requests.tsx:211
 msgid "Could not load the linked pull requests."
 msgstr "Impossibile caricare le pull request collegate."
 
@@ -9484,7 +9485,7 @@ msgstr "Crea chiave API"
 msgid "Create bot"
 msgstr "Crea bot"
 
-#: src/components/command-palette.tsx:477
+#: src/components/command-palette.tsx:645
 #: src/features/chat/thread-list/thread-node.tsx:743
 #: src/features/chat/thread-list/thread-node.tsx:766
 msgid "Create branch"
@@ -9796,7 +9797,7 @@ msgstr "Cuba"
 msgid "Currency Conversion"
 msgstr "Conversione di valuta"
 
-#: src/components/command-palette.tsx:651
+#: src/components/command-palette.tsx:931
 #: src/features/auth/components/settings/security/session-cell.tsx:80
 #: src/features/projects/components/move-to-project-dialog.tsx:84
 #: src/features/prompts/components/prompt-history-dialog.tsx:136
@@ -10700,8 +10701,8 @@ msgid "Delete this login?"
 msgstr "Eliminare questo accesso?"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
-#: src/components/command-palette.tsx:499
-#: src/components/command-palette.tsx:679
+#: src/components/command-palette.tsx:667
+#: src/components/command-palette.tsx:959
 #: src/features/chat/thread-list/thread-node.tsx:1082
 #: src/features/chat/thread-list/thread-node.tsx:1100
 #: src/features/pages/components/page-comments-panel.tsx:188
@@ -12723,7 +12724,7 @@ msgstr "Inserisci il nome dell'organizzazione"
 msgid "Enter organization slug"
 msgstr "Inserisci lo slug dell'organizzazione"
 
-#: src/features/develop/components/thread-pull-requests.tsx:125
+#: src/features/develop/components/thread-pull-requests.tsx:135
 msgid "Enter pull requests as owner/name#123."
 msgstr "Inserisci le pull request come owner/name#123."
 
@@ -13893,10 +13894,10 @@ msgstr "Impossibile eliminare il dataset"
 msgid "Failed to delete the thread. {0, plural, one {# branch was deleted.} other {# branches were deleted.}}"
 msgstr "Impossibile eliminare la conversazione. {0, plural, one {# branch è stato eliminato.} other {# branch sono stati eliminati.}}"
 
-#: src/components/command-palette.tsx:333
-#: src/components/command-palette.tsx:341
-#: src/components/command-palette.tsx:384
-#: src/components/command-palette.tsx:391
+#: src/components/command-palette.tsx:498
+#: src/components/command-palette.tsx:506
+#: src/components/command-palette.tsx:549
+#: src/components/command-palette.tsx:556
 msgid "Failed to delete thread"
 msgstr "Impossibile eliminare la conversazione"
 
@@ -15096,6 +15097,10 @@ msgstr "Filtra i ricordi per tipo"
 msgid "Filter path"
 msgstr "Percorso del filtro"
 
+#: src/components/command-palette.tsx:860
+msgid "Filter results"
+msgstr "Filtra i risultati"
+
 #: src/features/settings/components/chat/model-filter-settings.tsx:55
 #: src/features/settings/components/chat/model-filter-settings.tsx:66
 msgid "Filter rules updated"
@@ -16270,7 +16275,7 @@ msgstr "Passa dall'idea al risultato finale senza cambiare strumento. Testo, imm
 msgid "Go to chat"
 msgstr "Vai alla chat"
 
-#: src/components/command-palette.tsx:425
+#: src/components/command-palette.tsx:593
 #: src/routes/(public)/invite/$inviteToken.tsx:70
 msgid "Go to Chat"
 msgstr "Vai alla chat"
@@ -16313,7 +16318,7 @@ msgstr "Vai all’abbinamento"
 msgid "Go to previous page"
 msgstr "Vai alla pagina precedente"
 
-#: src/components/command-palette.tsx:431
+#: src/components/command-palette.tsx:599
 msgid "Go to Prompts"
 msgstr "Vai ai prompt"
 
@@ -16325,7 +16330,7 @@ msgstr "Vai alla risposta"
 msgid "Go to servers"
 msgstr "Vai ai server"
 
-#: src/components/command-palette.tsx:443
+#: src/components/command-palette.tsx:611
 msgid "Go to Settings"
 msgstr "Vai alle impostazioni"
 
@@ -16350,7 +16355,7 @@ msgstr "Vai alla slide {slideNumber}"
 msgid "Go to step {0}"
 msgstr "Vai al passaggio {0}"
 
-#: src/components/command-palette.tsx:437
+#: src/components/command-palette.tsx:605
 msgid "Go to Vault"
 msgstr "Vai all'Archivio"
 
@@ -17340,7 +17345,7 @@ msgstr "Come devono essere scritti i titoli?"
 msgid "How the agent's browser presses buttons and links"
 msgstr "Come il browser dell'agente preme pulsanti e link"
 
-#: src/features/develop/components/merge-panel.tsx:151
+#: src/features/develop/components/merge-panel.tsx:149
 msgid "How to merge"
 msgstr "Come unire"
 
@@ -19613,7 +19618,7 @@ msgstr "Righe con JSON non valido"
 
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:340
 #: src/features/auth/components/settings/providers/provider-cell.tsx:113
-#: src/features/develop/components/thread-pull-requests.tsx:282
+#: src/features/develop/components/thread-pull-requests.tsx:298
 msgid "Link"
 msgstr "Collega"
 
@@ -19621,7 +19626,7 @@ msgstr "Collega"
 msgid "Link active until {expiresAt}"
 msgstr "Link attivo fino al {expiresAt}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:137
+#: src/features/develop/components/thread-pull-requests.tsx:147
 msgid "Link at most {MAX_PULL_REQUESTS_PER_ATTACH} pull requests at a time."
 msgstr "Collega al massimo {MAX_PULL_REQUESTS_PER_ATTACH} pull request alla volta."
 
@@ -19639,11 +19644,11 @@ msgstr "Anteprima link"
 msgid "Link previews"
 msgstr "Anteprime dei link"
 
-#: src/features/develop/components/thread-pull-requests.tsx:215
+#: src/features/develop/components/thread-pull-requests.tsx:231
 msgid "Link pull request"
 msgstr "Collega pull request"
 
-#: src/features/develop/components/thread-pull-requests.tsx:234
+#: src/features/develop/components/thread-pull-requests.tsx:250
 msgid "Link pull requests"
 msgstr "Collega pull request"
 
@@ -19655,7 +19660,7 @@ msgstr "Collegata manualmente"
 msgid "Linked pull requests: {linkedPullRequests}"
 msgstr "Pull request collegate: {linkedPullRequests}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:102
+#: src/features/develop/components/thread-pull-requests.tsx:112
 msgid "Linked to this thread."
 msgstr "Collegata a questo thread."
 
@@ -19663,8 +19668,8 @@ msgstr "Collegata a questo thread."
 msgid "LinkedIn Post"
 msgstr "Post LinkedIn"
 
-#: src/features/develop/components/thread-pull-requests.tsx:263
-#: src/features/develop/components/thread-pull-requests.tsx:282
+#: src/features/develop/components/thread-pull-requests.tsx:279
+#: src/features/develop/components/thread-pull-requests.tsx:298
 msgid "Linking…"
 msgstr "Collegamento in corso…"
 
@@ -20019,7 +20024,7 @@ msgstr "Caricamento del link ospite…"
 msgid "Loading the guide"
 msgstr "Caricamento della guida"
 
-#: src/features/develop/components/thread-pull-requests.tsx:196
+#: src/features/develop/components/thread-pull-requests.tsx:206
 msgid "Loading the linked pull requests…"
 msgstr "Caricamento delle pull request collegate…"
 
@@ -20170,6 +20175,10 @@ msgstr "Blocca questa chat"
 #: src/features/chat/thread-list/thread-node.tsx:260
 msgid "Locked chat"
 msgstr "Chat bloccata"
+
+#: src/components/command-palette.tsx:896
+msgid "Locked chats do not reveal their project, so some may be missing here."
+msgstr "Le chat bloccate non mostrano il loro progetto, quindi qui potrebbero mancarne alcune."
 
 #. placeholder {0}: getModelModeName(anchorMode)
 #: src/components/model-picker/model-picker.tsx:1397
@@ -21035,8 +21044,8 @@ msgstr "Solo menzioni"
 msgid "Menu"
 msgstr "Menu"
 
-#: src/features/develop/components/merge-panel.tsx:133
-#: src/features/develop/components/merge-panel.tsx:143
+#: src/features/develop/components/merge-panel.tsx:131
+#: src/features/develop/components/merge-panel.tsx:141
 msgid "Merge"
 msgstr "Unisci"
 
@@ -21044,7 +21053,7 @@ msgstr "Unisci"
 msgid "Merge cells"
 msgstr "Unisci celle"
 
-#: src/features/develop/components/merge-panel.tsx:77
+#: src/features/develop/components/merge-panel.tsx:75
 msgid "Merge commit"
 msgstr "Merge commit"
 
@@ -21060,16 +21069,16 @@ msgstr "Merge request unita"
 msgid "Merge request opened"
 msgstr "Merge request aperta"
 
-#: src/features/develop/components/merge-panel.tsx:135
+#: src/features/develop/components/merge-panel.tsx:133
 msgid "Merge this {requestNoun}?"
 msgstr "Unire questa {requestNoun}?"
 
-#: src/features/develop/components/merge-panel.tsx:123
-#: src/features/develop/components/merge-panel.tsx:173
+#: src/features/develop/components/merge-panel.tsx:121
+#: src/features/develop/components/merge-panel.tsx:171
 msgid "Merge when ready"
 msgstr "Unisci quando pronta"
 
-#: src/features/develop/components/merge-panel.tsx:125
+#: src/features/develop/components/merge-panel.tsx:123
 msgid "Merge when ready?"
 msgstr "Unire quando pronta?"
 
@@ -21078,11 +21087,11 @@ msgstr "Unire quando pronta?"
 msgid "Merged"
 msgstr "Unito"
 
-#: src/features/develop/components/merge-panel.tsx:101
+#: src/features/develop/components/merge-panel.tsx:99
 msgid "Merged on {hostLabel}."
 msgstr "Unita su {hostLabel}."
 
-#: src/features/develop/components/merge-panel.tsx:168
+#: src/features/develop/components/merge-panel.tsx:166
 msgid "Merging…"
 msgstr "Unione in corso…"
 
@@ -21137,7 +21146,7 @@ msgstr "Versioni del messaggio"
 msgid "Message..."
 msgstr "Messaggio..."
 
-#: src/components/command-palette.tsx:562
+#: src/components/command-palette.tsx:757
 #: src/features/chat/sharing/shared-thread-page.tsx:151
 #: src/features/chat/thread-list/search-bar.tsx:57
 msgid "Messages"
@@ -22214,7 +22223,7 @@ msgid "navigate"
 msgstr "naviga"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:110
-#: src/components/command-palette.tsx:712
+#: src/components/command-palette.tsx:992
 msgid "Navigate"
 msgstr "Naviga"
 
@@ -22243,7 +22252,7 @@ msgid "Navigating to {target}..."
 msgstr "Navigazione verso {target}..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:132
-#: src/components/command-palette.tsx:450
+#: src/components/command-palette.tsx:618
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:68
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:59
 msgid "Navigation"
@@ -22615,7 +22624,7 @@ msgstr "Nuova chat temporanea"
 msgid "New Temporary Chat"
 msgstr "Nuova chat temporanea"
 
-#: src/components/command-palette.tsx:466
+#: src/components/command-palette.tsx:634
 msgid "New temporary thread"
 msgstr "Nuova conversazione temporanea"
 
@@ -22623,7 +22632,7 @@ msgstr "Nuova conversazione temporanea"
 msgid "New this week"
 msgstr "Nuovi questa settimana"
 
-#: src/components/command-palette.tsx:459
+#: src/components/command-palette.tsx:627
 msgid "New thread"
 msgstr "Nuova conversazione"
 
@@ -22947,7 +22956,7 @@ msgstr "Ancora nessun dataset"
 msgid "No description"
 msgstr "Nessuna descrizione"
 
-#: src/features/develop/components/pull-request-view.tsx:153
+#: src/features/develop/components/pull-request-view.tsx:146
 msgid "No description provided."
 msgstr "Nessuna descrizione fornita."
 
@@ -23311,7 +23320,7 @@ msgstr "Nessun risultato trovato"
 msgid "No results found for “{searchTerm}”"
 msgstr "Nessun risultato trovato per “{searchTerm}”"
 
-#: src/components/command-palette.tsx:634
+#: src/components/command-palette.tsx:909
 #: src/features/chat/thread/widgets/wolfram-widget.tsx:34
 msgid "No results found."
 msgstr "Nessun risultato trovato."
@@ -23627,7 +23636,7 @@ msgstr "Non consegnato al principale"
 msgid "Not found"
 msgstr "Non trovato"
 
-#: src/features/develop/components/thread-pull-requests.tsx:268
+#: src/features/develop/components/thread-pull-requests.tsx:284
 msgid "Not linked"
 msgstr "Non collegata"
 
@@ -23639,7 +23648,7 @@ msgstr "Non caricato: i diff di questa pagina erano già molto grandi."
 msgid "not measured"
 msgstr "non misurato"
 
-#: src/features/develop/components/merge-panel.tsx:190
+#: src/features/develop/components/merge-panel.tsx:188
 msgid "Not merged"
 msgstr "Non unita"
 
@@ -24184,8 +24193,18 @@ msgstr "Solo chi può scrivere in questa chat può prendere il controllo del bro
 
 #. placeholder {0}: allThreadsData.lunora.length
 #: src/components/command-palette.tsx:631
-msgid "Only the {0} threads loaded here are filtered by state; older ones are not included."
-msgstr "Solo le {0} conversazioni caricate qui sono filtrate per stato; quelle più vecchie non sono incluse."
+#~ msgid "Only the {0} threads loaded here are filtered by state; older ones are not included."
+#~ msgstr "Solo le {0} conversazioni caricate qui sono filtrate per stato; quelle più vecchie non sono incluse."
+
+#. placeholder {0}: allThreadsData.lunora.length
+#: src/components/command-palette.tsx:892
+msgid "Only the {0} threads loaded here are filtered; older ones are not included."
+msgstr "Vengono filtrate solo le {0} conversazioni caricate qui; quelle più vecchie non sono incluse."
+
+#. placeholder {0}: projects.length
+#: src/components/command-palette.tsx:899
+msgid "Only the first {0} projects are listed here."
+msgstr "Qui sono elencati solo i primi {0} progetti."
 
 #: src/features/knowledge/hooks/use-knowledge-import.ts:156
 msgid "Only the first {MAX_DOCUMENTS_PER_IMPORT} documents were imported."
@@ -24273,7 +24292,7 @@ msgid "Opacity"
 msgstr "Opacità"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:796
-#: src/components/command-palette.tsx:718
+#: src/components/command-palette.tsx:998
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
 #: src/features/develop/components/pull-request-view.tsx:75
@@ -24539,7 +24558,7 @@ msgstr "Apri il selettore dei modelli nel composer ({0})"
 
 #. placeholder {0}: link.repository
 #. placeholder {1}: link.number
-#: src/features/develop/components/thread-pull-requests.tsx:40
+#: src/features/develop/components/thread-pull-requests.tsx:50
 msgid "Open the pull request {0}#{1}"
 msgstr "Apri la pull request {0}#{1}"
 
@@ -26025,7 +26044,7 @@ msgid "Pin message"
 msgstr "Fissa messaggio"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
-#: src/components/command-palette.tsx:483
+#: src/components/command-palette.tsx:651
 #: src/features/chat/thread-list/thread-node.tsx:117
 msgid "Pin thread"
 msgstr "Fissa conversazione"
@@ -26980,6 +26999,13 @@ msgstr "Progetto non più disponibile"
 msgid "Project repository"
 msgstr "Repository del progetto"
 
+#. placeholder {0}: projectFilter.title
+#: src/components/command-palette.tsx:884
+msgid "Project: {0}"
+msgstr "Progetto: {0}"
+
+#: src/components/command-palette.tsx:700
+#: src/components/command-palette.tsx:877
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:606
 msgid "Projects"
 msgstr "Progetti"
@@ -27291,7 +27317,7 @@ msgid "Pull request settings updated"
 msgstr "Impostazioni delle pull request aggiornate"
 
 #: src/features/code/components/code-shell.tsx:95
-#: src/features/develop/components/thread-pull-requests.tsx:238
+#: src/features/develop/components/thread-pull-requests.tsx:254
 msgid "Pull requests"
 msgstr "Pull request"
 
@@ -27347,11 +27373,11 @@ msgstr "Notifiche push su questo browser"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "Metti più agenti con ruoli propri in un solo thread. Un pannello di revisione può controllare una modifica dal punto di vista della sicurezza e delle prestazioni, e un dibattito può sostenere entrambe le tesi prima di una sintesi."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:81
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:99
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
 msgstr "Inserisce nel composer un prompt per fare il rebase di questo branch su {base}, risolvere i conflitti, verificare build e test e fare push. Non viene inviato nulla."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:82
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:100
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "Inserisce nel composer un prompt per fare il rebase del branch di questo fork su {base} in una copia locale, risolvere i conflitti e verificare build e test. Non viene fatto push. Non viene inviato nulla."
 
@@ -27882,7 +27908,7 @@ msgstr "Ragionamento: {effortLabel}"
 msgid "Reasons through the prompt before generating"
 msgstr "Ragiona sul prompt prima di generare"
 
-#: src/features/develop/components/merge-panel.tsx:77
+#: src/features/develop/components/merge-panel.tsx:75
 msgid "Rebase and merge"
 msgstr "Rebase e unione"
 
@@ -27923,7 +27949,7 @@ msgstr "Ricollega"
 msgid "Reconnect {0}"
 msgstr "Ricollega {0}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:105
+#: src/features/develop/components/thread-pull-requests.tsx:115
 msgid "Reconnect your Git host in settings to link a pull request."
 msgstr "Riconnetti il tuo host Git nelle impostazioni per collegare una pull request."
 
@@ -28186,6 +28212,14 @@ msgstr "Rifiuta"
 #: src/features/marketing/use-cases/use-case-data.ts:27
 msgid "Rejecting a result in review marks the run as failed. The rejected answer stays on record."
 msgstr "Rifiutare un risultato in revisione segna l’esecuzione come fallita. La risposta rifiutata resta registrata."
+
+#: src/components/command-palette.tsx:904
+msgid "Related archived threads are picked from the closest matches across all your threads, so some may not be listed."
+msgstr "Le conversazioni archiviate correlate vengono scelte tra le corrispondenze più vicine di tutte le tue conversazioni, quindi alcune potrebbero mancare."
+
+#: src/components/command-palette.tsx:781
+msgid "Related threads"
+msgstr "Conversazioni correlate"
 
 #: src/features/devices/lib/device-diagnostics.ts:69
 msgid "relay (another paired computer)"
@@ -30030,6 +30064,14 @@ msgstr "Cerca articoli accademici e PDF"
 msgid "Search across the entire internet"
 msgstr "Cerca in tutto internet"
 
+#: src/components/command-palette.tsx:845
+msgid "Search by meaning failed, so related threads are not listed. Try again in a moment."
+msgstr "La ricerca per significato non è riuscita, quindi le conversazioni correlate non sono elencate. Riprova tra un momento."
+
+#: src/components/command-palette.tsx:844
+msgid "Search by meaning isn't available under your account's model rules, so related threads are not listed."
+msgstr "La ricerca per significato non è disponibile con le regole sui modelli del tuo account, quindi le conversazioni correlate non sono elencate."
+
 #: src/features/admin/components/users-management-card.tsx:122
 msgid "Search by name or email..."
 msgstr "Cerca per nome o email..."
@@ -30236,7 +30278,7 @@ msgstr "Cerca conversazioni"
 msgid "Search threads ({focusSearchShortcut})"
 msgstr "Cerca thread ({focusSearchShortcut})"
 
-#: src/components/command-palette.tsx:626
+#: src/components/command-palette.tsx:859
 msgid "Search threads, navigate, or perform actions..."
 msgstr "Cerca conversazioni, naviga o esegui azioni..."
 
@@ -32269,7 +32311,7 @@ msgstr "Quadrato"
 msgid "Square post"
 msgstr "Post quadrato"
 
-#: src/features/develop/components/merge-panel.tsx:77
+#: src/features/develop/components/merge-panel.tsx:75
 msgid "Squash and merge"
 msgstr "Squash e unione"
 
@@ -34644,7 +34686,7 @@ msgstr "Il limite di costo deve essere un numero positivo di dollari."
 msgid "The dataset, its cases and every run of it are removed."
 msgstr "Il dataset, i suoi casi e tutte le sue esecuzioni vengono rimossi."
 
-#: src/features/develop/components/pull-request-view.tsx:155
+#: src/features/develop/components/pull-request-view.tsx:148
 msgid "The description is cut short."
 msgstr "La descrizione è troncata."
 
@@ -34808,7 +34850,7 @@ msgstr "L’host"
 msgid "the host did not answer"
 msgstr "l’host non ha risposto"
 
-#: src/features/develop/components/thread-pull-requests.tsx:104
+#: src/features/develop/components/thread-pull-requests.tsx:114
 msgid "The host did not answer. Try again."
 msgstr "L’host non ha risposto. Riprova."
 
@@ -34820,11 +34862,11 @@ msgstr "L’host non ha risposto. Si riprova più tardi."
 msgid "the host did not change the option"
 msgstr "l’host non ha modificato l’opzione"
 
-#: src/features/develop/components/thread-pull-requests.tsx:107
+#: src/features/develop/components/thread-pull-requests.tsx:117
 msgid "The host has no pull request at that address."
 msgstr "L’host non ha alcuna pull request a quell’indirizzo."
 
-#: src/features/develop/components/thread-pull-requests.tsx:109
+#: src/features/develop/components/thread-pull-requests.tsx:119
 msgid "The host is limiting requests. Try again shortly."
 msgstr "L’host sta limitando le richieste. Riprova a breve."
 
@@ -35468,11 +35510,11 @@ msgstr "Sto pensando..."
 msgid "Thinking…"
 msgstr "Sto pensando…"
 
-#: src/features/develop/components/merge-panel.tsx:83
+#: src/features/develop/components/merge-panel.tsx:81
 msgid "This {requestNoun} is still a draft."
 msgstr "Questa {requestNoun} è ancora una bozza."
 
-#: src/features/develop/components/merge-panel.tsx:129
+#: src/features/develop/components/merge-panel.tsx:127
 msgid "This {requestNoun} will no longer merge by itself."
 msgstr "Questa {requestNoun} non verrà più unita automaticamente."
 
@@ -35500,11 +35542,11 @@ msgstr "Gli strumenti di questo bot sono stati modificati altrove. Chiudi questa
 msgid "This bot's tools were changed elsewhere. They are shown as saved now; make your change again."
 msgstr "Gli strumenti di questo bot sono stati modificati altrove. Ora sono mostrati come salvati; ripeti la modifica."
 
-#: src/features/develop/components/merge-panel.tsx:82
+#: src/features/develop/components/merge-panel.tsx:80
 msgid "This branch has conflicts with its base branch."
 msgstr "Questo branch ha conflitti con il suo branch di base."
 
-#: src/features/develop/components/merge-panel.tsx:79
+#: src/features/develop/components/merge-panel.tsx:77
 msgid "This branch is behind its base branch."
 msgstr "Questo branch è indietro rispetto al suo branch di base."
 
@@ -35766,7 +35808,7 @@ msgstr "Questa guida è stata scritta per un commit precedente. La {requestNoun}
 msgid "This host does not offer an inbox yet."
 msgstr "Questo host non offre ancora una posta in arrivo."
 
-#: src/features/develop/components/pull-request-view.tsx:140
+#: src/features/develop/components/pull-request-view.tsx:133
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr "Questo host non offre ancora alcuna vista di una {requestNoun}."
 
@@ -35875,7 +35917,7 @@ msgstr "Questo ricordo è stato poi eliminato."
 
 #. placeholder {0}: headSha.slice(0, 7)
 #. placeholder {1}: methodLabels[method]
-#: src/features/develop/components/merge-panel.tsx:134
+#: src/features/develop/components/merge-panel.tsx:132
 msgid "This merges the commit {0} into the base branch with “{1}” on {hostLabel}. If the branch has changed since you opened this page, {hostLabel} refuses."
 msgstr "Questo unisce il commit {0} nel branch di base con “{1}” su {hostLabel}. Se il branch è cambiato da quando hai aperto questa pagina, {hostLabel} la rifiuta."
 
@@ -35995,7 +36037,7 @@ msgstr "Questo prompt verrà usato per ogni messaggio. Ogni messaggio viene elab
 msgid "This prompt will configure:"
 msgstr "Questo prompt configurerà:"
 
-#: src/features/develop/components/thread-pull-requests.tsx:108
+#: src/features/develop/components/thread-pull-requests.tsx:118
 msgid "This pull request already has as many threads linked as it can keep."
 msgstr "Questa pull request ha già collegato il massimo di thread che può conservare."
 
@@ -36108,7 +36150,7 @@ msgstr "Questo testo contiene solo caratteri nascosti, quindi non c'è nulla da 
 msgid "This thread"
 msgstr "Questa conversazione"
 
-#: src/features/develop/components/thread-pull-requests.tsx:110
+#: src/features/develop/components/thread-pull-requests.tsx:120
 msgid "This thread already has as many pull requests linked as it can keep."
 msgstr "Questo thread ha già collegato il massimo di pull request che può conservare."
 
@@ -36214,7 +36256,7 @@ msgstr "thread"
 msgid "Thread"
 msgstr "Conversazione"
 
-#: src/components/command-palette.tsx:507
+#: src/components/command-palette.tsx:676
 msgid "Thread Actions"
 msgstr "Azioni sulla conversazione"
 
@@ -36312,6 +36354,7 @@ msgstr "Variabili della conversazione"
 msgid "Thread will auto-delete in {0}"
 msgstr "La conversazione verrà eliminata automaticamente tra {0}"
 
+#: src/components/command-palette.tsx:862
 #: src/features/admin/components/admin-shard-footprint-row.tsx:125
 #: src/features/admin/components/admin-shard-footprint-row.tsx:142
 #: src/features/admin/components/admin-shard-footprint-row.tsx:163
@@ -37011,7 +37054,7 @@ msgstr "Prova a modificare i termini di ricerca."
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
-#: src/features/develop/components/thread-pull-requests.tsx:203
+#: src/features/develop/components/thread-pull-requests.tsx:213
 #: src/features/home/components/home-page.tsx:154
 #: src/features/projects/components/computer-rule-file-import.tsx:495
 #: src/features/projects/components/project-repo-picker.tsx:190
@@ -37101,15 +37144,15 @@ msgstr "Trasforma qualsiasi repository GitHub in un endpoint MCP remoto"
 msgid "Turn it on"
 msgstr "Attivalo"
 
-#: src/features/develop/components/merge-panel.tsx:128
+#: src/features/develop/components/merge-panel.tsx:126
 msgid "Turn off"
 msgstr "Disattiva"
 
-#: src/features/develop/components/merge-panel.tsx:178
+#: src/features/develop/components/merge-panel.tsx:176
 msgid "Turn off auto-merge"
 msgstr "Disattiva l’unione automatica"
 
-#: src/features/develop/components/merge-panel.tsx:130
+#: src/features/develop/components/merge-panel.tsx:128
 msgid "Turn off auto-merge?"
 msgstr "Disattivare l’unione automatica?"
 
@@ -37317,8 +37360,8 @@ msgstr "Ultra grandangolare, architettonico"
 msgid "unarchive"
 msgstr "ripristina dall'archivio"
 
-#: src/components/command-palette.tsx:493
-#: src/components/command-palette.tsx:655
+#: src/components/command-palette.tsx:661
+#: src/components/command-palette.tsx:935
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Unarchive thread"
 msgstr "Ripristina conversazione dall'archivio"
@@ -37525,7 +37568,7 @@ msgid "Unpin memory"
 msgstr "Sblocca ricordo"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
-#: src/components/command-palette.tsx:483
+#: src/components/command-palette.tsx:651
 #: src/features/chat/thread-list/thread-node.tsx:117
 msgid "Unpin thread"
 msgstr "Sblocca conversazione"
@@ -37593,9 +37636,10 @@ msgstr "Senza titolo"
 msgid "Untitled chat"
 msgstr "Chat senza titolo"
 
-#: src/components/command-palette.tsx:265
-#: src/components/command-palette.tsx:278
-#: src/components/command-palette.tsx:554
+#: src/components/command-palette.tsx:430
+#: src/components/command-palette.tsx:443
+#: src/components/command-palette.tsx:749
+#: src/components/command-palette.tsx:774
 #: src/features/chat/core/hooks/use-thread-manager.ts:254
 msgid "Untitled Thread"
 msgstr "Conversazione senza titolo"
@@ -40000,7 +40044,7 @@ msgstr "Puoi visualizzare questa pagina ma non modificarla."
 msgid "You cannot ask a side question in this chat."
 msgstr "Non puoi fare una domanda a parte in questa chat."
 
-#: src/features/develop/components/thread-pull-requests.tsx:103
+#: src/features/develop/components/thread-pull-requests.tsx:113
 msgid "You cannot see that pull request on the host."
 msgstr "Non puoi vedere quella pull request sull’host."
 
@@ -40458,6 +40502,10 @@ msgstr "Il tuo piano"
 #: src/features/auth/components/organization/billing-settings-card.tsx:148
 msgid "Your plan and credit allowance follow your subscription."
 msgstr "Il tuo piano e i tuoi crediti dipendono dal tuo abbonamento."
+
+#: src/components/command-palette.tsx:847
+msgid "Your projects could not be loaded. Try again in a moment."
+msgstr "Non è stato possibile caricare i tuoi progetti. Riprova tra un momento."
 
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:162
 msgid "Your rating"
