@@ -1496,4 +1496,64 @@ describe("the usage-limit settings of a rate-limited run", () => {
 
         expect(active.pause).not.toHaveProperty("resetUnreported");
     });
+
+    it("an early Retry now gives back the owner's own snooze, which was shorter than the reset", async () => {
+        const ownerUntil = Date.now() + 10_000;
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", ids.threadId as never, { snoozedUntil: ownerUntil }));
+
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited(), textStep("Hello there.")]);
+
+        await run();
+
+        // The pause extended the snooze to the reset; the owner's own is what an early Retry now gives back.
+        expect(await snoozedUntil()).not.toBe(ownerUntil);
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(retryPausedRunsNow, { threadId: ids.threadId }));
+
+        expect(await snoozedUntil()).toBe(ownerUntil);
+    });
+
+    it("stopping one paused reply keeps the chat snoozed for another paused reply on it", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        expect(await snoozedUntil()).toBeDefined();
+
+        // A second paused reply on the same chat, which the first reply's stop must not expose.
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    messageId: "other-message",
+                    pause: {
+                        from: ids.messageId,
+                        id: "other-pause",
+                        reason: "rate_limit",
+                        retryAt: Date.now() + RETRY_IN_MS,
+                        run: {
+                            messageId: "other-message",
+                            streamId: "other-stream",
+                            streamingConfig: { contentType: "text", model: "test-model" },
+                            threadId: ids.threadId,
+                            userId: OWNER,
+                        },
+                        status: 429,
+                    },
+                    status: "pending",
+                    streamingConfig: { contentType: "text", model: "test-model" },
+                    threadId: ids.threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: ids.messageId, onlyNamed: true, threadId: ids.threadId }),
+        );
+
+        expect(await snoozedUntil()).toBeDefined();
+    });
 });

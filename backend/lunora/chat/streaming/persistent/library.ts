@@ -325,7 +325,7 @@ export const stopActiveForThread = internalMutation
 
             // A stopped wait gives its chat back: the snooze the pause put on it ends with the stop.
             if (stream.pause !== undefined) {
-                await liftPauseSnooze(ctx, stream.threadId as Id<"threads">, stream.pause.retryAt);
+                await liftPauseSnooze(ctx, stream);
             }
 
             // No run is left to end this reply and drop what it was holding: one that never started, or one waiting out a limit.
@@ -904,15 +904,34 @@ const hasLiveEdit = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<b
 };
 
 /**
- * Lifts the snooze a rate-limit pause put on its thread (`pauseRunForRateLimit`), while the snooze is still at that pause's own
- * reset time. An owner's snooze at any other time stays. The snooze is not stamped (`snoozeChosenAt`), so lifting it writes no choice.
+ * Lifts the snooze a rate-limit pause put on its thread (`pauseRunForRateLimit`). It puts back the value the snooze replaced
+ * (`pauseSnooze.previousUntil`, if still ahead), so an owner's own snooze survives the pause. It does nothing while the
+ * snooze is no longer the one this pause set, or while another paused reply on the same chat is still live: that reply
+ * still needs the chat snoozed. Lifting writes no choice (`snoozeChosenAt` stays).
  */
-const liftPauseSnooze = async (ctx: MutationCtx, threadId: Id<"threads">, retryAt: number): Promise<void> => {
+const liftPauseSnooze = async (ctx: MutationCtx, stream: Doc<"persistentStreams">): Promise<void> => {
+    const { pauseSnooze } = stream;
+
+    if (pauseSnooze === undefined) {
+        return;
+    }
+
+    const threadId = stream.threadId as Id<"threads">;
+    const others = await liveStreamsOf(ctx, threadId);
+
+    if (others.some((other) => other._id !== stream._id && other.pause !== undefined)) {
+        return;
+    }
+
     const thread = await ctx.db.get("threads", threadId);
 
-    if (thread !== null && thread.snoozedUntil === retryAt) {
-        await patchRow(ctx.db, "threads", thread, { snoozedUntil: undefined });
+    if (thread === null || thread.snoozedUntil !== pauseSnooze.until) {
+        return;
     }
+
+    const restore = pauseSnooze.previousUntil !== undefined && pauseSnooze.previousUntil > ctx.now ? pauseSnooze.previousUntil : undefined;
+
+    await patchRow(ctx.db, "threads", thread, { snoozedUntil: restore });
 };
 
 /** Ends a paused run that will not resume: records what it did, closes its stream, and frees the thread unless another reply is live on it. */
@@ -924,9 +943,7 @@ export const endPausedRun = async (ctx: MutationCtx, stream: Doc<"persistentStre
     await patchRow(ctx.db, "persistentStreams", stream, { pausedRun: undefined, status: "done", ...(steers && { steers }) });
 
     // A stopped wait gives its chat back: the snooze the pause put on it ends with the pause.
-    if (stream.pause) {
-        await liftPauseSnooze(ctx, stream.threadId as Id<"threads">, stream.pause.retryAt);
-    }
+    await liftPauseSnooze(ctx, stream);
 
     const { page } = await ctx.db.persistentStreams.findMany({
         limit: 2,
@@ -1059,6 +1076,17 @@ export const pauseRunForRateLimit = internalMutation
             status: args.status,
         };
 
+        // Snoozed until the reset, only when the provider reported one (a default wait has no reset to snooze to), and only
+        // for the thread's owner's own run: the snooze is the owner's active list. A later snooze the owner chose stays.
+        // The value a shorter snooze replaces is kept on the stream, so lifting this snooze puts back the owner's own.
+        const thread = await ctx.db.get("threads", threadId);
+        const snoozes =
+            args.snoozeUntilReset === true &&
+            args.retryAt !== undefined &&
+            thread !== null &&
+            thread.userId === args.run.userId &&
+            (thread.snoozedUntil ?? 0) < plan.retryAt;
+
         await patchRow(ctx.db, "persistentStreams", stream, {
             expiresAt: Math.max(stream.expiresAt, plan.retryAt + STREAM_TTL_MS),
             pause,
@@ -1067,6 +1095,12 @@ export const pauseRunForRateLimit = internalMutation
             pausedSteps,
             // The provider gave no reset time: `retryAt` is the default wait, not a reset the person can rely on.
             pauseResetUnreported: args.retryAt === undefined ? true : undefined,
+            // Not stamped as the owner's choice (`snoozeChosenAt` is left alone), so an owner's own snooze chosen before this
+            // pause and delivered after it still applies.
+            pauseSnooze:
+                thread !== null && snoozes
+                    ? { ...(thread.snoozedUntil !== undefined && { previousUntil: thread.snoozedUntil }), until: plan.retryAt }
+                    : undefined,
         });
 
         if (!awaitsPerson) {
@@ -1074,19 +1108,7 @@ export const pauseRunForRateLimit = internalMutation
             await enqueueRunResume(pause, plan.retryAt - ctx.now + RATE_LIMIT_RESUME_SLACK_MS);
         }
 
-        // Snoozed until the reset, only when the provider reported one (a default wait has no reset to snooze to), and only
-        // for the thread's owner's own run: the snooze is the owner's active list. A later snooze the owner chose stays.
-        const thread = await ctx.db.get("threads", threadId);
-
-        if (
-            args.snoozeUntilReset === true &&
-            args.retryAt !== undefined &&
-            thread !== null &&
-            thread.userId === args.run.userId &&
-            (thread.snoozedUntil ?? 0) < plan.retryAt
-        ) {
-            // Not stamped as the owner's choice (`snoozeChosenAt` stays): an owner's own snooze chosen before this pause, and
-            // delivered after it, must still apply.
+        if (thread !== null && snoozes) {
             await patchRow(ctx.db, "threads", thread, { snoozedUntil: plan.retryAt });
         }
 
@@ -1144,6 +1166,7 @@ export const claimRunResume = internalMutation
             pauseAwaitsPerson: undefined,
             pauseCause: undefined,
             pauseResetUnreported: undefined,
+            pauseSnooze: undefined,
             // This invocation's own claim: the ceiling its beats may extend the expiry to counts from here (`beatExpiry`).
             runClaimedAt: ctx.now,
             runEpoch: epoch,
@@ -1191,7 +1214,7 @@ export const retryPausedRunsNow = internalMutation
 
             // An early resume runs the reply now, so the snooze the pause put on its chat goes with the wait.
             if (early) {
-                await liftPauseSnooze(ctx, stream.threadId as Id<"threads">, pause.retryAt);
+                await liftPauseSnooze(ctx, stream);
             }
 
             // A pause the person resumes has no queued resume that could be late: once its reset has passed it is due at once.

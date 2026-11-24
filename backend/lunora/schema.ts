@@ -2199,6 +2199,9 @@ export const schema = defineSchema({
         pausedSteps: v.optional(v.array(v.string())),
         // The provider gave no reset time, so the pause's `retryAt` is the default wait, not a reset (`pauseRunForRateLimit`).
         pauseResetUnreported: v.optional(v.literal(true)),
+        // The snooze a rate-limit pause put on its chat (`pauseRunForRateLimit`): the reset time it set, and the value it replaced
+        // (absent if none), so lifting it restores the owner's own snooze.
+        pauseSnooze: v.optional(v.object({ previousUntil: v.optional(v.number()), until: v.number() })),
         producer: v.optional(v.literal("host")),
         // What the reply's usage record needs, kept from the run's start (`registerResumableRun`) for a run that dies before
         // any pause stored it in `pausedRun`.
