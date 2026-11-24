@@ -126,9 +126,17 @@ export const GLOBAL_USER_TABLES_NOT_REASSIGNED: Readonly<Record<string, string>>
     user: "the guest's user row itself",
 };
 
-/** `row` with every top-level field equal to `from` set to `to`. */
+/**
+ * A top-level field that can name a user: `userId`, or an id or `By` reference (`ownerId`, `grantedBy`, `resolvedBy`). Only these
+ * are re-pointed, so a content field whose text happens to equal the guest's id (a thread titled with it) is left as it is.
+ */
+const USER_REFERENCE_SUFFIX = /(?:Id|By)$/;
+
+export const isUserReferenceField = (key: string): boolean => key === "userId" || USER_REFERENCE_SUFFIX.test(key);
+
+/** `row` with every user-reference field equal to `from` set to `to` (see {@link isUserReferenceField}). */
 export const rewriteOwner = (row: Record<string, unknown>, from: string, to: string): Record<string, unknown> =>
-    Object.fromEntries(Object.entries(row).map(([key, value]) => [key, value === from ? to : value]));
+    Object.fromEntries(Object.entries(row).map(([key, value]) => [key, value === from && isUserReferenceField(key) ? to : value]));
 
 type RawDb = {
     delete: (table: string, id: string) => Promise<void>;
@@ -327,7 +335,7 @@ export const importShardRows = internalMutation
 
             const guestFields = Object.fromEntries(
                 Object.entries(existing)
-                    .filter(([key, value]) => key !== "_id" && value === args.from)
+                    .filter(([key, value]) => key !== "_id" && value === args.from && isUserReferenceField(key))
                     .map(([key]) => [key, args.to]),
             );
 

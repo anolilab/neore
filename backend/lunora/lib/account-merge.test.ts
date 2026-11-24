@@ -241,6 +241,10 @@ describe("rewriteOwner", () => {
             userId: "user",
         });
     });
+
+    it("leaves a content field alone when its text equals the guest's id", () => {
+        expect(rewriteOwner({ _id: "t1", title: "guest", userId: "guest" }, "guest", "user")).toStrictEqual({ _id: "t1", title: "guest", userId: "user" });
+    });
 });
 
 describe("shardLocalTables", () => {
@@ -1422,6 +1426,21 @@ describe("mergeGuestInto on real shard procedures", () => {
             }
         },
     );
+
+    it("keeps a thread's title when the guest named it with their own id, on a shared store", async () => {
+        const store = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const guest = await guestUser(store);
+            const threadId = await insert(store, "threads", { mode: "text", model: "gpt-4o", status: "active", title: guest, userId: guest });
+
+            await mergeGuestInto(realShards({ [guest]: store, user: store }), REFERENCES, guest, "user");
+
+            expect(await get(store, "threads", threadId)).toMatchObject({ title: guest, userId: "user" });
+        } finally {
+            store.close();
+        }
+    });
 });
 
 describe("importShardRows for the organization ledger", () => {
