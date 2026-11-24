@@ -1252,8 +1252,11 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
         );
     }
 
-    // A failed reply shows its cause after whatever text it kept, so the cause sits in the thread beside the partial reply
-    if (message.status === "failed" && !isAnimating) {
+    // A failed reply with text shows its cause beside the partial reply, but only for a local reply: a gateway failure already
+    // shows its error in the chat banner, so repeating it in the thread would show it twice.
+    const isLocalReply = message.localReply === true;
+
+    if (message.status === "failed" && !isAnimating && (renderedParts.length === 0 || isLocalReply)) {
         const errorMessage = message.error || t`An error occurred while generating the response.`;
 
         renderedParts.push(

@@ -14,7 +14,7 @@ export const LOCAL_REPEAT_LIMIT = 6;
 export const LOCAL_REPEAT_MAX_BLOCK_LINES = 4;
 /** A repeated block shorter than this (trimmed, joined) is ignored: `}` or `---` repeat in real code and tables. */
 export const LOCAL_REPEAT_MIN_CHARS = 8;
-/** No token for this long, counted from the request start, ends the reply. Covers a slow model load. */
+/** No token for this long, counted from the moment the server answers, ends the reply. A model that takes longer than this to produce its first token is stopped too: Continue asks again. */
 export const LOCAL_IDLE_TIMEOUT_MS = 120_000;
 /** Reasoning text past this many characters ends the reply. */
 export const LOCAL_REASONING_LIMIT_CHARS = 30_000;
@@ -60,11 +60,17 @@ export interface ContentStop {
     kind: "repeat-loop";
 }
 
+/** Reasoning past the limit: keep the delta's first `keep` characters, which bring the total to exactly the limit. */
+export interface ReasoningStop {
+    keep: number;
+    kind: "reasoning-limit";
+}
+
 export interface ReplyGuard {
     /** Feed visible reply text; returns the stop, and where in this delta the reply ends, once it repeats. */
     pushContent: (text: string) => ContentStop | undefined;
-    /** Feed reasoning text; returns the stop once it passes its limit. */
-    pushReasoning: (text: string) => ReplyStopKind | undefined;
+    /** Feed reasoning text; returns the stop, and how much of this delta fits under the limit, once it passes. */
+    pushReasoning: (text: string) => ReasoningStop | undefined;
 }
 
 export const createReplyGuard = (): ReplyGuard => {
@@ -106,9 +112,11 @@ export const createReplyGuard = (): ReplyGuard => {
             return undefined;
         },
         pushReasoning: (text) => {
+            const room = Math.max(LOCAL_REASONING_LIMIT_CHARS - reasoningChars, 0);
+
             reasoningChars += text.length;
 
-            return reasoningChars > LOCAL_REASONING_LIMIT_CHARS ? "reasoning-limit" : undefined;
+            return reasoningChars > LOCAL_REASONING_LIMIT_CHARS ? { keep: Math.min(room, text.length), kind: "reasoning-limit" } : undefined;
         },
     };
 };

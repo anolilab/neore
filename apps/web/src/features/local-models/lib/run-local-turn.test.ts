@@ -209,6 +209,36 @@ describe("reply guard stops", () => {
         expect(save).toHaveBeenCalledWith({ error: "repeat-loop", outcome: "failed", prompt: "hi", reasoning: "", reply: line.repeat(LOCAL_REPEAT_LIMIT) });
     });
 
+    it("does not start the idle clock until the server has answered", async () => {
+        expect.assertions(2);
+
+        vi.useFakeTimers();
+
+        try {
+            const open = holdingFetch([]);
+            let answer: () => void = () => undefined;
+            const { options, save } = setup(
+                (url, init) =>
+                    new Promise<Response>((resolve) => {
+                        answer = () => {
+                            resolve(open(url, init));
+                        };
+                    }),
+            );
+            const pending = runLocalTurn(options);
+
+            await vi.advanceTimersByTimeAsync(LOCAL_IDLE_TIMEOUT_MS * 2);
+            expect(save).not.toHaveBeenCalled();
+
+            answer();
+            await vi.advanceTimersByTimeAsync(LOCAL_IDLE_TIMEOUT_MS);
+
+            await expect(pending).resolves.toMatchObject({ error: { kind: "idle" } });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("stops a reply that sends nothing for the idle limit, even before the first token", async () => {
         expect.assertions(2);
 
@@ -235,7 +265,8 @@ describe("reply guard stops", () => {
         const { options, save } = setup(holdingFetch(frames));
 
         await expect(runLocalTurn(options)).resolves.toMatchObject({ error: { kind: "reasoning-limit" }, outcome: "failed", saved: true });
-        expect(save).toHaveBeenCalledWith({ error: "reasoning-limit", outcome: "failed", prompt: "hi", reasoning: `${atLimit}rr`, reply: "" });
+        // The "rr" past the limit is not kept: the saved reasoning stays at the limit.
+        expect(save).toHaveBeenCalledWith({ error: "reasoning-limit", outcome: "failed", prompt: "hi", reasoning: atLimit, reply: "" });
     });
 
     it("does not stop an ordinary reply, including short lines that repeat under the limit", async () => {

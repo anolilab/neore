@@ -95,6 +95,8 @@ export interface ChatMessage {
     /** Free-form per-message metadata; `prompt` and `errorType` are the keys the UI reads. */
     metadata?: { [key: string]: unknown; errorType?: string; prompt?: string };
     model?: string;
+    /** The browser streamed this reply from the user's own model server; set by the backend's UI conversion. */
+    localReply?: boolean;
     parts: MessagePart[];
     role: "assistant" | "system" | "tool" | "user";
     /** Group chat: the participant that wrote this reply, shown as a label above it. */

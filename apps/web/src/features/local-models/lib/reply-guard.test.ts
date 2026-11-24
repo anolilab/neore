@@ -131,6 +131,7 @@ describe(createReplyGuard, () => {
         const guard = createReplyGuard();
 
         expect(guard.pushReasoning("r".repeat(LOCAL_REASONING_LIMIT_CHARS))).toBeUndefined();
-        expect(guard.pushReasoning("r")).toBe("reasoning-limit");
+        // Nothing of this delta fits under the limit any more.
+        expect(guard.pushReasoning("r")).toStrictEqual({ keep: 0, kind: "reasoning-limit" });
     });
 });

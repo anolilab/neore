@@ -117,34 +117,36 @@ export const runLocalTurn = async (options: RunLocalTurnOptions): Promise<RunLoc
         signal.addEventListener("abort", onUserAbort, { once: true });
     }
 
-    armIdle();
-
     try {
         await streamLocalChat({
             baseUrl,
             fetchImpl,
             messages: [...buildLocalHistory(history, systemPrompt), { content: prompt, role: "user" }],
             model: modelId,
+            // The idle clock starts when the server answers: a request that is still being accepted is not a silent model.
             onDelta: (delta) => {
                 // Tokens of a chunk that arrived after the stop are not part of the saved reply.
                 if (state.stop) {
                     return;
                 }
 
-                // A chunk can carry the repeat that ends the reply and text past it: keep only what comes up to the repeat.
+                // A chunk can carry the repeat that ends the reply, or the reasoning that passes its limit, and text past either:
+                // keep only what comes up to the stop, so the saved reply stays within its limits.
                 const repeat = guard.pushContent(delta.content);
+                const overflow = guard.pushReasoning(delta.reasoning);
 
                 text += repeat ? delta.content.slice(0, repeat.keep) : delta.content;
-                reasoning += delta.reasoning;
+                reasoning += overflow ? delta.reasoning.slice(0, overflow.keep) : delta.reasoning;
                 onUpdate(text, reasoning);
                 armIdle();
 
-                const cause = repeat ? repeat.kind : guard.pushReasoning(delta.reasoning);
+                const cause = repeat?.kind ?? overflow?.kind;
 
                 if (cause) {
                     stopWith(cause);
                 }
             },
+            onOpen: armIdle,
             signal: stream.signal,
         });
     } catch (error) {
