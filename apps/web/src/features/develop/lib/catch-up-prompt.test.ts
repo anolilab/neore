@@ -83,7 +83,7 @@ describe(catchUpPrompt, () => {
 
             expect(firstIndex(commands, "git remote get-url --all origin")).toBe(0);
             expect(firstIndex(commands, "git remote get-url --push --all origin")).toBe(1);
-            expect(prompt).toContain("both are octo/hello on git.example");
+            expect(stepsOf(prompt).get(1)).toContain("`match`");
             expect(firstIndex(commands, "git status --porcelain")).toBe(2);
             expect(commandsMatching(commands, "git status --porcelain")[0]?.step).toBe(2);
             expect(fetch).toBeGreaterThan(2);
@@ -129,6 +129,22 @@ describe(catchUpPrompt, () => {
             }
 
             expect([0, 1, 2].some((step: number) => steps.get(step)?.includes("step 9"))).toBe(false);
+        });
+
+        it("prints none of origin's URLs: each URL list goes through a filter that prints only match or mismatch", () => {
+            const urlReads = commands.filter(
+                ({ command }: Command) => command.includes("get-url") || command.startsWith("git remote") || command.startsWith("git config"),
+            );
+
+            expect(urlReads.map(({ command, step }: Command) => [step, command.split(" | ")[0]])).toEqual([
+                [1, "git remote get-url --all origin"],
+                [1, "git remote get-url --push --all origin"],
+            ]);
+
+            for (const { command } of urlReads) {
+                expect(command.split(" | ").at(-1)).toContain('print (n == 1 && !bad) ? "match" : "mismatch"');
+                expect(command).toContain("want='git.example/octo/hello'");
+            }
         });
 
         it("is stored as written: the composer strips hidden characters, and none are there", () => {
@@ -184,6 +200,27 @@ describe(catchUpPrompt, () => {
         expect(expected).not.toMatch(A_REF);
         expect(stepsOf(SAME_REPO).get(4)).toContain("step 8 leases on that commit");
         expect(SAME_REPO).toContain(`in place of ${expected}`);
+    });
+
+    it("for a head in the base repository, a run that does not push sets its rebase aside and puts the branch back on origin's commit", () => {
+        const commands = commandsOf(SAME_REPO);
+        const steps = stepsOf(SAME_REPO);
+        const stepSeven = commands.filter(({ step }: Command) => step === 7).map(({ command }: Command) => command);
+
+        // A branch of this run's own, numbered past any that exists, then the pull request's branch moved back only while it
+        // still holds exactly the commits just set aside: the next run's fast-forward from origin's tip then works.
+        expect(stepSeven).toEqual([
+            "git show-ref --verify --quiet refs/heads/<name>",
+            "git switch -c <name>",
+            "git update-ref refs/heads/feat/x <commit from step 4> HEAD",
+        ]);
+        expect(steps.get(7)).toContain("start with pr-42-a1b2c3d4,");
+        expect(commandsMatching(commands, "git update-ref refs/heads/")).toHaveLength(1);
+        // The base moving twice, a refused push, and an aborted repeat rebase all set the rebase aside the same way.
+        expect(steps.get(8)?.match(/as step 7 says/gu)).toHaveLength(2);
+        expect(steps.get(6)).toContain("as step 7 says");
+        expect(SAME_REPO).not.toContain("leave the rebased commits in place");
+        expect(SAME_REPO).not.toMatch(/git (?:reset|branch -[fD])\b/u);
     });
 
     it("for a fork, even one whose branch has origin's name and commit, holds no push and never touches origin's branch of that name", () => {
