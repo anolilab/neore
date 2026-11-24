@@ -98,9 +98,10 @@ export const runReloadMessage = async (env: ReloadMessageEnv, messageId: string)
     }
 
     // A local reply continues only on the model that wrote it: the browser cannot send it to the gateway or to another model.
+    // A saved reply records the bare local model id, which is what the selected local target names.
     const failedMessage = currentMessages[messageIndex];
 
-    if (failedMessage?.localReply === true && (!localTarget || (failedMessage.model !== undefined && failedMessage.model !== model))) {
+    if (failedMessage?.localReply === true && (!localTarget || (failedMessage.model !== undefined && failedMessage.model !== localTarget.modelId))) {
         return "model-unavailable";
     }
 

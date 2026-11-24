@@ -12,7 +12,8 @@ vi.mock("@/lib/analytics", () => {
 
 const messages = [
     { id: "u1", role: "user", text: "write it again" },
-    { id: "a1", localReply: true, model: "custom:ollama/llama3", role: "assistant", status: "failed" },
+    // A saved local reply records the bare local model id, not the `custom:<provider>/<model>` the composer holds.
+    { id: "a1", localReply: true, model: "llama3", role: "assistant", status: "failed" },
 ];
 
 const envFor = (overrides: Partial<ReloadMessageEnv>): ReloadMessageEnv =>
@@ -50,6 +51,16 @@ describe("runReloadMessage for a local reply", () => {
         await expect(runReloadMessage(envFor({ sendLocalTurn, setIsRegenerating }), "a1")).resolves.toBe("model-unavailable");
         expect(sendLocalTurn).not.toHaveBeenCalled();
         expect(setIsRegenerating).not.toHaveBeenCalled();
+    });
+
+    it("refuses a local reply when a different local model is selected", async () => {
+        expect.assertions(2);
+
+        const sendLocalTurn = vi.fn();
+        const localTarget = { baseUrl: "http://localhost:11434", modelId: "qwen", providerId: "ollama", providerName: "Ollama" };
+
+        await expect(runReloadMessage(envFor({ localTarget, model: "custom:ollama/qwen", sendLocalTurn }), "a1")).resolves.toBe("model-unavailable");
+        expect(sendLocalTurn).not.toHaveBeenCalled();
     });
 
     it("regenerates a local reply on the local model that wrote it", async () => {
