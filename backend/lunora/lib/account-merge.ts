@@ -17,7 +17,10 @@
  *    ({@link deleteShardRows}), each while its digest still holds. A row
  *    written or edited on the guest's shard after its table was copied (a
  *    collaborator's comment, a guest tab still open, a scheduled job) so
- *    arrives as it is at the clear, never deleted uncopied;
+ *    arrives as it is at the clear, never deleted uncopied.
+ *    Before any copy, the guest's organization contributor entries are handed to the new account
+ *    ({@link handOverOrganizationContributors}, the `contributors` phase), so its organization ledger rows land in the cohort they
+ *    were counted in; an older row that cannot still moves, held out of the organization view (`heldFrom`);
  * 3. `.global()` rows naming the guest are re-pointed ({@link reassignGlobalRows}),
  *    its thread follows a page per mutation ({@link reassignThreadFollowsPage}),
  *    and its pins on other owners' threads on each owner's shard, each thread's
@@ -83,12 +86,14 @@ import { hasClaimWithPrefix, releaseClaimsWithPrefix } from "./claim-once";
 import { authLogger } from "./logger";
 import { callOnShard } from "./cross-shard";
 import { enqueueJob } from "./job-queue";
-import { noteShardActivity, noteShardDue } from "./shard-housekeeping";
+import { noteRetentionDueAt, noteShardActivity, noteShardDue } from "./shard-housekeeping";
 import { currentShard } from "./shard-context";
 import schema from "../schema";
 import { dropPushDevicesOf } from "../notifications/push-device-writes";
 import { mergeThreadFollowsPage } from "../chat/follows/follow-writes";
 import { firstPinRouteOf, moveSharedPinRoute, pinRouteOwnerOf } from "../chat/pins/pin-route-writes";
+import { ORGANIZATION_RECORD_LATE_MS } from "../usage/activity-logic";
+import { patchRow } from "./patch";
 
 /** Rows moved per round trip. */
 export const MERGE_PAGE_SIZE = 100;
@@ -152,6 +157,8 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     skills: ["userId"],
     threadAccess: ["userId", "ownerId", "grantedBy"],
     threadInvites: ["ownerId", "invitedBy", "acceptedBy"],
+    // The organizations a guest's projects were filed under: the list follows the guest's ledger rows (which move with their shard).
+    usageOrganizationContributors: ["userId"],
     userVariableDefaults: ["userId"],
 };
 
@@ -540,6 +547,7 @@ const vMergeProgressFields = {
     moved: v.number(),
     phase: v.union(
         v.literal("clear"),
+        v.literal("contributors"),
         v.literal("copy"),
         v.literal("follows"),
         v.literal("global"),
@@ -1133,7 +1141,7 @@ export const resumeStalledGuestMergesOnTick = internalMutation
  */
 export const importShardRows = internalMutation
     .input({ from: v.string(), generation: v.number(), rows: v.array(v.any()), table: v.string(), to: v.string() })
-    .output(v.object({ fenced: v.boolean(), imported: v.number(), present: v.array(v.string()) }))
+    .output(v.object({ fenced: v.boolean(), held: v.number(), imported: v.number(), present: v.array(v.string()) }))
     .mutation(async ({ args, ctx }) => {
         const db = rawDb(ctx);
         const rows = args.rows as Record<string, unknown>[];
@@ -1141,25 +1149,63 @@ export const importShardRows = internalMutation
         const { now } = ctx;
 
         if ((await mergeFinished(ctx.db, args.from, now)) || !(await holdMergeLease(ctx.db, args.from, args.generation, now))) {
-            return { fenced: true, imported: 0, present: [] };
+            return { fenced: true, held: 0, imported: 0, present: [] };
         }
 
         if (args.table === "userSettings") {
             await carrySetupSteps(ctx, rows, args.from, args.to);
 
-            return { fenced: false, imported: 0, present: ids };
+            return { fenced: false, held: 0, imported: 0, present: ids };
         }
 
         if (KEEP_NEW_USERS.has(args.table)) {
-            return { fenced: false, imported: 0, present: ids };
+            return { fenced: false, held: 0, imported: 0, present: ids };
         }
 
         let imported = 0;
+        let held = 0;
+        let usageWritten = false;
+        // Per organization: whether the new account's entry there is the guest's, handed over with its cohort.
+        const handedOver = new Map<string, boolean>();
 
         for (const row of rows) {
             const id = row._id as string;
             const key = markerKey(args.from, args.table, id);
-            const reowned = rewriteOwner(row, args.from, args.to);
+            const existing = (await db.get(args.table, id)) as Record<string, unknown> | null;
+            let reowned = rewriteOwner(row, args.from, args.to);
+
+            // An organization ledger row older than `ORGANIZATION_RECORD_LATE_MS` is in a week the organization view may already show. It
+            // counts only in the cohort it was counted in: where the guest's entry became the new account's
+            // (`handOverOrganizationContributors`), every cell stays as it was. Elsewhere (the account has its own entry, or the guest had
+            // none yet) it would change a released week by the guest's spend: it still moves, held (`heldFrom`), so the account keeps it
+            // in its export until retention prunes it, and the view never counts it. Nothing of the guest's is left behind to be deleted.
+            // Decided once, at the row's first import: the clear's re-import keeps what the copy chose (the row's age has grown since,
+            // and holding a row the view already counted would change a closed week too).
+            if (args.table === "usageOrganizationReplies") {
+                if (existing !== null) {
+                    if (typeof existing["heldFrom"] === "string") {
+                        reowned = { ...reowned, heldFrom: existing["heldFrom"] };
+                    }
+                } else if (typeof row["at"] === "number" && now - row["at"] > ORGANIZATION_RECORD_LATE_MS) {
+                    const organizationId = String(row["organizationId"]);
+                    let same = handedOver.get(organizationId);
+
+                    if (same === undefined) {
+                        const entry = await ctx.db.usageOrganizationContributors.findFirst({
+                            consistency: "primary",
+                            where: { organizationId, userId: args.to },
+                        });
+
+                        same = entry?.mergedFrom === args.from;
+                        handedOver.set(organizationId, same);
+                    }
+
+                    if (!same) {
+                        reowned = { ...reowned, heldFrom: typeof row["heldFrom"] === "string" ? row["heldFrom"] : args.from };
+                    }
+                }
+            }
+
             const wanted = await rowDigest(reowned);
             const marker = await ctx.db
                 .query("idempotencyClaims")
@@ -1167,7 +1213,6 @@ export const importShardRows = internalMutation
                 .first();
             // A marker counts however old it is: one written before markers stopped lapsing still says the merge wrote the row.
             const written = marker === null ? null : (marker.result ?? null);
-            const existing = (await db.get(args.table, id)) as Record<string, unknown> | null;
             let write = false;
 
             if (existing === null) {
@@ -1177,6 +1222,10 @@ export const importShardRows = internalMutation
                 if (write) {
                     await db.insert(args.table, reowned, { allowExplicitId: true });
                     imported += 1;
+
+                    if (typeof reowned["heldFrom"] === "string") {
+                        held += 1;
+                    }
                 }
             } else {
                 const current = await rowDigest(existing);
@@ -1192,6 +1241,8 @@ export const importShardRows = internalMutation
             }
 
             if (write) {
+                usageWritten ||= args.table === "usageOrganizationReplies" || args.table === "usageDaily";
+
                 if (marker === null) {
                     await ctx.db.insert("idempotencyClaims", {
                         claimedAt: now,
@@ -1207,7 +1258,18 @@ export const importShardRows = internalMutation
             }
         }
 
-        return { fenced: false, imported, present: ids };
+        if (held > 0) {
+            authLogger.info(`[auth] held ${String(held)} organization ledger rows of guest ${args.from} out of the organization view`, { to: args.to });
+        }
+
+        // Moved usage rows have no retention time on this shard (its census row was the guest's): wake it now, so the tick prunes them and
+        // sets the exact time.
+        if (usageWritten) {
+            await noteRetentionDueAt(ctx, now);
+            await noteShardDue(ctx, now);
+        }
+
+        return { fenced: false, held, imported, present: ids };
     });
 
 /**
@@ -1413,6 +1475,56 @@ export const firstTableWithGuestRows = async (ctx: { db: unknown }, guestId: str
     return null;
 };
 
+/** Organization contributor entries one {@link handOverOrganizationContributors} call decides. */
+const HAND_OVER_BATCH = 50;
+
+/**
+ * On the NEW user's shard, before any row is copied (the merge's `contributors` phase): each of the guest's organization contributor
+ * entries becomes the new account's, in the guest's cohort and marked with the guest (`mergedFrom`), so the copy moves the guest's ledger
+ * rows into the cohort that counted them and no closed week changes. Where the new account already has an entry under the organization, or
+ * ledger rows there of its own, the guest's entry stays the guest's, marked, and goes once the guest's shard is empty
+ * ({@link reassignGlobalRows}): the cohort that held the guest then shows without them, as one that lost a member does, and the guest's
+ * closed-week rows stay out of the view. A marked entry keeps its cohort withheld, and keeps the guest from being booked again while rows of
+ * theirs are still on their shard (`usage/cohorts.ts#insertContributor`). Handing over first also means a reply the new account records
+ * during the merge finds an entry, and books no cohort of its own that the guest's rows would then land in. Nothing for a delivery whose
+ * lease a later one took (`fenced`); each call is safe to run twice (a decided entry leaves the filter).
+ */
+export const handOverOrganizationContributors = internalMutation
+    .input({ from: v.string(), generation: v.number(), to: v.string() })
+    .output(v.object({ done: v.boolean(), fenced: v.boolean() }))
+    .mutation(async ({ args, ctx }) => {
+        if ((await mergeFinished(ctx.db, args.from, ctx.now)) || !(await holdMergeLease(ctx.db, args.from, args.generation, ctx.now))) {
+            return { done: false, fenced: true };
+        }
+
+        // Primary reads: a decided entry is marked, and leaves the filter, so the next call starts where this one stopped.
+        const { page } = await ctx.db.usageOrganizationContributors.findMany({
+            consistency: "primary",
+            limit: HAND_OVER_BATCH + 1,
+            where: { mergedFrom: { isNull: true }, userId: args.from },
+        });
+
+        for (const entry of page.slice(0, HAND_OVER_BATCH)) {
+            const { organizationId } = entry;
+            const kept = await ctx.db.usageOrganizationContributors.findFirst({ consistency: "primary", where: { organizationId, userId: args.to } });
+            // Rows with no entry yet (a reconcile still to run): they would join the guest's cohort and change its closed weeks.
+            const ownRows = kept
+                ? undefined
+                : await ctx.db.usageOrganizationReplies.findFirst({
+                      consistency: "primary",
+                      where: { heldFrom: { isNull: true }, organizationId, userId: args.to },
+                  });
+
+            if (kept || ownRows) {
+                await ctx.db.patch("usageOrganizationContributors", entry._id, { mergedFrom: args.from });
+            } else {
+                await ctx.db.patch("usageOrganizationContributors", entry._id, { mergedFrom: args.from, userId: args.to });
+            }
+        }
+
+        return { done: page.length <= HAND_OVER_BATCH, fenced: false };
+    });
+
 /** Re-point every `.global()` row naming the guest to the new user, and drop the guest's census row. */
 /**
  * Global rows one `reassignGlobalRows` call moves: each is one D1 statement, and an invocation may run only so many, so a
@@ -1427,7 +1539,10 @@ const REASSIGN_BATCH = 200;
 const REASSIGN_BATCH_BY_TABLE: Readonly<Record<string, number>> = { projectRuleFiles: 8 };
 
 export const reassignGlobalRows = internalMutation
-    .input({ from: v.string(), generation: v.number(), to: v.string() })
+    // `guestDrained: false` when rows are still on the guest's shard: the organization contributor entries are left as the hand-over
+    // marked them (their cohorts withheld), so the guest's leftover ledger rows are never booked into a cohort of their own. The merge's
+    // `global` step runs only after its clear emptied the guest's shard, so it never passes `false`.
+    .input({ from: v.string(), generation: v.number(), guestDrained: v.optional(v.boolean()), to: v.string() })
     .output(v.object({ done: v.boolean(), fenced: v.optional(v.boolean()), reassigned: v.number() }))
     .mutation(async ({ args, ctx }) => {
         // In the transaction that writes: a delivery whose lease a later one took (one that may have stopped the merge for an
@@ -1444,7 +1559,13 @@ export const reassignGlobalRows = internalMutation
         >;
         let reassigned = 0;
 
+        const settleContributors = args.guestDrained !== false;
+
         for (const [table, columns] of Object.entries(GLOBAL_USER_COLUMNS)) {
+            if (table === "usageOrganizationContributors" && !settleContributors) {
+                continue;
+            }
+
             for (const column of columns) {
                 const room = Math.min(REASSIGN_BATCH - reassigned, REASSIGN_BATCH_BY_TABLE[table] ?? REASSIGN_BATCH);
 
@@ -1456,6 +1577,23 @@ export const reassignGlobalRows = internalMutation
                 const { page } = await facades[table]!.findMany({ consistency: "primary", limit: room + 1, where: { [column]: args.from } });
 
                 for (const row of page.slice(0, room)) {
+                    // The new account may already be a contributor under the organization: its one entry is kept, and the guest's copy goes,
+                    // so the member's ledger is never summed twice. So does an entry the hand-over marked to go, whatever the new account
+                    // now has: moved, it would bring the new account's own closed weeks into the guest's cohort.
+                    if (table === "usageOrganizationContributors") {
+                        const kept = await ctx.db.usageOrganizationContributors.findFirst({
+                            consistency: "primary",
+                            where: { organizationId: String(row.organizationId), userId: args.to },
+                        });
+
+                        if (kept || typeof row.mergedFrom === "string") {
+                            await ctx.db.delete(table as never, row._id as never);
+                            reassigned += 1;
+
+                            continue;
+                        }
+                    }
+
                     await ctx.db.patch(table as never, row._id as never, { [column]: args.to } as never);
                     reassigned += 1;
                 }
@@ -1463,6 +1601,42 @@ export const reassignGlobalRows = internalMutation
                 if (page.length > room) {
                     return { done: false, reassigned };
                 }
+            }
+        }
+
+        // The guest's rows are copied and deleted: each entry a hand-over marked (`handOverOrganizationContributors`) is settled against the
+        // ledger rows the new account now has, as the reconcile would: unmarked where it has some, gone where it has none (a stale entry, or
+        // rows the prune took). The view withholds the entry's cohort until then.
+        if (settleContributors) {
+            const markRoom = Math.min(REASSIGN_BATCH - reassigned, HAND_OVER_BATCH);
+
+            if (markRoom <= 0) {
+                return { done: false, reassigned };
+            }
+
+            const { page: marked } = await ctx.db.usageOrganizationContributors.findMany({
+                consistency: "primary",
+                limit: markRoom + 1,
+                where: { mergedFrom: args.from, userId: args.to },
+            });
+
+            for (const entry of marked.slice(0, markRoom)) {
+                const row = await ctx.db.usageOrganizationReplies.findFirst({
+                    consistency: "primary",
+                    where: { heldFrom: { isNull: true }, organizationId: entry.organizationId, userId: args.to },
+                });
+
+                if (row) {
+                    await patchRow(ctx.db as never, "usageOrganizationContributors", entry, { mergedFrom: undefined });
+                } else {
+                    await ctx.db.delete("usageOrganizationContributors", entry._id);
+                }
+
+                reassigned += 1;
+            }
+
+            if (marked.length > markRoom) {
+                return { done: false, reassigned };
             }
         }
 
@@ -1633,7 +1807,7 @@ export const MERGE_CALLS_PER_RUN = 40;
 export const MAX_MERGE_RUNS = 1000;
 
 /** The merge's steps, in order. */
-export type MergePhase = "clear" | "copy" | "follows" | "global" | "guest" | "markers" | "pins" | "repins";
+export type MergePhase = "clear" | "contributors" | "copy" | "follows" | "global" | "guest" | "markers" | "pins" | "repins";
 
 /** Where a merge run stopped, for the next run to start from: the step, its table and that table's copy cursor. */
 export interface MergeProgress {
@@ -1685,7 +1859,17 @@ interface MergeContext {
 }
 
 /** The most cross-shard calls one step of each phase makes: a run stops before a step it could not finish. */
-const STEP_CALLS: Readonly<Record<MergePhase, number>> = { clear: 3, copy: 2, follows: 1, global: 2, guest: 1, markers: 1, pins: 3, repins: 4 };
+const STEP_CALLS: Readonly<Record<MergePhase, number>> = {
+    clear: 3,
+    contributors: 1,
+    copy: 2,
+    follows: 1,
+    global: 2,
+    guest: 1,
+    markers: 1,
+    pins: 3,
+    repins: 4,
+};
 
 /** Moves `state` to the first table of `phase`. */
 const enter = (state: MergeState, phase: MergePhase): void => {
@@ -1746,6 +1930,24 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
             state.calls -= 2;
         } else {
             nextTable(state, tables, "global");
+        }
+
+        return false;
+    },
+    // A batch of the guest's organization contributor entries, handed over before any row is copied, so the copy knows
+    // which ledger rows keep their cohort ({@link handOverOrganizationContributors}).
+    contributors: async ({ call, from, generation, references, to }, state) => {
+        state.calls -= 1;
+        const { done, fenced }: { done: boolean; fenced: boolean } = await call(references.handOverContributors, { from, generation, to }, to);
+
+        if (fenced) {
+            state.superseded = true;
+
+            return true;
+        }
+
+        if (done) {
+            enter(state, "copy");
         }
 
         return false;
@@ -2081,7 +2283,7 @@ export const mergeGuestInto = async (
         deferMs: null,
         index,
         moved: resume?.moved ?? 0,
-        phase: resume?.phase ?? "copy",
+        phase: resume?.phase ?? "contributors",
         route: resume?.route ?? 0,
         routeThread: resume?.phase === "repins" ? (resume.routeThread ?? null) : null,
         stopped: false,
@@ -2230,6 +2432,7 @@ export interface MergeReferences {
     deleteGuest: { __lunoraRef: string };
     deleteRows: { __lunoraRef: string };
     dropMarkers: { __lunoraRef: string };
+    handOverContributors: { __lunoraRef: string };
     importRows: { __lunoraRef: string };
     list: { __lunoraRef: string };
     listClear: { __lunoraRef: string };
@@ -2273,6 +2476,7 @@ export const runGuestMerge = internalAction
                 deleteGuest: internal.auth.hooks.deleteMergedGuest,
                 deleteRows: internal.lib.account_merge.deleteShardRows,
                 dropMarkers: internal.lib.account_merge.dropImportMarkersPage,
+                handOverContributors: internal.lib.account_merge.handOverOrganizationContributors,
                 importRows: internal.lib.account_merge.importShardRows,
                 list: internal.lib.account_merge.listShardRowsPage,
                 listClear: internal.lib.account_merge.listShardRowsToClear,

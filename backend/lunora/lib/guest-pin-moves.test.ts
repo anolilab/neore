@@ -30,6 +30,7 @@ const REFERENCES: MergeReferences = {
     deleteGuest: reference("deleteMergedGuest"),
     deleteRows: reference("deleteShardRows"),
     dropMarkers: reference("dropImportMarkersPage"),
+    handOverContributors: reference("handOverOrganizationContributors"),
     importRows: reference("importShardRows"),
     list: reference("listShardRowsPage"),
     listClear: reference("listShardRowsToClear"),
@@ -124,6 +125,9 @@ const build = ({
                 state.marked = false;
 
                 return { fenced: false, hasMore: false } as never;
+            }
+            case "handOverOrganizationContributors": {
+                return { done: true, fenced: false } as never;
             }
             case "listShardRowsPage": {
                 return { continueCursor: null, isDone: true, page: [] } as never;
