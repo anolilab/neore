@@ -175,6 +175,13 @@ export const beginAccountMoveFor = internalMutation
         return null;
     });
 
+/** Whether the account still holds a marker of `kind`, live or not: a finished guest merge checks that its own are gone. */
+export const hasAccountMove = async (context: Pick<QueryCtx, "db">, userId: string, kind: AccountMoveKind): Promise<boolean> => {
+    const { page } = await context.db.accountMoves.findMany({ consistency: "primary", where: { userId } });
+
+    return page.some((row) => row.kind === kind);
+};
+
 /** Whether an erasure of the account is active. A guest merge checks it before it moves a pin: an erasure removes those pins. */
 export const isErasing = async (context: Pick<QueryCtx, "db">, userId: string): Promise<boolean> => {
     const { page } = await context.db.accountMoves.findMany({ consistency: "primary", where: { userId } });

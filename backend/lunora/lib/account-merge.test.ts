@@ -42,6 +42,8 @@ import {
     runGuestMerge,
     shardLocalTables,
 } from "./account-merge";
+import { IMPORT_MARKER_SCOPE, MERGE_PINS_LEFT_SCOPE, pinsLeftShard } from "./account-merge";
+import { runInShard } from "./shard-context";
 import { schemaWithShardedTables } from "./test-schema";
 
 // The action's own query runs in the harness, which takes the registered procedure; every other reference stays plain.
@@ -89,6 +91,7 @@ const REFERENCES: MergeReferences = {
     movePinRoute: ref("moveSharedPinRouteOf"),
     nextPinRoute: ref("nextSharedPinRoute"),
     noteGeneration: ref("noteMergeGeneration"),
+    pinsLeft: ref("pinsLeftShard"),
     reassignFollows: ref("reassignThreadFollowsPage"),
     reassignGlobal: ref("reassignGlobalRows"),
     reassignPins: { __lunoraRef: "chat_pins_functions:reassignUserPinsOnThread" },
@@ -146,6 +149,8 @@ const fakeShards = (
     }: { follows?: number; followsRemain?: boolean; onGuestDeletion?: (pins: FakePin[], routes: FakePin[]) => void; pins?: FakePin[] } = {},
 ) => {
     let followsLeft = follows;
+    /** Owner shards whose own merge's clear has moved their pins away (`pinsLeftShard`). */
+    const pinsLeft = new Set<string>();
     const pinRows = pins.map((pin) => {
         return { ...pin };
     });
@@ -273,6 +278,9 @@ const fakeShards = (
             case "noteMergeGeneration": {
                 return { current: true } as never;
             }
+            case "pinsLeftShard": {
+                return { left: pinsLeft.has(args.ownerId as string) } as never;
+            }
             case "reassignGlobalRows": {
                 reassigned.push({ from: args.from as string, to: args.to as string });
 
@@ -305,7 +313,7 @@ const fakeShards = (
         }
     };
 
-    return { call, deletedGuests, followPageCalls: () => followPageCalls, pinRows, reassigned, routeMoves, routes, shards };
+    return { call, deletedGuests, followPageCalls: () => followPageCalls, pinRows, pinsLeft, reassigned, routeMoves, routes, shards };
 };
 
 /** A class instance and a pattern: no Lunora column holds either. */
@@ -991,6 +999,62 @@ describe("deleteMergedGuest", () => {
         }
     });
 
+    it("lists, deletes and checks none of its rows, and keeps the guest, where every user runs on `__root__`", async () => {
+        const harness = harnessWithUsers();
+
+        try {
+            const guest = await insertUser(harness, true);
+            const other = (await harness.run(
+                async (context: any) =>
+                    await context.db.insert("threads", {
+                        mode: "text",
+                        model: "gpt-4o",
+                        status: "active",
+                        title: "someone else's",
+                        updatedAt: 1,
+                        userId: "other",
+                    }),
+            )) as string;
+            const onRoot = async <T>(work: (context: any) => Promise<T>): Promise<T> => await runInShard("__root__", async () => await harness.run(work));
+
+            await onRoot(async (context: any) => await context.runMutation(noteMergeGeneration, { from: guest, generation: 1 }));
+
+            expect(
+                await onRoot(async (context: any) => await context.runQuery(listShardRowsPage, { cursor: null, from: guest, table: "threads" })),
+            ).toStrictEqual({
+                continueCursor: null,
+                isDone: true,
+                page: [],
+            });
+            expect(await onRoot(async (context: any) => await context.runQuery(listShardRowsToClear, { from: guest, table: "threads" }))).toStrictEqual({
+                digests: [],
+                rows: [],
+            });
+
+            const row = await harness.run(async (context: any) => await context.db.get("threads", other));
+            const { digests } = (await harness.run(
+                async (context: any) => await context.runQuery(listShardRowsToClear, { from: guest, table: "threads" }),
+            )) as {
+                digests: string[];
+            };
+
+            expect(row).not.toBeNull();
+            await onRoot(
+                async (context: any) =>
+                    await context.runMutation(deleteShardRows, { from: guest, generation: 1, rows: [{ digest: digests[0]!, id: other }], table: "threads" }),
+            );
+            expect(await harness.run(async (context: any) => await context.db.get("threads", other))).not.toBeNull();
+            expect(await onRoot(async (context: any) => await firstTableWithGuestRows(context, guest))).toBeNull();
+            expect(await onRoot(async (context: any) => await context.runMutation(deleteMergedGuest, { generation: 1, userId: guest }))).toStrictEqual({
+                deleted: false,
+                sharedShard: true,
+            });
+            await expect(userExists(harness, guest)).resolves.toBe(true);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("keeps a guest that a thread follow still names, and says so", async () => {
         const harness = harnessWithUsers();
 
@@ -1164,7 +1228,7 @@ describe("clearing the guest's settings", () => {
 
                 await context.db.insert("userSettings", { language: "de-DE", userId: "user" });
 
-                const { rows } = await context.runQuery(listShardRowsToClear, { ownedBy: "guest", table: "userSettings" });
+                const { rows } = await context.runQuery(listShardRowsToClear, { from: "guest", ownedBy: "guest", table: "userSettings" });
 
                 return { guestId, ids: rows.map((row: Row) => row._id) };
             });
@@ -1191,8 +1255,8 @@ describe("clearing the guest's settings", () => {
             "user",
         );
 
-        expect(listClearCalls.find((args) => args.table === "userSettings")).toEqual({ ownedBy: "guest", table: "userSettings" });
-        expect(listClearCalls.find((args) => args.table === "threads")).toEqual({ table: "threads" });
+        expect(listClearCalls.find((args) => args.table === "userSettings")).toEqual({ from: "guest", ownedBy: "guest", table: "userSettings" });
+        expect(listClearCalls.find((args) => args.table === "threads")).toEqual({ from: "guest", table: "threads" });
     });
 });
 
@@ -1853,7 +1917,7 @@ describe("the account-move markers a merge holds", () => {
         try {
             const begun = await harness.run(async (context: any) => await context.runMutation(beginMergeRun, { from: "guest", to: "user" }));
 
-            expect(begun).toStrictEqual({ finished: false, pinWritesUntil: null, stopped: false });
+            expect(begun).toStrictEqual({ cleanup: false, finished: false, pinWritesUntil: null, stopped: false });
             expect(await movesOf(harness, "guest")).toStrictEqual(["merging"]);
             expect(await movesOf(harness, "user")).toStrictEqual(["importing"]);
 
@@ -1886,7 +1950,7 @@ describe("the account-move markers a merge holds", () => {
 
                 const begun = await harness.run(async (context: any) => await context.runMutation(beginMergeRun, { from: "guest", to: "user" }));
 
-                expect(begun).toStrictEqual({ finished: false, pinWritesUntil: null, stopped: true });
+                expect(begun).toStrictEqual({ cleanup: false, finished: false, pinWritesUntil: null, stopped: true });
                 expect(await movesOf(harness, erased)).toStrictEqual(["erasing"]);
                 expect(await movesOf(harness, erased === "guest" ? "user" : "guest")).toStrictEqual([]);
             } finally {
@@ -1905,7 +1969,7 @@ describe("the account-move markers a merge holds", () => {
 
             const begun = await harness.run(async (context: any) => await context.runMutation(beginMergeRun, { from: "guest", to: "user" }));
 
-            expect(begun).toStrictEqual({ finished: false, pinWritesUntil: until, stopped: false });
+            expect(begun).toStrictEqual({ cleanup: false, finished: false, pinWritesUntil: until, stopped: false });
         } finally {
             harness.close();
         }
@@ -1928,7 +1992,7 @@ describe("the account-move markers a merge holds", () => {
 
             const begun = await harness.run(async (context: any) => await context.runMutation(beginMergeRun, { from: "guest", to: "user" }));
 
-            expect(begun).toStrictEqual({ finished: true, pinWritesUntil: null, stopped: false });
+            expect(begun).toStrictEqual({ cleanup: false, finished: true, pinWritesUntil: null, stopped: false });
             expect(await movesOf(harness, "guest")).toStrictEqual([]);
             expect(await movesOf(harness, "user")).toStrictEqual([]);
         } finally {
@@ -2066,6 +2130,229 @@ describe("the account-move markers a merge holds", () => {
         } finally {
             shards.guest.close();
             shards.user.close();
+        }
+    });
+});
+
+describe("a merge's end past the fence", () => {
+    const PROCEDURES: Record<string, unknown> = { acquireMergeLease, beginMergeRun, dropImportMarkersPage, noteMergeGeneration, releaseMergeLease };
+
+    it("drops every import marker and both account-move markers over several runs once the fence is in, renewing neither", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+        const call: ShardCall = async (reference, args) => {
+            const name = reference.__lunoraRef.split(":", 2)[1]!;
+
+            return (await harness.run(async (context: any) => await context.runMutation(PROCEDURES[name], args))) as never;
+        };
+        const claimsOf = async (scope: string) =>
+            (await harness.run(
+                async (context: any) =>
+                    await context.db
+                        .query("idempotencyClaims")
+                        .withIndex("by_scope_key", (q: any) => q.eq("scope", scope))
+                        .collect(),
+            )) as { key: string }[];
+
+        try {
+            await harness.run(async (context: any) => {
+                const expiresAt = Date.now() + 60_000;
+
+                await context.db.insert("idempotencyClaims", { claimedAt: 1, expiresAt, key: "guest", scope: MERGE_FENCE_SCOPE, userId: "user" });
+
+                // More than one page of markers (a page drops 500): the fence went in with the first, the rest are left.
+                for (let index = 0; index < 600; index += 1) {
+                    await context.db.insert("idempotencyClaims", {
+                        claimedAt: 1,
+                        expiresAt,
+                        key: `guest:threads:${String(index)}`,
+                        scope: IMPORT_MARKER_SCOPE,
+                        userId: "user",
+                    });
+                }
+
+                await context.db.insert("accountMoves", { createdAt: 1, kind: "merging", userId: "guest" });
+                await context.db.insert("accountMoves", { createdAt: 1, kind: "importing", userId: "user" });
+            });
+
+            const begun = await harness.run(async (context: any) => await context.runMutation(beginMergeRun, { from: "guest", to: "user" }));
+
+            expect(begun).toStrictEqual({ cleanup: true, finished: true, pinWritesUntil: null, stopped: false });
+
+            // A continuation from a stale progress, one markers page per run: the phase is the markers', whatever it says.
+            const { runs } = await mergeToEnd(call, "guest", "user", {
+                budget: MERGE_LEASE_CALLS + 1,
+                resume: { cursor: null, moved: 0, phase: "copy", run: 3, table: "threads" },
+            });
+
+            expect(runs.map((run) => run.phase)).toStrictEqual(["markers"]);
+            expect(await claimsOf(IMPORT_MARKER_SCOPE)).toStrictEqual([]);
+            expect(await claimsOf(MERGE_PROGRESS_SCOPE)).toStrictEqual([]);
+            expect(await claimsOf(MERGE_FENCE_SCOPE)).toHaveLength(1);
+
+            const moves = (await harness.run(async (context: any) => await context.db.accountMoves.findMany({ consistency: "primary", where: {} }))) as {
+                page: unknown[];
+            };
+
+            expect(moves.page).toStrictEqual([]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("keeps a fenced merge's record while its markers are left, so the sweep restarts the end", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                const expiresAt = Date.now() + 60_000;
+
+                await context.db.insert("idempotencyClaims", { claimedAt: 1, expiresAt, key: "guest", scope: MERGE_FENCE_SCOPE, userId: "user" });
+                await context.db.insert("idempotencyClaims", { claimedAt: 1, expiresAt, key: "guest:threads:1", scope: IMPORT_MARKER_SCOPE, userId: "user" });
+            });
+
+            const { generation } = (await harness.run(async (context: any) => await context.runMutation(acquireMergeLease, { from: "guest", to: "user" }))) as {
+                generation: number;
+            };
+            const progress: MergeProgress = { cursor: null, moved: 0, phase: "markers", run: 4, table: "" };
+
+            await harness.run(async (context: any) => await context.runMutation(releaseMergeLease, { from: "guest", generation, progress }));
+
+            const record = await harness.run(
+                async (context: any) =>
+                    await context.db
+                        .query("idempotencyClaims")
+                        .withIndex("by_scope_key", (q: any) => q.eq("scope", MERGE_PROGRESS_SCOPE).eq("key", "guest"))
+                        .first(),
+            );
+
+            expect(JSON.parse((record as { result: string }).result).progress).toStrictEqual(progress);
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+describe("how a run ends", () => {
+    it("gives the lease back, with where it was, when its generation note fails before any step", async () => {
+        const { call } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } });
+        const releases: Record<string, unknown>[] = [];
+        const resume: MergeProgress = { cursor: null, moved: 2, phase: "clear", run: 5, table: "threads" };
+
+        await expect(
+            mergeGuestInto(
+                async (reference, args, shardKey) => {
+                    const name = reference.__lunoraRef.split(":", 2)[1]!;
+
+                    if (name === "noteMergeGeneration") {
+                        throw new Error("the guest's shard is unreachable");
+                    }
+
+                    if (name === "releaseMergeLease") {
+                        releases.push(args);
+                    }
+
+                    return await call(reference, args, shardKey);
+                },
+                REFERENCES,
+                "guest",
+                "user",
+                { resume },
+            ),
+        ).rejects.toThrow("unreachable");
+
+        // Saved one run on, so a merge that fails here every time still reaches its run cap.
+        expect(releases).toStrictEqual([{ from: "guest", generation: 1, progress: { ...resume, run: 6 } }]);
+    });
+
+    it("says a delivery was superseded, not done, when another one finished the merge or holds a newer lease", async () => {
+        const answers: Record<string, unknown>[] = [
+            { importShardRows: { fenced: true, imported: 0, present: [] } },
+            { noteMergeGeneration: { current: false } },
+            { beginMergeRun: { cleanup: false, finished: true, pinWritesUntil: null, stopped: false } },
+        ];
+
+        for (const answer of answers) {
+            // The first table the copy reaches, so the fenced import comes within the run.
+            const { call } = fakeShards({ guest: { acpSessions: [{ _id: "a1", userId: "guest" }] } });
+            const result = await mergeGuestInto(
+                async (reference, args, shardKey) => {
+                    const name = reference.__lunoraRef.split(":", 2)[1]!;
+
+                    return name in answer ? (answer[name] as never) : await call(reference, args, shardKey);
+                },
+                REFERENCES,
+                "guest",
+                "user",
+            );
+
+            expect(result).toMatchObject({ next: null, superseded: true });
+        }
+    });
+
+    it("reports a finished merge as not superseded", async () => {
+        const { call } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } });
+        let last: Awaited<ReturnType<typeof mergeGuestInto>> | undefined;
+        let resume: MergeProgress | undefined;
+
+        for (;;) {
+            last = await mergeGuestInto(call, REFERENCES, "guest", "user", resume === undefined ? {} : { resume });
+
+            if (last.next === null) {
+                break;
+            }
+
+            resume = last.next;
+        }
+
+        expect(last.superseded).toBeUndefined();
+    });
+});
+
+describe("pins the clear moves off a guest's shard", () => {
+    it("marks the shard once its pins are deleted there, so another merge's pin pass waits for their route", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const pin = (await harness.run(async (context: any) => {
+                const threadId = await context.db.insert("threads", {
+                    mode: "text",
+                    model: "gpt-4o",
+                    status: "active",
+                    title: "T",
+                    updatedAt: 1,
+                    userId: "owner",
+                });
+
+                return await context.db.insert("threadPins", { createdAt: 1, messageRole: "user", threadId, updatedAt: 1, userId: "collaborator" });
+            })) as string;
+
+            await harness.run(async (context: any) => await context.runMutation(noteMergeGeneration, { from: "owner", generation: 1 }));
+
+            expect(await harness.run(async (context: any) => await context.runMutation(pinsLeftShard, { ownerId: "owner" }))).toStrictEqual({ left: false });
+
+            const { digests } = (await harness.run(
+                async (context: any) => await context.runQuery(listShardRowsToClear, { from: "owner", table: "threadPins" }),
+            )) as {
+                digests: string[];
+            };
+
+            await harness.run(
+                async (context: any) =>
+                    await context.runMutation(deleteShardRows, { from: "owner", generation: 1, rows: [{ digest: digests[0]!, id: pin }], table: "threadPins" }),
+            );
+
+            expect(await harness.run(async (context: any) => await context.runMutation(pinsLeftShard, { ownerId: "owner" }))).toStrictEqual({ left: true });
+            expect(
+                await harness.run(
+                    async (context: any) =>
+                        await context.db
+                            .query("idempotencyClaims")
+                            .withIndex("by_scope_key", (q: any) => q.eq("scope", MERGE_PINS_LEFT_SCOPE).eq("key", "owner"))
+                            .first(),
+                ),
+            ).not.toBeNull();
+        } finally {
+            harness.close();
         }
     });
 });

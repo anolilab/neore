@@ -69,6 +69,10 @@
   again when its lease is free and its progress older than `MERGE_STALL_MS`; it drops a finished,
   erased or over-cap one. Restarts rely on the lease generation, never on the queue: keep every step
   safe to run twice, and save progress through `releaseMergeLease`, never from the job payload.
+  Everything after the lease is taken runs inside the `try` that gives it back. A fenced merge with
+  import markers or account-move markers left is not finished: its runs drain the `markers` phase.
+  The merge reads the guest's shard whole only on that shard itself (`onGuestShard`); never on a
+  shard that serves other users too (dev's `SHARD_ROUTING=off`).
 
 - **Secret detection** — `lib/secret-redaction.ts` (`redactSecrets`, `containsSecret`)
   is the one detector for provider keys, JWTs, `Bearer` values, private key blocks,

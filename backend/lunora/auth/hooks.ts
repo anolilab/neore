@@ -27,7 +27,8 @@ import { internalMutation } from "../_generated/server";
 import { guestHasFollowRows } from "../chat/follows/follow-writes";
 import { guestHasPinRoutes } from "../chat/pins/pin-route-writes";
 import { ADMIN } from "../env";
-import { firstTableWithGuestRows, mergeGenerationCurrent } from "../lib/account-merge";
+import { firstTableWithGuestRows, mergeGenerationCurrent, onGuestShard } from "../lib/account-merge";
+import { authLogger } from "../lib/logger";
 import { noteShardActivity } from "../lib/shard-housekeeping";
 import { deleteShardRoutesOf } from "../lib/shard-routes";
 import { dropPushDevicesOf } from "../notifications/push-device-writes";
@@ -169,7 +170,9 @@ const cascadeDelete = async (ctx: MutationCtx, user: Id<"user">): Promise<void> 
  * last page) is kept and `followsRemain` is set, and one still named by a shared pin route (a pin made after the merge's
  * pin step) is kept with `pinsRemain`, and one whose shard still holds a row (written to a table after the merge cleared
  * it) with `rowsRemain` naming the first such table, so the merge moves the row first and tries again. A merge run whose
- * lease generation is no longer the newest this shard has seen deletes nothing (`fenced`).
+ * lease generation is no longer the newest this shard has seen deletes nothing (`fenced`). On a shard that is not the
+ * guest's own (development's `SHARD_ROUTING=off` runs every user on `__root__`), the merge moved none of its rows, so the
+ * guest is kept with them (`sharedShard`).
  */
 export const deleteMergedGuest = internalMutation
     .input({ generation: v.number(), userId: v.string() })
@@ -180,6 +183,7 @@ export const deleteMergedGuest = internalMutation
             followsRemain: v.optional(v.boolean()),
             pinsRemain: v.optional(v.boolean()),
             rowsRemain: v.optional(v.string()),
+            sharedShard: v.optional(v.boolean()),
         }),
     )
     .mutation(async ({ args, ctx }) => {
@@ -194,6 +198,12 @@ export const deleteMergedGuest = internalMutation
 
         if (user?.isAnonymous !== true) {
             return { deleted: false };
+        }
+
+        if (!onGuestShard(user._id)) {
+            authLogger.warn(`[auth] kept guest ${user._id}: its shard serves other users too, so the merge moved none of its rows`);
+
+            return { deleted: false, sharedShard: true };
         }
 
         if (await guestHasFollowRows(ctx.db, user._id)) {

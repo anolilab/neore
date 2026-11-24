@@ -5,18 +5,19 @@
  *
  * - the owner's parallel merge moves the pin and re-points the route after the guest's pins step has read the route: the second pass
  *   must reach the pin;
- * - a guest pin write lands during that route read: the marker refuses it, so no new pin of the guest's is left on the owner shard.
+ * - a guest pin write lands during that route read: the marker refuses it, so no new pin of the guest's is left on the owner shard;
+ * - the owner's merge has cleared its pins off its old shard but not yet re-pointed the route: the second pass waits for the route.
  *
  * The fake models the marker's refusal itself. The real check is covered by `account-moves.test.ts` and `chat/pins/functions.test.ts`.
  */
 import { describe, expect, it } from "vitest";
 
 import type { MergeProgress, MergeReferences, ShardCall } from "./account-merge";
-import { mergeGuestInto } from "./account-merge";
+import { mergeGuestInto, PINS_LEFT_RECHECK_MS } from "./account-merge";
 
 type Pin = { id: string; shard: string; threadId: string; userId: string };
 type Route = { ownerId: string; threadId: string; userId: string };
-type State = { converted: boolean; marked: boolean; pins: Pin[]; routes: Route[] };
+type State = { converted: boolean; marked: boolean; pins: Pin[]; routePending: boolean; routes: Route[] };
 
 const reference = (name: string) => {
     return { __lunoraRef: `test:${name}` };
@@ -35,6 +36,7 @@ const REFERENCES: MergeReferences = {
     movePinRoute: reference("moveSharedPinRouteOf"),
     nextPinRoute: reference("nextSharedPinRoute"),
     noteGeneration: reference("noteMergeGeneration"),
+    pinsLeft: reference("pinsLeftShard"),
     reassignFollows: reference("reassignThreadFollowsPage"),
     reassignGlobal: reference("reassignGlobalRows"),
     reassignPins: reference("reassignUserPinsOnThread"),
@@ -54,14 +56,28 @@ const guestPinWrite = (state: State, id: string): "refused" | "written" => {
 
 /**
  * The fake merge's shards, with no rows to copy. `duringRead` runs after the pins step's route read, which is where a concurrent write
- * lands; `skipRepins` answers the second pass with no routes, so a test can show it is that pass which reaches the pin.
+ * lands; `skipRepins` answers the second pass with no routes, so a test can show it is that pass which reaches the pin. With `split`,
+ * the owner's merge moves the pin at once but re-points the route only later, after its old shard first answered `pinsLeftShard`
+ * (`"wait"`), or the old shard never says its pins left (`"unmarked"`), so a test can show it is that answer which reaches the pin.
  */
-const build = ({ duringRead, skipRepins = false }: { duringRead?: (write: (id: string) => "refused" | "written") => void; skipRepins?: boolean } = {}) => {
+const build = ({
+    duringRead,
+    skipRepins = false,
+    split,
+}: { duringRead?: (write: (id: string) => "refused" | "written") => void; skipRepins?: boolean; split?: "unmarked" | "wait" } = {}) => {
     const state: State = {
         converted: false,
         marked: false,
         pins: [{ id: "pin-1", shard: "owner-a", threadId: "t1", userId: "guest" }],
+        routePending: false,
         routes: [{ ownerId: "owner-a", threadId: "t1", userId: "guest" }],
+    };
+    const repointRoutes = () => {
+        for (const route of state.routes) {
+            if (route.ownerId === "owner-a") {
+                route.ownerId = "owner-b";
+            }
+        }
     };
 
     // The owner's merge: after the guest's pins step read the route, its shard moves the pin and the route follows to the new owner.
@@ -74,10 +90,10 @@ const build = ({ duringRead, skipRepins = false }: { duringRead?: (write: (id: s
             }
         }
 
-        for (const route of state.routes) {
-            if (route.ownerId === "owner-a") {
-                route.ownerId = "owner-b";
-            }
+        if (split === undefined) {
+            repointRoutes();
+        } else {
+            state.routePending = true;
         }
     };
 
@@ -149,6 +165,17 @@ const build = ({ duringRead, skipRepins = false }: { duringRead?: (write: (id: s
             case "noteMergeGeneration": {
                 return { current: true } as never;
             }
+            case "pinsLeftShard": {
+                // The old owner shard's clear moved its pins away; its merge's `global` step re-points the route meanwhile.
+                const left = split === "wait" && shardKey === "owner-a" && state.routePending;
+
+                if (left) {
+                    state.routePending = false;
+                    repointRoutes();
+                }
+
+                return { left } as never;
+            }
             case "reassignGlobalRows": {
                 return { done: true, reassigned: 0 } as never;
             }
@@ -203,6 +230,38 @@ describe("moving a guest's pins around the row merge", () => {
 
     it("leaves the pin with the guest when the second pass finds nothing, so the test depends on that pass", async () => {
         const { call, state } = build({ skipRepins: true });
+
+        await mergeToEnd(call);
+
+        expect(state.pins).toStrictEqual([{ id: "pin-1", shard: "owner-b", threadId: "t1", userId: "guest" }]);
+    });
+
+    it("waits for a route whose owner's merge moved the pins off its shard before re-pointing it, then reaches the pin there", async () => {
+        const { call, state } = build({ split: "wait" });
+        const delays: number[] = [];
+        let resume: MergeProgress | undefined;
+
+        for (;;) {
+            const { delayMs, next } = await mergeGuestInto(call, REFERENCES, "guest", "new", resume === undefined ? {} : { resume });
+
+            if (delayMs !== undefined) {
+                delays.push(delayMs);
+            }
+
+            if (next === null) {
+                break;
+            }
+
+            resume = next;
+        }
+
+        expect(delays).toStrictEqual([PINS_LEFT_RECHECK_MS]);
+        expect(state.pins).toStrictEqual([{ id: "pin-1", shard: "owner-b", threadId: "t1", userId: "new" }]);
+        expect(state.routes).toStrictEqual([{ ownerId: "owner-b", threadId: "t1", userId: "new" }]);
+    });
+
+    it("leaves the pin with the guest when nothing says the owner's shard lost its pins, so the test depends on that check", async () => {
+        const { call, state } = build({ split: "unmarked" });
 
         await mergeToEnd(call);
 
