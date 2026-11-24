@@ -1286,7 +1286,11 @@ export const retryPausedRunsNow = internalMutation
         // loop, so a reply resumed in this same call does not count as one still paused.
         const leaving = new Set<string>(resumes.map((stream) => stream._id));
 
-        for (const stream of resumes) {
+        // Latest snooze first: lifting a later snooze restores the value it extended, and an earlier reply's snooze can then match it.
+        // In stream order the earlier lift finds nothing to match, and the chat stays snoozed to a reset that no longer holds it.
+        const latestFirst = resumes.toSorted((a, b) => (b.pauseSnooze?.until ?? 0) - (a.pauseSnooze?.until ?? 0));
+
+        for (const stream of latestFirst) {
             await liftPauseSnooze(ctx, stream, leaving);
         }
 
