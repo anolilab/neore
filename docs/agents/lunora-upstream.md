@@ -32,6 +32,13 @@ this is not test-only: a procedure that admits several threads reads each one's 
 (`admittedThreadDb`, `admittedThreadMessages`; `findSentNote`, `listSubAgentApprovals`).
 `agent/messages.ts#pinFollowingRowParent` is exposed.
 
+**Not filed yet (owner to decide): a failed vector upsert is not retried.** In `@lunora/do@alpha.282` the write-through
+vector sync runs after commit (`deferAfterCommit`); a failed Vectorize upsert is logged by `flushAfterCommit`, not thrown or
+re-queued, and nothing a mutation can read records it. The row then holds the new columns while the index keeps the old
+metadata, and a writer that compares against the row (the `archived` flag, `agent/thread-vector-archived.ts`) sees it as
+aligned. The remedy today is the operator's: `__lunora_admin__:backfillVectors` with `restart: true` re-upserts every
+vectorized row from its columns. An upstream retry, or a per-row "projection pending" marker, would close it.
+
 **Not filed yet (owner to decide): a subscription answer for a resume.** A reconnect the server answers with a `resume`
 frame calls no rows callback, so a live subscription cannot show the connection is back. The mobile project screen works
 around it with one direct read per refresh tick (`useProjectConfirm`, `apps/mobile/src/projects/use-projects.ts`). A

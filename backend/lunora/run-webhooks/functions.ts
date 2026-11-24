@@ -78,6 +78,9 @@ export const getRunWebhook = authQuery
         // Off the caller's own shard nothing of theirs is there to read.
         const row = onOwnShard(ctx.user.userId) ? await ownRow(ctx, ctx.user.userId) : null;
 
+        // Flags only: the URL and the secret stay out of the log.
+        ctx.log.event("runWebhooks.get", { configured: row !== null, enabled: row?.enabled ?? false });
+
         return row ? { configured: true, enabled: row.enabled, url: row.url } : { configured: false, enabled: false };
     });
 
