@@ -39,8 +39,10 @@ import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import type { ResearchDepth } from "../../agent/client/create-tool";
 import { MAX_ATTACHED_FILES } from "../../agent/file-attach-claim";
+import { callOnShard } from "../../lib/cross-shard";
 import { streamLogger } from "../../lib/logger";
 import { gatewayFetch, type ServiceFetch } from "../../lib/services";
+import { onUserShard } from "../lib/daily-limit";
 import { defaultModelUnderRules, getUtilityModel, readsImagesAndCallsTools } from "../../lib/utility-model";
 import { resolveReasoningEffort, resolveSkillModel } from "../../skills/slash-command";
 import type { AwaitingInput, RunContext } from "../lib/agent-run";
@@ -573,6 +575,19 @@ const shiftQueue = (queue: TurnQueue): { next: { skillId: string; step?: GroupSt
 const isQueueEmpty = (queue: TurnQueue): boolean => (queue.kind === "steps" ? queue.steps : queue.queue).length === 0;
 
 /**
+ * Takes the daily Text unit for a speaker after the first. `/chat/start` charged the turn's first reply; each further one is a
+ * full agent run of its own. The unit is taken on the paying user's own shard: this turn runs on the thread owner's, so a charge
+ * made here would draw on the owner's counter for the member.
+ */
+const takeFurtherSpeakerUnit = async (ctx: ActionCtx, turn: TurnContext): Promise<boolean> => {
+    const chargeArgs = { kind: "Text" as const, organizationId: turn.organizationId, userId: turn.userId };
+
+    return onUserShard(turn.userId)
+        ? await ctx.runMutation(internal.chat.daily_charge.chargeDailyUnit, chargeArgs)
+        : await callOnShard(internal.chat.daily_charge.chargeDailyUnit, chargeArgs, { shardKey: turn.userId });
+};
+
+/**
  * Run `queue` in order until it is empty, the per-turn cap is reached, the
  * user pressed stop, or a speaker paused for an approval. Closes the stream
  * unless a pause already did.
@@ -605,12 +620,7 @@ const runQueue = async (
             break;
         }
 
-        // `/chat/start` charged the turn's first reply; each further one is a
-        // full agent run of its own and costs one more unit of the daily quota.
-        if (
-            spoken.length > 0 &&
-            !(await ctx.runMutation(internal.chat.daily_charge.chargeDailyUnit, { kind: "Text", organizationId: turn.organizationId, userId: turn.userId }))
-        ) {
+        if (spoken.length > 0 && !(await takeFurtherSpeakerUnit(ctx, turn))) {
             streamLogger.debug("[GroupChat] Daily limit reached; ending the turn early", { spoken: spoken.length, threadId: turn.threadId });
 
             break;

@@ -45,7 +45,6 @@ import { api } from "../_generated/api";
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx as ActionContext, QueryCtx as QueryContext } from "../_generated/server";
-import { eraseThreadPinsAndRoutes } from "./gdpr";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 // Types from their declaring modules rather than the `agent/client` barrel —
 // see the note in `chat/composite.ts` (since fixed; kept because it decouples
@@ -1517,12 +1516,15 @@ export const updateThread = authAction
 
             const threadLanguage = threadData?.language;
 
+            // An archive or restore sends whichever model the caller has open, often another thread's (the palette's rows, a
+            // shortcut), so with a status the argument is no pick and the thread keeps its own model.
+            const pickedModel = status === undefined ? model : undefined;
             // Use provided model or fall back to thread's existing model
-            const effectiveModel = (threadData?.activeAgent ? undefined : model) ?? threadData?.model;
+            const effectiveModel = (threadData?.activeAgent ? undefined : pickedModel) ?? threadData?.model;
 
             // Only a change that reads or writes the model needs one: a thread whose model was never set can still be renamed,
             // archived or restored.
-            const modelChange = [autoModel, customSystemPrompt, enabledFeatures, model, order, reasoningEffort, statelessMode].some(
+            const modelChange = [autoModel, customSystemPrompt, enabledFeatures, pickedModel, order, reasoningEffort, statelessMode].some(
                 (value) => value !== undefined,
             );
 
@@ -1558,8 +1560,7 @@ export const updateThread = authAction
             // Auto stands for no switch: a switched thread keeps the agent its path derives, and a host thread has no cloud
             // model to route. A concrete model that differs from the stored one is a pick, and a pick ends Auto unless the
             // caller says otherwise.
-            // A status change (archive, restore) sends whatever model the caller has open, which is not a pick.
-            const pickEndsAuto = status === undefined && model !== undefined && model !== threadData?.model;
+            const pickEndsAuto = pickedModel !== undefined && pickedModel !== threadData?.model;
             const pickFallback = pickEndsAuto ? false : undefined;
             const stays = !(threadData?.activeAgent || threadData?.runner === "host");
             const autoModelForWrite = stays ? (autoModel ?? pickFallback) : undefined;
@@ -1612,7 +1613,8 @@ export const updateThread = authAction
             }
 
             context.log.event("chat.update_thread", {
-                modelChanged: model !== undefined && !threadData?.activeAgent,
+                // The model actually applied: an archive or restore carries the caller's open model but keeps the thread's own.
+                modelChanged: pickedModel !== undefined && !threadData?.activeAgent && pickedModel !== threadData?.model,
                 statusChanged: status ?? null,
                 summaryChanged: summary !== undefined,
                 titleChanged: title !== undefined,
@@ -3965,9 +3967,8 @@ export const hardDeleteThread = internalMutation
         // Get thread data before deletion for audit history
         const threadBeforeDelete = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
 
+        // The thread's pins and the collaborator routes that name it go with the chain, one batch per pass (`agent/threads.ts`).
         await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: threadId as Id<"threads"> });
-        // The thread's pins and the collaborator routes that name it go with it (`chat/gdpr.ts`).
-        await eraseThreadPinsAndRoutes(context, threadId as Id<"threads">);
         await context.runMutation(internal.chat.functions.deleteThreadRelationship, { threadId });
         await context.runMutation(internal.acp.functions.deleteSessionsOfThread, { threadId });
 
