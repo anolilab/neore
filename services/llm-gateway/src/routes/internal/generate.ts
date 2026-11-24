@@ -305,6 +305,7 @@ generateRouter.openapi(
             const costMicrodollars = pricing
                 ? calculateCost(pricing, {
                       cachedTokens: tokens.cachedTokens,
+                      cacheWriteTokens: tokens.cacheWriteTokens,
                       completionTokens: tokens.completionTokens,
                       promptTokens: tokens.promptTokens,
                       reasoningTokens: tokens.reasoningTokens,

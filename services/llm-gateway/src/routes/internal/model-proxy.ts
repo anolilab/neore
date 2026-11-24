@@ -277,12 +277,15 @@ modelProxyRouter.openapi(
                 // `outputTokens.total` already includes reasoning (`calculateCost` subtracts it): do not add `reasoning` on top.
                 const completionTokens = usage?.outputTokens?.total ?? 0;
                 const cachedTokens = usage?.inputTokens?.cacheRead ?? 0;
+                const cacheWriteTokens = usage?.inputTokens?.cacheWrite ?? 0;
                 const reasoningTokens = usage?.outputTokens?.reasoning ?? 0;
 
                 // A pricing read that fails after the call succeeded costs nothing here: the provider's usage is still recorded as returned.
                 // Read through the catch path, a failure would record the cancellation estimate instead of this call's actual usage.
                 const pricing = await pricingRead.catch(() => null);
-                const costMicrodollars = pricing ? calculateCost(pricing, { cachedTokens, completionTokens, promptTokens, reasoningTokens }) : 0;
+                const costMicrodollars = pricing
+                    ? calculateCost(pricing, { cachedTokens, cacheWriteTokens, completionTokens, promptTokens, reasoningTokens })
+                    : 0;
 
                 // Non-blocking usage tracking
                 c.executionCtx.waitUntil(
@@ -369,7 +372,9 @@ modelProxyRouter.openapi(
                         }
                     };
 
-                    let lastUsage: { cachedTokens: number; completionTokens: number; promptTokens: number; reasoningTokens: number } | undefined;
+                    let lastUsage:
+                        | { cachedTokens: number; cacheWriteTokens: number; completionTokens: number; promptTokens: number; reasoningTokens: number }
+                        | undefined;
                     let lastFinishReason: string | undefined;
                     let emittedChars = 0;
                     let reasoningChars = 0;
@@ -402,6 +407,7 @@ modelProxyRouter.openapi(
 
                                     lastUsage = {
                                         cachedTokens: usage?.inputTokens?.cacheRead ?? 0,
+                                        cacheWriteTokens: usage?.inputTokens?.cacheWrite ?? 0,
                                         completionTokens: usage?.outputTokens?.total ?? 0,
                                         promptTokens: usage?.inputTokens?.total ?? 0,
                                         reasoningTokens: usage?.outputTokens?.reasoning ?? 0,
@@ -459,7 +465,7 @@ modelProxyRouter.openapi(
                             lastUsage ??
                             (isEstimated
                                 ? estimateCancelledUsage({ emittedChars, promptChars: countPromptTextChars(callOptions.prompt), reasoningChars })
-                                : { cachedTokens: 0, completionTokens: 0, promptTokens: 0, reasoningTokens: 0 });
+                                : { cachedTokens: 0, cacheWriteTokens: 0, completionTokens: 0, promptTokens: 0, reasoningTokens: 0 });
 
                         const pricing = await pricingRead;
                         const costMicrodollars = pricing ? calculateCost(pricing, tokens) : 0;
