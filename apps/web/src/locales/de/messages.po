@@ -5230,7 +5230,7 @@ msgstr "Einsteiger"
 msgid "Behavior"
 msgstr "Verhalten"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:192
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:190
 msgid "Behind {base}"
 msgstr "Hinter {base}"
 
@@ -6298,11 +6298,11 @@ msgstr "Katalanisch (Spanien)"
 msgid "catalog"
 msgstr "Katalog"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:215
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:213
 msgid "Catch up"
 msgstr "Aufholen"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:182
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:180
 msgid "Catch up {pullRequest} with {base}"
 msgstr "{pullRequest} auf {base} aufholen"
 
@@ -14497,7 +14497,7 @@ msgstr "Anbieter konnte nicht aktualisiert werden"
 msgid "Failed to update pull request settings"
 msgstr "Die Pull-Request-Einstellungen konnten nicht aktualisiert werden"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:47
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:46
 msgid "Failed to update reply tools"
 msgstr "Antwort-Tools konnten nicht aktualisiert werden"
 
@@ -17695,7 +17695,6 @@ msgstr "Bildgenerierung"
 
 #: src/features/marketing/components/landing-page.tsx:136
 #: src/features/marketing/components/models-page.tsx:486
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:21
 msgid "Image generation"
 msgstr "Bildgenerierung"
 
@@ -19026,7 +19025,7 @@ msgstr "Wissensmodul"
 msgid "Knowledge retrieval"
 msgstr "Wissensabruf"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:22
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:21
 msgid "Knowledge search"
 msgstr "Wissenssuche"
 
@@ -19576,7 +19575,7 @@ msgstr "Weniger"
 msgid "Let a quick check approve low-risk calls"
 msgstr "Eine Schnellprüfung risikoarme Aufrufe genehmigen lassen"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:64
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:63
 msgid "Let replies use tools"
 msgstr "Antworten dürfen Tools nutzen"
 
@@ -23684,6 +23683,7 @@ msgid "none"
 msgstr "keine"
 
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:19
+#: src/features/chat/thread/ask-user-questions.tsx:87
 #: src/features/settings/components/chat/default-models-settings.tsx:165
 #: src/features/skills/components/skill-form-dialog.tsx:320
 #: src/features/skills/components/skill-form-dialog.tsx:334
@@ -24549,7 +24549,7 @@ msgstr "Offene Einladungslinks"
 msgid "Open it again"
 msgstr "Erneut öffnen"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:23
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:22
 msgid "Open links"
 msgstr "Links öffnen"
 
@@ -27532,11 +27532,11 @@ msgstr "Push-Benachrichtigungen in diesem Browser"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "Bringe mehrere Agenten mit eigenen Rollen in einen Thread. Ein Review-Panel kann eine Änderung aus Sicherheits- und Performance-Sicht prüfen, und eine Debatte kann vor einer Synthese beide Seiten abwägen."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:221
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:219
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
 msgstr "Fügt einen Prompt in das Eingabefeld ein, der diesen Branch auf {base} rebased, Konflikte löst, Build und Tests prüft und pusht. Es wird nichts gesendet."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:222
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:220
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "Fügt einen Prompt in das Eingabefeld ein, der den Branch dieses Forks in einer lokalen Kopie auf {base} rebased, Konflikte löst und Build und Tests prüft. Er wird nicht gepusht. Es wird nichts gesendet."
 
@@ -28871,9 +28871,9 @@ msgstr "Antworten"
 msgid "Replies and spend per day over the last 53 weeks"
 msgstr "Antworten und Ausgaben pro Tag in den letzten 53 Wochen"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:67
-msgid "Replies can search, generate images and more, charged to your account. Tools set to \"Ask\" are skipped — nobody can approve them in a messenger."
-msgstr "Antworten können suchen, Bilder erzeugen und mehr – abgerechnet über dein Konto. Tools auf „Fragen“ werden übersprungen, denn im Messenger kann sie niemand genehmigen."
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:66
+msgid "Replies can search and more, charged to your account. Tools set to \"Ask\" are skipped — nobody can approve them in a messenger."
+msgstr "Antworten können suchen und mehr – abgerechnet über dein Konto. Tools auf „Fragen“ werden übersprungen, denn im Messenger kann sie niemand genehmigen."
 
 #: src/features/settings/components/chat/event-trigger-fields.tsx:155
 msgid "Replies in a thread"
@@ -39461,7 +39461,7 @@ msgstr "Web-Scraping und strukturierte Datenextraktion"
 msgid "web search"
 msgstr "Websuche"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:24
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:23
 msgid "Web search"
 msgstr "Websuche"
 
@@ -40515,7 +40515,7 @@ msgid "Your answer in Neore has finished."
 msgstr "Die Antwort in Neore ist fertig."
 
 #: src/features/chat/thread/ask-user-prompt.tsx:222
-#: src/features/chat/thread/ask-user-questions.tsx:85
+#: src/features/chat/thread/ask-user-questions.tsx:86
 msgid "Your answer:"
 msgstr "Deine Antwort:"
 

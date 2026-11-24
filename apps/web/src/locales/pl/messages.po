@@ -5230,7 +5230,7 @@ msgstr "początkujący"
 msgid "Behavior"
 msgstr "Zachowanie"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:192
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:190
 msgid "Behind {base}"
 msgstr "Za {base}"
 
@@ -6298,11 +6298,11 @@ msgstr "Kataloński (Hiszpania)"
 msgid "catalog"
 msgstr "katalog"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:215
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:213
 msgid "Catch up"
 msgstr "Nadrób zaległości"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:182
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:180
 msgid "Catch up {pullRequest} with {base}"
 msgstr "Zaktualizuj {pullRequest} względem {base}"
 
@@ -14497,7 +14497,7 @@ msgstr "Nie udało się zaktualizować dostawcy"
 msgid "Failed to update pull request settings"
 msgstr "Nie udało się zaktualizować ustawień pull requestów"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:47
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:46
 msgid "Failed to update reply tools"
 msgstr "Nie udało się zaktualizować narzędzi odpowiedzi"
 
@@ -17695,7 +17695,6 @@ msgstr "generowanie obrazów"
 
 #: src/features/marketing/components/landing-page.tsx:136
 #: src/features/marketing/components/models-page.tsx:486
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:21
 msgid "Image generation"
 msgstr "Generowanie obrazów"
 
@@ -19026,7 +19025,7 @@ msgstr "Moduł wiedzy"
 msgid "Knowledge retrieval"
 msgstr "Wyszukiwanie w wiedzy"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:22
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:21
 msgid "Knowledge search"
 msgstr "Wyszukiwanie w wiedzy"
 
@@ -19576,7 +19575,7 @@ msgstr "Mniej"
 msgid "Let a quick check approve low-risk calls"
 msgstr "Pozwól szybkiej kontroli zatwierdzać wywołania niskiego ryzyka"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:64
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:63
 msgid "Let replies use tools"
 msgstr "Pozwól odpowiedziom używać narzędzi"
 
@@ -23684,6 +23683,7 @@ msgid "none"
 msgstr "brak"
 
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:19
+#: src/features/chat/thread/ask-user-questions.tsx:87
 #: src/features/settings/components/chat/default-models-settings.tsx:165
 #: src/features/skills/components/skill-form-dialog.tsx:320
 #: src/features/skills/components/skill-form-dialog.tsx:334
@@ -24549,7 +24549,7 @@ msgstr "Otwarte linki z zaproszeniem"
 msgid "Open it again"
 msgstr "Otwórz ponownie"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:23
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:22
 msgid "Open links"
 msgstr "Otwieranie linków"
 
@@ -27532,11 +27532,11 @@ msgstr "Powiadomienia push w tej przeglądarce"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "Umieść kilku agentów z własnymi rolami w jednym wątku. Panel przeglądu może sprawdzić zmianę z perspektywy bezpieczeństwa i wydajności, a debata może argumentować obie strony przed podsumowaniem."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:221
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:219
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
 msgstr "Wstawia do kompozytora prompt, który robi rebase tej gałęzi na {base}, rozwiązuje konflikty, sprawdza build i testy oraz wykonuje push. Nic nie zostaje wysłane."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:222
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:220
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "Wstawia do kompozytora prompt, który w lokalnej kopii robi rebase gałęzi tego forka na {base}, rozwiązuje konflikty oraz sprawdza build i testy. Nie jest wykonywany push. Nic nie zostaje wysłane."
 
@@ -28871,9 +28871,9 @@ msgstr "Odpowiedzi"
 msgid "Replies and spend per day over the last 53 weeks"
 msgstr "Odpowiedzi i wydatki dziennie w ciągu ostatnich 53 tygodni"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:67
-msgid "Replies can search, generate images and more, charged to your account. Tools set to \"Ask\" are skipped — nobody can approve them in a messenger."
-msgstr "Odpowiedzi mogą wyszukiwać, generować obrazy i więcej – na koszt twojego konta. Narzędzia ustawione na „Pytaj” są pomijane: w komunikatorze nikt nie może ich zatwierdzić."
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:66
+msgid "Replies can search and more, charged to your account. Tools set to \"Ask\" are skipped — nobody can approve them in a messenger."
+msgstr "Odpowiedzi mogą wyszukiwać i więcej – na koszt twojego konta. Narzędzia ustawione na „Pytaj” są pomijane: w komunikatorze nikt nie może ich zatwierdzić."
 
 #: src/features/settings/components/chat/event-trigger-fields.tsx:155
 msgid "Replies in a thread"
@@ -39461,7 +39461,7 @@ msgstr "Scraping stron i ekstrakcja danych strukturalnych"
 msgid "web search"
 msgstr "wyszukiwanie w sieci"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:24
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:23
 msgid "Web search"
 msgstr "Wyszukiwanie w sieci"
 
@@ -40515,7 +40515,7 @@ msgid "Your answer in Neore has finished."
 msgstr "Twoja odpowiedź w Neore jest gotowa."
 
 #: src/features/chat/thread/ask-user-prompt.tsx:222
-#: src/features/chat/thread/ask-user-questions.tsx:85
+#: src/features/chat/thread/ask-user-questions.tsx:86
 msgid "Your answer:"
 msgstr "Twoja odpowiedź:"
 

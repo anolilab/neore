@@ -62,5 +62,9 @@ export const toggleAskUserChoice = (selected: ReadonlyArray<string>, choice: str
     return selected.includes(choice) ? [] : [choice];
 };
 
-/** A question counts as answered by a pick or a non-blank note. */
-export const isAskUserQuestionAnswered = (draft: AskUserQuestionDraft): boolean => draft.selected.length > 0 || draft.note.trim().length > 0;
+/**
+ * A single-choice question counts as answered by a pick or a non-blank note. A multi-select one may go out with nothing
+ * picked, so it always counts (the server accepts the empty list too: `resolveQuestionAnswers`).
+ */
+export const isAskUserQuestionAnswered = (draft: AskUserQuestionDraft, multiSelect: boolean): boolean =>
+    multiSelect || draft.selected.length > 0 || draft.note.trim().length > 0;

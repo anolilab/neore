@@ -5230,7 +5230,7 @@ msgstr "初級"
 msgid "Behavior"
 msgstr "動作"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:192
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:190
 msgid "Behind {base}"
 msgstr "{base} より遅れています"
 
@@ -6298,11 +6298,11 @@ msgstr "カタルーニャ語（スペイン）"
 msgid "catalog"
 msgstr "カタログ"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:215
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:213
 msgid "Catch up"
 msgstr "追いつく"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:182
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:180
 msgid "Catch up {pullRequest} with {base}"
 msgstr "{pullRequest} を {base} に追いつかせる"
 
@@ -14497,7 +14497,7 @@ msgstr "プロバイダーを更新できませんでした"
 msgid "Failed to update pull request settings"
 msgstr "プルリクエストの設定を更新できませんでした"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:47
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:46
 msgid "Failed to update reply tools"
 msgstr "返信ツールを更新できませんでした"
 
@@ -17695,7 +17695,6 @@ msgstr "画像生成"
 
 #: src/features/marketing/components/landing-page.tsx:136
 #: src/features/marketing/components/models-page.tsx:486
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:21
 msgid "Image generation"
 msgstr "画像生成"
 
@@ -19026,7 +19025,7 @@ msgstr "ナレッジモジュール"
 msgid "Knowledge retrieval"
 msgstr "ナレッジ検索"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:22
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:21
 msgid "Knowledge search"
 msgstr "ナレッジ検索"
 
@@ -19576,7 +19575,7 @@ msgstr "少ない"
 msgid "Let a quick check approve low-risk calls"
 msgstr "クイックチェックで低リスクの呼び出しを承認する"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:64
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:63
 msgid "Let replies use tools"
 msgstr "返信でツールを使う"
 
@@ -23684,6 +23683,7 @@ msgid "none"
 msgstr "なし"
 
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:19
+#: src/features/chat/thread/ask-user-questions.tsx:87
 #: src/features/settings/components/chat/default-models-settings.tsx:165
 #: src/features/skills/components/skill-form-dialog.tsx:320
 #: src/features/skills/components/skill-form-dialog.tsx:334
@@ -24549,7 +24549,7 @@ msgstr "有効な招待リンク"
 msgid "Open it again"
 msgstr "もう一度開く"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:23
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:22
 msgid "Open links"
 msgstr "リンクを開く"
 
@@ -27532,11 +27532,11 @@ msgstr "このブラウザーでのプッシュ通知"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "役割の異なる複数のエージェントを 1 つのスレッドに配置できます。レビューパネルはセキュリティとパフォーマンスの観点から変更を確認でき、ディベートでは統合の前に両方の立場を議論できます。"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:221
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:219
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
 msgstr "このブランチを {base} にリベースし、コンフリクトを解消し、ビルドとテストを確認してプッシュするプロンプトをコンポーザーに入力します。送信はされません。"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:222
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:220
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "このフォークのブランチをローカルのコピーで {base} にリベースし、コンフリクトを解消し、ビルドとテストを確認するプロンプトをコンポーザーに入力します。プッシュはされません。送信はされません。"
 
@@ -28871,9 +28871,9 @@ msgstr "返信"
 msgid "Replies and spend per day over the last 53 weeks"
 msgstr "過去53週間の1日あたりの返信数と支出"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:67
-msgid "Replies can search, generate images and more, charged to your account. Tools set to \"Ask\" are skipped — nobody can approve them in a messenger."
-msgstr "返信で検索や画像生成などができます。費用はあなたのアカウントに請求されます。「確認」に設定したツールはスキップされます（メッセンジャーでは誰も承認できないため）。"
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:66
+msgid "Replies can search and more, charged to your account. Tools set to \"Ask\" are skipped — nobody can approve them in a messenger."
+msgstr "返信で検索などができます。費用はあなたのアカウントに請求されます。「確認」に設定したツールはスキップされます（メッセンジャーでは誰も承認できないため）。"
 
 #: src/features/settings/components/chat/event-trigger-fields.tsx:155
 msgid "Replies in a thread"
@@ -39461,7 +39461,7 @@ msgstr "Web スクレイピングと構造化データの抽出"
 msgid "web search"
 msgstr "Web 検索"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:24
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:23
 msgid "Web search"
 msgstr "Web 検索"
 
@@ -40515,7 +40515,7 @@ msgid "Your answer in Neore has finished."
 msgstr "Neore での回答が完了しました。"
 
 #: src/features/chat/thread/ask-user-prompt.tsx:222
-#: src/features/chat/thread/ask-user-questions.tsx:85
+#: src/features/chat/thread/ask-user-questions.tsx:86
 msgid "Your answer:"
 msgstr "あなたの回答："
 

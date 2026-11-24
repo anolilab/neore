@@ -5230,7 +5230,7 @@ msgstr "入门"
 msgid "Behavior"
 msgstr "行为"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:192
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:190
 msgid "Behind {base}"
 msgstr "落后于 {base}"
 
@@ -6298,11 +6298,11 @@ msgstr "加泰罗尼亚语（西班牙）"
 msgid "catalog"
 msgstr "目录"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:215
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:213
 msgid "Catch up"
 msgstr "追上"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:182
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:180
 msgid "Catch up {pullRequest} with {base}"
 msgstr "让 {pullRequest} 追上 {base}"
 
@@ -14497,7 +14497,7 @@ msgstr "无法更新提供商"
 msgid "Failed to update pull request settings"
 msgstr "无法更新拉取请求设置"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:47
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:46
 msgid "Failed to update reply tools"
 msgstr "无法更新回复工具"
 
@@ -17695,7 +17695,6 @@ msgstr "图像生成"
 
 #: src/features/marketing/components/landing-page.tsx:136
 #: src/features/marketing/components/models-page.tsx:486
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:21
 msgid "Image generation"
 msgstr "图像生成"
 
@@ -19026,7 +19025,7 @@ msgstr "知识模块"
 msgid "Knowledge retrieval"
 msgstr "知识检索"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:22
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:21
 msgid "Knowledge search"
 msgstr "知识搜索"
 
@@ -19576,7 +19575,7 @@ msgstr "少"
 msgid "Let a quick check approve low-risk calls"
 msgstr "让快速检查批准低风险调用"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:64
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:63
 msgid "Let replies use tools"
 msgstr "允许回复使用工具"
 
@@ -23684,6 +23683,7 @@ msgid "none"
 msgstr "无"
 
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:19
+#: src/features/chat/thread/ask-user-questions.tsx:87
 #: src/features/settings/components/chat/default-models-settings.tsx:165
 #: src/features/skills/components/skill-form-dialog.tsx:320
 #: src/features/skills/components/skill-form-dialog.tsx:334
@@ -24549,7 +24549,7 @@ msgstr "未使用的邀请链接"
 msgid "Open it again"
 msgstr "再次打开"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:23
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:22
 msgid "Open links"
 msgstr "打开链接"
 
@@ -27532,11 +27532,11 @@ msgstr "此浏览器上的推送通知"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "将多个各具角色的智能体放在同一对话中。审查小组可从安全和性能角度检查更改，辩论则可在综合前论证双方观点。"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:221
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:219
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
 msgstr "在输入框中填入一条提示，将此分支变基到 {base}、解决冲突、检查构建和测试并推送。不会发送任何内容。"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:222
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:220
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "在输入框中填入一条提示，在本地副本中将此复刻的分支变基到 {base}、解决冲突并检查构建和测试。不会推送。不会发送任何内容。"
 
@@ -28871,9 +28871,9 @@ msgstr "回复"
 msgid "Replies and spend per day over the last 53 weeks"
 msgstr "过去 53 周每天的回复与支出"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:67
-msgid "Replies can search, generate images and more, charged to your account. Tools set to \"Ask\" are skipped — nobody can approve them in a messenger."
-msgstr "回复可以搜索、生成图片等，费用计入你的账户。设为“询问”的工具会被跳过——在消息应用中无人可以批准它们。"
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:66
+msgid "Replies can search and more, charged to your account. Tools set to \"Ask\" are skipped — nobody can approve them in a messenger."
+msgstr "回复可以搜索等，费用计入你的账户。设为“询问”的工具会被跳过——在消息应用中无人可以批准它们。"
 
 #: src/features/settings/components/chat/event-trigger-fields.tsx:155
 msgid "Replies in a thread"
@@ -39461,7 +39461,7 @@ msgstr "网页抓取和结构化数据提取"
 msgid "web search"
 msgstr "网络搜索"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:24
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:23
 msgid "Web search"
 msgstr "网页搜索"
 
@@ -40515,7 +40515,7 @@ msgid "Your answer in Neore has finished."
 msgstr "你在 Neore 中的回复已生成完毕。"
 
 #: src/features/chat/thread/ask-user-prompt.tsx:222
-#: src/features/chat/thread/ask-user-questions.tsx:85
+#: src/features/chat/thread/ask-user-questions.tsx:86
 msgid "Your answer:"
 msgstr "你的回答："
 

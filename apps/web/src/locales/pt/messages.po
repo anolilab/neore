@@ -5230,7 +5230,7 @@ msgstr "iniciante"
 msgid "Behavior"
 msgstr "Comportamento"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:192
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:190
 msgid "Behind {base}"
 msgstr "Atrás de {base}"
 
@@ -6298,11 +6298,11 @@ msgstr "Catalão (Espanha)"
 msgid "catalog"
 msgstr "catálogo"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:215
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:213
 msgid "Catch up"
 msgstr "Atualizar"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:182
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:180
 msgid "Catch up {pullRequest} with {base}"
 msgstr "Atualizar {pullRequest} com {base}"
 
@@ -14497,7 +14497,7 @@ msgstr "Não foi possível atualizar o provedor"
 msgid "Failed to update pull request settings"
 msgstr "Não foi possível atualizar as configurações de pull requests"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:47
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:46
 msgid "Failed to update reply tools"
 msgstr "Não foi possível atualizar as ferramentas de resposta"
 
@@ -17695,7 +17695,6 @@ msgstr "geração de imagens"
 
 #: src/features/marketing/components/landing-page.tsx:136
 #: src/features/marketing/components/models-page.tsx:486
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:21
 msgid "Image generation"
 msgstr "Geração de imagens"
 
@@ -19026,7 +19025,7 @@ msgstr "Módulo de conhecimento"
 msgid "Knowledge retrieval"
 msgstr "Recuperação de conhecimento"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:22
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:21
 msgid "Knowledge search"
 msgstr "Pesquisa no conhecimento"
 
@@ -19576,7 +19575,7 @@ msgstr "Menos"
 msgid "Let a quick check approve low-risk calls"
 msgstr "Permitir que uma verificação rápida aprove chamadas de baixo risco"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:64
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:63
 msgid "Let replies use tools"
 msgstr "Permitir ferramentas nas respostas"
 
@@ -23684,6 +23683,7 @@ msgid "none"
 msgstr "nenhum"
 
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:19
+#: src/features/chat/thread/ask-user-questions.tsx:87
 #: src/features/settings/components/chat/default-models-settings.tsx:165
 #: src/features/skills/components/skill-form-dialog.tsx:320
 #: src/features/skills/components/skill-form-dialog.tsx:334
@@ -24549,7 +24549,7 @@ msgstr "Links de convite abertos"
 msgid "Open it again"
 msgstr "Abrir novamente"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:23
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:22
 msgid "Open links"
 msgstr "Abrir links"
 
@@ -27532,11 +27532,11 @@ msgstr "Notificações push neste navegador"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "Coloque vários agentes com papéis próprios em uma mesma conversa. Um painel de revisão pode verificar uma alteração pelos ângulos de segurança e desempenho, e um debate pode argumentar os dois lados antes de uma síntese."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:221
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:219
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
 msgstr "Coloca um prompt no compositor para fazer rebase deste branch em {base}, resolver conflitos, verificar o build e os testes e fazer push. Nada é enviado."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:222
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:220
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "Coloca um prompt no compositor para fazer rebase do branch deste fork em {base} numa cópia local, resolver conflitos e verificar o build e os testes. Não é feito push. Nada é enviado."
 
@@ -28871,9 +28871,9 @@ msgstr "Respostas"
 msgid "Replies and spend per day over the last 53 weeks"
 msgstr "Respostas e gastos por dia nas últimas 53 semanas"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:67
-msgid "Replies can search, generate images and more, charged to your account. Tools set to \"Ask\" are skipped — nobody can approve them in a messenger."
-msgstr "As respostas podem pesquisar, gerar imagens e mais, cobradas na sua conta. Ferramentas definidas como \"Perguntar\" são ignoradas — ninguém pode aprová-las num mensageiro."
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:66
+msgid "Replies can search and more, charged to your account. Tools set to \"Ask\" are skipped — nobody can approve them in a messenger."
+msgstr "As respostas podem pesquisar e mais, cobradas na sua conta. Ferramentas definidas como \"Perguntar\" são ignoradas — ninguém pode aprová-las num mensageiro."
 
 #: src/features/settings/components/chat/event-trigger-fields.tsx:155
 msgid "Replies in a thread"
@@ -39461,7 +39461,7 @@ msgstr "Web scraping e extração de dados estruturados"
 msgid "web search"
 msgstr "pesquisa na web"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:24
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:23
 msgid "Web search"
 msgstr "Pesquisa na web"
 
@@ -40515,7 +40515,7 @@ msgid "Your answer in Neore has finished."
 msgstr "Sua resposta no Neore foi concluída."
 
 #: src/features/chat/thread/ask-user-prompt.tsx:222
-#: src/features/chat/thread/ask-user-questions.tsx:85
+#: src/features/chat/thread/ask-user-questions.tsx:86
 msgid "Your answer:"
 msgstr "Sua resposta:"
 
