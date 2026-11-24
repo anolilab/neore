@@ -147,6 +147,10 @@ const renderCatchUp = async () => {
     return view;
 };
 
+const REBASE_ON_RUN_BASE = /`git rebase refs\/neore\/pull-7-[\da-f]{8}-base`/u;
+
+const RUN_OF_BASE = /refs\/neore\/pull-7-([\da-f]{8})-base/u;
+
 describe("ThreadPullRequestCatchUp", () => {
     beforeEach(() => {
         prefill.mockClear();
@@ -170,8 +174,16 @@ describe("ThreadPullRequestCatchUp", () => {
 
         expect(prefill).toHaveBeenCalledTimes(1);
         expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringContaining("`git switch --no-guess feat/x`"));
-        expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringContaining("`git rebase refs/neore/pull-7-base`"));
+        expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringMatching(REBASE_ON_RUN_BASE));
         expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringContaining("origin HEAD:refs/heads/feat/x`"));
+
+        // Each click fetches into refs of its own: a second Catch up never force-fetches over the first one's refs.
+        fireEvent.click(button);
+
+        const runOf = (call: number): string | undefined => RUN_OF_BASE.exec(String(prefill.mock.calls[call]?.[1]))?.[1];
+
+        expect(runOf(1)).toBeDefined();
+        expect(runOf(1)).not.toBe(runOf(0));
     });
 
     it.each([

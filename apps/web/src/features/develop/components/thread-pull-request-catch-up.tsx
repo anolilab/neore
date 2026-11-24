@@ -6,7 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/to
 
 import { prefillComposer, useComposerTakesPrefill } from "@/features/chat/thread/composer-prefill";
 
-import { catchUpPrompt, hostOfPullRequestUrl, isPlainBranchName, isPlainRepo } from "../lib/catch-up-prompt";
+import { catchUpPrompt, catchUpRunId, hostOfPullRequestUrl, isPlainBranchName, isPlainRepo } from "../lib/catch-up-prompt";
 import { usePullRequest } from "../lib/use-develop";
 import { useMergeStatus } from "../lib/use-merge";
 
@@ -59,7 +59,14 @@ const CatchUpControl = ({ link, threadId }: { link: { number: number; repository
                             onClick={() =>
                                 prefillComposer(
                                     threadId,
-                                    catchUpPrompt({ baseBranch: base, headBranch: head, headInBaseRepository: sameRepo, host, ...address }),
+                                    catchUpPrompt({
+                                        baseBranch: base,
+                                        headBranch: head,
+                                        headInBaseRepository: sameRepo,
+                                        host,
+                                        ...address,
+                                        run: catchUpRunId(),
+                                    }),
                                 )
                             }
                             size="sm"
