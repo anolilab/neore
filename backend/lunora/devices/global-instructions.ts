@@ -14,7 +14,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
-import { authMutation, authQuery } from "../lib/crpc";
+import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { decryptKey } from "../lib/encryption";
 import { checkRateLimit } from "../lib/rate-limiter";
 import {
@@ -121,6 +121,7 @@ export const startGlobalInstructionsCall = authMutation
             }),
         ),
     })
+    .use(rateLimit("devices/call"))
     .output(v.object({ callId: v.string() }))
     .mutation(async ({ args, ctx }) => {
         const { impersonatedBy, userId } = ctx.user;

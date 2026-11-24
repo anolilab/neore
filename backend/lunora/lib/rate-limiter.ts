@@ -246,6 +246,8 @@ export const RATE_LIMIT_CONFIGS = {
     "codingAgent/run:premium": Ratelimit.fixedWindow(20, HOUR),
     // Connector OAuth: start/complete each make outbound discovery, registration
     // and token calls, and disconnect a revocation call.
+    "connectors/access:free": Ratelimit.fixedWindow(30, MINUTE),
+    "connectors/access:premium": Ratelimit.fixedWindow(60, MINUTE),
     "connectors/oauth:free": Ratelimit.fixedWindow(20, MINUTE),
     "connectors/oauth:premium": Ratelimit.fixedWindow(40, MINUTE),
     // Device execution (`devices/`). Pairing is rare; a call is one approval

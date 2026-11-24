@@ -5,7 +5,7 @@
  * in a new thread (`runHeadlessAgent` — text only, with memory) and logs the
  * execution.
  */
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import { parseCustomModelId } from "@neore/ai/models";
 
@@ -337,7 +337,7 @@ export const executeTrigger = internalAction
                 const rendered = webhookPrompt ?? renderWebhookPrompt(trigger.inputTemplate, { body: payload ?? "", headers: {}, query: {} }, randomFrameId());
 
                 if (rendered === undefined) {
-                    throw new Error("The payload cannot be rendered into the trigger's Input Template.");
+                    throw new LunoraError("UNPROCESSABLE", "The payload cannot be rendered into the trigger's Input Template.");
                 }
 
                 inputMessage = rendered;

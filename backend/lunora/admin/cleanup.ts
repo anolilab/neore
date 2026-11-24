@@ -192,7 +192,7 @@ export const executeCleanup = adminAction
                     const refused = threadResults.find((result) => result.status === "rejected");
 
                     if (refused?.status === "rejected") {
-                        throw new Error("A thread of this account could not be deleted, so the account is kept", { cause: refused.reason });
+                        throw new LunoraError("CONFLICT", "A thread of this account could not be deleted, so the account is kept", { cause: refused.reason });
                     }
 
                     // `auth_hooks.cascadeDeleteUser` already deletes the session and
@@ -545,7 +545,7 @@ const readShardPage =
  */
 export const getShardFootprint = adminAction
     .use(rateLimit("admin/read"))
-    .input({ cursor: v.optional(v.string()) })
+    .input({ cursor: v.optional(v.string().max(MAX_LENGTH.cursor)) })
     .output(
         v.object({
             abandonedShards: v.number(),
