@@ -60,7 +60,7 @@ import {
     shardLocalTables,
     USER_REFERENCE_FIELDS,
 } from "./account-merge";
-import { IMPORT_MARKER_EXPIRES_AT, IMPORT_MARKER_SCOPE, MERGE_PINS_LEFT_SCOPE, pinsLeftShard, resolvePinsLeft } from "./account-merge";
+import { IMPORT_MARKER_EXPIRES_AT, IMPORT_MARKER_SCOPE, MERGE_CLEARED_SCOPE, MERGE_PINS_LEFT_SCOPE, pinsLeftShard, resolvePinsLeft } from "./account-merge";
 import { dropMergeGeneration, dropPinsLeft, mergeGenerationCurrent, moveSharedPinRouteOf } from "./account-merge";
 import { purgeExpiredClaims } from "./claim-once";
 import { eraseWaitUntil, isAccountMoving } from "./account-moves";
@@ -1147,6 +1147,52 @@ describe("reassignGlobalRows", () => {
             expect(kept.page).toHaveLength(1);
         } finally {
             harness.close();
+        }
+    });
+
+    it("hands over, re-points and moves nothing of the guest's once an erasure of either account began after the run's start", async () => {
+        for (const erased of ["guest", "user"]) {
+            const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "threadFollows", "shardActivity"]) as never);
+
+            try {
+                await harness.run(async (context: any) => {
+                    await context.db.insert("knowledgeCollections", { createdAt: 0, name: "Guest notes", updatedAt: 0, userId: "guest" });
+                    await context.db.insert("threadFollows", { createdAt: 1, state: "on", threadId: "thread-1", updatedAt: 1, userId: "guest" });
+                    await context.db.insert("usageOrganizationContributors", { cohort: 1, createdAt: 1, organizationId: "org-1", userId: "guest" });
+                });
+                expect(await beginRunOf(harness)).toMatchObject({ stopped: false });
+                await harness.run(async (context: any) => await context.db.insert("accountMoves", { createdAt: 1, kind: "erasing", userId: erased }));
+
+                const results = await harness.run(async (context: any) => [
+                    await asLeaseHolder(context, handOverOrganizationContributors),
+                    await asLeaseHolder(context, reassignGlobalRows),
+                    await asLeaseHolder(context, reassignThreadFollowsPage),
+                    await asLeaseHolder(context, moveSharedPinRouteOf, { threadId: "thread-1" }),
+                ]);
+
+                expect(results).toStrictEqual([
+                    { done: false, erasing: true, fenced: false },
+                    { done: false, erasing: true, reassigned: 0 },
+                    { erasing: true, hasMore: false, moved: 0 },
+                    { erasing: true, fenced: false },
+                ]);
+
+                const left = (await harness.run(async (context: any) => {
+                    const { page: collections } = await context.db.knowledgeCollections.findMany({ where: { userId: "guest" } });
+                    const { page: follows } = await context.db.threadFollows.findMany({ where: { userId: "guest" } });
+                    const { page: contributors } = await context.db.usageOrganizationContributors.findMany({ where: { userId: "guest" } });
+
+                    return [collections.length, follows.length, contributors.map((row: any) => row.mergedFrom ?? null)];
+                })) as unknown[];
+
+                expect(left).toStrictEqual([1, 1, [null]]);
+                // The merge stopped there: its markers ended (the erasure's own stays) and its record went.
+                expect(await movesOf(harness, "guest")).toStrictEqual(erased === "guest" ? ["erasing"] : []);
+                expect(await movesOf(harness, "user")).toStrictEqual(erased === "user" ? ["erasing"] : []);
+                expect(await progressRecordOf(harness, "guest")).toBeNull();
+            } finally {
+                harness.close();
+            }
         }
     });
 
@@ -2358,6 +2404,83 @@ describe("mergeGuestInto across two real shards", () => {
         } finally {
             merge.close();
         }
+    });
+
+    describe("a guest erasure that begins during a run", () => {
+        /** The merge's caller, with the guest's erasure marked just before its `nth` import of rows on the new account's shard. */
+        const erasingBeforeImport = (merge: ReturnType<typeof twoShards>, nth: number): ShardCall => {
+            let imports = 0;
+
+            return async (reference, args, shardKey) => {
+                if (reference.__lunoraRef.endsWith(":importShardRows")) {
+                    imports += 1;
+
+                    if (imports === nth) {
+                        await merge.shards.user.run(
+                            async (context: any) => await context.db.insert("accountMoves", { createdAt: 1, kind: "erasing", userId: "guest" }),
+                        );
+                    }
+                }
+
+                return await merge.call(reference, args, shardKey);
+            };
+        };
+
+        /** Every run, chained as the queue would, to the one that ends the merge: what that run says. */
+        const lastRun = async (call: ShardCall) => {
+            let resume: MergeProgress | undefined;
+
+            for (;;) {
+                const result = await mergeGuestInto(call, REFERENCES, "guest", "user", resume === undefined ? {} : { resume });
+
+                if (result.next === null) {
+                    return result;
+                }
+
+                resume = result.next;
+            }
+        };
+
+        it("stops the clear's import, keeps the guest and its rows on its shard, and leaves the copy written before it to the new account", async () => {
+            const merge = twoShards();
+
+            try {
+                const id = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("guest title")))) as string;
+
+                // The copy's import ran before the erasure began; the clear's import is the first to see it.
+                const result = await lastRun(erasingBeforeImport(merge, 2));
+
+                expect(result).toStrictEqual({ moved: 1, next: null, stopped: true });
+                // Nothing of the guest's is deleted by the merge: its erasure takes what is on its shard.
+                expect(await merge.threadsOn("guest")).toStrictEqual([{ _id: id, title: "guest title", userId: "guest" }]);
+                expect(merge.guestDeletions).toStrictEqual([]);
+                // Written before the erasure began: the new account's now, its own erasure's to take.
+                expect(await merge.threadsOn("user")).toStrictEqual([{ _id: id, title: "guest title", userId: "user" }]);
+                // The clear never recorded the page, the merge's markers ended, and the sweep has nothing to restart.
+                expect(await claimKeysOf(merge.shards.user, MERGE_CLEARED_SCOPE)).toStrictEqual([]);
+                expect(await movesOf(merge.shards.user, "guest")).toStrictEqual(["erasing"]);
+                expect(await movesOf(merge.shards.user, "user")).toStrictEqual([]);
+                expect(await progressRecordOf(merge.shards.user, "guest")).toBeNull();
+            } finally {
+                merge.close();
+            }
+        });
+
+        it("writes no row of the guest's on the new account's shard once the erasure began before the copy's first import", async () => {
+            const merge = twoShards();
+
+            try {
+                const id = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("guest title")))) as string;
+
+                expect(await lastRun(erasingBeforeImport(merge, 1))).toStrictEqual({ moved: 0, next: null, stopped: true });
+                expect(await merge.threadsOn("user")).toStrictEqual([]);
+                expect(await merge.threadsOn("guest")).toStrictEqual([{ _id: id, title: "guest title", userId: "guest" }]);
+                expect(await claimKeysOf(merge.shards.user, IMPORT_MARKER_SCOPE)).toStrictEqual([]);
+                expect(merge.guestDeletions).toStrictEqual([]);
+            } finally {
+                merge.close();
+            }
+        });
     });
 
     describe("the stalled-merge sweep", () => {

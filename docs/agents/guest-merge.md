@@ -70,6 +70,23 @@ not cleared; the tick replaces only the one it read (`consumed`).
 
 Everything after the lease is taken runs inside the `try` that gives it back.
 
+An erasure of either account that begins during a run is fenced where the guest's data would move, not only at the run's
+start (`beginMergeRun`): each step that writes guest data on the new account's side (`importShardRows` for the copy and
+the clear, `handOverOrganizationContributors`, `reassignGlobalRows`, `reassignThreadFollowsPage`, `moveSharedPinRouteOf`;
+the owner shard's pin move already checks) reads both accounts' erasing markers (primary, two D1 reads) after its lease
+check and before any write (`stoppedForErasure`). Seeing one, it writes nothing and stops the merge in that transaction:
+markers end, the progress record goes, the result says `erasing`, and the run ends `stopped` with no further call, so no
+clear page is deleted on the guest's shard and the guest stays for its erasure to take. The deletion waits for the merge's
+markers and erases only the guest's shard, so without this a later import of the same run would have handed guest rows to
+the new account after the erasure began. The reconcile's and the clear's take-backs (`dropRowsGoneFromGuest`) are not
+fenced: they only remove copies from the new account.
+
+Rule for what moved before the erasure: a row, global row, follow or route a step wrote before that step saw the guest's
+erasing marker is the new account's, as anything the account holds is, and goes only with the new account's own erasure;
+the guest's erasure takes what is still on the guest's shard. A step that read no marker counts as before the erasure even
+when the marker was written while it ran: the deletion then still waits on the merge's live markers, and the next step
+stops.
+
 A fenced merge with import or account-move markers left drains its `markers` phase. Every step that writes checks the
 lease generation first (owner-shard pin moves: both accounts' erasure markers).
 

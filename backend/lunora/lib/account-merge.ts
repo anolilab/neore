@@ -236,6 +236,7 @@ export const USER_REFERENCE_FIELDS: ReadonlySet<string> = new Set([
 /** Shard-local columns whose names look like a user reference but hold no user id, and what they hold. */
 export const NOT_USER_REFERENCE_FIELDS: Readonly<Record<string, string>> = {
     actor: "a kind (`owner` or `collaborator`), never an id",
+    authorizationResponseIssParameterSupported: "a flag of the OAuth authorization server's metadata",
     authorName: "a display name",
     dispatchedBy: "a dispatch source",
     isAdvancedUser: "a flag",
@@ -1225,6 +1226,27 @@ export const resumeStalledGuestMergesOnTick = internalMutation
     });
 
 /**
+ * The erasure fence of every step that hands the guest's data to the new account (the copy's and the clear's imports, the
+ * contributor hand-over, the `global` and follows re-points, a pin route's move). {@link beginMergeRun} checks for an
+ * erasure only at the run's start; one of either account that begins during the run is seen here, in the transaction that
+ * would write, before anything is written. The merge then stops in that transaction and keeps the guest: its markers end
+ * (so the erasure waits no longer), its progress record goes (nothing for the sweep to restart), and nothing more of the
+ * guest's moves or is deleted on its shard; the guest's erasure takes what is left there. What a step wrote before the
+ * erasure's marker was visible to it stays the new account's (`docs/agents/guest-merge.md`).
+ */
+const stoppedForErasure = async (ctx: Pick<MutationCtx, "db">, from: string, to: string, now: number): Promise<boolean> => {
+    if (!(await isErasing(ctx, from)) && !(await isErasing(ctx, to))) {
+        return false;
+    }
+
+    await endImporting(ctx, from, to, now);
+    await endAccountMove(ctx, from, "merging");
+    await dropMergeProgress(ctx.db, from);
+
+    return true;
+};
+
+/**
  * On the NEW user's shard: insert `rows` of `table` under their own ids, re-owned. An id already here is brought up to
  * the guest's row as it is now (a row edited after the copy) only while it still holds what the merge last wrote there
  * (its import marker): a row the new account changed, or one written here by anything but the merge, stays as it is,
@@ -1233,11 +1255,12 @@ export const resumeStalledGuestMergesOnTick = internalMutation
  * tables the new account keeps its own row of) handled. An id here with other content and no marker is left out: the
  * guest's row stays on its shard, never deleted unseen. Once the guest's merge has finished ({@link MERGE_FENCE_SCOPE}),
  * or another delivery has taken the merge's lease since this one did ({@link MERGE_LEASE_SCOPE}: its rows may be newer
- * than these), it writes nothing and confirms nothing: `fenced` tells the stale delivery to stop.
+ * than these), it writes nothing and confirms nothing: `fenced` tells the stale delivery to stop. Nor once an erasure of
+ * either account has begun ({@link stoppedForErasure}): `erasing`, and the merge has stopped keeping the guest.
  */
 export const importShardRows = internalMutation
     .input({ clearing: v.optional(v.boolean()), from: v.string(), generation: v.number(), rows: v.array(v.any()), table: v.string(), to: v.string() })
-    .output(v.object({ fenced: v.boolean(), held: v.number(), imported: v.number(), present: v.array(v.string()) }))
+    .output(v.object({ erasing: v.optional(v.boolean()), fenced: v.boolean(), held: v.number(), imported: v.number(), present: v.array(v.string()) }))
     .mutation(async ({ args, ctx }) => {
         const db = rawDb(ctx);
         const rows = args.rows as Record<string, unknown>[];
@@ -1246,6 +1269,10 @@ export const importShardRows = internalMutation
 
         if ((await mergeFinished(ctx.db, args.from, now)) || !(await holdMergeLease(ctx.db, args.from, args.generation, now))) {
             return { fenced: true, held: 0, imported: 0, present: [] };
+        }
+
+        if (await stoppedForErasure(ctx, args.from, args.to, now)) {
+            return { erasing: true, fenced: false, held: 0, imported: 0, present: [] };
         }
 
         if (args.table === "userSettings") {
@@ -1731,10 +1758,14 @@ const HAND_OVER_BATCH = 50;
  */
 export const handOverOrganizationContributors = internalMutation
     .input({ from: v.string(), generation: v.number(), to: v.string() })
-    .output(v.object({ done: v.boolean(), fenced: v.boolean() }))
+    .output(v.object({ done: v.boolean(), erasing: v.optional(v.boolean()), fenced: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
         if ((await mergeFinished(ctx.db, args.from, ctx.now)) || !(await holdMergeLease(ctx.db, args.from, args.generation, ctx.now))) {
             return { done: false, fenced: true };
+        }
+
+        if (await stoppedForErasure(ctx, args.from, args.to, ctx.now)) {
+            return { done: false, erasing: true, fenced: false };
         }
 
         // Primary reads: a decided entry is marked, and leaves the filter, so the next call starts where this one stopped.
@@ -1783,12 +1814,16 @@ export const reassignGlobalRows = internalMutation
     // marked them (their cohorts withheld), so the guest's leftover ledger rows are never booked into a cohort of their own. The merge's
     // `global` step runs only after its clear emptied the guest's shard, so it never passes `false`.
     .input({ from: v.string(), generation: v.number(), guestDrained: v.optional(v.boolean()), to: v.string() })
-    .output(v.object({ done: v.boolean(), fenced: v.optional(v.boolean()), reassigned: v.number() }))
+    .output(v.object({ done: v.boolean(), erasing: v.optional(v.boolean()), fenced: v.optional(v.boolean()), reassigned: v.number() }))
     .mutation(async ({ args, ctx }) => {
         // In the transaction that writes: a delivery whose lease a later one took (one that may have stopped the merge for an
-        // erasure since) re-points nothing.
+        // erasure since) re-points nothing, nor does one that finds an erasure begun since its run's start.
         if (!(await holdMergeLease(ctx.db, args.from, args.generation, ctx.now))) {
             return { done: false, fenced: true, reassigned: 0 };
+        }
+
+        if (await stoppedForErasure(ctx, args.from, args.to, ctx.now)) {
+            return { done: false, erasing: true, reassigned: 0 };
         }
 
         const facades = ctx.db as unknown as Record<
@@ -1899,10 +1934,14 @@ export const reassignGlobalRows = internalMutation
  */
 export const reassignThreadFollowsPage = internalMutation
     .input({ from: v.string(), generation: v.number(), to: v.string() })
-    .output(v.object({ fenced: v.optional(v.boolean()), hasMore: v.boolean(), moved: v.number() }))
+    .output(v.object({ erasing: v.optional(v.boolean()), fenced: v.optional(v.boolean()), hasMore: v.boolean(), moved: v.number() }))
     .mutation(async ({ args, ctx }) => {
         if (!(await holdMergeLease(ctx.db, args.from, args.generation, ctx.now))) {
             return { fenced: true, hasMore: false, moved: 0 };
+        }
+
+        if (await stoppedForErasure(ctx, args.from, args.to, ctx.now)) {
+            return { erasing: true, hasMore: false, moved: 0 };
         }
 
         return await mergeThreadFollowsPage(ctx.db, args.from, args.to);
@@ -1960,10 +1999,14 @@ export const stopMergeKeepingGuest = internalMutation
  */
 export const moveSharedPinRouteOf = internalMutation
     .input({ from: v.string(), generation: v.number(), threadId: v.string(), to: v.string() })
-    .output(v.object({ fenced: v.boolean() }))
+    .output(v.object({ erasing: v.optional(v.boolean()), fenced: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
         if (!(await holdMergeLease(ctx.db, args.from, args.generation, ctx.now))) {
             return { fenced: true };
+        }
+
+        if (await stoppedForErasure(ctx, args.from, args.to, ctx.now)) {
+            return { erasing: true, fenced: false };
         }
 
         await moveSharedPinRoute(ctx.db, args.from, args.to, args.threadId);
@@ -2157,6 +2200,16 @@ const stopKeepingGuest = async ({ call, from, generation, references, to }: Merg
     return true;
 };
 
+/**
+ * A step's transfer found an erasure of either account begun since this run's start, and stopped the merge in its own
+ * transaction ({@link stoppedForErasure}): the run ends with the guest kept, no further call made.
+ */
+const stoppedByErasure = (state: MergeState): boolean => {
+    state.stopped = true;
+
+    return true;
+};
+
 /** One step of each phase; `true` once the merge is done. */
 const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeState) => Promise<boolean>>> = {
     // A page of the table: cleared, and read again until the guest's shard holds none of its rows.
@@ -2172,6 +2225,10 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
         const { calls, outcome } = await clearPage(call, references, table, { from, generation, to });
 
         state.calls -= calls;
+
+        if (outcome === "erasing") {
+            return stoppedByErasure(state);
+        }
 
         if (outcome === "fenced") {
             state.superseded = true;
@@ -2191,7 +2248,15 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
     // which ledger rows keep their cohort ({@link handOverOrganizationContributors}).
     contributors: async ({ call, from, generation, references, to }, state) => {
         state.calls -= 1;
-        const { done, fenced }: { done: boolean; fenced: boolean } = await call(references.handOverContributors, { from, generation, to }, to);
+        const { done, erasing, fenced }: { done: boolean; erasing?: boolean; fenced: boolean } = await call(
+            references.handOverContributors,
+            { from, generation, to },
+            to,
+        );
+
+        if (erasing === true) {
+            return stoppedByErasure(state);
+        }
 
         if (fenced) {
             state.superseded = true;
@@ -2224,7 +2289,15 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
 
         if (page.page.length > 0) {
             state.calls -= 1;
-            const { fenced }: { fenced: boolean } = await call(references.importRows, { from, generation, rows: page.page, table, to }, to);
+            const { erasing, fenced }: { erasing?: boolean; fenced: boolean } = await call(
+                references.importRows,
+                { from, generation, rows: page.page, table, to },
+                to,
+            );
+
+            if (erasing === true) {
+                return stoppedByErasure(state);
+            }
 
             // Another delivery finished this merge, or took it over: this one read its rows before that and must write none of them.
             if (fenced) {
@@ -2246,7 +2319,15 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
     },
     follows: async ({ call, from, generation, references, to }, state) => {
         state.calls -= 1;
-        const page: { fenced?: boolean; hasMore: boolean; moved: number } = await call(references.reassignFollows, { from, generation, to }, to);
+        const page: { erasing?: boolean; fenced?: boolean; hasMore: boolean; moved: number } = await call(
+            references.reassignFollows,
+            { from, generation, to },
+            to,
+        );
+
+        if (page.erasing === true) {
+            return stoppedByErasure(state);
+        }
 
         if (page.fenced === true) {
             state.superseded = true;
@@ -2265,7 +2346,15 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
     // Each call moves at most `REASSIGN_BATCH` rows, so a guest with many never hits the statement cap.
     global: async ({ call, from, generation, references, to }, state) => {
         state.calls -= 1;
-        const { done, fenced: stale }: { done: boolean; fenced?: boolean } = await call(references.reassignGlobal, { from, generation, to }, to);
+        const {
+            done,
+            erasing,
+            fenced: stale,
+        }: { done: boolean; erasing?: boolean; fenced?: boolean } = await call(references.reassignGlobal, { from, generation, to }, to);
+
+        if (erasing === true) {
+            return stoppedByErasure(state);
+        }
 
         if (stale === true) {
             state.superseded = true;
@@ -2364,7 +2453,15 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
 
         if (!hasMore) {
             state.calls -= 1;
-            const { fenced }: { fenced?: boolean } = await call(references.movePinRoute, { from, generation, threadId: route.threadId, to }, to);
+            const { erasing: routeErasing, fenced }: { erasing?: boolean; fenced?: boolean } = await call(
+                references.movePinRoute,
+                { from, generation, threadId: route.threadId, to },
+                to,
+            );
+
+            if (routeErasing === true) {
+                return stoppedByErasure(state);
+            }
 
             if (fenced === true) {
                 state.superseded = true;
@@ -2674,7 +2771,8 @@ export const mergeGuestInto = async (
         await call(references.releaseLease, { from, generation, ...(keep && { progress: progress() }) }, to);
     }
 
-    if (early?.stopped === true) {
+    // A step that stopped the merge (an erasure begun during the run) may have done so before the `global` step.
+    if (early?.stopped === true || (done && state.stopped)) {
         await abandonPins();
     }
 
@@ -2694,7 +2792,8 @@ export const mergeGuestInto = async (
  * edited there since the table was copied arrives as it is now; only ids the new shard confirms are deleted. A row the
  * guest deleted after the read is gone before the delete: its copy is taken back from the new shard, unless the account
  * changed it since. `empty` when the table holds none of the guest's rows any more (one call), `page` after a page (three
- * calls, four with a row gone or changed since the read), `fenced` when another delivery already finished the merge.
+ * calls, four with a row gone or changed since the read), `fenced` when another delivery already finished the merge,
+ * `erasing` when its import found an erasure begun and stopped the merge ({@link stoppedForErasure}).
  * `calls`: how many it made.
  */
 const clearPage = async (
@@ -2702,7 +2801,7 @@ const clearPage = async (
     references: MergeReferences,
     table: string,
     { from, generation, to }: { from: string; generation: number; to: string },
-): Promise<{ calls: number; outcome: "empty" | "fenced" | "page" }> => {
+): Promise<{ calls: number; outcome: "empty" | "erasing" | "fenced" | "page" }> => {
     const { digests, rows }: { digests: string[]; rows: Record<string, unknown>[] } = await call(
         references.listClear,
         KEEP_NEW_USERS.has(table) ? { from, ownedBy: from, table } : { from, table },
@@ -2713,11 +2812,16 @@ const clearPage = async (
         return { calls: 1, outcome: "empty" };
     }
 
-    const { fenced, present }: { fenced: boolean; present: string[] } = await call(
+    const { erasing, fenced, present }: { erasing?: boolean; fenced: boolean; present: string[] } = await call(
         references.importRows,
         { clearing: true, from, generation, rows, table, to },
         to,
     );
+
+    // An erasure began since the run's start: the merge stopped in that import, and the guest's rows of this page stay on its shard.
+    if (erasing === true) {
+        return { calls: 2, outcome: "erasing" };
+    }
 
     // Another delivery finished this merge or took it over: nothing of this page is confirmed, so nothing of it is deleted.
     if (fenced) {
