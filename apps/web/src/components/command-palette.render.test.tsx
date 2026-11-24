@@ -17,6 +17,8 @@ const harness = vi.hoisted(() => {
         askFirst: vi.fn(),
         confirmBeforeDelete: true,
         // Set by the delete-confirmation tests; `undefined` keeps the thread manager's delete unavailable, as before them.
+        /** The chat the palette acts on; `undefined` shows no current-thread actions. */
+        currentThreadId: undefined as string | undefined,
         deleteBranch: undefined as undefined | ReturnType<typeof vi.fn>,
         navigate: vi.fn(),
         scrollToMessage: vi.fn(),
@@ -183,7 +185,7 @@ vi.mock("@/features/chat/core/hooks/use-thread-manager", () => {
 });
 
 vi.mock("@/features/chat/core/stores/thread-store-hooks", () => {
-    return { useCurrentThreadId: () => undefined, useThreadMetadata: () => new Map() };
+    return { useCurrentThreadId: () => harness.currentThreadId, useThreadMetadata: () => new Map() };
 });
 
 vi.mock("@/features/chat/thread-list/hooks/use-thread-handlers", () => {
@@ -403,6 +405,7 @@ describe("command palette thread delete confirmation", () => {
             useCommandDialogStore.getState().close();
         });
         harness.deleteBranch = undefined;
+        harness.currentThreadId = undefined;
     });
 
     it("asks before deleting a thread from its row, and deletes it only once confirmed", async () => {
@@ -431,6 +434,39 @@ describe("command palette thread delete confirmation", () => {
         await openPalette();
 
         fireEvent.click(await screen.findByRole("button", { name: "Delete thread" }));
+
+        expect(harness.askFirst).not.toHaveBeenCalled();
+        expect(harness.deleteBranch).toHaveBeenCalledWith("thread-1");
+    });
+
+    it("asks before deleting the open thread from the palette's thread actions, and deletes it only once confirmed", async () => {
+        harness.currentThreadId = "thread-1";
+        renderPalette();
+        await openPalette();
+
+        fireEvent.click(await screen.findByRole("option", { name: "Delete thread" }));
+
+        expect(harness.deleteBranch).not.toHaveBeenCalled();
+        expect(harness.askFirst).toHaveBeenCalledTimes(1);
+
+        const request = harness.askFirst.mock.calls[0]?.[0] as { run: () => void; title: string };
+
+        expect(request.title).toBe("Delete thread?");
+
+        await act(async () => {
+            request.run();
+        });
+
+        expect(harness.deleteBranch).toHaveBeenCalledWith("thread-1");
+    });
+
+    it("deletes the open thread from the palette's thread actions at once when the setting is saved as off", async () => {
+        harness.confirmBeforeDelete = false;
+        harness.currentThreadId = "thread-1";
+        renderPalette();
+        await openPalette();
+
+        fireEvent.click(await screen.findByRole("option", { name: "Delete thread" }));
 
         expect(harness.askFirst).not.toHaveBeenCalled();
         expect(harness.deleteBranch).toHaveBeenCalledWith("thread-1");
