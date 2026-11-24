@@ -9,6 +9,8 @@ import { isMockLlmEnabled, MOCK_PRICING } from "./mock-model.js";
 
 export interface ModelPricing {
     cachedInputPerMillion?: number;
+    /** Price of tokens written to the prompt cache. Falls back to the input price when absent. */
+    cacheWritePerMillion?: number;
     contextWindow?: number;
     inputPerMillion: number;
     outputPerMillion: number;
@@ -17,6 +19,8 @@ export interface ModelPricing {
 
 export interface TokenUsage {
     cachedTokens?: number;
+    /** Prompt tokens written to the cache this call. They are part of `promptTokens`, not on top of it. */
+    cacheWriteTokens?: number;
     completionTokens: number;
     promptTokens: number;
     reasoningTokens?: number;
@@ -41,29 +45,34 @@ const MODELS_DEV_URL = "https://models.dev/api.json";
 /** The whole models.dev document, provider-keyed (`data[provider].models[model]`). */
 const FULL_CACHE_KEY = "models_dev_full";
 const FULL_CACHE_TTL = 86_400; // 24 hours
-// Keys are `pricing:v2:<providerHint | _>:<modelApiId>`: one model id can be hosted
-// by several providers at different prices. v2 also drops entries written before
-// the provider-keyed lookup, which may carry the old (x 1e6) scale.
-const PRICING_KEY_PREFIX = "pricing:v2:";
+// Keys are `pricing:v3:<providerHint | _>:<modelApiId>`: one model id can be hosted
+// by several providers at different prices. v3 adds the cache-write price, so entries
+// cached under v2 (which lack it) are dropped and refetched.
+const PRICING_KEY_PREFIX = "pricing:v3:";
 const PRICING_TTL = 86_400;
 
 /**
  * Calculate cost in microdollars from token usage and pricing.
  * $1.00 = 1,000,000 microdollars.
  *
- * `completionTokens` is the total output, reasoning included (AI SDK `outputTokens.total`), so reasoning
- * is charged once: at its own rate, and the rest of the output at the output rate.
+ * `promptTokens` covers every input token. Cache reads and cache writes are taken out of it and priced at
+ * their own rates, so each input token is charged once. `completionTokens` is the total output, reasoning
+ * included (AI SDK `outputTokens.total`), so reasoning is charged once: at its own rate, and the rest of the
+ * output at the output rate.
  */
 export const calculateCost = (pricing: ModelPricing, usage: TokenUsage): number => {
-    const regularInputTokens = usage.promptTokens - (usage.cachedTokens ?? 0);
+    const cachedTokens = usage.cachedTokens ?? 0;
+    const cacheWriteTokens = usage.cacheWriteTokens ?? 0;
+    const regularInputTokens = usage.promptTokens - cachedTokens - cacheWriteTokens;
     const inputCost = (regularInputTokens * pricing.inputPerMillion) / 1_000_000;
     const textOutputTokens = Math.max(0, usage.completionTokens - (usage.reasoningTokens ?? 0));
     const outputCost = (textOutputTokens * pricing.outputPerMillion) / 1_000_000;
-    const cachedCost = ((usage.cachedTokens ?? 0) * (pricing.cachedInputPerMillion ?? pricing.inputPerMillion)) / 1_000_000;
+    const cachedCost = (cachedTokens * (pricing.cachedInputPerMillion ?? pricing.inputPerMillion)) / 1_000_000;
+    const cacheWriteCost = (cacheWriteTokens * (pricing.cacheWritePerMillion ?? pricing.inputPerMillion)) / 1_000_000;
     const reasoningCost = ((usage.reasoningTokens ?? 0) * (pricing.reasoningOutputPerMillion ?? pricing.outputPerMillion)) / 1_000_000;
 
     // Convert dollars to microdollars
-    return Math.round((inputCost + outputCost + cachedCost + reasoningCost) * 1_000_000);
+    return Math.round((inputCost + outputCost + cachedCost + cacheWriteCost + reasoningCost) * 1_000_000);
 };
 
 /** Fetches with a 5s timeout to avoid blocking requests when models.dev is slow. */
@@ -136,6 +145,7 @@ const toPricing = (model: ModelsDevelopmentModel | undefined, isFreeAllowed = fa
 
     return {
         ...(cost.cache_read !== undefined && { cachedInputPerMillion: cost.cache_read }),
+        ...(cost.cache_write !== undefined && { cacheWritePerMillion: cost.cache_write }),
         ...(model.limit?.context !== undefined && { contextWindow: model.limit.context }),
         inputPerMillion: cost.input ?? 0,
         outputPerMillion: cost.output ?? 0,

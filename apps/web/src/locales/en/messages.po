@@ -10584,8 +10584,8 @@ msgid "Delete Open Thread"
 msgstr "Delete Open Thread"
 
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:78
-msgid "Delete open thread (asks first)"
-msgstr "Delete open thread (asks first)"
+msgid "Delete open thread"
+msgstr "Delete open thread"
 
 #: src/features/auth/components/organization/delete-organization-card.tsx:37
 #: src/features/auth/components/organization/delete-organization-card.tsx:42
@@ -17231,6 +17231,10 @@ msgstr "Hit rate"
 msgid "HLS playback is not supported in this browser."
 msgstr "HLS playback is not supported in this browser."
 
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:32
+msgid "Hold Ctrl, Cmd or the middle mouse button to open it in the other place. The side panel needs Split View, turned on in Account settings."
+msgstr "Hold Ctrl, Cmd or the middle mouse button to open it in the other place. The side panel needs Split View, turned on in Account settings."
+
 #: src/features/settings/components/personalization/memory-item.tsx:208
 msgid "Holds until"
 msgstr "Holds until"
@@ -20470,6 +20474,10 @@ msgstr "Magic Link"
 #: src/features/auth/components/auth/forms/magic-link-form.tsx:76
 msgid "Magic link email sent"
 msgstr "Magic link email sent"
+
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:21
+msgid "Main view"
+msgstr "Main view"
 
 #: src/features/workflow/components/nodes/style-ref-node.tsx:147
 msgid "Maintain original structure"
@@ -31347,6 +31355,10 @@ msgstr "Showing {firstShown} to {lastShown} of {totalRows} rows"
 msgid "Shown to the assistant so it knows when the skill applies."
 msgstr "Shown to the assistant so it knows when the skill applies."
 
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:22
+msgid "Side panel"
+msgstr "Side panel"
+
 #: src/features/chat/aside/aside-panel.tsx:208
 #: src/features/chat/aside/aside-panel.tsx:293
 msgid "Side question"
@@ -39560,6 +39572,10 @@ msgstr "When to delegate"
 msgid "When to read it"
 msgstr "When to read it"
 
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:29
+msgid "Where a sub-agent or side chat opens"
+msgstr "Where a sub-agent or side chat opens"
+
 #: src/features/tasks/components/task-form-dialog.tsx:586
 msgid "Where each run goes"
 msgstr "Where each run goes"
@@ -40758,3 +40774,37 @@ msgstr "Zurich"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ points"
+
+msgid "Archive"
+msgstr "Archive"
+
+msgid "Archive this chat?"
+msgstr "Archive this chat?"
+
+msgid "Archived chats stay searchable, and you can restore them from the archive."
+msgstr "Archived chats stay searchable, and you can restore them from the archive."
+
+msgid "Asks before a chat is archived. Off: archiving happens on the first click."
+msgstr "Asks before a chat is archived. Off: archiving happens on the first click."
+
+msgid "Asks before a chat is deleted. Off: deleting happens on the first click."
+msgstr "Asks before a chat is deleted. Off: deleting happens on the first click."
+
+msgid "Asks before a pinned chat is unpinned. Off: unpinning happens on the first click."
+msgstr "Asks before a pinned chat is unpinned. Off: unpinning happens on the first click."
+
+msgid "Confirm before archiving a chat"
+msgstr "Confirm before archiving a chat"
+
+msgid "Confirm before deleting a chat"
+msgstr "Confirm before deleting a chat"
+
+msgid "Confirm before unpinning a chat"
+msgstr "Confirm before unpinning a chat"
+
+msgid "The chat will no longer be pinned. You can pin it again from the list."
+msgstr "The chat will no longer be pinned. You can pin it again from the list."
+
+msgid "Unpin this chat?"
+msgstr "Unpin this chat?"
+

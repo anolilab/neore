@@ -10585,8 +10585,8 @@ msgid "Delete Open Thread"
 msgstr "Usuń otwarty wątek"
 
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:78
-msgid "Delete open thread (asks first)"
-msgstr "Usuń otwarty wątek (najpierw zapyta)"
+msgid "Delete open thread"
+msgstr "Usuń otwarty wątek"
 
 #: src/features/auth/components/organization/delete-organization-card.tsx:37
 #: src/features/auth/components/organization/delete-organization-card.tsx:42
@@ -17232,6 +17232,10 @@ msgstr "Współczynnik trafień"
 msgid "HLS playback is not supported in this browser."
 msgstr "Odtwarzanie HLS nie jest obsługiwane w tej przeglądarce."
 
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:32
+msgid "Hold Ctrl, Cmd or the middle mouse button to open it in the other place. The side panel needs Split View, turned on in Account settings."
+msgstr "Przytrzymaj Ctrl, Cmd lub środkowy przycisk myszy, aby otworzyć w drugim miejscu. Panel boczny wymaga widoku podzielonego, który włączysz w ustawieniach konta."
+
 #: src/features/settings/components/personalization/memory-item.tsx:208
 msgid "Holds until"
 msgstr "Obowiązuje do"
@@ -20471,6 +20475,10 @@ msgstr "Magiczny link"
 #: src/features/auth/components/auth/forms/magic-link-form.tsx:76
 msgid "Magic link email sent"
 msgstr "Wysłano e-mail z magicznym linkiem"
+
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:21
+msgid "Main view"
+msgstr "Widok główny"
 
 #: src/features/workflow/components/nodes/style-ref-node.tsx:147
 msgid "Maintain original structure"
@@ -31348,6 +31356,10 @@ msgstr "Wyświetlanie wierszy {firstShown}–{lastShown} z {totalRows}"
 msgid "Shown to the assistant so it knows when the skill applies."
 msgstr "Pokazywany asystentowi, aby wiedział, kiedy umiejętność ma zastosowanie."
 
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:22
+msgid "Side panel"
+msgstr "Panel boczny"
+
 #: src/features/chat/aside/aside-panel.tsx:208
 #: src/features/chat/aside/aside-panel.tsx:293
 msgid "Side question"
@@ -39561,6 +39573,10 @@ msgstr "Kiedy delegować"
 msgid "When to read it"
 msgstr "Kiedy go czytać"
 
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:29
+msgid "Where a sub-agent or side chat opens"
+msgstr "Gdzie otwiera się podagent lub czat boczny"
+
 #: src/features/tasks/components/task-form-dialog.tsx:586
 msgid "Where each run goes"
 msgstr "Dokąd trafia każde uruchomienie"
@@ -40759,3 +40775,37 @@ msgstr "Zurych"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ punkty"
+
+msgid "Archive"
+msgstr "Archiwizuj"
+
+msgid "Archive this chat?"
+msgstr "Zarchiwizować ten czat?"
+
+msgid "Archived chats stay searchable, and you can restore them from the archive."
+msgstr "Zarchiwizowane czaty nadal można wyszukiwać, a przywrócisz je z archiwum."
+
+msgid "Asks before a chat is archived. Off: archiving happens on the first click."
+msgstr "Pyta przed zarchiwizowaniem czatu. Wyłączone: archiwizacja następuje od razu po kliknięciu."
+
+msgid "Asks before a chat is deleted. Off: deleting happens on the first click."
+msgstr "Pyta przed usunięciem czatu. Wyłączone: usunięcie następuje od razu po kliknięciu."
+
+msgid "Asks before a pinned chat is unpinned. Off: unpinning happens on the first click."
+msgstr "Pyta przed odpięciem przypiętego czatu. Wyłączone: odpięcie następuje od razu po kliknięciu."
+
+msgid "Confirm before archiving a chat"
+msgstr "Potwierdź przed zarchiwizowaniem czatu"
+
+msgid "Confirm before deleting a chat"
+msgstr "Potwierdź przed usunięciem czatu"
+
+msgid "Confirm before unpinning a chat"
+msgstr "Potwierdź przed odpięciem czatu"
+
+msgid "The chat will no longer be pinned. You can pin it again from the list."
+msgstr "Czat nie będzie już przypięty. Możesz go ponownie przypiąć z listy."
+
+msgid "Unpin this chat?"
+msgstr "Odpiąć ten czat?"
+

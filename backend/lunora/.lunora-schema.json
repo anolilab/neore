@@ -33340,6 +33340,24 @@
           "optional": true,
           "unique": false
         },
+        "confirmBeforeArchiveChat": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "confirmBeforeDeleteChat": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "confirmBeforeUnpinChat": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "contrast": {
           "kind": "string",
           "nullable": false,

@@ -10585,8 +10585,8 @@ msgid "Delete Open Thread"
 msgstr "删除当前对话"
 
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:78
-msgid "Delete open thread (asks first)"
-msgstr "删除当前对话（会先确认）"
+msgid "Delete open thread"
+msgstr "删除当前打开的线程"
 
 #: src/features/auth/components/organization/delete-organization-card.tsx:37
 #: src/features/auth/components/organization/delete-organization-card.tsx:42
@@ -17232,6 +17232,10 @@ msgstr "命中率"
 msgid "HLS playback is not supported in this browser."
 msgstr "此浏览器不支持 HLS 播放。"
 
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:32
+msgid "Hold Ctrl, Cmd or the middle mouse button to open it in the other place. The side panel needs Split View, turned on in Account settings."
+msgstr "按住 Ctrl、Cmd 或鼠标中键可在另一位置打开。侧边面板需要分屏视图，请在账户设置中开启。"
+
 #: src/features/settings/components/personalization/memory-item.tsx:208
 msgid "Holds until"
 msgstr "有效期至"
@@ -20471,6 +20475,10 @@ msgstr "魔法链接"
 #: src/features/auth/components/auth/forms/magic-link-form.tsx:76
 msgid "Magic link email sent"
 msgstr "魔法链接邮件已发送"
+
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:21
+msgid "Main view"
+msgstr "主视图"
 
 #: src/features/workflow/components/nodes/style-ref-node.tsx:147
 msgid "Maintain original structure"
@@ -31348,6 +31356,10 @@ msgstr "显示第 {firstShown} 至 {lastShown} 行，共 {totalRows} 行"
 msgid "Shown to the assistant so it knows when the skill applies."
 msgstr "会展示给助手，让它知道何时适用此技能。"
 
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:22
+msgid "Side panel"
+msgstr "侧边面板"
+
 #: src/features/chat/aside/aside-panel.tsx:208
 #: src/features/chat/aside/aside-panel.tsx:293
 msgid "Side question"
@@ -39561,6 +39573,10 @@ msgstr "何时委派"
 msgid "When to read it"
 msgstr "何时读取"
 
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:29
+msgid "Where a sub-agent or side chat opens"
+msgstr "子代理或侧边聊天的打开位置"
+
 #: src/features/tasks/components/task-form-dialog.tsx:586
 msgid "Where each run goes"
 msgstr "每次运行的去向"
@@ -40759,3 +40775,37 @@ msgstr "苏黎世"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ 分数"
+
+msgid "Archive"
+msgstr "归档"
+
+msgid "Archive this chat?"
+msgstr "归档此对话？"
+
+msgid "Archived chats stay searchable, and you can restore them from the archive."
+msgstr "已归档的对话仍可搜索，你可以从归档中恢复。"
+
+msgid "Asks before a chat is archived. Off: archiving happens on the first click."
+msgstr "归档对话前询问。关闭：第一次点击即归档。"
+
+msgid "Asks before a chat is deleted. Off: deleting happens on the first click."
+msgstr "删除对话前询问。关闭：第一次点击即删除。"
+
+msgid "Asks before a pinned chat is unpinned. Off: unpinning happens on the first click."
+msgstr "取消置顶对话前询问。关闭：第一次点击即取消置顶。"
+
+msgid "Confirm before archiving a chat"
+msgstr "归档对话前确认"
+
+msgid "Confirm before deleting a chat"
+msgstr "删除对话前确认"
+
+msgid "Confirm before unpinning a chat"
+msgstr "取消置顶对话前确认"
+
+msgid "The chat will no longer be pinned. You can pin it again from the list."
+msgstr "对话将不再置顶。你可以在列表中重新置顶。"
+
+msgid "Unpin this chat?"
+msgstr "取消置顶此对话？"
+

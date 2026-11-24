@@ -1,0 +1,55 @@
+"use client";
+
+import { useLingui } from "@lingui/react/macro";
+import { Label } from "@neore/ui/components/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
+import type { FC } from "react";
+
+import type { ChatOpenPlace } from "@/features/chat/split/chat-open-place";
+import { readChatOpenPlace } from "@/features/chat/split/chat-open-place";
+import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
+
+/**
+ * Where a click on a sub-agent opens its chat. Saved in this browser only, like the split view it relies on.
+ */
+const SubAgentOpenPlaceSettings: FC = () => {
+    const { t } = useLingui();
+    const place = useUIStateStore((state) => readChatOpenPlace(state.preferences.subAgentOpenPlace));
+    const setUserPreferences = useUIStateStore((state) => state.setUserPreferences);
+
+    const labels: Record<ChatOpenPlace, string> = {
+        main: t`Main view`,
+        side: t`Side panel`,
+    };
+
+    return (
+        <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1 space-y-0.5">
+                <Label className="text-sm font-medium" htmlFor="sub-agent-open-place">
+                    {t`Where a sub-agent or side chat opens`}
+                </Label>
+                <p className="text-muted-foreground text-xs" id="sub-agent-open-place-description">
+                    {t`Hold Ctrl, Cmd or the middle mouse button to open it in the other place. The side panel needs Split View, turned on in Account settings.`}
+                </p>
+            </div>
+            <Select<ChatOpenPlace>
+                onValueChange={(next) => {
+                    if (next === "main" || next === "side") {
+                        setUserPreferences({ subAgentOpenPlace: next });
+                    }
+                }}
+                value={place}
+            >
+                <SelectTrigger aria-describedby="sub-agent-open-place-description" className="w-44 shrink-0" id="sub-agent-open-place">
+                    <SelectValue>{(value: ChatOpenPlace | null) => labels[value ?? "side"]}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="side">{labels.side}</SelectItem>
+                    <SelectItem value="main">{labels.main}</SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
+    );
+};
+
+export default SubAgentOpenPlaceSettings;

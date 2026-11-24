@@ -13,9 +13,12 @@ import {
     assertSafeOAuthUrl,
     authorizationServerMetadataUrls,
     buildAuthorizationUrl,
+    checkAuthorizationResponseIssuer,
     chooseTokenEndpointAuthMethod,
     discoverOAuth,
     exchangeAuthorizationCode,
+    OAUTH_ISSUER_MISMATCH,
+    OAUTH_ISSUER_MISSING,
     OAuthError,
     parseResourceMetadataHeader,
     parseTokenResponse,
@@ -587,5 +590,65 @@ describe("probeRequiresOAuth", () => {
             }),
         ).resolves.toBe(false);
         await expect(probeRequiresOAuth("https://127.0.0.1/mcp", fakeFetch({}))).resolves.toBe(false);
+    });
+});
+
+describe("RFC 9207 iss check on the callback", () => {
+    const EXPECTED = "https://mcp.notion.com";
+
+    it("accepts a response whose iss matches the issuer the flow started against", () => {
+        expect(checkAuthorizationResponseIssuer({ expectedIssuer: EXPECTED, iss: EXPECTED, issParameterSupported: true })).toStrictEqual({ ok: true });
+    });
+
+    it("refuses an iss naming another authorization server, even when the metadata does not advertise support", () => {
+        expect(checkAuthorizationResponseIssuer({ expectedIssuer: EXPECTED, iss: "https://auth.evil.example", issParameterSupported: false })).toStrictEqual({
+            code: OAUTH_ISSUER_MISMATCH,
+            ok: false,
+        });
+    });
+
+    it("compares iss as a plain string, so an issuer that differs by a trailing slash is a mismatch", () => {
+        expect(checkAuthorizationResponseIssuer({ expectedIssuer: EXPECTED, iss: `${EXPECTED}/`, issParameterSupported: true })).toStrictEqual({
+            code: OAUTH_ISSUER_MISMATCH,
+            ok: false,
+        });
+    });
+
+    it("refuses a missing iss when the metadata advertises support", () => {
+        expect(checkAuthorizationResponseIssuer({ expectedIssuer: EXPECTED, iss: undefined, issParameterSupported: true })).toStrictEqual({
+            code: OAUTH_ISSUER_MISSING,
+            ok: false,
+        });
+    });
+
+    it("accepts a missing iss when the metadata does not advertise support", () => {
+        expect(checkAuthorizationResponseIssuer({ expectedIssuer: EXPECTED, iss: undefined, issParameterSupported: false })).toStrictEqual({ ok: true });
+    });
+
+    it("reads the support flag from the metadata, and leaves it unset when the metadata omits it", async () => {
+        const withFlag = fakeFetch({
+            "GET https://auth.example.com/.well-known/oauth-authorization-server": json({
+                authorization_endpoint: "https://auth.example.com/authorize",
+                authorization_response_iss_parameter_supported: true,
+                issuer: "https://auth.example.com",
+                token_endpoint: "https://auth.example.com/token",
+            }),
+            "GET https://mcp.example.com/.well-known/oauth-protected-resource/mcp": json({ authorization_servers: ["https://auth.example.com"] }),
+        });
+        const withoutFlag = fakeFetch({
+            "GET https://auth.example.com/.well-known/oauth-authorization-server": json({
+                authorization_endpoint: "https://auth.example.com/authorize",
+                issuer: "https://auth.example.com",
+                token_endpoint: "https://auth.example.com/token",
+            }),
+            "GET https://mcp.example.com/.well-known/oauth-protected-resource/mcp": json({ authorization_servers: ["https://auth.example.com"] }),
+        });
+
+        await expect(discoverOAuth("https://mcp.example.com/mcp", withFlag)).resolves.toMatchObject({
+            authorizationServer: { authorizationResponseIssParameterSupported: true, issuer: "https://auth.example.com" },
+        });
+        const discovery = await discoverOAuth("https://mcp.example.com/mcp", withoutFlag);
+
+        expect(discovery.authorizationServer.authorizationResponseIssParameterSupported).toBeUndefined();
     });
 });
