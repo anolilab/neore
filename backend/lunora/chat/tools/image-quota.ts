@@ -1,0 +1,87 @@
+/**
+ * The daily image bucket every image call from a chat tool draws on: generation (`image-generation.ts`), editing
+ * (`image-editing.ts`) and the canvas tool's edits and element generation (`canvas-ai.ts`).
+ *
+ * It is the bucket `/chat/media` charges (`chargeDailyLimit`, kind "Image"), so a tool call and a media request count
+ * against one allowance, with the same tiers (`DAILY_LIMIT_KEYS` in `chat/lib/daily-limit.ts`). The tier comes from the
+ * user's row and the run's plan, read here on the server; a tool context carries no tier of its own.
+ *
+ * Taken before the provider call. A spent allowance is refused with `DAILY_IMAGE_LIMIT_REACHED`, and a failed check with
+ * `IMAGE_QUOTA_UNAVAILABLE` (fail closed). A unit is not given back when the provider later fails, as with `/chat/media`.
+ */
+import { internal } from "../../_generated/internal";
+import type { ToolCtx as ToolContext } from "../../agent/client";
+import { RATE_LIMIT_CONFIGS } from "../../lib/rate-limiter";
+import { toolsLogger } from "../../lib/logger";
+import { callOnShard } from "../../lib/cross-shard";
+import { chargeDailyLimit, dailyLimitKeyOf, dailyLimitTierOf, isPlatformAdmin, onUserShard, refundDailyLimit } from "../lib/daily-limit";
+
+/** The run's plan for `organizationId`, read on the user's own shard when the code runs on another (see `takeImageQuota`). */
+const runPlanQuery = async (context: Pick<ToolContext, "runQuery">, userId: string, organizationId: string | null) =>
+    onUserShard(userId)
+        ? await context.runQuery(internal.auth.billing.getRunPlanForOrganizationQuery, { organizationId, userId })
+        : await callOnShard(internal.auth.billing.getRunPlanForOrganizationQuery, { organizationId, userId }, { shardKey: userId });
+
+export const DAILY_IMAGE_LIMIT_REACHED = "DAILY_IMAGE_LIMIT_REACHED";
+export const IMAGE_QUOTA_UNAVAILABLE = "IMAGE_QUOTA_UNAVAILABLE";
+
+export type ImageQuotaCode = typeof DAILY_IMAGE_LIMIT_REACHED | typeof IMAGE_QUOTA_UNAVAILABLE;
+
+/**
+ * On success, `refund` gives the taken unit back, for an edit that then cannot run (no preview left once the write answers).
+ * It is for a charge of one unit, which is all a single edit takes.
+ */
+export type ImageQuotaResult = { ok: true; refund: () => Promise<void> } | { code: ImageQuotaCode; message: string; ok: false; retryAfter?: number };
+
+const limitReached = (retryAfter?: number): ImageQuotaResult => {
+    return {
+        code: DAILY_IMAGE_LIMIT_REACHED,
+        message: `${DAILY_IMAGE_LIMIT_REACHED}: the daily image limit is reached. Generated and edited images share it; try again after it resets.`,
+        ok: false,
+        retryAfter,
+    };
+};
+
+/**
+ * Charges `count` images to `userId`'s daily image allowance. Call it after the request is validated and before the provider
+ * call, so a refused request costs nothing.
+ */
+export const takeImageQuota = async (context: ToolContext, userId: string, count: number): Promise<ImageQuotaResult> => {
+    try {
+        // The plan `/chat/media` charges on comes from its session's active organization, and a paid organization counts for its
+        // members. The run's organization is that same organization (the chat was started in it), so the run's plan answers it.
+        // A run that never set one has no session organization, and gets the user's own plan, as a sessionless media request does.
+        // The user's row and memberships live on the user's own shard, so these reads go there too (a shared thread runs on its owner's).
+        const flags = onUserShard(userId)
+            ? await context.runQuery(internal.auth.functions.getUserAuthFlagsQuery, { userId })
+            : await callOnShard(internal.auth.functions.getUserAuthFlagsQuery, { userId }, { shardKey: userId });
+        const runPlan = context.organizationId === undefined ? undefined : await runPlanQuery(context, userId, context.organizationId);
+        const user = { _id: userId, isAnonymous: flags.isAnonymous, plan: runPlan ? runPlan.plan : flags.plan, role: flags.role };
+
+        // A request bigger than the whole bucket can never fit, and the limiter throws on it instead of refusing it, so it is
+        // refused here, uncharged, rather than reported as a failed check.
+        const key = isPlatformAdmin(user) ? undefined : dailyLimitKeyOf("Image", dailyLimitTierOf(user));
+
+        if (key !== undefined && count > RATE_LIMIT_CONFIGS[key].rate) {
+            return limitReached();
+        }
+
+        const charge = await chargeDailyLimit(context, user, "Image", count);
+
+        if (charge.ok) {
+            const { windowStart } = charge;
+
+            return { ok: true, refund: async () => await refundDailyLimit(context, user, "Image", { windowStart }) };
+        }
+
+        return limitReached(charge.retryAfter);
+    } catch (error) {
+        toolsLogger.error("[IMAGE_QUOTA] Could not check the daily image limit:", error);
+
+        return {
+            code: IMAGE_QUOTA_UNAVAILABLE,
+            message: `${IMAGE_QUOTA_UNAVAILABLE}: the daily image limit could not be checked, so no image was made. Try again shortly.`,
+            ok: false,
+        };
+    }
+};

@@ -5,6 +5,12 @@ const SIGN_IN_URL_RE = /\/auth\/sign-in/;
 
 test.describe("Account deletion", () => {
     test("deleting the account signs the user out and removes their rows", async ({ user, userPage: page }) => {
+        // Before the identity rows go, the deletion workflow sleeps 2 minutes (`erase-pins-grace`), plus
+        // a minute per round of `pin-writes-wait-*` or `usage-exports-live-*` while a pin write or a usage
+        // export is in flight (this user has neither). The budget below covers the sign-out wait (60 s),
+        // the identity poll (300 s) and the shard poll (120 s); revisit all three if those waits change.
+        test.setTimeout(540_000);
+
         const [row] = await queryBackend<{ id: string }>('SELECT id FROM "user" WHERE email = ?', user.email);
 
         expect(row?.id, "the seeded user exists before deletion").toBeTruthy();
@@ -43,7 +49,7 @@ test.describe("Account deletion", () => {
 
                     return users.length + sessions.length + accounts.length;
                 },
-                { intervals: [1000, 2000, 5000], timeout: 120_000 },
+                { intervals: [1000, 2000, 5000], timeout: 300_000 },
             )
             .toBe(0);
 
