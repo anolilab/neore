@@ -482,6 +482,11 @@ const embeddingIndexes = EMBEDDING_DIMENSIONS.map((dimensions) => ({
 // every filtered query matches nothing.
 const EMBEDDING_METADATA_PROPERTIES = ["model_table_threadId", "model_table_userId"] as const;
 
+// Thread title and summary vectors (bge-m3, 1024 wide only) also carry whether their thread is archived
+// (`agent/thread-vector-archived.ts`), so a meaning search can filter archived threads before its top-K cut.
+// The housekeeping sweep rewrites older vectors once, after this index exists.
+const THREAD_VECTOR_METADATA = { dimensions: 1024, indexType: "boolean", propertyName: "archived" } as const;
+
 /**
  * The backend's jobs queue and its DLQ (`backend/lunora/queues.ts`).
  *
@@ -916,6 +921,14 @@ export default Alchemy.Stack(
                     indexName: vectorIndex.indexName,
                     indexType: "string",
                     propertyName,
+                });
+            }
+
+            if (dimensions === THREAD_VECTOR_METADATA.dimensions) {
+                yield* Cloudflare.Vectorize.MetadataIndex(`neore-embeddings-${dimensions}-${THREAD_VECTOR_METADATA.propertyName}`, {
+                    indexName: vectorIndex.indexName,
+                    indexType: THREAD_VECTOR_METADATA.indexType,
+                    propertyName: THREAD_VECTOR_METADATA.propertyName,
                 });
             }
         }

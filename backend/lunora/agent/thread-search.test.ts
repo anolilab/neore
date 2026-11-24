@@ -15,6 +15,7 @@ import { runThreadSearchSync, searchThreadsByMeaningFor, visibleThreadsForSearch
 
 const mocks = vi.hoisted(() => {
     return {
+        callOnShard: vi.fn(async (_ref: unknown, _args: unknown, _options?: { shardKey?: string }) => null),
         embeddingModelAllowed: vi.fn(() => true),
         embedMany: vi.fn(async (_ctx: unknown, { values }: { values: string[] }) => {
             return { embeddings: values.map(() => Array.from({ length: 1024 }, (_unused, index) => (index === 0 ? 1 : 0))) };
@@ -38,6 +39,9 @@ vi.mock("../chat/lib/model-filter-rules", () => {
     return {
         loadModelFilterRules: mocks.loadModelFilterRules,
     };
+});
+vi.mock("../lib/cross-shard", () => {
+    return { callOnShard: mocks.callOnShard };
 });
 vi.mock("../lib/services", () => {
     return { gatewayFetch: () => async () => new Response(null) };
@@ -90,6 +94,7 @@ const makeCtx = (fixture: Fixture) => {
 
 const readyThread = (overrides: Record<string, unknown> = {}) => {
     return {
+        archived: false,
         eligible: true,
         enoughTurns: true,
         summary: { text: null, vectorId: null },
@@ -112,6 +117,17 @@ describe(runThreadSearchSync, () => {
 
         expect(mocks.embedMany).toHaveBeenCalledOnce();
         expect(mocks.embedMany.mock.calls[0]?.[1]).toMatchObject({ userId: "user-1", values: ["PDF totals off by one"] });
+    });
+
+    it("writes the thread's archived flag on the vector it inserts", async () => {
+        const ctx = makeCtx({ readThreadSearchState: readyThread({ archived: true }) }) as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
+        await runThreadSearchSync(ctx as never, { changed: ["title"], threadId: THREAD });
+
+        expect(ctx.runMutation).toHaveBeenCalledWith(internal.agent.vector.insertBatch, {
+            vectorDimension: 1024,
+            vectors: [expect.objectContaining({ archived: true, table: "threadTitle", userId: "user-1" })],
+        });
     });
 
     it("embeds nothing for a locked thread, and clears the vectors it still holds", async () => {
@@ -282,6 +298,45 @@ describe(runThreadSearchSync, () => {
 });
 
 describe(searchThreadsByMeaningFor, () => {
+    it("starts the shard's archived-flag backfill, at most once per interval", async () => {
+        mocks.searchVectors.mockResolvedValue([]);
+        const ctx = makeCtx({});
+
+        await searchThreadsByMeaningFor(ctx, { query: "the invoice bug", userId: "user-returning" });
+        await searchThreadsByMeaningFor(ctx, { query: "the invoice bug", userId: "user-returning" });
+
+        // Outside any shard the sweep is sent to the user's (`thread-vector-archived.test.ts` runs it there).
+        expect(
+            mocks.callOnShard.mock.calls.filter(([reference]) => reference === internal.agent.thread_vector_archived.sweepThreadVectorArchived),
+        ).toStrictEqual([[internal.agent.thread_vector_archived.sweepThreadVectorArchived, {}, { shardKey: "user-returning" }]]);
+    });
+
+    it("embeds and searches while the backfill start is still on its way", async () => {
+        let finishBackfill: () => void = () => {};
+
+        mocks.callOnShard.mockImplementationOnce(
+            async () =>
+                await new Promise<null>((resolve) => {
+                    finishBackfill = () => resolve(null);
+                }),
+        );
+        mocks.searchVectors.mockResolvedValue([]);
+
+        let settled = false;
+        const search = searchThreadsByMeaningFor(makeCtx({}), { query: "the invoice bug", userId: "user-slow-backfill" }).then((result) => {
+            settled = true;
+
+            return result;
+        });
+
+        await vi.waitFor(() => expect(mocks.searchVectors).toHaveBeenCalledTimes(2));
+        expect(mocks.embedMany).toHaveBeenCalledOnce();
+        expect(settled).toBe(false);
+
+        finishBackfill();
+        expect(await search).toStrictEqual([]);
+    });
+
     it("finds 'PDF totals off by one' for 'the invoice bug' through its title vector", async () => {
         mocks.searchVectors.mockImplementation(async (_ctx, _vector, args) => (args.table === "threadTitle" ? [{ _id: "vec-title", _score: 0.82 }] : []));
         const ctx = makeCtx({

@@ -88,10 +88,13 @@
   threshold is `PROMPT_CACHE_COLD_START_TOKENS` (`@neore/ai/models`), shared with the gateway's
   downgrade policy.
 
-- **Typed words column** (`messages.typedText`) — `text` stays the message as it was sent; `typedText` holds only what the
-  person typed (`typedTextColumn` over `typedTextOf`: no attachment, quote, guest note or placeholder) and is what the
-  composer's prompt search indexes (`typed_text_search`). Every writer of a user row's `text` sets it beside it:
-  `addMessagesHandler`, `updateMessage`, and `insertMessageRow`/`patchMessage` (`table-writes.ts`) for the others (the
-  reply rewrite in `branches.ts` edits assistant rows only). A new writer goes through one of them, or the index and
-  `text` disagree. It is server-only: not in `vMessageDocFields`, stripped by `publicMessage` from every
-  message read; the search reads it as `vTypedPromptRow` (`typedTextSearch`, `typedPromptRow`).
+- **Typed words column** (`messages.typedText`) — `text` stays as sent; `typedText` is only what the person typed
+  (`typedTextColumn`), indexed by `typed_text_search`. Every writer of a user row's `text` sets it beside it
+  (`addMessagesHandler`, `updateMessage`, `table-writes.ts`); server-only, stripped by `publicMessage`. Detail:
+  `docs/agents/backend-lunora.md#agent-columns`.
+- **Archived flag on thread vectors** (`agent/thread-vector-archived.ts`) — title/summary vectors carry `archived`,
+  Vectorize metadata on `embeddings-1024` only (metadata index in `alchemy.run.ts`), so a meaning search can filter
+  archived threads before its top-K cut. A row column patched after commit: set at insert, corrected in
+  `commitThreadSearch`, moved by the threads update trigger on any change into or out of `archived` (a failed schedule
+  fails the write), backfilled once per shard by the housekeeping sweep and by a meaning search. Writers patch only the
+  thread's own vectors of the same owner and skip a thread gone or being deleted. Claim, caveats: same doc section.

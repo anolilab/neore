@@ -1003,6 +1003,7 @@ export const schema = defineSchema({
         }),
 
     embeddings_128: defineTable({
+        archived: v.optional(v.boolean()),
         model: v.string(),
         model_table_threadId: v.optional(v.string()),
         model_table_userId: v.optional(v.string()),
@@ -1025,6 +1026,7 @@ export const schema = defineSchema({
         }),
 
     embeddings_256: defineTable({
+        archived: v.optional(v.boolean()),
         model: v.string(),
         model_table_threadId: v.optional(v.string()),
         model_table_userId: v.optional(v.string()),
@@ -1047,6 +1049,7 @@ export const schema = defineSchema({
         }),
 
     embeddings_512: defineTable({
+        archived: v.optional(v.boolean()),
         model: v.string(),
         model_table_threadId: v.optional(v.string()),
         model_table_userId: v.optional(v.string()),
@@ -1069,6 +1072,7 @@ export const schema = defineSchema({
         }),
 
     embeddings_768: defineTable({
+        archived: v.optional(v.boolean()),
         model: v.string(),
         model_table_threadId: v.optional(v.string()),
         model_table_userId: v.optional(v.string()),
@@ -1091,6 +1095,8 @@ export const schema = defineSchema({
         }),
 
     embeddings_1024: defineTable({
+        // Thread title/summary vectors only (`agent/thread-search.ts`): whether the thread is archived, for a filter on it.
+        archived: v.optional(v.boolean()),
         model: v.string(),
         model_table_threadId: v.optional(v.string()),
         model_table_userId: v.optional(v.string()),
@@ -1108,11 +1114,13 @@ export const schema = defineSchema({
             dimensions: 1024,
             embed,
             index: "embeddings-1024",
-            metadata: ["model_table_userId", "model_table_threadId"],
+            // `archived` only here: thread vectors live in this table alone (bge-m3, `agent/thread-search-plan.ts`).
+            metadata: ["model_table_userId", "model_table_threadId", "archived"],
             metric: "cosine",
         }),
 
     embeddings_1408: defineTable({
+        archived: v.optional(v.boolean()),
         model: v.string(),
         model_table_threadId: v.optional(v.string()),
         model_table_userId: v.optional(v.string()),
@@ -1135,6 +1143,7 @@ export const schema = defineSchema({
         }),
 
     embeddings_1536: defineTable({
+        archived: v.optional(v.boolean()),
         model: v.string(),
         model_table_threadId: v.optional(v.string()),
         model_table_userId: v.optional(v.string()),
