@@ -2,14 +2,18 @@
 
 /**
  * The provider tells the page when a turn of its thread ended (`turn-ended.ts`), from its own stream state: a control whose
- * read of the thread has not answered still hears it. Opening a thread, or one that never streamed, tells nothing.
+ * read of the thread has not answered still hears it. Opening a thread, or one that never streamed, tells nothing, and nor
+ * does a send or regeneration the gateway refuses before any stream started: only its optimistic "thinking" state came and went.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, render, waitFor } from "@testing-library/react";
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+import { useEffect } from "react";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { subscribeTurnEnded } from "../utils/turn-ended";
-import { ChatProvider } from "./chat-context";
+import { ChatProvider, useChatActions, useChatIsStreaming } from "./chat-context";
 
 const { hydrated } = vi.hoisted(() => {
     return { hydrated: { messages: [] as { id: string; parts: unknown[]; role: string; status: string; text: string }[] } };
@@ -107,17 +111,54 @@ const reply = (status: string) => {
     return { id: "m2", parts: [], role: "assistant", status, text: "hello" };
 };
 
+const actions: {
+    reload?: (messageId: string) => Promise<unknown>;
+    send?: (text: string) => Promise<unknown>;
+    streamingSeen: boolean;
+} = { streamingSeen: false };
+
+const Probe = () => {
+    const { reloadMessage, sendMessage } = useChatActions();
+    const { isThreadStreaming } = useChatIsStreaming();
+
+    useEffect(() => {
+        actions.send = sendMessage;
+        actions.reload = reloadMessage;
+    }, [reloadMessage, sendMessage]);
+
+    useEffect(() => {
+        if (isThreadStreaming) {
+            actions.streamingSeen = true;
+        }
+    }, [isThreadStreaming]);
+
+    return <span />;
+};
+
 const view = () => (
     <QueryClientProvider client={new QueryClient()}>
         <ChatProvider initialThread={initialThread} jwtToken="token" threadId="thread-1">
-            <span />
+            <Probe />
         </ChatProvider>
     </QueryClientProvider>
 );
 
+const server = setupServer();
+
+beforeAll(() => {
+    server.listen({ onUnhandledFrame: "error" });
+});
+afterEach(() => {
+    server.resetHandlers();
+});
+afterAll(() => {
+    server.close();
+});
+
 describe("ChatProvider's end of a turn", () => {
     beforeEach(() => {
         hydrated.messages = [];
+        actions.streamingSeen = false;
     });
 
     it("tells the thread's listeners once when its reply stops streaming", () => {
@@ -151,6 +192,57 @@ describe("ChatProvider's end of a turn", () => {
 
         const { rerender } = render(view());
 
+        rerender(view());
+
+        expect(ended).not.toHaveBeenCalled();
+
+        stop();
+    });
+
+    it("tells nothing when a send or a regeneration fails before any stream started", async () => {
+        // Each refusal is held until the test lets it go, so the optimistic thinking state renders in between.
+        const held: (() => void)[] = [];
+
+        server.use(
+            http.post(
+                "https://gateway.test/v1/chat",
+                () =>
+                    new Promise<Response>((resolve) => {
+                        held.push(() => resolve(HttpResponse.json({ error: "unavailable", message: "Down." }, { status: 503 })));
+                    }),
+            ),
+        );
+
+        const ended = vi.fn();
+        const stop = subscribeTurnEnded("thread-1", ended);
+
+        hydrated.messages = [prompt, reply("success")];
+
+        const { rerender } = render(view());
+
+        const refuse = async (start: () => Promise<unknown> | undefined): Promise<void> => {
+            let done: Promise<unknown> | undefined;
+
+            actions.streamingSeen = false;
+
+            act(() => {
+                done = start();
+            });
+
+            // The thinking state showed: the refusal below really comes before any stream.
+            await waitFor(() => {
+                expect(held).toHaveLength(1);
+                expect(actions.streamingSeen).toBe(true);
+            });
+
+            await act(async () => {
+                held.shift()?.();
+                await done;
+            });
+        };
+
+        await refuse(() => actions.send?.("again please"));
+        await refuse(() => actions.reload?.("m2"));
         rerender(view());
 
         expect(ended).not.toHaveBeenCalled();

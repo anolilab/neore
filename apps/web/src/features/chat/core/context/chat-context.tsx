@@ -667,18 +667,22 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
         (streamingMessageId !== null || Boolean(activeStreamId) || isRegenerating || (isLocalStreaming && localStreamingThreadId === threadId));
 
     // Tells the page when a turn of THIS thread ended (`turn-ended.ts`): a control there whose own read of the thread has not
-    // answered yet still hears a turn that started and ended before it. Only a change within one thread counts.
+    // answered yet still hears a turn that started and ended before it. Only a change within one thread counts, and only an
+    // actual stream: the optimistic `isRegenerating` is left out, so a send or regeneration that fails before the gateway
+    // starts one ends no turn (nothing ran that could have pushed a branch).
+    const isThreadStreamRunning =
+        Boolean(threadId) && (streamingMessageId !== null || Boolean(activeStreamId) || (isLocalStreaming && localStreamingThreadId === threadId));
     const streamedRef = useRef<{ streaming: boolean; threadId: string | undefined }>({ streaming: false, threadId: undefined });
 
     useEffect(() => {
         const previous = streamedRef.current;
 
-        streamedRef.current = { streaming: isThreadStreaming, threadId };
+        streamedRef.current = { streaming: isThreadStreamRunning, threadId };
 
-        if (threadId && previous.threadId === threadId && previous.streaming && !isThreadStreaming) {
+        if (threadId && previous.threadId === threadId && previous.streaming && !isThreadStreamRunning) {
             markTurnEnded(threadId);
         }
-    }, [isThreadStreaming, threadId]);
+    }, [isThreadStreamRunning, threadId]);
 
     const { mutateAsync: abortStreamMutation } = useMutation(crpc.chat.functions.abortStreamByMessageId.mutationOptions());
     const { mutateAsync: abortThreadStreamMutation } = useMutation(crpc.chat.functions.abortThreadStream.mutationOptions());
