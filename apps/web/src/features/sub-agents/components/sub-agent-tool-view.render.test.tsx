@@ -236,6 +236,9 @@ describe("where a sub-agent's chat opens", () => {
 
         expect(fireEvent.click(link, { shiftKey: true })).toBe(true);
         expect(fireEvent.click(link, { altKey: true })).toBe(true);
+        // The same holds for the middle button with Shift or Alt: the browser opens the new window, not the placement.
+        expect(fireEvent(link, new MouseEvent("auxclick", { altKey: true, bubbles: true, button: 1, cancelable: true }))).toBe(true);
+        expect(fireEvent(link, new MouseEvent("auxclick", { bubbles: true, button: 1, cancelable: true, shiftKey: true }))).toBe(true);
 
         expect(harness.navigate).not.toHaveBeenCalled();
         expect(harness.openBeside).not.toHaveBeenCalled();

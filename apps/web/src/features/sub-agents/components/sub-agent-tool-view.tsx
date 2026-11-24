@@ -134,7 +134,8 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
                 <Link
                     className="text-primary-text mt-2 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
                     onAuxClick={(event) => {
-                        if (event.button !== 1) {
+                        // Only the middle button places the chat; with Shift or Alt held the browser keeps its own action.
+                        if (event.button !== 1 || event.shiftKey || event.altKey) {
                             return;
                         }
 
