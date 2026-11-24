@@ -12,6 +12,7 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import { pollEvents as pollLog } from "./events-poll";
 import type { EventLogStore } from "./events-poll";
 import { RETENTION_MS } from "./events-log";
+import { setRetentionDue } from "../lib/shard-housekeeping";
 
 /** Rows the sweep deletes per call. The sweep runs again while it reports more. */
 const PRUNE_BATCH = 200;
@@ -108,5 +109,14 @@ export const pruneMcpEvents = internalMutation.output(v.object({ hasMore: v.bool
         await ctx.db.delete("mcpEvents", row._id);
     }
 
-    return { hasMore: page.length === PRUNE_BATCH, removed: page.length };
+    const hasMore = page.length === PRUNE_BATCH;
+    // The shard's next retention time for this log: now while a full batch was deleted, else the expiry of the oldest event left
+    // (none when the log is empty). Without it a shard with no other retained rows would never be woken to expire these.
+    const { page: oldest } = await ctx.db.mcpEvents.findMany({ limit: 1, orderBy: [{ createdAt: "asc" }] });
+
+    const next = oldest[0] === undefined ? undefined : oldest[0].createdAt + RETENTION_MS;
+
+    await setRetentionDue(ctx, hasMore ? ctx.now : next);
+
+    return { hasMore, removed: page.length };
 });

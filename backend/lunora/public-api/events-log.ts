@@ -7,6 +7,7 @@
  * redelivered job cannot double a run's event.
  */
 import type { MutationCtx } from "../_generated/server";
+import { noteRetentionWake } from "../lib/shard-housekeeping";
 
 /** How long a poll can look back: a cursor older than this reads as truncated. */
 export const RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -49,6 +50,8 @@ export const recordMcpEvent = async (ctx: Pick<MutationCtx, "db" | "now">, input
         userId: input.userId,
     });
     await setWatermark(ctx, input.userId, watermark?._id, seq);
+    // The event expires a window from now: the shard is woken then, so the sweep finds it even with no other retained rows.
+    await noteRetentionWake(ctx, ctx.now + RETENTION_MS);
 
     return true;
 };
@@ -100,6 +103,8 @@ export const copyMergedMcpEvents = async (ctx: Pick<MutationCtx, "db" | "now">, 
 
     if (appended > 0) {
         await setWatermark(ctx, to, watermark?._id, seq);
+        // The copied rows expire a window from the copy, as a recorded event does (see `recordMcpEvent`).
+        await noteRetentionWake(ctx, ctx.now + RETENTION_MS);
     }
 
     return appended;
