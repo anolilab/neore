@@ -11,6 +11,8 @@ const state = vi.hoisted(() => {
         document: null as Document | null,
         editedFrom: "",
         log: [] as string[],
+        /** When set, the message write throws, as it does for a document deleted after the charge. */
+        writeThrows: false,
         /** What the message write answers with, when a test needs the document to have changed since the read. */
         written: null as Document | null,
     };
@@ -68,6 +70,10 @@ const makeContext = (chargeOk = true) => {
 
             state.log.push(`write:${reference}`);
 
+            if (state.writeThrows) {
+                throw new Error("Document not found");
+            }
+
             return state.written ?? state.document;
         },
         runQuery: async (reference: string) => {
@@ -91,6 +97,7 @@ beforeEach(() => {
     state.editedFrom = "";
     state.log.length = 0;
     state.written = null;
+    state.writeThrows = false;
 });
 
 describe("canvas edits draw on the daily image allowance", () => {
@@ -165,6 +172,15 @@ describe("canvas edits draw on the daily image allowance", () => {
         const output = await tool.execute(makeContext(), { documentId: "doc-1", operation: "upscale" });
 
         expect(output.error).toBe("No image preview");
+        expect(state.log).toStrictEqual(["read:getDocumentInternal", "charge", "write:updateDocumentInternal", "refund"]);
+    });
+
+    it("gives the unit back when the document is deleted before the write, and calls no provider", async () => {
+        state.writeThrows = true;
+
+        const output = await tool.execute(makeContext(), { documentId: "doc-1", operation: "upscale" });
+
+        expect(output.error).toBe("Document not found");
         expect(state.log).toStrictEqual(["read:getDocumentInternal", "charge", "write:updateDocumentInternal", "refund"]);
     });
 });

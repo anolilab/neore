@@ -13,7 +13,14 @@ import { internal } from "../../_generated/internal";
 import type { ToolCtx as ToolContext } from "../../agent/client";
 import { RATE_LIMIT_CONFIGS } from "../../lib/rate-limiter";
 import { toolsLogger } from "../../lib/logger";
-import { chargeDailyLimit, dailyLimitKeyOf, dailyLimitTierOf, isPlatformAdmin, refundDailyLimit } from "../lib/daily-limit";
+import { callOnShard } from "../../lib/cross-shard";
+import { chargeDailyLimit, dailyLimitKeyOf, dailyLimitTierOf, isPlatformAdmin, onUserShard, refundDailyLimit } from "../lib/daily-limit";
+
+/** The run's plan for `organizationId`, read on the user's own shard when the code runs on another (see `takeImageQuota`). */
+const runPlanQuery = async (context: Pick<ToolContext, "runQuery">, userId: string, organizationId: string | null) =>
+    onUserShard(userId)
+        ? await context.runQuery(internal.auth.billing.getRunPlanForOrganizationQuery, { organizationId, userId })
+        : await callOnShard(internal.auth.billing.getRunPlanForOrganizationQuery, { organizationId, userId }, { shardKey: userId });
 
 export const DAILY_IMAGE_LIMIT_REACHED = "DAILY_IMAGE_LIMIT_REACHED";
 export const IMAGE_QUOTA_UNAVAILABLE = "IMAGE_QUOTA_UNAVAILABLE";
@@ -44,11 +51,11 @@ export const takeImageQuota = async (context: ToolContext, userId: string, count
         // The plan `/chat/media` charges on comes from its session's active organization, and a paid organization counts for its
         // members. The run's organization is that same organization (the chat was started in it), so the run's plan answers it.
         // A run that never set one has no session organization, and gets the user's own plan, as a sessionless media request does.
-        const flags = await context.runQuery(internal.auth.functions.getUserAuthFlagsQuery, { userId });
-        const runPlan =
-            context.organizationId === undefined
-                ? undefined
-                : await context.runQuery(internal.auth.billing.getRunPlanForOrganizationQuery, { organizationId: context.organizationId, userId });
+        // The user's row and memberships live on the user's own shard, so these reads go there too (a shared thread runs on its owner's).
+        const flags = onUserShard(userId)
+            ? await context.runQuery(internal.auth.functions.getUserAuthFlagsQuery, { userId })
+            : await callOnShard(internal.auth.functions.getUserAuthFlagsQuery, { userId }, { shardKey: userId });
+        const runPlan = context.organizationId === undefined ? undefined : await runPlanQuery(context, userId, context.organizationId);
         const user = { _id: userId, isAnonymous: flags.isAnonymous, plan: runPlan ? runPlan.plan : flags.plan, role: flags.role };
 
         // A request bigger than the whole bucket can never fit, and the limiter throws on it instead of refusing it, so it is
