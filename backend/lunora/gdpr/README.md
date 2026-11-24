@@ -377,7 +377,9 @@ its step, so the retry removes what is left. `subAgentRuns` is read with
 all gone: until then the organization view still reads the member, sees the
 erasure underway and withholds their cohort's weeks. Once the entry is gone the
 cohort shows with the members it has (an accepted departure, owner's decision
-of 2026-11-23); a cohort left with one member is withheld.
+of 2026-11-23); a cohort left with fewer than three members is withheld
+(`MIN_MEMBERS_SHORT_COHORT`: with two, a member reading the view subtracts
+their own spend and sees the other's).
 
 `usageDaily` is exported in durable steps (`gdpr/usage-export-steps.ts`): a page
 of 900 rows (`USAGE_EXPORT_PAGE`, below a mutation's write limit), then a recount of the closed days (two days before the user's latest
