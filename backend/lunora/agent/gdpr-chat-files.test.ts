@@ -288,6 +288,18 @@ describe("chat files in the GDPR export", () => {
         expect(after.files.find((file) => file.id === fileId)?.createdAt).toBe(storedAt);
     });
 
+    it("lists a file once when two stores of the same bytes each wrote its metadata", async () => {
+        const fileId = await store(A, "twice.png", "hash-twice");
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("chatFileMetadata", { createdAt: 1, fileId, filename: "twice.png", hash: "hash-twice", mediaType: "image/png" });
+        });
+
+        const { files } = await exportedFor(A);
+
+        expect(files.filter((file) => file.id === fileId)).toHaveLength(1);
+    });
+
     it("reads the metadata, not the file row, so a large extracted text is not read", async () => {
         const fileId = await store(A, "documented.png", "hash-documented");
 

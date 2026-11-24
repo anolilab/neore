@@ -218,8 +218,19 @@ export const chatFileMetadataForExport = internalQuery
 
         // Primary, as the grants are: a file uploaded moments before the export must be in it.
         const { page } = await ctx.db.chatFileMetadata.findMany({ consistency: "primary", where: { fileId: { in: fileIds } } });
-        const rowsOf = storedRows(page);
-        const readBytes = rowsOf.reduce((total, row) => total + rowBytes(row), 0);
+        const readRows = storedRows(page);
+        const readBytes = readRows.reduce((total, row) => total + rowBytes(row), 0);
+        // Two stores of the same bytes at once can each write a metadata row, so a file may have two: the export lists it once.
+        const seen = new Set<string>();
+        const rowsOf = readRows.filter((row) => {
+            if (seen.has(row.fileId)) {
+                return false;
+            }
+
+            seen.add(row.fileId);
+
+            return true;
+        });
 
         return {
             readBytes,
