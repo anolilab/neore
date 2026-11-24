@@ -3,8 +3,7 @@ import type { ReactNode } from "react";
 import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { FOCUS_FRAMES, focusComposerWhenMounted, useComposerFocusRequest } from "./focus-composer";
-import { requestComposerFocus, useSplitLayoutStore } from "./split-layout-store";
+import { FOCUS_FRAMES, focusComposerWhenMounted, requestComposerFocus, useComposerFocusRequest, useComposerFocusRequestStore } from "./focus-composer";
 
 // Every element that takes focus, in order: asserted instead of reading `document.activeElement` directly.
 const focusLog: EventTarget[] = [];
@@ -48,7 +47,7 @@ const composer = () => createElement("textarea", { "data-focus-area": "composer"
 beforeEach(() => {
     focusLog.length = 0;
     document.addEventListener("focusin", recordFocus);
-    useSplitLayoutStore.setState({ composerFocusThreadId: undefined });
+    useComposerFocusRequestStore.setState({ threadId: undefined });
     frameQueue.callbacks = [];
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
         frameQueue.callbacks.push(callback);
@@ -122,7 +121,7 @@ describe("useComposerFocusRequest", () => {
         renderHook(() => useComposerFocusRequest(pane, "chat-a", true));
 
         expect(focusLog).toEqual([screen.getByRole("textbox")]);
-        expect(useSplitLayoutStore.getState().composerFocusThreadId).toBeUndefined();
+        expect(useComposerFocusRequestStore.getState().threadId).toBeUndefined();
     });
 
     it("waits until the pane is focused before it moves focus", () => {
@@ -134,7 +133,7 @@ describe("useComposerFocusRequest", () => {
         });
 
         expect(focusLog).toEqual([]);
-        expect(useSplitLayoutStore.getState().composerFocusThreadId).toBe("chat-a");
+        expect(useComposerFocusRequestStore.getState().threadId).toBe("chat-a");
 
         rerender({ isFocused: true });
 
@@ -148,7 +147,7 @@ describe("useComposerFocusRequest", () => {
         renderHook(() => useComposerFocusRequest(pane, "chat-a", true));
 
         expect(focusLog).toEqual([]);
-        expect(useSplitLayoutStore.getState().composerFocusThreadId).toBe("chat-b");
+        expect(useComposerFocusRequestStore.getState().threadId).toBe("chat-b");
     });
 
     it("clears the request when the pane is left before its composer mounts", () => {
@@ -159,6 +158,20 @@ describe("useComposerFocusRequest", () => {
 
         unmount();
 
-        expect(useSplitLayoutStore.getState().composerFocusThreadId).toBeUndefined();
+        expect(useComposerFocusRequestStore.getState().threadId).toBeUndefined();
+    });
+});
+
+describe("requestComposerFocus", () => {
+    it("is held in memory: a storage that fails cannot make the request throw", () => {
+        const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+            throw new Error("storage is full");
+        });
+
+        expect(() => requestComposerFocus("chat-a")).not.toThrow();
+        expect(useComposerFocusRequestStore.getState().threadId).toBe("chat-a");
+        expect(setItem).not.toHaveBeenCalled();
+
+        vi.restoreAllMocks();
     });
 });

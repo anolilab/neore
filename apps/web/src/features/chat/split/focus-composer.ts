@@ -1,6 +1,36 @@
 import { useEffect } from "react";
+import { create } from "zustand";
 
-import { clearComposerFocusRequest, useSplitLayoutStore } from "./split-layout-store";
+/**
+ * The pane of a chat that a keyboard activation asked to take focus, once it is shown. Not persisted: it is transient, and a write
+ * to the saved layout that failed could otherwise stop the link's navigation.
+ */
+export const useComposerFocusRequestStore = create<{
+    clear: (threadId: string) => void;
+    request: (threadId: string) => void;
+    threadId?: string;
+}>()((set, get) => {
+    return {
+        clear: (threadId) => {
+            if (get().threadId === threadId) {
+                set({ threadId: undefined });
+            }
+        },
+        request: (threadId) => {
+            set({ threadId });
+        },
+    };
+});
+
+/** Asks the pane of `threadId` to move keyboard focus into its composer. */
+export const requestComposerFocus = (threadId: string): void => {
+    useComposerFocusRequestStore.getState().request(threadId);
+};
+
+/** Clears the request, if it is still for `threadId`: a pane that is done or gone must not clear another pane's request. */
+export const clearComposerFocusRequest = (threadId: string): void => {
+    useComposerFocusRequestStore.getState().clear(threadId);
+};
 
 /** How many frames to wait for the composer's editor (it loads lazily) before giving up on moving focus into it. */
 export const FOCUS_FRAMES = 60;
@@ -46,7 +76,7 @@ export const focusComposerWhenMounted = (pane: { current: HTMLElement | null }, 
  * request is cleared when the composer takes focus or gives up, and when the pane is left meanwhile.
  */
 export const useComposerFocusRequest = (pane: { current: HTMLElement | null }, threadId: string, isFocused: boolean): void => {
-    const isRequested = useSplitLayoutStore((state) => state.composerFocusThreadId === threadId);
+    const isRequested = useComposerFocusRequestStore((state) => state.threadId === threadId);
 
     useEffect(() => {
         if (!(isFocused && isRequested)) {

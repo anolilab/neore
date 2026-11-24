@@ -10,8 +10,6 @@ import type { SplitAction, SplitLayout } from "./split-layout";
 import { initialSplitLayout, parseSplitLayout, splitLayoutReducer } from "./split-layout";
 
 type SplitLayoutState = {
-    /** The pane asked to move keyboard focus into its composer, once it is shown: set by a keyboard activation, cleared by the pane. */
-    composerFocusThreadId?: string;
     dispatch: (action: SplitAction) => void;
     layout: SplitLayout;
     /** Each pane's header title, reported by the pane once its chat has loaded. Not saved: a reload reads them again. */
@@ -172,18 +170,6 @@ export const survivingPaneAfterDelete = async (
 
 /** Whether the address names one of these chats: a delete that has moved the route on must not move it again. */
 export const routeIsOn = (threadIds: ReadonlyArray<string>): boolean => globalThis.location.pathname.split("/").some((part) => threadIds.includes(part));
-
-/** Asks the pane of `threadId` to move keyboard focus into its composer. */
-export const requestComposerFocus = (threadId: string): void => {
-    useSplitLayoutStore.setState({ composerFocusThreadId: threadId });
-};
-
-/** Clears the request, if it is still for `threadId`: a pane that is done or gone must not clear another pane's request. */
-export const clearComposerFocusRequest = (threadId: string): void => {
-    if (useSplitLayoutStore.getState().composerFocusThreadId === threadId) {
-        useSplitLayoutStore.setState({ composerFocusThreadId: undefined });
-    }
-};
 
 /** What opening a chat as a pane did: it was already open, it opened, or every pane is taken. */
 type PaneOpenResult = "focused" | "full" | "opened";

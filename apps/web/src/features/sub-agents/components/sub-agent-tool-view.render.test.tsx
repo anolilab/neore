@@ -70,10 +70,15 @@ vi.mock("@/features/chat/split/desktop-layout", () => {
     return { useIsDesktop: () => harness.isDesktop };
 });
 
+vi.mock("@/features/chat/split/focus-composer", () => {
+    return {
+        requestComposerFocus: (threadId: string) => harness.requestComposerFocus(threadId),
+    };
+});
+
 vi.mock("@/features/chat/split/split-layout-store", () => {
     return {
         openThreadBesideFocusedPane: (threadId: string, originThreadId?: string) => harness.openBeside(threadId, originThreadId),
-        requestComposerFocus: (threadId: string) => harness.requestComposerFocus(threadId),
         showThreadInSplitView: (threadId: string) => harness.showInSplitView(threadId),
     };
 });

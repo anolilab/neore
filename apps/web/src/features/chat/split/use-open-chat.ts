@@ -8,7 +8,8 @@ import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import type { ChatClick } from "./chat-open-place";
 import { chatOpenPlaceFor, readChatOpenPlace } from "./chat-open-place";
 import { useIsDesktop } from "./desktop-layout";
-import { openThreadBesideFocusedPane, requestComposerFocus, showThreadInSplitView } from "./split-layout-store";
+import { requestComposerFocus } from "./focus-composer";
+import { openThreadBesideFocusedPane, showThreadInSplitView } from "./split-layout-store";
 
 /** Whether the split view is on now. Read when it is needed: it can be turned off while a saved layout is being read. */
 const isSplitViewOnNow = (): boolean => useUIStateStore.getState().preferences.splitViewEnabled === true;
