@@ -1,0 +1,159 @@
+// @vitest-environment node
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { catchUpPrompt } from "./catch-up-prompt";
+
+const PULL = { baseBranch: "main", headBranch: "feat/x", host: "git.example", repository: "octo/hello", run: "a1b2c3d4" };
+
+const REF_PREFIX = "refs/neore/pull-42-a1b2c3d4";
+
+/** Git with no global or system config, so the person's hooks, signing and aliases cannot change what these commands do. */
+const GIT_ENV = {
+    ...process.env,
+    GIT_AUTHOR_EMAIL: "test@example.invalid",
+    GIT_AUTHOR_NAME: "Test",
+    GIT_COMMITTER_EMAIL: "test@example.invalid",
+    GIT_COMMITTER_NAME: "Test",
+    GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_CONFIG_NOSYSTEM: "1",
+};
+
+/** The first command between backticks that starts with `prefix`, exactly as the prompt writes it. */
+const commandOf = (prompt: string, prefix: string): string => {
+    const command = prompt.split("`").find((part: string) => part.startsWith(prefix));
+
+    if (command === undefined) {
+        throw new Error(`no command starting with ${prefix}`);
+    }
+
+    return command;
+};
+
+/** Git through the same shell the prompt's commands run in, with each argument passed as is. */
+const git = (cwd: string, ...args: string[]): string =>
+    execFileSync("/bin/sh", ["-c", 'git "$@"', "git", ...args], { cwd, encoding: "utf8", env: GIT_ENV }).trim();
+
+/** Runs one of the prompt's commands as an agent's shell would. */
+const sh = (cwd: string, command: string): { output: string; status: number | null } => {
+    const result = spawnSync("/bin/sh", ["-c", command], { cwd, encoding: "utf8", env: GIT_ENV });
+
+    return { output: result.stdout, status: result.status };
+};
+
+const root = mkdtempSync(join(tmpdir(), "catch-up-fail-closed-"));
+
+/** A checkout of an origin whose `main` is behind `feat/x`, the head of pull request 42 (`refs/pull/42/head`). */
+const cloneOrigin = (name: string): string => {
+    const work = join(root, name);
+
+    git(root, "clone", "--quiet", join(root, "origin.git"), work);
+
+    return work;
+};
+
+beforeAll(() => {
+    const seed = join(root, "seed");
+
+    git(root, "init", "--quiet", "-b", "main", seed);
+    git(seed, "commit", "--quiet", "--allow-empty", "-m", "base");
+    git(seed, "switch", "--quiet", "-c", "feat/x");
+    git(seed, "commit", "--quiet", "--allow-empty", "-m", "change");
+    git(seed, "update-ref", "refs/pull/42/head", "HEAD");
+    git(seed, "switch", "--quiet", "main");
+    git(seed, "commit", "--quiet", "--allow-empty", "-m", "landed on main");
+    git(root, "clone", "--quiet", "--bare", seed, join(root, "origin.git"));
+    git(join(root, "origin.git"), "update-ref", "refs/pull/42/head", git(seed, "rev-parse", "refs/pull/42/head"));
+});
+
+afterAll(() => {
+    rmSync(root, { force: true, recursive: true });
+});
+
+describe("catchUpPrompt's fetch and switch, run against a scratch origin", () => {
+    describe("for a fork", () => {
+        const prompt = catchUpPrompt({ ...PULL, headInBaseRepository: false, number: 42 });
+        const fetch = (): string => commandOf(prompt, "git fetch origin ");
+        const switchTo = (): string => commandOf(prompt, "git switch -c <name> ").replaceAll("<name>", "pr-42-a1b2c3d4");
+
+        it("fails the fetch as a whole when the pull request's head is gone, and then the switch makes nothing and prints no ready", () => {
+            const work = cloneOrigin("fork-missing-head");
+
+            git(join(root, "origin.git"), "update-ref", "-d", "refs/pull/42/head", git(work, "rev-parse", "origin/feat/x"));
+
+            try {
+                expect(sh(work, fetch()).status).not.toBe(0);
+                expect(sh(work, switchTo()).output).toBe("");
+                expect(sh(work, switchTo()).status).not.toBe(0);
+                expect(git(work, "symbolic-ref", "HEAD")).toBe("refs/heads/main");
+                expect(git(work, "for-each-ref", "refs/heads/pr-42-a1b2c3d4")).toBe("");
+            } finally {
+                git(join(root, "origin.git"), "update-ref", "refs/pull/42/head", git(work, "rev-parse", "origin/feat/x"));
+            }
+        });
+
+        it("prints ready only on the new branch at the fetched head", () => {
+            const work = cloneOrigin("fork-ok");
+
+            expect(sh(work, fetch()).status).toBe(0);
+            expect(sh(work, switchTo())).toStrictEqual({ output: "ready\n", status: 0 });
+            expect(git(work, "rev-parse", "HEAD")).toBe(git(work, "rev-parse", `${REF_PREFIX}-head`));
+            // Run again: the branch exists now, so the switch fails and nothing is ready.
+            expect(sh(work, switchTo()).output).toBe("");
+        });
+    });
+
+    describe("for a head in the base repository", () => {
+        const prompt = catchUpPrompt({ ...PULL, headInBaseRepository: true, number: 42 });
+        const fetch = (): string => commandOf(prompt, "git fetch origin ");
+        const switchExisting = (): string => commandOf(prompt, "git switch --no-guess ");
+        const switchNew = (): string => commandOf(prompt, "git switch -c feat/x ");
+        const ready = (): string => commandOf(prompt, "git symbolic-ref ");
+
+        it("fails the fetch when origin no longer has the branch", () => {
+            const work = cloneOrigin("same-missing-branch");
+            const missing = catchUpPrompt({ ...PULL, headBranch: "feat/gone", headInBaseRepository: true, number: 42 });
+
+            expect(sh(work, commandOf(missing, "git fetch origin ")).status).not.toBe(0);
+        });
+
+        it("never fast-forwards the branch already checked out when the switch fails, and prints no ready", () => {
+            const work = cloneOrigin("same-switch-fails");
+            const main = git(work, "rev-parse", "main");
+
+            expect(sh(work, fetch()).status).toBe(0);
+            // Another linked worktree has feat/x checked out, so git refuses the switch; main is an ancestor of the head and
+            // would fast-forward if the merge ran anyway.
+            git(work, "worktree", "add", "--quiet", join(root, "same-other-worktree"), "-b", "feat/x", `${REF_PREFIX}-branch`);
+
+            expect(sh(work, switchExisting()).status).not.toBe(0);
+            expect(git(work, "rev-parse", "main")).toBe(main);
+            expect(sh(work, ready()).output).toBe("");
+        });
+
+        it("prints no ready when the local branch has commits origin does not", () => {
+            const work = cloneOrigin("same-ahead");
+
+            expect(sh(work, fetch()).status).toBe(0);
+            git(work, "branch", "feat/x", `${REF_PREFIX}-branch`);
+            git(work, "switch", "--quiet", "feat/x");
+            git(work, "commit", "--quiet", "--allow-empty", "-m", "local only");
+            git(work, "switch", "--quiet", "main");
+
+            expect(sh(work, switchExisting()).status).toBe(0);
+            expect(sh(work, ready()).output).toBe("");
+        });
+
+        it("prints ready once the new branch is at the pull request's head", () => {
+            const work = cloneOrigin("same-ok");
+
+            expect(sh(work, fetch()).status).toBe(0);
+            expect(sh(work, switchNew()).status).toBe(0);
+            expect(sh(work, ready())).toStrictEqual({ output: "ready\n", status: 0 });
+        });
+    });
+});

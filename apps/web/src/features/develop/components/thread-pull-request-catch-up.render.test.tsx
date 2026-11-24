@@ -165,7 +165,7 @@ describe("ThreadPullRequestCatchUp", () => {
         fireEvent.click(button);
 
         expect(prefill).toHaveBeenCalledTimes(1);
-        expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringContaining("`git switch --no-guess feat/x`"));
+        expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringContaining("`git switch --no-guess feat/x && git merge --ff-only "));
         expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringMatching(REBASE_ON_RUN_BASE));
         expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringContaining("origin HEAD:refs/heads/feat/x`"));
 
