@@ -22,6 +22,7 @@ const harness = vi.hoisted(() => {
         showInfo: vi.fn(),
         upload: vi.fn<(state: { file: File }) => Promise<unknown>>(),
         comparisonLoading: false,
+        focusEditor: vi.fn(),
         pickedMark: "suggestion" as string | undefined,
         threadId: "thread-1" as string | undefined,
     };
@@ -151,7 +152,7 @@ vi.mock("./composer-tiptap/use-composer-autocomplete", () => {
 // The input row stands in with its contract: Ctrl+R reaches the composer through `onPromptSearch`, absent when it is not offered.
 const InputArea = ({ onPromptSearch, ref }: { onPromptSearch?: () => boolean; ref?: Ref<ComposerInputAreaRef> }) => {
     useImperativeHandle(ref, () => {
-        return { blur: () => undefined, focus: () => undefined, getEditor: () => null };
+        return { blur: () => undefined, focus: harness.focusEditor, getEditor: () => null };
     });
 
     return (
@@ -180,13 +181,19 @@ for (const path of [
     });
 }
 
-// The search stands in with its contract: a pick hands back the prompt and its not-typed mark.
+// The search stands in with its contract: a pick hands back the prompt and its not-typed mark; Escape, the close button and
+// the backdrop all call `onClose`.
 vi.doMock("./composer-prompt-search", () => {
     return {
-        default: ({ onPick }: { onPick: (prompt: { draftFrom?: string; text: string }) => void }) => (
-            <button onClick={() => onPick({ draftFrom: harness.pickedMark, text: "deploy a preview" })} type="button">
-                Pick
-            </button>
+        default: ({ onClose, onPick }: { onClose: () => void; onPick: (prompt: { draftFrom?: string; text: string }) => void }) => (
+            <>
+                <button onClick={() => onPick({ draftFrom: harness.pickedMark, text: "deploy a preview" })} type="button">
+                    Pick
+                </button>
+                <button onClick={onClose} type="button">
+                    Close
+                </button>
+            </>
         ),
     };
 });
@@ -253,6 +260,15 @@ describe("ComposerInput prompt search", () => {
 
         expect(useChatUIStore.getState().composerText).toBe("check this\ndeploy a preview");
         expect(useChatUIStore.getState().composerDraftFrom).toBe("suggestion");
+    });
+
+    it("gives focus back to the editor when the search is closed without a pick", () => {
+        renderComposer();
+        openSearch();
+        fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+        expect(screen.queryByRole("button", { name: "Pick" })).toBeNull();
+        expect(harness.focusEditor).toHaveBeenCalledOnce();
     });
 
     it("does not offer the search while a comparison send locks the composer", () => {

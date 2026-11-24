@@ -570,7 +570,12 @@ const ComposerInput = ({
 
         return true;
     }, [threadId]);
-    const closePromptSearch = useCallback(() => setPromptSearchThread(null), []);
+    // Escape, the close button or the backdrop: the search opened from the editor without a trigger, so focus goes back to
+    // the editor, as after a pick. A close forced by a locked composer or another chat does not come through here.
+    const closePromptSearch = useCallback(() => {
+        setPromptSearchThread(null);
+        inputAreaRef.current?.focus();
+    }, []);
 
     // A `/compact` typed in one chat is not carried into the next: submitting it there would compact the chat that is open.
     useEffect(() => {
