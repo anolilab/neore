@@ -182,7 +182,16 @@ export const rememberProjectRunner = async (
     const settings = await ctx.db.userSettings.findFirst({ where: { userId } });
     const current: StoredRunner | undefined = settings?.projectRunnerDefaults?.[project._id];
 
-    if (!runnerReplaces(threadAt, threadId, current)) {
+    // Every session open in the thread records again (a reopen, a switch back): an entry it would leave as it is saves nothing,
+    // as each settings write also writes an audit row.
+    const unchanged =
+        current?.agentKey === runner.agentKey &&
+        current.deviceId === runner.deviceId &&
+        current.folderId === runner.folderId &&
+        current.threadAt === threadAt &&
+        current.threadId === threadId;
+
+    if (unchanged || !runnerReplaces(threadAt, threadId, current)) {
         return;
     }
 

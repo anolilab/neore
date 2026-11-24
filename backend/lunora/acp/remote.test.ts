@@ -1373,6 +1373,48 @@ describe("a project remembers its runner", () => {
         expect((settings?.projectRunnerDefaults as Record<string, unknown> | undefined)?.[projectId]).toBeUndefined();
     });
 
+    it("writes no settings row and no audit row when a reopen records the runner already saved, and writes when it changed", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ organizationId: "org-a", userId: ownerId });
+        const project = (await projectRow(projectId)) as never;
+        const runner = { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" };
+        const remember = async (recorded: typeof runner) =>
+            await run(async (ctx) => await projectRunner.rememberProjectRunner(ctx, project, ownerId, recorded, 3000, "thread-a"));
+        const settingsHistory = async () => {
+            const found = await rows("documentHistory", { tableName: "userSettings", userId: ownerId });
+
+            return found.length;
+        };
+
+        await remember(runner);
+
+        const [saved] = await rows("userSettings", { userId: ownerId });
+        const historyAfterFirst = await settingsHistory();
+
+        expect(historyAfterFirst).toBeGreaterThan(0);
+
+        await remember(runner);
+
+        const [reopened] = await rows("userSettings", { userId: ownerId });
+
+        expect(reopened?.updatedAt).toBe(saved?.updatedAt);
+        expect(reopened?.projectRunnerDefaults).toEqual(saved?.projectRunnerDefaults);
+        expect(await settingsHistory()).toBe(historyAfterFirst);
+
+        await remember({ ...runner, folderId: "f2" });
+
+        const [changed] = await rows("userSettings", { userId: ownerId });
+
+        expect((changed?.projectRunnerDefaults as Record<string, Row>)[projectId]).toMatchObject({ folderId: "f2", threadAt: 3000, threadId: "thread-a" });
+        expect(await settingsHistory()).toBe(historyAfterFirst + 1);
+
+        const history = await rows("documentHistory", { documentId: changed?._id, tableName: "userSettings" });
+        const [latest] = history.toSorted((a, b) => (b.ts as number) - (a.ts as number));
+
+        expect(latest?.doc).not.toHaveProperty("projectRunnerDefaults");
+        expect(latest?.oldDoc).not.toHaveProperty("projectRunnerDefaults");
+    });
+
     it("offers no default once the computer stops offering that agent and folder", async () => {
         const device = await pairedDevice(ownerId);
         const projectId = await insertProject({ userId: ownerId });
