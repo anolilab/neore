@@ -13,8 +13,10 @@ import type { HttpActionCtx } from "lunorash/server";
 
 import { internal } from "../../_generated/internal";
 import type { BetterAuthUser } from "../../auth/lib/types";
+import { callOnShard } from "../../lib/cross-shard";
 import { chatLogger } from "../../lib/logger";
 import { getUserTier, type RateLimitKey } from "../../lib/rate-limiter";
+import { currentShard } from "../../lib/shard-context";
 
 export type DailyLimitKind = "Audio" | "Image" | "Suggestion" | "Text" | "Video";
 
@@ -60,9 +62,51 @@ export const dailyLimitKeyOf = (kind: DailyLimitKind, tier: DailyLimitTier): Rat
 /** `windowStart` is the fixed window the units were taken from; a refund gives them back only while that window is current. */
 export type DailyLimitResult = { ok: true; windowStart?: number } | { ok: false; retryAfter?: number };
 
+type LimitArgs = { count: number; identifier: string; key: string };
+
 /**
- * Charge `count` units of `kind` to `user`'s daily quota. With a `chargeKey` (a keyed send's, `startChargeKey`) the units
- * are taken once per key (`chat/daily-charge.ts#chargeDailyLimitOnce`): a retry of a send already charged is not charged again.
+ * Whether a daily-quota call for `userId` may run where the code is now. A user's quota lives on the user's own shard, not on
+ * the shard the work runs on: a shared thread's work runs on its owner's shard (and so does `/chat/media`), so a charge made
+ * there would draw on a second counter for the same person. Routes that act for a user enter that user's shard
+ * (`lib/http-shard.ts`), so a context on another shard crosses to the user's. No shard context at all stays where it is.
+ */
+export const onUserShard = (userId: string): boolean => {
+    const shard = currentShard();
+
+    return shard === undefined || shard === userId;
+};
+
+const applyOnHomeShard = async (context: Pick<HttpActionCtx, "runMutation">, userId: string, args: LimitArgs) => {
+    if (onUserShard(userId)) {
+        return await context.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, args);
+    }
+
+    return await callOnShard(internal.lib.rate_limiter_mutations.applyRateLimit, args, { shardKey: userId });
+};
+
+const chargeOnceOnHomeShard = async (context: Pick<HttpActionCtx, "runMutation">, userId: string, args: LimitArgs & { chargeKey: string }) => {
+    if (onUserShard(userId)) {
+        return await context.runMutation(internal.chat.daily_charge.chargeDailyLimitOnce, args);
+    }
+
+    return await callOnShard(internal.chat.daily_charge.chargeDailyLimitOnce, args, { shardKey: userId });
+};
+
+const refundOnHomeShard = async (
+    context: Pick<HttpActionCtx, "runMutation">,
+    userId: string,
+    args: { chargeKey?: string; count: number; identifier: string; key: string; windowStart?: number },
+) => {
+    if (onUserShard(userId)) {
+        return await context.runMutation(internal.chat.daily_charge.refundDailyCharge, args);
+    }
+
+    return await callOnShard(internal.chat.daily_charge.refundDailyCharge, args, { shardKey: userId });
+};
+
+/**
+ * Charge `count` units of `kind` to `user`'s daily quota, on the user's own shard. With a `chargeKey` (a keyed send's, `startChargeKey`)
+ * the units are taken once per key (`chat/daily-charge.ts#chargeDailyLimitOnce`): a retry of a send already charged is not charged again.
  */
 export const chargeDailyLimit = async (
     context: Pick<HttpActionCtx, "runMutation">,
@@ -83,8 +127,8 @@ export const chargeDailyLimit = async (
 
     const result =
         chargeKey === undefined
-            ? await context.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { count, identifier: user._id, key })
-            : await context.runMutation(internal.chat.daily_charge.chargeDailyLimitOnce, { chargeKey, count, identifier: user._id, key });
+            ? await applyOnHomeShard(context, user._id, { count, identifier: user._id, key })
+            : await chargeOnceOnHomeShard(context, user._id, { chargeKey, count, identifier: user._id, key });
 
     if (!result.ok) {
         return { ok: false, retryAfter: result.retryAfter };
@@ -116,7 +160,7 @@ export const refundDailyLimit = async (
 
     // Best effort: the refusal it follows is the answer the client gets, so a failed refund must not replace it with a 500.
     try {
-        await context.runMutation(internal.chat.daily_charge.refundDailyCharge, {
+        await refundOnHomeShard(context, user._id, {
             ...(chargeKey !== undefined && { chargeKey }),
             count: 1,
             identifier: user._id,
