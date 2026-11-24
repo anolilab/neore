@@ -333,3 +333,27 @@ export const addPurchaseLookBrowser = defineMigration({
     // `undefined` leaves every row untouched (`MigrationTransform`).
     up: () => undefined,
 });
+
+/**
+ * A person's organization-project runner defaults (`userSettings.projectRunnerDefaults`, `acp/lib/project-runner.ts`)
+ * gained an optional `threadAt`, the start time of the thread an entry came from. Nothing to fill: an entry without it is
+ * read as older than any thread and any move. A no-op, so `lunora prepare` records the added optional key in the baseline.
+ */
+export const addProjectRunnerThreadAt = defineMigration({
+    id: "add-project-runner-thread-at",
+    table: "userSettings",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});
+
+/**
+ * Each entry of `userSettings.projectRunnerDefaults` gained an optional `threadId`, the id of the thread it came from: of two
+ * threads started in the same millisecond, the one with the greater id keeps the default (`agent/table-writes.ts#runnerReplaces`).
+ * Nothing to fill: an entry without it loses a tie. A no-op, so `lunora prepare` records the added optional key in the baseline.
+ */
+export const addProjectRunnerThreadId = defineMigration({
+    id: "add-project-runner-thread-id",
+    table: "userSettings",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});

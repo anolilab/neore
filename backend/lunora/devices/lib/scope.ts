@@ -13,8 +13,8 @@ export const isDeviceInScope = (device: Pick<Doc<"devices">, "projectIds">, thre
 /** D1 caps bound parameters per statement at 100; each read leaves room for `userId` and the query's own. */
 const IDS_PER_READ = 90;
 
-/** Which of `ids` are projects of `userId` that still exist: a few reads through the `.global()` facade, in batches D1 accepts. */
-export const filterOwnProjectIds = async (ctx: Pick<QueryCtx, "db">, userId: string, ids: Iterable<Id<"projects">>): Promise<Set<Id<"projects">>> => {
+/** The titles of those of `ids` that are projects of `userId` and still exist: a few reads through the `.global()` facade, in batches D1 accepts. */
+export const ownProjectTitles = async (ctx: Pick<QueryCtx, "db">, userId: string, ids: Iterable<Id<"projects">>): Promise<Map<Id<"projects">, string>> => {
     const unique = [...new Set(ids)];
     const batches: Id<"projects">[][] = [];
 
@@ -24,7 +24,14 @@ export const filterOwnProjectIds = async (ctx: Pick<QueryCtx, "db">, userId: str
 
     const pages = await Promise.all(batches.map(async (batch) => await ctx.db.projects.findMany({ where: { _id: { in: batch }, userId } })));
 
-    return new Set(pages.flatMap(({ page }) => page.map((project) => project._id)));
+    return new Map(pages.flatMap(({ page }) => page.map((project) => [project._id, project.title] as const)));
+};
+
+/** Which of `ids` are projects of `userId` that still exist (see {@link ownProjectTitles}). */
+export const filterOwnProjectIds = async (ctx: Pick<QueryCtx, "db">, userId: string, ids: Iterable<Id<"projects">>): Promise<Set<Id<"projects">>> => {
+    const titles = await ownProjectTitles(ctx, userId, ids);
+
+    return new Set(titles.keys());
 };
 
 /**
