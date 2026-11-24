@@ -536,7 +536,9 @@ describe("account deletion workflow: usage exports", () => {
         const purges = runs().filter((entry) => isPurge(entry.ref));
 
         expect(purges.map((entry) => entry.args["force"])).toStrictEqual([false, false, false]);
-        expect(sleeps).toStrictEqual(["2 minutes", "1 minute", "1 minute"]);
+        // The usage-export waits, plus the grace wait every deletion takes before its routes are drained.
+        expect(sleeps.filter((duration) => duration === "1 minute")).toHaveLength(2);
+        expect(sleeps.filter((duration) => duration === "2 minutes")).toHaveLength(1);
         expect(completionIndex()).toBeGreaterThan(-1);
         // Completion is recorded only after the final purge, so the request is never complete while a purge is still pending.
         const lastPurgeAt = trace.findLastIndex((entry) => entry.kind === "run" && isPurge(entry.ref));
@@ -589,7 +591,20 @@ describe("account deletion workflow: usage exports", () => {
 });
 
 describe("account deletion workflow: the owner-shard sweep", () => {
+    it("with no shared-pin routes, still waits the grace period and sweeps again, since a write admitted earlier can create a route later", async () => {
+        // The first sweep reports no routes; the grace wait and the second sweep still run.
+        await execute();
+
+        expect(stepNames()).toContain("erase-pins-on-owner-shards");
+        expect(stepNames()).toContain("erase-pins-grace");
+        expect(stepNames()).toContain("erase-pins-on-owner-shards-again");
+        expect(sleeps).toContain("2 minutes");
+    });
+
     it("sweeps the owner shards, waits the grace period, sweeps again, and only then drains the routes", async () => {
+        // The first sweep finds a shared-pin route, so its owner shard is fenced and swept again.
+        answer = (ref) =>
+            ref === "gdpr_steps:erasePinsOnOwnerShards" ? { cursor: null, hasMore: false, routes: 1 } : { cursor: null, hasMore: false, owners: [] };
         await execute();
 
         const names = stepNames();
