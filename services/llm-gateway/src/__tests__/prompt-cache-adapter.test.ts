@@ -1,7 +1,8 @@
 /**
- * `injectPromptCaching` places Anthropic cache breakpoints for OpenRouter and Requesty only:
- * the system prompt, the last tool, and the end of the conversation. Anthropic allows at most
- * four breakpoints per request, and every other provider must come back untouched.
+ * `injectPromptCaching` places Anthropic cache breakpoints for OpenRouter and Requesty: the system
+ * prompt and the last tool for both, and the end of the conversation for OpenRouter only. Anthropic
+ * allows at most four breakpoints per request, counting any already present, and every other
+ * provider must come back untouched.
  */
 import type { ModelMessage } from "ai";
 import { describe, expect, it } from "vitest";
@@ -36,12 +37,50 @@ const countBreakpoints = (messages: ModelMessage[], toolDefinitions: ToolDefinit
     breakpointsOn(messages).length + (toolDefinitions ?? []).filter((tool) => tool.cache_control !== undefined).length;
 
 describe("injectPromptCaching", () => {
-    it.each(["openrouter", "requesty"])("places a breakpoint on the last message for %s", (provider) => {
+    it("places a breakpoint on the last message for openrouter", () => {
         const messages = growingConversation(5);
-        const result = injectPromptCaching(messages, provider, tools);
+        const result = injectPromptCaching(messages, "openrouter", tools);
 
         expect(breakpointsOn(result.messages)).toEqual([0, messages.length - 1]);
         expect(result.messages.at(-1)?.providerOptions?.anthropic?.cacheControl).toEqual(CACHE);
+    });
+
+    it("keeps system and tool breakpoints for requesty but skips the message one its converter would drop", () => {
+        const result = injectPromptCaching(growingConversation(5), "requesty", tools);
+
+        expect(breakpointsOn(result.messages)).toEqual([0]);
+        expect(result.tools?.[1]?.cache_control).toEqual(CACHE);
+    });
+
+    it("counts breakpoints already on the incoming messages against the limit", () => {
+        const hinted = (text: string): ModelMessage => {
+            return {
+                content: text,
+                providerOptions: { anthropic: { cacheControl: CACHE } },
+                role: "user",
+            };
+        };
+        const messages: ModelMessage[] = [hinted("a"), hinted("b"), hinted("c"), hinted("d"), { content: "latest", role: "user" }];
+        const result = injectPromptCaching(messages, "openrouter", tools);
+
+        expect(breakpointsOn(result.messages)).toEqual([0, 1, 2, 3]);
+        expect(result.tools?.every((tool) => tool.cache_control === undefined)).toBe(true);
+    });
+
+    it("fills the remaining budget with system and tool before the message, and stays at four", () => {
+        const hinted = (text: string): ModelMessage => {
+            return {
+                content: text,
+                providerOptions: { anthropic: { cacheControl: CACHE } },
+                role: "assistant",
+            };
+        };
+        const messages: ModelMessage[] = [system, hinted("a"), hinted("b"), { content: "latest", role: "user" }];
+        const result = injectPromptCaching(messages, "openrouter", tools);
+
+        expect(breakpointsOn(result.messages)).toEqual([0, 1, 2]);
+        expect(result.tools?.[1]?.cache_control).toEqual(CACHE);
+        expect(countBreakpoints(result.messages, result.tools)).toBe(ANTHROPIC_MAX_CACHE_BREAKPOINTS);
     });
 
     it("keeps the system breakpoint and the last-tool breakpoint alongside it", () => {
