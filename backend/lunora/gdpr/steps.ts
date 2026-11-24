@@ -2,7 +2,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import { buildUsageJson, spliceUsageJson, usageObjectKey } from "./usage-export-steps";
 import { readStoredText } from "../lib/storage-read";
-import { collectAllChatFileMetadata, collectAllMessageFileIds } from "../agent/export-pages";
+import { capChatFiles, collectAllChatFileMetadata, collectAllMessageFileIds } from "../agent/export-pages";
 import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
 import { collectAcpSessionPages } from "../acp/gdpr";
 import { BROWSER_EXPORT_BYTES, browserExportPageKey, readAllBrowserPages } from "../browser/export-pages";
@@ -821,10 +821,10 @@ export const generateExportFile = internalAction
                       BROWSER_EXPORT_BYTES,
                       browserCut === true,
                   );
-        // The user's chat files (uploads and generated images), metadata only: the files behind their grants and behind their chats' links
-        // (`agent/export-pages.ts`), read here a page per query, as the sections above are.
-        const chatFiles = await collectAllChatFileMetadata(
-            async (source, cursor) => await context.runQuery(internal.agent.gdpr.collectChatFileIdsForExport, { cursor, source, userId: args.userId }),
+        // The user's chat files (uploads and generated images), metadata only: the files behind their grants and the files their messages
+        // name (`agent/export-pages.ts`), read here a page per query, as the sections above are. Held to a byte budget, with a flag when cut.
+        const chatFileRows = await collectAllChatFileMetadata(
+            async (cursor) => await context.runQuery(internal.agent.gdpr.collectGrantedChatFileIdsForExport, { cursor, userId: args.userId }),
             async () =>
                 await collectAllMessageFileIds(
                     async (cursor) => await context.runQuery(internal.agent.gdpr.collectThreadIdsForExport, { cursor, userId: args.userId }),
@@ -833,6 +833,7 @@ export const generateExportFile = internalAction
                 ),
             async (fileIds) => await context.runQuery(internal.agent.gdpr.chatFileMetadataForExport, { fileIds: fileIds as Id<"chatFiles">[] }),
         );
+        const chatFiles = capChatFiles(chatFileRows);
         const exportData = {
             acpSessions,
             bots: args.bots ?? { bots: [] },

@@ -81,18 +81,24 @@ export const eraseChatFileAccessForUser = async (ctx: MutationCtx, userId: strin
     return { hasMore: full(rows) };
 };
 
-/** Chat-file ids one export page reads, from either source (`collectChatFileIdsForExport`). */
+/** Chat-file ids one export page reads (`collectGrantedChatFileIdsForExport`, and the walks of a user's threads and messages). */
 export const CHAT_FILE_EXPORT_PAGE = 100;
 
+/** A chat file's name and media type are cut to these lengths in the export, so one page of rows has a bounded size. */
+export const CHAT_FILE_NAME_MAX = 512;
+export const CHAT_FILE_TYPE_MAX = 255;
+
 /**
- * One page of the ids of the user's chat files, from one of two sources: the grants they hold (`chatFileAccess`), or the links of
- * their own chats (`chatFileThreads`, keyed by the owner). A file stored with a message carries the link but no grant (a large
- * image part is stored without an owner), so both are read. The caller walks each source to its end and dedupes the ids.
+ * One page of the ids of the files the user holds a grant for (`chatFileAccess`): their uploads and generated images. The grant is
+ * what makes a file theirs; the row itself is shared by content and has no owner. The caller walks it to its end.
+ *
+ * The links of their chats (`chatFileThreads`) are not read here. A link outlives the message that named the file (a deleted message
+ * releases the file's reference, not its link), so a link names files the chat no longer holds. The messages name what is still there
+ * (`collectMessageFileIdsForExport`).
  */
-export const collectChatFileIdsForExport = internalQuery
+export const collectGrantedChatFileIdsForExport = internalQuery
     .input({
         cursor: v.optional(v.union(v.string().max(MAX_LENGTH.cursor), v.null())),
-        source: v.union(v.literal("grants"), v.literal("threads")),
         userId: v.string().max(MAX_LENGTH.id),
     })
     .output(
@@ -101,24 +107,12 @@ export const collectChatFileIdsForExport = internalQuery
             ids: v.array(v.string()),
         }),
     )
-    .query(async ({ args: { cursor, source, userId }, ctx }) => {
-        if (source === "grants") {
-            const grants = await ctx.db.chatFileAccess.findMany({ cursor: cursor ?? null, limit: CHAT_FILE_EXPORT_PAGE, where: { userId } });
-
-            return {
-                cursor: grants.isDone ? null : grants.continueCursor,
-                ids: grants.page.map((grant) => grant.fileId),
-            };
-        }
-
-        const links = await ctx.db
-            .query("chatFileThreads")
-            .withIndex("by_userId", (q) => q.eq("userId", userId))
-            .paginate({ cursor: cursor ?? null, numItems: CHAT_FILE_EXPORT_PAGE });
+    .query(async ({ args: { cursor, userId }, ctx }) => {
+        const grants = await ctx.db.chatFileAccess.findMany({ cursor: cursor ?? null, limit: CHAT_FILE_EXPORT_PAGE, where: { userId } });
 
         return {
-            cursor: links.isDone ? null : links.continueCursor,
-            ids: links.page.map((link) => link.fileId),
+            cursor: grants.isDone ? null : grants.continueCursor,
+            ids: grants.page.map((grant) => grant.fileId),
         };
     });
 
@@ -181,6 +175,7 @@ export const chatFileMetadataForExport = internalQuery
             v.object({
                 createdAt: v.number(),
                 filename: v.optional(v.string()),
+                filenameCut: v.boolean(),
                 hash: v.string(),
                 id: v.string(),
                 mediaType: v.string(),
@@ -197,10 +192,11 @@ export const chatFileMetadataForExport = internalQuery
         return storedRows(page).map((file) => {
             return {
                 createdAt: file._creationTime,
-                filename: file.filename,
+                filename: file.filename?.slice(0, CHAT_FILE_NAME_MAX),
+                filenameCut: (file.filename?.length ?? 0) > CHAT_FILE_NAME_MAX,
                 hash: file.hash,
                 id: file._id,
-                mediaType: file.mediaType,
+                mediaType: file.mediaType.slice(0, CHAT_FILE_TYPE_MAX),
             };
         });
     });
