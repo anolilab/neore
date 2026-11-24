@@ -1653,6 +1653,41 @@ describe("the usage-limit settings of a rate-limited run", () => {
         expect(await snoozedUntil()).toBeUndefined();
     });
 
+    it("stopping the earlier of two paused replies leaves the later reply's own snooze marker alone, and stopping the later one clears the chat", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        await readState();
+
+        expect(await pauseSecondReply(5)).toMatchObject({ paused: true });
+
+        const later = await snoozedUntil();
+        const laterMarker = async () =>
+            await harness.run(async (ctx: any) => {
+                const row = await ctx.db.persistentStreams.findFirst({ where: { messageId: "other-message" } });
+
+                return row.pauseSnooze;
+            });
+        const markerBefore = await laterMarker();
+
+        expect(markerBefore?.until).toBe(later);
+
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: ids.messageId, onlyNamed: true, threadId: ids.threadId }),
+        );
+
+        expect(await snoozedUntil()).toBe(later);
+        expect(await laterMarker()).toEqual(markerBefore);
+
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: "other-message", onlyNamed: true, threadId: ids.threadId }),
+        );
+
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
     it("a Retry now that resumes both replies, where the later pause extended the snooze, leaves the chat visible", async () => {
         modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
         modelState.model = planned([rateLimited(), textStep("Hello there.")]);
