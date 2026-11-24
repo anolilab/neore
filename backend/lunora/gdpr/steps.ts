@@ -698,6 +698,8 @@ export const generateExportFile = internalAction
         // the same in-flight-replay reason as `threadTags`.
         evals: v.optional(v.any()),
         files: v.any(),
+        // The owner's Events log: their run and approval events (`public-api/gdpr.ts`). Optional for the same reason.
+        mcpEvents: v.optional(v.any()),
         // Memories (superseded history included) and reflection digests
         // (`memory/gdpr.ts`). Optional for the same in-flight-replay reason as `threadTags`.
         memories: v.optional(v.any()),
@@ -854,6 +856,7 @@ export const generateExportFile = internalAction
             feedback: feedback.section,
             files: args.files,
             knowledgeCollections: activity?.knowledgeCollections ?? [],
+            mcpEvents: args.mcpEvents ?? { events: [] },
             memories: args.memories ?? { digests: [], memories: [] },
             notifications: args.notifications ?? { notifications: [], pushSubscriptions: [] },
             pages: args.pages ?? { comments: [], favorites: [], grants: [], pages: [] },

@@ -2,9 +2,50 @@ import { lunoraTest } from "@lunora/testing";
 import { describe, expect, it } from "vitest";
 
 import { schemaWithShardedTables } from "../lib/test-schema";
-import { deleteUserMcpEvents } from "./gdpr";
+import { collectMcpEventsForExport, deleteUserMcpEvents } from "./gdpr";
 
 const BATCH = 200;
+
+describe("collectMcpEventsForExport", () => {
+    it("returns every page of the user's events, and no other user's", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < BATCH + 1; index += 1) {
+                    await context.db.insert("mcpEvents", {
+                        createdAt: 1,
+                        data: "{}",
+                        eventId: `run:${index}`,
+                        name: "run.completed",
+                        seq: index + 1,
+                        timestamp: 1,
+                        userId: "user",
+                    });
+                }
+
+                await context.db.insert("mcpEvents", {
+                    createdAt: 1,
+                    data: "{}",
+                    eventId: "run:stranger",
+                    name: "run.completed",
+                    seq: 1,
+                    timestamp: 1,
+                    userId: "stranger",
+                });
+            });
+
+            const { events } = (await harness.run(async (context: any) => await context.runQuery(collectMcpEventsForExport, { userId: "user" }))) as {
+                events: { eventId: string }[];
+            };
+
+            expect(events).toHaveLength(BATCH + 1);
+            expect(events.some((event) => event.eventId === "run:stranger")).toBe(false);
+        } finally {
+            harness.close();
+        }
+    });
+});
 
 describe("deleteUserMcpEvents", () => {
     it.each([

@@ -338,6 +338,11 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                         { dedupId: stepDedupId(scope, "collect-notifications") },
                     ),
             );
+            const mcpEvents = await context.step.do(
+                "collect-mcp-events",
+                async () =>
+                    await context.run(internal.public_api.gdpr.collectMcpEventsForExport, { userId }, { dedupId: stepDedupId(scope, "collect-mcp-events") }),
+            );
             const runWebhooks = await context.step.do(
                 "collect-run-webhooks",
                 async () =>
@@ -422,6 +427,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                             devices,
                             evals,
                             files,
+                            mcpEvents,
                             memories,
                             notifications,
                             pages,
