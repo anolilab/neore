@@ -428,7 +428,12 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
                         )}
                         {/* The run is waiting out a provider's rate limit: when it resumes, and what a person can do meanwhile. */}
                         {streamIdToShow && pause && threadId && (
-                            <RateLimitPauseNotice className="mx-auto w-full max-w-(--thread-max-width) pb-3" pause={pause} threadId={threadId} />
+                            <RateLimitPauseNotice
+                                className="mx-auto w-full max-w-(--thread-max-width) pb-3"
+                                pause={pause}
+                                streamId={activeStreamId ?? undefined}
+                                threadId={threadId}
+                            />
                         )}
                         {/* Simple "Thinking..." placeholder when regenerating but no stream yet */}
                         {!streamIdToShow && <ThinkingPlaceholder maxWidth={maxWidth} />}

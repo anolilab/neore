@@ -26,16 +26,19 @@ import { describe, expect, it } from "vitest";
 
 import { schema } from "../schema";
 
-import { vMessageDocFields, vThreadDocFields } from "./validators";
+import { SERVER_ONLY_MESSAGE_COLUMNS, vMessageDocFields, vThreadDocFields } from "./validators";
 
 const columnsOf = (table: keyof typeof schema.tables): string[] => Object.keys(schema.tables[table].shape);
+
+// A column no client reads is left out on purpose; the read that returns rows strips it (`publicMessage`).
+const serverOnly: Readonly<Record<string, ReadonlyArray<string>>> = { messages: SERVER_ONLY_MESSAGE_COLUMNS };
 
 describe.each([
     ["vThreadDocFields", vThreadDocFields, "threads"],
     ["vMessageDocFields", vMessageDocFields, "messages"],
 ] as const)("%s covers its table", (_name, fields, table) => {
     it("declares every column the schema declares", () => {
-        const declared = new Set(Object.keys(fields));
+        const declared = new Set([...Object.keys(fields), ...(serverOnly[table] ?? [])]);
         const missing = columnsOf(table).filter((column) => !declared.has(column));
 
         expect(missing, `${table} column(s) absent from the validator — an .output() using it would strip them silently`).toStrictEqual([]);

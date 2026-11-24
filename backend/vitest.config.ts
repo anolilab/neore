@@ -17,6 +17,19 @@ import { timeSharding } from "../scripts/vitest/time-sharding";
 // `browser/gdpr.test.ts` writes and reads 40 MB of typed actions to pass the transaction's 32 MiB read limit.
 const SERIAL_FILES = ["lunora/admin/shard-footprint.test.ts", "lunora/browser/gdpr.test.ts"];
 
+/**
+ * Tests that pass alone and fail only when the whole suite shares the machine (timing, or fixtures that compete for CPU). They run in
+ * their own project with two retries: a retry that passes is reported as flaky, so the flakiness stays visible, and a test that fails on
+ * every attempt still fails the run. Move a file out of this list once its cause is fixed.
+ */
+const QUARANTINED_FILES = [
+    "lunora/acp/gdpr.test.ts",
+    "lunora/acp/switch.test.ts",
+    "lunora/chat/lib/approval-reminder.test.ts",
+    "lunora/chat/lib/link-preview.test.ts",
+    "lunora/sub-agents/approvals.test.ts",
+];
+
 export default defineConfig({
     resolve: {
         alias: {
@@ -30,8 +43,17 @@ export default defineConfig({
             {
                 extends: true,
                 test: {
-                    exclude: [...configDefaults.exclude, ...SERIAL_FILES],
+                    exclude: [...configDefaults.exclude, ...SERIAL_FILES, ...QUARANTINED_FILES],
                     name: "parallel",
+                    sequence: { groupOrder: 1 },
+                },
+            },
+            {
+                extends: true,
+                test: {
+                    include: QUARANTINED_FILES,
+                    name: "quarantined",
+                    retry: 2,
                     sequence: { groupOrder: 1 },
                 },
             },

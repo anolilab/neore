@@ -1,4 +1,5 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import type { QueryKey } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -41,4 +42,21 @@ export const useRefetchAfterBackfill = (backfilling: boolean, refetch: () => Pro
 
         wasBackfilling.current = backfilling;
     }, [backfilling, ready, refetch]);
+};
+
+/**
+ * When the backfill finishes, invalidates the query: one the page is showing reads again now, and one it is not showing (disabled) is only
+ * marked stale, so it reads fresh the next time it is enabled. A disabled query is never run by this.
+ */
+export const useStaleAfterBackfill = (backfilling: boolean, queryKey: QueryKey, ready = true): void => {
+    const queryClient = useQueryClient();
+    const wasBackfilling = useRef(backfilling);
+
+    useEffect(() => {
+        if (wasBackfilling.current && !backfilling && ready) {
+            void queryClient.invalidateQueries({ queryKey });
+        }
+
+        wasBackfilling.current = backfilling;
+    }, [backfilling, queryClient, queryKey, ready]);
 };

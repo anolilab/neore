@@ -539,6 +539,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                         const costMicrodollars = pricing
                             ? calculateCost(pricing, {
                                   cachedTokens: tokens.cachedTokens,
+                                  cacheWriteTokens: tokens.cacheWriteTokens,
                                   completionTokens: tokens.completionTokens,
                                   promptTokens: tokens.promptTokens,
                                   reasoningTokens: tokens.reasoningTokens,
@@ -688,6 +689,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
         const costMicrodollars = pricing
             ? calculateCost(pricing, {
                   cachedTokens: tokens.cachedTokens,
+                  cacheWriteTokens: tokens.cacheWriteTokens,
                   completionTokens: tokens.completionTokens,
                   promptTokens: tokens.promptTokens,
                   reasoningTokens: tokens.reasoningTokens,
@@ -945,6 +947,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                                 const costMicrodollars = pricing
                                     ? calculateCost(pricing, {
                                           cachedTokens: tokens.cachedTokens,
+                                          cacheWriteTokens: tokens.cacheWriteTokens,
                                           completionTokens: tokens.completionTokens,
                                           promptTokens: tokens.promptTokens,
                                           reasoningTokens: tokens.reasoningTokens,
@@ -1025,6 +1028,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                 const costMicrodollars = pricing
                     ? calculateCost(pricing, {
                           cachedTokens: tokens.cachedTokens,
+                          cacheWriteTokens: tokens.cacheWriteTokens,
                           completionTokens: tokens.completionTokens,
                           promptTokens: tokens.promptTokens,
                           reasoningTokens: tokens.reasoningTokens,

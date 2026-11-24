@@ -34,6 +34,7 @@ import { runAfterOnShard } from "../lib/shard-scheduler";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { liveTrustedServers } from "../chat/lib/low-risk-trust";
+import { callerRestrictsFull } from "../chat/lib/new-chat-mode";
 import { normalizeSearchDomainBlocklist } from "../chat/tools/search-domains";
 import { backupFilterRejection, eligibleBackupModel } from "../chat/lib/backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "../chat/lib/paid-model";
@@ -985,6 +986,13 @@ export const updateUserSettings = authMutation
     .input(userSettingsFieldsWithoutUserId)
     .mutation(async (options) => {
         const { ctx } = options;
+
+        // The default mode of new chats is the owner's to set by hand: neither an admin acting as them nor a grant session (an app or the
+        // browser extension) may change it, since the default would then reach every chat they start (`callerRestrictsFull`).
+        if (options.args.defaultPermissionMode !== undefined && (await callerRestrictsFull(ctx))) {
+            throw new LunoraError("FORBIDDEN", "The default permission mode cannot be changed from an impersonated or grant session");
+        }
+
         const result = await settingsUpsert("userSettings", options);
 
         ctx.log.event("auth.update_user_settings", { fieldCount: Object.keys(options.args).length });
@@ -1169,7 +1177,9 @@ export const getUserPreferencesQuery = internalQuery
             nickname: v.optional(v.string()),
             personalizationByImpersonator: v.boolean(),
             profession: v.optional(v.string()),
+            resumeAfterUsageLimit: v.optional(v.boolean()),
             resumeInterruptedRuns: v.optional(v.boolean()),
+            snoozeUntilUsageLimitReset: v.optional(v.boolean()),
             threadSummariesEnabled: v.boolean(),
             threadTitleInstructions: v.optional(v.string()),
             timezone: v.optional(v.string()),
@@ -1194,7 +1204,9 @@ export const getUserPreferencesQuery = internalQuery
                 nickname: userSettings?.nickname ?? undefined,
                 personalizationByImpersonator: userSettings?.personalizationByImpersonator === true,
                 profession: userSettings?.profession ?? undefined,
+                resumeAfterUsageLimit: userSettings?.resumeAfterUsageLimit ?? undefined,
                 resumeInterruptedRuns: userSettings?.resumeInterruptedRuns ?? undefined,
+                snoozeUntilUsageLimitReset: userSettings?.snoozeUntilUsageLimitReset ?? undefined,
                 threadSummariesEnabled: userSettings?.threadSummariesEnabled === true, // Opt-in; see agent/thread-summaries.ts
                 threadTitleInstructions: userSettings?.threadTitleInstructions ?? undefined,
                 timezone: userSettings?.timezone ?? undefined,
@@ -1212,6 +1224,8 @@ export const getUserPreferencesQuery = internalQuery
                 // A failed read carries no personalization, so nothing an admin wrote reaches the prompt.
                 personalizationByImpersonator: false,
                 profession: undefined,
+                // A failed read resumes as an absent setting does (`readUsageLimitPreferences`): on, with no snooze.
+                resumeAfterUsageLimit: true,
                 // A failed read is not an absent setting: the resume is off for it (`readResumeInterruptedRuns`).
                 resumeInterruptedRuns: false,
                 threadSummariesEnabled: false,

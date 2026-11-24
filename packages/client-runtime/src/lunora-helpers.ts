@@ -19,6 +19,12 @@ export const runLunoraAction = async (client: LunoraClient, reference: FunctionR
     await client.action(reference as never, withUnlockProof(args) as never, shardOptionsFor(args));
 
 /**
+ * The `mutationKey` of a write to a Lunora function: `["lunora", "<module>:<function>"]`, the start of its query keys. A
+ * mutation-cache listener matches on it to tell which function a finished write called.
+ */
+export const lunoraMutationKey = (functionName: string | undefined): ReadonlyArray<unknown> => ["lunora", functionName];
+
+/**
  * `useAction(ref)` — Lunora action invocation hook.
  */
 export const useAction = <F extends FunctionReference>(reference: F): ((args: ArgsOf<F>) => Promise<ReturnOf<F>>) => {
@@ -34,7 +40,10 @@ export const useLunoraActionOptions = <F extends FunctionReference>(reference: F
     const client = useLunora();
 
     return useMemo(() => {
-        return { mutationFn: async (args: ArgsOf<F>) => (await runLunoraAction(client, reference, args)) as ReturnOf<F> };
+        return {
+            mutationFn: async (args: ArgsOf<F>) => (await runLunoraAction(client, reference, args)) as ReturnOf<F>,
+            mutationKey: lunoraMutationKey((reference as { __lunoraRef?: string }).__lunoraRef),
+        };
     }, [client, reference]);
 };
 

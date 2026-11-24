@@ -8,6 +8,7 @@ import type { ActionCtx } from "../../_generated/server";
 import { streamLogger } from "../../lib/logger";
 import { rateLimitOf } from "./rate-limit-pause";
 import type { RunStreamingArgs } from "./streaming-run-args";
+import { DEFAULT_USAGE_LIMIT_PREFERENCES, type UsageLimitPreferences } from "./usage-limit-settings";
 
 /** What the run has done, read once its model call has wound down: where the rejected step continues from, and what to carry over. */
 export interface PauseProgress {
@@ -41,6 +42,8 @@ export const pauseOnRateLimit = async (
         runEpoch?: number;
         settle: () => Promise<unknown>;
         streamId: string;
+        /** The person's usage-limit settings, read only when this is a rate limit. Absent: today's behaviour. */
+        usageLimit?: () => Promise<UsageLimitPreferences>;
     },
 ): Promise<boolean> => {
     const rateLimit = rateLimitOf(args.error);
@@ -51,16 +54,19 @@ export const pauseOnRateLimit = async (
 
     await args.settle();
 
+    const preferences = args.usageLimit ? await args.usageLimit() : DEFAULT_USAGE_LIMIT_PREFERENCES;
     const { from, placeholderId, replyRowIds, stepsUsed } = args.progress();
     const outcome = await ctx.runMutation(internal.chat.streaming.persistent.library.pauseRunForRateLimit, {
         from,
         ...(placeholderId !== undefined && { placeholderId }),
         ...(rateLimit.provider !== undefined && { provider: rateLimit.provider }),
         replyRowIds,
+        resumeAfterLimit: preferences.resumeAfterLimit,
         ...(rateLimit.retryAt !== undefined && { retryAt: rateLimit.retryAt }),
         run: args.run,
         ...(args.runEpoch !== undefined && { runEpoch: args.runEpoch }),
         ...(args.reply.skill && { skill: args.reply.skill }),
+        snoozeUntilReset: preferences.snoozeUntilReset,
         status: rateLimit.status,
         stepsUsed,
         streamId: args.streamId as Id<"persistentStreams">,

@@ -244,6 +244,7 @@ const OWNER_TABLES = [
     "usageExportPieces",
     "usageExportProjects",
     "usageExportRuns",
+    "usageOrganizationReplies",
     "usageReplies",
     "userConnectors",
     "userSettings",
@@ -432,6 +433,8 @@ export const UNPOLICED_TABLES: Record<string, string> = {
         "bot creator record, global: written by `createBot`, erased with its owner; read by the memory list (`listUserMemories` through `memory/bot-owner.ts`), which returns only whether a bot is someone else's and whether it was deleted, never the owner id",
     browserActions: "no owner column; read only after the parent browser session's owner check",
     changelogCache: "public changelog cache",
+    chatFileMetadata:
+        "the export view of a shared `chatFiles` row (name, type, hash, stored-at), written and erased with that row; read only by the GDPR export, which reads it for files the user holds a grant for or names in a message",
     chatFiles: "content-addressed and SHARED (same bytes, one row) — no owner; access is the `chatFileAccess` grant",
     chatFileThreads:
         "derived index of which of the owner's chats hold a chat file; read only as a yes/no by the lock gate, never returned, written by `changeMessageFiles` and the chat-file backfill (`agent/file-link-backfill.ts`), and deleted directly by `deleteChatFileLinksForThread` (permanent thread delete) and `eraseChatFileThreadsForUser` (account erasure)",
@@ -465,6 +468,8 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     projectRuleFiles:
         "one row per project; its `userId` copies the project's owner (re-stamped on account merge) for erasure only (`eraseProjectRuleFilesForUser`), and every access follows the project's check (`readableProject`, `projectWithEditableSettings` in `projects/functions.ts`)",
     promptHistory: "`userId` is the EDITOR of an org-shared prompt; read under the prompt's rule",
+    pullRequestStateScans:
+        "the housekeeping sweep's scan position over the owner's pull-request links; written and read only by `dispatchLinkedPullRequestChecks` on the owner's shard, erased with the links (`source-control/gdpr.ts`); no client reads it",
     rateLimit: "better-auth rate limiter",
     rateLimits: "rate-limit counters written by every procedure's rate-limit middleware",
     sandboxActions: "no owner column; internal only",
@@ -485,6 +490,10 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     teamSettings: "org-scoped settings, checked by org role",
     threadKnowledge: "link rows with no owner column; every access follows a thread access check",
     triggerExecutions: "no owner column; every access follows the parent trigger's owner check",
+    usageOrganizationCohortSlots:
+        "global booking slots per organization; written by the contributor booking and read by the organization usage view, both through systemDb",
+    usageOrganizationContributors:
+        "global list of the organization view's contributors; read only by the admin-checked organization query (through systemDb), written by the contributor's own reply and erased with the account",
     verification: "better-auth verification tokens",
 };
 

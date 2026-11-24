@@ -30,12 +30,15 @@ export const useProjectList = (enabled: boolean = true) => {
     // Only run query when authenticated and not loading
     const shouldQuery = enabled && isAuthenticated && !isLoading;
 
-    const { data } = useQuery(crpc.projects.functions.listProjects.queryOptions(shouldQuery ? { paginationOpts: PROJECT_LIST_PAGINATION_OPTS } : skipToken));
+    const { data, isError } = useQuery(
+        crpc.projects.functions.listProjects.queryOptions(shouldQuery ? { paginationOpts: PROJECT_LIST_PAGINATION_OPTS } : skipToken),
+    );
 
     // Memoize to ensure stable reference and consistency with useThreads pattern
     const projects = useMemo(() => data?.page ?? [], [data]);
 
-    return { isAnswered: data !== undefined, projects };
+    // More projects exist than this first page holds; a list built from it says it is cut. A failed read is told apart from no projects.
+    return { hasMore: data?.isDone === false, isAnswered: data !== undefined, isError, projects };
 };
 
 /**

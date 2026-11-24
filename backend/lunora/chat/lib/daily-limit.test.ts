@@ -1,8 +1,32 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { internal } from "../../_generated/internal";
 import { RATE_LIMIT_CONFIGS } from "../../lib/rate-limiter";
-import { chargeDailyLimit, dailyLimitKeyOf, dailyLimitTierOf, type DailyLimitKind, type DailyLimitTier, rateLimitTierOf } from "./daily-limit";
+import { runInShard } from "../../lib/shard-context";
+import {
+    chargeDailyLimit,
+    dailyLimitKeyOf,
+    dailyLimitTierOf,
+    type DailyLimitKind,
+    type DailyLimitTier,
+    rateLimitTierOf,
+    refundDailyLimit,
+} from "./daily-limit";
 import { mediaThreadTitle, startTitleJobs } from "./start-title-jobs";
+
+const crossShard = vi.hoisted(() => {
+    return { calls: [] as { args: unknown; reference: unknown; shardKey: string }[] };
+});
+
+vi.mock("../../lib/cross-shard", () => {
+    return {
+        callOnShard: async (reference: unknown, args: unknown, options: { shardKey: string }) => {
+            crossShard.calls.push({ args, reference, shardKey: options.shardKey });
+
+            return { ok: true };
+        },
+    };
+});
 
 const runnerReturning = (result: { ok: boolean; retryAfter?: number }) => {
     const runMutation = vi.fn(async (_reference: unknown, _args: { count?: number; identifier: string; key: string }) => result);
@@ -74,6 +98,50 @@ describe("daily limits", () => {
         const { context } = runnerReturning({ ok: false, retryAfter: 42 });
 
         expect(await chargeDailyLimit(context, { _id: "u" }, "Text")).toEqual({ ok: false, retryAfter: 42 });
+    });
+
+    it("charges a member on their own shard when the work runs on the owner's, so a shared chat draws on one counter", async () => {
+        crossShard.calls.length = 0;
+        const { context, runMutation } = runnerReturning({ ok: true });
+
+        await runInShard("owner-1", async () => {
+            expect(await chargeDailyLimit(context, { _id: "member-1", plan: null }, "Image")).toEqual({ ok: true });
+        });
+
+        expect(runMutation).not.toHaveBeenCalled();
+        expect(crossShard.calls).toStrictEqual([
+            {
+                args: { count: 1, identifier: "member-1", key: "chat/dailyImage:free" },
+                reference: internal.lib.rate_limiter_mutations.applyRateLimit,
+                shardKey: "member-1",
+            },
+        ]);
+    });
+
+    it("keeps a charge on the user's own shard local, with no crossing", async () => {
+        crossShard.calls.length = 0;
+        const { context, runMutation } = runnerReturning({ ok: true });
+
+        await runInShard("member-1", async () => {
+            await chargeDailyLimit(context, { _id: "member-1", plan: "premium" }, "Text");
+        });
+
+        expect(runMutation).toHaveBeenCalledTimes(1);
+        expect(crossShard.calls).toHaveLength(0);
+    });
+
+    it("gives a refund back on the same shard as the charge it undoes", async () => {
+        crossShard.calls.length = 0;
+        const { context, runMutation } = runnerReturning({ ok: true });
+
+        await runInShard("owner-1", async () => {
+            await refundDailyLimit(context, { _id: "member-1", plan: null }, "Image", { windowStart: 7 });
+        });
+
+        expect(runMutation).not.toHaveBeenCalled();
+        expect(crossShard.calls).toMatchObject([
+            { args: { count: 1, identifier: "member-1", key: "chat/dailyImage:free", windowStart: 7 }, shardKey: "member-1" },
+        ]);
     });
 });
 

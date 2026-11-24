@@ -8,6 +8,7 @@ import { eraseConnectorsForUser } from "../../connectors/gdpr";
 import {
     eraseDocumentsForUser,
     eraseProjectsForUser,
+    releaseProjectImagesForUser,
     eraseThreadMetadataForUser,
     eraseThreadPasscodesForUser,
     eraseThreadSuggestionsAndInvites,
@@ -171,6 +172,15 @@ export const deleteUserMemories = internalMutation
     .input({ userId: v.string() })
     .output(vBatchResult)
     .mutation(async ({ args: { userId }, ctx: context }) => await eraseMemoriesForUser(context, userId));
+
+/**
+ * The chat files the user's projects hold, released while their grants still exist (`agent/gdpr.ts`). Runs before
+ * `deleteUserIntegrations`, which erases the grants.
+ */
+export const deleteUserProjectImages = internalMutation
+    .input({ userId: v.string() })
+    .output(vBatchResult)
+    .mutation(async ({ args: { userId }, ctx: context }) => await releaseProjectImagesForUser(context, userId));
 
 /** One page of the user's projects with their rule files (`agent/gdpr.ts`). */
 export const deleteUserProjects = internalMutation

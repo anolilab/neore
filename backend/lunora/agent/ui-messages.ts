@@ -65,6 +65,8 @@ export type UIMessage<METADATA = unknown, DATA_PARTS extends UIDataTypes = UIDat
     /** A host-run turn's changed files and, when kept, its patch (`acp/lib/changes.ts`); older builds ignore it. */
     hostChanges?: HostChanges;
     key: string;
+    /** The browser streamed this reply from the user's own model server (`local-browser`): the thread shows its cause and Continue. */
+    localReply?: true;
     /**
      * Set when memories were injected into this reply's prompt: how many, and the
      * row that records them (`memory_functions.getMessageMemoryUsage` takes its id).
@@ -451,6 +453,13 @@ const hostChangesOf = (group: ReadonlyArray<MessageDoc>): { hostChanges?: HostCh
     return {};
 };
 
+/** A reply the browser streamed from the user's own model server: `providerMetadata.neore.runtime` is set by `chat/lib/local-turn.ts`. */
+const localReplyOf = (group: ReadonlyArray<MessageDoc>): { localReply?: true } => {
+    const isLocal = group.some((row) => (row.providerMetadata as { neore?: { runtime?: unknown } } | undefined)?.neore?.runtime === "local-browser");
+
+    return isLocal ? { localReply: true } : {};
+};
+
 const createAssistantUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataTypes = UIDataTypes, TOOLS extends UITools = UITools>(
     groupUnordered: (ExtraFields<METADATA> & MessageDoc)[],
 ): UIMessage<METADATA, DATA_PARTS, TOOLS> => {
@@ -473,6 +482,7 @@ const createAssistantUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataT
         ...(firstMessage.replyId && { replyId: firstMessage.replyId }),
         ...memoryUsageOf(group),
         ...hostChangesOf(group),
+        ...localReplyOf(group),
         stepOrder: firstMessage.stepOrder,
         userId: firstMessage.userId,
     };

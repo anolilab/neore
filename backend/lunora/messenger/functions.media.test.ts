@@ -73,9 +73,10 @@ describe("saveMessengerMessage", () => {
 
         expect(row.fileIds).toStrictEqual([fileId]);
         expect(row.message.content).toStrictEqual([
-            { text: "what is this?", type: "text" },
+            { providerOptions: { neore: { messenger: true } }, text: "what is this?", type: "text" },
             { image: `storage:agent-files/${HASH}`, mediaType: "image/png", type: "image" },
         ]);
+        expect(row.typedText).toBe("what is this?");
         expect(file.refcount).toBe(1);
         expect(await harness.run(async (ctx: any) => await ctx.runQuery(threadRecentMedia, { threadId }))).toBe("images");
     });

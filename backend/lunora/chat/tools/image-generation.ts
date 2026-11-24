@@ -10,7 +10,7 @@ import { internal } from "../../_generated/internal";
 import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
 import { toolsLogger } from "../../lib/logger";
-import { checkRateLimit } from "../../lib/rate-limiter";
+import { type ImageQuotaCode, takeImageQuota } from "./image-quota";
 
 const imageGenerationTool = createTool<
     {
@@ -23,6 +23,7 @@ const imageGenerationTool = createTool<
         seed?: number;
     },
     {
+        code?: ImageQuotaCode;
         error?: string;
         images: {
             model: string;
@@ -46,18 +47,16 @@ Use 'auto' to automatically match input image's aspect ratio. Premium users can 
             return { error: "Authentication required", images: [] };
         }
 
-        // Charge the same daily image bucket the chat/http endpoint charges,
-        // so this skill-driven path cannot bypass dailyImage when invoked
-        // from text-mode chats. Each generated image counts.
-        const tier = context.userTier === "premium" || context.userTier === "ultra" ? "premium" : "free";
-        const limited = await checkRateLimit(context, `chat/dailyImage:${tier}`, {
-            count: numberImages,
-            key: context.userId,
-            throws: false,
-        });
+        // The schema asks for a whole number; a fraction is refused here too, before the allowance is touched.
+        if (!Number.isSafeInteger(numberImages)) {
+            return { error: "numImages must be a whole number", images: [] };
+        }
 
-        if (!limited.ok) {
-            return { error: "Daily image generation limit reached", images: [] };
+        // The same daily image allowance `/chat/media` charges, one unit per image, before the provider call.
+        const quota = await takeImageQuota(context, context.userId, numberImages);
+
+        if (!quota.ok) {
+            return { code: quota.code, error: quota.message, images: [] };
         }
 
         toolsLogger.debug(`[IMAGE_GEN] Generating ${numberImages} image(s) with ${model}: ${prompt.slice(0, 50)}...`);
@@ -111,7 +110,7 @@ Use 'auto' to automatically match input image's aspect ratio. Premium users can 
                 .default(MEDIA_DEFAULT_MODELS.image)
                 .meta({ description: "AI model to use (e.g., fal-ai/recraft/v3/text-to-image, google/gemini-2.5-flash-image)" }),
             negativePrompt: z.string().optional().meta({ description: "What to avoid in the image" }),
-            numImages: z.number().min(1).max(4).optional().default(1).meta({ description: "Number of images to generate (1-4)" }),
+            numImages: z.int().min(1).max(4).optional().default(1).meta({ description: "Number of images to generate (a whole number, 1-4)" }),
             prompt: z.string().min(1).max(2000).meta({ description: "Detailed image description" }),
             referenceImages: z.array(z.url()).max(4).optional().meta({
                 description:

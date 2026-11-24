@@ -161,21 +161,65 @@ export const blankQuotedLines = (text: string): string => {
 };
 
 /**
- * What the person TYPED into a user message: its text without attached documents, a captured page, a guest's
- * note or a quoted block. A memory quotes only this (`memory/evidence.ts`), so a sentence from an upload or a
- * quote is never shown as their words.
+ * The lines messenger writes about a received attachment into the caption's part (`messenger/media.ts`): a voice
+ * transcript's label, a voice message or file it could not read, a file it cannot show the model. Read as such only in
+ * a part messenger wrote ({@link messengerTextPart}): typed into the composer, the same line is the person's own words.
  */
-export const typedTextOf = (message: MessageLike | undefined): string => {
+const MESSENGER_ATTACHMENT_LINE_RE = /^\s*\[(?:Voice message[ :\]]|Attached file: |Attachment(?: "[^\n]*")? not read: )/u;
+
+/**
+ * The text part messenger saves a received message in: the caption with the lines it writes about the attachments
+ * (`messenger/media.ts#ingestAttachments`). The mark tells {@link typedTextOf} those lines are not typed.
+ */
+export const messengerTextPart = (text: string): { providerOptions: { neore: { messenger: true } }; text: string; type: "text" } => {
+    return { providerOptions: { neore: { messenger: true } }, text, type: "text" };
+};
+
+/** Whether one stored part is messenger's text (`messengerTextPart`). */
+const isMessengerPart = (part: ContentPart): boolean => {
+    const options = part.providerOptions as { neore?: { messenger?: unknown } } | undefined;
+
+    return options?.neore?.messenger === true;
+};
+
+/**
+ * The typed lines of one text: up to the first attachment label (or, in messenger's text, its first attachment line),
+ * without quoted lines.
+ */
+const typedLinesOf = (text: string, messengerLines: boolean): string => {
+    const lines = text.split("\n");
+    const end = lines.findIndex((line) => isAttachedLine(line) || (messengerLines && MESSENGER_ATTACHMENT_LINE_RE.test(line)));
+
+    return withoutQuotedLines(end === -1 ? text : lines.slice(0, end).join("\n")).trimEnd();
+};
+
+export interface TypedTextOptions {
+    /**
+     * The message came in through messenger, so its unmarked text parts are read as messenger's text too: a row saved
+     * before {@link messengerTextPart} marked it (the typed-text backfill learns this from the thread).
+     */
+    messengerOrigin?: boolean;
+}
+
+/**
+ * What the person TYPED into a user message: its text without attached documents, a captured page, a guest's
+ * note, an outside agent's text, the app's placeholders or a quoted block, each typed part kept as its own paragraph.
+ * Typed words can come before an attachment in one text (messenger puts the caption and its attachment lines in one
+ * part): they are kept, and the rest is dropped from the first label on. Messenger's own attachment lines end the typed
+ * words only in its marked part (`messengerTextPart`) or with `options.messengerOrigin`.
+ * A memory quotes only this (`memory/evidence.ts`), and the composer's prompt search indexes, lists and matches only this
+ * (stored as `messages.typedText` by `agent/shared.ts#typedTextColumn`), so a sentence from an upload or a quote is never
+ * shown as their words.
+ */
+export const typedTextOf = (message: MessageLike | undefined, options: TypedTextOptions = {}): string => {
     if (message?.role !== "user") {
         return "";
     }
 
-    if (typeof message.content === "string") {
-        // Typed words can come before an attachment in one string (messenger): keep them, and drop the block from its label on.
-        const lines = message.content.split("\n");
-        const attached = lines.findIndex((line) => isAttachedLine(line));
+    const messengerOrigin = options.messengerOrigin === true;
 
-        return withoutQuotedLines(attached === -1 ? message.content : lines.slice(0, attached).join("\n")).trimEnd();
+    if (typeof message.content === "string") {
+        return typedLinesOf(message.content, messengerOrigin);
     }
 
     if (!Array.isArray(message.content)) {
@@ -183,18 +227,26 @@ export const typedTextOf = (message: MessageLike | undefined): string => {
     }
 
     return (message.content as ReadonlyArray<ContentPart>)
-        .flatMap((part) =>
-            part.type === "text" &&
-            typeof part.text === "string" &&
-            !isAttachedPart(part) &&
-            !isGuestTextPart(part) &&
-            !isOutsideAgentPart(part) &&
-            !isPlaceholderPart(part)
-                ? [withoutQuotedLines(part.text)]
-                : [],
-        )
+        .flatMap((part) => {
+            const typed = isTypedPart(part) ? typedLinesOf(part.text, messengerOrigin || isMessengerPart(part)) : "";
+
+            return typed.trim() === "" ? [] : [typed];
+        })
         .join("\n\n");
 };
+
+/**
+ * Whether one stored part of a user message may hold the person's typing: a text part that is no captured page, no
+ * guest's note, no outside agent's text and no placeholder the app wrote. {@link typedTextOf}, the one reader of typed words,
+ * reads only these parts, and only up to an attachment label in them.
+ */
+const isTypedPart = (part: ContentPart): part is ContentPart & { text: string } =>
+    part.type === "text" &&
+    typeof part.text === "string" &&
+    !hasPageMarker(part) &&
+    !isGuestTextPart(part) &&
+    !isOutsideAgentPart(part) &&
+    !isPlaceholderPart(part);
 
 /**
  * A text part an outside agent (the public API) sent: the person did not write it, so no quote may name it as their words.

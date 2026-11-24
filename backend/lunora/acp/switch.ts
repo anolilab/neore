@@ -111,7 +111,8 @@ const resolveTarget = async (ctx: MutationCtx, args: SwitchArgs, thread: Doc<"th
         return { kind: "model", model: definition.id };
     }
 
-    const device = await ctx.db.devices.findFirst({ where: { _id: target.hostId, userId: args.userId } });
+    // From the primary: the device's pairing and project scope decide the switch, and a replica can still show them as they were.
+    const device = await ctx.db.devices.findFirst({ consistency: "primary", where: { _id: target.hostId, userId: args.userId } });
     const offer = offerOf(device, target.agentKey, target.folderId);
 
     if (!device?.encryptedSecret || device.revokedAt !== undefined || !offer) {

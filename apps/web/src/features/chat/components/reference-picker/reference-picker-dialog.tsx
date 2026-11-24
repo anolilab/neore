@@ -174,11 +174,13 @@ const ReferencePickerDialog: FC<ReferencePickerDialogProps> = ({ initialSelectio
             );
         }
 
+        // A picker chooses a reference and never saves one. Its items carry no screening status, so none is offered a save.
         const galleryItems = items.map((item) => {
             return {
                 alt: item.threadTitle ?? undefined,
                 createdAt: new Date(item.createdAt),
                 id: item.id,
+                saveable: false,
                 src: item.url,
                 thumbnail: item.thumbnailUrl ?? item.url,
                 type: "image" as const,
