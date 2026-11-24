@@ -13,14 +13,18 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import schema from "../schema";
 import { addFile } from "./files";
 import {
+    CHAT_FILE_EXPORT_BYTES,
     CHAT_FILE_METADATA_CHUNK,
     CHAT_FILE_METADATA_MAX_QUERIES,
     type IdsPage,
     capChatFiles,
     chatFileMeter,
+    chatFileSectionBudget,
     collectAllChatFileMetadata,
     collectAllMessageFileIds,
+    textBytes,
     walkIds,
+    withChatFiles,
 } from "./export-pages";
 import {
     CHAT_FILE_EXPORT_PAGE,
@@ -491,6 +495,33 @@ describe("chat files in the GDPR export", () => {
         expect(chatFilesReadBudget(ACTION_READ_BYTES - READ_MARGIN_BYTES - 1024)).toBe(1024);
     });
 
+    it("gives the chat-file section what the rest of the export leaves under the file's size limit", () => {
+        expect(chatFileSectionBudget(100, 1000)).toBe(1000 - 100 - 64);
+        expect(chatFileSectionBudget(2000, 1000)).toBe(0);
+        expect(chatFileSectionBudget(0, 1_000_000_000)).toBe(CHAT_FILE_EXPORT_BYTES);
+    });
+
+    it("writes the chat-file section as the export's last key, and the file still parses", () => {
+        const rest = JSON.stringify({ a: 1, nested: { b: [1, 2] } }, null, 2);
+        const chatFiles = { files: [{ filename: "n.png", id: "x" }], truncated: false };
+
+        expect(JSON.parse(withChatFiles(rest, chatFiles))).toEqual({ a: 1, chatFiles, nested: { b: [1, 2] } });
+    });
+
+    it("keeps the whole file within its size limit, with the chat-file section cut to fit", () => {
+        const rest = JSON.stringify({ padding: "p".repeat(5000) }, null, 2);
+        const limit = 9000;
+        const rows = Array.from({ length: 200 }, (_, index) => {
+            return { filename: "f".repeat(40), id: `row-${String(index)}` };
+        });
+
+        const capped = capChatFiles(rows, chatFileSectionBudget(textBytes(rest), limit));
+        const file = withChatFiles(rest, { files: capped.files, truncated: capped.truncated });
+
+        expect(capped.truncated).toBe(true);
+        expect(textBytes(file)).toBeLessThanOrEqual(limit);
+    });
+
     it("is wired into the export action", () => {
         const steps = readFileSync(join(import.meta.dirname, "../gdpr/steps.ts"), "utf8");
 
@@ -498,8 +529,8 @@ describe("chat files in the GDPR export", () => {
         expect(steps).toContain("internal.agent.gdpr.collectThreadIdsForExport");
         expect(steps).toContain("internal.agent.gdpr.collectMessageFileIdsForExport");
         expect(steps).toContain("internal.agent.gdpr.chatFileMetadataForExport");
-        expect(steps).toContain("capChatFiles(chatFileRead.rows)");
+        expect(steps).toContain("capChatFiles(chatFileRead.rows, chatFileSectionBudget(restBytes, MAX_EXPORT_BYTES))");
+        expect(steps).toContain("withChatFiles(rest, chatFiles)");
         expect(steps).toContain("chatFilesReadBudget(");
-        expect(steps).toContain("\n            chatFiles,\n");
     });
 });

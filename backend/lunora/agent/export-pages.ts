@@ -232,3 +232,26 @@ export const capChatFiles = <Row>(rows: Row[], budget: number = CHAT_FILE_EXPORT
 
     return { files, truncated: false };
 };
+
+/** The UTF-8 bytes of a text, as the file's size limit counts them. */
+export const textBytes = (text: string): number => new TextEncoder().encode(text).byteLength;
+
+/** Held back from the file's size limit for the text the splices add around the chat-file section (its key, the commas and indent). */
+const CHAT_FILE_SPLICE_SLACK_BYTES = 64;
+
+/**
+ * The bytes the chat-file section may take: its own cap, and what the rest of the export leaves under the file's size limit. `restBytes`
+ * is the export without the section, usage JSON included. Past it the section is cut to fit, and says so.
+ */
+export const chatFileSectionBudget = (restBytes: number, fileLimit: number): number =>
+    Math.max(0, Math.min(CHAT_FILE_EXPORT_BYTES, fileLimit - restBytes - CHAT_FILE_SPLICE_SLACK_BYTES));
+
+/**
+ * The export's JSON with the chat-file section as its last key. `rest` is the export serialized without the section (`JSON.stringify(…,
+ * null, 2)`), which ends with its closing brace; the section is written at the same depth as the export's other keys.
+ */
+export const withChatFiles = (rest: string, chatFiles: unknown): string => {
+    const value = JSON.stringify(chatFiles, null, 2).replaceAll("\n", "\n  ");
+
+    return `${rest.slice(0, -2)},\n  "chatFiles": ${value}\n}`;
+};
