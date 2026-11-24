@@ -32,6 +32,23 @@ interface ConfirmationRequest {
     title: string;
 }
 
+/**
+ * Where focus goes after a confirmed archive or unpin, when the control that asked was in the sidebar: that row leaves its
+ * group and unmounts, so focus lands on the search toggle, which stays. Read when the action is asked, before the dialog takes
+ * focus. From the shortcut, the palette or the chat, focus is left where it was.
+ */
+const focusListAfterSidebarAction = (): (() => void) | undefined => {
+    const origin = document.activeElement;
+
+    if (!(origin instanceof HTMLElement) || origin.closest('[data-slot="sidebar"]') === null) {
+        return undefined;
+    }
+
+    return () => {
+        focusThreadSearchToggle();
+    };
+};
+
 const updateLoadingState = <K extends keyof LoadingStates>(previous: LoadingStates, key: K, threadId: string, isAdding: boolean): LoadingStates => {
     const currentSet = previous[key] as Set<string>;
     const newSet = new Set(currentSet);
@@ -278,6 +295,7 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
             }
 
             askFirst({
+                afterConfirm: focusListAfterSidebarAction(),
                 confirmLabel: t`Unpin`,
                 description: t`The chat will no longer be pinned. You can pin it again from the list.`,
                 run: () => {
@@ -336,10 +354,7 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
             }
 
             askFirst({
-                // The archived row is the button that opened the dialog, and it leaves the list: focus moves to the search toggle.
-                afterConfirm: () => {
-                    focusThreadSearchToggle();
-                },
+                afterConfirm: focusListAfterSidebarAction(),
                 confirmLabel: t`Archive`,
                 description: t`Archived chats stay searchable, and you can restore them from the archive.`,
                 run: () => {

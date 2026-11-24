@@ -4,6 +4,7 @@
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -65,7 +66,8 @@ vi.mock("@neore/client-runtime", () => {
 
 vi.mock("@tanstack/react-router", () => {
     return {
-        Link: ({ children }: { children: unknown }) => children,
+        Link: ({ children, ...rest }: { children: ReactNode; "data-worker-link"?: string }) =>
+            createElement("a", { "data-worker-link": rest["data-worker-link"], href: "#" }, children),
     };
 });
 
@@ -164,6 +166,17 @@ describe("worker list archive confirmation", () => {
 
         await waitFor(() => expect(harness.updateThread).toHaveBeenCalledWith({ status: "archived", threadId: "worker-1" }));
         expect(harness.updateThread).toHaveBeenCalledTimes(1);
+    });
+
+    it("moves focus to the worker's chat link after a confirmed archive, since the archive button that opened the dialog leaves", async () => {
+        harness.settings = { confirmBeforeArchiveChat: true };
+        mountList([idleWorker()]);
+
+        fireEvent.click(await archiveButton());
+        fireEvent.click(await screen.findByRole("button", { name: "Archive" }));
+
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement (document.activeElement) is what this test asserts
+        await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("link", { name: "Plan A" })));
     });
 
     it("leaves the worker alone when the archive dialog is cancelled", async () => {

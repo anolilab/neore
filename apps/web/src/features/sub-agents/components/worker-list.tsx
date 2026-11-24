@@ -16,7 +16,7 @@ import { skipToken, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArchiveIcon, Bot, SquareIcon } from "lucide-react";
 import type { FC } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
@@ -92,6 +92,8 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
     const archiveWorker = (workerId: string) => {
         updateThread({ status: "archived", threadId: workerId as Id<"threads"> }).catch(() => showError(t`Failed to archive the worker`));
     };
+    // The list, which keeps focus on the page after an archive: the Archive button that opened the dialog unmounts once the worker is archived.
+    const listRef = useRef<HTMLElement>(null);
 
     const now = useNow((workers ?? []).some((worker) => worker.lastActivityAt !== null));
 
@@ -111,7 +113,7 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
     const quietNames = workers.filter((worker) => quietMinutesAt(now, worker.lastActivityAt, worker.quietAfterMs) !== null).map((worker) => worker.name);
 
     return (
-        <section aria-label={t`Workers`} className={className}>
+        <section aria-label={t`Workers`} className={className} ref={listRef} tabIndex={-1}>
             <p aria-live="polite" className="sr-only" role="status">
                 {quietNames.length === 0 ? "" : t`No progress: ${quietNames.join(", ")}`}
             </p>
@@ -121,6 +123,7 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
                         <Bot aria-hidden="true" className="text-muted-foreground size-4 shrink-0" />
                         <Link
                             className="min-w-0 flex-1 truncate underline-offset-4 hover:underline"
+                            data-worker-link={worker.workerId}
                             params={{ threadId: worker.workerId }}
                             to="/chat/$threadId"
                         >
@@ -178,6 +181,17 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
                     if (worker !== undefined && worker.state === "idle" && !worker.stopping && !worker.archived && !isImpersonating) {
                         archiveWorker(worker.workerId);
                     }
+
+                    // The archive button that opened the dialog is gone once the worker is archived, so focus goes to the worker's
+                    // chat link, which stays in the list, and to the list itself if that link is not there. After the dialog returns focus.
+                    const archivedId = pendingArchive;
+
+                    globalThis.setTimeout(() => {
+                        const links = [...(listRef.current?.querySelectorAll<HTMLElement>("[data-worker-link]") ?? [])];
+                        const link = links.find((candidate) => candidate.dataset.workerLink === archivedId);
+
+                        (link ?? listRef.current)?.focus();
+                    }, 0);
 
                     setArchiveTarget(undefined);
                 }}

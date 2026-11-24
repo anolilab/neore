@@ -302,21 +302,74 @@ describe("chat action confirmations", () => {
         expect(calls).toStrictEqual([{ args: { model: "model-a", status: "archived", threadId: "t1" }, fn: "updateThread" }]);
     });
 
-    it("moves focus to the search toggle after a confirmed archive, since the archived row is leaving", async () => {
+    it("moves focus to the search toggle after a confirmed archive from the sidebar, since the archived row is leaving", async () => {
         settings.value = { confirmBeforeArchiveChat: true };
         render(
             <>
-                <button data-search-toggle="" type="button">
-                    Search threads
-                </button>
+                <div data-slot="sidebar">
+                    <button type="button">Archive row</button>
+                    <button data-search-toggle="" type="button">
+                        Search threads
+                    </button>
+                </div>
                 <Confirmable />
             </>,
         );
 
+        screen.getByRole("button", { name: "Archive row" }).focus();
         act(() => {
             current().updateThread("t1", "model-a", "archived");
         });
         fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement (document.activeElement) is what this test asserts
+        await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Search threads" })));
+    });
+
+    it("leaves focus where it was after a confirmed archive asked from outside the sidebar, such as the shortcut or the palette", async () => {
+        settings.value = { confirmBeforeArchiveChat: true };
+        render(
+            <>
+                <div data-slot="sidebar">
+                    <button data-search-toggle="" type="button">
+                        Search threads
+                    </button>
+                </div>
+                <button type="button">Chat composer</button>
+                <Confirmable />
+            </>,
+        );
+
+        screen.getByRole("button", { name: "Chat composer" }).focus();
+        act(() => {
+            current().updateThread("t1", "model-a", "archived");
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+        await act(flush);
+
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement (document.activeElement) is what this test asserts
+        expect(document.activeElement).not.toBe(screen.getByRole("button", { name: "Search threads" }));
+    });
+
+    it("moves focus to the search toggle after a confirmed unpin from the sidebar, since the pinned row leaves its group", async () => {
+        settings.value = { confirmBeforeUnpinChat: true };
+        render(
+            <>
+                <div data-slot="sidebar">
+                    <button type="button">Unpin row</button>
+                    <button data-search-toggle="" type="button">
+                        Search threads
+                    </button>
+                </div>
+                <Confirmable />
+            </>,
+        );
+
+        screen.getByRole("button", { name: "Unpin row" }).focus();
+        act(() => {
+            current().handleUnpinThread("t1");
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Unpin" }));
 
         // eslint-disable-next-line testing-library/no-node-access -- focus placement (document.activeElement) is what this test asserts
         await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Search threads" })));
