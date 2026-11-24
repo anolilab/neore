@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -300,6 +300,26 @@ describe("chat action confirmations", () => {
         await act(flush);
 
         expect(calls).toStrictEqual([{ args: { model: "model-a", status: "archived", threadId: "t1" }, fn: "updateThread" }]);
+    });
+
+    it("moves focus to the search toggle after a confirmed archive, since the archived row is leaving", async () => {
+        settings.value = { confirmBeforeArchiveChat: true };
+        render(
+            <>
+                <button data-search-toggle="" type="button">
+                    Search threads
+                </button>
+                <Confirmable />
+            </>,
+        );
+
+        act(() => {
+            current().updateThread("t1", "model-a", "archived");
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement (document.activeElement) is what this test asserts
+        await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Search threads" })));
     });
 
     it("restores without asking even when the archive setting is on", async () => {

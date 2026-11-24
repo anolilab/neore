@@ -12,6 +12,7 @@ import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useThreadManager } from "@/features/chat/core/hooks/use-thread-manager";
 import { useOptimisticActions, useThreadActions } from "@/features/chat/core/stores/thread-store-hooks";
 import { routeIsOn, survivingPaneAfterDelete } from "@/features/chat/split/split-layout-store";
+import { focusThreadSearchToggle } from "@/features/keyboard/lib/thread-search-target";
 import type { DownloadFormat } from "@/lib/download";
 import { handleDownload } from "@/lib/download";
 import { ValidationError } from "@/lib/errors";
@@ -23,6 +24,8 @@ import type { BranchNode, LoadingStates } from "../types";
 
 /** What a confirmation asks, and the action it runs only on confirm. */
 interface ConfirmationRequest {
+    /** Runs after the confirm, once the dialog has returned focus: for focus that must land on a control still on the page. */
+    afterConfirm?: () => void;
     confirmLabel: string;
     description: string;
     run: () => void;
@@ -333,6 +336,10 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
             }
 
             askFirst({
+                // The archived row is the button that opened the dialog, and it leaves the list: focus moves to the search toggle.
+                afterConfirm: () => {
+                    focusThreadSearchToggle();
+                },
                 confirmLabel: t`Archive`,
                 description: t`Archived chats stay searchable, and you can restore them from the archive.`,
                 run: () => {
@@ -401,8 +408,15 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
             confirmLabel={pendingRequest?.confirmLabel}
             description={pendingRequest?.description}
             onConfirm={() => {
+                const request = pendingRequest;
+
                 setDialogOpen(false);
-                pendingRequest?.run();
+                request?.run();
+
+                // The dialog returns focus to the button that opened it on close, so a follow-up runs after that return.
+                if (request?.afterConfirm) {
+                    globalThis.setTimeout(request.afterConfirm, 0);
+                }
             }}
             onOpenChange={setDialogOpen}
             open={dialogOpen}
