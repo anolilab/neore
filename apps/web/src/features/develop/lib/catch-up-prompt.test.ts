@@ -5,6 +5,17 @@ import { catchUpPrompt, hostOfPullRequestUrl, isPlainBranchName, isPlainRepo } f
 
 const PULL = { baseBranch: "release/2.0", headBranch: "feat/x", host: "git.example", number: 42, repository: "octo/hello" };
 
+const CLEAN_CHECK =
+    "2. Run `git status --porcelain`. If it prints anything, stop without switching branches or changing any ref, and tell the person to commit or stash their work first.";
+
+/** The checkout is checked clean right after origin and before any fetch or switch: local changes would ride onto the branch. */
+const expectCleanCheckFirst = (prompt: string, firstChange: string): void => {
+    expect(prompt).toContain(`\n${CLEAN_CHECK}\n3. Fetch by name`);
+    expect(prompt.indexOf("1. Check that `git remote get-url")).toBeLessThan(prompt.indexOf(CLEAN_CHECK));
+    expect(prompt.indexOf(CLEAN_CHECK)).toBeLessThan(prompt.indexOf("`git fetch origin"));
+    expect(prompt.indexOf(CLEAN_CHECK)).toBeLessThan(prompt.indexOf(firstChange));
+};
+
 /** Every `git push` command in a prompt, as written between backticks. */
 const pushes = (prompt: string): string[] => [...prompt.matchAll(/`(git push[^`]*)`/gu)].map((match) => match[1] ?? "");
 
@@ -16,6 +27,7 @@ describe(catchUpPrompt, () => {
         // The push goes to origin's push URL, which may differ from its fetch URL: both are checked.
         expect(prompt).toContain("`git remote get-url --all origin` and `git remote get-url --push --all origin` each print exactly one URL");
         expect(prompt).toContain("both are octo/hello on git.example");
+        expectCleanCheckFirst(prompt, "`git switch --no-guess feat/x`");
         // A single-branch clone has no other ref after a bare `git fetch origin`; each is fetched by name.
         // Each into a flat name of its own outside refs/remotes/origin: a stale origin/release cannot block release/2.0, and a
         // branch of origin named pr-42 cannot overwrite the pull request's head.
@@ -26,7 +38,7 @@ describe(catchUpPrompt, () => {
         expect(prompt).toContain("`git rev-parse refs/neore/pull-42-branch` differs from `git rev-parse refs/neore/pull-42-head`, stop");
         // The lease is the commit checked here: another run's fetch of refs/neore/pull-42-head after this step cannot move it.
         expect(prompt).toContain(
-            "Otherwise record the commit `git rev-parse refs/neore/pull-42-head` printed and say it: step 7 leases on that commit. Then run `git switch --no-guess feat/x`",
+            "Otherwise record the commit `git rev-parse refs/neore/pull-42-head` printed and say it: step 8 leases on that commit. Then run `git switch --no-guess feat/x`",
         );
         // Not --track: a ref outside refs/remotes is no upstream, and git refuses to track it.
         expect(prompt).toContain("(`git switch -c feat/x refs/neore/pull-42-branch` when there is no local branch of that name)");
@@ -36,8 +48,8 @@ describe(catchUpPrompt, () => {
         expect(prompt).toContain("or `git rev-parse HEAD` then differs from `git rev-parse refs/neore/pull-42-branch`");
         expect(prompt).toContain("intent of both sides");
         expect(prompt).toContain("build and the tests");
-        expect(pushes(prompt)).toEqual(["git push --no-follow-tags --force-with-lease=refs/heads/feat/x:<commit from step 3> origin HEAD:refs/heads/feat/x"]);
-        expect(prompt).toContain("`, writing the commit you recorded in step 3 in place of <commit from step 3>.");
+        expect(pushes(prompt)).toEqual(["git push --no-follow-tags --force-with-lease=refs/heads/feat/x:<commit from step 4> origin HEAD:refs/heads/feat/x"]);
+        expect(prompt).toContain("`, writing the commit you recorded in step 4 in place of <commit from step 4>.");
         expect(prompt).not.toContain("--force-with-lease=refs/heads/feat/x:refs/neore/");
         expect(prompt).toContain("Do not push to any other branch or remote.");
         // A delegated cloud coding-agent run never pushes: the steps say to run them where git has the person's own access.
@@ -53,6 +65,7 @@ describe(catchUpPrompt, () => {
 
         expect(prompt).toContain("comes from a fork");
         expect(prompt).toContain("both are octo/hello on git.example");
+        expectCleanCheckFirst(prompt, "`git switch -c pr-42 refs/neore/pull-42-head`");
         expect(prompt).toContain("`git fetch origin +refs/heads/release/2.0:refs/neore/pull-42-base`");
         expect(prompt).toContain("`git fetch origin +refs/pull/42/head:refs/neore/pull-42-head`");
         expect(prompt).toContain("`git switch -c pr-42 refs/neore/pull-42-head`");
@@ -70,7 +83,7 @@ describe(catchUpPrompt, () => {
 
         expect(prompt).toContain("`git fetch origin +refs/heads/pr-42:refs/neore/pull-42-branch`");
         expect(prompt).toContain("`git fetch origin +refs/pull/42/head:refs/neore/pull-42-head`");
-        expect(pushes(prompt)).toEqual(["git push --no-follow-tags --force-with-lease=refs/heads/pr-42:<commit from step 3> origin HEAD:refs/heads/pr-42"]);
+        expect(pushes(prompt)).toEqual(["git push --no-follow-tags --force-with-lease=refs/heads/pr-42:<commit from step 4> origin HEAD:refs/heads/pr-42"]);
     });
 });
 

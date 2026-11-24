@@ -60,15 +60,18 @@ export const catchUpPrompt = ({
     const base = `refs/neore/pull-${pull}-base`;
     // Fetch and push URLs can differ (`pushurl`, `pushInsteadOf`, several URLs): each must be exactly one, and this repository.
     const checkOrigin = `1. Check that \`git remote get-url --all origin\` and \`git remote get-url --push --all origin\` each print exactly one URL, and that both are ${repository} on ${host} (ignoring case and a trailing \`.git\`). Otherwise stop and say so.`;
+    // Before any fetch or switch: uncommitted changes would be carried onto the pull request's branch, and the rebase then refuses.
+    const checkClean =
+        "2. Run `git status --porcelain`. If it prints anything, stop without switching branches or changing any ref, and tell the person to commit or stash their work first.";
     const fetchBaseAndPull = `\`git fetch origin +refs/heads/${baseBranch}:${base}\` and the pull request's own head with \`git fetch origin +refs/pull/${pull}/head:${pullRef}\``;
     // A delegated coding-agent run clones in a sandbox, has no credential once its agent starts, and turns its result into a
     // new pull request from a diff: it can neither push this branch nor leave commits the person can reach.
     const whereToRun =
         "Run these steps yourself, in a checkout where git uses the person's own access to origin (their computer, or a device or server they paired). Do not hand them to a cloud coding agent run: it cannot push, and its result becomes a new pull request instead of updating this one.";
     const finish = [
-        `4. Run \`git rebase ${base}\`.`,
-        "5. Resolve any conflicts so the result keeps the intent of both sides: this branch's change and what landed on the base.",
-        "6. Check that the build and the tests still pass, and fix what the rebase broke.",
+        `5. Run \`git rebase ${base}\`.`,
+        "6. Resolve any conflicts so the result keeps the intent of both sides: this branch's change and what landed on the base.",
+        "7. Check that the build and the tests still pass, and fix what the rebase broke.",
     ];
 
     if (!headInBaseRepository) {
@@ -77,26 +80,28 @@ export const catchUpPrompt = ({
             whereToRun,
             "",
             checkOrigin,
-            `2. Fetch by name, which also works in a clone of one branch: ${fetchBaseAndPull}.`,
-            `3. Run \`git switch -c pr-${pull} ${pullRef}\` (if a branch pr-${pull} already exists, stop and say so).`,
+            checkClean,
+            `3. Fetch by name, which also works in a clone of one branch: ${fetchBaseAndPull}.`,
+            `4. Run \`git switch -c pr-${pull} ${pullRef}\` (if a branch pr-${pull} already exists, stop and say so).`,
             ...finish,
-            `7. Leave the rebased commits on pr-${pull} and say so, for the person to bring to the fork. Do not push to any branch or remote.`,
+            `8. Leave the rebased commits on pr-${pull} and say so, for the person to bring to the fork. Do not push to any branch or remote.`,
         ].join("\n");
     }
 
     const head = `refs/neore/pull-${pull}-branch`;
-    // The push's lease is the commit step 3 checked and recorded, not a ref: a background fetch can move `head`, and another
-    // Catch up run for this pull request in the same repository or a linked worktree can move `pullRef`, after step 3.
-    const leaseCommit = "<commit from step 3>";
+    // The push's lease is the commit step 4 checked and recorded, not a ref: a background fetch can move `head`, and another
+    // Catch up run for this pull request in the same repository or a linked worktree can move `pullRef`, after step 4.
+    const leaseCommit = "<commit from step 4>";
 
     return [
         `The branch ${headBranch} of ${repository}#${pull} is behind ${baseBranch}. Bring it up to date.`,
         whereToRun,
         "",
         checkOrigin,
-        `2. Fetch by name, which also works in a clone of one branch: \`git fetch origin +refs/heads/${headBranch}:${head}\`, ${fetchBaseAndPull}.`,
-        `3. If \`git rev-parse ${head}\` differs from \`git rev-parse ${pullRef}\`, stop and say so: origin's ${headBranch} is not this pull request's head right now. Otherwise record the commit \`git rev-parse ${pullRef}\` printed and say it: step 7 leases on that commit. Then run \`git switch --no-guess ${headBranch}\` (\`git switch -c ${headBranch} ${head}\` when there is no local branch of that name), then \`git merge --ff-only ${head}\`. If that fails, or \`git rev-parse HEAD\` then differs from \`git rev-parse ${head}\`, the local branch has commits origin does not: stop and say so.`,
+        checkClean,
+        `3. Fetch by name, which also works in a clone of one branch: \`git fetch origin +refs/heads/${headBranch}:${head}\`, ${fetchBaseAndPull}.`,
+        `4. If \`git rev-parse ${head}\` differs from \`git rev-parse ${pullRef}\`, stop and say so: origin's ${headBranch} is not this pull request's head right now. Otherwise record the commit \`git rev-parse ${pullRef}\` printed and say it: step 8 leases on that commit. Then run \`git switch --no-guess ${headBranch}\` (\`git switch -c ${headBranch} ${head}\` when there is no local branch of that name), then \`git merge --ff-only ${head}\`. If that fails, or \`git rev-parse HEAD\` then differs from \`git rev-parse ${head}\`, the local branch has commits origin does not: stop and say so.`,
         ...finish,
-        `7. Push only this pull request's branch: \`git push --no-follow-tags --force-with-lease=refs/heads/${headBranch}:${leaseCommit} origin HEAD:refs/heads/${headBranch}\`, writing the commit you recorded in step 3 in place of ${leaseCommit}. If this environment cannot push or the push is refused, leave the rebased commits in place and say so. Do not push to any other branch or remote.`,
+        `8. Push only this pull request's branch: \`git push --no-follow-tags --force-with-lease=refs/heads/${headBranch}:${leaseCommit} origin HEAD:refs/heads/${headBranch}\`, writing the commit you recorded in step 4 in place of ${leaseCommit}. If this environment cannot push or the push is refused, leave the rebased commits in place and say so. Do not push to any other branch or remote.`,
     ].join("\n");
 };
