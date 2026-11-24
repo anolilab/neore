@@ -14,6 +14,7 @@ import schema from "../schema";
 import { addFile } from "./files";
 import {
     CHAT_FILE_METADATA_CHUNK,
+    CHAT_FILE_METADATA_MAX_QUERIES,
     type IdsPage,
     capChatFiles,
     chatFileMeter,
@@ -388,6 +389,33 @@ describe("chat files in the GDPR export", () => {
             readBytes: 0,
             truncated: true,
         });
+    });
+
+    it("stops reading metadata chunks once their own query allowance is spent, and says so", async () => {
+        const granted = Array.from({ length: CHAT_FILE_METADATA_MAX_QUERIES + 5 }, (_, index) => `g${String(index)}`);
+
+        const { rows, truncated } = await collectAllChatFileMetadata(
+            async (meter) =>
+                await walkIds(async () => {
+                    return { cursor: null, ids: granted };
+                }, meter),
+            async () => {
+                return { ids: [], readBytes: 0, truncated: false };
+            },
+            async (fileIds) => {
+                return {
+                    readBytes: 0,
+                    rows: fileIds.map((id) => {
+                        return { id };
+                    }),
+                };
+            },
+            1,
+            chatFileMeter(),
+        );
+
+        expect(rows).toHaveLength(CHAT_FILE_METADATA_MAX_QUERIES);
+        expect(truncated).toBe(true);
     });
 
     it("reads the granted files' metadata before a long message history spends the allowance", async () => {

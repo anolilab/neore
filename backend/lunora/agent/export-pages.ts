@@ -35,17 +35,17 @@ export interface ChatFileMeter {
     queriesLeft: number;
 }
 
-/** The queries the chat-file section may issue in one export action: each page and each metadata chunk is one. */
+/** The queries the id walks may issue in one export action: each page of grants, threads and messages is one. */
 export const CHAT_FILE_MAX_QUERIES = 200;
+
+/** The metadata chunks one export action may read, each one query: their own allowance, so many granted files cannot stall the walks. */
+export const CHAT_FILE_METADATA_MAX_QUERIES = 200;
 
 /**
  * Held back from the message walk for reading the metadata of the files it finds, so a walk that runs long cannot leave them unread. The
  * walk stops short of the reserve and the section says so.
  */
 export const CHAT_FILE_METADATA_RESERVE_BYTES = 2 * 1024 * 1024;
-
-/** The queries held back from the message walk for the metadata chunks (see {@link CHAT_FILE_METADATA_RESERVE_BYTES}). */
-export const CHAT_FILE_METADATA_RESERVE_QUERIES = 20;
 
 /** A meter for the chat-file section: the bytes it may read (default `CHAT_FILES_READ_BYTES`) and the queries it may issue. */
 export const chatFileMeter = (bytes: number = CHAT_FILES_READ_BYTES, queries: number = CHAT_FILE_MAX_QUERIES): ChatFileMeter => {
@@ -132,19 +132,22 @@ export const collectAllChatFileMetadata = async <Row>(
     chunkSize: number = CHAT_FILE_METADATA_CHUNK,
     meter: ChatFileMeter = chatFileMeter(),
 ): Promise<{ rows: Row[]; truncated: boolean }> => {
+    // The metadata chunks have their own query allowance, so a large set of granted files cannot stall the export.
+    let metadataQueriesLeft = CHAT_FILE_METADATA_MAX_QUERIES;
+
     const readChunks = async (fileIds: string[]): Promise<{ rows: Row[]; truncated: boolean }> => {
         const rows: Row[] = [];
 
         for (let start = 0; start < fileIds.length; start += chunkSize) {
-            // Past the bytes the rest of the files are not read: the section says so, as it does past its byte cap.
-            if (meter.bytesLeft <= 0) {
+            // Past the bytes or the chunk queries the rest of the files are not read: the section says so, as it does past its byte cap.
+            if (meter.bytesLeft <= 0 || metadataQueriesLeft <= 0) {
                 return { rows, truncated: true };
             }
 
             const chunk = await readMetadata(fileIds.slice(start, start + chunkSize));
 
             meter.bytesLeft -= chunk.readBytes;
-            meter.queriesLeft -= 1;
+            metadataQueriesLeft -= 1;
             rows.push(...chunk.rows);
         }
 
@@ -155,11 +158,8 @@ export const collectAllChatFileMetadata = async <Row>(
     const grantedIds = [...new Set(granted.ids)];
     const grantedRead = await readChunks(grantedIds);
 
-    // The message walk stops short of a reserve, so the files it finds still get their metadata read even when it runs long.
-    const walkMeter = chatFileMeter(
-        Math.max(0, meter.bytesLeft - CHAT_FILE_METADATA_RESERVE_BYTES),
-        Math.max(0, meter.queriesLeft - CHAT_FILE_METADATA_RESERVE_QUERIES),
-    );
+    // The message walk stops short of a bytes reserve, so the files it finds still get their metadata read even when it runs long.
+    const walkMeter = chatFileMeter(Math.max(0, meter.bytesLeft - CHAT_FILE_METADATA_RESERVE_BYTES), meter.queriesLeft);
     const queriesBefore = walkMeter.queriesLeft;
     const messages = await walkMessages(walkMeter);
 
