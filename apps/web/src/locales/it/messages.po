@@ -37,6 +37,22 @@ msgstr "-- NORMALE --"
 msgid ", unread"
 msgstr ", non letta"
 
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:83
+msgid "An admin acting as you cannot change this default."
+msgstr "Un amministratore che agisce al tuo posto non può modificare questo predefinito."
+
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:66
+msgid "Could not save the default permission mode"
+msgstr "Impossibile salvare la modalità di autorizzazione predefinita"
+
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:48
+msgid "Default for new chats"
+msgstr "Predefinito per le nuove chat"
+
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:50
+msgid "New chats start in this permission mode. A chat that already exists keeps its own mode, and you can still change a chat's mode in its composer."
+msgstr "Le nuove chat iniziano in questa modalità di autorizzazione. Una chat esistente mantiene la propria modalità; la modalità di una chat si può ancora cambiare dal suo composer."
+
 #: src/features/sub-agents/components/sub-agent-approvals.tsx:63
 msgid "… ({omitted, plural, one {# more character not shown} other {# more characters not shown}}; approving runs the whole call)"
 msgstr "… ({omitted, plural, one {# altro carattere non mostrato} other {altri # caratteri non mostrati}}; approvare esegue l’intera chiamata)"

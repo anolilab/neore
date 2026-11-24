@@ -4250,6 +4250,8 @@ export const schema = defineSchema({
         dailyBriefEnabled: v.optional(v.boolean()),
         // When the user answered "Not now" to the home page's one-time Daily Brief offer (`home/overview.ts`). Server-written only. Absent = not answered.
         dailyBriefOfferDismissedAt: v.optional(v.number()),
+        // The permission mode a new chat starts with (`chat/lib/thread-permission-mode.ts`). Absent = auto.
+        defaultPermissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
         // Appearance: UI spacing preset (accepted values: `auth/fields.ts`).
         density: v.optional(v.string()),
         dictationLanguage: v.optional(v.string()),

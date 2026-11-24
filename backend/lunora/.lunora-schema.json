@@ -33472,6 +33472,35 @@
           "optional": true,
           "unique": false
         },
+        "defaultPermissionMode": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"auto\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"full\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"supervised\""
+            }
+          ]
+        },
         "density": {
           "kind": "string",
           "nullable": false,
