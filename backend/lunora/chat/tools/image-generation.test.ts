@@ -82,6 +82,14 @@ describe("image generation draws on the daily image allowance", () => {
         expect(state.log).toStrictEqual(["charge:chat/dailyImage:free:1"]);
     });
 
+    it("refuses a fractional image count before anything is charged, instead of reporting a failed check", async () => {
+        const output = await tool.execute(makeContext(), { numImages: 1.5, prompt: "a cat" });
+
+        expect(output.error).toBe("numImages must be a whole number");
+        expect(output.code).toBeUndefined();
+        expect(state.log).toStrictEqual([]);
+    });
+
     it("refuses a request bigger than the whole bucket as a limit, uncharged, not as a failed check", async () => {
         // A guest's bucket holds one image: two cannot fit, so nothing is charged and the limiter is never asked.
         state.anonymous = true;

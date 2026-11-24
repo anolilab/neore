@@ -47,6 +47,11 @@ Use 'auto' to automatically match input image's aspect ratio. Premium users can 
             return { error: "Authentication required", images: [] };
         }
 
+        // The schema asks for a whole number; a fraction is refused here too, before the allowance is touched.
+        if (!Number.isSafeInteger(numberImages)) {
+            return { error: "numImages must be a whole number", images: [] };
+        }
+
         // The same daily image allowance `/chat/media` charges, one unit per image, before the provider call.
         const quota = await takeImageQuota(context, context.userId, numberImages);
 
@@ -105,7 +110,7 @@ Use 'auto' to automatically match input image's aspect ratio. Premium users can 
                 .default(MEDIA_DEFAULT_MODELS.image)
                 .meta({ description: "AI model to use (e.g., fal-ai/recraft/v3/text-to-image, google/gemini-2.5-flash-image)" }),
             negativePrompt: z.string().optional().meta({ description: "What to avoid in the image" }),
-            numImages: z.number().min(1).max(4).optional().default(1).meta({ description: "Number of images to generate (1-4)" }),
+            numImages: z.int().min(1).max(4).optional().default(1).meta({ description: "Number of images to generate (a whole number, 1-4)" }),
             prompt: z.string().min(1).max(2000).meta({ description: "Detailed image description" }),
             referenceImages: z.array(z.url()).max(4).optional().meta({
                 description:
