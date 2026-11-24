@@ -307,7 +307,7 @@ msgstr "{0, plural, other {# 个文件}}"
 
 #. placeholder {0}: items.length
 #. placeholder {0}: option.value
-#: ../../packages/ui/src/components/image-gallery.tsx:407
+#: ../../packages/ui/src/components/image-gallery.tsx:444
 #: src/features/chat/thread/composer-image-settings.tsx:227
 msgid "{0, plural, one {# image} other {# images}}"
 msgstr "{0, plural, other {# 张图片}}"
@@ -765,7 +765,7 @@ msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "已选择 {0}/{MAX_PARALLEL} 个"
 
 #. placeholder {0}: referenceImageIds.length
-#: src/features/chat/thread/media-gallery-view.tsx:370
+#: src/features/chat/thread/media-gallery-view.tsx:372
 msgid "{0} of {MAX_REFERENCE_IMAGES} references selected"
 msgstr "已选择 {0}/{MAX_REFERENCE_IMAGES} 张参考图"
 
@@ -1014,7 +1014,7 @@ msgstr "{date}：无回复"
 msgid "{days} days"
 msgstr "{days} 天"
 
-#: src/features/chat/pins/pin-item.tsx:53
+#: src/features/chat/pins/pin-item.tsx:54
 #: src/features/settings/components/chat/api-keys-settings.tsx:290
 msgid "{days}d ago"
 msgstr "{days} 天前"
@@ -1197,7 +1197,7 @@ msgstr "{hours} 小时 {minutes} 分钟"
 msgid "{hours}h {minutes}m remaining"
 msgstr "剩余 {hours} 小时 {minutes} 分钟"
 
-#: src/features/chat/pins/pin-item.tsx:49
+#: src/features/chat/pins/pin-item.tsx:50
 #: src/features/settings/components/chat/api-keys-settings.tsx:286
 msgid "{hours}h ago"
 msgstr "{hours} 小时前"
@@ -1290,11 +1290,11 @@ msgstr "{metricLabel} > 每小时 {threshold}"
 msgid "{metricLabel} > {threshold} per month"
 msgstr "{metricLabel} > 每月 {threshold}"
 
-#: src/features/chat/thread/media-gallery-view.tsx:345
+#: src/features/chat/thread/media-gallery-view.tsx:347
 msgid "{mins}m"
 msgstr "{mins} 分"
 
-#: src/features/chat/thread/media-gallery-view.tsx:345
+#: src/features/chat/thread/media-gallery-view.tsx:347
 msgid "{mins}m {secs}s"
 msgstr "{mins} 分 {secs} 秒"
 
@@ -1302,7 +1302,7 @@ msgstr "{mins} 分 {secs} 秒"
 msgid "{minutes}m"
 msgstr "{minutes} 分钟"
 
-#: src/features/chat/pins/pin-item.tsx:45
+#: src/features/chat/pins/pin-item.tsx:46
 #: src/features/settings/components/chat/api-keys-settings.tsx:282
 msgid "{minutes}m ago"
 msgstr "{minutes} 分钟前"
@@ -1331,7 +1331,7 @@ msgstr "{more, plural, other {另外 # 个}}"
 msgid "{moreCount, plural, one {# more item} other {# more items}}"
 msgstr "{moreCount, plural, other {另外 # 项}}"
 
-#: src/features/canvas/canvas-panel.tsx:245
+#: src/features/canvas/canvas-panel.tsx:246
 msgid "{n, plural, one {# unsaved edit} other {# unsaved edits}}"
 msgstr "{n, plural, other {# 处未保存的编辑}}"
 
@@ -1537,7 +1537,7 @@ msgstr "{rowsNeeded, plural, other {需要再添加 # 行才能粘贴剪贴板�
 msgid "{secondLabel} ×{secondCount}"
 msgstr "{secondLabel} ×{secondCount}"
 
-#: src/features/chat/thread/media-gallery-view.tsx:339
+#: src/features/chat/thread/media-gallery-view.tsx:341
 msgid "{seconds}s"
 msgstr "{seconds} 秒"
 
@@ -2546,7 +2546,7 @@ msgstr "添加备注（可选）…"
 msgid "Add a note..."
 msgstr "添加备注..."
 
-#: src/features/chat/pins/pin-item.tsx:226
+#: src/features/chat/pins/pin-item.tsx:233
 msgid "Add a note…"
 msgstr "添加备注…"
 
@@ -2645,7 +2645,7 @@ msgstr "添加端点"
 msgid "Add error handling"
 msgstr "添加错误处理"
 
-#: src/features/chat/pins/pin-item.tsx:280
+#: src/features/chat/pins/pin-item.tsx:289
 msgid "Add excerpt"
 msgstr "添加摘录"
 
@@ -2942,7 +2942,7 @@ msgstr "不添加任何工具。"
 msgid "Adds these tools:"
 msgstr "添加以下工具："
 
-#: src/features/canvas/canvas-panel.tsx:121
+#: src/features/canvas/canvas-panel.tsx:122
 msgid "Adjust"
 msgstr "调整"
 
@@ -3240,7 +3240,7 @@ msgstr "智能体会自主处理你的任务。验证器会根据成功标准检
 msgid "Aggregate scores of both runs"
 msgstr "两次运行的汇总得分"
 
-#: src/features/chat/pins/pin-item.tsx:240
+#: src/features/chat/pins/pin-item.tsx:247
 #: src/features/workflow/types/index.ts:384
 msgid "AI"
 msgstr "AI"
@@ -3764,7 +3764,7 @@ msgstr "Amazon 最新且最小的 LLM"
 msgid "Amber"
 msgstr "琥珀色"
 
-#: src/features/canvas/canvas-panel.tsx:220
+#: src/features/canvas/canvas-panel.tsx:221
 msgid "Amount"
 msgstr "金额"
 
@@ -3820,7 +3820,7 @@ msgstr "发生错误"
 msgid "An error occurred during One Tap sign in"
 msgstr "One Tap 登录时出错"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1254
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1255
 msgid "An error occurred while generating the response."
 msgstr "生成回复时发生错误。"
 
@@ -4158,7 +4158,7 @@ msgstr "应用方式"
 msgid "Applies to"
 msgstr "适用于"
 
-#: src/features/canvas/canvas-panel.tsx:119
+#: src/features/canvas/canvas-panel.tsx:120
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:333
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:430
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:212
@@ -4556,8 +4556,8 @@ msgstr "请你的其他助手列出它记住的内容，粘贴其回答，并选
 msgid "Aspect ratio"
 msgstr "宽高比"
 
-#: src/features/chat/thread/media-gallery-view.tsx:456
-#: src/features/chat/thread/media-gallery-view.tsx:541
+#: src/features/chat/thread/media-gallery-view.tsx:458
+#: src/features/chat/thread/media-gallery-view.tsx:543
 #: src/features/workflow/components/nodes/video-node.tsx:178
 msgid "Aspect Ratio"
 msgstr "宽高比"
@@ -4741,7 +4741,7 @@ msgstr "自动"
 #: src/features/chat/thread/composer-permission-mode.tsx:41
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:65
-#: src/features/chat/thread/media-gallery-view.tsx:509
+#: src/features/chat/thread/media-gallery-view.tsx:511
 #: src/features/settings/components/chat/bots-settings.tsx:132
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Auto"
@@ -4970,7 +4970,7 @@ msgstr "返回"
 msgid "Back online"
 msgstr "已恢复在线"
 
-#: src/features/canvas/components/canvas-version-history.tsx:175
+#: src/features/canvas/components/canvas-version-history.tsx:178
 msgid "Back to editor"
 msgstr "返回编辑器"
 
@@ -5397,13 +5397,13 @@ msgid "Blog Header"
 msgstr "博客头图"
 
 #: src/features/appearance/components/appearance-controls.tsx:158
-#: src/features/canvas/canvas-panel.tsx:221
+#: src/features/canvas/canvas-panel.tsx:222
 #: src/features/chat/tags/thread-tag-color-picker.tsx:16
 #: src/features/workflow/components/nodes/comment-node.tsx:15
 msgid "Blue"
 msgstr "蓝色"
 
-#: src/features/canvas/canvas-panel.tsx:136
+#: src/features/canvas/canvas-panel.tsx:137
 msgid "Blue Channel"
 msgstr "蓝色通道"
 
@@ -5490,7 +5490,7 @@ msgstr "可以使用它的机器人"
 msgid "Bottom"
 msgstr "底部"
 
-#: src/features/canvas/canvas-panel.tsx:140
+#: src/features/canvas/canvas-panel.tsx:141
 msgid "Box Blur"
 msgstr "方框模糊"
 
@@ -5566,7 +5566,7 @@ msgstr "此项目的简短描述"
 msgid "Brief description of this prompt"
 msgstr "此提示词的简短描述"
 
-#: src/features/canvas/canvas-panel.tsx:142
+#: src/features/canvas/canvas-panel.tsx:143
 msgid "Brightness"
 msgstr "亮度"
 
@@ -6001,7 +6001,7 @@ msgstr "加拿大"
 #: src/features/auth/components/team/delete-team-dialog.tsx:76
 #: src/features/auth/components/team/leave-team-dialog.tsx:76
 #: src/features/auth/components/team/team-settings-dialog.tsx:209
-#: src/features/canvas/canvas-panel.tsx:120
+#: src/features/canvas/canvas-panel.tsx:121
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:256
 #: src/features/chat/forward/forward-dialog.tsx:169
 #: src/features/chat/forward/forward-selection-bar.tsx:78
@@ -6010,7 +6010,7 @@ msgstr "加拿大"
 #: src/features/chat/host/host-composer.tsx:1017
 #: src/features/chat/lock/thread-lock-dialog.tsx:211
 #: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:70
-#: src/features/chat/pins/pin-item.tsx:294
+#: src/features/chat/pins/pin-item.tsx:303
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:405
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:414
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:178
@@ -6369,7 +6369,7 @@ msgstr "修改 URL 后需要重新输入 API 密钥。"
 msgid "Channel secret from the Basic settings tab, used to verify X-Line-Signature"
 msgstr "“基本设置”标签页中的 Channel secret，用于验证 X-Line-Signature"
 
-#: src/features/canvas/canvas-panel.tsx:122
+#: src/features/canvas/canvas-panel.tsx:123
 msgid "Channels"
 msgstr "通道"
 
@@ -6886,7 +6886,7 @@ msgstr "清理失败"
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:233
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:252
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:96
-#: src/features/chat/thread/media-gallery-view.tsx:380
+#: src/features/chat/thread/media-gallery-view.tsx:382
 #: src/features/prompts/components/prompt-list.tsx:614
 #: src/features/settings/components/chat/api-keys-settings.tsx:401
 #: src/features/settings/components/chat/models-settings.tsx:477
@@ -7057,7 +7057,7 @@ msgstr "克隆或新建…"
 #: ../../packages/ui/src/components/sheet.tsx:75
 #: src/components/command-palette.tsx:726
 #: src/features/admin/components/user-sessions-dialog.tsx:159
-#: src/features/canvas/canvas-panel.tsx:818
+#: src/features/canvas/canvas-panel.tsx:835
 #: src/features/canvas/pdf-preview-panel.tsx:105
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
 #: src/features/develop/components/thread-pull-requests.tsx:275
@@ -7092,7 +7092,7 @@ msgstr "关闭查找"
 msgid "Close full screen"
 msgstr "退出全屏"
 
-#: src/features/canvas/canvas-panel.tsx:772
+#: src/features/canvas/canvas-panel.tsx:788
 msgid "Close history"
 msgstr "关闭历史记录"
 
@@ -7121,7 +7121,7 @@ msgstr "关闭提示词优化"
 msgid "Close search"
 msgstr "关闭搜索"
 
-#: src/features/canvas/document-artifact.tsx:43
+#: src/features/canvas/document-artifact.tsx:46
 msgid "Close the document open in another chat to view this one."
 msgstr "请关闭在其他聊天中打开的文档，以查看此文档。"
 
@@ -7162,7 +7162,7 @@ msgstr "Cloudflare Workers AI 模型在 Cloudflare 有可用容量的任何地�
 #: src/features/auth/components/device-code-parts.tsx:46
 #: src/features/auth/components/device-code-parts.tsx:80
 #: src/features/auth/components/device-code-parts.tsx:134
-#: src/features/canvas/canvas-panel.tsx:754
+#: src/features/canvas/canvas-panel.tsx:770
 #: src/features/chat/thread/composer-search-mode.tsx:56
 #: src/features/code/components/code-workspace.tsx:219
 #: src/features/layout/components/workspace-switch.tsx:48
@@ -7228,7 +7228,7 @@ msgstr "代码审查小组"
 msgid "Code Sandbox"
 msgstr "代码沙箱"
 
-#: src/features/canvas/canvas-panel.tsx:747
+#: src/features/canvas/canvas-panel.tsx:763
 msgid "Code view"
 msgstr "代码视图"
 
@@ -7396,7 +7396,7 @@ msgstr "集合"
 msgid "Colombia"
 msgstr "哥伦比亚"
 
-#: src/features/canvas/canvas-panel.tsx:123
+#: src/features/canvas/canvas-panel.tsx:124
 #: src/features/projects/components/project-form-dialog.tsx:299
 msgid "Color"
 msgstr "颜色"
@@ -7410,7 +7410,7 @@ msgstr "新标签的颜色"
 msgid "Color of tag {0}"
 msgstr "标签 {0} 的颜色"
 
-#: src/features/canvas/canvas-panel.tsx:143
+#: src/features/canvas/canvas-panel.tsx:144
 msgid "Colorize"
 msgstr "着色"
 
@@ -8393,7 +8393,7 @@ msgid "Continued quality improvements over 2.5"
 msgstr "在 2.5 基础上持续提升质量"
 
 #: src/features/appearance/components/appearance-controls.tsx:247
-#: src/features/canvas/canvas-panel.tsx:144
+#: src/features/canvas/canvas-panel.tsx:145
 msgid "Contrast"
 msgstr "对比度"
 
@@ -8595,7 +8595,7 @@ msgstr "复制为纯文本"
 msgid "Copy command: {label}"
 msgstr "复制命令：{label}"
 
-#: src/features/canvas/canvas-panel.tsx:786
+#: src/features/canvas/canvas-panel.tsx:803
 msgid "Copy content"
 msgstr "复制内容"
 
@@ -8991,7 +8991,7 @@ msgstr "无法关联。请重试。"
 msgid "Could not load API keys. Try again later."
 msgstr "无法加载 API 密钥。请稍后重试。"
 
-#: src/features/canvas/canvas-panel.tsx:131
+#: src/features/canvas/canvas-panel.tsx:132
 msgid "Could not load image"
 msgstr "无法加载图片"
 
@@ -9919,7 +9919,7 @@ msgstr "个性化"
 msgid "Customize"
 msgstr "自定义"
 
-#: src/features/chat/thread/media-gallery-view.tsx:437
+#: src/features/chat/thread/media-gallery-view.tsx:439
 msgid "Customize and regenerate"
 msgstr "自定义并重新生成"
 
@@ -10038,7 +10038,7 @@ msgstr "丹麦语（丹麦）"
 msgid "Dark"
 msgstr "深色"
 
-#: src/features/canvas/canvas-panel.tsx:145
+#: src/features/canvas/canvas-panel.tsx:146
 msgid "Darken"
 msgstr "变暗"
 
@@ -10383,7 +10383,7 @@ msgstr "定义你希望 AI 如何回复。这些指令适用于所有对话。"
 msgid "Degraded"
 msgstr "性能下降"
 
-#: src/features/canvas/canvas-panel.tsx:222
+#: src/features/canvas/canvas-panel.tsx:223
 msgid "Degrees"
 msgstr "角度"
 
@@ -10585,7 +10585,7 @@ msgstr "删除当前对话（会先确认）"
 msgid "Delete Organization"
 msgstr "删除组织"
 
-#: src/features/chat/pins/pin-item.tsx:267
+#: src/features/chat/pins/pin-item.tsx:276
 msgid "Delete pin"
 msgstr "删除置顶"
 
@@ -10845,7 +10845,7 @@ msgstr "部署名称"
 msgid "Deployments, edge functions, and frontend infra"
 msgstr "部署、边缘函数和前端基础设施"
 
-#: src/features/canvas/canvas-panel.tsx:223
+#: src/features/canvas/canvas-panel.tsx:224
 msgid "Depth"
 msgstr "深度"
 
@@ -10857,7 +10857,7 @@ msgstr "深度图"
 msgid "Depth-aware generation"
 msgstr "深度感知生成"
 
-#: src/features/canvas/canvas-panel.tsx:146
+#: src/features/canvas/canvas-panel.tsx:147
 msgid "Desaturate"
 msgstr "去饱和"
 
@@ -10881,7 +10881,7 @@ msgstr "描述如何转换这张图片..."
 msgid "Describe the image to generate..."
 msgstr "描述要生成的图片..."
 
-#: src/features/chat/thread/media-gallery-view.tsx:446
+#: src/features/chat/thread/media-gallery-view.tsx:448
 msgid "Describe the image you want to create..."
 msgstr "描述你想创建的图像..."
 
@@ -10906,7 +10906,7 @@ msgstr "描述任务、预期结果以及重复时间：每天、每周，或 UT
 msgid "Describe the video to generate..."
 msgstr "描述要生成的视频..."
 
-#: src/features/chat/thread/media-gallery-view.tsx:446
+#: src/features/chat/thread/media-gallery-view.tsx:448
 msgid "Describe the video you want to create..."
 msgstr "描述你想创建的视频..."
 
@@ -10973,7 +10973,7 @@ msgstr "请输入描述"
 msgid "Description must be {SKILL_DESCRIPTION_MAX} characters or less"
 msgstr "描述不能超过 {SKILL_DESCRIPTION_MAX} 个字符"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:337
+#: ../../packages/ui/src/components/image-gallery.tsx:374
 msgid "Deselect"
 msgstr "取消选择"
 
@@ -10982,7 +10982,7 @@ msgstr "取消选择"
 msgid "Deselect all"
 msgstr "取消全选"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:238
+#: ../../packages/ui/src/components/image-gallery.tsx:261
 msgid "Deselect image"
 msgstr "取消选择图片"
 
@@ -10991,7 +10991,7 @@ msgstr "取消选择图片"
 msgid "Design"
 msgstr "设计"
 
-#: src/features/canvas/canvas-panel.tsx:305
+#: src/features/canvas/canvas-panel.tsx:306
 msgid "Design preview unavailable"
 msgstr "设计预览不可用"
 
@@ -11343,7 +11343,7 @@ msgstr "均匀分布"
 msgid "Distribute evenly (D)"
 msgstr "均匀分布（D）"
 
-#: src/features/canvas/canvas-panel.tsx:147
+#: src/features/canvas/canvas-panel.tsx:148
 msgid "Dither"
 msgstr "抖动"
 
@@ -11462,9 +11462,10 @@ msgstr "下载"
 
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:109
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:183
+#: ../../packages/ui/src/components/save-file-button.tsx:27
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:82
-#: src/features/canvas/canvas-panel.tsx:794
 #: src/features/canvas/canvas-panel.tsx:811
+#: src/features/canvas/canvas-panel.tsx:828
 #: src/features/download/components/download-page.tsx:120
 #: src/features/skills/components/bundle-export-dialog.tsx:227
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:300
@@ -11486,6 +11487,7 @@ msgid "Download {displayName}"
 msgstr "下载 {displayName}"
 
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:118
+#: ../../packages/ui/src/components/save-file-button.tsx:27
 msgid "Download {filename}"
 msgstr "下载 {filename}"
 
@@ -11497,6 +11499,11 @@ msgstr "下载 {fileName}"
 msgid "Download {name} ({size})"
 msgstr "下载 {name}（{size}）"
 
+#: ../../packages/ui/src/components/image-gallery.tsx:252
+#: ../../packages/ui/src/components/image-gallery.tsx:365
+msgid "Download {tileName} ({position})"
+msgstr "下载 {tileName} ({position})"
+
 #: src/features/settings/components/privacy/data-export.tsx:98
 msgid "Download a copy of all your personal data in JSON format (GDPR Article 20 - Right to Data Portability)"
 msgstr "以 JSON 格式下载你所有个人数据的副本（GDPR 第 20 条——数据可携带权）"
@@ -11506,7 +11513,7 @@ msgstr "以 JSON 格式下载你所有个人数据的副本（GDPR 第 20 条—
 msgid "Download a model"
 msgstr "下载模型"
 
-#: src/features/canvas/canvas-panel.tsx:802
+#: src/features/canvas/canvas-panel.tsx:819
 msgid "Download as CSV"
 msgstr "下载为 CSV"
 
@@ -11514,7 +11521,7 @@ msgstr "下载为 CSV"
 msgid "Download as Markdown"
 msgstr "下载为 Markdown"
 
-#: src/features/canvas/canvas-panel.tsx:806
+#: src/features/canvas/canvas-panel.tsx:823
 msgid "Download as XLSX"
 msgstr "下载为 XLSX"
 
@@ -11562,7 +11569,7 @@ msgstr "下载 Neore 桌面版"
 msgid "Download PDF"
 msgstr "下载 PDF"
 
-#: src/features/canvas/canvas-panel.tsx:128
+#: src/features/canvas/canvas-panel.tsx:129
 msgid "Download PNG"
 msgstr "下载 PNG"
 
@@ -11720,7 +11727,7 @@ msgstr "复制所选（{selectedNonGroupCount}）"
 
 #: src/features/admin/components/ban-user-dialog.tsx:117
 #: src/features/chat/header/temporary-chat-dropdown.tsx:300
-#: src/features/chat/thread/media-gallery-view.tsx:567
+#: src/features/chat/thread/media-gallery-view.tsx:569
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:136
 msgid "Duration"
 msgstr "时长"
@@ -11928,7 +11935,7 @@ msgstr "边缘部署"
 msgid "Edge detection"
 msgstr "边缘检测"
 
-#: src/features/canvas/canvas-panel.tsx:148
+#: src/features/canvas/canvas-panel.tsx:149
 msgid "Edge Detection"
 msgstr "边缘检测"
 
@@ -11937,7 +11944,7 @@ msgid "Edge-guided generation"
 msgstr "边缘引导生成"
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:141
-#: src/features/canvas/canvas-panel.tsx:767
+#: src/features/canvas/canvas-panel.tsx:783
 #: src/features/chat/host/host-composer.tsx:1060
 #: src/features/chat/thread-list/group-header.tsx:138
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
@@ -12002,8 +12009,8 @@ msgstr "编辑数据集"
 msgid "Edit Endpoint"
 msgstr "编辑端点"
 
-#: src/features/chat/pins/pin-item.tsx:259
-#: src/features/chat/pins/pin-item.tsx:280
+#: src/features/chat/pins/pin-item.tsx:268
+#: src/features/chat/pins/pin-item.tsx:289
 msgid "Edit excerpt"
 msgstr "编辑摘录"
 
@@ -12158,7 +12165,7 @@ msgstr "通过自然语言提示词编辑和改编现有图像，针对 Krea 工
 msgid "Editing: {editingNodeId}"
 msgstr "正在编辑：{editingNodeId}"
 
-#: src/features/canvas/canvas-panel.tsx:124
+#: src/features/canvas/canvas-panel.tsx:125
 msgid "Effects"
 msgstr "效果"
 
@@ -12375,7 +12382,7 @@ msgstr "任务完成时发送邮件"
 msgid "Email:"
 msgstr "邮箱："
 
-#: src/features/canvas/canvas-panel.tsx:149
+#: src/features/canvas/canvas-panel.tsx:150
 msgid "Emboss"
 msgstr "浮雕"
 
@@ -13278,7 +13285,7 @@ msgstr "存在"
 msgid "Exit {0}"
 msgstr "退出码 {0}"
 
-#: src/features/canvas/canvas-panel.tsx:815
+#: src/features/canvas/canvas-panel.tsx:832
 msgid "Exit fullscreen"
 msgstr "退出全屏"
 
@@ -13940,7 +13947,7 @@ msgstr "启用临时模式失败"
 msgid "Failed to export"
 msgstr "导出失败"
 
-#: src/features/canvas/canvas-panel.tsx:672
+#: src/features/canvas/canvas-panel.tsx:682
 msgid "Failed to export as XLSX."
 msgstr "导出为 XLSX 失败。"
 
@@ -13983,11 +13990,11 @@ msgstr "获取音频设备失败"
 msgid "Failed to import cases"
 msgstr "导入用例失败"
 
-#: src/features/canvas/canvas-panel.tsx:655
+#: src/features/canvas/canvas-panel.tsx:665
 msgid "Failed to import the spreadsheet file."
 msgstr "导入表格文件失败。"
 
-#: src/features/canvas/canvas-panel.tsx:130
+#: src/features/canvas/canvas-panel.tsx:131
 msgid "Failed to initialize image editor"
 msgstr "初始化图像编辑器失败"
 
@@ -14003,7 +14010,7 @@ msgstr "关联账号失败"
 msgid "Failed to load analytics. Ensure the LLM Gateway is running and reachable."
 msgstr "加载分析数据失败。请确保 LLM Gateway 正在运行且可访问。"
 
-#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:84
+#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:85
 msgid "Failed to load audio"
 msgstr "加载音频失败"
 
@@ -14024,7 +14031,7 @@ msgstr "加载电子表格失败"
 msgid "Failed to load usage data. Ensure the LLM Gateway is running and reachable."
 msgstr "加载用量数据失败。请确保 LLM Gateway 正在运行且可访问。"
 
-#: ../../packages/ui/src/components/file-renderers/video-player.tsx:92
+#: ../../packages/ui/src/components/file-renderers/video-player.tsx:98
 msgid "Failed to load video stream."
 msgstr "加载视频流失败。"
 
@@ -14124,7 +14131,7 @@ msgstr "恢复默认设置失败"
 msgid "Failed to restore attachment"
 msgstr "恢复附件失败"
 
-#: src/features/canvas/components/canvas-version-history.tsx:141
+#: src/features/canvas/components/canvas-version-history.tsx:144
 msgid "Failed to restore this version."
 msgstr "恢复此版本失败。"
 
@@ -15103,7 +15110,7 @@ msgstr "筛选："
 msgid "Filtering"
 msgstr "筛选"
 
-#: src/features/canvas/canvas-panel.tsx:125
+#: src/features/canvas/canvas-panel.tsx:126
 #: src/features/settings/components/chat/models-settings.tsx:407
 msgid "Filters"
 msgstr "滤镜"
@@ -15251,11 +15258,11 @@ msgstr "灵活的推理开关，按任务优化"
 msgid "Flexible Standard and Pro output modes"
 msgstr "灵活的标准和 Pro 输出模式"
 
-#: src/features/canvas/canvas-panel.tsx:183
+#: src/features/canvas/canvas-panel.tsx:184
 msgid "Flip Horizontal"
 msgstr "水平翻转"
 
-#: src/features/canvas/canvas-panel.tsx:184
+#: src/features/canvas/canvas-panel.tsx:185
 msgid "Flip Vertical"
 msgstr "垂直翻转"
 
@@ -15763,7 +15770,7 @@ msgstr "需要尾帧控制、参考输入以及字节跳动最新一代模型的
 msgid "Frontier-tier quality from BFL"
 msgstr "来自 BFL 的前沿级品质"
 
-#: src/features/canvas/canvas-panel.tsx:185
+#: src/features/canvas/canvas-panel.tsx:186
 msgid "Frosted Glass"
 msgstr "磨砂玻璃"
 
@@ -15785,7 +15792,7 @@ msgstr "完全访问"
 msgid "Full chain-of-thought reasoning visibility"
 msgstr "思维链推理完全可见"
 
-#: src/features/chat/pins/pin-item.tsx:179
+#: src/features/chat/pins/pin-item.tsx:186
 msgid "Full message pinned"
 msgstr "已置顶整条消息"
 
@@ -15809,7 +15816,7 @@ msgstr "通栏主视觉"
 msgid "Full-width promotional"
 msgstr "通栏宣传图"
 
-#: src/features/canvas/canvas-panel.tsx:815
+#: src/features/canvas/canvas-panel.tsx:832
 msgid "Fullscreen"
 msgstr "全屏"
 
@@ -15825,11 +15832,13 @@ msgstr "加利西亚语"
 msgid "Galician (Spain)"
 msgstr "加利西亚语（西班牙）"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:193
+#: ../../packages/ui/src/components/image-gallery.tsx:166
+#: ../../packages/ui/src/components/image-gallery.tsx:205
+#: ../../packages/ui/src/components/image-gallery.tsx:297
 msgid "Gallery item"
 msgstr "图库项目"
 
-#: src/features/canvas/canvas-panel.tsx:186
+#: src/features/canvas/canvas-panel.tsx:187
 msgid "Gamma"
 msgstr "伽马"
 
@@ -15842,7 +15851,7 @@ msgstr "网关"
 msgid "Gateway sections"
 msgstr "网关版块"
 
-#: src/features/canvas/canvas-panel.tsx:188
+#: src/features/canvas/canvas-panel.tsx:189
 msgid "Gaussian Blur"
 msgstr "高斯模糊"
 
@@ -15967,7 +15976,7 @@ msgstr "为创意写作故事构思点子"
 msgid "Generate image"
 msgstr "生成图像"
 
-#: src/features/chat/thread/media-gallery-view.tsx:620
+#: src/features/chat/thread/media-gallery-view.tsx:622
 #: src/features/workflow/templates/index.ts:106
 msgid "Generate Image"
 msgstr "生成图像"
@@ -15993,7 +16002,7 @@ msgstr "为 2025 年构思独特的商业点子"
 msgid "Generate video"
 msgstr "生成视频"
 
-#: src/features/chat/thread/media-gallery-view.tsx:620
+#: src/features/chat/thread/media-gallery-view.tsx:622
 #: src/features/workflow/templates/index.ts:424
 msgid "Generate Video"
 msgstr "生成视频"
@@ -16023,15 +16032,15 @@ msgstr "生成的图像"
 msgid "Generated Image"
 msgstr "生成的图像"
 
-#: src/features/chat/thread/media-gallery-view.tsx:353
+#: src/features/chat/thread/media-gallery-view.tsx:355
 msgid "Generated images will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成的图像将显示在这里。在下方输入框中描述你想创作的内容即可开始。"
 
-#: src/features/chat/thread/media-gallery-view.tsx:244
+#: src/features/chat/thread/media-gallery-view.tsx:245
 msgid "Generated video"
 msgstr "生成的视频"
 
-#: src/features/chat/thread/media-gallery-view.tsx:354
+#: src/features/chat/thread/media-gallery-view.tsx:356
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成的视频将显示在这里。在下方输入框中描述你想创作的内容即可开始。"
 
@@ -16044,7 +16053,7 @@ msgid "Generating draft…"
 msgstr "正在生成草稿…"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:530
-#: src/features/chat/thread/media-gallery-view.tsx:403
+#: src/features/chat/thread/media-gallery-view.tsx:405
 msgid "Generating image..."
 msgstr "正在生成图像..."
 
@@ -16057,7 +16066,7 @@ msgid "Generating response"
 msgstr "正在生成回复"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:531
-#: src/features/chat/thread/media-gallery-view.tsx:403
+#: src/features/chat/thread/media-gallery-view.tsx:405
 msgid "Generating video..."
 msgstr "正在生成视频..."
 
@@ -16270,8 +16279,8 @@ msgid "Go to last item"
 msgstr "转到最后一项"
 
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:225
-#: src/features/chat/pins/pin-item.tsx:248
-#: src/features/chat/pins/pin-item.tsx:251
+#: src/features/chat/pins/pin-item.tsx:256
+#: src/features/chat/pins/pin-item.tsx:259
 msgid "Go to message"
 msgstr "跳转到消息"
 
@@ -16640,11 +16649,11 @@ msgstr "在标准和 Pro 模式下都需要极其清晰、细腻的图像和完�
 msgid "Gray"
 msgstr "灰色"
 
-#: src/features/canvas/canvas-panel.tsx:190
+#: src/features/canvas/canvas-panel.tsx:191
 msgid "Grayscale"
 msgstr "灰度"
 
-#: src/features/canvas/canvas-panel.tsx:191
+#: src/features/canvas/canvas-panel.tsx:192
 msgid "Grayscale (Human)"
 msgstr "灰度（人眼）"
 
@@ -16665,13 +16674,13 @@ msgid "Greek (Greece)"
 msgstr "希腊语（希腊）"
 
 #: src/features/appearance/components/appearance-controls.tsx:161
-#: src/features/canvas/canvas-panel.tsx:224
+#: src/features/canvas/canvas-panel.tsx:225
 #: src/features/chat/tags/thread-tag-color-picker.tsx:18
 #: src/features/workflow/components/nodes/comment-node.tsx:16
 msgid "Green"
 msgstr "绿色"
 
-#: src/features/canvas/canvas-panel.tsx:137
+#: src/features/canvas/canvas-panel.tsx:138
 msgid "Green Channel"
 msgstr "绿色通道"
 
@@ -17205,7 +17214,7 @@ msgstr "历史"
 msgid "Hit rate"
 msgstr "命中率"
 
-#: ../../packages/ui/src/components/file-renderers/video-player.tsx:92
+#: ../../packages/ui/src/components/file-renderers/video-player.tsx:98
 msgid "HLS playback is not supported in this browser."
 msgstr "此浏览器不支持 HLS 播放。"
 
@@ -17237,7 +17246,7 @@ msgstr "香港"
 msgid "Horizontal rule"
 msgstr "水平分隔线"
 
-#: src/features/canvas/canvas-panel.tsx:192
+#: src/features/canvas/canvas-panel.tsx:193
 msgid "Horizontal Strips"
 msgstr "水平条纹"
 
@@ -17359,7 +17368,7 @@ msgstr "https://...（白色 = 编辑，黑色 = 保留）"
 msgid "https://... or from input"
 msgstr "https://... 或来自输入"
 
-#: src/features/canvas/canvas-panel.tsx:193
+#: src/features/canvas/canvas-panel.tsx:194
 msgid "Hue Rotate"
 msgstr "色相旋转"
 
@@ -17562,7 +17571,7 @@ msgid "Image generation"
 msgstr "图像生成"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:177
-#: src/features/chat/thread/media-gallery-view.tsx:350
+#: src/features/chat/thread/media-gallery-view.tsx:352
 #: src/features/marketing/components/landing-page.tsx:287
 #: src/features/marketing/components/model-detail-page.tsx:87
 #: src/features/workflow/components/gallery/publish-dialog.tsx:28
@@ -17817,7 +17826,7 @@ msgstr "导入工作流"
 msgid "Import workflow (ZIP or JSON)"
 msgstr "导入工作流 (ZIP 或 JSON)"
 
-#: src/features/canvas/canvas-panel.tsx:780
+#: src/features/canvas/canvas-panel.tsx:796
 msgid "Import XLSX"
 msgstr "导入 XLSX"
 
@@ -18294,7 +18303,7 @@ msgstr "智能场景构图"
 msgid "Intelligent video model that thinks before generating"
 msgstr "先思考再生成的智能视频模型"
 
-#: src/features/canvas/canvas-panel.tsx:225
+#: src/features/canvas/canvas-panel.tsx:226
 msgid "Intensity"
 msgstr "强度"
 
@@ -18388,7 +18397,7 @@ msgstr "URL 格式无效"
 msgid "Invalid verification code"
 msgstr "验证码无效"
 
-#: src/features/canvas/canvas-panel.tsx:194
+#: src/features/canvas/canvas-panel.tsx:195
 msgid "Invert"
 msgstr "反相"
 
@@ -18698,7 +18707,7 @@ msgid "Jump to prompt {promptNumber}: {preview}"
 msgstr "跳转到提示 {promptNumber}：{preview}"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:154
-#: src/features/chat/pins/pin-item.tsx:42
+#: src/features/chat/pins/pin-item.tsx:43
 #: src/features/settings/components/chat/api-keys-settings.tsx:279
 msgid "just now"
 msgstr "刚刚"
@@ -19454,7 +19463,7 @@ msgstr "让智能体在你通过 SSH 连接的服务器上工作。需要一台�
 msgid "Let the bot use its computer"
 msgstr "让机器人使用它的电脑"
 
-#: src/features/canvas/canvas-panel.tsx:226
+#: src/features/canvas/canvas-panel.tsx:227
 msgid "Level"
 msgstr "级别"
 
@@ -19462,7 +19471,7 @@ msgstr "级别"
 msgid "Light"
 msgstr "浅色"
 
-#: src/features/canvas/canvas-panel.tsx:195
+#: src/features/canvas/canvas-panel.tsx:196
 msgid "Lighten"
 msgstr "变亮"
 
@@ -19793,7 +19802,7 @@ msgstr "加载中"
 msgid "Loading API keys…"
 msgstr "正在加载 API 密钥…"
 
-#: src/features/canvas/canvas-panel.tsx:318
+#: src/features/canvas/canvas-panel.tsx:319
 msgid "Loading canvas editor..."
 msgstr "正在加载画布编辑器..."
 
@@ -19824,7 +19833,7 @@ msgstr "正在加载数据集…"
 msgid "Loading devices..."
 msgstr "正在加载设备..."
 
-#: src/features/canvas/canvas-panel.tsx:834
+#: src/features/canvas/canvas-panel.tsx:851
 msgid "Loading document..."
 msgstr "正在加载文档..."
 
@@ -19832,16 +19841,16 @@ msgstr "正在加载文档..."
 msgid "Loading document…"
 msgstr "正在加载文档…"
 
-#: src/features/canvas/canvas-panel.tsx:101
-#: src/features/canvas/canvas-panel.tsx:292
-#: src/features/canvas/canvas-panel.tsx:369
-#: src/features/canvas/canvas-panel.tsx:838
+#: src/features/canvas/canvas-panel.tsx:102
+#: src/features/canvas/canvas-panel.tsx:293
+#: src/features/canvas/canvas-panel.tsx:370
+#: src/features/canvas/canvas-panel.tsx:855
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:916
 msgid "Loading editor..."
 msgstr "正在加载编辑器..."
 
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:280
-#: src/features/canvas/canvas-panel.tsx:132
+#: src/features/canvas/canvas-panel.tsx:133
 #: src/features/pages/components/page-editor.tsx:40
 msgid "Loading editor…"
 msgstr "正在加载编辑器…"
@@ -19867,11 +19876,11 @@ msgstr "正在加载文件…"
 msgid "Loading folders…"
 msgstr "正在加载文件夹…"
 
-#: src/features/canvas/canvas-panel.tsx:358
+#: src/features/canvas/canvas-panel.tsx:359
 msgid "Loading image editor..."
 msgstr "正在加载图像编辑器..."
 
-#: src/features/canvas/canvas-panel.tsx:133
+#: src/features/canvas/canvas-panel.tsx:134
 msgid "Loading image editor…"
 msgstr "正在加载图像编辑器…"
 
@@ -20049,7 +20058,7 @@ msgstr "正在加载你的服务器、连接器和电脑…"
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:178
 #: ../../packages/ui/src/components/elevenlabs/mic-selector.tsx:62
 #: src/components/default-loading.tsx:8
-#: src/features/canvas/canvas-panel.tsx:731
+#: src/features/canvas/canvas-panel.tsx:747
 #: src/features/changelog/components/changelog-panel.tsx:109
 #: src/features/chat/split/chat-split-view.tsx:245
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:874
@@ -22928,7 +22937,7 @@ msgstr "未提供描述。"
 msgid "No devices paired."
 msgstr "没有已配对的设备。"
 
-#: src/features/canvas/components/canvas-version-history.tsx:155
+#: src/features/canvas/components/canvas-version-history.tsx:158
 msgid "No diff data available for this version"
 msgstr "此版本没有可用的差异数据"
 
@@ -23003,7 +23012,7 @@ msgstr "无指南"
 msgid "No history available"
 msgstr "没有历史记录"
 
-#: src/features/canvas/components/canvas-version-history.tsx:215
+#: src/features/canvas/components/canvas-version-history.tsx:218
 #: src/features/workflow/components/version-history.tsx:126
 msgid "No history yet"
 msgstr "还没有历史记录"
@@ -23013,7 +23022,7 @@ msgid "No icon found"
 msgstr "未找到图标"
 
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:171
-#: src/features/chat/thread/media-gallery-view.tsx:351
+#: src/features/chat/thread/media-gallery-view.tsx:353
 msgid "No images yet"
 msgstr "还没有图片"
 
@@ -23029,7 +23038,7 @@ msgstr "已有一段时间没有输入：控制权将在一分钟内交还给智
 msgid "No instruction files were found in this repository."
 msgstr "此仓库中没有找到指令文件。"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:489
+#: ../../packages/ui/src/components/image-gallery.tsx:526
 msgid "No items"
 msgstr "无项目"
 
@@ -23207,7 +23216,7 @@ msgstr "无项目"
 msgid "No projects available. Create a project first."
 msgstr "没有可用的项目。请先创建一个项目。"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:400
+#: ../../packages/ui/src/components/image-gallery.tsx:437
 msgid "No prompt"
 msgstr "无提示词"
 
@@ -23458,7 +23467,7 @@ msgstr "未找到变量"
 msgid "No versions yet. Versions are saved as you edit."
 msgstr "还没有版本。编辑时会自动保存版本。"
 
-#: src/features/chat/thread/media-gallery-view.tsx:351
+#: src/features/chat/thread/media-gallery-view.tsx:353
 msgid "No videos yet"
 msgstr "还没有视频"
 
@@ -23503,7 +23512,7 @@ msgstr "节点搜索"
 msgid "Node type"
 msgstr "节点类型"
 
-#: src/features/canvas/canvas-panel.tsx:196
+#: src/features/canvas/canvas-panel.tsx:197
 msgid "Noise Reduction"
 msgstr "降噪"
 
@@ -23535,7 +23544,7 @@ msgstr "正常"
 msgid "Normal Map"
 msgstr "法线贴图"
 
-#: src/features/canvas/canvas-panel.tsx:197
+#: src/features/canvas/canvas-panel.tsx:198
 msgid "Normalize"
 msgstr "标准化"
 
@@ -23863,21 +23872,21 @@ msgid "Offline – reconnecting…"
 msgstr "离线 – 正在重新连接…"
 
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:258
-#: src/features/canvas/canvas-panel.tsx:227
 #: src/features/canvas/canvas-panel.tsx:228
-#: src/features/canvas/canvas-panel.tsx:230
+#: src/features/canvas/canvas-panel.tsx:229
+#: src/features/canvas/canvas-panel.tsx:231
 msgid "Offset"
 msgstr "偏移"
 
-#: src/features/canvas/canvas-panel.tsx:198
+#: src/features/canvas/canvas-panel.tsx:199
 msgid "Offset Blue"
 msgstr "蓝色偏移"
 
-#: src/features/canvas/canvas-panel.tsx:199
+#: src/features/canvas/canvas-panel.tsx:200
 msgid "Offset Green"
 msgstr "绿色偏移"
 
-#: src/features/canvas/canvas-panel.tsx:200
+#: src/features/canvas/canvas-panel.tsx:201
 msgid "Offset Red"
 msgstr "红色偏移"
 
@@ -23885,7 +23894,7 @@ msgstr "红色偏移"
 msgid "Offset: 0x{hoveredOffsetHex} ({hoveredByte}) = 0x{hoveredValueHex} ({hoveredValue})"
 msgstr "偏移：0x{hoveredOffsetHex}（{hoveredByte}）= 0x{hoveredValueHex}（{hoveredValue}）"
 
-#: src/features/canvas/canvas-panel.tsx:201
+#: src/features/canvas/canvas-panel.tsx:202
 msgid "Oil Painting"
 msgstr "油画"
 
@@ -24859,7 +24868,7 @@ msgstr "正在打开共享页面…"
 msgid "Operating system"
 msgstr "操作系统"
 
-#: src/features/canvas/canvas-panel.tsx:134
+#: src/features/canvas/canvas-panel.tsx:135
 msgid "Operation \"{label}\" failed"
 msgstr "操作“{label}”失败"
 
@@ -25659,7 +25668,7 @@ msgstr "粘贴风格参考图片 URL..."
 msgid "Path"
 msgstr "路径"
 
-#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:93
+#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:96
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:168
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:233
 msgid "Pause"
@@ -26044,11 +26053,11 @@ msgstr "置顶"
 msgid "Pinterest Pin"
 msgstr "Pinterest Pin"
 
-#: src/features/canvas/canvas-panel.tsx:233
+#: src/features/canvas/canvas-panel.tsx:234
 msgid "Pixel Size"
 msgstr "像素大小"
 
-#: src/features/canvas/canvas-panel.tsx:202
+#: src/features/canvas/canvas-panel.tsx:203
 msgid "Pixelize"
 msgstr "像素化"
 
@@ -26089,7 +26098,7 @@ msgstr "规划"
 msgid "Platform"
 msgstr "平台"
 
-#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:93
+#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:96
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:168
 msgid "Play"
 msgstr "播放"
@@ -26529,8 +26538,8 @@ msgstr "预览版"
 #: ../../packages/ui/src/components/ai-elements/web-preview.tsx:163
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:62
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:139
-#: src/features/canvas/canvas-panel.tsx:762
-#: src/features/canvas/canvas-panel.tsx:767
+#: src/features/canvas/canvas-panel.tsx:778
+#: src/features/canvas/canvas-panel.tsx:783
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:790
 #: src/features/prompts/components/variable-fill-dialog.tsx:174
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:317
@@ -26583,7 +26592,7 @@ msgstr "预览新一代推理能力"
 msgid "Preview of next-generation capabilities"
 msgstr "预览新一代能力"
 
-#: src/features/canvas/canvas-panel.tsx:236
+#: src/features/canvas/canvas-panel.tsx:237
 msgid "Preview: {label}"
 msgstr "预览：{label}"
 
@@ -26668,7 +26677,7 @@ msgstr "价格：从低到高"
 msgid "Pricing"
 msgstr "定价"
 
-#: src/features/canvas/canvas-panel.tsx:203
+#: src/features/canvas/canvas-panel.tsx:204
 msgid "Primary"
 msgstr "主色"
 
@@ -26849,8 +26858,8 @@ msgstr "专业"
 msgid "Professional"
 msgstr "专业"
 
-#: src/features/chat/thread/media-gallery-view.tsx:527
-#: src/features/chat/thread/media-gallery-view.tsx:606
+#: src/features/chat/thread/media-gallery-view.tsx:529
+#: src/features/chat/thread/media-gallery-view.tsx:608
 msgid "Professional Camera Controls"
 msgstr "专业相机控制"
 
@@ -26986,8 +26995,8 @@ msgstr "提升为管理员"
 msgid "prompt"
 msgstr "提示词"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:400
-#: src/features/chat/thread/media-gallery-view.tsx:441
+#: ../../packages/ui/src/components/image-gallery.tsx:437
+#: src/features/chat/thread/media-gallery-view.tsx:443
 #: src/features/settings/components/chat/trigger-settings.tsx:1017
 #: src/features/workflow/templates/index.ts:96
 #: src/features/workflow/templates/index.ts:230
@@ -27321,7 +27330,7 @@ msgid "Put several agents with their own roles in one thread. A review panel can
 msgstr "将多个各具角色的智能体放在同一对话中。审查小组可从安全和性能角度检查更改，辩论则可在综合前论证双方观点。"
 
 #: src/features/chat/thread/composer-image-settings.tsx:181
-#: src/features/chat/thread/media-gallery-view.tsx:481
+#: src/features/chat/thread/media-gallery-view.tsx:483
 msgid "Quality"
 msgstr "质量"
 
@@ -27468,7 +27477,7 @@ msgstr "将 R1 推理蒸馏到紧凑的 32B 模型中"
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:247
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:249
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:333
-#: src/features/canvas/canvas-panel.tsx:232
+#: src/features/canvas/canvas-panel.tsx:233
 msgid "Radius"
 msgstr "半径"
 
@@ -27643,7 +27652,7 @@ msgstr "阅读顺序"
 msgid "Reading…"
 msgstr "正在读取…"
 
-#: src/features/canvas/canvas-panel.tsx:237
+#: src/features/canvas/canvas-panel.tsx:238
 msgid "Ready"
 msgstr "就绪"
 
@@ -27937,12 +27946,12 @@ msgstr "Recraft 的文生图模型，支持长文本生成、矢量图和品牌�
 msgid "Rectangle"
 msgstr "矩形"
 
-#: src/features/canvas/canvas-panel.tsx:231
+#: src/features/canvas/canvas-panel.tsx:232
 #: src/features/chat/tags/thread-tag-color-picker.tsx:21
 msgid "Red"
 msgstr "红色"
 
-#: src/features/canvas/canvas-panel.tsx:139
+#: src/features/canvas/canvas-panel.tsx:140
 msgid "Red Channel"
 msgstr "红色通道"
 
@@ -27957,7 +27966,7 @@ msgstr "正在跳转到对话..."
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:607
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:293
 #: ../../packages/ui/src/components/tiptap-editor.tsx:186
-#: src/features/canvas/canvas-panel.tsx:238
+#: src/features/canvas/canvas-panel.tsx:239
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:37
 msgid "Redo"
 msgstr "重做"
@@ -28812,7 +28821,7 @@ msgid "Resend Verification Email"
 msgstr "重新发送验证邮件"
 
 #: ../../packages/ui/src/components/image-editor.tsx:311
-#: src/features/canvas/canvas-panel.tsx:239
+#: src/features/canvas/canvas-panel.tsx:240
 #: src/features/chat/components/cinema-studio/cinema-panel.tsx:88
 #: src/features/settings/components/chat/models-settings.tsx:617
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:268
@@ -28945,7 +28954,7 @@ msgstr "恢复到输入框"
 msgid "Restore Version {0}"
 msgstr "恢复版本 {0}"
 
-#: src/features/canvas/components/canvas-version-history.tsx:233
+#: src/features/canvas/components/canvas-version-history.tsx:236
 msgid "Restore version {selectedVersion}"
 msgstr "恢复版本 {selectedVersion}"
 
@@ -29312,15 +29321,15 @@ msgstr "罗马"
 msgid "Rose"
 msgstr "玫瑰色"
 
-#: src/features/canvas/canvas-panel.tsx:204
+#: src/features/canvas/canvas-panel.tsx:205
 msgid "Rotate 180°"
 msgstr "旋转 180°"
 
-#: src/features/canvas/canvas-panel.tsx:205
+#: src/features/canvas/canvas-panel.tsx:206
 msgid "Rotate 90° CCW"
 msgstr "逆时针旋转 90°"
 
-#: src/features/canvas/canvas-panel.tsx:207
+#: src/features/canvas/canvas-panel.tsx:208
 msgid "Rotate 90° CW"
 msgstr "顺时针旋转 90°"
 
@@ -29652,7 +29661,7 @@ msgstr "无衬线"
 msgid "Sans (default)"
 msgstr "无衬线（默认）"
 
-#: src/features/canvas/canvas-panel.tsx:208
+#: src/features/canvas/canvas-panel.tsx:209
 msgid "Saturate"
 msgstr "饱和"
 
@@ -29674,7 +29683,7 @@ msgstr "沙特阿拉伯"
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
 #: src/features/chat/goal/pinned-goal.tsx:134
 #: src/features/chat/host/host-composer.tsx:1006
-#: src/features/chat/pins/pin-item.tsx:295
+#: src/features/chat/pins/pin-item.tsx:304
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:181
 #: src/features/chat/thread/edit-composer.tsx:166
@@ -29739,7 +29748,7 @@ msgstr "保存更改"
 msgid "Save Changes"
 msgstr "保存更改"
 
-#: src/features/canvas/canvas-panel.tsx:241
+#: src/features/canvas/canvas-panel.tsx:242
 msgid "Save failed"
 msgstr "保存失败"
 
@@ -29791,11 +29800,11 @@ msgstr "保存工具"
 msgid "Save Variables"
 msgstr "保存变量"
 
-#: src/features/canvas/canvas-panel.tsx:242
+#: src/features/canvas/canvas-panel.tsx:243
 msgid "Save version"
 msgstr "保存版本"
 
-#: src/features/canvas/canvas-panel.tsx:240
+#: src/features/canvas/canvas-panel.tsx:241
 msgid "Save version as new"
 msgstr "另存为新版本"
 
@@ -29862,7 +29871,7 @@ msgstr "正在保存工具…"
 msgid "Saving..."
 msgstr "正在保存..."
 
-#: src/features/canvas/canvas-panel.tsx:243
+#: src/features/canvas/canvas-panel.tsx:244
 #: src/features/develop/components/pull-request-edit-action.tsx:174
 #: src/features/skills/components/skill-builder-dialog.tsx:182
 #: src/features/skills/components/skill-form-dialog.tsx:515
@@ -30340,7 +30349,7 @@ msgstr "为此团队从组织允许的模型中选择一部分。"
 msgid "Select a version to preview"
 msgstr "选择要预览的版本"
 
-#: src/features/canvas/components/canvas-version-history.tsx:239
+#: src/features/canvas/components/canvas-version-history.tsx:242
 msgid "Select a version to see changes"
 msgstr "选择一个版本查看更改"
 
@@ -30376,7 +30385,7 @@ msgstr "选择一个对象以编辑其属性"
 msgid "Select an organization to manage teams"
 msgstr "选择一个组织以管理团队"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:337
+#: ../../packages/ui/src/components/image-gallery.tsx:374
 msgid "Select as reference"
 msgstr "选为参考"
 
@@ -30400,7 +30409,7 @@ msgstr "选择文件"
 msgid "Select files to upload"
 msgstr "选择要上传的文件"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:238
+#: ../../packages/ui/src/components/image-gallery.tsx:261
 msgid "Select image as reference"
 msgstr "选择图像作为参考"
 
@@ -30530,7 +30539,7 @@ msgstr "选择你的消息"
 msgid "Selected {requestNoun}"
 msgstr "已选{requestNoun}"
 
-#: src/features/chat/thread/media-gallery-view.tsx:365
+#: src/features/chat/thread/media-gallery-view.tsx:367
 msgid "Selected reference"
 msgstr "已选参考"
 
@@ -30769,7 +30778,7 @@ msgstr "已发送到 {device}…"
 msgid "Separate tags with commas."
 msgstr "用逗号分隔标签。"
 
-#: src/features/canvas/canvas-panel.tsx:209
+#: src/features/canvas/canvas-panel.tsx:210
 msgid "Sepia"
 msgstr "棕褐色"
 
@@ -31048,7 +31057,7 @@ msgstr "已与你的组织共享"
 msgid "sharp detail"
 msgstr "清晰细节"
 
-#: src/features/canvas/canvas-panel.tsx:210
+#: src/features/canvas/canvas-panel.tsx:211
 msgid "Sharpen"
 msgstr "锐化"
 
@@ -31166,12 +31175,12 @@ msgid "Show Labels"
 msgstr "显示标签"
 
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
-#: src/features/chat/pins/pin-item.tsx:207
+#: src/features/chat/pins/pin-item.tsx:214
 #: src/features/skills/components/bundle-import-dialog.tsx:99
 msgid "Show less"
 msgstr "收起"
 
-#: src/features/chat/pins/pin-item.tsx:207
+#: src/features/chat/pins/pin-item.tsx:214
 msgid "Show more"
 msgstr "展开"
 
@@ -31720,7 +31729,7 @@ msgstr "幻灯片 {streamingSlideNumber}"
 msgid "Slide title"
 msgstr "幻灯片标题"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1187
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1188
 msgid "Slide updated"
 msgstr "幻灯片已更新"
 
@@ -31862,7 +31871,7 @@ msgstr "需要 xAI 专用编程模型的软件开发任务"
 msgid "software engineering"
 msgstr "软件工程"
 
-#: src/features/canvas/canvas-panel.tsx:211
+#: src/features/canvas/canvas-panel.tsx:212
 msgid "Solarize"
 msgstr "负感"
 
@@ -31977,7 +31986,7 @@ msgstr "已开启音效"
 msgid "Source"
 msgstr "来源"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1324
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1325
 #: src/features/chat/thread/message-content.tsx:161
 msgid "Source {index}"
 msgstr "来源 {index}"
@@ -32209,7 +32218,7 @@ msgstr "Spotify"
 msgid "Spreadsheet"
 msgstr "电子表格"
 
-#: src/features/canvas/canvas-panel.tsx:653
+#: src/features/canvas/canvas-panel.tsx:663
 msgid "Spreadsheet imported successfully."
 msgstr "表格导入成功。"
 
@@ -32814,7 +32823,7 @@ msgstr "强度"
 msgid "Strikethrough"
 msgstr "删除线"
 
-#: src/features/canvas/canvas-panel.tsx:234
+#: src/features/canvas/canvas-panel.tsx:235
 msgid "Strips"
 msgstr "条纹"
 
@@ -33100,7 +33109,7 @@ msgid "style"
 msgstr "风格"
 
 #: src/features/chat/thread/composer-image-settings.tsx:205
-#: src/features/chat/thread/media-gallery-view.tsx:502
+#: src/features/chat/thread/media-gallery-view.tsx:504
 #: src/features/workflow/components/nodes/character-ref-node.tsx:26
 msgid "Style"
 msgstr "风格"
@@ -33368,15 +33377,15 @@ msgstr "斯瓦希里语"
 msgid "Swahili (Kenya)"
 msgstr "斯瓦希里语（肯尼亚）"
 
-#: src/features/canvas/canvas-panel.tsx:212
+#: src/features/canvas/canvas-panel.tsx:213
 msgid "Swap G↔B"
 msgstr "交换 G↔B"
 
-#: src/features/canvas/canvas-panel.tsx:213
+#: src/features/canvas/canvas-panel.tsx:214
 msgid "Swap R↔B"
 msgstr "交换 R↔B"
 
-#: src/features/canvas/canvas-panel.tsx:214
+#: src/features/canvas/canvas-panel.tsx:215
 msgid "Swap R↔G"
 msgstr "交换 R↔G"
 
@@ -34640,7 +34649,7 @@ msgstr "答案应检索自的文档。用于计算命中率、MRR、精确率和
 msgid "The draft is full. Send or remove some comments before adding more."
 msgstr "草稿已满。请先发送或移除一些评论，再添加更多。"
 
-#: src/features/canvas/canvas-panel.tsx:129
+#: src/features/canvas/canvas-panel.tsx:130
 msgid "The edited image is too large to save (>1 MB). Try cropping, downscaling, or applying fewer effects."
 msgstr "编辑后的图片过大，无法保存（>1 MB）。请尝试裁剪、缩小尺寸或减少效果。"
 
@@ -34832,7 +34841,7 @@ msgstr "主机软件已过时"
 msgid "The icons could not be loaded."
 msgstr "无法加载图标。"
 
-#: src/features/canvas/canvas-panel.tsx:638
+#: src/features/canvas/canvas-panel.tsx:648
 msgid "The imported file appears to be empty."
 msgstr "导入的文件似乎是空的。"
 
@@ -35303,7 +35312,7 @@ msgstr "然后下载一个模型并使用此基础 URL："
 msgid "There are no credits left to answer this. Add credits and try again."
 msgstr "积分已用完，无法回答。请充值积分后重试。"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:490
+#: ../../packages/ui/src/components/image-gallery.tsx:527
 msgid "There are no items to display."
 msgstr "没有可显示的项目。"
 
@@ -35402,7 +35411,7 @@ msgid "Thinking-enabled vision-language model"
 msgstr "支持思考的视觉语言模型"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1250
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1251
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:114
 #: src/features/chat/thread/streaming-placeholder.tsx:808
 msgid "Thinking..."
@@ -35734,7 +35743,7 @@ msgstr "此主机在 ~/.ssh/config 中使用了 {key}，Neore 不支持该设置
 msgid "This image has been flagged for review"
 msgstr "此图像已被标记待审核"
 
-#: src/features/canvas/canvas-panel.tsx:127
+#: src/features/canvas/canvas-panel.tsx:128
 msgid "This image's host does not allow editing. Re-upload or generate a new image to enable editing."
 msgstr "此图片的托管方不允许编辑。请重新上传或生成新图片以启用编辑。"
 
@@ -36128,7 +36137,7 @@ msgstr "这将永久删除提示词“{0}”。此操作无法撤销。"
 msgid "This will permanently remove these {0} files from your knowledge base, including their indexed content. The original files in your vault will not be affected."
 msgstr "这将从你的知识库中永久移除这 {0} 个文件及其已索引的内容。你文件库中的原始文件不受影响。"
 
-#: src/features/canvas/canvas-panel.tsx:644
+#: src/features/canvas/canvas-panel.tsx:654
 msgid "This workbook has {sheetCount} sheets — only the first sheet was imported."
 msgstr "此工作簿有 {sheetCount} 个工作表——只导入了第一个工作表。"
 
@@ -36280,7 +36289,7 @@ msgstr "处理此{requestNoun}的对话"
 msgid "Three steps to use coding agents on your own machines. Skip any of them and come back later."
 msgstr "在你自己的设备上使用编码智能体需要三个步骤。可跳过任一步骤，稍后再回来完成。"
 
-#: src/features/canvas/canvas-panel.tsx:215
+#: src/features/canvas/canvas-panel.tsx:216
 #: src/features/settings/components/chat/usage-settings.tsx:500
 msgid "Threshold"
 msgstr "阈值"
@@ -36748,7 +36757,7 @@ msgid "transform"
 msgstr "转换"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:290
-#: src/features/canvas/canvas-panel.tsx:126
+#: src/features/canvas/canvas-panel.tsx:127
 #: src/features/workflow/templates/index.ts:331
 msgid "Transform"
 msgstr "变换"
@@ -37316,7 +37325,7 @@ msgstr "下划线"
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:290
 #: ../../packages/ui/src/components/tiptap-editor.tsx:183
 #: src/components/model-picker/model-picker.tsx:862
-#: src/features/canvas/canvas-panel.tsx:244
+#: src/features/canvas/canvas-panel.tsx:245
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:51
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:126
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:228
@@ -37486,7 +37495,7 @@ msgstr "取消发布"
 msgid "Unread"
 msgstr "未读"
 
-#: src/features/canvas/canvas-panel.tsx:733
+#: src/features/canvas/canvas-panel.tsx:749
 msgid "Unsaved changes"
 msgstr "未保存的更改"
 
@@ -37673,11 +37682,11 @@ msgstr "更新的 OpenAI 前沿性能"
 msgid "Updated reasoning capabilities over the original R1"
 msgstr "相比原版 R1 推理能力更新"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1185
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1186
 msgid "Updated slide"
 msgstr "已更新幻灯片"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1185
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1186
 msgid "Updated slide {slideNumber}"
 msgstr "已更新第 {slideNumber} 张幻灯片"
 
@@ -38008,7 +38017,7 @@ msgstr "从 MCP 客户端使用"
 msgid "Use lowercase letters, numbers and single hyphens only"
 msgstr "只能使用小写字母、数字和单个连字符"
 
-#: src/features/chat/thread/media-gallery-view.tsx:631
+#: src/features/chat/thread/media-gallery-view.tsx:633
 msgid "Use Original Prompt"
 msgstr "使用原始提示词"
 
@@ -38427,7 +38436,7 @@ msgstr "版本 {0} 的内容"
 msgid "Version {position} of {total}"
 msgstr "第 {position}/{total} 个版本"
 
-#: src/features/canvas/canvas-panel.tsx:772
+#: src/features/canvas/canvas-panel.tsx:788
 #: src/features/pages/components/page-version-panel.tsx:81
 #: src/features/pages/components/page-version-panel.tsx:83
 #: src/features/pages/components/page-view.tsx:448
@@ -38443,7 +38452,7 @@ msgstr "版本历史"
 msgid "Version restored"
 msgstr "版本已恢复"
 
-#: src/features/canvas/components/canvas-version-history.tsx:184
+#: src/features/canvas/components/canvas-version-history.tsx:187
 #: src/features/prompts/components/prompt-history-dialog.tsx:104
 msgid "Versions"
 msgstr "版本"
@@ -38460,7 +38469,7 @@ msgstr "竖版宣传布局"
 msgid "Vertical story"
 msgstr "竖版快拍"
 
-#: src/features/canvas/canvas-panel.tsx:216
+#: src/features/canvas/canvas-panel.tsx:217
 msgid "Vertical Strips"
 msgstr "垂直条纹"
 
@@ -38549,7 +38558,7 @@ msgstr "视频生成"
 msgid "Video generation"
 msgstr "视频生成"
 
-#: src/features/chat/thread/media-gallery-view.tsx:350
+#: src/features/chat/thread/media-gallery-view.tsx:352
 #: src/features/marketing/components/model-detail-page.tsx:95
 msgid "Video Generation"
 msgstr "视频生成"
@@ -39843,7 +39852,7 @@ msgid "Yesterday"
 msgstr "昨天"
 
 #: src/features/chat/forward/forward-selection-bar.tsx:54
-#: src/features/chat/pins/pin-item.tsx:240
+#: src/features/chat/pins/pin-item.tsx:247
 msgid "You"
 msgstr "你"
 
