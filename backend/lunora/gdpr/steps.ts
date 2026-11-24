@@ -2,6 +2,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import { buildUsageJson, spliceUsageJson, usageObjectKey } from "./usage-export-steps";
 import { readStoredText } from "../lib/storage-read";
+import { collectAllChatFileMetadata } from "../agent/export-pages";
 import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
 import { collectAcpSessionPages } from "../acp/gdpr";
 import { BROWSER_EXPORT_BYTES, browserExportPageKey, readAllBrowserPages } from "../browser/export-pages";
@@ -677,9 +678,6 @@ export const generateExportFile = internalAction
         // the same in-flight-replay reason as `threadTags`.
         browserPages: v.optional(v.number()),
         browserPrefix: v.optional(v.string()),
-        // The user's chat files (uploads and generated images), metadata only, read a page per step (`collectChatFilesForExport`).
-        // Optional for the same in-flight-replay reason as `threadTags`.
-        chatFiles: v.optional(v.any()),
         // Coding-agent runs (`coding-agents/gdpr.ts`). Optional for the same
         // in-flight-replay reason as `threadTags`.
         codingAgentRuns: v.optional(v.any()),
@@ -823,11 +821,17 @@ export const generateExportFile = internalAction
                       BROWSER_EXPORT_BYTES,
                       browserCut === true,
                   );
+        // The user's chat files (uploads and generated images), metadata only: the files behind their grants and behind their chats' links
+        // (`agent/export-pages.ts`), read here a page per query, as the sections above are.
+        const chatFiles = await collectAllChatFileMetadata(
+            async (source, cursor) => await context.runQuery(internal.agent.gdpr.collectChatFileIdsForExport, { cursor, source, userId: args.userId }),
+            async (fileIds) => await context.runQuery(internal.agent.gdpr.chatFileMetadataForExport, { fileIds: fileIds as Id<"chatFiles">[] }),
+        );
         const exportData = {
             acpSessions,
             bots: args.bots ?? { bots: [] },
             browser,
-            chatFiles: args.chatFiles ?? [],
+            chatFiles,
             codingAgentRuns: args.codingAgentRuns ?? [],
             conversations: args.conversations,
             dataSubject: {

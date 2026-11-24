@@ -10,7 +10,7 @@ import type { Id } from "../_generated/dataModel";
 import { internalQuery, type MutationCtx } from "../_generated/server";
 import { BATCH, type BatchResult, deleteParentsWithChildren, full } from "../gdpr/batch";
 import { gdprLogger } from "../lib/logger";
-import { storedRow } from "../lib/stored-row";
+import { storedRows } from "../lib/stored-row";
 import { MAX_LENGTH } from "../lib/validators";
 import { eraseProjectRuleFilesForUser, eraseProjectsRuleFiles, markProjectsRuleFilesErasing, RULE_FILE_ROWS_PER_PAGE } from "../projects/gdpr";
 import { erasePinsNamingDocuments } from "../chat/gdpr";
@@ -81,53 +81,80 @@ export const eraseChatFileAccessForUser = async (ctx: MutationCtx, userId: strin
     return { hasMore: full(rows) };
 };
 
-/** Chat-file grants one export page reads (`collectChatFilesForExport`). */
+/** Chat-file ids one export page reads, from either source (`collectChatFileIdsForExport`). */
 export const CHAT_FILE_EXPORT_PAGE = 100;
 
 /**
- * One page of the chat files the user holds a grant for: their own uploads and generated images alike. The grant is what makes a
- * file theirs (the row is shared by content and has no owner). Metadata only, as a vault file's is: the bytes stay out of the export.
- * A grant whose row is already gone is left out.
+ * One page of the ids of the user's chat files, from one of two sources: the grants they hold (`chatFileAccess`), or the links of
+ * their own chats (`chatFileThreads`, keyed by the owner). A file stored with a message carries the link but no grant (a large
+ * image part is stored without an owner), so both are read. The caller walks each source to its end and dedupes the ids.
  */
-export const collectChatFilesForExport = internalQuery
+export const collectChatFileIdsForExport = internalQuery
     .input({
         cursor: v.optional(v.union(v.string().max(MAX_LENGTH.cursor), v.null())),
+        source: v.union(v.literal("grants"), v.literal("threads")),
         userId: v.string().max(MAX_LENGTH.id),
     })
     .output(
         v.object({
             cursor: v.union(v.string(), v.null()),
-            files: v.array(
-                v.object({
-                    createdAt: v.number(),
-                    filename: v.optional(v.string()),
-                    hash: v.string(),
-                    id: v.string(),
-                    mediaType: v.string(),
-                }),
-            ),
+            fileIds: v.array(v.string()),
         }),
     )
-    .query(async ({ args: { cursor, userId }, ctx }) => {
-        const grants = await ctx.db.chatFileAccess.findMany({ cursor: cursor ?? null, limit: CHAT_FILE_EXPORT_PAGE, where: { userId } });
-        const rows = await Promise.all(grants.page.map(async (grant) => storedRow(await ctx.db.chatFiles.findFirst({ where: { _id: grant.fileId } }))));
+    .query(async ({ args: { cursor, source, userId }, ctx }) => {
+        if (source === "grants") {
+            const grants = await ctx.db.chatFileAccess.findMany({ cursor: cursor ?? null, limit: CHAT_FILE_EXPORT_PAGE, where: { userId } });
+
+            return {
+                cursor: grants.isDone ? null : grants.continueCursor,
+                fileIds: grants.page.map((grant) => grant.fileId),
+            };
+        }
+
+        const links = await ctx.db
+            .query("chatFileThreads")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .paginate({ cursor: cursor ?? null, numItems: CHAT_FILE_EXPORT_PAGE });
 
         return {
-            cursor: grants.isDone ? null : grants.continueCursor,
-            files: rows.flatMap((file) =>
-                file
-                    ? [
-                          {
-                              createdAt: file._creationTime,
-                              filename: file.filename,
-                              hash: file.hash,
-                              id: file._id,
-                              mediaType: file.mediaType,
-                          },
-                      ]
-                    : [],
-            ),
+            cursor: links.isDone ? null : links.continueCursor,
+            fileIds: links.page.map((link) => link.fileId),
         };
+    });
+
+/**
+ * The metadata of the given chat files, read in one query (the caller passes at most one chunk of ids). Metadata only, as a vault
+ * file's is: the bytes stay out of the export. A file whose row is already gone is left out.
+ */
+export const chatFileMetadataForExport = internalQuery
+    .input({ fileIds: v.array(v.id("chatFiles")) })
+    .output(
+        v.array(
+            v.object({
+                createdAt: v.number(),
+                filename: v.optional(v.string()),
+                hash: v.string(),
+                id: v.string(),
+                mediaType: v.string(),
+            }),
+        ),
+    )
+    .query(async ({ args: { fileIds }, ctx }) => {
+        if (fileIds.length === 0) {
+            return [];
+        }
+
+        const { page } = await ctx.db.chatFiles.findMany({ where: { _id: { in: fileIds } } });
+
+        return storedRows(page).map((file) => {
+            return {
+                createdAt: file._creationTime,
+                filename: file.filename,
+                hash: file.hash,
+                id: file._id,
+                mediaType: file.mediaType,
+            };
+        });
     });
 
 /** The file-to-chat links of the user's own chats (`chatFileThreads`, keyed by owner). */

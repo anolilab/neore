@@ -1,6 +1,7 @@
 /**
- * The GDPR export carries the chat files the user holds a grant for: their uploads and generated images, metadata only. Another user's
- * file never appears, and a grant whose file is gone is left out. Past one page, every page is read.
+ * The GDPR export carries the chat files of the user: the files behind their grants, and the files linked to their own chats (a
+ * large image stored with a message has the link but no grant). Metadata only. Another user's file never appears, a file named by
+ * both sources is listed once, and a file whose row is gone is left out. Past one page, every page is read.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -10,13 +11,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
 import { addFile } from "./files";
-import { collectAllChatFiles } from "./export-pages";
-import { CHAT_FILE_EXPORT_PAGE, collectChatFilesForExport } from "./gdpr";
+import { type ChatFileIdsPage, collectAllChatFileMetadata } from "./export-pages";
+import { CHAT_FILE_EXPORT_PAGE, chatFileMetadataForExport, collectChatFileIdsForExport } from "./gdpr";
 
 const A = "user-a";
 const B = "user-b";
 const MANY = CHAT_FILE_EXPORT_PAGE + 30;
-const EXPORT_FILE_CHAT_FILES = /generateExportFile[\s\S]*chatFiles,/u;
 
 type Harness = ReturnType<typeof lunoraTest>;
 interface ExportedFile {
@@ -37,7 +37,7 @@ afterEach(() => {
     harness.close();
 });
 
-/** Stores a file the way a generated image or an upload is stored: a row, and the grant of the user who stored it. */
+/** Stores a file the way an upload is stored: a row, and the grant of the user who stored it. */
 const store = async (userId: string, filename: string, hash: string): Promise<string> => {
     const { fileId } = (await harness.run(
         async (ctx: any) => await ctx.runMutation(addFile, { filename, hash, mediaType: "image/png", storageId: `agent-files/${hash}`, userId }),
@@ -46,20 +46,55 @@ const store = async (userId: string, filename: string, hash: string): Promise<st
     return fileId;
 };
 
-/** Every page of the user's export, each read by its own call (as the workflow reads them). */
+/** A file stored with a message: the row and the link of the owner's chat, and no grant (`mapping.ts` stores large parts without one). */
+const storeWithMessage = async (userId: string, hash: string): Promise<string> =>
+    await harness.run(async (ctx: any) => {
+        const threadId = await ctx.db.insert("threads", { status: "active", title: "T", userId });
+        const fileId = await ctx.db.insert("chatFiles", {
+            extractionStatus: "pending",
+            filename: `${hash}.png`,
+            hash,
+            lastTouchedAt: 1,
+            mediaType: "image/png",
+            refcount: 1,
+            storageId: `agent-files/${hash}`,
+        });
+
+        await ctx.db.insert("chatFileThreads", { createdAt: 1, fileId, threadId, userId });
+
+        return fileId as string;
+    });
+
+/** Adds a chat link of `userId` to a file that already exists. */
+const linkTo = async (userId: string, fileId: string): Promise<void> => {
+    await harness.run(async (ctx: any) => {
+        const threadId = await ctx.db.insert("threads", { status: "active", title: "T", userId });
+
+        await ctx.db.insert("chatFileThreads", { createdAt: 1, fileId, threadId, userId });
+    });
+};
+
+/** One page of ids from one source, as the export reads it. */
+const idsPage = async (userId: string, source: "grants" | "threads", cursor: string | null) =>
+    await harness.run(async (ctx: any) => await ctx.runQuery(collectChatFileIdsForExport, { cursor, source, userId }));
+
+/** The whole export for one user, paging each source and reading metadata as the export action does. */
 const exportedFor = async (userId: string): Promise<{ files: ExportedFile[]; pages: number }> => {
     let pages = 0;
-    const files = (await collectAllChatFiles(async (cursor) => {
-        pages += 1;
+    const files = (await collectAllChatFileMetadata(
+        async (source, cursor) => {
+            pages += 1;
 
-        return await harness.run(async (ctx: any) => await ctx.runQuery(collectChatFilesForExport, { cursor, userId }));
-    })) as ExportedFile[];
+            return (await idsPage(userId, source, cursor)) as ChatFileIdsPage;
+        },
+        async (fileIds) => await harness.run(async (ctx: any) => await ctx.runQuery(chatFileMetadataForExport, { fileIds })),
+    )) as ExportedFile[];
 
     return { files, pages };
 };
 
 describe("chat files in the GDPR export", () => {
-    it("includes a generated image the user holds a grant for, with its metadata, and leaves out another user's", async () => {
+    it("includes an uploaded or generated file the user holds a grant for, with its metadata, and leaves out another user's", async () => {
         const generated = await store(A, "generated-1.png", "hash-generated");
         const others = await store(B, "others.png", "hash-others");
 
@@ -75,6 +110,27 @@ describe("chat files in the GDPR export", () => {
             id: generated,
             mediaType: "image/png",
         });
+    });
+
+    it("includes a file stored with the user's message, which has a chat link but no grant, and leaves out another user's", async () => {
+        const linked = await storeWithMessage(A, "hash-linked");
+        const othersLinked = await storeWithMessage(B, "hash-others-linked");
+
+        const { files } = await exportedFor(A);
+        const ids = files.map((file) => file.id);
+
+        expect(ids).toContain(linked);
+        expect(ids).not.toContain(othersLinked);
+    });
+
+    it("lists a file once when a grant and a chat link both name it", async () => {
+        const shared = await store(A, "shared.png", "hash-shared");
+
+        await linkTo(A, shared);
+
+        const { files } = await exportedFor(A);
+
+        expect(files.filter((file) => file.id === shared)).toHaveLength(1);
     });
 
     it("leaves out a grant whose file row is gone", async () => {
@@ -98,12 +154,40 @@ describe("chat files in the GDPR export", () => {
         expect(pages).toBeGreaterThan(1);
     });
 
-    it("is wired into the export workflow and the export file", () => {
-        const workflow = readFileSync(join(import.meta.dirname, "../gdpr/workflows/export-workflow.ts"), "utf8");
+    it("walks both sources, lists each file once, and reads metadata in chunks", async () => {
+        const pages: Record<string, ChatFileIdsPage[]> = {
+            grants: [
+                { cursor: "next", fileIds: ["a", "b"] },
+                { cursor: null, fileIds: ["c"] },
+            ],
+            threads: [{ cursor: null, fileIds: ["b", "d"] }],
+        };
+        const reads: string[][] = [];
+
+        const rows = await collectAllChatFileMetadata(
+            async (source, cursor) => pages[source]?.[cursor === null ? 0 : 1] ?? { cursor: null, fileIds: [] },
+            async (fileIds) => {
+                reads.push(fileIds);
+
+                return fileIds.map((id) => {
+                    return { id };
+                });
+            },
+            2,
+        );
+
+        expect(reads).toEqual([
+            ["a", "b"],
+            ["c", "d"],
+        ]);
+        expect(rows.map((row) => row.id)).toEqual(["a", "b", "c", "d"]);
+    });
+
+    it("is wired into the export action", () => {
         const steps = readFileSync(join(import.meta.dirname, "../gdpr/steps.ts"), "utf8");
 
-        expect(workflow).toContain("internal.agent.gdpr.collectChatFilesForExport");
-        expect(workflow).toMatch(EXPORT_FILE_CHAT_FILES);
-        expect(steps).toContain("chatFiles: args.chatFiles ?? []");
+        expect(steps).toContain("internal.agent.gdpr.collectChatFileIdsForExport");
+        expect(steps).toContain("internal.agent.gdpr.chatFileMetadataForExport");
+        expect(steps).toContain("\n            chatFiles,\n");
     });
 });

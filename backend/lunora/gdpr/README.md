@@ -126,8 +126,9 @@ Users can request a complete export of all their personal data in JSON format. T
 1. **Profile Data** - User account information
 2. **Settings** - User preferences and AI settings
 3. **Conversations** - All threads and messages
-4. **Files** - Vault file and folder metadata, and the chat files the user holds a grant for (uploads and generated images): metadata
-   only, the bytes are not exported (`agent/gdpr.ts#collectChatFilesForExport`, a page per workflow step)
+4. **Files** - Vault file and folder metadata, and the chat files of the user (uploads and generated images): the files behind their
+   grants and behind the links of their own chats, metadata only, the bytes are not exported (`agent/export-pages.ts`, read by
+   `agent/gdpr.ts#collectChatFileIdsForExport` and `chatFileMetadataForExport`, a page per query)
 5. **Prompts** - Saved prompts and history
 6. **Usage History** - AI usage tracking events
 7. **Browser** - Browser sessions (started, status, last page, the extension that drove it), their actions (action, target, time, success),
@@ -421,6 +422,7 @@ The following tables contain user personal data and are included in exports/dele
 | `messages`          | `schema.ts` | Chat messages                                                  |
 | `files`             | `schema.ts` | Uploaded files                                                 |
 | `chatFileAccess`    | `schema.ts` | Chat files held (uploads, generated images), metadata exported |
+| `chatFileThreads`   | `schema.ts` | Chat files linked to the user's chats, metadata exported       |
 | `folders`           | `schema.ts` | Folder structure                                               |
 | `prompts`           | `schema.ts` | Saved prompts                                                  |
 | `promptHistory`     | `schema.ts` | Prompt versions                                                |
