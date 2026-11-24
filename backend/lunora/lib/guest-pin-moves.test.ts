@@ -41,6 +41,7 @@ const REFERENCES: MergeReferences = {
     reassignGlobal: reference("reassignGlobalRows"),
     reassignPins: reference("reassignUserPinsOnThread"),
     releaseLease: reference("releaseMergeLease"),
+    resolvePinsLeft: reference("resolvePinsLeft"),
 };
 
 /** A guest pin write as `createPin` makes it: refused once the account is marked, otherwise a new pin on the owner shard. */
@@ -194,6 +195,9 @@ const build = ({
             }
             case "releaseMergeLease": {
                 return null as never;
+            }
+            case "resolvePinsLeft": {
+                return { fenced: false } as never;
             }
             default: {
                 throw new Error(`unexpected ${String(name)}`);

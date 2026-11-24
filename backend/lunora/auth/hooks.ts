@@ -27,7 +27,7 @@ import { internalMutation } from "../_generated/server";
 import { guestHasFollowRows } from "../chat/follows/follow-writes";
 import { guestHasPinRoutes } from "../chat/pins/pin-route-writes";
 import { ADMIN } from "../env";
-import { firstTableWithGuestRows, mergeGenerationCurrent, onGuestShard } from "../lib/account-merge";
+import { dropPinsLeft, firstTableWithGuestRows, mergeGenerationCurrent, onGuestShard } from "../lib/account-merge";
 import { authLogger } from "../lib/logger";
 import { noteShardActivity } from "../lib/shard-housekeeping";
 import { deleteShardRoutesOf } from "../lib/shard-routes";
@@ -222,6 +222,8 @@ export const deleteMergedGuest = internalMutation
         }
 
         await cascadeDelete(ctx, user._id);
+        // Its `global` step dropped this already; a guest gone takes its shard's pins-left signal with it in any case.
+        await dropPinsLeft(ctx.db, user._id);
         await ctx.db.delete("user", user._id);
 
         return { deleted: true };

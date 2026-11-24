@@ -432,16 +432,17 @@ const carrySetupSteps = async (ctx: { db: unknown }, guestRows: Record<string, u
 export const IMPORT_MARKER_SCOPE = "guest-merge-row";
 
 /**
- * The time to live of the merge's other claims (lease, generation, progress), each written again by every run. Not the
- * import markers': a run writes a marker only with its row, so a merge that runs longer than this would see its first
- * markers lapse.
+ * The time to live of the merge's lease and generation claims, each written again by every run. Not the import markers',
+ * the progress record's or the pins-left signal's: each is the only record of something a merge has not finished, and
+ * none may lapse before that is done ({@link IMPORT_MARKER_EXPIRES_AT}).
  */
 export const IMPORT_MARKER_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
- * An import marker's `expiresAt`: it never lapses, so the claim purge never takes it. It goes only with the end of the
- * merge or the new account's erasure; a merge given up on keeps its markers until then, so a later delivery still
- * leaves alone every row the account deleted.
+ * The `expiresAt` of an import marker, a progress record and a pins-left signal: it never lapses, so the claim purge
+ * never takes it. Each goes only when the merge has done what it records, or with the erasure of the account it is
+ * tagged with; a merge given up on keeps its markers until then, so a later delivery still leaves alone every row the
+ * account deleted.
  */
 export const IMPORT_MARKER_EXPIRES_AT = Number.MAX_SAFE_INTEGER;
 
@@ -683,7 +684,7 @@ export const acquireMergeLease = internalMutation
         });
         await recordMergeStart(ctx, args.from, args.to, now);
 
-        const record = await claimAt(ctx.db, MERGE_PROGRESS_SCOPE, args.from, now);
+        const record = await storedClaim(ctx.db, MERGE_PROGRESS_SCOPE, args.from);
         const saved = record === null ? null : savedProgressOf(record.result).progress;
 
         return { generation, ...(saved !== null && { saved }) };
@@ -710,7 +711,7 @@ export const releaseMergeLease = internalMutation
         if ((await mergeFinished(ctx.db, args.from, now)) && !(await mergeCleanupPending(ctx, args.from, row.userId))) {
             await dropMergeProgress(ctx.db, args.from);
         } else if (args.progress !== undefined && row.userId !== undefined) {
-            const record = await claimAt(ctx.db, MERGE_PROGRESS_SCOPE, args.from, now);
+            const record = await storedClaim(ctx.db, MERGE_PROGRESS_SCOPE, args.from);
 
             if (record === null || args.progress.run > runOf(savedProgressOf(record.result).progress)) {
                 // The lease is tagged with the new account (`acquireMergeLease`), so the record is too.
@@ -752,7 +753,8 @@ export const noteMergeGeneration = internalMutation
  * its erasure takes it. Apart from any queued job's payload: when a job runs out of redeliveries, nothing else would carry
  * the merge on, so {@link resumeStalledGuestMerges} restarts it from here. Written when the merge is handed over
  * ({@link recordGuestMerge}) and at its first lease, saved each time a run gives the lease back, and dropped once the
- * merge is finished (its fence is here) or stopped by an erasure.
+ * merge is finished (its fence is here), stopped by an erasure or past {@link MAX_MERGE_RUNS}; never by time
+ * ({@link IMPORT_MARKER_EXPIRES_AT}), as a merge whose jobs are gone has no other way on.
  */
 export const MERGE_PROGRESS_SCOPE = "guest-merge-progress";
 
@@ -786,7 +788,8 @@ const runOf = (progress: MergeProgress | null): number => progress?.run ?? 0;
  */
 const saveMergeProgress = async (ctx: Pick<MutationCtx, "db">, from: string, to: string, progress: MergeProgress | null, now: number): Promise<void> => {
     await writeClaim(ctx.db, MERGE_PROGRESS_SCOPE, from, now, {
-        expiresAt: now + IMPORT_MARKER_TTL_MS,
+        // Never by time: the record is the merge's only continuation once its jobs are gone, so only its end goes with it.
+        expiresAt: IMPORT_MARKER_EXPIRES_AT,
         result: JSON.stringify({ progress, savedAt: now }),
         userId: to,
     });
@@ -892,7 +895,6 @@ const resumeStalledMerges = async (ctx: MutationCtx): Promise<{ dropped: number;
 
         const ended =
             to === undefined ||
-            row.expiresAt <= now ||
             ((await mergeFinished(ctx.db, from, now)) && !(await mergeCleanupPending(ctx, from, to))) ||
             (progress !== null && progress.run >= MAX_MERGE_RUNS) ||
             (await isErasing(ctx, to)) ||
@@ -1124,7 +1126,7 @@ export const deleteShardRows = internalMutation
         // Pins on the guest's threads (other users' among them) now sit on the new account's shard, while their routes still
         // name the guest until the `global` step: another merge's pin pass reading this shard in between must wait for them.
         if (deleted && args.table === "threadPins") {
-            await writeClaim(ctx.db, MERGE_PINS_LEFT_SCOPE, args.from, now, { expiresAt: now + IMPORT_MARKER_TTL_MS, result: "", userId: args.from });
+            await writeClaim(ctx.db, MERGE_PINS_LEFT_SCOPE, args.from, now, { expiresAt: IMPORT_MARKER_EXPIRES_AT, result: "", userId: args.from });
         }
 
         return { fenced: false };
@@ -1135,16 +1137,49 @@ export const deleteShardRows = internalMutation
  * on the guest's shard): the routes of those pins still name the guest as the thread's owner until the merge's `global`
  * step re-points them. A merge of one of the pins' authors that reaches this shard through such a route finds no pin of
  * its guest here, yet one may still arrive on the route's next shard; its `repins` step waits ({@link pinsLeftShard}).
- * Tagged with the guest; lapses with the claim purge.
+ * Never by time ({@link IMPORT_MARKER_EXPIRES_AT}): a merge stalled between its clear and its `global` step leaves the
+ * routes naming this shard for as long as it stays stalled. Dropped once that step has re-pointed them
+ * ({@link resolvePinsLeft}) or with the guest's deletion; tagged with the guest, so its erasure takes it too.
  */
 export const MERGE_PINS_LEFT_SCOPE = "guest-merge-pins-left";
 
-/** On a thread owner's shard: whether its guest merge's clear has moved the pins here away ({@link MERGE_PINS_LEFT_SCOPE}). */
+/**
+ * On a thread owner's shard: whether its guest merge's clear has moved the pins here away ({@link MERGE_PINS_LEFT_SCOPE}).
+ * A signal whose time has passed still counts: only the merge's `global` step ends it.
+ */
 export const pinsLeftShard = internalMutation
     .input({ ownerId: v.string() })
     .output(v.object({ left: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
-        return { left: (await claimAt(ctx.db, MERGE_PINS_LEFT_SCOPE, args.ownerId, ctx.now)) !== null };
+        return { left: (await storedClaim(ctx.db, MERGE_PINS_LEFT_SCOPE, args.ownerId)) !== null };
+    });
+
+/** Drops the guest's pins-left signal ({@link MERGE_PINS_LEFT_SCOPE}); on the guest's shard. */
+export const dropPinsLeft = async (db: MutationCtx["db"], from: string): Promise<void> => {
+    const row = await storedClaim(db, MERGE_PINS_LEFT_SCOPE, from);
+
+    if (row !== null) {
+        await db.delete("idempotencyClaims", row._id);
+    }
+};
+
+/**
+ * On the GUEST's shard, once the merge's `global` step is done: the routes of the pins its clear moved away now name the
+ * new account, so another merge's `repins` step reaches them there and need not wait on this shard any more. Nothing is
+ * dropped for a delivery whose generation is no longer this shard's newest (`fenced`): the newer one's clear may have
+ * moved pins again since.
+ */
+export const resolvePinsLeft = internalMutation
+    .input({ from: v.string(), generation: v.number() })
+    .output(v.object({ fenced: v.boolean() }))
+    .mutation(async ({ args, ctx }) => {
+        if (!(await mergeGenerationCurrent(ctx.db, args.from, args.generation, ctx.now))) {
+            return { fenced: true };
+        }
+
+        await dropPinsLeft(ctx.db, args.from);
+
+        return { fenced: false };
     });
 
 /**
@@ -1400,7 +1435,7 @@ interface MergeContext {
 }
 
 /** The most cross-shard calls one step of each phase makes: a run stops before a step it could not finish. */
-const STEP_CALLS: Readonly<Record<MergePhase, number>> = { clear: 3, copy: 2, follows: 1, global: 1, guest: 1, markers: 1, pins: 3, repins: 3 };
+const STEP_CALLS: Readonly<Record<MergePhase, number>> = { clear: 3, copy: 2, follows: 1, global: 2, guest: 1, markers: 1, pins: 3, repins: 3 };
 
 /** Moves `state` to the first table of `phase`. */
 const enter = (state: MergeState, phase: MergePhase): void => {
@@ -1502,11 +1537,21 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
         return false;
     },
     // Each call moves at most `REASSIGN_BATCH` rows, so a guest with many never hits the statement cap.
-    global: async ({ call, from, references, to }, state) => {
+    global: async ({ call, from, generation, references, to }, state) => {
         state.calls -= 1;
         const { done }: { done: boolean } = await call(references.reassignGlobal, { from, to }, to);
 
         if (done) {
+            // The routes name the new account now: the guest's shard stops holding other merges' `repins` steps back.
+            state.calls -= 1;
+            const { fenced }: { fenced: boolean } = await call(references.resolvePinsLeft, { from, generation }, from);
+
+            if (fenced) {
+                state.superseded = true;
+
+                return true;
+            }
+
             enter(state, "follows");
         }
 
@@ -1831,6 +1876,7 @@ export interface MergeReferences {
     reassignGlobal: { __lunoraRef: string };
     reassignPins: { __lunoraRef: string };
     releaseLease: { __lunoraRef: string };
+    resolvePinsLeft: { __lunoraRef: string };
 }
 
 /**
@@ -1870,6 +1916,7 @@ export const runGuestMerge = internalAction
                 reassignGlobal: internal.lib.account_merge.reassignGlobalRows,
                 reassignPins: internal.chat.pins.functions.reassignUserPinsOnThread,
                 releaseLease: internal.lib.account_merge.releaseMergeLease,
+                resolvePinsLeft: internal.lib.account_merge.resolvePinsLeft,
             },
             args.from,
             args.to,

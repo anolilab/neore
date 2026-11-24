@@ -42,7 +42,7 @@ import {
     runGuestMerge,
     shardLocalTables,
 } from "./account-merge";
-import { IMPORT_MARKER_EXPIRES_AT, IMPORT_MARKER_SCOPE, MERGE_PINS_LEFT_SCOPE, pinsLeftShard } from "./account-merge";
+import { IMPORT_MARKER_EXPIRES_AT, IMPORT_MARKER_SCOPE, MERGE_PINS_LEFT_SCOPE, pinsLeftShard, resolvePinsLeft } from "./account-merge";
 import { purgeExpiredClaims } from "./claim-once";
 import { eraseWaitUntil } from "./account-moves";
 import { runInShard } from "./shard-context";
@@ -98,6 +98,7 @@ const REFERENCES: MergeReferences = {
     reassignGlobal: ref("reassignGlobalRows"),
     reassignPins: { __lunoraRef: "chat_pins_functions:reassignUserPinsOnThread" },
     releaseLease: ref("releaseMergeLease"),
+    resolvePinsLeft: ref("resolvePinsLeft"),
 };
 
 /** A guest's pin on a thread another user owns, and its `.global()` route, as the fake shards keep them. */
@@ -308,6 +309,11 @@ const fakeShards = (
             }
             case "releaseMergeLease": {
                 return null as never;
+            }
+            case "resolvePinsLeft": {
+                pinsLeft.delete(args.from as string);
+
+                return { fenced: false } as never;
             }
             default: {
                 throw new Error(`unexpected ${String(name)}`);
@@ -976,6 +982,31 @@ describe("deleteMergedGuest", () => {
             return await context.runMutation(deleteMergedGuest, { generation, userId });
         });
 
+    it("takes the guest's pins-left signal with it", async () => {
+        const harness = harnessWithUsers();
+
+        try {
+            const guest = await insertUser(harness, true);
+
+            await harness.run(
+                async (context: any) =>
+                    await context.db.insert("idempotencyClaims", {
+                        claimedAt: 0,
+                        expiresAt: IMPORT_MARKER_EXPIRES_AT,
+                        key: guest,
+                        result: "",
+                        scope: MERGE_PINS_LEFT_SCOPE,
+                        userId: guest,
+                    }),
+            );
+
+            expect(await deleteGuest(harness, guest)).toStrictEqual({ deleted: true });
+            expect(await harness.run(async (context: any) => await context.runMutation(pinsLeftShard, { ownerId: guest }))).toStrictEqual({ left: false });
+        } finally {
+            harness.close();
+        }
+    });
+
     it("deletes a guest and its sessions", async () => {
         const harness = harnessWithUsers();
 
@@ -1280,6 +1311,7 @@ describe("mergeGuestInto across two real shards", () => {
         listShardRowsToClear: { fn: listShardRowsToClear, kind: "query" },
         noteMergeGeneration: { fn: noteMergeGeneration, kind: "mutation" },
         releaseMergeLease: { fn: releaseMergeLease, kind: "mutation" },
+        resolvePinsLeft: { fn: resolvePinsLeft, kind: "mutation" },
     };
 
     const thread = (title: string, userId = "guest") => {
@@ -2219,6 +2251,7 @@ describe("the account-move markers a merge holds", () => {
             listShardRowsToClear,
             noteMergeGeneration,
             releaseMergeLease,
+            resolvePinsLeft,
         };
         const QUERIES = new Set(["listShardRowsPage", "listShardRowsToClear"]);
         const shards = { guest: lunoraTest(schemaWithShardedTables([]) as never), user: lunoraTest(schemaWithShardedTables([]) as never) };
@@ -2777,5 +2810,118 @@ describe("import markers outlive any merge", () => {
             harness.close();
             vi.useRealTimers();
         }
+    });
+});
+
+describe("a merge's unfinished state never lapses", () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const claimOf = (harness: ReturnType<typeof lunoraTest>, scope: string, key: string) =>
+        harness.run(
+            async (context: any) =>
+                await context.db
+                    .query("idempotencyClaims")
+                    .withIndex("by_scope_key", (q: any) => q.eq("scope", scope).eq("key", key))
+                    .first(),
+        ) as Promise<{ expiresAt: number } | null>;
+
+    it("restarts a merge whose progress is older than the old 30-day time to live, after a claim purge", async () => {
+        vi.useFakeTimers({ now: 1_000_000_000, toFake: ["Date"] });
+
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            await harness.run(async (context: any) => await context.runMutation(recordGuestMerge, { from: "guest", to: "user" }));
+
+            const record = await claimOf(harness, MERGE_PROGRESS_SCOPE, "guest");
+
+            expect(record?.expiresAt).toBe(IMPORT_MARKER_EXPIRES_AT);
+
+            // No job carries the merge on for a month and more; the purge runs meanwhile.
+            vi.setSystemTime(Date.now() + 31 * DAY);
+            await harness.run(async (context: any) => await context.runMutation(purgeExpiredClaims, {}));
+            transport.queued = [];
+
+            expect(await harness.run(async (context: any) => await context.runMutation(resumeStalledGuestMerges, {}))).toStrictEqual({
+                dropped: 0,
+                resumed: 1,
+            });
+            expect(transport.queued.map((job) => job.args)).toStrictEqual([{ from: "guest", to: "user" }]);
+            expect(await claimOf(harness, MERGE_PROGRESS_SCOPE, "guest")).not.toBeNull();
+        } finally {
+            harness.close();
+            vi.useRealTimers();
+        }
+    });
+
+    it("keeps a shard's pins-left signal past the old 30-day time to live, until the merge's global step resolves it", async () => {
+        vi.useFakeTimers({ now: 1_000_000_000, toFake: ["Date"] });
+
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+        const left = async () => await harness.run(async (context: any) => await context.runMutation(pinsLeftShard, { ownerId: "owner" }));
+
+        try {
+            const pin = (await harness.run(async (context: any) => {
+                const threadId = await context.db.insert("threads", {
+                    mode: "text",
+                    model: "gpt-4o",
+                    status: "active",
+                    title: "T",
+                    updatedAt: 1,
+                    userId: "owner",
+                });
+
+                return await context.db.insert("threadPins", { createdAt: 1, messageRole: "user", threadId, updatedAt: 1, userId: "collaborator" });
+            })) as string;
+
+            await harness.run(async (context: any) => await context.runMutation(noteMergeGeneration, { from: "owner", generation: 2 }));
+
+            const { digests } = (await harness.run(
+                async (context: any) => await context.runQuery(listShardRowsToClear, { from: "owner", table: "threadPins" }),
+            )) as { digests: string[] };
+
+            await harness.run(
+                async (context: any) =>
+                    await context.runMutation(deleteShardRows, { from: "owner", generation: 2, rows: [{ digest: digests[0]!, id: pin }], table: "threadPins" }),
+            );
+
+            const signal = await claimOf(harness, MERGE_PINS_LEFT_SCOPE, "owner");
+
+            expect(signal?.expiresAt).toBe(IMPORT_MARKER_EXPIRES_AT);
+
+            // The owner's merge stalls before its global step; a collaborator's merge comes by more than 30 days later.
+            vi.setSystemTime(Date.now() + 31 * DAY);
+            await harness.run(async (context: any) => await context.runMutation(purgeExpiredClaims, {}));
+
+            expect(await left()).toStrictEqual({ left: true });
+
+            // The owner's merge resumes with a new run; a superseded delivery's global step does not end the signal, the current one's does.
+            await harness.run(async (context: any) => await context.runMutation(noteMergeGeneration, { from: "owner", generation: 3 }));
+
+            expect(await harness.run(async (context: any) => await context.runMutation(resolvePinsLeft, { from: "owner", generation: 2 }))).toStrictEqual({
+                fenced: true,
+            });
+            expect(await left()).toStrictEqual({ left: true });
+            expect(await harness.run(async (context: any) => await context.runMutation(resolvePinsLeft, { from: "owner", generation: 3 }))).toStrictEqual({
+                fenced: false,
+            });
+            expect(await left()).toStrictEqual({ left: false });
+        } finally {
+            harness.close();
+            vi.useRealTimers();
+        }
+    });
+
+    it("resolves the guest's own pins-left signal at its global step", async () => {
+        const merge = fakeShards({});
+
+        merge.pinsLeft.add("guest");
+
+        let result = await mergeGuestInto(merge.call, REFERENCES, "guest", "user");
+
+        while (result.next !== null) {
+            result = await mergeGuestInto(merge.call, REFERENCES, "guest", "user", { resume: result.next });
+        }
+
+        expect(merge.pinsLeft.has("guest")).toBe(false);
     });
 });
