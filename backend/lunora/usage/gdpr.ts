@@ -164,7 +164,11 @@ export const releaseBrowserPages = internalMutation
  * later batches of the same erasure do not rescan the run rows.
  */
 export const eraseUsageForUser = async (ctx: MutationCtx, userId: string, runCursor?: string | null): Promise<BatchResult & { runCursor: string | null }> => {
-    const [days, keys, backfills, pieces, projects] = await Promise.all([
+    // The organizations' lists of who has rows under them (`usageOrganizationContributors`, a global table, read through its own API).
+    // From the primary: a replica that lags a committed entry would end the erasure with the user's ID still in a list, and a stale
+    // one would return rows an earlier batch deleted.
+    const { page: contributors } = await ctx.db.usageOrganizationContributors.findMany({ consistency: "primary", limit: BATCH, where: { userId } });
+    const [days, keys, backfills, ledger, pieces, projects] = await Promise.all([
         ctx.db
             .query("usageDaily")
             .withIndex("by_user_date", (q) => q.eq("userId", userId))
@@ -177,14 +181,23 @@ export const eraseUsageForUser = async (ctx: MutationCtx, userId: string, runCur
             .query("usageBackfill")
             .withIndex("by_userId", (q) => q.eq("userId", userId))
             .take(BATCH),
+        // The organization ledger (`usageOrganizationReplies`): a member's replies filed under their organizations' projects.
+        // From the primary: a replica that lags committed rows would let erasure report done with them left on the shard.
+        ctx.db.usageOrganizationReplies.findMany({ consistency: "primary", limit: BATCH, where: { userId } }).then((result) => result.page),
         ctx.db.usageExportPieces.findMany({ consistency: "primary", limit: EXPORT_PIECE_BATCH, where: { userId } }),
         ctx.db.usageExportProjects.findMany({ consistency: "primary", limit: EXPORT_PIECE_BATCH, where: { userId } }),
     ]);
+
+    // The entries go only once the ledger is empty: while rows remain, the organization view reads the member, finds the erasure underway
+    // and withholds their cohort. Dropping the entries first would show the cohort short, part-way through the erasure.
+    const ledgerGone = ledger.length === 0;
 
     await Promise.all([
         ...days.map(async (row) => await ctx.db.delete("usageDaily", row._id)),
         ...keys.map(async (row) => await ctx.db.delete("usageReplies", row._id)),
         ...backfills.map(async (row) => await ctx.db.delete("usageBackfill", row._id)),
+        ...ledger.map(async (row) => await ctx.db.delete("usageOrganizationReplies", row._id)),
+        ...(ledgerGone ? contributors : []).map(async (row) => await ctx.db.delete("usageOrganizationContributors", row._id)),
         ...pieces.page.map(async (row) => await ctx.db.delete("usageExportPieces", row._id)),
         ...projects.page.map(async (row) => await ctx.db.delete("usageExportProjects", row._id)),
     ]);
@@ -215,7 +228,16 @@ export const eraseUsageForUser = async (ctx: MutationCtx, userId: string, runCur
     }
 
     return {
-        hasMore: full(days) || full(keys) || full(backfills) || fullPieces(pieces.page) || fullPieces(projects.page) || cursor !== null,
+        hasMore:
+            full(days) ||
+            full(keys) ||
+            full(backfills) ||
+            full(ledger) ||
+            full(contributors) ||
+            (contributors.length > 0 && !ledgerGone) ||
+            fullPieces(pieces.page) ||
+            fullPieces(projects.page) ||
+            cursor !== null,
         runCursor: cursor ?? null,
     };
 };
@@ -461,6 +483,69 @@ export const pruneUsageDaysBefore = async (ctx: MutationCtx, cutoffDate: string,
     await Promise.all(days.map(async (row) => await ctx.db.delete("usageDaily", row._id)));
 
     return days.length;
+};
+
+/**
+ * The organizations one prune batch takes rows from. Each organization a batch empties books a reconcile on the scheduler, a subrequest, so a
+ * batch over a member's many organizations stays under the Free Worker's 50; the rest are taken by the next batch.
+ */
+export const MAX_PRUNED_ORGANIZATIONS = 20;
+
+/**
+ * Retention (`gdpr/retention.ts`): one batch of `usageOrganizationReplies` rows recorded before `cutoff` (epoch ms). Returns how many rows
+ * were deleted. The contributor entries of the members they belonged to are settled after this write commits
+ * (`reconcileOrganizationContributor`), not here: a member left with no rows loses their entry, and one with rows keeps it.
+ */
+export const pruneOrganizationRepliesBefore = async (ctx: MutationCtx, cutoff: number, limit: number): Promise<number> => {
+    const { page } = await ctx.db.usageOrganizationReplies.findMany({
+        limit,
+        orderBy: [{ at: "asc" }],
+        where: { at: { lt: cutoff } },
+    });
+
+    // Oldest first, up to the batch's organization bound; a row of an organization past it waits for the next batch.
+    const members = new Map<string, (typeof page)[number]>();
+    const taken: typeof page = [];
+
+    for (const row of page) {
+        const key = `${row.organizationId}\u{0}${row.userId}`;
+
+        if (!members.has(key)) {
+            if (members.size >= MAX_PRUNED_ORGANIZATIONS) {
+                continue;
+            }
+
+            members.set(key, row);
+        }
+
+        taken.push(row);
+    }
+
+    await Promise.all(taken.map(async (row) => await ctx.db.delete("usageOrganizationReplies", row._id)));
+
+    for (const row of members.values()) {
+        // A member with rows left keeps their entry, so only an organization this batch emptied needs the reconcile. Held rows
+        // (`heldFrom`) keep no entry, so they do not count as rows left.
+        const left = await ctx.db.usageOrganizationReplies.findFirst({
+            consistency: "primary",
+            where: { heldFrom: { isNull: true }, organizationId: row.organizationId, userId: row.userId },
+        });
+
+        if (left) {
+            continue;
+        }
+
+        await runAfterOnShard(
+            ctx.scheduler,
+            0,
+            internal.usage.organization.reconcileOrganizationContributor,
+            { organizationId: row.organizationId, userId: row.userId },
+            row.userId,
+            RECORD_RETRY,
+        );
+    }
+
+    return taken.length;
 };
 
 /**

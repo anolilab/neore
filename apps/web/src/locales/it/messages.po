@@ -1464,7 +1464,7 @@ msgstr "{pages, plural, one {# pagina} other {# pagine}}"
 msgid "{prefixed}, selected"
 msgstr "{prefixed}, selezionato"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:134
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:242
 msgid "{project}: {spendShare} of spend"
 msgstr "{project}: {spendShare} della spesa"
 
@@ -9018,7 +9018,7 @@ msgstr "Impossibile caricare il marketplace. Riprova più tardi."
 msgid "Could not load the memories."
 msgstr "Impossibile caricare i ricordi."
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:94
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:202
 msgid "Could not load the project breakdown."
 msgstr "Impossibile caricare la ripartizione per progetto."
 
@@ -9339,6 +9339,10 @@ msgstr "Impossibile aggiornare i partecipanti"
 #: src/features/chat/thread-list/thread-options-menu.tsx:100
 msgid "Couldn't load follow state"
 msgstr "Impossibile caricare lo stato di monitoraggio"
+
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:167
+msgid "Counted in whole weeks (Monday to Sunday, UTC) once each week has ended, so this week's usage shows next week."
+msgstr "Conteggiato per settimane intere (da lunedì a domenica, UTC) al termine di ogni settimana, quindi l’utilizzo di questa settimana compare la settimana prossima."
 
 #: src/features/settings/lib/settings-keywords.ts:31
 msgid "country"
@@ -20037,7 +20041,7 @@ msgid "Loading triggers..."
 msgstr "Caricamento dei trigger..."
 
 #: src/features/projects/components/project-usage-summary.tsx:56
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:86
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:194
 msgid "Loading usage…"
 msgstr "Caricamento dell'utilizzo…"
 
@@ -21247,6 +21251,7 @@ msgid "Min"
 msgstr "Min"
 
 #: src/features/develop/components/inbox-list.tsx:51
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:185
 msgid "Mine"
 msgstr "Miei"
 
@@ -23221,7 +23226,7 @@ msgid "No progress: {0}"
 msgstr "Nessun progresso: {0}"
 
 #: src/features/projects/components/project-repo-picker.tsx:105
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:66
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:127
 #: src/features/tasks/components/task-form-dialog.tsx:430
 #: src/features/tasks/components/task-form-dialog.tsx:442
 msgid "No project"
@@ -23281,7 +23286,7 @@ msgstr "Nessun riferimento selezionato"
 msgid "No remote MCP servers match your search."
 msgstr "Nessun server MCP remoto corrisponde alla tua ricerca."
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:98
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:206
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:85
 msgid "No replies recorded for this period."
 msgstr "Nessuna risposta registrata per questo periodo."
@@ -24147,7 +24152,7 @@ msgstr "Solo gli strumenti elencati"
 msgid "Only organization owners can manage billing settings"
 msgstr "Solo i proprietari dell'organizzazione possono gestire le impostazioni di fatturazione"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:152
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:260
 msgid "Only part of this period is included."
 msgstr "È inclusa solo una parte di questo periodo."
 
@@ -25070,6 +25075,7 @@ msgstr "I clic normali vengono controllati e poi eseguiti davvero. Una pagina pu
 #: src/features/auth/components/organization/organization-logo.tsx:62
 #: src/features/auth/components/organization/organization-view.tsx:64
 #: src/features/layout/lib/dashboard-page-names.ts:32
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:186
 #: src/features/settings/lib/settings-navigation.ts:110
 #: src/features/skills/components/skill-form-dialog.tsx:476
 #: src/features/skills/components/skill-item.tsx:130
@@ -25187,7 +25193,8 @@ msgstr "Altri modelli con un soprannome"
 msgid "Other presets"
 msgstr "Altri preset"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:62
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:123
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:138
 msgid "Other projects"
 msgstr "Altri progetti"
 
@@ -26962,7 +26969,7 @@ msgstr "Avanzamento di {toolName}"
 
 #: src/features/projects/components/project-repo-picker.tsx:145
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:451
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:104
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:212
 #: src/features/tasks/components/task-form-dialog.tsx:427
 msgid "Project"
 msgstr "Progetto"
@@ -26979,7 +26986,7 @@ msgstr "Contesto del progetto"
 msgid "Project Context"
 msgstr "Contesto del progetto"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:58
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:119
 msgid "Project no longer available"
 msgstr "Progetto non più disponibile"
 
@@ -26997,6 +27004,10 @@ msgstr "Progetto: {0}"
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:606
 msgid "Projects"
 msgstr "Progetti"
+
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:143
+msgid "Projects no longer in the organization"
+msgstr "Progetti non più presenti nell'organizzazione"
 
 #: src/features/marketing/data/models-data.ts:66
 msgid "Projects requiring clean, readable text and typography rendered within generated images"
@@ -28662,7 +28673,7 @@ msgstr "Ripeti il tour di benvenuto per rivedere le funzioni principali di Neore
 #: src/features/projects/components/project-usage-summary.tsx:38
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:150
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:252
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:105
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:213
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:92
 msgid "Replies"
 msgstr "Risposte"
@@ -28691,7 +28702,7 @@ msgstr "Le risposte verranno lette ad alta voce"
 msgid "Replies will no longer be read aloud"
 msgstr "Le risposte non verranno più lette ad alta voce"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:81
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:163
 msgid "Replies, tokens and spend per project for the selected period"
 msgstr "Risposte, token e spesa per progetto nel periodo selezionato"
 
@@ -31042,7 +31053,7 @@ msgstr "Gli shard che non è stato possibile misurare sono esclusi dai totali: {
 msgid "Share"
 msgstr "Condividi"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:109
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:217
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:96
 msgid "Share of spend"
 msgstr "Quota della spesa"
@@ -32225,7 +32236,7 @@ msgstr "Livello veloce di Nano Banana 2 per una generazione rapida da testo a im
 #: src/features/projects/components/project-usage-summary.tsx:43
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:151
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:253
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:107
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:215
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:94
 msgid "Spend"
 msgstr "Spesa"
@@ -36567,7 +36578,7 @@ msgid "Token usage and cost breakdown per model for the selected period"
 msgstr "Utilizzo dei token e ripartizione dei costi per modello nel periodo selezionato"
 
 #: src/features/projects/components/project-usage-summary.tsx:40
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:106
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:214
 #: src/features/settings/components/chat/usage-settings.tsx:319
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:93
 msgid "Tokens"
@@ -37988,7 +37999,7 @@ msgstr "Analisi dell’utilizzo"
 msgid "Usage Analytics"
 msgstr "Analisi dell’utilizzo"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:79
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:159
 msgid "Usage by project"
 msgstr "Utilizzo per progetto"
 
@@ -39574,6 +39585,10 @@ msgstr "Con quale identità vengono eseguiti i commit di una pull request"
 msgid "Who answers"
 msgstr "Chi risponde"
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:172
+msgid "Whose usage"
+msgstr "Utilizzo di chi"
+
 #. placeholder {0}: model.name
 #: src/features/marketing/components/model-detail-page.tsx:175
 msgid "Why {0}"
@@ -40446,6 +40461,10 @@ msgstr "La tua organizzazione non consente agenti sul tuo computer."
 #: src/features/home/components/daily-brief-offer.tsx:96
 msgid "Your organization manages the Daily Brief."
 msgstr "La tua organizzazione gestisce il Daily Brief."
+
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:164
+msgid "Your organization's projects, summed over every member, for the selected period"
+msgstr "I progetti della tua organizzazione, sommati tra tutti i membri, per il periodo selezionato"
 
 #: src/features/home/components/home-page.tsx:144
 msgid "Your overview could not be loaded."

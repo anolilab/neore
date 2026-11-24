@@ -10,10 +10,13 @@ import { deleteMergedGuest } from "../auth/hooks";
 import { FOLLOW_MERGE_PAGE_SIZE } from "../chat/follows/follow-writes";
 import { requireOwnCollectionId } from "../knowledge/documents-shared";
 import type { MergeReferences, ShardCall } from "./account-merge";
+import { ORGANIZATION_RECORD_LATE_MS } from "../usage/activity-logic";
+import { reconcileOrganizationContributor } from "../usage/organization";
 import { importShardRows, listShardRowIds, MERGE_PAGE_SIZE } from "./account-merge";
 import {
     GLOBAL_USER_COLUMNS,
     GLOBAL_USER_TABLES_NOT_REASSIGNED,
+    handOverOrganizationContributors,
     mergeGuestInto,
     reassignGlobalRows,
     reassignThreadFollowsPage,
@@ -29,6 +32,7 @@ const ref = (name: string) => {
 const REFERENCES: MergeReferences = {
     deleteGuest: { __lunoraRef: "auth_hooks:deleteMergedGuest" },
     deleteRows: ref("deleteShardRows"),
+    handOverContributors: ref("handOverOrganizationContributors"),
     importRows: ref("importShardRows"),
     list: ref("listShardRowsPage"),
     listIds: ref("listShardRowIds"),
@@ -45,12 +49,19 @@ type Row = Record<string, unknown> & { _id: string };
 const fakeShards = (
     seed: Record<string, Record<string, Row[]>>,
     pageSize = 2,
-    { follows = 0, followsRemain = false }: { follows?: number; followsRemain?: boolean } = {},
+    {
+        follows = 0,
+        followsRemain = false,
+        handOverDone = true,
+        stuck = false,
+    }: { follows?: number; followsRemain?: boolean; handOverDone?: boolean; stuck?: boolean } = {},
 ) => {
     let followsLeft = follows;
     let followPageCalls = 0;
     const shards = new Map(Object.entries(seed).map(([key, tables]) => [key, new Map(Object.entries(tables).map(([table, rows]) => [table, [...rows]]))]));
     const reassigned: { from: string; to: string }[] = [];
+    /** Every procedure called, in order. */
+    const calls: string[] = [];
     /** Each guest deletion, with how many rows the guest's shard still held at that moment. */
     const deletedGuests: { left: number; shardKey: string; userId: string }[] = [];
     const tableOf = (shardKey: string, table: string): Row[] => {
@@ -69,6 +80,8 @@ const fakeShards = (
         const name = reference.__lunoraRef.split(":", 2)[1];
         const table = args.table as string;
 
+        calls.push(String(name));
+
         switch (name) {
             case "deleteMergedGuest": {
                 if (followsRemain) {
@@ -82,6 +95,10 @@ const fakeShards = (
                 return { deleted: true } as never;
             }
             case "deleteShardRows": {
+                if (stuck) {
+                    return null as never;
+                }
+
                 const shard = shards.get(shardKey) ?? new Map<string, Row[]>();
 
                 shard.set(
@@ -90,6 +107,9 @@ const fakeShards = (
                 );
 
                 return null as never;
+            }
+            case "handOverOrganizationContributors": {
+                return { done: handOverDone } as never;
             }
             case "importShardRows": {
                 const target = tableOf(shardKey, table);
@@ -134,7 +154,7 @@ const fakeShards = (
         }
     };
 
-    return { call, deletedGuests, followPageCalls: () => followPageCalls, reassigned, shards };
+    return { call, calls, deletedGuests, followPageCalls: () => followPageCalls, reassigned, shards };
 };
 
 describe("rewriteOwner", () => {
@@ -195,6 +215,15 @@ describe("mergeGuestInto", () => {
         expect(reassigned).toStrictEqual([{ from: "guest", to: "user" }]);
     });
 
+    it("hands the guest's organization contributor entries over before it copies a row, so the copy knows where ledger rows belong", async () => {
+        const { call, calls } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } });
+
+        await mergeGuestInto(call, REFERENCES, "guest", "user");
+
+        expect(calls[0]).toBe("handOverOrganizationContributors");
+        expect(calls.indexOf("importShardRows")).toBeGreaterThan(0);
+    });
+
     it("deletes the guest once its shard is empty, on the guest's shard", async () => {
         const { call, deletedGuests } = fakeShards({
             guest: {
@@ -234,6 +263,31 @@ describe("mergeGuestInto", () => {
         const { call } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } }, 2, { followsRemain: true });
 
         await expect(mergeGuestInto(call, REFERENCES, "guest", "user")).rejects.toThrow("thread follows");
+    });
+
+    it("fails before it copies a row when the hand-over's round cap leaves contributor entries, so the redelivery hands them over first", async () => {
+        const { call, calls, deletedGuests } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } }, 2, { handOverDone: false });
+
+        await expect(mergeGuestInto(call, REFERENCES, "guest", "user")).rejects.toThrow("contributor entries");
+
+        expect(calls).not.toContain("importShardRows");
+        expect(deletedGuests).toStrictEqual([]);
+    });
+
+    it("keeps the guest and fails for the queue to redeliver when the clear's round cap leaves rows on the guest's shard", async () => {
+        const { call, deletedGuests, followPageCalls, reassigned } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } }, 2, {
+            follows: 1,
+            stuck: true,
+        });
+
+        await expect(mergeGuestInto(call, REFERENCES, "guest", "user")).rejects.toThrow("rows on its shard");
+
+        // The thread follows still move first, so a run the queue gives up on has moved them.
+        expect(followPageCalls()).toBe(1);
+
+        // The marked contributor entries stay as they are for the redelivery to settle, never left marked by a run that returned.
+        expect(reassigned).toStrictEqual([{ from: "guest", to: "user" }]);
+        expect(deletedGuests).toStrictEqual([]);
     });
 
     it("is safe to run twice", async () => {
@@ -647,5 +701,222 @@ describe("clearing the guest's settings", () => {
 
         expect(listIdCalls.find((args) => args.table === "userSettings")).toEqual({ ownedBy: "guest", table: "userSettings" });
         expect(listIdCalls.find((args) => args.table === "threads")).toEqual({ table: "threads" });
+    });
+});
+
+describe("importShardRows for the organization ledger", () => {
+    it("moves every guest organization row, holding the older ones out of the view where the guest's entry did not become the new account's", async () => {
+        const now = 10 * ORGANIZATION_RECORD_LATE_MS;
+        const harness = lunoraTest(schemaWithShardedTables(["shardActivity"]) as never, { now } as never);
+        const row = (id: string, at: number) => {
+            return { _id: id, at, costMicrodollars: 100, organizationId: "org-1", projectKey: "p", replyKey: id, tokens: 1, userId: "guest" };
+        };
+
+        try {
+            // No contributor entry for the guest yet (its reconcile has not run): before, the old row was skipped and deleted with the guest.
+            const { moved, result } = await harness.run(async (context: any) => {
+                const imported = await context.runMutation(importShardRows, {
+                    from: "guest",
+                    rows: [row("old", now - ORGANIZATION_RECORD_LATE_MS - 1), row("recent", now - ORGANIZATION_RECORD_LATE_MS)],
+                    table: "usageOrganizationReplies",
+                    to: "user",
+                });
+
+                return { moved: await context.db.query("usageOrganizationReplies").take(10), result: imported };
+            });
+
+            expect(moved.map((entry: { heldFrom?: string; replyKey: string; userId: string }) => [entry.replyKey, entry.userId, entry.heldFrom])).toEqual([
+                ["old", "user", "guest"],
+                ["recent", "user", undefined],
+            ]);
+            expect(result).toStrictEqual({ held: 1, imported: 2 });
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+describe("merging a guest's organization usage", () => {
+    const now = 10 * ORGANIZATION_RECORD_LATE_MS;
+    const harness = () => lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never, { now } as never);
+    const ledgerRow = (id: string, at: number) => {
+        return { _id: id, at, costMicrodollars: 100, organizationId: "org-1", projectKey: "p", replyKey: id, tokens: 1, userId: "guest" };
+    };
+    const old = now - ORGANIZATION_RECORD_LATE_MS - 1;
+    const recent = now - 1;
+
+    /** Hand-over, the copy of the guest's ledger rows (passed in, as the guest's shard would page them), then the global re-point. */
+    const merge = async (run: ReturnType<typeof harness>, rows: Record<string, unknown>[]) => {
+        await run.run(async (context: any) => await context.runMutation(handOverOrganizationContributors, { from: "guest", to: "user" }));
+        await run.run(
+            async (context: any) => await context.runMutation(importShardRows, { from: "guest", rows, table: "usageOrganizationReplies", to: "user" }),
+        );
+        await run.run(async (context: any) => await context.runMutation(reassignGlobalRows, { from: "guest", to: "user" }));
+
+        return await run.run(async (context: any) => {
+            const entries = await context.db.usageOrganizationContributors.findMany({ where: { organizationId: "org-1" } });
+            const ledger = await context.db.usageOrganizationReplies.findMany({ where: { organizationId: "org-1", userId: "user" } });
+
+            return {
+                entries: entries.page.map((entry: any) => [entry.userId, entry.cohort, entry.mergedFrom]),
+                // A held row (`heldFrom`) is the account's record, outside the view.
+                ledger: ledger.page
+                    .map((row: any) => (typeof row.heldFrom === "string" ? `${String(row.replyKey)} (held)` : (row.replyKey as string)))
+                    .toSorted((a: string, b: string) => a.localeCompare(b)),
+            };
+        });
+    };
+
+    it("keeps the guest's cohort and every ledger row with it, so a contributor is never left without the usage its weeks counted", async () => {
+        const run = harness();
+
+        try {
+            await run.run(async (context: any) => {
+                await context.db.insert("usageOrganizationContributors", { cohort: 2, createdAt: old, organizationId: "org-1", userId: "guest" });
+            });
+
+            // Only rows past the late window: before, none moved, and the new account sat in the guest's cohort with no activity.
+            const after = await merge(run, [ledgerRow("closed-a", old), ledgerRow("closed-b", old - 1)]);
+
+            expect(after.entries).toStrictEqual([["user", 2, undefined]]);
+            expect(after.ledger).toStrictEqual(["closed-a", "closed-b"]);
+        } finally {
+            run.close();
+        }
+    });
+
+    it("keeps the new account's own entry where both are contributors, and holds the guest's rows of weeks the view may show", async () => {
+        const run = harness();
+
+        try {
+            await run.run(async (context: any) => {
+                await context.db.insert("usageOrganizationContributors", { cohort: 0, createdAt: old, organizationId: "org-1", userId: "guest" });
+                await context.db.insert("usageOrganizationContributors", { cohort: 3, createdAt: old, organizationId: "org-1", userId: "user" });
+            });
+
+            const after = await merge(run, [ledgerRow("closed", old), ledgerRow("open", recent)]);
+
+            // The new account's closed weeks stay in its cohort, and the guest's closed rows join none: no released cell changes by them.
+            expect(after.entries).toStrictEqual([["user", 3, undefined]]);
+            expect(after.ledger).toStrictEqual(["closed (held)", "open"]);
+        } finally {
+            run.close();
+        }
+    });
+
+    it("drops the guest's entry where the new account has ledger rows under the organization but no entry yet", async () => {
+        const run = harness();
+
+        try {
+            await run.run(async (context: any) => {
+                await context.db.insert("usageOrganizationContributors", { cohort: 1, createdAt: old, organizationId: "org-1", userId: "guest" });
+                await context.db.insert("usageOrganizationReplies", {
+                    at: old,
+                    costMicrodollars: 100,
+                    organizationId: "org-1",
+                    projectKey: "p",
+                    replyKey: "own",
+                    tokens: 1,
+                    userId: "user",
+                });
+            });
+
+            const after = await merge(run, [ledgerRow("closed", old)]);
+
+            expect(after.entries).toStrictEqual([]);
+            expect(after.ledger).toStrictEqual(["closed (held)", "own"]);
+        } finally {
+            run.close();
+        }
+    });
+
+    it("is safe to run twice: the second hand-over finds nothing of the guest's, and the cohort keeps its rows", async () => {
+        const run = harness();
+
+        try {
+            await run.run(async (context: any) => {
+                await context.db.insert("usageOrganizationContributors", { cohort: 2, createdAt: old, organizationId: "org-1", userId: "guest" });
+            });
+
+            await merge(run, [ledgerRow("closed", old)]);
+            const again = await merge(run, []);
+
+            expect(again.entries).toStrictEqual([["user", 2, undefined]]);
+            expect(again.ledger).toStrictEqual(["closed"]);
+        } finally {
+            run.close();
+        }
+    });
+});
+
+describe("an organization contributor entry handed over by a merge", () => {
+    const now = 10 * ORGANIZATION_RECORD_LATE_MS;
+    const harness = () => lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never, { now } as never);
+    const entries = async (run: ReturnType<typeof harness>) =>
+        await run.run(async (context: any) => {
+            const { page } = await context.db.usageOrganizationContributors.findMany({ where: { organizationId: "org-1" } });
+
+            return page.map((entry: any) => [entry.userId, entry.cohort, entry.mergedFrom]);
+        });
+
+    it("survives a reconcile while the copy has not brought its rows yet, and goes at the merge's end when none came", async () => {
+        const run = harness();
+
+        try {
+            // A stale entry: the guest's rows are gone (pruned), and its reconcile has not run.
+            await run.run(async (context: any) => {
+                await context.db.insert("usageOrganizationContributors", { cohort: 2, createdAt: 1, organizationId: "org-1", userId: "guest" });
+            });
+            await run.run(async (context: any) => await context.runMutation(handOverOrganizationContributors, { from: "guest", to: "user" }));
+            // A prune on the new account's shard between two copy pages reconciles it.
+            await run.run(async (context: any) => await context.runMutation(reconcileOrganizationContributor, { organizationId: "org-1", userId: "user" }));
+
+            expect(await entries(run)).toStrictEqual([["user", 2, "guest"]]);
+
+            await run.run(async (context: any) => await context.runMutation(reassignGlobalRows, { from: "guest", to: "user" }));
+
+            // No ledger row reached the new account: no member sits in the cohort with no usage.
+            expect(await entries(run)).toStrictEqual([]);
+        } finally {
+            run.close();
+        }
+    });
+});
+
+describe("a guest entry the new account's own entry outranks", () => {
+    const harness = () => lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
+    const entries = async (run: ReturnType<typeof harness>) =>
+        await run.run(async (context: any) => {
+            const { page } = await context.db.usageOrganizationContributors.findMany({ where: { organizationId: "org-1" } });
+
+            return page.map((entry: any) => [entry.userId, entry.cohort, entry.mergedFrom]).toSorted((a: string[], b: string[]) => a[0]!.localeCompare(b[0]!));
+        });
+
+    it("stays the guest's, marked, until the guest's shard is empty: their cohort is withheld and they are not booked again meanwhile", async () => {
+        const run = harness();
+
+        try {
+            await run.run(async (context: any) => {
+                await context.db.insert("usageOrganizationContributors", { cohort: 0, createdAt: 1, organizationId: "org-1", userId: "guest" });
+                await context.db.insert("usageOrganizationContributors", { cohort: 3, createdAt: 1, organizationId: "org-1", userId: "user" });
+            });
+            await run.run(async (context: any) => await context.runMutation(handOverOrganizationContributors, { from: "guest", to: "user" }));
+
+            expect(await entries(run)).toStrictEqual([
+                ["guest", 0, "guest"],
+                ["user", 3, undefined],
+            ]);
+
+            // Rows still on the guest's shard: the global step leaves the mark while the merge could not empty it.
+            await run.run(async (context: any) => await context.runMutation(reassignGlobalRows, { from: "guest", guestDrained: false, to: "user" }));
+
+            expect(await entries(run)).toHaveLength(2);
+
+            await run.run(async (context: any) => await context.runMutation(reassignGlobalRows, { from: "guest", to: "user" }));
+
+            expect(await entries(run)).toStrictEqual([["user", 3, undefined]]);
+        } finally {
+            run.close();
+        }
     });
 });
