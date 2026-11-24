@@ -12,7 +12,7 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import { pollEvents as pollLog } from "./events-poll";
 import type { EventLogStore } from "./events-poll";
 import { RETENTION_MS } from "./events-log";
-import { setRetentionDue } from "../lib/shard-housekeeping";
+import { noteRetentionWake } from "../lib/shard-housekeeping";
 
 /** Rows the sweep deletes per call. The sweep runs again while it reports more. */
 const PRUNE_BATCH = 200;
@@ -110,13 +110,13 @@ export const pruneMcpEvents = internalMutation.output(v.object({ hasMore: v.bool
     }
 
     const hasMore = page.length === PRUNE_BATCH;
-    // The shard's next retention time for this log: now while a full batch was deleted, else the expiry of the oldest event left
-    // (none when the log is empty). Without it a shard with no other retained rows would never be woken to expire these.
-    const { page: oldest } = await ctx.db.mcpEvents.findMany({ limit: 1, orderBy: [{ createdAt: "asc" }] });
 
-    const next = oldest[0] === undefined ? undefined : oldest[0].createdAt + RETENTION_MS;
-
-    await setRetentionDue(ctx, hasMore ? ctx.now : next);
+    // The shard has one retention time, shared with the other retained rows (`gdpr/retention.ts`), which sets it from all of them,
+    // this log's oldest event included. This sweep never writes it, so it cannot delay another table's expiry. A full batch only
+    // asks for the next one now.
+    if (hasMore) {
+        await noteRetentionWake(ctx, ctx.now);
+    }
 
     return { hasMore, removed: page.length };
 });

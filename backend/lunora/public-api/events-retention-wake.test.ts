@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { runInShard } from "../lib/shard-context";
 import { schemaWithShardedTables } from "../lib/test-schema";
+import { pruneRetainedActivity } from "../gdpr/retention";
 import { pruneMcpEvents } from "./events";
 import { RETENTION_MS, recordMcpEvent } from "./events-log";
 
@@ -45,7 +46,7 @@ describe("the Events log's retention wake", () => {
         }
     });
 
-    it("re-arms the shard for the oldest event left once the sweep has pruned the expired ones", async () => {
+    it("sets the shard's retention time to the oldest event left, once the retention sweep has run", async () => {
         const harness = lunoraTest(schemaWithShardedTables([]) as never);
 
         try {
@@ -80,6 +81,11 @@ describe("the Events log's retention wake", () => {
                 };
 
                 expect(outcome).toStrictEqual({ hasMore: false, removed: 1 });
+
+                // The Events sweep alone never writes the shard's retention time (`gdpr/retention.ts` does, from all retained rows).
+                expect(await censusOf(harness)).toBeUndefined();
+
+                await harness.run(async (context: any) => await context.runMutation(pruneRetainedActivity, {}));
             });
 
             const census = await censusOf(harness);
