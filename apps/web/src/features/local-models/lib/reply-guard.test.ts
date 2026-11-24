@@ -134,6 +134,17 @@ describe(createReplyGuard, () => {
         expect(guard.pushContent(delta)).toStrictEqual({ keep: line.length * LOCAL_REPEAT_LIMIT, kind: "repeat-loop" });
     });
 
+    it("does not cut reasoning between the halves of an emoji", () => {
+        expect.assertions(2);
+
+        const guard = createReplyGuard();
+
+        expect(guard.pushReasoning("r".repeat(LOCAL_REASONING_LIMIT_CHARS - 1))).toBeUndefined();
+
+        // One unit of room is left, but it is the first half of an emoji: keeping it would save a broken character.
+        expect(guard.pushReasoning("😀")).toStrictEqual({ keep: 0, kind: "reasoning-limit" });
+    });
+
     it("stops reasoning once it passes the limit, and not before", () => {
         expect.assertions(2);
 

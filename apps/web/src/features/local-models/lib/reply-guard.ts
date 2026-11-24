@@ -26,6 +26,8 @@ const REPLY_STOP_KINDS: ReadonlyArray<ReplyStopKind> = ["idle", "reasoning-limit
 export const isReplyStopKind = (kind: string): kind is ReplyStopKind => (REPLY_STOP_KINDS as ReadonlyArray<string>).includes(kind);
 
 const TRAILING_CR = /\r$/u;
+/** The first half of a UTF-16 surrogate pair: a character that is only whole with the second half after it. */
+const HIGH_SURROGATE = /^[\uD800-\uDBFF]$/u;
 
 /** The completed lines the repeat check can still see: enough for the longest block repeated the limit's times. */
 const WINDOW_LINES = LOCAL_REPEAT_LIMIT * LOCAL_REPEAT_MAX_BLOCK_LINES;
@@ -118,7 +120,18 @@ export const createReplyGuard = (): ReplyGuard => {
 
             reasoningChars += text.length;
 
-            return reasoningChars > LOCAL_REASONING_LIMIT_CHARS ? { keep: Math.min(room, text.length), kind: "reasoning-limit" } : undefined;
+            if (reasoningChars <= LOCAL_REASONING_LIMIT_CHARS) {
+                return undefined;
+            }
+
+            let keep = Math.min(room, text.length);
+
+            // Never cut between the two halves of a surrogate pair (an emoji): that would save a broken character.
+            if (keep > 0 && HIGH_SURROGATE.test(text.charAt(keep - 1))) {
+                keep -= 1;
+            }
+
+            return { keep, kind: "reasoning-limit" };
         },
     };
 };
