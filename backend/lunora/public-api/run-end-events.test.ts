@@ -6,7 +6,8 @@ import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { closeGroupTurnStream } from "../chat/group/run";
-import { addChunk } from "../chat/streaming/persistent/library";
+import { cleanupExpiredStreams } from "../chat/streaming/persistent/crons";
+import { addChunk, setStreamStatus } from "../chat/streaming/persistent/library";
 import schema from "../schema";
 import { pruneMcpEvents } from "./events";
 
@@ -144,13 +145,16 @@ describe("retention of the Events log", () => {
 describe("a group turn's end in the Events log", () => {
     // The harness runs function references, not the `internal.*` reference the group runner passes. `closeGroupTurnStream` calls only
     // `addChunk`, so the wrapper runs that function with the same args.
-    const groupEnd = async (): Promise<void> =>
+    const closeWith = async (runEnd: "succeeded" | "failed" | undefined): Promise<void> =>
         await harness.run(
             async (ctx: any) =>
-                await closeGroupTurnStream({ runMutation: async (_ref: unknown, args: unknown) => await ctx.runMutation(addChunk, args) } as never, {
-                    streamId,
-                }),
+                await closeGroupTurnStream(
+                    { runMutation: async (_ref: unknown, args: unknown) => await ctx.runMutation(addChunk, args) } as never,
+                    { streamId },
+                    runEnd,
+                ),
         );
+    const groupEnd = async (): Promise<void> => await closeWith("succeeded");
 
     it("writes one run.completed when the group turn finishes normally", async () => {
         await groupEnd();
@@ -171,9 +175,33 @@ describe("a group turn's end in the Events log", () => {
             },
         };
 
-        await closeGroupTurnStream(recording as never, { streamId });
+        await closeGroupTurnStream(recording as never, { streamId }, "succeeded");
 
         expect(chunks).toStrictEqual([{ final: true, runEnd: "succeeded", streamId, text: "" }]);
+    });
+
+    it("writes no run event when the group Stop ends the turn, and its closing chunk carries no runEnd", async () => {
+        const chunks: unknown[] = [];
+        const recording = {
+            runMutation: async (_ref: unknown, args: unknown) => {
+                chunks.push(args);
+            },
+        };
+
+        await closeGroupTurnStream(recording as never, { streamId }, undefined);
+
+        expect(chunks).toStrictEqual([{ final: true, streamId, text: "" }]);
+        await closeWith(undefined);
+        expect(await eventsOf()).toStrictEqual([]);
+    });
+
+    it("writes one run.failed when the daily quota ends the group turn early", async () => {
+        await closeWith("failed");
+
+        const events = await eventsOf();
+
+        expect(events.map((event) => event.name)).toStrictEqual(["run.failed"]);
+        expect(JSON.parse(events[0]!.data)).toMatchObject({ outcome: "failed", threadId });
     });
 
     it("writes one run.completed when the closing chunk is redelivered, because the stream refuses the second end", async () => {
@@ -181,5 +209,37 @@ describe("a group turn's end in the Events log", () => {
         await expect(groupEnd()).rejects.toThrow();
 
         expect(await eventsOf()).toHaveLength(1);
+    });
+});
+
+describe("a run that ends without its own final chunk in the Events log", () => {
+    it("writes one run.failed when a live stream is set to error", async () => {
+        await harness.run(async (ctx: any) => await ctx.runMutation(setStreamStatus, { status: "error", streamId }));
+
+        const events = await eventsOf();
+
+        expect(events.map((event) => event.name)).toStrictEqual(["run.failed"]);
+        expect(events[0]).toMatchObject({ eventId: `run:${streamId}`, userId: OWNER });
+    });
+
+    it("writes one run.failed for an expired stream the sweep times out", async () => {
+        const expiredId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() - 60_000,
+                    messageId: "prompt-expired",
+                    status: "streaming",
+                    streamingConfig: { contentType: "text", model: "test-model" },
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(cleanupExpiredStreams, {}));
+
+        const events = await eventsOf();
+
+        expect(events.map((event) => event.eventId)).toStrictEqual([`run:${expiredId}`]);
+        expect(events[0]!.name).toBe("run.failed");
     });
 });

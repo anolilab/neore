@@ -2,6 +2,7 @@ import type { Id } from "../../../_generated/dataModel";
 import { internalMutation } from "../../../_generated/server";
 import { expireHostStream } from "../../../acp/lib/reap";
 import { patchRow } from "../../../lib/patch";
+import { recordRunEnd } from "../../../public-api/events-log";
 import { remindPendingApprovals } from "../../lib/approval-reminder";
 import { recordPausedRunUsage } from "../../lib/pause-usage";
 import { type SteerEntry, withoutQueuedText } from "../../lib/steer-queue";
@@ -45,6 +46,7 @@ export const cleanupExpiredStreams = internalMutation.input({}).mutation(async (
         }
 
         await patchRow(ctx.db, "persistentStreams", stream, { status: "timeout", ...(steers && { steers }), ...(waiting && { pausedRun: undefined }) });
+        await recordRunEnd(ctx, { outcome: "failed", streamId: stream._id, threadId: stream.threadId });
 
         // A run that died without reaching `failRun` (evicted, or a dropped redelivery)
         // leaves its thread `running`; nothing else resets it. A newer live stream on the

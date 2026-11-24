@@ -6,7 +6,9 @@
  * One row per upstream event, keyed by `(userId, eventId)`. A recorder that runs twice for the same event writes once, so a
  * redelivered job cannot double a run's event.
  */
+import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import { RUN_COMPLETED_EVENT, RUN_FAILED_EVENT } from "./events-catalog";
 
 /** How long a poll can look back: a cursor older than this reads as truncated. */
 export const RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -51,6 +53,31 @@ export const recordMcpEvent = async (ctx: Pick<MutationCtx, "db" | "now">, input
     await setWatermark(ctx, input.userId, watermark?._id, seq);
 
     return true;
+};
+
+/**
+ * Records how a reply's run ended, for the thread's owner. Keyed by the stream, so one reply has one end event however often
+ * the end is written: the final chunk, a live stream set to error, and a timed-out stream all go through here.
+ */
+export const recordRunEnd = async (
+    ctx: Pick<MutationCtx, "db" | "now">,
+    input: { outcome: "succeeded" | "failed"; streamId: string; threadId: string },
+): Promise<void> => {
+    const thread = await ctx.db.get("threads", input.threadId as Id<"threads">);
+    const owner = thread?.userId;
+
+    // A thread with no owner has no log to write to.
+    if (owner === undefined) {
+        return;
+    }
+
+    await recordMcpEvent(ctx, {
+        data: { finishedAt: ctx.now, outcome: input.outcome, threadId: input.threadId },
+        eventId: `run:${input.streamId}`,
+        name: input.outcome === "succeeded" ? RUN_COMPLETED_EVENT : RUN_FAILED_EVENT,
+        timestamp: ctx.now,
+        userId: owner,
+    });
 };
 
 const setWatermark = async (ctx: Pick<MutationCtx, "db">, userId: string, rowId: string | undefined, seq: number): Promise<void> => {

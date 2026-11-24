@@ -585,6 +585,8 @@ const runQueue = async (
     const spoken = [...start.spokenSkillIds];
     let queue = boundedQueue(start.plan, spoken);
     let continueFrom = start.continueFromMessageId;
+    // The end the closing chunk records: none for a stop (a stopped run writes no event), failed for a quota refusal.
+    let runEnd: "succeeded" | "failed" | undefined = "succeeded";
 
     while (!isQueueEmpty(queue)) {
         const { next, rest } = shiftQueue(queue);
@@ -602,6 +604,8 @@ const runQueue = async (
             spoken.length > 0 &&
             (await ctx.runQuery(internal.chat.group.functions.isGroupStopRequested, { since: turn.turnStartedAt, threadId: turn.threadId }))
         ) {
+            runEnd = undefined;
+
             break;
         }
 
@@ -612,6 +616,8 @@ const runQueue = async (
             !(await ctx.runMutation(internal.chat.daily_charge.chargeDailyUnit, { kind: "Text", organizationId: turn.organizationId, userId: turn.userId }))
         ) {
             streamLogger.debug("[GroupChat] Daily limit reached; ending the turn early", { spoken: spoken.length, threadId: turn.threadId });
+
+            runEnd = "failed";
 
             break;
         }
@@ -647,9 +653,9 @@ const runQueue = async (
         continueFrom = lastMessageId ?? continueFrom;
     }
 
-    // Every way past the speaker loop that is not a pause or a stop lands here, the repeated-call guard's included: the turn
-    // succeeded, so its end is recorded in the Events log by the chunk that closes the stream.
-    await closeGroupTurnStream(ctx, turn);
+    // Every way past the speaker loop that is not a pause lands here and closes the stream. The end it records is `runEnd`: a stop
+    // records none, a quota refusal records a failure, and the rest (the repeated-call guard's included) succeeded.
+    await closeGroupTurnStream(ctx, turn, runEnd);
 
     await setThreadStatus(ctx, turn.threadId, "active", { replied: true });
     // The turn is over for good (a pause or a stop returned before this): its saved references go with it.
@@ -739,13 +745,17 @@ const loadTurnContext = async (
 };
 
 /**
- * The chunk that closes a group turn which finished, normally or by the repeated-call guard. It is the only write that records
- * the turn's end in the Events log (`run.completed`). A paused or stopped turn returns before this is called, so it writes nothing.
+ * The chunk that closes a group turn's stream. `runEnd` is the end it records in the Events log; `undefined` records none, which
+ * is what a stop does. A paused turn returns before this is called, so it writes nothing.
  */
-export const closeGroupTurnStream = async (ctx: Pick<ActionCtx, "runMutation">, turn: Pick<TurnContext, "streamId">): Promise<void> => {
+export const closeGroupTurnStream = async (
+    ctx: Pick<ActionCtx, "runMutation">,
+    turn: Pick<TurnContext, "streamId">,
+    runEnd: "succeeded" | "failed" | undefined,
+): Promise<void> => {
     await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
         final: true,
-        runEnd: "succeeded",
+        ...(runEnd !== undefined && { runEnd }),
         streamId: turn.streamId as Id<"persistentStreams">,
         text: "",
     });

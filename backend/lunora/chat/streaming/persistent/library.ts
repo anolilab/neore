@@ -25,8 +25,7 @@ import { runStreamingAgentFields } from "../../lib/streaming-run-args";
 import { streamLockedAfterStart } from "../../lib/thread-gate";
 import { type OpenToolProgress, openToolProgress } from "../../lib/mcp-progress";
 import { discardPausedThreadSecrets, discardThreadSecrets, replyKeyOfStream } from "../../lib/secret-requests";
-import { RUN_COMPLETED_EVENT, RUN_FAILED_EVENT } from "../../../public-api/events-catalog";
-import { recordMcpEvent } from "../../../public-api/events-log";
+import { recordRunEnd } from "../../../public-api/events-log";
 import { findPendingRequestOnLatestTurn } from "../../lib/tool-approval-claim";
 import { ASK_USER_TOOL_NAME } from "../../tools/ask-user-constants";
 import { MAX_LENGTH } from "../../../lib/validators";
@@ -210,19 +209,7 @@ export const addChunk = internalMutation
 
         // The run's end: one event per reply, keyed by its stream. A redelivered end finds the event and writes nothing more.
         if (args.final && args.runEnd !== undefined) {
-            const thread = await ctx.db.get("threads", stream.threadId as Id<"threads">);
-            const owner = thread?.userId;
-
-            // A thread with no owner has no log to write to.
-            if (owner !== undefined) {
-                await recordMcpEvent(ctx, {
-                    data: { finishedAt: ctx.now, outcome: args.runEnd, threadId: stream.threadId },
-                    eventId: `run:${args.streamId}`,
-                    name: args.runEnd === "succeeded" ? RUN_COMPLETED_EVENT : RUN_FAILED_EVENT,
-                    timestamp: ctx.now,
-                    userId: owner,
-                });
-            }
+            await recordRunEnd(ctx, { outcome: args.runEnd, streamId: args.streamId, threadId: stream.threadId });
         }
     });
 
@@ -251,6 +238,11 @@ export const setStreamStatus = internalMutation
             status: args.status,
             ...(steers && { steers }),
         });
+
+        // A live stream set to error is a failed run: its final chunk may have been refused, so the end is recorded here.
+        if (args.status === "error") {
+            await recordRunEnd(ctx, { outcome: "failed", streamId: args.streamId, threadId: stream.threadId });
+        }
     });
 
 /** Every live stream of a thread, read in pages (a thread has one or two; the bound is for a runaway one). */
