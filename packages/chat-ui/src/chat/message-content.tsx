@@ -78,10 +78,24 @@ const IMAGE_GENERATING_MARKER = "__IMAGE_GENERATING__";
 const VIDEO_GENERATING_MARKER = "__VIDEO_GENERATING__";
 const AUDIO_GENERATING_MARKER = "__AUDIO_GENERATING__";
 
-/** Where an image sits in its message, so an `Image` override can act on that one image (pin it, open it). */
-/** A bare lowercase code with no spaces or punctuation: an error kind, not a sentence a person can read. */
-const BARE_ERROR_CODE = /^[a-z][a-z-]*$/u;
+/**
+ * The error kinds older builds saved for a local reply in place of a sentence (`unreachable`, `stream`). Matched exactly: a server
+ * message that merely looks like a code is shown as written.
+ */
+const LEGACY_LOCAL_ERROR_CODES: ReadonlySet<string> = new Set([
+    "aborted",
+    "cors",
+    "http",
+    "mixed-content",
+    "not-found",
+    "permission-denied",
+    "stream",
+    "timeout",
+    "unknown",
+    "unreachable",
+]);
 
+/** Where an image sits in its message, so an `Image` override can act on that one image (pin it, open it). */
 export interface ImagePlace {
     /** The image's place among the message's images (`utils/image-ordinals.ts`), which a reply edit leaves as it is. */
     imageIndex?: number;
@@ -1260,8 +1274,9 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
     const isLocalReply = message.localReply === true;
 
     if (message.status === "failed" && !isAnimating && (renderedParts.length === 0 || isLocalReply)) {
-        // An error that is only a code (`unreachable`, `stream`) is what older builds saved for a local reply: never show the code.
-        const errorMessage = message.error && !BARE_ERROR_CODE.test(message.error) ? message.error : t`An error occurred while generating the response.`;
+        // An error that is only an old kind code (`unreachable`) is what older builds saved for a local reply: never show the code.
+        const errorMessage =
+            message.error && !LEGACY_LOCAL_ERROR_CODES.has(message.error) ? message.error : t`An error occurred while generating the response.`;
 
         renderedParts.push(
             <div
