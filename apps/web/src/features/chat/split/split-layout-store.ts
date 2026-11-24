@@ -87,7 +87,16 @@ export const hydrateSplitLayout = (): Promise<void> => {
         return Promise.resolve();
     }
 
-    hydration.pending ??= Promise.resolve(useSplitLayoutStore.persist.rehydrate()).finally(() => {
+    const read = async (): Promise<void> => {
+        await useSplitLayoutStore.persist.rehydrate();
+
+        // zustand resolves a read that failed too: only a store that has hydrated holds the saved layout.
+        if (!useSplitLayoutStore.persist.hasHydrated()) {
+            throw new Error("The saved split layout could not be read.");
+        }
+    };
+
+    hydration.pending ??= read().finally(() => {
         hydration.pending = undefined;
     });
 

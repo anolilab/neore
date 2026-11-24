@@ -35,13 +35,18 @@ describe("hydrateSplitLayout", () => {
     });
 
     it("reads the saved layout once for callers that arrive while the read is pending", async () => {
-        vi.spyOn(useSplitLayoutStore.persist, "hasHydrated").mockReturnValue(false);
+        let hydrated = false;
+
+        vi.spyOn(useSplitLayoutStore.persist, "hasHydrated").mockImplementation(() => hydrated);
 
         // Both calls below run before the read settles, so the timer is what ends the read.
         const rehydrate = vi.spyOn(useSplitLayoutStore.persist, "rehydrate").mockImplementation(
             () =>
                 new Promise<void>((resolve) => {
-                    setTimeout(resolve, 0);
+                    setTimeout(() => {
+                        hydrated = true;
+                        resolve();
+                    }, 0);
                 }),
         );
 
@@ -54,14 +59,28 @@ describe("hydrateSplitLayout", () => {
     });
 
     it("retries a read that failed", async () => {
-        const rehydrate = vi.spyOn(useSplitLayoutStore.persist, "rehydrate").mockRejectedValueOnce(new Error("storage unavailable")).mockResolvedValueOnce();
+        let hydrated = false;
 
-        vi.spyOn(useSplitLayoutStore.persist, "hasHydrated").mockReturnValue(false);
+        vi.spyOn(useSplitLayoutStore.persist, "hasHydrated").mockImplementation(() => hydrated);
+        const rehydrate = vi
+            .spyOn(useSplitLayoutStore.persist, "rehydrate")
+            .mockRejectedValueOnce(new Error("storage unavailable"))
+            .mockImplementationOnce(async () => {
+                hydrated = true;
+            });
 
         await expect(hydrateSplitLayout()).rejects.toThrow("storage unavailable");
         await expect(hydrateSplitLayout()).resolves.toBeUndefined();
 
         expect(rehydrate).toHaveBeenCalledTimes(2);
+    });
+
+    it("rejects when the saved layout could not be read, even though zustand resolves the read", async () => {
+        // zustand swallows a failed read: the read resolves, and the store has not hydrated.
+        vi.spyOn(useSplitLayoutStore.persist, "hasHydrated").mockReturnValue(false);
+        vi.spyOn(useSplitLayoutStore.persist, "rehydrate").mockResolvedValueOnce();
+
+        await expect(hydrateSplitLayout()).rejects.toThrow("could not be read");
     });
 });
 
@@ -82,9 +101,12 @@ describe("survivingPaneAfterDelete", () => {
 
     it("picks the first open pane that survives, once the saved layout has loaded", async () => {
         useUIStateStore.setState({ preferences: { ...useUIStateStore.getState().preferences, splitViewEnabled: true } });
-        vi.spyOn(useSplitLayoutStore.persist, "hasHydrated").mockReturnValue(false);
+        let hydrated = false;
+
+        vi.spyOn(useSplitLayoutStore.persist, "hasHydrated").mockImplementation(() => hydrated);
         vi.spyOn(useSplitLayoutStore.persist, "rehydrate").mockImplementation(async () => {
             useSplitLayoutStore.setState({ layout: layoutOf(["A", "B", "C"]) });
+            hydrated = true;
         });
 
         await expect(survivingPaneAfterDelete(["A"], readable())).resolves.toBe("B");
