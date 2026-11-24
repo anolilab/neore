@@ -41,6 +41,7 @@ vi.mock("sonner", () => {
 });
 
 const mutate = vi.fn();
+const updateLatest = vi.fn((_build: () => Record<string, unknown>, _options?: { failFast: boolean }) => Promise.resolve());
 const setHidePersonalInfo = vi.fn();
 const setLayoutDirection = vi.fn();
 /** The saved settings the account page reads; each test sets the ones it needs. */
@@ -49,7 +50,7 @@ const savedSettings: Record<string, unknown> = { temporaryChatRetentionHours: 24
 vi.mock("@/features/auth/hooks/use-user-settings", () => {
     return {
         useUpdateUserSettings: () => {
-            return { mutate };
+            return { mutate, updateLatest };
         },
         useUserSettings: () => {
             return { data: savedSettings };
@@ -162,7 +163,9 @@ describe("AccountSettings", () => {
 
             fireEvent.click(resume);
 
-            expect(mutate).toHaveBeenCalledWith({ resumeAfterUsageLimit: false }, expect.objectContaining({ onSuccess: expect.any(Function) }));
+            // The write goes through the ordered queue (`updateLatest`), so a quick second toggle cannot be overtaken by this one.
+            expect(updateLatest).toHaveBeenLastCalledWith(expect.any(Function), { failFast: true });
+            expect(updateLatest.mock.lastCall?.[0]()).toEqual({ resumeAfterUsageLimit: false });
         });
 
         it("does not snooze chats by default, and saving the switch on turns it on", () => {
@@ -174,7 +177,8 @@ describe("AccountSettings", () => {
 
             fireEvent.click(snooze);
 
-            expect(mutate).toHaveBeenCalledWith({ snoozeUntilUsageLimitReset: true }, expect.objectContaining({ onSuccess: expect.any(Function) }));
+            expect(updateLatest).toHaveBeenLastCalledWith(expect.any(Function), { failFast: true });
+            expect(updateLatest.mock.lastCall?.[0]()).toEqual({ snoozeUntilUsageLimitReset: true });
         });
 
         it("shows the saved values of both switches", () => {

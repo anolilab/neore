@@ -575,6 +575,8 @@ const AccountSettings: FC = () => {
                                     "resumeAfterUsageLimit",
                                     checked,
                                     checked ? t`Paused replies will resume when the limit resets` : t`Paused replies will wait for you to resume them`,
+                                    // Ordered with the settings queue: a quick second toggle cannot be overwritten by the first write landing last.
+                                    true,
                                 );
                             }}
                         />
@@ -597,6 +599,8 @@ const AccountSettings: FC = () => {
                                     "snoozeUntilUsageLimitReset",
                                     checked,
                                     checked ? t`Chats paused by a usage limit will be snoozed` : t`Chats paused by a usage limit will not be snoozed`,
+                                    // Ordered with the settings queue, as the resume switch above.
+                                    true,
                                 );
                             }}
                         />
