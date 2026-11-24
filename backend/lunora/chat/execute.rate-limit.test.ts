@@ -1622,4 +1622,82 @@ describe("the usage-limit settings of a rate-limited run", () => {
 
         expect(await snoozedUntil()).toBeUndefined();
     });
+
+    /** A second reply on the chat, live and not yet paused, paused through the pause mutation: its reset is `minutes` away. */
+    const pauseSecondReply = async (minutes: number) => {
+        const streamId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    messageId: "other-message",
+                    status: "pending",
+                    streamingConfig: { contentType: "text", model: "test-model" },
+                    threadId: ids.threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        return await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(pauseRunForRateLimit, {
+                    from: ids.messageId,
+                    replyRowIds: [],
+                    retryAt: Date.now() + minutes * 60_000,
+                    run: {
+                        messageId: "other-message",
+                        streamId: String(streamId),
+                        streamingConfig: { contentType: "text", model: "test-model" },
+                        threadId: ids.threadId,
+                        userId: OWNER,
+                    },
+                    snoozeUntilReset: true,
+                    status: 429,
+                    stepsUsed: 0,
+                    streamId,
+                }),
+        );
+    };
+
+    it("stopping the first reply leaves a snooze a later pause extended to its own reset, and that reply lifts it", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const first = await readState();
+
+        // The second reply extends the snooze to its later reset.
+        expect(await pauseSecondReply(5)).toMatchObject({ paused: true });
+
+        const later = await snoozedUntil();
+
+        expect(later).toBeGreaterThan(first.pause!.retryAt);
+
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: ids.messageId, onlyNamed: true, threadId: ids.threadId }),
+        );
+
+        // The first reply's snooze is no longer the chat's: stopping it must not hand its snooze on or change the chat's.
+        expect(await snoozedUntil()).toBe(later);
+
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: "other-message", onlyNamed: true, threadId: ids.threadId }),
+        );
+
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("a Retry now that resumes both replies, where the later pause extended the snooze, leaves the chat visible", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited(), textStep("Hello there.")]);
+
+        await run();
+
+        expect(await pauseSecondReply(5)).toMatchObject({ paused: true });
+
+        const resumed = await harness.run(async (ctx: any) => await ctx.runMutation(retryPausedRunsNow, { threadId: ids.threadId }));
+
+        expect(resumed).toBe(true);
+        expect(await snoozedUntil()).toBeUndefined();
+    });
 });

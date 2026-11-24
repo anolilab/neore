@@ -920,18 +920,19 @@ const liftPauseSnooze = async (ctx: MutationCtx, stream: Doc<"persistentStreams"
     }
 
     const threadId = stream.threadId as Id<"threads">;
+    const thread = await ctx.db.get("threads", threadId);
+
+    // Only the snooze this record set is the one it may end or hand on. A later snooze (another pause's, or the owner's) is not this reply's.
+    if (thread === null || thread.snoozedUntil !== pauseSnooze.until) {
+        return;
+    }
+
     const live = await liveStreamsOf(ctx, threadId);
     const stillPaused = live.find((other) => other._id !== stream._id && other.pause !== undefined && !leaving.has(other._id));
 
     if (stillPaused !== undefined) {
         await patchRow(ctx.db, "persistentStreams", stillPaused, { pauseSnooze });
 
-        return;
-    }
-
-    const thread = await ctx.db.get("threads", threadId);
-
-    if (thread === null || thread.snoozedUntil !== pauseSnooze.until) {
         return;
     }
 
@@ -1093,6 +1094,13 @@ export const pauseRunForRateLimit = internalMutation
             thread.userId === args.run.userId &&
             (thread.snoozedUntil ?? 0) < plan.retryAt;
 
+        // When another paused reply set the snooze this one extends, the value to restore is the owner's own, which that reply
+        // recorded. Restoring the other reply's snooze would hide the chat after both have resumed.
+        const current = thread?.snoozedUntil;
+        const liveNow = snoozes && current !== undefined ? await liveStreamsOf(ctx, threadId) : [];
+        const otherOwner = liveNow.find((other) => other._id !== stream._id && other.pauseSnooze?.until === current);
+        const previous = otherOwner === undefined ? current : otherOwner.pauseSnooze?.previousUntil;
+
         await patchRow(ctx.db, "persistentStreams", stream, {
             expiresAt: Math.max(stream.expiresAt, plan.retryAt + STREAM_TTL_MS),
             pause,
@@ -1103,10 +1111,7 @@ export const pauseRunForRateLimit = internalMutation
             pauseResetUnreported: args.retryAt === undefined ? true : undefined,
             // Not stamped as the owner's choice (`snoozeChosenAt` is left alone), so an owner's own snooze chosen before this
             // pause and delivered after it still applies.
-            pauseSnooze:
-                thread !== null && snoozes
-                    ? { ...(thread.snoozedUntil !== undefined && { previousUntil: thread.snoozedUntil }), until: plan.retryAt }
-                    : undefined,
+            pauseSnooze: thread !== null && snoozes ? { ...(previous !== undefined && { previousUntil: previous }), until: plan.retryAt } : undefined,
         });
 
         if (!awaitsPerson) {
