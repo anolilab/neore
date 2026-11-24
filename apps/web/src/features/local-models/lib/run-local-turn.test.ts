@@ -269,14 +269,15 @@ describe("reply guard stops", () => {
         expect(save).toHaveBeenCalledWith({ error: "reasoning-limit", outcome: "failed", prompt: "hi", reasoning: atLimit, reply: "" });
     });
 
-    it("does not stop an ordinary reply, including short lines that repeat under the limit", async () => {
+    it("stops a reply whose last repeat has no newline when the stream ends", async () => {
         expect.assertions(2);
 
-        const lines = ["# Notes", "", "- one point", "}", "}", "}", "}", "}", "}", "Done."];
-        const { options, save } = setup(async () => sseResponse(lines.map((line) => `${line}\n`)));
+        const line = "I will try the same thing again.";
+        const reply = `${`${line}\n`.repeat(LOCAL_REPEAT_LIMIT - 1)}${line}`;
+        const { options, save } = setup(async () => sseResponse([`${line}\n`.repeat(LOCAL_REPEAT_LIMIT - 1), line]));
 
-        await expect(runLocalTurn(options)).resolves.toStrictEqual({ outcome: "complete", saved: true, threadId: "thread-1" });
-        expect(save).toHaveBeenCalledWith({ outcome: "complete", prompt: "hi", reasoning: "", reply: `${lines.join("\n")}\n` });
+        await expect(runLocalTurn(options)).resolves.toMatchObject({ error: { kind: "repeat-loop" }, outcome: "failed", saved: true });
+        expect(save).toHaveBeenCalledWith({ error: "repeat-loop", outcome: "failed", prompt: "hi", reasoning: "", reply });
     });
 });
 

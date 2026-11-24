@@ -71,6 +71,8 @@ export interface ReasoningStop {
 }
 
 export interface ReplyGuard {
+    /** Call once the stream has ended: a final line with no newline takes part in the repeat check, as it would have had a newline followed. */
+    finish: () => "repeat-loop" | undefined;
     /** Feed visible reply text; returns the stop, and where in this delta the reply ends, once it repeats. */
     pushContent: (text: string) => ContentStop | undefined;
     /** Feed reasoning text; returns the stop, and how much of this delta fits under the limit, once it passes. */
@@ -83,7 +85,35 @@ export const createReplyGuard = (): ReplyGuard => {
     let lines: string[] = [];
     let reasoningChars = 0;
 
+    /** Adds a completed line to the window; true when it ends a repeat. */
+    const addLine = (line: string): boolean => {
+        lines.push(line);
+
+        if (lines.length > WINDOW_LINES) {
+            lines = lines.slice(-WINDOW_LINES);
+        }
+
+        for (let size = 1; size <= LOCAL_REPEAT_MAX_BLOCK_LINES; size += 1) {
+            if (repeatsAtTail(lines, size)) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
     return {
+        finish: () => {
+            if (partial === "") {
+                return undefined;
+            }
+
+            const line = partial.replace(TRAILING_CR, "");
+
+            partial = "";
+
+            return addLine(line) ? "repeat-loop" : undefined;
+        },
         pushContent: (text) => {
             let offset = 0;
             let newline = text.indexOf("\n");
@@ -98,16 +128,9 @@ export const createReplyGuard = (): ReplyGuard => {
                 const line = partial.replace(TRAILING_CR, "");
 
                 partial = "";
-                lines.push(line);
 
-                if (lines.length > WINDOW_LINES) {
-                    lines = lines.slice(-WINDOW_LINES);
-                }
-
-                for (let size = 1; size <= LOCAL_REPEAT_MAX_BLOCK_LINES; size += 1) {
-                    if (repeatsAtTail(lines, size)) {
-                        return { keep: offset, kind: "repeat-loop" };
-                    }
+                if (addLine(line)) {
+                    return { keep: offset, kind: "repeat-loop" };
                 }
             }
 

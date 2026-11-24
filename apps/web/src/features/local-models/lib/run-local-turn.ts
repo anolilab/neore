@@ -156,6 +156,11 @@ export const runLocalTurn = async (options: RunLocalTurnOptions): Promise<RunLoc
         signal.removeEventListener("abort", onUserAbort);
     }
 
+    // A stream that ends on a repeat with no newline after it is still a loop: the guard checks its last line now.
+    if (!state.stop && !state.failure && guard.finish()) {
+        state.stop = "repeat-loop";
+    }
+
     // The guard's stop wins over whatever the stream did next: a stream that ended on its own right after the stop is still a stop.
     if (state.stop) {
         const info: LocalErrorInfo = { kind: state.stop };

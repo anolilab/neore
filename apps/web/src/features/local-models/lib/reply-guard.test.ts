@@ -154,4 +154,24 @@ describe(createReplyGuard, () => {
         // Nothing of this delta fits under the limit any more.
         expect(guard.pushReasoning("r")).toStrictEqual({ keep: 0, kind: "reasoning-limit" });
     });
+
+    it("stops at the end of a stream whose sixth repeat has no newline", () => {
+        expect.assertions(2);
+
+        const guard = createReplyGuard();
+        const line = "Let me try that again.";
+
+        // The sixth repeat is the unfinished last line: nothing completes it while the stream runs.
+        expect(feedContent(guard, `${line}\n`.repeat(LOCAL_REPEAT_LIMIT - 1) + line)).toBeUndefined();
+        expect(guard.finish()).toBe("repeat-loop");
+    });
+
+    it("does not stop at the end of a stream that ends under the limit", () => {
+        expect.assertions(2);
+
+        const guard = createReplyGuard();
+
+        expect(feedContent(guard, "Let me try that again.\n".repeat(LOCAL_REPEAT_LIMIT - 1))).toBeUndefined();
+        expect(guard.finish()).toBeUndefined();
+    });
 });
