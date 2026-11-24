@@ -8,6 +8,7 @@
  * thread, embeds through the gateway, inserts the vectors, then commits them in a
  * mutation. A commit that finds its text already changed deletes its own vectors.
  */
+import type { ModelFilterRules } from "@neore/ai/models";
 import { type Infer, LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
@@ -31,6 +32,7 @@ import {
     MEANING_MIN_CHARS,
     MEANING_MIN_SCORE,
     MEANING_RESULT_LIMIT,
+    MEANING_SEARCH_REFUSED,
     MEANING_TOP_K,
     planThreadSearch,
     SEARCH_CLAIM_MS,
@@ -95,10 +97,13 @@ const embeddingAllowedFor = async (ctx: ActionCtx, userId: string): Promise<bool
     return embeddingModelAllowed(await loadModelFilterRules(ctx, userId));
 };
 
-/** Embeds the texts through the gateway, billed to the thread's owner. `[]` when the owner's model rules refuse the model. */
-const embedTexts = async (ctx: ActionCtx, userId: string, texts: string[]): Promise<number[][]> => {
+/**
+ * Embeds the texts through the gateway, billed to the thread's owner. `[]` when the owner's model rules refuse the model.
+ * A caller that already read those rules passes them, so one request reads them once.
+ */
+const embedTexts = async (ctx: ActionCtx, userId: string, texts: string[], loadedRules?: ModelFilterRules): Promise<number[][]> => {
     const { createGatewayEmbeddingModel, embeddingModelAllowed } = await import("../chat/lib/gateway-embedding-model");
-    const modelFilterRules = await loadModelFilterRules(ctx, userId);
+    const modelFilterRules = loadedRules ?? (await loadModelFilterRules(ctx, userId));
 
     if (!embeddingModelAllowed(modelFilterRules)) {
         return [];
@@ -460,25 +465,31 @@ export interface MeaningThread {
 /**
  * The palette's meaning search for one person: embed the query, read the nearest
  * title and summary vectors among their own, map each to its thread and keep the
- * best ones. Returns `[]` for a query too short to embed, or when the model is
- * refused for the person.
+ * best ones. With `archivedOnly`, active threads are dropped before the result
+ * limit, so archived candidates ranked below them still fill it. The candidates are
+ * still the closest vectors overall: the vectors carry no archived flag to filter on
+ * in the index, so an archived thread ranked below every candidate is not found.
+ * Returns `[]` for a query too short to embed. Throws `FORBIDDEN` with `data.code` {@link MEANING_SEARCH_REFUSED}
+ * when the person's model rules refuse the embedding model, so the palette tells that apart from "nothing related";
+ * rejects when the embedding fails.
  */
-export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { query: string; userId: string }): Promise<MeaningThread[]> => {
+export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { archivedOnly?: boolean; query: string; userId: string }): Promise<MeaningThread[]> => {
     const query = args.query.trim();
 
     if (query.length < MEANING_MIN_CHARS) {
         return [];
     }
 
-    let queryVector: number[] | undefined;
+    // A refused model is said as such, not answered with an empty list the palette would show as "nothing related". Any
+    // other failure rejects too, so the palette says the search failed; its title matches do not depend on this call.
+    const { embeddingModelAllowed } = await import("../chat/lib/gateway-embedding-model");
+    const modelFilterRules = await loadModelFilterRules(ctx, args.userId);
 
-    try {
-        [queryVector] = await embedTexts(ctx, args.userId, [query.slice(0, 2000)]);
-    } catch (error) {
-        console.warn("[agent/thread-search] Query embedding failed; the palette shows title matches only:", error);
-
-        return [];
+    if (!embeddingModelAllowed(modelFilterRules)) {
+        throw new LunoraError("FORBIDDEN", "Search by meaning is not available under your model rules", { data: { code: MEANING_SEARCH_REFUSED } });
     }
+
+    const [queryVector] = await embedTexts(ctx, args.userId, [query.slice(0, 2000)], modelFilterRules);
 
     if (!queryVector || queryVector.length !== SEARCH_DIMENSION) {
         return [];
@@ -530,6 +541,7 @@ export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { query: s
     const scoreOf = new Map(ranked.map((entry) => [entry.threadId, entry.score] as const));
 
     return rows
+        .filter((row) => args.archivedOnly !== true || row.archived)
         .map((row) => {
             return { archived: row.archived, score: scoreOf.get(row.threadId) ?? 0, threadId: row.threadId, title: row.title };
         })
@@ -539,12 +551,12 @@ export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { query: s
 
 export const searchThreadsByMeaning = authAction
     .use(rateLimit("threads/meaning"))
-    .input({ query: v.string().max(MAX_LENGTH.long) })
+    .input({ archivedOnly: v.optional(v.boolean()), query: v.string().max(MAX_LENGTH.long) })
     .output(v.array(v.object({ archived: v.boolean(), score: v.number(), threadId: v.string(), title: v.union(v.string(), v.null()) })))
     .action(async ({ args, ctx }) => {
         if (args.query.trim().length > 2000) {
             throw new LunoraError("BAD_REQUEST", "Query must be at most 2000 characters");
         }
 
-        return await searchThreadsByMeaningFor(ctx, { query: args.query, userId: ctx.user.userId });
+        return await searchThreadsByMeaningFor(ctx, { archivedOnly: args.archivedOnly, query: args.query, userId: ctx.user.userId });
     });
