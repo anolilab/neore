@@ -66,7 +66,8 @@ export type KeyPurpose =
     | "messenger-keys"
     | "provider-keys"
     | "site-logins"
-    | "tool-keys";
+    | "tool-keys"
+    | "usage-cursor";
 
 // Import master key as HKDF base key material (once, cached)
 let hkdfBaseKey: CryptoKey | null = null;

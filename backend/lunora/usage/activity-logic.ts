@@ -201,8 +201,19 @@ export const RECORD_RETRY = { backoff: "exponential", baseMs: 10_000, maxAttempt
  */
 export const RETRY_COUNTS_WITHIN_MS = 24 * 60 * 60 * 1000;
 
-/** Where a reply is filed besides the total: its thread's project. */
+/**
+ * How late a reply's organization row may be written, after the reply's instant. The organization view shows a UTC week only once this
+ * long (and a margin) has passed after the week closed (`usage/organization.ts#organizationPeriodEnd`): a row is written before its week
+ * shows, and a row written later would change a week already shown by one member's reply. A reply recorded later still counts in the member's own totals, never in the organization's.
+ */
+export const ORGANIZATION_RECORD_LATE_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * Where a reply is filed besides the total: its thread's project, and the organization that project belonged to when the reply was
+ * made. The organization is read from the project's row where the reply is filed, never taken from an argument.
+ */
 export interface Attribution {
+    organizationId?: string;
     projectKey?: string;
 }
 

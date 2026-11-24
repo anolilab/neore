@@ -1469,7 +1469,7 @@ msgstr "{pages, plural, other {# ページ}}"
 msgid "{prefixed}, selected"
 msgstr "{prefixed}、選択中"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:134
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:242
 msgid "{project}: {spendShare} of spend"
 msgstr "{project}: 支出の {spendShare}"
 
@@ -9023,7 +9023,7 @@ msgstr "マーケットプレイスを読み込めませんでした。しばら
 msgid "Could not load the memories."
 msgstr "メモリを読み込めませんでした。"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:94
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:202
 msgid "Could not load the project breakdown."
 msgstr "プロジェクト別の内訳を読み込めませんでした。"
 
@@ -9344,6 +9344,10 @@ msgstr "参加者を更新できませんでした"
 #: src/features/chat/thread-list/thread-options-menu.tsx:100
 msgid "Couldn't load follow state"
 msgstr "フォロー状態を読み込めませんでした"
+
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:167
+msgid "Counted in whole weeks (Monday to Sunday, UTC) once each week has ended, so this week's usage shows next week."
+msgstr "使用量は各週（月曜日から日曜日、UTC）が終わってから週単位で集計されるため、今週の使用量は来週表示されます。"
 
 #: src/features/settings/lib/settings-keywords.ts:31
 msgid "country"
@@ -20046,7 +20050,7 @@ msgid "Loading triggers..."
 msgstr "トリガーを読み込んでいます..."
 
 #: src/features/projects/components/project-usage-summary.tsx:56
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:86
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:194
 msgid "Loading usage…"
 msgstr "使用状況を読み込み中…"
 
@@ -21260,6 +21264,7 @@ msgid "Min"
 msgstr "Min"
 
 #: src/features/develop/components/inbox-list.tsx:51
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:185
 msgid "Mine"
 msgstr "自分"
 
@@ -23234,7 +23239,7 @@ msgid "No progress: {0}"
 msgstr "進捗なし: {0}"
 
 #: src/features/projects/components/project-repo-picker.tsx:105
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:66
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:127
 #: src/features/tasks/components/task-form-dialog.tsx:430
 #: src/features/tasks/components/task-form-dialog.tsx:442
 msgid "No project"
@@ -23294,7 +23299,7 @@ msgstr "参照が選択されていません"
 msgid "No remote MCP servers match your search."
 msgstr "検索に一致するリモート MCP サーバーはありません。"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:98
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:206
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:85
 msgid "No replies recorded for this period."
 msgstr "この期間に記録された返信はありません。"
@@ -24164,7 +24169,7 @@ msgstr "一覧のツールのみ"
 msgid "Only organization owners can manage billing settings"
 msgstr "請求設定を管理できるのは組織のオーナーのみです"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:152
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:260
 msgid "Only part of this period is included."
 msgstr "この期間の一部のみが含まれています。"
 
@@ -25091,6 +25096,7 @@ msgstr "通常のクリックは確認されたあとに実際に実行されま
 #: src/features/auth/components/organization/organization-logo.tsx:62
 #: src/features/auth/components/organization/organization-view.tsx:64
 #: src/features/layout/lib/dashboard-page-names.ts:32
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:186
 #: src/features/settings/lib/settings-navigation.ts:110
 #: src/features/skills/components/skill-form-dialog.tsx:476
 #: src/features/skills/components/skill-item.tsx:130
@@ -25208,7 +25214,8 @@ msgstr "ニックネームのあるその他のモデル"
 msgid "Other presets"
 msgstr "その他のプリセット"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:62
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:123
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:138
 msgid "Other projects"
 msgstr "その他のプロジェクト"
 
@@ -26983,7 +26990,7 @@ msgstr "{toolName} の進捗"
 
 #: src/features/projects/components/project-repo-picker.tsx:145
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:451
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:104
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:212
 #: src/features/tasks/components/task-form-dialog.tsx:427
 msgid "Project"
 msgstr "プロジェクト"
@@ -27000,7 +27007,7 @@ msgstr "プロジェクトのコンテキスト"
 msgid "Project Context"
 msgstr "プロジェクトのコンテキスト"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:58
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:119
 msgid "Project no longer available"
 msgstr "プロジェクトは利用できなくなりました"
 
@@ -27018,6 +27025,10 @@ msgstr "プロジェクト: {0}"
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:606
 msgid "Projects"
 msgstr "プロジェクト"
+
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:143
+msgid "Projects no longer in the organization"
+msgstr "組織に属さなくなったプロジェクト"
 
 #: src/features/marketing/data/models-data.ts:66
 msgid "Projects requiring clean, readable text and typography rendered within generated images"
@@ -28687,7 +28698,7 @@ msgstr "ウェルカムツアーを再生して、Neore の主な機能を確認
 #: src/features/projects/components/project-usage-summary.tsx:38
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:150
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:252
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:105
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:213
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:92
 msgid "Replies"
 msgstr "返信"
@@ -28716,7 +28727,7 @@ msgstr "返信が読み上げられます"
 msgid "Replies will no longer be read aloud"
 msgstr "返信は読み上げられなくなります"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:81
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:163
 msgid "Replies, tokens and spend per project for the selected period"
 msgstr "選択した期間のプロジェクトごとの返信、トークン、支出"
 
@@ -31081,7 +31092,7 @@ msgstr "測定できなかったシャードは合計から除外されていま
 msgid "Share"
 msgstr "共有"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:109
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:217
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:96
 msgid "Share of spend"
 msgstr "支出の割合"
@@ -32264,7 +32275,7 @@ msgstr "高速なテキストから画像への生成に向けた Nano Banana 2 
 #: src/features/projects/components/project-usage-summary.tsx:43
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:151
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:253
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:107
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:215
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:94
 msgid "Spend"
 msgstr "支出"
@@ -36618,7 +36629,7 @@ msgid "Token usage and cost breakdown per model for the selected period"
 msgstr "選択した期間のモデル別トークン使用量とコストの内訳"
 
 #: src/features/projects/components/project-usage-summary.tsx:40
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:106
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:214
 #: src/features/settings/components/chat/usage-settings.tsx:319
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:93
 msgid "Tokens"
@@ -38043,7 +38054,7 @@ msgstr "使用状況の分析"
 msgid "Usage Analytics"
 msgstr "使用状況の分析"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:79
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:159
 msgid "Usage by project"
 msgstr "プロジェクト別の使用状況"
 
@@ -39629,6 +39640,10 @@ msgstr "プルリクエストのコミットの作成者"
 msgid "Who answers"
 msgstr "回答者"
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:172
+msgid "Whose usage"
+msgstr "誰の利用量"
+
 #. placeholder {0}: model.name
 #: src/features/marketing/components/model-detail-page.tsx:175
 msgid "Why {0}"
@@ -40501,6 +40516,10 @@ msgstr "組織では、お使いのコンピューター上でのエージェン
 #: src/features/home/components/daily-brief-offer.tsx:96
 msgid "Your organization manages the Daily Brief."
 msgstr "Daily Brief は組織によって管理されています。"
+
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:164
+msgid "Your organization's projects, summed over every member, for the selected period"
+msgstr "選択した期間の、組織のすべてのメンバーを合算したプロジェクトの利用量"
 
 #: src/features/home/components/home-page.tsx:144
 msgid "Your overview could not be loaded."
