@@ -87,6 +87,20 @@ describe("sub-agent delegation", () => {
     });
 });
 
+describe("paid media default", () => {
+    it.each(["canvasAI", "imageGeneration", "imageEditing", "videoGeneration", "musicGeneration"])(
+        "asks before a paid %s call unless the user chose otherwise",
+        (name) => {
+            const paid = { key: toolPermissionKey("builtin", name), source: "builtin" as const };
+
+            expect(BUILTIN_TOOLS_ASK_BY_DEFAULT.has(name)).toBe(true);
+            expect(defaultToolPermission("builtin", undefined, name)).toBe("ask");
+            expect(resolveToolPermission(paid, undefined)).toBe("ask");
+            expect(resolveToolPermission(paid, { [`builtin:${name}`]: "auto" })).toBe("auto");
+        },
+    );
+});
+
 describe("coding-agent delegation default", () => {
     const delegate = { key: toolPermissionKey("builtin", "delegateToCodingAgent"), source: "builtin" as const };
 

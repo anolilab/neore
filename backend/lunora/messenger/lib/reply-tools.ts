@@ -17,7 +17,7 @@ import { backupCapabilities } from "../../chat/lib/backup-model";
 import { callsTools, defaultModelUnderRules, readsImagesAndCallsTools } from "../../lib/utility-model";
 
 /** The groups an owner can allow, in the order the settings list them. */
-export const MESSENGER_REPLY_TOOL_GROUPS = ["webSearch", "urlFetch", "imageGeneration", "codeExecution", "knowledge", "dateTime", "connectors"] as const;
+export const MESSENGER_REPLY_TOOL_GROUPS = ["webSearch", "urlFetch", "codeExecution", "knowledge", "dateTime", "connectors"] as const;
 
 export type MessengerReplyToolGroup = (typeof MESSENGER_REPLY_TOOL_GROUPS)[number];
 
@@ -29,6 +29,7 @@ export const DEFAULT_MESSENGER_REPLY_TOOL_GROUPS: ReadonlyArray<MessengerReplyTo
  * owner's MCP and connector tools, which reach a headless run only at `auto`.
  * Deliberately absent: the browser, deep research, documents, sub-agents and
  * coding agents (long or costly runs a stranger's message should not start),
+ * image generation (a paid call that asks every time, and a headless run cannot ask),
  * `askUser` (nobody can answer) and memory search (the owner's memories are
  * private to them).
  */
@@ -36,7 +37,6 @@ const GROUP_BUILTINS: Readonly<Record<MessengerReplyToolGroup, ReadonlyArray<str
     codeExecution: ["codeExecution", "shellExecution", "fileOperations"],
     connectors: [],
     dateTime: ["dateTime"],
-    imageGeneration: ["imageGeneration"],
     knowledge: ["knowledgeSearch"],
     urlFetch: ["retrieve"],
     webSearch: ["webSearch"],
@@ -100,8 +100,6 @@ export interface StoredReplyTools {
 
 /** What a reply may use: `null` for no tools. */
 export interface ReplyToolPlan {
-    /** Built-in names outside the headless search mode's set that the run must still offer. */
-    additionalTools: string[];
     /** Built-in names the run is narrowed to. */
     allowlist: string[];
     /** Whether the owner's `auto` MCP and connector tools stay. */
@@ -139,9 +137,6 @@ export const planReplyTools = (setting: StoredReplyTools | null | undefined): Re
     const allowlist = groups.flatMap((group) => GROUP_BUILTINS[group]);
 
     return {
-        // Image generation is not in the headless (web) search mode's set; the
-        // allowlist below still narrows the run to exactly the picked groups.
-        additionalTools: allowlist.filter((name) => name === "imageGeneration"),
         allowlist,
         keepMcpTools: groups.includes("connectors"),
     };

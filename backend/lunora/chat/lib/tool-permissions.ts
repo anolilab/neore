@@ -85,7 +85,8 @@ export const toolPermissionKey = (source: ToolSource, toolName: string, owner?: 
 };
 
 /**
- * Built-ins that default to `ask`. `delegateToCodingAgent` spends the user's
+ * Built-ins that default to `ask`. `canvasAI` and the paid generation tools (imageGeneration, imageEditing, videoGeneration,
+ * musicGeneration) ask too: a default `auto` would run a paid call with no approval for anyone who has not set an override. `delegateToCodingAgent` spends the user's
  * own provider key on a long sandbox run and can push to their GitHub;
  * `delegateToSubAgent` and `messageWorker` start a background run charged to their task quota —
  * so the user sees the task before anything starts. `replyToReviewComment` and `rerunFailedChecks` act on a pull request
@@ -97,17 +98,57 @@ export const toolPermissionKey = (source: ToolSource, toolName: string, owner?: 
  */
 export const BUILTIN_TOOLS_ASK_BY_DEFAULT: ReadonlySet<string> = new Set([
     "askUser",
+    "canvasAI",
     "delegateToCodingAgent",
     "delegateToSubAgent",
+    "imageEditing",
+    "imageGeneration",
     "mergePullRequest",
     "messageWorker",
+    "musicGeneration",
     "replyToReviewComment",
     "requestSecret",
     "rerunFailedChecks",
     "signInWithSavedLogin",
+    "videoGeneration",
 ]);
 
 const SUB_AGENT_BUILTINS: ReadonlySet<string> = new Set(["delegateToSubAgent", "messageWorker"]);
+
+/**
+ * Built-ins that "Always allow" never grants. Each one spends money or sends something out as the person, and a stored
+ * `auto` would let every later call run unasked. An `always` answer for them is refused and the call still asks; an hour
+ * or today allow is unaffected.
+ *
+ * - imageGeneration, imageEditing, videoGeneration, musicGeneration: paid per generation on a metered provider (FAL),
+ *   each one counted against the user's daily bucket.
+ * - canvasAI: its generate and style operations call the same image generation and editing actions, so it is paid too.
+ * - delegateToCodingAgent: spends the user's own provider key on a sandbox run that can push to their GitHub.
+ * - delegateToSubAgent, messageWorker: start a run charged to the task quota, or send more work to a worker.
+ * - replyToReviewComment: posts a comment on a pull request as the person.
+ * - rerunFailedChecks: re-runs checks on a pull request with the person's GitHub access.
+ * - mergePullRequest: merges a pull request as the person.
+ * - signInWithSavedLogin: types a saved password for the person into a site.
+ *
+ * `tool-permissions.grants.test.ts` checks that every name here is a real built-in.
+ */
+export const ALWAYS_ALLOW_REFUSED_BUILTINS: ReadonlySet<string> = new Set([
+    "canvasAI",
+    "delegateToCodingAgent",
+    "delegateToSubAgent",
+    "imageEditing",
+    "imageGeneration",
+    "mergePullRequest",
+    "messageWorker",
+    "musicGeneration",
+    "replyToReviewComment",
+    "rerunFailedChecks",
+    "signInWithSavedLogin",
+    "videoGeneration",
+]);
+
+/** Whether an `always` answer for this permission key is refused: a built-in listed in {@link ALWAYS_ALLOW_REFUSED_BUILTINS}. */
+export const isAlwaysAllowRefused = (key: string): boolean => key.startsWith("builtin:") && ALWAYS_ALLOW_REFUSED_BUILTINS.has(key.slice("builtin:".length));
 
 export { BUILTIN_TOOLS_NEEDING_A_PERSON } from "./person-tools";
 
