@@ -7,6 +7,7 @@ import NewChatPermissionModeSetting from "./new-chat-permission-mode-setting";
 const state = vi.hoisted(() => {
     return {
         impersonating: false,
+        impersonationKnown: true,
         mutate: vi.fn((_variables: unknown, _options: unknown) => undefined),
         settings: undefined as undefined | { defaultPermissionMode?: "auto" | "full" | "supervised" },
     };
@@ -38,7 +39,8 @@ vi.mock("@/features/auth/hooks/use-user-settings", () => {
 vi.mock("@/features/admin/hooks/use-admin", () => {
     return {
         useIsImpersonating: () => {
-            return { data: { isImpersonating: state.impersonating } };
+            // `undefined` while the session's impersonation state has not loaded.
+            return { data: state.impersonationKnown ? { isImpersonating: state.impersonating } : undefined };
         },
     };
 });
@@ -49,6 +51,7 @@ vi.mock("@/lib/toast", () => {
 
 beforeEach(() => {
     state.impersonating = false;
+    state.impersonationKnown = true;
     state.settings = undefined;
     state.mutate.mockClear();
 });
@@ -90,6 +93,16 @@ describe("NewChatPermissionModeSetting", () => {
         await userEvent.click(screen.getByRole("button", { name: "Auto" }));
 
         expect(state.mutate).not.toHaveBeenCalled();
+    });
+
+    it("stays locked while the impersonation state has not loaded, without the admin note", () => {
+        state.settings = { defaultPermissionMode: "auto" };
+        state.impersonationKnown = false;
+
+        render(<NewChatPermissionModeSetting />);
+
+        expect((screen.getByRole("button", { name: "Full access" }) as HTMLButtonElement).disabled).toBe(true);
+        expect(screen.queryByText("An admin acting as you cannot change this default.")).toBeNull();
     });
 
     it("cannot be changed while an admin is acting as the owner", () => {

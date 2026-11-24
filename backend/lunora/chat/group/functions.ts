@@ -35,6 +35,8 @@ import type { GroupChat, GroupChatMode } from "./validators";
 import { vGroupChatMode } from "./validators";
 import { admitSkills } from "../../lib/rls/scope";
 import { MAX_LENGTH } from "../../lib/validators";
+import { ownerNewChatMode } from "../lib/new-chat-mode";
+import type { ThreadPermissionMode } from "../lib/thread-permission-mode";
 
 const DEFAULT_GROUP_TITLE = "Group chat";
 
@@ -166,6 +168,8 @@ interface NewGroupChat {
     mode: GroupChatMode;
     model: string;
     organizationId?: string;
+    /** The owner's default for a new chat (`ownerNewChatMode`); absent for a chat that stores none, such as an imported one. */
+    permissionMode?: ThreadPermissionMode;
     skillIds: string[];
     synthesizerSkillId?: string;
     title?: string;
@@ -175,7 +179,7 @@ interface NewGroupChat {
 /** Validates the participants and options, then inserts the group thread. `requireEnabled` is the opt-in `createGroupChat` demands of every participant. */
 const insertGroupChat = async (
     ctx: Pick<MutationCtx, "db" | "now">,
-    { debateRounds, mode, model, organizationId, skillIds, synthesizerSkillId, title, userId }: NewGroupChat,
+    { debateRounds, mode, model, organizationId, permissionMode, skillIds, synthesizerSkillId, title, userId }: NewGroupChat,
     { requireEnabled }: { requireEnabled: boolean },
 ): Promise<{ threadId: string }> => {
     if (skillIds.length < 2) {
@@ -198,6 +202,7 @@ const insertGroupChat = async (
         },
         model,
         ...(organizationId && { organizationId }),
+        ...(permissionMode && { permissionMode }),
         status: "active",
         tags: ["chat"],
         title: title?.trim().slice(0, 200) || DEFAULT_GROUP_TITLE,
@@ -302,9 +307,11 @@ export const createGroupChat = authMutation
         const { userId } = ctx.user;
         const organizationId = ctx.user.activeOrganization?.id;
 
+        const permissionMode = await ownerNewChatMode(ctx, userId, Boolean(ctx.user.impersonatedBy));
+
         const created = await insertGroupChat(
             ctx,
-            { debateRounds, mode, model, organizationId, skillIds, synthesizerSkillId, title, userId },
+            { debateRounds, mode, model, organizationId, permissionMode, skillIds, synthesizerSkillId, title, userId },
             { requireEnabled: true },
         );
 
@@ -388,6 +395,8 @@ export const createGroupChatFromTemplate = authMutation
         const synthesizerSkillId = slugOptions.synthesizerSkillId === undefined ? undefined : skillIds[slugs.indexOf(slugOptions.synthesizerSkillId)];
         const options = { ...slugOptions, ...(synthesizerSkillId !== undefined && { synthesizerSkillId }) };
 
+        const permissionMode = await ownerNewChatMode(ctx, userId, Boolean(ctx.user.impersonatedBy));
+
         const { now } = ctx;
         const threadId = await insertThread(ctx.db, {
             createdBy: userId,
@@ -400,6 +409,7 @@ export const createGroupChatFromTemplate = authMutation
             },
             model,
             ...(organizationId && { organizationId }),
+            ...(permissionMode && { permissionMode }),
             status: "active",
             tags: ["chat"],
             title: title?.trim().slice(0, 200) || template.title,

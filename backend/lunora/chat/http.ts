@@ -1744,8 +1744,9 @@ const runChatStartOnShard = async (
                 mode: body.mode,
                 model: effectiveModel,
                 ...(threadOrganizationId && { organizationId: threadOrganizationId }),
-                // An impersonating admin's new chat never takes the owner's `full` default (`newChatPermissionMode`).
-                ...(placed?.impersonating === true && { impersonated: true }),
+                // An impersonating admin's or a browser-extension grant's new chat never takes the owner's `full` default: the
+                // extension relays page text into a chat, which a `full` default would run unasked (`newChatPermissionMode`).
+                ...((placed?.impersonating === true || placed?.extension === true) && { impersonated: true }),
                 reasoningEffort: body.reasoningEffort,
                 statelessMode: body.statelessMode,
                 // Temporary only when the client asked for it; the composer applies the user's default itself.

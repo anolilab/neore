@@ -71,6 +71,7 @@ import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
 import { readChildThreads } from "./lib/child-threads";
 import { capSearchTerms, matchesQueryTerms, queryTerms } from "./lib/search-terms";
 import { newChatPermissionMode } from "./lib/thread-permission-mode";
+import { ownerNewChatMode } from "./lib/new-chat-mode";
 import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGranted, type ThreadGateOutcome } from "./lib/thread-gate";
 import { type TypedPromptRow, vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
 import { type DraftFrom, draftFromOfMarks, notTypedMarksOfMessage, statelessPrompt } from "../lib/not-typed-text";
@@ -578,25 +579,27 @@ export const createThread = authMutation
                 }
             }
 
+            // The mode is read before the thread exists, so a failed read writes nothing. A chat with a bot starts in the bot's mode and
+            // never in the owner's default: a bot with no stored mode is Auto, which stores nothing. An admin acting as the owner cannot
+            // set a mode, so their chat never takes `full` from the bot or the default.
+            const impersonated = Boolean(context.user.impersonatedBy);
+            const botMode = bot?.permissionMode && !(bot.permissionMode === "full" && impersonated) ? bot.permissionMode : undefined;
+            const startMode = bot ? botMode : await ownerNewChatMode(context, userId, impersonated);
+
             const { threadId } = await agent.createThread(context, {
                 title: threadTitle,
                 userId,
             });
 
-            // A new chat starts in the owner's default mode (`userSettings.defaultPermissionMode`), and a chat with a bot in the bot's
-            // mode instead; the owner can still change it per thread. Before the bot patch, so a thread that names its bot always
-            // carries the bot's mode. An admin acting as the owner cannot set a mode, so their chat never takes `full` from the bot or
-            // the default: it stays on the default.
-            const impersonated = Boolean(context.user.impersonatedBy);
-            const botMode = bot?.permissionMode && !(bot.permissionMode === "full" && impersonated) ? bot.permissionMode : undefined;
-            const defaultSettings = await context.db
-                .query("userSettings")
-                .withIndex("by_userId", (q) => q.eq("userId", userId))
-                .unique();
-            const startMode = botMode ?? newChatPermissionMode(defaultSettings?.defaultPermissionMode, impersonated);
-
             if (startMode) {
-                await context.runMutation(internal.chat.thread_state.copyThreadPermissionMode, { mode: startMode, threadId });
+                try {
+                    await context.runMutation(internal.chat.thread_state.copyThreadPermissionMode, { mode: startMode, threadId });
+                } catch (error) {
+                    // Nothing else is written yet. Without this the chat would stay as an empty chat the user never asked for (as a branch does).
+                    await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: threadId as Id<"threads"> });
+
+                    throw error;
+                }
             }
 
             await context.runMutation(internal.agent.threads.updateThread, {
@@ -746,11 +749,7 @@ export const createThreadWithInitialMessage = internalMutation
             // a `clientMessageId` must leave either the thread, its prompt and the claim's record, or none of them.
             // The owner's default mode for a new chat, read here and written with the insert: the claim's invariant allows no nested
             // mutation, so the default cannot be copied on afterwards.
-            const defaultSettings = await context.db
-                .query("userSettings")
-                .withIndex("by_userId", (q) => q.eq("userId", userId))
-                .unique();
-            const startMode = newChatPermissionMode(defaultSettings?.defaultPermissionMode, impersonated === true);
+            const startMode = await ownerNewChatMode(context, userId, impersonated === true);
 
             const threadId = await insertThread(context.db, {
                 ...withoutUndefined({ customSystemPrompt, enabledFeatures, language, mode, reasoningEffort, statelessMode }),

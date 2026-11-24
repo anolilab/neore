@@ -28,7 +28,10 @@ const NewChatPermissionModeSetting: FC = () => {
     // An absent value is the defaults, which is Auto.
     const saved = userSettings?.defaultPermissionMode;
     const current: ThreadPermissionMode = isThreadPermissionMode(saved) ? saved : "auto";
+    // Locked until the session confirms the user is not impersonating: while that is unknown (still loading, or failed) the server's
+    // refusal must not be reachable from the control. The note only says so once the session confirms it.
     const impersonating = impersonation?.isImpersonating === true;
+    const locked = impersonation?.isImpersonating !== false;
 
     const labels: Record<ThreadPermissionMode, string> = {
         auto: t`Auto`,
@@ -54,7 +57,7 @@ const NewChatPermissionModeSetting: FC = () => {
                 <ToggleGroup
                     aria-describedby={descriptionId}
                     aria-labelledby={titleId}
-                    disabled={updateUserSettings.isPending || impersonating}
+                    disabled={updateUserSettings.isPending || locked}
                     onValueChange={(value) => {
                         const next = value?.[0];
 

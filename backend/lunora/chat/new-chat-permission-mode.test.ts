@@ -6,6 +6,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { ownerNewChatMode } from "./lib/new-chat-mode";
 import { newChatPermissionMode } from "./lib/thread-permission-mode";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
@@ -95,6 +96,20 @@ describe("newChatPermissionMode", () => {
     it("never gives an impersonating admin full, but still gives supervised", () => {
         expect(newChatPermissionMode("full", true)).toBeUndefined();
         expect(newChatPermissionMode("supervised", true)).toBe("supervised");
+    });
+});
+
+describe("ownerNewChatMode reads the owner's setting", () => {
+    it("returns the owner's default, and never Full access for an admin acting as the owner", async () => {
+        await setDefault("full");
+
+        const [owner, impersonated] = await harness.run(async (ctx: any) => [
+            await ownerNewChatMode(ctx, OWNER, false),
+            await ownerNewChatMode(ctx, OWNER, true),
+        ]);
+
+        expect(owner).toBe("full");
+        expect(impersonated).toBeUndefined();
     });
 });
 
