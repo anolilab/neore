@@ -460,6 +460,8 @@ describe("ThreadPullRequestCatchUp", () => {
 
         refetch.mockImplementationOnce(
             async () =>
+                // The tsconfig lib predates `Promise.withResolvers`.
+                // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
                 await new Promise<{ data?: unknown }>((resolve) => {
                     answer = resolve;
                 }),

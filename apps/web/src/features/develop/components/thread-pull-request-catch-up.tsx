@@ -66,7 +66,7 @@ const CatchUpControl = ({
     // One run per mounted control: a second click makes the same prompt, and the composer adds the same text only once.
     // A retry of the same run still goes ahead: the fork's local branch takes the next free number instead of stopping.
     const [run] = useState(catchUpRunId);
-    const key = `${threadId}\u0000${link.repository}#${String(link.number)}`;
+    const key = `${threadId} ${link.repository}#${String(link.number)}`;
     // A turn ended while this was not mounted: the cached reads predate it, so nothing shows until they are read again.
     const [stale, setStale] = useState(() => missedTurn(key, threadId));
     const address = { number: link.number, repository: link.repository };
@@ -84,12 +84,12 @@ const CatchUpControl = ({
     // one that confirmed the pull request closed, merged, a draft or caught up. A failed read hides the control but leaves this as
     // it was, so the next turn's end reads again and the control comes back once the host answers behind.
     useEffect(() => {
-        const generation = heard.get(key)?.generation ?? turnEndedGeneration(threadId);
-
         // While a missed turn's read has not answered, the cached reads say nothing new.
         if (stale) {
             return;
         }
+
+        const generation = heard.get(key)?.generation ?? turnEndedGeneration(threadId);
 
         if (behind && !pull.isError) {
             heard.set(key, { generation, rereads: true });
@@ -146,15 +146,12 @@ const CatchUpControl = ({
             return;
         }
 
-        const done = hear();
-
-        if (done === undefined) {
+        const settle = async (): Promise<void> => {
+            await hear();
             setStale(false);
-        } else {
-            void done.then(() => {
-                setStale(false);
-            });
-        }
+        };
+
+        void settle();
     }, [stale]);
 
     useEffect(
