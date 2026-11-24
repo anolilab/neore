@@ -530,8 +530,8 @@ const MessageItem: FC<MessageItemProps> = memo(
                 {message.role === "assistant" && message.hostChanges && <HostChangesOfThread changes={message.hostChanges} messageId={message.id} />}
                 {/* A failed last local reply can be asked again: the same prompt, saved as a sibling reply. A gateway failure keeps its own Retry. */}
                 {message.role === "assistant" && message.status === "failed" && isLast && message.localReply === true && (
-                    <Button className="mb-2 h-7 gap-1.5 text-xs" onClick={handleReload} size="sm" variant="outline">
-                        <RefreshCwIcon aria-hidden="true" className="size-3" />
+                    <Button className="mb-2 min-h-11 gap-1.5" onClick={handleReload} size="default" variant="outline">
+                        <RefreshCwIcon aria-hidden="true" className="size-4" />
                         <Trans>Continue</Trans>
                     </Button>
                 )}
