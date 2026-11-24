@@ -2,7 +2,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import { buildUsageJson, spliceUsageJson, usageObjectKey } from "./usage-export-steps";
 import { readStoredText } from "../lib/storage-read";
-import { collectAllChatFileMetadata } from "../agent/export-pages";
+import { collectAllChatFileMetadata, collectAllMessageFileIds } from "../agent/export-pages";
 import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
 import { collectAcpSessionPages } from "../acp/gdpr";
 import { BROWSER_EXPORT_BYTES, browserExportPageKey, readAllBrowserPages } from "../browser/export-pages";
@@ -825,6 +825,12 @@ export const generateExportFile = internalAction
         // (`agent/export-pages.ts`), read here a page per query, as the sections above are.
         const chatFiles = await collectAllChatFileMetadata(
             async (source, cursor) => await context.runQuery(internal.agent.gdpr.collectChatFileIdsForExport, { cursor, source, userId: args.userId }),
+            async () =>
+                await collectAllMessageFileIds(
+                    async (cursor) => await context.runQuery(internal.agent.gdpr.collectThreadIdsForExport, { cursor, userId: args.userId }),
+                    async (threadId, cursor) =>
+                        await context.runQuery(internal.agent.gdpr.collectMessageFileIdsForExport, { cursor, threadId: threadId as Id<"threads"> }),
+                ),
             async (fileIds) => await context.runQuery(internal.agent.gdpr.chatFileMetadataForExport, { fileIds: fileIds as Id<"chatFiles">[] }),
         );
         const exportData = {

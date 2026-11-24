@@ -98,7 +98,7 @@ export const collectChatFileIdsForExport = internalQuery
     .output(
         v.object({
             cursor: v.union(v.string(), v.null()),
-            fileIds: v.array(v.string()),
+            ids: v.array(v.string()),
         }),
     )
     .query(async ({ args: { cursor, source, userId }, ctx }) => {
@@ -107,7 +107,7 @@ export const collectChatFileIdsForExport = internalQuery
 
             return {
                 cursor: grants.isDone ? null : grants.continueCursor,
-                fileIds: grants.page.map((grant) => grant.fileId),
+                ids: grants.page.map((grant) => grant.fileId),
             };
         }
 
@@ -118,7 +118,55 @@ export const collectChatFileIdsForExport = internalQuery
 
         return {
             cursor: links.isDone ? null : links.continueCursor,
-            fileIds: links.page.map((link) => link.fileId),
+            ids: links.page.map((link) => link.fileId),
+        };
+    });
+
+/** One page of the owner's thread ids, for walking their messages (`collectAllMessageFileIds`). */
+export const collectThreadIdsForExport = internalQuery
+    .input({
+        cursor: v.optional(v.union(v.string().max(MAX_LENGTH.cursor), v.null())),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(
+        v.object({
+            cursor: v.union(v.string(), v.null()),
+            ids: v.array(v.string()),
+        }),
+    )
+    .query(async ({ args: { cursor, userId }, ctx }) => {
+        const page = await ctx.db
+            .query("threads")
+            .withIndex("by_user_and_status", (q) => q.eq("userId", userId))
+            .paginate({ cursor: cursor ?? null, numItems: CHAT_FILE_EXPORT_PAGE });
+
+        return {
+            cursor: page.isDone ? null : page.continueCursor,
+            ids: page.page.map((thread) => thread._id),
+        };
+    });
+
+/** One page of the file ids named by one thread's messages (`collectAllMessageFileIds` walks each thread's messages). */
+export const collectMessageFileIdsForExport = internalQuery
+    .input({
+        cursor: v.optional(v.union(v.string().max(MAX_LENGTH.cursor), v.null())),
+        threadId: v.id("threads"),
+    })
+    .output(
+        v.object({
+            cursor: v.union(v.string(), v.null()),
+            ids: v.array(v.string()),
+        }),
+    )
+    .query(async ({ args: { cursor, threadId }, ctx }) => {
+        const page = await ctx.db
+            .query("messages")
+            .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
+            .paginate({ cursor: cursor ?? null, numItems: CHAT_FILE_EXPORT_PAGE });
+
+        return {
+            cursor: page.isDone ? null : page.continueCursor,
+            ids: page.page.flatMap((message) => message.fileIds ?? []),
         };
     });
 
