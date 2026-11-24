@@ -22,6 +22,10 @@ import { msg } from "@lingui/core/macro";
 import { isNativeShell } from "@/lib/native/bridge";
 
 import { LocalStreamError } from "./openai-sse";
+import type { ReplyStopKind } from "./reply-guard";
+import { LOCAL_IDLE_TIMEOUT_MS } from "./reply-guard";
+
+const IDLE_SECONDS = Math.round(LOCAL_IDLE_TIMEOUT_MS / 1000);
 
 export type LocalErrorKind =
     | "aborted"
@@ -33,7 +37,8 @@ export type LocalErrorKind =
     | "stream"
     | "timeout"
     | "unknown"
-    | "unreachable";
+    | "unreachable"
+    | ReplyStopKind;
 
 export interface LocalErrorInfo {
     /** The server's own message (an `{ error }` body or stream error), when it sent one. */
@@ -182,6 +187,9 @@ export const describeLocalError = (info: LocalErrorInfo): MessageDescriptor => {
                 ? msg`The local server answered HTTP ${info.status ?? 0}: ${info.detail}`
                 : msg`The local server answered HTTP ${info.status ?? 0}.`;
         }
+        case "idle": {
+            return msg`The local model stopped: it sent nothing for ${IDLE_SECONDS} seconds. Continue to ask again.`;
+        }
         case "mixed-content": {
             return msg`Safari blocks this secure page from calling http://localhost. Use Chrome, Edge or Firefox for local models.`;
         }
@@ -190,6 +198,12 @@ export const describeLocalError = (info: LocalErrorInfo): MessageDescriptor => {
         }
         case "permission-denied": {
             return msg`Your browser blocked access to local network devices for this site. Allow "Local network access" in the site settings (the icon left of the address bar), then try again.`;
+        }
+        case "reasoning-limit": {
+            return msg`The local model stopped: its reasoning ran too long. Continue to ask again.`;
+        }
+        case "repeat-loop": {
+            return msg`The local model stopped: it kept repeating the same text. Continue to ask again.`;
         }
         case "stream": {
             return info.detail ? msg`The local model reported an error: ${info.detail}` : msg`The local model reported an error.`;
