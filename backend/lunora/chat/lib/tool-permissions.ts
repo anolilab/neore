@@ -116,13 +116,16 @@ const SUB_AGENT_BUILTINS: ReadonlySet<string> = new Set(["delegateToSubAgent", "
  *
  * - imageGeneration, imageEditing, videoGeneration, musicGeneration: paid per generation on a metered provider (FAL),
  *   each one counted against the user's daily bucket.
+ * - canvasAI: its generate and style operations call the same image generation and editing actions, so it is paid too.
  * - delegateToCodingAgent: spends the user's own provider key on a sandbox run that can push to their GitHub.
  * - delegateToSubAgent, messageWorker: start a run charged to the task quota, or send more work to a worker.
  * - replyToReviewComment: posts a comment on a pull request as the person.
+ * - rerunFailedChecks: re-runs checks on a pull request with the person's GitHub access.
  *
  * `tool-permissions.grants.test.ts` checks that every name here is a real built-in.
  */
 export const ALWAYS_ALLOW_REFUSED_BUILTINS: ReadonlySet<string> = new Set([
+    "canvasAI",
     "delegateToCodingAgent",
     "delegateToSubAgent",
     "imageEditing",
@@ -130,6 +133,7 @@ export const ALWAYS_ALLOW_REFUSED_BUILTINS: ReadonlySet<string> = new Set([
     "messageWorker",
     "musicGeneration",
     "replyToReviewComment",
+    "rerunFailedChecks",
     "videoGeneration",
 ]);
 
