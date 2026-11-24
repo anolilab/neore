@@ -91,6 +91,8 @@ export interface ProtectedResourceMetadata {
 
 export interface AuthorizationServerMetadata {
     authorizationEndpoint: string;
+    /** RFC 9207: the server puts `iss` on its authorization responses, so a callback without one is refused. */
+    authorizationResponseIssParameterSupported?: boolean;
     codeChallengeMethodsSupported?: string[];
     issuer: string;
     registrationEndpoint?: string;
@@ -221,6 +223,7 @@ export const parseAuthorizationServerMetadata = (json: unknown, expectedIssuer: 
     const scopesSupported = stringArray(document["scopes_supported"]);
     const tokenEndpointAuthMethodsSupported = stringArray(document["token_endpoint_auth_methods_supported"]);
 
+    const authorizationResponseIssParameterSupported = document["authorization_response_iss_parameter_supported"] === true;
     const issuer = optionalString(document["issuer"]);
 
     // RFC 8414 §3.3: the metadata must name the issuer it was fetched for, or a
@@ -231,6 +234,7 @@ export const parseAuthorizationServerMetadata = (json: unknown, expectedIssuer: 
 
     return {
         authorizationEndpoint: assertSafeOAuthUrl(authorizationEndpoint, "authorization_endpoint"),
+        ...(authorizationResponseIssParameterSupported && { authorizationResponseIssParameterSupported: true }),
         ...(codeChallengeMethodsSupported && { codeChallengeMethodsSupported }),
         issuer: issuer ?? expectedIssuer,
         ...(registrationEndpoint && { registrationEndpoint: assertSafeOAuthUrl(registrationEndpoint, "registration_endpoint") }),
@@ -438,6 +442,32 @@ export const registerClient = async (
 // ---------------------------------------------------------------------------
 // Authorization request
 // ---------------------------------------------------------------------------
+
+/** Coded refusals for a callback whose RFC 9207 `iss` does not check out. */
+export const OAUTH_ISSUER_MISMATCH = "OAUTH_ISSUER_MISMATCH";
+export const OAUTH_ISSUER_MISSING = "OAUTH_ISSUER_MISSING";
+
+export type AuthorizationResponseIssuerCheck = { ok: true } | { code: typeof OAUTH_ISSUER_MISMATCH | typeof OAUTH_ISSUER_MISSING; ok: false };
+
+/**
+ * RFC 9207: an authorization response names the issuer that produced it in `iss`.
+ * When `iss` is present it must equal the issuer the flow started against, by
+ * simple string comparison, whatever the metadata advertises. When it is absent,
+ * the response is refused only if the metadata advertises
+ * `authorization_response_iss_parameter_supported`. Either way, a response from
+ * one authorization server cannot complete a flow started with another.
+ */
+export const checkAuthorizationResponseIssuer = (options: {
+    expectedIssuer: string;
+    iss: string | undefined;
+    issParameterSupported: boolean;
+}): AuthorizationResponseIssuerCheck => {
+    if (options.iss === undefined) {
+        return options.issParameterSupported ? { code: OAUTH_ISSUER_MISSING, ok: false } : { ok: true };
+    }
+
+    return options.iss === options.expectedIssuer ? { ok: true } : { code: OAUTH_ISSUER_MISMATCH, ok: false };
+};
 
 export const buildAuthorizationUrl = (options: {
     authorizationEndpoint: string;
