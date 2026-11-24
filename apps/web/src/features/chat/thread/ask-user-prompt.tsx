@@ -134,7 +134,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                 return position === index ? { ...base, ...patch } : base;
             }),
         );
-    const allAnswered = !!questions && questions.every((_, index) => isAskUserQuestionAnswered(drafts[index] ?? EMPTY_DRAFT));
+    const allAnswered = !!questions && questions.every((asked, index) => isAskUserQuestionAnswered(drafts[index] ?? EMPTY_DRAFT, asked.multiSelect));
 
     const sendQuestions = () => {
         if (questions && allAnswered && canAnswer && !uploading) {
