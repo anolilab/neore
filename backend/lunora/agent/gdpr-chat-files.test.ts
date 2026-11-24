@@ -11,7 +11,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
-import { addFile } from "./files";
+import { addFile, useExistingFile } from "./files";
 import {
     CHAT_FILE_EXPORT_BYTES,
     CHAT_FILE_METADATA_CHUNK,
@@ -22,6 +22,7 @@ import {
     chatFileSectionBudget,
     collectAllChatFileMetadata,
     collectAllMessageFileIds,
+    readChunkMetadata,
     textBytes,
     walkIds,
     withChatFiles,
@@ -31,6 +32,7 @@ import {
     CHAT_FILE_HASH_MAX,
     CHAT_FILE_NAME_MAX,
     chatFileMetadataForExport,
+    repairChatFileMetadataForExport,
     collectGrantedChatFileIdsForExport,
     collectMessageFileIdsForExport,
     collectThreadIdsForExport,
@@ -79,8 +81,8 @@ const store = async (userId: string, filename: string, hash: string): Promise<st
 };
 
 /** A bare file row, with neither a grant nor a message naming it. */
-const bareFile = async (ctx: any, hash: string): Promise<string> =>
-    await ctx.db.insert("chatFiles", {
+const bareFile = async (ctx: any, hash: string): Promise<string> => {
+    const fileId = await ctx.db.insert("chatFiles", {
         extractionStatus: "pending",
         filename: `${hash}.png`,
         hash,
@@ -89,6 +91,12 @@ const bareFile = async (ctx: any, hash: string): Promise<string> =>
         refcount: 1,
         storageId: `agent-files/${hash}`,
     });
+
+    // The export's view of the file, written with it, as `addFile` writes it.
+    await ctx.db.insert("chatFileMetadata", { createdAt: 1, fileId, filename: `${hash}.png`, hash, mediaType: "image/png" });
+
+    return fileId;
+};
 
 /**
  * A file that one of the user's messages names, with no grant: a large part stored with a message has no owner, so the message is the
@@ -163,7 +171,22 @@ const exportedFor = async (userId: string): Promise<{ files: ExportedFile[]; pag
                     )) as IdsPage,
                 meter,
             ),
-        async (fileIds) => await harness.run(async (ctx: any) => await ctx.runQuery(chatFileMetadataForExport, { fileIds })),
+        async (fileIds, bytesLeft, queriesLeft) =>
+            await readChunkMetadata(
+                fileIds,
+                bytesLeft,
+                queriesLeft,
+                async (ids) =>
+                    (await harness.run(async (ctx: any) => await ctx.runQuery(chatFileMetadataForExport, { fileIds: ids }))) as {
+                        readBytes: number;
+                        rows: ExportedFile[];
+                    },
+                async (id) =>
+                    (await harness.run(async (ctx: any) => await ctx.runMutation(repairChatFileMetadataForExport, { fileIds: [id] }))) as {
+                        readBytes: number;
+                        rows: ExportedFile[];
+                    },
+            ),
         CHAT_FILE_METADATA_CHUNK,
         chatFileMeter(),
     )) as { rows: ExportedFile[]; truncated: boolean };
@@ -223,7 +246,13 @@ describe("chat files in the GDPR export", () => {
     it("leaves out a grant whose file row is gone", async () => {
         const gone = await store(A, "gone.png", "hash-gone");
 
-        await harness.run(async (ctx: any) => await ctx.db.delete("chatFiles", gone));
+        // Erased as the reaper erases a file: its metadata and its row, in one mutation.
+        await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.chatFileMetadata.findMany({ where: { fileId: gone } });
+
+            await Promise.all(page.map(async (row: any) => await ctx.db.delete("chatFileMetadata", row._id)));
+            await ctx.db.delete("chatFiles", gone);
+        });
 
         const { files } = await exportedFor(A);
 
@@ -248,6 +277,168 @@ describe("chat files in the GDPR export", () => {
         const { files } = await exportedFor(A);
 
         expect(files.find((file) => file.id === longHashFile)?.hash).toHaveLength(CHAT_FILE_HASH_MAX);
+    });
+
+    it("completes the export's view of a file whose metadata write did not land, on the next store of the same bytes", async () => {
+        const fileId = await store(A, "retried.png", "hash-retried");
+        const storedAt = (await harness.run(async (ctx: any) => {
+            const file = await ctx.db.chatFiles.findFirst({ where: { _id: fileId } });
+
+            return file._creationTime;
+        })) as number;
+
+        await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.chatFileMetadata.findMany({ where: { fileId } });
+
+            await Promise.all(page.map(async (row: any) => await ctx.db.delete("chatFileMetadata", row._id)));
+        });
+        // The export repairs the missing row from the file (`repairChatFileMetadataForExport`), so the file is still exported.
+        const before = await exportedFor(A);
+
+        expect(before.files.map((file) => file.id)).toContain(fileId);
+
+        await store(A, "retried.png", "hash-retried");
+
+        const after = await exportedFor(A);
+
+        expect(after.files.map((file) => file.id)).toContain(fileId);
+        // Dated as the file was stored, not as it was repaired.
+        expect(after.files.find((file) => file.id === fileId)?.createdAt).toBe(storedAt);
+    });
+
+    it("repairs the export's view of a file on the reuse path, as a store of the same bytes does", async () => {
+        const fileId = await store(A, "reused.png", "hash-reused");
+
+        await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.chatFileMetadata.findMany({ where: { fileId } });
+
+            await Promise.all(page.map(async (row: any) => await ctx.db.delete("chatFileMetadata", row._id)));
+        });
+
+        // The client's store of bytes the workspace already holds takes this path (`agent/client/files.ts`).
+        await harness.run(async (ctx: any) => await ctx.runMutation(useExistingFile, { filename: "reused.png", hash: "hash-reused", userId: A }));
+
+        const after = await exportedFor(A);
+
+        expect(after.files.map((file) => file.id)).toContain(fileId);
+    });
+
+    it("repairs one file per mutation, and stops the repairs once the chunk's budget is spent", async () => {
+        const repaired: string[] = [];
+
+        const chunk = await readChunkMetadata(
+            ["a", "b", "c"],
+            10,
+            200,
+            async () => {
+                return { readBytes: 0, rows: [] };
+            },
+            async (id) => {
+                repaired.push(id);
+
+                return { readBytes: 10, rows: [{ id }] };
+            },
+        );
+
+        expect(repaired).toEqual(["a"]);
+        expect(chunk.rows).toEqual([{ id: "a" }]);
+        expect(chunk.truncated).toBe(true);
+    });
+
+    it("stops the repairs when the query allowance is spent, and says so", async () => {
+        const repaired: string[] = [];
+
+        const chunk = await readChunkMetadata(
+            ["a", "b", "c"],
+            1000,
+            2,
+            async () => {
+                return { readBytes: 0, rows: [] };
+            },
+            async (id) => {
+                repaired.push(id);
+
+                return { readBytes: 0, rows: [{ id }] };
+            },
+        );
+
+        // The read is one query and the allowance is two: one repair, then the rest are left out and flagged.
+        expect(repaired).toEqual(["a"]);
+        expect(chunk.truncated).toBe(true);
+    });
+
+    it("does not flag a complete chunk whose last repair overshoots the budget, since nothing is left out", async () => {
+        const chunk = await readChunkMetadata(
+            ["a"],
+            5,
+            200,
+            async () => {
+                return { readBytes: 0, rows: [] };
+            },
+            async (id) => {
+                return { readBytes: 10, rows: [{ id }] };
+            },
+        );
+
+        expect(chunk.rows).toEqual([{ id: "a" }]);
+        expect(chunk.truncated).toBe(false);
+    });
+
+    it("exports a file stored before its export metadata was written, and writes that metadata", async () => {
+        // A file row with a grant and no metadata row: what a store before `chatFileMetadata` looked like.
+        const legacy = (await harness.run(async (ctx: any) => {
+            const fileId = await ctx.db.insert("chatFiles", {
+                extractionStatus: "pending",
+                filename: "legacy.png",
+                hash: "hash-legacy",
+                lastTouchedAt: 1,
+                mediaType: "image/png",
+                refcount: 1,
+                storageId: "agent-files/hash-legacy",
+            });
+
+            await ctx.db.insert("chatFileAccess", { createdAt: 1, fileId, userId: A });
+
+            return fileId;
+        })) as string;
+
+        const { files } = await exportedFor(A);
+
+        expect(files.map((file) => file.id)).toContain(legacy);
+
+        const written = (await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.chatFileMetadata.findMany({ where: { fileId: legacy } });
+
+            return page.length;
+        })) as number;
+
+        expect(written).toBe(1);
+    });
+
+    it("lists a file once when two stores of the same bytes each wrote its metadata", async () => {
+        const fileId = await store(A, "twice.png", "hash-twice");
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("chatFileMetadata", { createdAt: 1, fileId, filename: "twice.png", hash: "hash-twice", mediaType: "image/png" });
+        });
+
+        const { files } = await exportedFor(A);
+
+        expect(files.filter((file) => file.id === fileId)).toHaveLength(1);
+    });
+
+    it("reads the metadata, not the file row, so a large extracted text is not read", async () => {
+        const fileId = await store(A, "documented.png", "hash-documented");
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("chatFiles", fileId, { extractedText: "x".repeat(200_000) }));
+
+        const read = (await harness.run(async (ctx: any) => await ctx.runQuery(chatFileMetadataForExport, { fileIds: [fileId] }))) as {
+            readBytes: number;
+            rows: unknown[];
+        };
+
+        expect(read.rows).toHaveLength(1);
+        expect(read.readBytes).toBeLessThan(10_000);
     });
 
     it("reads every page of a user's files", async () => {
