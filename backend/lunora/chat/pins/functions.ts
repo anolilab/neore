@@ -185,10 +185,36 @@ const recordSharedPinRoute = async (context: MutationCtx, threadId: Id<"threads"
 };
 
 /**
+ * Removes the caller's routes to a thread once the caller holds no pin there: nothing is left to find through them. The same rule runs
+ * when the last pin goes (`deletePin`).
+ */
+const dropRoutesWithoutPins = async (context: MutationCtx, threadId: Id<"threads">, userId: string): Promise<void> => {
+    const left = await context.db
+        .query("threadPins")
+        .withIndex("by_user_and_thread", (q) => q.eq("userId", userId).eq("threadId", threadId))
+        .take(1);
+
+    if (left.length > 0) {
+        return;
+    }
+
+    // Every route to the thread goes: a guest merge can leave more than one for the same user and thread, and a survivor is a link.
+    const { page } = await context.db.sharedPinRoutes.findMany({ consistency: "primary", limit: 100, where: { threadId, userId } });
+
+    for (const route of page) {
+        await context.db.delete("sharedPinRoutes", route._id);
+    }
+};
+
+/**
  * Writes a pin with its route. The route is a global row, outside this shard's transaction, so it is written BEFORE the pin: a
  * committed pin always has its route (erasure after a revoked grant finds the pin through it). A failed pin write leaves its route
  * behind on purpose. Removing it could race a concurrent writer that found the same route and is about to commit its own pin; a
  * route with no pin is harmless (every reader skips it), and account and thread deletion remove it.
+ *
+ * The one exception is a refusal: the account is being erased, so the route must not outlive it. A refused write can run after the
+ * erasure's route drain (the route write is not in the refused transaction), so it takes the route back when the caller has no pin
+ * on the thread. A refusal is account-wide, so no other pin write of the account is admitted while it stands.
  */
 export const withSharedPinRoute = async <T>(
     context: MutationCtx,
@@ -199,7 +225,15 @@ export const withSharedPinRoute = async <T>(
 ): Promise<T> => {
     await recordSharedPinRoute(context, threadId, userId, now);
 
-    return await write();
+    try {
+        return await write();
+    } catch (error) {
+        if (error instanceof LunoraError && error.code === "FORBIDDEN") {
+            await dropRoutesWithoutPins(context, threadId, userId);
+        }
+
+        throw error;
+    }
 };
 
 /**
@@ -482,20 +516,7 @@ export const deletePin = authMutation
 
         await context.db.delete("threadPins", pinId as Id<"threadPins">);
 
-        // Once the caller has no pin left on the thread, the route to it goes too: nothing is left to find through it.
-        const left = await context.db
-            .query("threadPins")
-            .withIndex("by_user_and_thread", (q) => q.eq("userId", userId).eq("threadId", pin.threadId))
-            .take(1);
-
-        if (left.length === 0) {
-            // Every route to the thread goes: a guest merge can leave more than one for the same user and thread, and a survivor is a link.
-            const { page } = await context.db.sharedPinRoutes.findMany({ consistency: "primary", limit: 100, where: { threadId: pin.threadId, userId } });
-
-            for (const route of page) {
-                await context.db.delete("sharedPinRoutes", route._id);
-            }
-        }
+        await dropRoutesWithoutPins(context, pin.threadId, userId);
 
         context.log.event("chat.delete_pin", { deleted: true });
     });

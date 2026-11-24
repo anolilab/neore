@@ -4,6 +4,7 @@
  * index do not fit together is refused. A document pin is one per document and reads its title from the document.
  */
 import { lunoraTest } from "@lunora/testing";
+import { LunoraError } from "lunorash/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Id } from "../../_generated/dataModel";
@@ -521,6 +522,52 @@ describe("a failed pin write leaves its shared route", () => {
         expect(message).toBe("pin write failed");
 
         const routes = await harness.run(async (context: any) => await context.db.sharedPinRoutes.findMany({ where: { threadId } }));
+
+        expect(routes.page).toHaveLength(1);
+    });
+});
+
+describe("a refused pin write takes back the route it wrote", () => {
+    const refusal = () => new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
+
+    it("removes the route when the collaborator holds no pin on the thread", async () => {
+        // A refusal after the route write: the erasure's drain may already have passed, so the route must not stay behind.
+        const message = await harness.run(async (context: any) => {
+            try {
+                await withSharedPinRoute(context, threadId, "user-collaborator", 1, async () => {
+                    throw refusal();
+                });
+
+                return null;
+            } catch (error) {
+                return (error as Error).message;
+            }
+        });
+
+        expect(message).toBe("Pins cannot be added while this account is being moved or erased");
+
+        const routes = await harness.run(async (context: any) => await context.db.sharedPinRoutes.findMany({ where: { threadId } }));
+
+        expect(routes.page).toHaveLength(0);
+    });
+
+    it("keeps the route when the collaborator already holds a pin on the thread", async () => {
+        const routes = await harness.run(async (context: any) => {
+            await context.db.insert("threadPins", {
+                createdAt: 1,
+                messageId: "m-held",
+                messageRole: "assistant",
+                threadId,
+                updatedAt: 1,
+                userId: "user-collaborator",
+            });
+
+            await withSharedPinRoute(context, threadId, "user-collaborator", 1, async () => {
+                throw refusal();
+            }).catch(() => null);
+
+            return await context.db.sharedPinRoutes.findMany({ where: { threadId } });
+        });
 
         expect(routes.page).toHaveLength(1);
     });
