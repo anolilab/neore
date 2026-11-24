@@ -12,7 +12,7 @@ export interface SaveFileButtonProps {
     fallbackName?: string;
     /** The file's name. The saved file keeps this name. */
     filename?: string;
-    /** What the button says it saves, when that is not the file's name: a gallery tile tells its own position apart. */
+    /** The button's full accessible name, built by a caller whose name is more than the file's (a numbered gallery tile). */
     label?: string;
     url: string;
 }
@@ -24,8 +24,7 @@ export interface SaveFileButtonProps {
  */
 const SaveFileButton: FC<SaveFileButtonProps> = ({ className, fallbackName, filename, label, url }) => {
     const { t } = useLingui();
-    const displayName = label ?? filename;
-    const text = displayName ? t`Download ${displayName}` : t`Download`;
+    const text = label ?? (filename ? t`Download ${filename}` : t`Download`);
 
     return (
         <Button

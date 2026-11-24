@@ -163,6 +163,8 @@ const formatDuration = (seconds: number): string => {
 const ImageGalleryItem = ({ className, item }: ImageGalleryItemProps) => {
     const { t } = useLingui();
     const { items, maxSelections, onItemClick, onToggleSelection, selectedIds, selectionEnabled } = useImageGallery();
+    const tileName = item.alt || t`Gallery item`;
+    const position = items.indexOf(item) + 1;
     const isSelected = selectedIds.includes(item.id);
     const isAtMaxSelections = selectedIds.length >= maxSelections;
     const canSelect = isSelected || !isAtMaxSelections;
@@ -247,7 +249,7 @@ const ImageGalleryItem = ({ className, item }: ImageGalleryItemProps) => {
                     className="absolute top-2 left-2 bg-black/60 text-white opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-black/75 hover:text-white focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
                     fallbackName={`${item.type}-${item.id}`}
                     filename={item.filename}
-                    label={`${item.alt || t`Gallery item`} ${items.indexOf(item) + 1}`}
+                    label={t`Download ${tileName} (${position})`}
                     url={item.src}
                 />
             )}
@@ -292,6 +294,8 @@ const ImageGalleryItem = ({ className, item }: ImageGalleryItemProps) => {
 const KreaImageItem = ({ className, item }: ImageGalleryItemProps) => {
     const { t } = useLingui();
     const { items, maxSelections, onItemClick, onToggleSelection, selectedIds, selectionEnabled } = useImageGallery();
+    const tileName = item.alt || t`Gallery item`;
+    const position = items.indexOf(item) + 1;
     const isSelected = selectedIds.includes(item.id);
     const isAtMaxSelections = selectedIds.length >= maxSelections;
     const canSelect = isSelected || !isAtMaxSelections;
@@ -358,7 +362,7 @@ const KreaImageItem = ({ className, item }: ImageGalleryItemProps) => {
                     className="absolute top-2.5 left-2.5 bg-black/60 text-white opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-black/75 hover:text-white focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
                     fallbackName={`${item.type}-${item.id}`}
                     filename={item.filename}
-                    label={`${item.alt || t`Gallery item`} ${items.indexOf(item) + 1}`}
+                    label={t`Download ${tileName} (${position})`}
                     url={item.src}
                 />
             )}
