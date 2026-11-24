@@ -52,6 +52,19 @@ For generate_element, add the result as a FabricImage object in the canvas JSON 
         toolsLogger.debug(`[canvasAI] Operation: ${operation} on document ${documentId}`);
 
         try {
+            // Every operation works on a design of this user and thread, so that is checked before any allowance is taken. The same
+            // owner and thread check as `update-document`: another user's or thread's design is refused as not found.
+            const documentRow = await context.runQuery(internal.agent.documents.getDocumentInternal, { documentId: documentId as Id<"documents"> });
+
+            if (!documentRow || documentRow.userId !== context.userId || (documentRow.threadId && documentRow.threadId !== context.threadId)) {
+                return {
+                    documentId,
+                    error: "Document not found",
+                    message: "Design document not found",
+                    operation,
+                };
+            }
+
             if (operation === "generate_element") {
                 if (!prompt) {
                     return {
@@ -99,20 +112,8 @@ For generate_element, add the result as a FabricImage object in the canvas JSON 
                 };
             }
 
-            // For canvas-wide operations, use the document's PNG preview. The preview is stored in the document's content field as a data URL.
-            // Read first: the document is checked and its message is written only once the request is accepted and paid for.
-            const documentRow = await context.runQuery(internal.agent.documents.getDocumentInternal, { documentId: documentId as Id<"documents"> });
-
-            // Same owner and thread check as `update-document`, so a document of another user or thread cannot be edited or read.
-            if (!documentRow || documentRow.userId !== context.userId || (documentRow.threadId && documentRow.threadId !== context.threadId)) {
-                return {
-                    documentId,
-                    error: "Document not found",
-                    message: "Design document not found",
-                    operation,
-                };
-            }
-
+            // Canvas-wide operations edit the document's PNG preview, which is stored in its content field as a data URL. The message is
+            // written only once the request is accepted and paid for.
             if (operation === "style_transfer" && !prompt) {
                 return { documentId, error: "Missing prompt", message: "style_transfer operation requires a prompt", operation };
             }

@@ -103,6 +103,15 @@ describe("canvas edits draw on the daily image allowance", () => {
         expect(state.editedFrom).toBe("data:image/png;base64,BBBB");
     });
 
+    it("refuses a generated element for another user's design before charging", async () => {
+        state.document = { content: "data:image/png;base64,AAAA", threadId: "thread-1", userId: "someone-else" };
+
+        const output = await tool.execute(makeContext(), { documentId: "doc-1", operation: "generate_element", prompt: "a cat" });
+
+        expect(output.error).toBe("Document not found");
+        expect(sideEffects()).toStrictEqual([]);
+    });
+
     it("writes nothing and calls no provider when the allowance is spent", async () => {
         const output = await tool.execute(makeContext(false), { documentId: "doc-1", operation: "upscale" });
 

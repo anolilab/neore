@@ -37,10 +37,15 @@ const limitReached = (retryAfter?: number): ImageQuotaResult => {
  */
 export const takeImageQuota = async (context: ToolContext, userId: string, count: number): Promise<ImageQuotaResult> => {
     try {
-        // The plan `/chat/media` charges on: the user's own, from the user row. An organization's plan is not used, so one person
-        // draws the same allowance on every image path, whichever organization the run belongs to.
+        // The plan `/chat/media` charges on comes from its session's active organization, and a paid organization counts for its
+        // members. The run's organization is that same organization (the chat was started in it), so the run's plan answers it.
+        // A run that never set one has no session organization, and gets the user's own plan, as a sessionless media request does.
         const flags = await context.runQuery(internal.auth.functions.getUserAuthFlagsQuery, { userId });
-        const user = { _id: userId, isAnonymous: flags.isAnonymous, plan: flags.plan, role: flags.role };
+        const runPlan =
+            context.organizationId === undefined
+                ? undefined
+                : await context.runQuery(internal.auth.billing.getRunPlanForOrganizationQuery, { organizationId: context.organizationId, userId });
+        const user = { _id: userId, isAnonymous: flags.isAnonymous, plan: runPlan ? runPlan.plan : flags.plan, role: flags.role };
 
         // A request bigger than the whole bucket can never fit, and the limiter throws on it instead of refusing it, so it is
         // refused here, uncharged, rather than reported as a failed check.

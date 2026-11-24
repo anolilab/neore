@@ -22,7 +22,10 @@ vi.mock("../../agent/client", () => {
 vi.mock("../../_generated/internal", () => {
     return {
         internal: {
-            auth: { functions: { getUserAuthFlagsQuery: "getUserAuthFlagsQuery" } },
+            auth: {
+                billing: { getRunPlanForOrganizationQuery: "getRunPlanForOrganizationQuery" },
+                functions: { getUserAuthFlagsQuery: "getUserAuthFlagsQuery" },
+            },
             chat: { functions: { editImage: "editImage" } },
             lib: { rate_limiter_mutations: { applyRateLimit: "applyRateLimit" } },
         },
@@ -56,8 +59,13 @@ const makeContext = () => {
 
             return state.quotaOk ? { ok: true } : { ok: false, retryAfter: state.retryAfter };
         },
-        runQuery: async (reference: string) =>
-            reference === "getUserAuthFlagsQuery" ? { isAnonymous: state.anonymous, plan: state.plan, role: state.role } : undefined,
+        runQuery: async (reference: string) => {
+            if (reference === "getRunPlanForOrganizationQuery") {
+                return { isAdmin: state.role === "admin", plan: state.plan };
+            }
+
+            return reference === "getUserAuthFlagsQuery" ? { isAnonymous: state.anonymous, plan: state.plan, role: state.role } : undefined;
+        },
         userId: "user-1",
     };
 };
