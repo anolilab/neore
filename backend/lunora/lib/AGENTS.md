@@ -72,6 +72,9 @@
   record only moves forward (a later `run` writes it; a delivery behind it starts from it), the sweep
   moves its time before it sends the job, and each save arms the shard's timed work (`noteShardDue`) for its stall: the
   minute tick runs the sweep there (`resumeStalledGuestMergesOnTick`), since housekeeping reads only the most active shards.
+  An erasure takes every claim tagged with the account, its erasing marker too, so the lease, each run's start and the sweep
+  read the new account's `user` row (`auth/lib/merge-destination.ts`, primary): once it is gone the merge stops, writes
+  nothing there and keeps the guest. The lease and generation never lapse while a merge is unfinished.
   Import markers (`guest-merge-row`), progress records and the pins-left signal (`guest-merge-pins-left`) never lapse, and
   a lapsed one still counts: each goes only when the merge has done what it records (its end, the run cap, the `global`
   step that re-points the moved pins' routes) or with the erasure of the account it is tagged with. A time to live there

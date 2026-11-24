@@ -21,6 +21,7 @@ import {
     listShardRowsToClear,
     MERGE_CALLS_PER_RUN,
     MERGE_FENCE_SCOPE,
+    MERGE_GENERATION_SCOPE,
     MERGE_LEASE_CALLS,
     MERGE_LEASE_SCOPE,
     MERGE_PAGE_SIZE,
@@ -50,6 +51,21 @@ import { schemaWithShardedTables } from "./test-schema";
 
 // The action's own query runs in the harness, which takes the registered procedure; every other reference stays plain.
 const registry = vi.hoisted(() => new Map<string, unknown>());
+
+/**
+ * New accounts that are gone (erased). The `user` table is `.global()`, which these harnesses do not hold, so whether a
+ * merge's new account still exists is read from here; `isMergeDestination` itself is tested on a real `user` row below.
+ */
+const goneAccounts = vi.hoisted(() => new Set<string>());
+
+vi.mock("../auth/lib/merge-destination", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../auth/lib/merge-destination")>();
+
+    return {
+        ...actual,
+        isMergeDestination: async (_context: unknown, userId: string) => !goneAccounts.has(userId),
+    };
+});
 
 vi.mock("../_generated/internal", async (importOriginal) => {
     const { registeredApi } = await import("../../test/registered-api");
@@ -365,8 +381,30 @@ describe("canonicalValue", () => {
 
         new Float32Array(buffer).set([1]);
         expect(canonicalValue(new Float32Array(buffer))).not.toBe(canonicalValue(new Int32Array(buffer)));
-        // A binary column comes back as an `ArrayBuffer`, the same bytes the guest's `Uint8Array` held.
-        expect(canonicalValue(new Uint8Array(buffer))).toBe(canonicalValue(buffer));
+    });
+
+    it("tells apart the same bytes held as another binary type, which the storage codec keeps apart", () => {
+        const bytes = [1, 2, 3, 4];
+        const buffer = (): ArrayBuffer => {
+            const copy = new ArrayBuffer(bytes.length);
+
+            new Uint8Array(copy).set(bytes);
+
+            return copy;
+        };
+        const texts = [
+            buffer(),
+            new Uint8Array(bytes),
+            new Uint8ClampedArray(bytes),
+            new Int8Array(bytes),
+            new Uint16Array(buffer()),
+            new DataView(buffer()),
+        ].map((value) => canonicalValue({ a: value }));
+
+        // A guest's edit that only changes a value's binary type changes the row's digest, so the clear imports it again.
+        expect(new Set(texts).size).toBe(texts.length);
+        expect(canonicalValue({ a: buffer() })).toBe(canonicalValue({ a: buffer() }));
+        expect(canonicalValue({ a: new Uint8Array(bytes) })).toBe(canonicalValue({ a: new Uint8Array([0, ...bytes]).subarray(1) }));
     });
 
     it("still refuses a value the store cannot hold, so a row it cannot compare is never deleted", () => {
@@ -1936,6 +1974,113 @@ describe("mergeGuestInto across two real shards", () => {
                 merge.close();
             }
         });
+
+        /** Every claim on the new account's shard, as an erasure that has finished leaves none tagged with it. */
+        const userClaims = async (merge: ReturnType<typeof twoShards>) =>
+            (await merge.shards.user.run(async (context: any) => await context.db.query("idempotencyClaims").take(100))) as {
+                key: string;
+                scope: string;
+                userId?: string;
+            }[];
+
+        /** The new account's erasure, finished: its rows and every claim tagged with it are gone, and so is its `user` row. */
+        const eraseNewAccount = async (merge: ReturnType<typeof twoShards>) => {
+            await merge.shards.user.run(async (context: any) => {
+                for (const table of ["threads", "idempotencyClaims", "accountMoves"]) {
+                    const rows = await context.db.query(table).take(100);
+
+                    for (const row of rows) {
+                        await context.db.delete(table, row._id);
+                    }
+                }
+            });
+            goneAccounts.add("user");
+        };
+
+        it("writes nothing onto an erased account's shard from a late job, and keeps the guest, however often it comes", async () => {
+            const merge = twoShards();
+
+            try {
+                await merge.shards.guest.run(async (context: any) =>
+                    Promise.all(["a", "b", "c"].map(async (title) => await context.db.insert("threads", thread(title)))),
+                );
+
+                // A run moves part of the merge and queues its successor; the new account's erasure then finishes.
+                const { next } = await mergeGuestInto(merge.call, REFERENCES, "guest", "user", { budget: MERGE_LEASE_CALLS + 3 });
+
+                expect(next).not.toBeNull();
+
+                await eraseNewAccount(merge);
+
+                // The delayed successor, a busy-requeued duplicate and a first job: each ends the merge, none takes a lease.
+                for (const resume of [next!, next!, undefined]) {
+                    expect(await mergeGuestInto(merge.call, REFERENCES, "guest", "user", resume === undefined ? {} : { resume })).toStrictEqual({
+                        moved: resume?.moved ?? 0,
+                        next: null,
+                        stopped: true,
+                    });
+                }
+
+                // Sweeps after them find nothing to restart, however many pass.
+                for (let pass = 0; pass < 3; pass += 1) {
+                    expect(await sweep(merge)).toStrictEqual({ dropped: 0, resumed: 0 });
+                    expect(transport.queued).toStrictEqual([]);
+                }
+
+                expect(await merge.threadsOn("user")).toStrictEqual([]);
+                const kept = await merge.threadsOn("guest");
+
+                expect(kept.map((row) => String(row.title)).toSorted((a, b) => a.localeCompare(b))).toStrictEqual(["a", "b", "c"]);
+                expect(merge.guestDeletions).toStrictEqual([]);
+                expect(await userClaims(merge)).toStrictEqual([]);
+
+                const moves = (await merge.shards.user.run(async (context: any) => await context.db.query("accountMoves").take(10))) as { kind: string }[];
+
+                // The guest's merging marker ended with the merge, so its own pin writes go on.
+                expect(moves).toStrictEqual([]);
+            } finally {
+                goneAccounts.delete("user");
+                merge.close();
+            }
+        });
+
+        it("ends a run whose new account was erased after it took the lease, leaving no lease or progress behind", async () => {
+            const merge = twoShards();
+
+            try {
+                await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("a")));
+                merge.onceBefore("beginMergeRun", async () => {
+                    await eraseNewAccount(merge);
+                });
+
+                expect(await mergeGuestInto(merge.call, REFERENCES, "guest", "user")).toStrictEqual({ moved: 0, next: null, stopped: true });
+                expect(await merge.threadsOn("user")).toStrictEqual([]);
+                expect(await merge.threadsOn("guest")).toHaveLength(1);
+                expect(merge.guestDeletions).toStrictEqual([]);
+                expect(await userClaims(merge)).toStrictEqual([]);
+            } finally {
+                goneAccounts.delete("user");
+                merge.close();
+            }
+        });
+
+        it("drops, never queues, a stalled merge whose new account is gone", async () => {
+            const merge = twoShards();
+
+            try {
+                await merge.shards.user.run(async (context: any) => await context.runMutation(recordGuestMerge, { from: "guest", to: "user" }));
+                await age(merge);
+                goneAccounts.add("user");
+
+                expect(await sweep(merge)).toStrictEqual({ dropped: 1, resumed: 0 });
+                expect(transport.queued).toStrictEqual([]);
+                expect(await progressOf(merge)).toBeNull();
+                expect(await sweep(merge)).toStrictEqual({ dropped: 0, resumed: 0 });
+            } finally {
+                goneAccounts.delete("user");
+                merge.close();
+            }
+        });
     });
 });
 
@@ -2823,6 +2968,45 @@ describe("a merge's unfinished state never lapses", () => {
                     .withIndex("by_scope_key", (q: any) => q.eq("scope", scope).eq("key", key))
                     .first(),
         ) as Promise<{ expiresAt: number } | null>;
+
+    it("never hands a generation out twice, however long an unfinished merge waits between runs", async () => {
+        vi.useFakeTimers({ now: 1_000_000_000, toFake: ["Date"] });
+
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+        const acquire = async () =>
+            (await harness.run(async (context: any) => await context.runMutation(acquireMergeLease, { from: "guest", to: "user" }))) as { generation: number };
+
+        try {
+            const { generation } = await acquire();
+
+            await harness.run(async (context: any) => await context.runMutation(noteMergeGeneration, { from: "guest", generation }));
+            await harness.run(async (context: any) => await context.runMutation(releaseMergeLease, { from: "guest", generation }));
+
+            const lease = await claimOf(harness, MERGE_LEASE_SCOPE, "guest");
+            const seen = await claimOf(harness, MERGE_GENERATION_SCOPE, "guest");
+
+            expect(lease?.expiresAt).toBe(IMPORT_MARKER_EXPIRES_AT);
+            expect(seen?.expiresAt).toBe(IMPORT_MARKER_EXPIRES_AT);
+
+            // The merge waits more than the old 30-day time to live; the purge runs meanwhile.
+            vi.setSystemTime(Date.now() + 31 * DAY);
+            await harness.run(async (context: any) => await context.runMutation(purgeExpiredClaims, {}));
+
+            const next = await acquire();
+
+            expect(next.generation).toBe(generation + 1);
+            // The older run's generation is still refused on the guest's shard.
+            expect(
+                await harness.run(async (context: any) => await context.runMutation(noteMergeGeneration, { from: "guest", generation: generation + 1 })),
+            ).toStrictEqual({ current: true });
+            expect(await harness.run(async (context: any) => await context.runMutation(noteMergeGeneration, { from: "guest", generation }))).toStrictEqual({
+                current: false,
+            });
+        } finally {
+            harness.close();
+            vi.useRealTimers();
+        }
+    });
 
     it("restarts a merge whose progress is older than the old 30-day time to live, after a claim purge", async () => {
         vi.useFakeTimers({ now: 1_000_000_000, toFake: ["Date"] });

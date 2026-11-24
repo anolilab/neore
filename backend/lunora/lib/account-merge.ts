@@ -75,6 +75,7 @@ import { v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import type { MutationCtx } from "../_generated/server";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
+import { isMergeDestination } from "../auth/lib/merge-destination";
 import { mergeSkippedSteps } from "../auth/lib/setup-step-limits";
 import { beginAccountMove, endAccountMove, hasAccountMove, isErasing, MERGE_MARKER_MAX_AGE_MS, pinWritesInFlightUntil } from "./account-moves";
 import { AUDIT_TABLES } from "./audit-triggers";
@@ -246,13 +247,11 @@ const byCodeUnit = (a: string, b: string): number => {
     return a < b ? -1 : 1;
 };
 
-/** The byte views the store hands back as plain bytes: a top-level binary column decodes to an `ArrayBuffer`. */
-const PLAIN_BYTES = new Set(["DataView", "Uint8Array"]);
-
 /**
  * A stored value as deterministic text: object keys sorted, absent (`undefined`) keys dropped, and every value JSON
  * cannot carry tagged with its type. These are the types Lunora's storage codec (`@lunora/wire`) gives back: a bigint by
- * its digits, binary by the hex of its bytes (a typed array other than `Uint8Array` with its type), a date by its time,
+ * its digits, binary by its type and the hex of its bytes (the codec keeps an `ArrayBuffer`, a `Uint8Array` and each other
+ * typed array apart, so an edit that changes only the type is a change), a date by its time,
  * a URL by its address, a `Map` by its entries and a `Set` by its members (in their iteration order, which the codec
  * stores, so a change of order alone is a change), an `Error` by its name, message, fields and cause. JSON throws on a bigint and writes every
  * `ArrayBuffer`, `Map` and `Set` as `{}`; this tells them apart, so two rows with the same text hold the same values.
@@ -286,14 +285,11 @@ export const canonicalValue = (value: unknown): string => {
     }
 
     if (value instanceof ArrayBuffer) {
-        return `<bytes:${hex(new Uint8Array(value))}>`;
+        return `<bytes:ArrayBuffer:${hex(new Uint8Array(value))}>`;
     }
 
     if (ArrayBuffer.isView(value)) {
-        const bytes = hex(new Uint8Array(value.buffer, value.byteOffset, value.byteLength));
-        const type = value.constructor.name;
-
-        return PLAIN_BYTES.has(type) ? `<bytes:${bytes}>` : `<bytes:${type}:${bytes}>`;
+        return `<bytes:${value.constructor.name}:${hex(new Uint8Array(value.buffer, value.byteOffset, value.byteLength))}>`;
     }
 
     if (value instanceof Date) {
@@ -432,17 +428,17 @@ const carrySetupSteps = async (ctx: { db: unknown }, guestRows: Record<string, u
 export const IMPORT_MARKER_SCOPE = "guest-merge-row";
 
 /**
- * The time to live of the merge's lease and generation claims, each written again by every run. Not the import markers',
- * the progress record's or the pins-left signal's: each is the only record of something a merge has not finished, and
- * none may lapse before that is done ({@link IMPORT_MARKER_EXPIRES_AT}).
+ * The time to live of the stalled-merge sweep's cursor. Not of any claim a merge has not finished with: import markers,
+ * the progress record, the pins-left signal, the lease and the generation are each the only record of something
+ * unfinished, and none may lapse before that is done ({@link IMPORT_MARKER_EXPIRES_AT}).
  */
 export const IMPORT_MARKER_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
- * The `expiresAt` of an import marker, a progress record and a pins-left signal: it never lapses, so the claim purge
- * never takes it. Each goes only when the merge has done what it records, or with the erasure of the account it is
- * tagged with; a merge given up on keeps its markers until then, so a later delivery still leaves alone every row the
- * account deleted.
+ * The `expiresAt` of an import marker, a progress record, a pins-left signal, and a merge's lease and generation: it
+ * never lapses, so the claim purge never takes it. Each goes only when the merge has done what it records, or with the
+ * erasure of the account it is tagged with; a merge given up on keeps its markers until then, so a later delivery still
+ * leaves alone every row the account deleted, and its lease and generation, so a generation is never handed out twice.
  */
 export const IMPORT_MARKER_EXPIRES_AT = Number.MAX_SAFE_INTEGER;
 
@@ -476,15 +472,17 @@ const mergeFinished = async (db: MutationCtx["db"], from: string, now: number): 
  * of rows there checks it ({@link holdMergeLease}): queues deliver at least once, so two deliveries of a merge can run at
  * once, and without it an older one paused after reading a row could write that row over the newer edit another one
  * imported since. A holder that dies lets it lapse after {@link MERGE_LEASE_MS}; a later delivery then takes it over.
- * The row outlives the lease ({@link IMPORT_MARKER_TTL_MS}), so a generation is never handed out twice. Tagged with the
- * new account, so its erasure takes it.
+ * The row never lapses while the merge is unfinished ({@link IMPORT_MARKER_EXPIRES_AT}), so a generation is never handed
+ * out twice; a finished merge's lease lapses with its fence ({@link MERGE_FENCE_TTL_MS}). Tagged with the new account,
+ * so its erasure takes it.
  */
 export const MERGE_LEASE_SCOPE = "guest-merge-lease";
 
 /**
  * The claim scope of the highest generation the GUEST's shard has seen (`result` `{"generation":n}`, keyed by the guest's
  * id): every delete there refuses an older one ({@link mergeGenerationCurrent}). Its own scope, so a shard serving both
- * users keeps the lease and this apart. Tagged with the guest; it lapses with the claim purge after the guest is gone.
+ * users keeps the lease and this apart. Never lapses ({@link IMPORT_MARKER_EXPIRES_AT}): it goes with the guest's deletion
+ * (`auth/hooks.ts#deleteMergedGuest`) or with the erasure of the guest it is tagged with.
  */
 export const MERGE_GENERATION_SCOPE = "guest-merge-generation";
 
@@ -640,7 +638,7 @@ const generationOf = (result: string | undefined): { generation: number; until: 
  * that delivery's rows are the newer ones. One whose lease lapsed with nobody taking it over still holds it.
  */
 const holdMergeLease = async (db: MutationCtx["db"], from: string, generation: number, now: number): Promise<boolean> => {
-    const row = await claimAt(db, MERGE_LEASE_SCOPE, from, now);
+    const row = await storedClaim(db, MERGE_LEASE_SCOPE, from);
 
     if (row === null || generationOf(row.result).generation !== generation) {
         return false;
@@ -652,23 +650,65 @@ const holdMergeLease = async (db: MutationCtx["db"], from: string, generation: n
 };
 
 /** On the GUEST's shard: `generation` is the newest this shard has seen, so its deletes may run. */
-export const mergeGenerationCurrent = async (db: MutationCtx["db"], from: string, generation: number, now: number): Promise<boolean> => {
-    const row = await claimAt(db, MERGE_GENERATION_SCOPE, from, now);
+export const mergeGenerationCurrent = async (db: MutationCtx["db"], from: string, generation: number): Promise<boolean> => {
+    const row = await storedClaim(db, MERGE_GENERATION_SCOPE, from);
 
     return row !== null && generationOf(row.result).generation === generation;
+};
+
+/** On the GUEST's shard, once the guest is deleted: its merge has nothing left to fence. */
+export const dropMergeGeneration = async (db: MutationCtx["db"], from: string): Promise<void> => {
+    const row = await storedClaim(db, MERGE_GENERATION_SCOPE, from);
+
+    if (row !== null) {
+        await db.delete("idempotencyClaims", row._id);
+    }
+};
+
+/**
+ * A merge into an account that is gone (erased, so every claim tagged with it went too): this merge's markers end and its
+ * progress record and lease go, so nothing tagged with the erased account is left on its shard. The guest and its rows
+ * stay, as for any merge that stops.
+ */
+const stopMergeIntoMissingAccount = async (ctx: Pick<MutationCtx, "db">, from: string, to: string, now: number): Promise<void> => {
+    await endImporting(ctx, from, to, now);
+    await endAccountMove(ctx, from, "merging");
+    await dropMergeProgress(ctx.db, from);
+
+    const lease = await storedClaim(ctx.db, MERGE_LEASE_SCOPE, from);
+
+    if (lease !== null) {
+        await ctx.db.delete("idempotencyClaims", lease._id);
+    }
 };
 
 /**
  * On the NEW user's shard: take the guest's merge lease with the next generation, or `busyUntil` while another delivery
  * holds it. The generation counts on from the last one even after a lease lapsed. `saved` is the merge's progress record
- * ({@link MERGE_PROGRESS_SCOPE}): a delivery whose payload is behind it goes on from the record, never back.
+ * ({@link MERGE_PROGRESS_SCOPE}): a delivery whose payload is behind it goes on from the record, never back. `stopped`:
+ * the new account is gone ({@link isMergeDestination}); nothing is written and the merge ends, so a late job (a delayed
+ * successor, a requeued duplicate) never starts it again on an erased account's shard.
  */
 export const acquireMergeLease = internalMutation
     .input({ from: v.string(), to: v.string() })
-    .output(v.object({ busyUntil: v.optional(v.number()), generation: v.number(), saved: v.optional(v.object({ ...vMergeProgressFields })) }))
+    .output(
+        v.object({
+            busyUntil: v.optional(v.number()),
+            generation: v.number(),
+            saved: v.optional(v.object({ ...vMergeProgressFields })),
+            stopped: v.optional(v.boolean()),
+        }),
+    )
     .mutation(async ({ args, ctx }) => {
         const { now } = ctx;
-        const row = await claimAt(ctx.db, MERGE_LEASE_SCOPE, args.from, now);
+
+        if (!(await isMergeDestination(ctx, args.to))) {
+            await stopMergeIntoMissingAccount(ctx, args.from, args.to, now);
+
+            return { generation: 0, stopped: true };
+        }
+
+        const row = await storedClaim(ctx.db, MERGE_LEASE_SCOPE, args.from);
         const held = row === null ? null : generationOf(row.result);
 
         if (held !== null && held.until > now) {
@@ -678,7 +718,8 @@ export const acquireMergeLease = internalMutation
         const generation = (held?.generation ?? 0) + 1;
 
         await writeClaim(ctx.db, MERGE_LEASE_SCOPE, args.from, now, {
-            expiresAt: now + IMPORT_MARKER_TTL_MS,
+            // Never by time while the merge is unfinished: a lapsed row would hand out a generation again.
+            expiresAt: IMPORT_MARKER_EXPIRES_AT,
             result: JSON.stringify({ generation, until: now + MERGE_LEASE_MS }),
             userId: args.to,
         });
@@ -700,7 +741,7 @@ export const releaseMergeLease = internalMutation
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const { now } = ctx;
-        const row = await claimAt(ctx.db, MERGE_LEASE_SCOPE, args.from, now);
+        const row = await storedClaim(ctx.db, MERGE_LEASE_SCOPE, args.from);
 
         if (row === null || generationOf(row.result).generation !== args.generation) {
             return null;
@@ -710,6 +751,8 @@ export const releaseMergeLease = internalMutation
 
         if ((await mergeFinished(ctx.db, args.from, now)) && !(await mergeCleanupPending(ctx, args.from, row.userId))) {
             await dropMergeProgress(ctx.db, args.from);
+            // Finished: the lease lapses with the fence, which refuses every delivery after it until then.
+            await ctx.db.patch("idempotencyClaims", row._id, { expiresAt: now + MERGE_FENCE_TTL_MS });
         } else if (args.progress !== undefined && row.userId !== undefined) {
             const record = await storedClaim(ctx.db, MERGE_PROGRESS_SCOPE, args.from);
 
@@ -731,7 +774,7 @@ export const noteMergeGeneration = internalMutation
     .output(v.object({ current: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
         const { now } = ctx;
-        const row = await claimAt(ctx.db, MERGE_GENERATION_SCOPE, args.from, now);
+        const row = await storedClaim(ctx.db, MERGE_GENERATION_SCOPE, args.from);
         const seen = row === null ? 0 : generationOf(row.result).generation;
 
         if (seen > args.generation) {
@@ -739,7 +782,7 @@ export const noteMergeGeneration = internalMutation
         }
 
         await writeClaim(ctx.db, MERGE_GENERATION_SCOPE, args.from, now, {
-            expiresAt: now + IMPORT_MARKER_TTL_MS,
+            expiresAt: IMPORT_MARKER_EXPIRES_AT,
             result: JSON.stringify({ generation: args.generation }),
             userId: args.from,
         });
@@ -885,10 +928,18 @@ const resumeStalledMerges = async (ctx: MutationCtx): Promise<{ dropped: number;
             continue;
         }
 
-        const lease = await claimAt(ctx.db, MERGE_LEASE_SCOPE, from, now);
+        const lease = await storedClaim(ctx.db, MERGE_LEASE_SCOPE, from);
 
         if (lease !== null && generationOf(lease.result).until > now) {
             checkAt(generationOf(lease.result).until);
+
+            continue;
+        }
+
+        if (to !== undefined && !(await isMergeDestination(ctx, to))) {
+            // The new account is gone: the merge ends here, and nothing is queued to write onto its shard.
+            await stopMergeIntoMissingAccount(ctx, from, to, now);
+            dropped += 1;
 
             continue;
         }
@@ -1103,7 +1154,7 @@ export const deleteShardRows = internalMutation
         const db = rawDb(ctx);
         const { now } = ctx;
 
-        if (!(await mergeGenerationCurrent(ctx.db, args.from, args.generation, now))) {
+        if (!(await mergeGenerationCurrent(ctx.db, args.from, args.generation))) {
             return { fenced: true };
         }
 
@@ -1173,7 +1224,7 @@ export const resolvePinsLeft = internalMutation
     .input({ from: v.string(), generation: v.number() })
     .output(v.object({ fenced: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
-        if (!(await mergeGenerationCurrent(ctx.db, args.from, args.generation, ctx.now))) {
+        if (!(await mergeGenerationCurrent(ctx.db, args.from, args.generation))) {
             return { fenced: true };
         }
 
@@ -1332,6 +1383,13 @@ export const beginMergeRun = internalMutation
     )
     .mutation(async ({ args, ctx }) => {
         const { now } = ctx;
+
+        // The account was erased after this run took its lease: its erasing marker is gone with it, so this is the check.
+        if (!(await isMergeDestination(ctx, args.to))) {
+            await stopMergeIntoMissingAccount(ctx, args.from, args.to, now);
+
+            return { cleanup: false, finished: false, pinWritesUntil: null, stopped: true, superseded: false };
+        }
 
         if (!(await holdMergeLease(ctx.db, args.from, args.generation, now))) {
             return { cleanup: false, finished: false, pinWritesUntil: null, stopped: false, superseded: true };
@@ -1703,7 +1761,12 @@ export const mergeGuestInto = async (
     }
 
     // One delivery at a time: the lease's generation goes with every write, and a later one's makes this one's stale.
-    const lease: { busyUntil?: number; generation: number; saved?: MergeProgress } = await call(references.acquireLease, { from, to }, to);
+    const lease: { busyUntil?: number; generation: number; saved?: MergeProgress; stopped?: boolean } = await call(references.acquireLease, { from, to }, to);
+
+    if (lease.stopped === true) {
+        // The new account is gone: no lease was taken, so there is none to give back.
+        return { moved: payload?.moved ?? 0, next: null, stopped: true };
+    }
 
     if (lease.busyUntil !== undefined) {
         return { busyUntil: lease.busyUntil, moved: payload?.moved ?? 0, next: null };
@@ -1943,7 +2006,9 @@ export const runGuestMerge = internalAction
         }
 
         if (stopped === true) {
-            authLogger.info(`[auth] stopped the merge of guest ${args.from} into ${args.to}: an erasure of either account has begun`);
+            authLogger.info(
+                `[auth] stopped the merge of guest ${args.from} into ${args.to}: an erasure of either account has begun, or the new account is gone`,
+            );
 
             return { done: true, moved };
         }

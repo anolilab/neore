@@ -32,6 +32,9 @@ vi.mock(
         }) as never,
 );
 
+// The `user` table is `.global()`, which this harness does not hold: a merge's new account counts as present.
+vi.mock(import("../auth/lib/merge-destination"), () => ({ isMergeDestination: async () => true }) as never);
+
 // The shard tick's own steps run as registered procedures; the dispatch targets stay plain references, so their paths show.
 const registry = vi.hoisted(() => new Map<string, unknown>());
 
