@@ -665,7 +665,8 @@ export const deleteFiles = internalMutation
                 await Promise.all(grants.map((grant) => ctx.db.delete("chatFileAccess", grant._id)));
 
                 // The export's view goes with the file row (`chatFileMetadata`), in the same mutation.
-                const { page: metadata } = await ctx.db.chatFileMetadata.findMany({ where: { fileId } });
+                // Primary: a replica that lags could miss a row, and the export would then list a file that was deleted.
+                const { page: metadata } = await ctx.db.chatFileMetadata.findMany({ consistency: "primary", where: { fileId } });
 
                 await Promise.all(metadata.map((row) => ctx.db.delete("chatFileMetadata", row._id)));
                 await ctx.db.delete("chatFiles", fileId);
