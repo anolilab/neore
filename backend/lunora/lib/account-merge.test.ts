@@ -24,7 +24,11 @@ import {
     MERGE_LEASE_CALLS,
     MERGE_LEASE_SCOPE,
     MERGE_PAGE_SIZE,
+    MERGE_PROGRESS_SCOPE,
+    MERGE_STALL_MS,
     noteMergeGeneration,
+    recordGuestMerge,
+    resumeStalledGuestMerges,
 } from "./account-merge";
 import {
     GLOBAL_USER_COLUMNS,
@@ -105,10 +109,10 @@ const mergeToEnd = async (
     call: ShardCall,
     from: string,
     to: string,
-    options: { budget?: number; maxRuns?: number } = {},
+    { resume: start, ...options }: { budget?: number; maxRuns?: number; resume?: MergeProgress } = {},
 ): Promise<{ moved: number; runs: MergeProgress[] }> => {
     const runs: MergeProgress[] = [];
-    let resume: MergeProgress | undefined;
+    let resume: MergeProgress | undefined = start;
 
     for (;;) {
         const { busyUntil, moved, next } = await mergeGuestInto(call, REFERENCES, from, to, { ...options, ...(resume !== undefined && { resume }) });
@@ -666,6 +670,41 @@ describe("mergeGuestInto", () => {
             { guestPinsLeft: 0, threadId: "shared-2" },
         ]);
         expect(deletedGuests).toStrictEqual([{ left: 0, shardKey: "guest", userId: "guest" }]);
+    });
+
+    it("resumes the second pin pass at its route's thread, so a route deleted before it between runs skips nothing", async () => {
+        const { call, pinRows, routes } = fakeShards({});
+
+        routes.push(
+            { ownerId: "owner-a", threadId: "shared-1", userId: "user" },
+            { ownerId: "owner-a", threadId: "shared-2", userId: "user" },
+            { ownerId: "owner-a", threadId: "shared-3", userId: "user" },
+        );
+        // A guest pin an owner's parallel merge moved behind the account's third route: only the second pass reaches it.
+        pinRows.push({ ownerId: "owner-a", threadId: "shared-3", userId: "guest" });
+
+        // A run stopped at the third route; the first one goes before the next run reads the page again.
+        const resume: MergeProgress = { cursor: null, moved: 0, phase: "repins", route: 2, routeThread: "shared-3", run: 1, table: "" };
+
+        routes.shift();
+
+        await mergeToEnd(call, "guest", "user", { resume });
+
+        expect(pinRows).toStrictEqual([{ ownerId: "owner-a", threadId: "shared-3", userId: "user" }]);
+    });
+
+    it("saves the thread of the route the second pin pass stopped at with its progress", async () => {
+        const { call, pinRows, routes } = fakeShards({});
+
+        routes.push({ ownerId: "owner-a", threadId: "shared-1", userId: "user" }, { ownerId: "owner-a", threadId: "shared-2", userId: "user" });
+        // Two pins: the fake moves one a call, so the second route takes two steps.
+        pinRows.push({ ownerId: "owner-a", threadId: "shared-2", userId: "guest" }, { ownerId: "owner-a", threadId: "shared-2", userId: "guest" });
+
+        const resume: MergeProgress = { cursor: null, moved: 0, phase: "repins", run: 1, table: "" };
+        // The lease calls and two of the pass's steps (two calls each): it stops inside the second route.
+        const { next } = await mergeGuestInto(call, REFERENCES, "guest", "user", { budget: MERGE_LEASE_CALLS + 4, resume });
+
+        expect(next).toMatchObject({ phase: "repins", route: 1, routeThread: "shared-2" });
     });
 
     it("is safe to run twice", async () => {
@@ -1591,6 +1630,212 @@ describe("mergeGuestInto across two real shards", () => {
         } finally {
             merge.close();
         }
+    });
+
+    describe("the stalled-merge sweep", () => {
+        type Saved = { progress: MergeProgress | null; savedAt: number };
+
+        /** The merge's progress record on the new account's shard, or `null`. */
+        const progressOf = async (merge: ReturnType<typeof twoShards>): Promise<Saved | null> => {
+            const row = (await merge.shards.user.run(
+                async (context: any) =>
+                    await context.db
+                        .query("idempotencyClaims")
+                        .withIndex("by_scope_key", (q: any) => q.eq("scope", MERGE_PROGRESS_SCOPE).eq("key", "guest"))
+                        .first(),
+            )) as { result: string; userId: string } | null;
+
+            if (row === null) {
+                return null;
+            }
+
+            expect(row.userId).toBe("user");
+
+            return JSON.parse(row.result) as Saved;
+        };
+
+        /** The record last moved past the stall threshold, as it would with no job carrying the merge on. */
+        const age = async (merge: ReturnType<typeof twoShards>) => {
+            await merge.shards.user.run(async (context: any) => {
+                const row = await context.db
+                    .query("idempotencyClaims")
+                    .withIndex("by_scope_key", (q: any) => q.eq("scope", MERGE_PROGRESS_SCOPE).eq("key", "guest"))
+                    .first();
+                const saved = JSON.parse(row.result) as Saved;
+
+                await context.db.patch("idempotencyClaims", row._id, { result: JSON.stringify({ ...saved, savedAt: Date.now() - MERGE_STALL_MS - 1 }) });
+            });
+        };
+
+        const sweep = async (merge: ReturnType<typeof twoShards>) => {
+            transport.queued = [];
+
+            return (await merge.shards.user.run(async (context: any) => await context.runMutation(resumeStalledGuestMerges, {}))) as {
+                dropped: number;
+                resumed: number;
+            };
+        };
+
+        it("restarts a merge whose job died mid-copy from its saved progress, and it finishes with no row lost", async () => {
+            const merge = twoShards();
+
+            try {
+                const ids = (await merge.shards.guest.run(async (context: any) =>
+                    Promise.all(["a", "b", "c"].map(async (title) => await context.db.insert("threads", thread(title)))),
+                )) as string[];
+
+                merge.onceFail((name, args) => name === "importShardRows" && args.table === "threads");
+
+                // The chain of runs, until one dies mid-copy on its last redelivery and nothing queues the merge again.
+                let resume: MergeProgress | undefined;
+                let died: unknown;
+
+                while (died === undefined) {
+                    try {
+                        const { next } = await mergeGuestInto(merge.call, REFERENCES, "guest", "user", resume === undefined ? {} : { resume });
+
+                        resume = next!;
+                    } catch (error) {
+                        died = error;
+                    }
+                }
+
+                expect(String(died)).toContain("cut off");
+
+                const saved = await progressOf(merge);
+
+                expect(saved?.progress).toMatchObject({ phase: "copy", table: "threads" });
+                // Not yet stalled: the sweep leaves a merge alone while its progress is fresh.
+                expect(await sweep(merge)).toStrictEqual({ dropped: 0, resumed: 0 });
+
+                await age(merge);
+
+                expect(await sweep(merge)).toStrictEqual({ dropped: 0, resumed: 1 });
+                expect(transport.queued).toStrictEqual([
+                    {
+                        args: { from: "guest", resume: saved?.progress, to: "user" },
+                        options: { shardKey: "user" },
+                        ref: expect.objectContaining({ __lunoraRef: expect.stringContaining("runGuestMerge") }),
+                    },
+                ]);
+                // The record's time moved, so the next pass waits for the queued job instead of queueing a second.
+                expect(await sweep(merge)).toStrictEqual({ dropped: 0, resumed: 0 });
+
+                expect(transport.queued).toStrictEqual([]);
+
+                await mergeToEnd(merge.call, "guest", "user", { resume: saved!.progress! });
+
+                const moved = await merge.threadsOn("user");
+
+                expect(moved.map((row) => row._id)).toStrictEqual(ids.toSorted((a, b) => a.localeCompare(b)));
+                expect(await merge.threadsOn("guest")).toStrictEqual([]);
+                expect(await progressOf(merge)).toBeNull();
+            } finally {
+                merge.close();
+            }
+        });
+
+        it("restarts a merge whose first job never took the lease, from the start", async () => {
+            const merge = twoShards();
+
+            try {
+                await merge.shards.user.run(async (context: any) => await context.runMutation(recordGuestMerge, { from: "guest", to: "user" }));
+                await age(merge);
+
+                expect(await sweep(merge)).toStrictEqual({ dropped: 0, resumed: 1 });
+                expect(transport.queued.map((job) => job.args)).toStrictEqual([{ from: "guest", to: "user" }]);
+            } finally {
+                merge.close();
+            }
+        });
+
+        it("never restarts a completed merge, and drops a record one left behind", async () => {
+            const merge = twoShards();
+
+            try {
+                await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("a")));
+                await mergeToEnd(merge.call, "guest", "user");
+
+                expect(await progressOf(merge)).toBeNull();
+
+                // A late hand-over or a stale delivery writes no record once the fence is here.
+                await merge.shards.user.run(async (context: any) => await context.runMutation(recordGuestMerge, { from: "guest", to: "user" }));
+
+                expect(await progressOf(merge)).toBeNull();
+
+                // One left from before the fence (a release that failed) is dropped, never queued.
+                await merge.shards.user.run(
+                    async (context: any) =>
+                        await context.db.insert("idempotencyClaims", {
+                            claimedAt: 1,
+                            expiresAt: Date.now() + 60_000,
+                            key: "guest",
+                            result: JSON.stringify({ progress: null, savedAt: 1 }),
+                            scope: MERGE_PROGRESS_SCOPE,
+                            userId: "user",
+                        }),
+                );
+
+                expect(await sweep(merge)).toStrictEqual({ dropped: 1, resumed: 0 });
+                expect(transport.queued).toStrictEqual([]);
+                expect(await progressOf(merge)).toBeNull();
+            } finally {
+                merge.close();
+            }
+        });
+
+        it("leaves a merge alone while a run holds its lease, so it is never run twice", async () => {
+            const merge = twoShards();
+
+            try {
+                await merge.shards.user.run(async (context: any) => await context.runMutation(acquireMergeLease, { from: "guest", to: "user" }));
+                await age(merge);
+
+                expect(await sweep(merge)).toStrictEqual({ dropped: 0, resumed: 0 });
+                expect(transport.queued).toStrictEqual([]);
+
+                // Once that run's lease lapses with no word from it, the merge is restarted.
+                await merge.lapseLease();
+
+                expect(await sweep(merge)).toStrictEqual({ dropped: 0, resumed: 1 });
+            } finally {
+                merge.close();
+            }
+        });
+
+        it("restarts no merge while either account is being erased, and drops its record", async () => {
+            for (const erased of ["guest", "user"]) {
+                const merge = twoShards();
+
+                try {
+                    await merge.shards.user.run(async (context: any) => await context.runMutation(recordGuestMerge, { from: "guest", to: "user" }));
+                    await merge.shards.user.run(
+                        async (context: any) => await context.db.insert("accountMoves", { createdAt: 1, kind: "erasing", userId: erased }),
+                    );
+                    await age(merge);
+
+                    expect(await sweep(merge)).toStrictEqual({ dropped: 1, resumed: 0 });
+                    expect(transport.queued).toStrictEqual([]);
+                    expect(await progressOf(merge)).toBeNull();
+                } finally {
+                    merge.close();
+                }
+            }
+        });
+
+        it("drops the record of a merge an erasure stopped at its run's start", async () => {
+            const merge = twoShards();
+
+            try {
+                await merge.shards.user.run(async (context: any) => await context.runMutation(recordGuestMerge, { from: "guest", to: "user" }));
+                await merge.shards.user.run(async (context: any) => await context.db.insert("accountMoves", { createdAt: 1, kind: "erasing", userId: "user" }));
+
+                expect(await mergeGuestInto(merge.call, REFERENCES, "guest", "user")).toStrictEqual({ moved: 0, next: null, stopped: true });
+                expect(await progressOf(merge)).toBeNull();
+            } finally {
+                merge.close();
+            }
+        });
     });
 });
 

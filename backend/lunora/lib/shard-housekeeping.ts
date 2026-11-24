@@ -104,6 +104,8 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "backfillUnindexedFileLinks", ref: internal.agent.file_link_backfill.backfillUnindexedFileLinks },
     // A bot whose delete failed after its tombstone was written is labelled live again (`bots/owner.ts`).
     { name: "restoreLiveBotOwners", ref: internal.bots.owner.restoreLiveBotOwners },
+    // A guest merge whose queued job ran out of redeliveries is queued again from its saved progress (`lib/account-merge.ts`).
+    { name: "resumeStalledGuestMerges", ref: internal.lib.account_merge.resumeStalledGuestMerges },
 ];
 
 type CensusCtx = Pick<MutationCtx, "db">;

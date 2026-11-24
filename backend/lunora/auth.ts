@@ -682,7 +682,16 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
             // table and page, too long to hold the sign-up request. The job runs
             // on the NEW user's shard (`lib/account-merge.ts#runGuestMerge`). A
             // failure is the caller's to handle: each one keeps the request alive.
+            // The merge's record goes first, so the housekeeping sweep restarts a
+            // merge whose job never ran (`resumeStalledGuestMerges`); its first
+            // lease writes it too, so a failed write here costs only that backstop.
             onGuestConverted: async (guestId, userId) => {
+                try {
+                    await shard.call(internal.lib.account_merge.recordGuestMerge, { from: guestId, to: userId }, { shardKey: userId });
+                } catch (error) {
+                    authLogger.warn(`[auth] recording the merge of guest ${guestId} failed:`, error);
+                }
+
                 await enqueueJob(internal.lib.account_merge.runGuestMerge, { from: guestId, to: userId }, { shardKey: userId });
             },
         }),

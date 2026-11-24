@@ -63,6 +63,13 @@
   (`file.sweepStagedChatUploads`) is the backstop and also drops upload state
   untouched for an hour. There is no signed `PUT` path any more.
 
+- **Guest merges recover from the housekeeping sweep.** `lib/account-merge.ts` keeps each merge's
+  latest progress in `idempotencyClaims` (scope `guest-merge-progress`, on the new account's shard,
+  tagged with it so its erasure drops it). `resumeStalledGuestMerges` (`shardSweeps()`) queues a merge
+  again when its lease is free and its progress older than `MERGE_STALL_MS`; it drops a finished,
+  erased or over-cap one. Restarts rely on the lease generation, never on the queue: keep every step
+  safe to run twice, and save progress through `releaseMergeLease`, never from the job payload.
+
 - **Secret detection** — `lib/secret-redaction.ts` (`redactSecrets`, `containsSecret`)
   is the one detector for provider keys, JWTs, `Bearer` values, private key blocks,
   `password:`-style values and long random strings. Reuse it for any text the backend
