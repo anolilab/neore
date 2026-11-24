@@ -88,7 +88,7 @@ export const RateLimitPauseNoticeView: FC<RateLimitPauseNoticeViewProps> = ({ ca
     let spoken: string;
     let shown: string;
 
-    if (awaitsPerson) {
+    if (awaitsPerson && canControl) {
         if (pause.resetUnreported === true) {
             spoken = t`Rate limited. Waiting for you to resume`;
             shown = spoken;
@@ -97,6 +97,18 @@ export const RateLimitPauseNoticeView: FC<RateLimitPauseNoticeViewProps> = ({ ca
             shown = t`Rate limited, the limit resets in ${countdown}. Waiting for you to resume`;
         } else {
             spoken = t`The limit has reset. Waiting for you to resume`;
+            shown = spoken;
+        }
+    } else if (awaitsPerson) {
+        // A viewer who cannot resume the run is told the limit's state only, not that the run waits for them.
+        if (pause.resetUnreported === true) {
+            spoken = t`Rate limited`;
+            shown = spoken;
+        } else if (isWaiting) {
+            spoken = t`Rate limited. The limit resets in about ${announced}`;
+            shown = t`Rate limited, the limit resets in ${countdown}`;
+        } else {
+            spoken = t`The limit has reset`;
             shown = spoken;
         }
     } else if (isOverdue) {

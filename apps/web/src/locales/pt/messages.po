@@ -9291,7 +9291,7 @@ msgstr "Não foi possível restaurar esta versão"
 msgid "Could not resume its own session, so the conversation was handed over"
 msgstr "Não foi possível retomar a própria sessão, então a conversa foi transferida"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:165
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:177
 msgid "Could not retry. Please try again."
 msgstr "Não foi possível tentar novamente. Tente de novo."
 
@@ -9404,7 +9404,7 @@ msgstr "Não foi possível interromper a conversa"
 #: src/features/chat/thread-list/thread-node.tsx:655
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:150
 #: src/features/chat/thread-list/thread-node.tsx:644
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:170
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:182
 msgid "Could not stop the reply. Please try again."
 msgstr "Não foi possível interromper a resposta. Tente novamente."
 
@@ -27805,29 +27805,38 @@ msgstr "Limite de uso excedido. Tente novamente mais tarde."
 msgid "Rate limit reached. You can improve {minutes, plural, one {# more prompt} other {# more prompts}} in {minutes, plural, one {# minute} other {# minutes}}."
 msgstr "Limite de taxa atingido. Você poderá aprimorar {minutes, plural, one {mais # prompt} other {mais # prompts}} em {minutes, plural, one {# minuto} other {# minutos}}."
 
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:105
 #: src/features/develop/components/failure-notice.tsx:21
 msgid "Rate limited"
 msgstr "Limite de taxa atingido"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:110
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:122
 msgid "Rate limited by {provider}, retrying in {countdown}"
 msgstr "Limite de taxa atingido em {provider}, tentando novamente em {countdown}"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:109
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:121
 msgid "Rate limited by {provider}. Retrying in about {announced}"
 msgstr "Limite de taxa atingido em {provider}. Tentando novamente em cerca de {announced}"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:113
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:125
 msgid "Rate limited, retrying in {countdown}"
 msgstr "Limite de taxa atingido, tentando novamente em {countdown}"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:109
+msgid "Rate limited, the limit resets in {countdown}"
+msgstr "Limite de taxa atingido, o limite é redefinido em {countdown}"
 
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:97
 msgid "Rate limited, the limit resets in {countdown}. Waiting for you to resume"
 msgstr "Limite de taxa atingido, o limite é redefinido em {countdown}. Aguardando você retomar"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:112
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:124
 msgid "Rate limited. Retrying in about {announced}"
 msgstr "Limite de taxa atingido. Tentando novamente em cerca de {announced}"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:108
+msgid "Rate limited. The limit resets in about {announced}"
+msgstr "Limite de taxa atingido. O limite é redefinido em cerca de {announced}"
 
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:96
 msgid "Rate limited. The limit resets in about {announced}. Waiting for you to resume"
@@ -29294,7 +29303,7 @@ msgstr "Resultado"
 msgid "Result not delivered"
 msgstr "Resultado não entregue"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:128
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:140
 #: src/features/onboarding/components/setup-checklist.tsx:202
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:233
 msgid "Resume"
@@ -29388,7 +29397,7 @@ msgstr "Tentar exportar novamente"
 msgid "Retry in {retryAfterMinutes}m"
 msgstr "Tente novamente em {retryAfterMinutes} min"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:128
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:140
 msgid "Retry now"
 msgstr "Tentar agora"
 
@@ -29408,7 +29417,7 @@ msgstr "Tentar o envio de {attachmentName} novamente"
 msgid "Retry with note"
 msgstr "Tentar novamente com observação"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:106
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:118
 msgid "Retrying now"
 msgstr "Tentando agora"
 
@@ -33061,7 +33070,7 @@ msgstr "Ações"
 #: src/features/chat/goal/goal-notes.tsx:85
 #: src/features/chat/group/group-participant-bar.tsx:234
 #: src/features/chat/host/host-composer.tsx:1240
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:132
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:144
 #: src/features/develop/components/watched-repositories.tsx:86
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:367
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:380
@@ -35277,6 +35286,10 @@ msgstr "da última vez"
 msgid "The last turn stopped before it finished."
 msgstr "O último turno parou antes de terminar."
 
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:111
+msgid "The limit has reset"
+msgstr "O limite foi redefinido"
+
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:99
 msgid "The limit has reset. Waiting for you to resume"
 msgstr "O limite foi redefinido. Aguardando você retomar"
@@ -35582,7 +35595,7 @@ msgstr "A solicitação foi recusada antes de chegar a {hostLabel}. Nada foi alt
 msgid "The resource endpoint from Keys and Endpoint — *.openai.azure.com or *.cognitiveservices.azure.com."
 msgstr "O ponto de extremidade do recurso, em Chaves e ponto de extremidade — *.openai.azure.com ou *.cognitiveservices.azure.com."
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:103
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:115
 msgid "The retry is taking longer than expected"
 msgstr "A nova tentativa está demorando mais que o esperado"
 

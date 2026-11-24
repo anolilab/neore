@@ -76,6 +76,7 @@ const { OVERDUE_MS, RateLimitPauseNotice, RateLimitPauseNoticeView } = await imp
 
 const START = Date.parse("2026-10-31T12:00:00.000Z");
 const LIMIT_RESETS = /limit resets/;
+const WAITING_FOR_YOU = /Waiting for you/;
 
 const mount = (
     overrides: { awaitsPerson?: boolean; canControl?: boolean; isRetrying?: boolean; provider?: string; resetUnreported?: boolean; retryInMs?: number } = {},
@@ -245,11 +246,22 @@ describe("rate limit pause notice", () => {
             expect((screen.getByRole("button", { name: "Resume" }) as HTMLButtonElement).disabled).toBe(false);
         });
 
-        it("gives a read-only viewer the waiting text and no buttons", () => {
+        it("tells a read-only viewer the limit's state, not that the run waits for them, and gives no buttons", () => {
             mount({ awaitsPerson: true, canControl: false });
 
-            expect(screen.getByText("Rate limited, the limit resets in 0:42. Waiting for you to resume")).toBeTruthy();
+            expect(screen.getByText("Rate limited, the limit resets in 0:42")).toBeTruthy();
+            expect(screen.getByRole("status").textContent).toBe("Rate limited. The limit resets in about 1:00");
+            expect(screen.queryByText(WAITING_FOR_YOU)).toBeNull();
             expect(screen.queryByRole("button")).toBeNull();
+        });
+
+        it("tells a read-only viewer once the limit has reset, without asking anyone to resume", () => {
+            mount({ awaitsPerson: true, canControl: false, retryInMs: 3000 });
+
+            tick(3000);
+
+            expect(screen.getByRole("status").textContent).toBe("The limit has reset");
+            expect(screen.queryByText(WAITING_FOR_YOU)).toBeNull();
         });
     });
 

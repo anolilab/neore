@@ -9290,7 +9290,7 @@ msgstr "Could not restore this version"
 msgid "Could not resume its own session, so the conversation was handed over"
 msgstr "Could not resume its own session, so the conversation was handed over"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:165
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:177
 msgid "Could not retry. Please try again."
 msgstr "Could not retry. Please try again."
 
@@ -9403,7 +9403,7 @@ msgstr "Could not stop the conversation"
 #: src/features/chat/thread-list/thread-node.tsx:655
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:150
 #: src/features/chat/thread-list/thread-node.tsx:644
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:170
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:182
 msgid "Could not stop the reply. Please try again."
 msgstr "Could not stop the reply. Please try again."
 
@@ -27804,29 +27804,38 @@ msgstr "Rate limit exceeded. Please try again later."
 msgid "Rate limit reached. You can improve {minutes, plural, one {# more prompt} other {# more prompts}} in {minutes, plural, one {# minute} other {# minutes}}."
 msgstr "Rate limit reached. You can improve {minutes, plural, one {# more prompt} other {# more prompts}} in {minutes, plural, one {# minute} other {# minutes}}."
 
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:105
 #: src/features/develop/components/failure-notice.tsx:21
 msgid "Rate limited"
 msgstr "Rate limited"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:110
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:122
 msgid "Rate limited by {provider}, retrying in {countdown}"
 msgstr "Rate limited by {provider}, retrying in {countdown}"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:109
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:121
 msgid "Rate limited by {provider}. Retrying in about {announced}"
 msgstr "Rate limited by {provider}. Retrying in about {announced}"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:113
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:125
 msgid "Rate limited, retrying in {countdown}"
 msgstr "Rate limited, retrying in {countdown}"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:109
+msgid "Rate limited, the limit resets in {countdown}"
+msgstr "Rate limited, the limit resets in {countdown}"
 
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:97
 msgid "Rate limited, the limit resets in {countdown}. Waiting for you to resume"
 msgstr "Rate limited, the limit resets in {countdown}. Waiting for you to resume"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:112
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:124
 msgid "Rate limited. Retrying in about {announced}"
 msgstr "Rate limited. Retrying in about {announced}"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:108
+msgid "Rate limited. The limit resets in about {announced}"
+msgstr "Rate limited. The limit resets in about {announced}"
 
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:96
 msgid "Rate limited. The limit resets in about {announced}. Waiting for you to resume"
@@ -29293,7 +29302,7 @@ msgstr "Result"
 msgid "Result not delivered"
 msgstr "Result not delivered"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:128
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:140
 #: src/features/onboarding/components/setup-checklist.tsx:202
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:233
 msgid "Resume"
@@ -29387,7 +29396,7 @@ msgstr "Retry Export"
 msgid "Retry in {retryAfterMinutes}m"
 msgstr "Retry in {retryAfterMinutes}m"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:128
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:140
 msgid "Retry now"
 msgstr "Retry now"
 
@@ -29407,7 +29416,7 @@ msgstr "Retry upload of {attachmentName}"
 msgid "Retry with note"
 msgstr "Retry with note"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:106
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:118
 msgid "Retrying now"
 msgstr "Retrying now"
 
@@ -33060,7 +33069,7 @@ msgstr "Stocks"
 #: src/features/chat/goal/goal-notes.tsx:85
 #: src/features/chat/group/group-participant-bar.tsx:234
 #: src/features/chat/host/host-composer.tsx:1240
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:132
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:144
 #: src/features/develop/components/watched-repositories.tsx:86
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:367
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:380
@@ -35276,6 +35285,10 @@ msgstr "the last time"
 msgid "The last turn stopped before it finished."
 msgstr "The last turn stopped before it finished."
 
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:111
+msgid "The limit has reset"
+msgstr "The limit has reset"
+
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:99
 msgid "The limit has reset. Waiting for you to resume"
 msgstr "The limit has reset. Waiting for you to resume"
@@ -35581,7 +35594,7 @@ msgstr "The request was refused before it reached {hostLabel}. Nothing was chang
 msgid "The resource endpoint from Keys and Endpoint — *.openai.azure.com or *.cognitiveservices.azure.com."
 msgstr "The resource endpoint from Keys and Endpoint — *.openai.azure.com or *.cognitiveservices.azure.com."
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:103
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:115
 msgid "The retry is taking longer than expected"
 msgstr "The retry is taking longer than expected"
 

@@ -9291,7 +9291,7 @@ msgstr "このバージョンを復元できませんでした"
 msgid "Could not resume its own session, so the conversation was handed over"
 msgstr "自身のセッションを再開できなかったため、会話を引き継ぎました"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:165
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:177
 msgid "Could not retry. Please try again."
 msgstr "再試行できませんでした。もう一度お試しください。"
 
@@ -9404,7 +9404,7 @@ msgstr "会話を停止できませんでした"
 #: src/features/chat/thread-list/thread-node.tsx:655
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:150
 #: src/features/chat/thread-list/thread-node.tsx:644
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:170
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:182
 msgid "Could not stop the reply. Please try again."
 msgstr "返信を停止できませんでした。もう一度お試しください。"
 
@@ -27805,29 +27805,38 @@ msgstr "レート制限を超えました。しばらくしてからもう一度
 msgid "Rate limit reached. You can improve {minutes, plural, one {# more prompt} other {# more prompts}} in {minutes, plural, one {# minute} other {# minutes}}."
 msgstr "レート制限に達しました。{minutes, plural, other {# 分}}後に、あと {minutes, plural, other {# 件}}のプロンプトを改善できます。"
 
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:105
 #: src/features/develop/components/failure-notice.tsx:21
 msgid "Rate limited"
 msgstr "レート制限中"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:110
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:122
 msgid "Rate limited by {provider}, retrying in {countdown}"
 msgstr "{provider} のレート制限中、{countdown} 後に再試行します"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:109
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:121
 msgid "Rate limited by {provider}. Retrying in about {announced}"
 msgstr "{provider} のレート制限中です。約 {announced} 後に再試行します"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:113
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:125
 msgid "Rate limited, retrying in {countdown}"
 msgstr "レート制限中、{countdown} 後に再試行します"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:109
+msgid "Rate limited, the limit resets in {countdown}"
+msgstr "レート制限中、上限は {countdown} でリセットされます"
 
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:97
 msgid "Rate limited, the limit resets in {countdown}. Waiting for you to resume"
 msgstr "レート制限中、上限は {countdown} でリセットされます。再開はあなたの操作を待っています"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:112
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:124
 msgid "Rate limited. Retrying in about {announced}"
 msgstr "レート制限中です。約 {announced} 後に再試行します"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:108
+msgid "Rate limited. The limit resets in about {announced}"
+msgstr "レート制限中。上限は約 {announced} でリセットされます"
 
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:96
 msgid "Rate limited. The limit resets in about {announced}. Waiting for you to resume"
@@ -29294,7 +29303,7 @@ msgstr "結果"
 msgid "Result not delivered"
 msgstr "結果は配信されませんでした"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:128
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:140
 #: src/features/onboarding/components/setup-checklist.tsx:202
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:233
 msgid "Resume"
@@ -29388,7 +29397,7 @@ msgstr "エクスポートを再試行"
 msgid "Retry in {retryAfterMinutes}m"
 msgstr "{retryAfterMinutes} 分後に再試行"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:128
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:140
 msgid "Retry now"
 msgstr "今すぐ再試行"
 
@@ -29408,7 +29417,7 @@ msgstr "{attachmentName} のアップロードを再試行"
 msgid "Retry with note"
 msgstr "メモを付けて再試行"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:106
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:118
 msgid "Retrying now"
 msgstr "再試行中"
 
@@ -33061,7 +33070,7 @@ msgstr "株式"
 #: src/features/chat/goal/goal-notes.tsx:85
 #: src/features/chat/group/group-participant-bar.tsx:234
 #: src/features/chat/host/host-composer.tsx:1240
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:132
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:144
 #: src/features/develop/components/watched-repositories.tsx:86
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:367
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:380
@@ -35277,6 +35286,10 @@ msgstr "でサインインしました"
 msgid "The last turn stopped before it finished."
 msgstr "前回のターンは完了する前に停止しました。"
 
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:111
+msgid "The limit has reset"
+msgstr "上限がリセットされました"
+
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:99
 msgid "The limit has reset. Waiting for you to resume"
 msgstr "上限がリセットされました。再開はあなたの操作を待っています"
@@ -35582,7 +35595,7 @@ msgstr "リクエストは {hostLabel} に届く前に拒否されました。�
 msgid "The resource endpoint from Keys and Endpoint — *.openai.azure.com or *.cognitiveservices.azure.com."
 msgstr "「キーとエンドポイント」に表示されるリソースのエンドポイント（*.openai.azure.com または *.cognitiveservices.azure.com）。"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:103
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:115
 msgid "The retry is taking longer than expected"
 msgstr "再試行に予想より時間がかかっています"
 
