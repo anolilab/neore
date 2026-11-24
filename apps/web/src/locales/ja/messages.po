@@ -41230,3 +41230,7 @@ msgstr "レート制限中、上限は {countdown} でリセットされます�
 
 msgid "The limit has reset. Waiting for you to resume"
 msgstr "上限がリセットされました。再開はあなたの操作を待っています"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx
+msgid "A message you send here is sent when the reply ends."
+msgstr "ここで送ったメッセージは、返信が終わると送信されます。"

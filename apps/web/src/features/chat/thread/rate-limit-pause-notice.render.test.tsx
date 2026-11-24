@@ -208,8 +208,12 @@ describe("rate limit pause notice", () => {
         it("says the run waits for the person while the limit resets, and offers no resume yet", () => {
             mount({ awaitsPerson: true });
 
-            expect(screen.getByText("Rate limited, the limit resets in 0:42. Waiting for you to resume")).toBeTruthy();
-            expect(screen.getByRole("status").textContent).toBe("Rate limited. The limit resets in about 1:00. Waiting for you to resume");
+            expect(
+                screen.getByText("Rate limited, the limit resets in 0:42. Waiting for you to resume. A message you send here is sent when the reply ends."),
+            ).toBeTruthy();
+            expect(screen.getByRole("status").textContent).toBe(
+                "Rate limited. The limit resets in about 1:00. Waiting for you to resume. A message you send here is sent when the reply ends.",
+            );
             expect((screen.getByRole("button", { name: "Resume" }) as HTMLButtonElement).disabled).toBe(true);
             expect(screen.queryByRole("button", { name: "Retry now" })).toBeNull();
         });
@@ -219,8 +223,12 @@ describe("rate limit pause notice", () => {
 
             tick(3000);
 
-            expect(screen.getByText("The limit has reset. Waiting for you to resume", { selector: "p" })).toBeTruthy();
-            expect(screen.getByRole("status").textContent).toBe("The limit has reset. Waiting for you to resume");
+            expect(
+                screen.getByText("The limit has reset. Waiting for you to resume. A message you send here is sent when the reply ends.", { selector: "p" }),
+            ).toBeTruthy();
+            expect(screen.getByRole("status").textContent).toBe(
+                "The limit has reset. Waiting for you to resume. A message you send here is sent when the reply ends.",
+            );
 
             fireEvent.click(screen.getByRole("button", { name: "Resume" }));
             expect(onRetryNow).toHaveBeenCalledOnce();
@@ -229,7 +237,9 @@ describe("rate limit pause notice", () => {
         it("does not call a default wait a reset: the provider gave no time, so Resume is offered at once", () => {
             const { onRetryNow } = mount({ awaitsPerson: true, resetUnreported: true });
 
-            expect(screen.getByRole("status").textContent).toBe("Rate limited. Waiting for you to resume");
+            expect(screen.getByRole("status").textContent).toBe(
+                "Rate limited. Waiting for you to resume. A message you send here is sent when the reply ends.",
+            );
             expect(screen.queryByText(LIMIT_RESETS)).toBeNull();
             expect((screen.getByRole("button", { name: "Resume" }) as HTMLButtonElement).disabled).toBe(false);
 
@@ -242,7 +252,9 @@ describe("rate limit pause notice", () => {
 
             tick(3000 + OVERDUE_MS + 10_000);
 
-            expect(screen.getByRole("status").textContent).toBe("The limit has reset. Waiting for you to resume");
+            expect(screen.getByRole("status").textContent).toBe(
+                "The limit has reset. Waiting for you to resume. A message you send here is sent when the reply ends.",
+            );
             expect((screen.getByRole("button", { name: "Resume" }) as HTMLButtonElement).disabled).toBe(false);
         });
 

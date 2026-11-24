@@ -41230,3 +41230,7 @@ msgstr "Ratenbegrenzt, das Limit wird in {countdown} zurückgesetzt. Warten auf 
 
 msgid "The limit has reset. Waiting for you to resume"
 msgstr "Das Limit wurde zurückgesetzt. Warten auf dich, um fortzusetzen"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx
+msgid "A message you send here is sent when the reply ends."
+msgstr "Eine Nachricht, die du hier sendest, wird gesendet, wenn die Antwort endet."

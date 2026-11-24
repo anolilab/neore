@@ -84,6 +84,8 @@ export const RateLimitPauseNoticeView: FC<RateLimitPauseNoticeViewProps> = ({ ca
     const canResume = awaitsPerson ? pause.resetUnreported === true || !isWaiting : isWaiting || isOverdue;
     const countdown = formatCountdown(remainingMs);
     const announced = formatCountdown(announcedWaitMs(remainingMs));
+    // A message sent into a reply that waits for the person is queued, not steered: it goes out when the reply ends (after Resume or Stop).
+    const queuedNote = awaitsPerson && canControl ? t`A message you send here is sent when the reply ends.` : undefined;
 
     let spoken: string;
     let shown: string;
@@ -123,6 +125,11 @@ export const RateLimitPauseNoticeView: FC<RateLimitPauseNoticeViewProps> = ({ ca
     } else {
         spoken = t`Rate limited. Retrying in about ${announced}`;
         shown = t`Rate limited, retrying in ${countdown}`;
+    }
+
+    if (queuedNote !== undefined) {
+        spoken += `. ${queuedNote}`;
+        shown += `. ${queuedNote}`;
     }
 
     return (

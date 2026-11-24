@@ -41230,3 +41230,7 @@ msgstr "Limite di frequenza raggiunto, il limite si azzera tra {countdown}. In a
 
 msgid "The limit has reset. Waiting for you to resume"
 msgstr "Il limite si è azzerato. In attesa che tu riprenda"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx
+msgid "A message you send here is sent when the reply ends."
+msgstr "Un messaggio che invii qui viene inviato quando la risposta termina."
