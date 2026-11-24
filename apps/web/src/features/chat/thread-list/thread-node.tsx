@@ -284,7 +284,14 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     // On a page with no chat open there is no split view to add a pane to: the chat opens as the page's own, then.
     const handleOpenInSplitView = useCallback(() => {
         const open = async () => {
-            const result = await openThreadInSplitView(node.threadId);
+            let result: "focused" | "full" | "opened" | undefined;
+
+            try {
+                result = await openThreadInSplitView(node.threadId);
+            } catch {
+                // The saved layout could not be read: the chat opens in the main view below.
+                result = undefined;
+            }
 
             if (result === "full") {
                 showWarning(t`Split view is full. Close a chat first.`);
@@ -293,7 +300,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
             }
 
             // Read at the click, not subscribed to: only this handler needs to know whether a chat is open.
-            if (!CHAT_THREAD_PATH_RE.test(router.state.location.pathname)) {
+            if (result === undefined || !CHAT_THREAD_PATH_RE.test(router.state.location.pathname)) {
                 await router.navigate({ params: { threadId: node.threadId }, search: {}, to: "/chat/$threadId" });
             }
         };

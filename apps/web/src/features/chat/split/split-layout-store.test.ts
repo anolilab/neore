@@ -131,6 +131,14 @@ describe("survivingPaneAfterDelete", () => {
         await expect(survivingPaneAfterDelete(["A"], readable())).resolves.toBe("B");
     });
 
+    it("has no survivor when the saved layout cannot be read, so the delete still completes", async () => {
+        useUIStateStore.setState({ preferences: { ...useUIStateStore.getState().preferences, splitViewEnabled: true } });
+        vi.spyOn(useSplitLayoutStore.persist, "hasHydrated").mockReturnValue(false);
+        vi.spyOn(useSplitLayoutStore.persist, "rehydrate").mockResolvedValueOnce();
+
+        await expect(survivingPaneAfterDelete(["A"], readable())).resolves.toBeUndefined();
+    });
+
     it("passes over a pane whose chat was deleted elsewhere, and falls back to none", async () => {
         useUIStateStore.setState({ preferences: { ...useUIStateStore.getState().preferences, splitViewEnabled: true } });
         vi.spyOn(useSplitLayoutStore.persist, "hasHydrated").mockReturnValue(true);

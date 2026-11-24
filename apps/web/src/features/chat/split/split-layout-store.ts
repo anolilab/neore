@@ -153,7 +153,12 @@ export const survivingPaneAfterDelete = async (
         return undefined;
     }
 
-    await hydrateSplitLayout();
+    try {
+        await hydrateSplitLayout();
+    } catch {
+        // An unreadable layout has no pane to move to: the caller goes to the chat list instead.
+        return undefined;
+    }
 
     const deleted = new Set(deletedIds);
     const candidates = useSplitLayoutStore.getState().layout.panes.filter((id) => !deleted.has(id));
