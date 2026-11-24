@@ -37,8 +37,7 @@ export interface EditMessageEnv extends BranchActionEnv {
     setOptimisticMessages: Dispatch<SetStateAction<UIMessage[]>>;
 }
 
-/** The body of the provider's `reloadMessage`: regenerates the reply after `messageId` as a sibling. */
-export const runReloadMessage = async (env: ReloadMessageEnv, messageId: string) => {
+const reloadMessageOnce = async (env: ReloadMessageEnv, messageId: string) => {
     const {
         authHeader,
         defaultLanguage,
@@ -227,6 +226,24 @@ export const runReloadMessage = async (env: ReloadMessageEnv, messageId: string)
     }
 
     return true;
+};
+
+/** Replies whose Continue or Regenerate is running: a second click on the same reply is not a second turn. */
+const reloadsInFlight = new Set<string>();
+
+/** The body of the provider's `reloadMessage`: regenerates the reply after `messageId` as a sibling. */
+export const runReloadMessage = async (env: ReloadMessageEnv, messageId: string) => {
+    if (reloadsInFlight.has(messageId)) {
+        return undefined;
+    }
+
+    reloadsInFlight.add(messageId);
+
+    try {
+        return await reloadMessageOnce(env, messageId);
+    } finally {
+        reloadsInFlight.delete(messageId);
+    }
 };
 
 /** The body of the provider's `editMessage`: replaces the user message `messageId` and answers the new text as a sibling branch. */

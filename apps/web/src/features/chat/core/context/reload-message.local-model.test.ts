@@ -63,6 +63,30 @@ describe("runReloadMessage for a local reply", () => {
         expect(sendLocalTurn).not.toHaveBeenCalled();
     });
 
+    it("does not start a second turn for a reply whose retry is still running", async () => {
+        expect.assertions(2);
+
+        // The first turn never settles here, so the second click lands while it is still running. Its own reply id keeps the
+        // in-flight mark from leaking into the other tests.
+        const neverSettles = (): Promise<void> =>
+            new Promise<void>(() => {
+                // A turn that is still running.
+            });
+        const sendLocalTurn = vi.fn(neverSettles);
+        const localTarget = { baseUrl: "http://localhost:11434", modelId: "llama3", providerId: "ollama", providerName: "Ollama" };
+        const twoReplies = [...messages, { id: "a2", localReply: true, model: "llama3", role: "assistant", status: "failed" }];
+        const env = {
+            ...envFor({ localTarget, model: "custom:ollama/llama3", sendLocalTurn }),
+            messagesRef: { current: twoReplies },
+        } as unknown as ReloadMessageEnv;
+
+        void runReloadMessage(env, "a2");
+        const second = await runReloadMessage(env, "a2");
+
+        expect(second).toBeUndefined();
+        expect(sendLocalTurn).toHaveBeenCalledTimes(1);
+    });
+
     it("regenerates a local reply on the local model that wrote it", async () => {
         expect.assertions(2);
 

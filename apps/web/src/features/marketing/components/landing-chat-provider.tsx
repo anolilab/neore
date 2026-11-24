@@ -93,7 +93,7 @@ const LandingChatProvider = ({ children }: LandingChatProviderProps) => {
             error: null,
             jwtToken: "",
             lunora,
-            regenerate: noop,
+            regenerate: async () => undefined,
             reloadMessage: async () => undefined,
             // The landing page sends nothing: nothing started.
             sendMessage: async () => {

@@ -180,6 +180,13 @@ describe(createReplyGuard, () => {
         expect(feedContent(createReplyGuard(), "I will not talk in class.\n".repeat(LOCAL_LINE_REPEAT_LIMIT))).toBe("repeat-loop");
     });
 
+    it("stops an indented two-line loop at the block limit, not the single-line one", () => {
+        expect.assertions(1);
+
+        // The two lines differ only in indentation: they are a block of two lines, not one line repeated.
+        expect(feedContent(createReplyGuard(), "Keep going.\n    Keep going.\n".repeat(LOCAL_REPEAT_LIMIT))).toBe("repeat-loop");
+    });
+
     it("does not stop a short line repeated over many lines, since its motif is too short to count", () => {
         expect.assertions(1);
 

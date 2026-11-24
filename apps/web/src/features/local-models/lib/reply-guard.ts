@@ -50,7 +50,7 @@ const shortestMotif = (block: ReadonlyArray<string>): ReadonlyArray<string> => {
 
 /** How many copies end a loop: one line, with blank lines between its copies, needs the line limit; any other block the block limit. */
 const copiesNeeded = (motif: ReadonlyArray<string>): number =>
-    new Set(motif.map((line) => line.trim()).filter((line) => line !== "")).size === 1 ? LOCAL_LINE_REPEAT_LIMIT : LOCAL_REPEAT_LIMIT;
+    new Set(motif.filter((line) => line.trim() !== "")).size === 1 ? LOCAL_LINE_REPEAT_LIMIT : LOCAL_REPEAT_LIMIT;
 
 /** Whether the last `size` lines are one block repeated enough times in a row to be a loop. */
 const repeatsAtTail = (lines: ReadonlyArray<string>, size: number): boolean => {

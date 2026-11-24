@@ -119,7 +119,8 @@ export interface ChatActionsContextValue {
     error: AppError | null;
     jwtToken: string;
     lunora: ReturnType<typeof useLunora>;
-    regenerate: () => Promise<void>;
+    /** Resolves with the outcome of the reply it regenerated, as `reloadMessage` does, so the banner can say why nothing started. */
+    regenerate: () => Promise<boolean | "model-unavailable" | undefined>;
 
     /**
      * Resolves `false` when the reply's prompt is not among the loaded messages, so nothing was asked again.
