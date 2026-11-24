@@ -31,6 +31,8 @@ const { enqueued, modelState, registry } = vi.hoisted(() => {
             model: undefined as unknown,
             /** The tool context the run built its tools with, which it sets its turn on (`setRunTurn`). */
             toolCtx: undefined as { runTurn?: { systemContext?: ReadonlyArray<string> } } | undefined,
+            /** The person's usage-limit settings, as the prefs read answers them (absent = the defaults). */
+            usagePrefs: {} as { resumeAfterUsageLimit?: boolean; snoozeUntilUsageLimitReset?: boolean },
             withTools: false,
         },
         registry: new Map<string, unknown>(),
@@ -55,6 +57,16 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
 
 vi.mock("../lib/rate-limiter", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("../lib/rate-limiter")>()), rateLimitGuard: async () => undefined };
+});
+
+// The person's own shard answers their preferences. The harness is one database, so the read is faked; resumable runs stay off here.
+vi.mock("../lib/cross-shard", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/cross-shard")>()),
+        callOnShard: vi.fn(async () => {
+            return { memoryEnabled: false, resumeInterruptedRuns: false, threadSummariesEnabled: false, ...modelState.usagePrefs };
+        }),
+    };
 });
 
 vi.mock("../lib/job-queue", () => {
@@ -233,6 +245,7 @@ beforeEach(async () => {
     modelState.builtAgents = 0;
     modelState.withTools = false;
     modelState.groupConfig = null;
+    modelState.usagePrefs = {};
     vi.mocked(runGroupTurn).mockClear();
     modelState.model = scriptedModel([textStep("Hello there.")]);
 
@@ -283,6 +296,8 @@ const run = async (extra: { impersonated?: boolean; resume?: string; skill?: { r
 interface RunState {
     chunkText: string;
     pause: { from: string; id: string; provider?: string; reason: string; retryAt: number; status: number } | undefined;
+    /** Whether the person resumes the paused run (no resume is queued for it). */
+    pauseAwaitsPerson: true | undefined;
     pausedSteps: string[] | undefined;
     rows: { id: string; order: number; parent: string | undefined; role: string; status: string; stepOrder: number }[];
     steers: { id: string; status: string; text?: string }[] | undefined;
@@ -306,6 +321,7 @@ const readState = async (): Promise<RunState> =>
         return {
             chunkText: chunks.map((chunk: { text: string }) => chunk.text).join(""),
             pause: stream?.pause,
+            pauseAwaitsPerson: stream?.pauseAwaitsPerson,
             pausedSteps: stream?.pausedSteps,
             rows: rows.map((row: any) => {
                 return {
@@ -1259,5 +1275,139 @@ describe("how the model fails", () => {
 
         expect(wrapped.lastError).toBeDefined();
         expect(paused.pause).toMatchObject({ provider: "anthropic", status: 429 });
+    });
+});
+
+describe("the usage-limit settings of a rate-limited run", () => {
+    /** The thread's snooze, as the owner's active list reads it. */
+    const snoozedUntil = async (): Promise<number | undefined> =>
+        await harness.run(async (ctx: any) => {
+            const thread = await ctx.db.get("threads", ids.threadId as never);
+
+            return thread?.snoozedUntil;
+        });
+
+    it("resumes by itself and leaves the chat alone when both settings are absent", async () => {
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const { pause, pauseAwaitsPerson } = await readState();
+
+        expect(pause).toBeDefined();
+        expect(pauseAwaitsPerson).toBeUndefined();
+        expect(enqueued).toHaveLength(1);
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("with resuming after a limit off, queues no resume: the run waits, and the chat shows it waiting for the person", async () => {
+        modelState.usagePrefs = { resumeAfterUsageLimit: false };
+        modelState.model = planned([rateLimited(), textStep("Hello there.")]);
+
+        await run();
+
+        const { pause, pauseAwaitsPerson, streamStatus, threadStatus } = await readState();
+
+        // Still live and paused, with the same reset time the pause always has.
+        expect(["pending", "streaming"]).toContain(streamStatus);
+        expect(threadStatus).toBe("running");
+        expect(pauseAwaitsPerson).toBe(true);
+        expect(pause).toMatchObject({ reason: "rate_limit", status: 429 });
+        expect(enqueued).toHaveLength(0);
+
+        const { getActiveStreamForThread } = await import("./streaming");
+        const active = (await harness
+            .withIdentity({ userId: OWNER } as never)
+            .query(getActiveStreamForThread as never, { threadId: ids.threadId } as never)) as { pause: object };
+
+        expect(active.pause).toMatchObject({ awaitsPerson: true, reason: "rate_limit" });
+    });
+
+    it("with resuming after a limit off, Retry now resumes the run at once after its reset, though no resume was queued", async () => {
+        modelState.usagePrefs = { resumeAfterUsageLimit: false };
+        modelState.model = planned([rateLimited(), textStep("Hello there.")]);
+
+        await run();
+
+        // The reset has passed by five seconds: an automatic resume would still be given its overdue grace.
+        await harness.run(async (ctx: any) => {
+            const stream = await ctx.db.get("persistentStreams", ids.streamId as never);
+
+            await ctx.db.patch("persistentStreams", ids.streamId as never, { pause: { ...stream.pause, retryAt: Date.now() - 5000 } });
+        });
+
+        const resumed = await harness.run(async (ctx: any) => await ctx.runMutation(retryPausedRunsNow, { threadId: ids.threadId }));
+        const { pause } = await readState();
+
+        expect(resumed).toBe(true);
+        expect(enqueued).toHaveLength(1);
+        expect(enqueued[0]!.delayMs).toBe(0);
+
+        await run({ resume: pause!.id });
+
+        const state = await readState();
+
+        expect(state.streamStatus).toBe("done");
+        expect(state.rows.filter((row) => row.role === "assistant")).toHaveLength(1);
+    });
+
+    it("with snoozing on and the provider's reset time given, the chat is snoozed until that reset, and still resumes by itself", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const { pause } = await readState();
+
+        expect(await snoozedUntil()).toBe(pause!.retryAt);
+        expect(enqueued).toHaveLength(1);
+        expect(enqueued[0]!.delayMs).toBeGreaterThan(RETRY_IN_MS);
+    });
+
+    it("with snoozing on and no reset time from the provider, the chat is not snoozed, and the default wait still resumes it", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        // A 429 with no retry time: `rateLimited(undefined)` would take the parameter's default, so the error is built without one.
+        modelState.model = planned([
+            Object.assign(new Error("Gateway model proxy failed (502): rate limited"), {
+                rateLimit: { provider: "anthropic", status: 429 },
+                statusCode: 502,
+            }),
+        ]);
+
+        await run();
+
+        const { pause } = await readState();
+
+        expect(pause).toBeDefined();
+        expect(await snoozedUntil()).toBeUndefined();
+        // The default wait (30 s) and the resume slack, not the reset the other tests give.
+        expect(enqueued[0]!.delayMs).toBeGreaterThan(25_000);
+        expect(enqueued[0]!.delayMs).toBeLessThan(35_000);
+    });
+
+    it("with both settings on, the chat is snoozed to the reset and the run waits for the person", async () => {
+        modelState.usagePrefs = { resumeAfterUsageLimit: false, snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const { pause, pauseAwaitsPerson } = await readState();
+
+        expect(pauseAwaitsPerson).toBe(true);
+        expect(await snoozedUntil()).toBe(pause!.retryAt);
+        expect(enqueued).toHaveLength(0);
+    });
+
+    it("never shortens a snooze the owner chose for a later time", async () => {
+        const later = Date.now() + 2 * 60 * 60 * 1000;
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", ids.threadId as never, { snoozeChosenAt: Date.now() - 1000, snoozedUntil: later }));
+
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        expect(await snoozedUntil()).toBe(later);
     });
 });

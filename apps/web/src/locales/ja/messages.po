@@ -40898,3 +40898,69 @@ msgstr "チューリッヒ"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ ポイント"
+
+msgid "Archive"
+msgstr "アーカイブ"
+
+msgid "Archive this chat?"
+msgstr "このチャットをアーカイブしますか？"
+
+msgid "Archived chats stay searchable, and you can restore them from the archive."
+msgstr "アーカイブしたチャットも検索でき、アーカイブから元に戻せます。"
+
+msgid "Asks before a chat is archived. Off: archiving happens on the first click."
+msgstr "チャットをアーカイブする前に確認します。オフ: 最初のクリックでアーカイブします。"
+
+msgid "Asks before a chat is deleted. Off: deleting happens on the first click."
+msgstr "チャットを削除する前に確認します。オフ: 最初のクリックで削除します。"
+
+msgid "Asks before a pinned chat is unpinned. Off: unpinning happens on the first click."
+msgstr "ピン留めされたチャットのピン留めを解除する前に確認します。オフ: 最初のクリックでピン留めを解除します。"
+
+msgid "Confirm before archiving a chat"
+msgstr "チャットをアーカイブする前に確認"
+
+msgid "Confirm before deleting a chat"
+msgstr "チャットを削除する前に確認"
+
+msgid "Confirm before unpinning a chat"
+msgstr "チャットのピン留めを解除する前に確認"
+
+msgid "The chat will no longer be pinned. You can pin it again from the list."
+msgstr "チャットのピン留めが解除されます。リストからいつでも再度ピン留めできます。"
+
+msgid "Unpin this chat?"
+msgstr "このチャットのピン留めを解除しますか？"
+
+msgid "Resume after a usage limit"
+msgstr "使用上限後に再開"
+
+msgid "When a reply pauses because a usage limit was reached, it resumes by itself once the limit resets. Off: it waits until you resume it."
+msgstr "利用上限に達して返信が一時停止した場合、上限がリセットされると自動的に再開します。オフの場合は、あなたが再開するまで待機します。"
+
+msgid "Paused replies will resume when the limit resets"
+msgstr "一時停止中の返信は上限がリセットされると再開します"
+
+msgid "Paused replies will wait for you to resume them"
+msgstr "一時停止中の返信は、あなたが再開するまで待機します"
+
+msgid "Snooze chats until the limit resets"
+msgstr "上限がリセットされるまでチャットをスヌーズ"
+
+msgid "When a reply pauses because a usage limit was reached and the provider says when it resets, its chat leaves your active list until then."
+msgstr "利用上限に達して返信が一時停止し、プロバイダーがリセット時刻を示している場合、そのチャットはリセットまでアクティブな一覧から外れます。"
+
+msgid "Chats paused by a usage limit will be snoozed"
+msgstr "利用上限で一時停止した返信のあるチャットをスヌーズします"
+
+msgid "Chats paused by a usage limit will not be snoozed"
+msgstr "利用上限で一時停止した返信のあるチャットはスヌーズしません"
+
+msgid "Rate limited. The limit resets in about {announced}. Waiting for you to resume"
+msgstr "レート制限中。上限は約 {announced} でリセットされます。再開はあなたの操作を待っています"
+
+msgid "Rate limited, the limit resets in {countdown}. Waiting for you to resume"
+msgstr "レート制限中、上限は {countdown} でリセットされます。再開はあなたの操作を待っています"
+
+msgid "The limit has reset. Waiting for you to resume"
+msgstr "上限がリセットされました。再開はあなたの操作を待っています"

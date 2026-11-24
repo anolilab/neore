@@ -29,6 +29,69 @@ describe("pauseOnRateLimit", () => {
         expect(runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ from: "row-2", replyRowIds: ["row-1", "row-2"], stepsUsed: 2 }));
     });
 
+    it("reads the person's usage-limit settings for a rate limit, and passes them to the pause", async () => {
+        const usageLimit = vi.fn(async () => {
+            return { resumeAfterLimit: false, snoozeUntilReset: true };
+        });
+        const runMutation = vi.fn(async () => {
+            return { paused: true, retryAt: 1 };
+        });
+
+        await pauseOnRateLimit({ runMutation } as never, {
+            error: limited,
+            progress: () => {
+                return { from: "row-1", replyRowIds: ["row-1"], stepsUsed: 1 };
+            },
+            reply: {},
+            run,
+            settle: async () => undefined,
+            streamId: "s1",
+            usageLimit,
+        });
+
+        expect(usageLimit).toHaveBeenCalledTimes(1);
+        expect(runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ resumeAfterLimit: false, snoozeUntilReset: true }));
+    });
+
+    it("passes today's behaviour when the settings are not read", async () => {
+        const runMutation = vi.fn(async () => {
+            return { paused: true, retryAt: 1 };
+        });
+
+        await pauseOnRateLimit({ runMutation } as never, {
+            error: limited,
+            progress: () => {
+                return { from: "row-1", replyRowIds: ["row-1"], stepsUsed: 1 };
+            },
+            reply: {},
+            run,
+            settle: async () => undefined,
+            streamId: "s1",
+        });
+
+        expect(runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ resumeAfterLimit: true, snoozeUntilReset: false }));
+    });
+
+    it("does not read the settings for an error that is not a rate limit", async () => {
+        const usageLimit = vi.fn(async () => {
+            return { resumeAfterLimit: false, snoozeUntilReset: true };
+        });
+
+        await pauseOnRateLimit({ runMutation: vi.fn() } as never, {
+            error: new Error("boom"),
+            progress: () => {
+                return { from: "row-1", replyRowIds: [], stepsUsed: 0 };
+            },
+            reply: {},
+            run,
+            settle: async () => undefined,
+            streamId: "s1",
+            usageLimit,
+        });
+
+        expect(usageLimit).not.toHaveBeenCalled();
+    });
+
     it("asks for nothing when the error is not a rate limit", async () => {
         const runMutation = vi.fn();
         const progress = vi.fn();

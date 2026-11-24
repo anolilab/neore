@@ -68,7 +68,7 @@ const { OVERDUE_MS, RateLimitPauseNotice, RateLimitPauseNoticeView } = await imp
 
 const START = Date.parse("2026-10-31T12:00:00.000Z");
 
-const mount = (overrides: { canControl?: boolean; isRetrying?: boolean; provider?: string; retryInMs?: number } = {}) => {
+const mount = (overrides: { awaitsPerson?: boolean; canControl?: boolean; isRetrying?: boolean; provider?: string; retryInMs?: number } = {}) => {
     const onRetryNow = vi.fn();
     const onStop = vi.fn();
 
@@ -80,6 +80,7 @@ const mount = (overrides: { canControl?: boolean; isRetrying?: boolean; provider
             onRetryNow={onRetryNow}
             onStop={onStop}
             pause={{
+                ...(overrides.awaitsPerson !== undefined && { awaitsPerson: overrides.awaitsPerson }),
                 provider: "provider" in overrides ? overrides.provider : "anthropic",
                 reason: "rate_limit",
                 retryAt: START + (overrides.retryInMs ?? 42_000),
@@ -188,6 +189,45 @@ describe("rate limit pause notice", () => {
         mount({ isRetrying: true });
 
         expect((screen.getByRole("button", { name: "Retry now" }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    describe("when the person resumes the run after a limit", () => {
+        it("says the run waits for the person while the limit resets, and offers no resume yet", () => {
+            mount({ awaitsPerson: true });
+
+            expect(screen.getByText("Rate limited, the limit resets in 0:42. Waiting for you to resume")).toBeTruthy();
+            expect(screen.getByRole("status").textContent).toBe("Rate limited. The limit resets in about 1:00. Waiting for you to resume");
+            expect((screen.getByRole("button", { name: "Resume" }) as HTMLButtonElement).disabled).toBe(true);
+            expect(screen.queryByRole("button", { name: "Retry now" })).toBeNull();
+        });
+
+        it("says so once the limit has reset, and resumes from the button", () => {
+            const { onRetryNow } = mount({ awaitsPerson: true, retryInMs: 3000 });
+
+            tick(3000);
+
+            expect(screen.getByText("The limit has reset. Waiting for you to resume", { selector: "p" })).toBeTruthy();
+            expect(screen.getByRole("status").textContent).toBe("The limit has reset. Waiting for you to resume");
+
+            fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+            expect(onRetryNow).toHaveBeenCalledOnce();
+        });
+
+        it("does not call the wait overdue after the reset: nothing was queued to be late", () => {
+            mount({ awaitsPerson: true, retryInMs: 3000 });
+
+            tick(3000 + OVERDUE_MS + 10_000);
+
+            expect(screen.getByRole("status").textContent).toBe("The limit has reset. Waiting for you to resume");
+            expect((screen.getByRole("button", { name: "Resume" }) as HTMLButtonElement).disabled).toBe(false);
+        });
+
+        it("gives a read-only viewer the waiting text and no buttons", () => {
+            mount({ awaitsPerson: true, canControl: false });
+
+            expect(screen.getByText("Rate limited, the limit resets in 0:42. Waiting for you to resume")).toBeTruthy();
+            expect(screen.queryByRole("button")).toBeNull();
+        });
     });
 
     describe("wired to the thread", () => {

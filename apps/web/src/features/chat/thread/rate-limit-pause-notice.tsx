@@ -27,6 +27,8 @@ import { announcedWaitMs, formatCountdown, providerLabel } from "./rate-limit-pa
 
 /** The pause `getActiveStreamForThread` reports for a run waiting on a rate limit. */
 export interface RateLimitPause {
+    /** The person resumes the run: nothing resumes it at `retryAt`, so the notice waits for them after the reset. */
+    awaitsPerson?: boolean;
     provider?: string;
     reason: "rate_limit";
     /** Epoch ms the run resumes at. */
@@ -74,13 +76,24 @@ export const RateLimitPauseNoticeView: FC<RateLimitPauseNoticeViewProps> = ({ ca
     const isWaiting = remainingMs > 0;
     // The resume that was queued for the retry time did not run: asking again queues another.
     const isOverdue = remainingMs <= -OVERDUE_MS;
+    // The person resumes this run: nothing is queued for it, so after the reset it waits for them (and there is no overdue resume).
+    const awaitsPerson = pause.awaitsPerson === true;
+    const canResume = awaitsPerson ? !isWaiting : isWaiting || isOverdue;
     const countdown = formatCountdown(remainingMs);
     const announced = formatCountdown(announcedWaitMs(remainingMs));
 
     let spoken: string;
     let shown: string;
 
-    if (isOverdue) {
+    if (awaitsPerson) {
+        if (isWaiting) {
+            spoken = t`Rate limited. The limit resets in about ${announced}. Waiting for you to resume`;
+            shown = t`Rate limited, the limit resets in ${countdown}. Waiting for you to resume`;
+        } else {
+            spoken = t`The limit has reset. Waiting for you to resume`;
+            shown = spoken;
+        }
+    } else if (isOverdue) {
         spoken = t`The retry is taking longer than expected`;
         shown = spoken;
     } else if (!isWaiting) {
@@ -104,9 +117,9 @@ export const RateLimitPauseNoticeView: FC<RateLimitPauseNoticeViewProps> = ({ ca
             </p>
             {canControl && (
                 <div className="flex items-center gap-2">
-                    <Button className="h-6 gap-1.5 text-xs" disabled={!(isWaiting || isOverdue) || isRetrying} onClick={onRetryNow} size="sm" variant="outline">
+                    <Button className="h-6 gap-1.5 text-xs" disabled={!canResume || isRetrying} onClick={onRetryNow} size="sm" variant="outline">
                         <RefreshCw aria-hidden="true" className="size-3" />
-                        <Trans>Retry now</Trans>
+                        {awaitsPerson ? <Trans>Resume</Trans> : <Trans>Retry now</Trans>}
                     </Button>
                     <Button className="h-6 gap-1.5 text-xs" disabled={isStopping} onClick={onStop} size="sm" variant="ghost">
                         <Square aria-hidden="true" className="size-3" />

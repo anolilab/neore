@@ -40898,3 +40898,69 @@ msgstr "苏黎世"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ 分数"
+
+msgid "Archive"
+msgstr "归档"
+
+msgid "Archive this chat?"
+msgstr "归档此对话？"
+
+msgid "Archived chats stay searchable, and you can restore them from the archive."
+msgstr "已归档的对话仍可搜索，你可以从归档中恢复。"
+
+msgid "Asks before a chat is archived. Off: archiving happens on the first click."
+msgstr "归档对话前询问。关闭：第一次点击即归档。"
+
+msgid "Asks before a chat is deleted. Off: deleting happens on the first click."
+msgstr "删除对话前询问。关闭：第一次点击即删除。"
+
+msgid "Asks before a pinned chat is unpinned. Off: unpinning happens on the first click."
+msgstr "取消置顶对话前询问。关闭：第一次点击即取消置顶。"
+
+msgid "Confirm before archiving a chat"
+msgstr "归档对话前确认"
+
+msgid "Confirm before deleting a chat"
+msgstr "删除对话前确认"
+
+msgid "Confirm before unpinning a chat"
+msgstr "取消置顶对话前确认"
+
+msgid "The chat will no longer be pinned. You can pin it again from the list."
+msgstr "对话将不再置顶。你可以在列表中重新置顶。"
+
+msgid "Unpin this chat?"
+msgstr "取消置顶此对话？"
+
+msgid "Resume after a usage limit"
+msgstr "达到用量上限后继续"
+
+msgid "When a reply pauses because a usage limit was reached, it resumes by itself once the limit resets. Off: it waits until you resume it."
+msgstr "回复因达到用量上限而暂停时，上限重置后会自动继续。关闭时，需要你手动继续。"
+
+msgid "Paused replies will resume when the limit resets"
+msgstr "暂停的回复将在上限重置后继续"
+
+msgid "Paused replies will wait for you to resume them"
+msgstr "暂停的回复将等待你手动继续"
+
+msgid "Snooze chats until the limit resets"
+msgstr "在上限重置前暂时搁置对话"
+
+msgid "When a reply pauses because a usage limit was reached and the provider says when it resets, its chat leaves your active list until then."
+msgstr "回复因达到用量上限而暂停，且服务商给出了重置时间时，对话会在此之前从你的活动列表中暂时搁置。"
+
+msgid "Chats paused by a usage limit will be snoozed"
+msgstr "因用量上限而暂停回复的对话将被暂时搁置"
+
+msgid "Chats paused by a usage limit will not be snoozed"
+msgstr "因用量上限而暂停回复的对话不会被暂时搁置"
+
+msgid "Rate limited. The limit resets in about {announced}. Waiting for you to resume"
+msgstr "已被限流，上限约在 {announced} 后重置。等待你继续"
+
+msgid "Rate limited, the limit resets in {countdown}. Waiting for you to resume"
+msgstr "已被限流，上限将在 {countdown} 后重置。等待你继续"
+
+msgid "The limit has reset. Waiting for you to resume"
+msgstr "上限已重置。等待你继续"

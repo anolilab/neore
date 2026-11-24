@@ -40898,3 +40898,69 @@ msgstr "Zurych"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ punkty"
+
+msgid "Archive"
+msgstr "Archiwizuj"
+
+msgid "Archive this chat?"
+msgstr "Zarchiwizować ten czat?"
+
+msgid "Archived chats stay searchable, and you can restore them from the archive."
+msgstr "Zarchiwizowane czaty nadal można wyszukiwać, a przywrócisz je z archiwum."
+
+msgid "Asks before a chat is archived. Off: archiving happens on the first click."
+msgstr "Pyta przed zarchiwizowaniem czatu. Wyłączone: archiwizacja następuje od razu po kliknięciu."
+
+msgid "Asks before a chat is deleted. Off: deleting happens on the first click."
+msgstr "Pyta przed usunięciem czatu. Wyłączone: usunięcie następuje od razu po kliknięciu."
+
+msgid "Asks before a pinned chat is unpinned. Off: unpinning happens on the first click."
+msgstr "Pyta przed odpięciem przypiętego czatu. Wyłączone: odpięcie następuje od razu po kliknięciu."
+
+msgid "Confirm before archiving a chat"
+msgstr "Potwierdź przed zarchiwizowaniem czatu"
+
+msgid "Confirm before deleting a chat"
+msgstr "Potwierdź przed usunięciem czatu"
+
+msgid "Confirm before unpinning a chat"
+msgstr "Potwierdź przed odpięciem czatu"
+
+msgid "The chat will no longer be pinned. You can pin it again from the list."
+msgstr "Czat nie będzie już przypięty. Możesz go ponownie przypiąć z listy."
+
+msgid "Unpin this chat?"
+msgstr "Odpiąć ten czat?"
+
+msgid "Resume after a usage limit"
+msgstr "Wznów po limicie użycia"
+
+msgid "When a reply pauses because a usage limit was reached, it resumes by itself once the limit resets. Off: it waits until you resume it."
+msgstr "Gdy odpowiedź zostanie wstrzymana z powodu osiągnięcia limitu użycia, wznowi się sama po zresetowaniu limitu. Wyłączone: czeka, aż ją wznowisz."
+
+msgid "Paused replies will resume when the limit resets"
+msgstr "Wstrzymane odpowiedzi wznowią się po zresetowaniu limitu"
+
+msgid "Paused replies will wait for you to resume them"
+msgstr "Wstrzymane odpowiedzi będą czekać, aż je wznowisz"
+
+msgid "Snooze chats until the limit resets"
+msgstr "Odłóż czaty do zresetowania limitu"
+
+msgid "When a reply pauses because a usage limit was reached and the provider says when it resets, its chat leaves your active list until then."
+msgstr "Gdy odpowiedź zostanie wstrzymana z powodu osiągnięcia limitu użycia, a dostawca poda czas resetu, czat zniknie z aktywnej listy do tego czasu."
+
+msgid "Chats paused by a usage limit will be snoozed"
+msgstr "Czaty z odpowiedzią wstrzymaną przez limit użycia zostaną odłożone"
+
+msgid "Chats paused by a usage limit will not be snoozed"
+msgstr "Czaty z odpowiedzią wstrzymaną przez limit użycia nie zostaną odłożone"
+
+msgid "Rate limited. The limit resets in about {announced}. Waiting for you to resume"
+msgstr "Przekroczono limit żądań. Limit zostanie zresetowany za około {announced}. Czeka na Twoje wznowienie"
+
+msgid "Rate limited, the limit resets in {countdown}. Waiting for you to resume"
+msgstr "Przekroczono limit żądań, limit zostanie zresetowany za {countdown}. Czeka na Twoje wznowienie"
+
+msgid "The limit has reset. Waiting for you to resume"
+msgstr "Limit został zresetowany. Czeka na Twoje wznowienie"

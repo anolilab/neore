@@ -40898,3 +40898,69 @@ msgstr "Zurich"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ points"
+
+msgid "Archive"
+msgstr "Archiver"
+
+msgid "Archive this chat?"
+msgstr "Archiver ce chat ?"
+
+msgid "Archived chats stay searchable, and you can restore them from the archive."
+msgstr "Les chats archivés restent consultables, et vous pouvez les restaurer depuis les archives."
+
+msgid "Asks before a chat is archived. Off: archiving happens on the first click."
+msgstr "Demande confirmation avant d'archiver un chat. Désactivé : l'archivage se fait au premier clic."
+
+msgid "Asks before a chat is deleted. Off: deleting happens on the first click."
+msgstr "Demande confirmation avant de supprimer un chat. Désactivé : la suppression se fait au premier clic."
+
+msgid "Asks before a pinned chat is unpinned. Off: unpinning happens on the first click."
+msgstr "Demande confirmation avant de désépingler un chat. Désactivé : le désépinglage se fait au premier clic."
+
+msgid "Confirm before archiving a chat"
+msgstr "Confirmer avant d'archiver un chat"
+
+msgid "Confirm before deleting a chat"
+msgstr "Confirmer avant de supprimer un chat"
+
+msgid "Confirm before unpinning a chat"
+msgstr "Confirmer avant de désépingler un chat"
+
+msgid "The chat will no longer be pinned. You can pin it again from the list."
+msgstr "Le chat ne sera plus épinglé. Vous pouvez le réépingler depuis la liste."
+
+msgid "Unpin this chat?"
+msgstr "Désépingler ce chat ?"
+
+msgid "Resume after a usage limit"
+msgstr "Reprendre après une limite d’utilisation"
+
+msgid "When a reply pauses because a usage limit was reached, it resumes by itself once the limit resets. Off: it waits until you resume it."
+msgstr "Quand une réponse est suspendue parce qu’une limite d’utilisation est atteinte, elle reprend d’elle-même une fois la limite réinitialisée. Désactivé : elle attend que vous la repreniez."
+
+msgid "Paused replies will resume when the limit resets"
+msgstr "Les réponses suspendues reprendront une fois la limite réinitialisée"
+
+msgid "Paused replies will wait for you to resume them"
+msgstr "Les réponses suspendues attendront que vous les repreniez"
+
+msgid "Snooze chats until the limit resets"
+msgstr "Reporter les discussions jusqu’à la réinitialisation de la limite"
+
+msgid "When a reply pauses because a usage limit was reached and the provider says when it resets, its chat leaves your active list until then."
+msgstr "Quand une réponse est suspendue parce qu’une limite d’utilisation est atteinte et que le fournisseur indique quand elle sera réinitialisée, sa discussion quitte votre liste active jusque-là."
+
+msgid "Chats paused by a usage limit will be snoozed"
+msgstr "Les discussions dont une réponse est suspendue par une limite d’utilisation seront reportées"
+
+msgid "Chats paused by a usage limit will not be snoozed"
+msgstr "Les discussions dont une réponse est suspendue par une limite d’utilisation ne seront pas reportées"
+
+msgid "Rate limited. The limit resets in about {announced}. Waiting for you to resume"
+msgstr "Limite de débit atteinte. La limite sera réinitialisée dans environ {announced}. En attente de votre reprise"
+
+msgid "Rate limited, the limit resets in {countdown}. Waiting for you to resume"
+msgstr "Limite de débit atteinte, réinitialisation de la limite dans {countdown}. En attente de votre reprise"
+
+msgid "The limit has reset. Waiting for you to resume"
+msgstr "La limite a été réinitialisée. En attente de votre reprise"

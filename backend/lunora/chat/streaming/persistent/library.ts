@@ -9,7 +9,7 @@ import { LunoraError, v } from "lunorash/server";
 import { syncActiveAgent } from "../../../agent/agent-switch";
 import { addMessagesHandler, deleteMessage } from "../../../agent/messages";
 import { parentOf } from "../../../agent/branch-rows";
-import { patchThread } from "../../../agent/table-writes";
+import { patchThread, setThreadSnooze } from "../../../agent/table-writes";
 import { internal } from "../../../_generated/internal";
 import type { Doc, Id } from "../../../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../../../_generated/server";
@@ -960,11 +960,15 @@ export const pauseRunForRateLimit = internalMutation
         placeholderId: v.optional(v.string().max(MAX_LENGTH.id)),
         provider: v.optional(v.string().max(MAX_LENGTH.short)),
         replyRowIds: v.array(v.string().max(MAX_LENGTH.id)),
+        /** `false`: the person resumes the run, so no resume is queued (`usage-limit-settings.ts`). Absent: it resumes at `retryAt`. */
+        resumeAfterLimit: v.optional(v.boolean()),
         retryAt: v.optional(v.number()),
         run: v.object({ ...runStreamingAgentFields }),
         /** The pausing run's epoch (`run-epoch.ts`): a run a newer one replaced pauses nothing. */
         runEpoch: v.optional(v.number()),
         skill: v.optional(v.object({ id: v.optional(v.string().max(MAX_LENGTH.id)), name: v.string().max(MAX_LENGTH.short) })),
+        /** `true`: the chat is snoozed until `retryAt`, when the provider reported a reset time (`usage-limit-settings.ts`). */
+        snoozeUntilReset: v.optional(v.boolean()),
         status: v.number(),
         stepsUsed: v.number(),
         streamId: v.id("persistentStreams"),
@@ -1021,6 +1025,8 @@ export const pauseRunForRateLimit = internalMutation
             ...((args.skill ?? earlier?.skill) && { skill: args.skill ?? earlier?.skill }),
             ...((args.timeZone ?? earlier?.timeZone) && { timeZone: args.timeZone ?? earlier?.timeZone }),
         };
+        // The person resumes this run themselves (`resumeAfterLimit: false`): the pause is the same, only no resume is queued.
+        const awaitsPerson = args.resumeAfterLimit === false;
         const pause = {
             from: args.from,
             id: `${ctx.now}-${pausedSteps.length}`,
@@ -1031,14 +1037,32 @@ export const pauseRunForRateLimit = internalMutation
             status: args.status,
         };
 
-        await ctx.db.patch("persistentStreams", stream._id, {
+        await patchRow(ctx.db, "persistentStreams", stream, {
             expiresAt: Math.max(stream.expiresAt, plan.retryAt + STREAM_TTL_MS),
             pause,
+            pauseAwaitsPerson: awaitsPerson ? true : undefined,
             pausedRun,
             pausedSteps,
         });
-        // A moment after the provider's time, so the resume does not land just before the limit lifts.
-        await enqueueRunResume(pause, plan.retryAt - ctx.now + RATE_LIMIT_RESUME_SLACK_MS);
+
+        if (!awaitsPerson) {
+            // A moment after the provider's time, so the resume does not land just before the limit lifts.
+            await enqueueRunResume(pause, plan.retryAt - ctx.now + RATE_LIMIT_RESUME_SLACK_MS);
+        }
+
+        // Snoozed until the reset, only when the provider reported one (a default wait has no reset to snooze to), and only
+        // for the thread's owner's own run: the snooze is the owner's active list. A later snooze the owner chose stays.
+        const thread = await ctx.db.get("threads", threadId);
+
+        if (
+            args.snoozeUntilReset === true &&
+            args.retryAt !== undefined &&
+            thread !== null &&
+            thread.userId === args.run.userId &&
+            (thread.snoozedUntil ?? 0) < plan.retryAt
+        ) {
+            await setThreadSnooze(ctx.db, thread, plan.retryAt, Math.max(ctx.now, thread.snoozeChosenAt ?? 0));
+        }
 
         return { paused: true, retryAt: plan.retryAt };
     });
@@ -1091,6 +1115,7 @@ export const claimRunResume = internalMutation
             beatAt: ctx.now,
             expiresAt: ctx.now + STREAM_TTL_MS,
             pause: undefined,
+            pauseAwaitsPerson: undefined,
             pauseCause: undefined,
             // This invocation's own claim: the ceiling its beats may extend the expiry to counts from here (`beatExpiry`).
             runClaimedAt: ctx.now,
@@ -1137,7 +1162,8 @@ export const retryPausedRunsNow = internalMutation
 
             const early = pause.retryAt > ctx.now;
 
-            if (!early && pause.retryAt > ctx.now - RESUME_OVERDUE_MS) {
+            // A pause the person resumes has no queued resume that could be late: once its reset has passed it is due at once.
+            if (!early && stream.pauseAwaitsPerson !== true && pause.retryAt > ctx.now - RESUME_OVERDUE_MS) {
                 continue;
             }
 
