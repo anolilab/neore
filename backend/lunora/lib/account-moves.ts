@@ -6,9 +6,9 @@
  *
  * A marker belongs to the operation that wrote it: a merge ends only its own marker, so an erasure that overlaps it keeps its fence.
  *
- * A pin write checks the marker, renews the account's lease, and checks the marker again. A refused write renews nothing, so a marked
- * account's retries cannot hold a move back. A write that passed the second check cannot commit unseen: the move waits until no lease
- * is in flight (`pinWritesInFlightUntil`) before it sweeps the pins.
+ * A pin write checks the marker and renews the account's lease. A refused write renews nothing, so a marked account's retries cannot hold
+ * a move back. Every pin write checks the marker again right before its insert (`refusesPinWrite`, `chat/pins/functions.ts`). A write
+ * that passed the check cannot commit unseen: the move waits until no lease is in flight (`pinWritesInFlightUntil`) before it sweeps.
  */
 import { v } from "lunorash/server";
 
@@ -156,7 +156,8 @@ export const endAccountMoveFor = internalMutation
     .mutation(async ({ args, ctx }) => {
         await endAccountMove(ctx, args.userId, args.kind);
 
-        // An erasure also lifts the fence on the account's own shard; the owner shards' fences are lifted by the sweep that set them.
+        // An erasure also lifts the fence on the account's own shard. The owner shards' fences are lifted by the erasure's release step
+        // (`gdpr/steps.ts#releasePinFences`), once both owner sweeps have run.
         if (args.kind === "erasing") {
             await unfencePinsOnShard(ctx, args.userId);
         }
@@ -276,7 +277,7 @@ export const fencePinsOnShardFor = internalMutation
         return null;
     });
 
-/** Lifts the account's fence on the shard the call runs on, once the sweep that set it has finished. */
+/** Lifts the account's fence on the shard the call runs on, once the erasure no longer needs that shard fenced. */
 export const unfencePinsOnShardFor = internalMutation
     .input({ userId: v.string().max(MAX_LENGTH.id) })
     .output(v.null())

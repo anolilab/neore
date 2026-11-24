@@ -198,11 +198,16 @@ const dropRoutesWithoutPins = async (context: MutationCtx, threadId: Id<"threads
         return;
     }
 
-    // Every route to the thread goes: a guest merge can leave more than one for the same user and thread, and a survivor is a link.
-    const { page } = await context.db.sharedPinRoutes.findMany({ consistency: "primary", limit: 100, where: { threadId, userId } });
+    // Every route to the thread goes: a guest merge can leave more than one for the same user and thread, and a survivor is a link. The
+    // read repeats until none is left, so duplicates past the first page are not left behind.
+    let { page } = await context.db.sharedPinRoutes.findMany({ consistency: "primary", limit: 100, where: { threadId, userId } });
 
-    for (const route of page) {
-        await context.db.delete("sharedPinRoutes", route._id);
+    while (page.length > 0) {
+        for (const route of page) {
+            await context.db.delete("sharedPinRoutes", route._id);
+        }
+
+        ({ page } = await context.db.sharedPinRoutes.findMany({ consistency: "primary", limit: 100, where: { threadId, userId } }));
     }
 };
 

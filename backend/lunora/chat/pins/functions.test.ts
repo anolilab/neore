@@ -571,6 +571,22 @@ describe("a refused pin write takes back the route it wrote", () => {
 
         expect(routes.page).toHaveLength(1);
     });
+
+    it("removes every duplicate route to the thread, not only the first page of them", async () => {
+        const routes = await harness.run(async (context: any) => {
+            for (let index = 0; index < 150; index += 1) {
+                await context.db.insert("sharedPinRoutes", { createdAt: 1, ownerId: OWNER, threadId, userId: "user-collaborator" });
+            }
+
+            await withSharedPinRoute(context, threadId, "user-collaborator", 1, async () => {
+                throw refusal();
+            }).catch(() => null);
+
+            return await context.db.sharedPinRoutes.findMany({ where: { threadId } });
+        });
+
+        expect(routes.page).toHaveLength(0);
+    });
 });
 
 describe("a pin write renews the writer's lease before its move check", () => {
