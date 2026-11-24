@@ -171,7 +171,6 @@ export const survivingPaneAfterDelete = async (
 /** Whether the address names one of these chats: a delete that has moved the route on must not move it again. */
 export const routeIsOn = (threadIds: ReadonlyArray<string>): boolean => globalThis.location.pathname.split("/").some((part) => threadIds.includes(part));
 
-/** What opening a chat as a pane did: it was already open, it opened, or every pane is taken. */
 /** What opening a chat as a pane did: it was already open, it opened, every pane is taken, or a later click has overtaken this one. */
 export type PaneOpenResult = "focused" | "full" | "opened" | "superseded";
 
