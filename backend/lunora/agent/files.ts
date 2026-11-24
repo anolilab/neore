@@ -99,7 +99,8 @@ const ensureChatFileMetadata = async (
     context: MutationContext,
     file: { _creationTime: number; _id: Id<"chatFiles">; filename?: string; hash: string; mediaType: string },
 ): Promise<void> => {
-    const { page } = await context.db.chatFileMetadata.findMany({ where: { fileId: file._id } });
+    // Primary: a lagging replica that misses the row writes a second one (the export lists a file once, but the row is waste).
+    const { page } = await context.db.chatFileMetadata.findMany({ consistency: "primary", where: { fileId: file._id } });
 
     if (page.length > 0) {
         return;
