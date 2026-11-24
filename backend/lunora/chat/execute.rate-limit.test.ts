@@ -1688,6 +1688,32 @@ describe("the usage-limit settings of a rate-limited run", () => {
         expect(await snoozedUntil()).toBeUndefined();
     });
 
+    it("stopping the reply that set the snooze, with a second paused reply that has an earlier reset, then stopping that one, leaves the chat visible", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const first = await readState();
+
+        // The second reply's reset is earlier, so it extends nothing and stores no snooze record of its own.
+        expect(await pauseSecondReply(0.5)).toMatchObject({ paused: true });
+        expect(await snoozedUntil()).toBe(first.pause!.retryAt);
+
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: ids.messageId, onlyNamed: true, threadId: ids.threadId }),
+        );
+
+        // The record hands on to the paused reply, which now holds the snooze for the first reply's reset.
+        expect(await snoozedUntil()).toBe(first.pause!.retryAt);
+
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: "other-message", onlyNamed: true, threadId: ids.threadId }),
+        );
+
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
     it("a Retry now that resumes both replies, where the later pause extended the snooze, leaves the chat visible", async () => {
         modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
         modelState.model = planned([rateLimited(), textStep("Hello there.")]);
