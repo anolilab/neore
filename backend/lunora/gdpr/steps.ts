@@ -2,7 +2,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import { buildUsageJson, spliceUsageJson, usageObjectKey } from "./usage-export-steps";
 import { readStoredText } from "../lib/storage-read";
-import { CHAT_FILE_METADATA_CHUNK, capChatFiles, collectAllChatFileMetadata, collectAllMessageFileIds, walkIds } from "../agent/export-pages";
+import { CHAT_FILE_METADATA_CHUNK, capChatFiles, chatFileMeter, collectAllChatFileMetadata, collectAllMessageFileIds, walkIds } from "../agent/export-pages";
 import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
 import { callOnShard } from "../lib/cross-shard";
 import { collectOrganizationReplyPages } from "../usage/organization";
@@ -845,30 +845,33 @@ export const generateExportFile = internalAction
                   );
         // The user's chat files (uploads and generated images), metadata only: the files behind their grants and the files their messages
         // name (`agent/export-pages.ts`), read here a page per query, as the sections above are. The walks and the metadata reads share
-        // one budget, what every section above left of the action's read budget (`read-budget.ts`); past it the section is cut and flagged.
+        // one budget of bytes and queries, what every section above left of the action's read budget (`read-budget.ts`); past it the
+        // section is cut and flagged. The grants' metadata is read before the message walk, so a long history cannot leave them out.
         const chatFileRead = await collectAllChatFileMetadata(
-            async (budget) =>
+            async (meter) =>
                 await walkIds(
                     async (cursor) => await context.runQuery(internal.agent.gdpr.collectGrantedChatFileIdsForExport, { cursor, userId: args.userId }),
-                    budget,
+                    meter,
                 ),
-            async (budget) =>
+            async (meter) =>
                 await collectAllMessageFileIds(
                     async (cursor) => await context.runQuery(internal.agent.gdpr.collectThreadIdsForExport, { cursor, userId: args.userId }),
                     async (threadId, cursor) =>
                         await context.runQuery(internal.agent.gdpr.collectMessageFileIdsForExport, { cursor, threadId: threadId as Id<"threads"> }),
-                    budget,
+                    meter,
                 ),
             async (fileIds) => await context.runQuery(internal.agent.gdpr.chatFileMetadataForExport, { fileIds: fileIds as Id<"chatFiles">[] }),
             CHAT_FILE_METADATA_CHUNK,
-            chatFilesReadBudget(
-                earlierReadBytes +
-                    repositories.readBytes +
-                    feedback.readBytes +
-                    ownedProjects.readBytes +
-                    threadFollows.readBytes +
-                    triggers.readBytes +
-                    ownedWithRules.readBytes,
+            chatFileMeter(
+                chatFilesReadBudget(
+                    earlierReadBytes +
+                        repositories.readBytes +
+                        feedback.readBytes +
+                        ownedProjects.readBytes +
+                        threadFollows.readBytes +
+                        triggers.readBytes +
+                        ownedWithRules.readBytes,
+                ),
             ),
         );
         const chatFileCapped = capChatFiles(chatFileRead.rows);

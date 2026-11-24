@@ -27,24 +27,56 @@ export const CHAT_FILE_METADATA_CHUNK = 100;
 export const CHAT_FILE_EXPORT_BYTES = 8 * 1024 * 1024;
 
 /**
- * Walks one source to its end, or until the bytes its pages read reach `budget`: the check runs before each page, so the page that
- * crosses the budget is the last one read, and the walk says it stopped short.
+ * What the chat-file section may still spend, shared by every walk and read of one export: the bytes its rows cost and the queries it
+ * issues. A walk or a read stops, and the section says so, once either is gone.
  */
-export const walkIds = async (read: (cursor: string | null) => Promise<IdsPage>, budget: number): Promise<Walked> => {
+export interface ChatFileMeter {
+    bytesLeft: number;
+    queriesLeft: number;
+}
+
+/** The queries the chat-file section may issue in one export action: each page and each metadata chunk is one. */
+export const CHAT_FILE_MAX_QUERIES = 200;
+
+/**
+ * Held back from the message walk for reading the metadata of the files it finds, so a walk that runs long cannot leave them unread. The
+ * walk stops short of the reserve and the section says so.
+ */
+export const CHAT_FILE_METADATA_RESERVE_BYTES = 2 * 1024 * 1024;
+
+/** The queries held back from the message walk for the metadata chunks (see {@link CHAT_FILE_METADATA_RESERVE_BYTES}). */
+export const CHAT_FILE_METADATA_RESERVE_QUERIES = 20;
+
+/** A meter for the chat-file section: the bytes it may read (default `CHAT_FILES_READ_BYTES`) and the queries it may issue. */
+export const chatFileMeter = (bytes: number = CHAT_FILES_READ_BYTES, queries: number = CHAT_FILE_MAX_QUERIES): ChatFileMeter => {
+    return {
+        bytesLeft: bytes,
+        queriesLeft: queries,
+    };
+};
+
+/**
+ * Walks one source to its end, or until the meter is spent: the check runs before each page, so the page that spends the last of it is
+ * the last one read, and the walk says it stopped short.
+ */
+export const walkIds = async (read: (cursor: string | null) => Promise<IdsPage>, meter: ChatFileMeter): Promise<Walked> => {
     const ids: string[] = [];
     let cursor: string | null = null;
     let more = true;
     let readBytes = 0;
 
     while (more) {
-        if (readBytes >= budget) {
+        if (meter.bytesLeft <= 0 || meter.queriesLeft <= 0) {
             return { ids, readBytes, truncated: true };
         }
 
         const page = await read(cursor);
+        const pageBytes = page.readBytes ?? 0;
 
+        meter.bytesLeft -= pageBytes;
+        meter.queriesLeft -= 1;
+        readBytes += pageBytes;
         ids.push(...page.ids);
-        readBytes += page.readBytes ?? 0;
         more = page.cursor !== null;
         cursor = page.cursor;
     }
@@ -53,22 +85,22 @@ export const walkIds = async (read: (cursor: string | null) => Promise<IdsPage>,
 };
 
 /**
- * The file ids named by the messages of every thread the user owns. Threads are walked to their end; each thread's messages are
- * walked to theirs. A message keeps its files in `fileIds`, so these are the files the chats still hold. `listThreads` reads one page
- * of the owner's thread ids; `listFiles` reads one page of one thread's message file ids.
+ * The file ids named by the messages of every thread the user owns. Threads are walked to their end; each thread's messages are walked
+ * to theirs, until the meter is spent. A message keeps its files in `fileIds`, so these are the files the chats still hold.
+ * `listThreads` reads one page of the owner's thread ids; `listFiles` reads one page of one thread's message file ids.
  */
 export const collectAllMessageFileIds = async (
     listThreads: (cursor: string | null) => Promise<IdsPage>,
     listFiles: (threadId: string, cursor: string | null) => Promise<IdsPage>,
-    budget: number,
+    meter: ChatFileMeter,
 ): Promise<Walked> => {
-    const threads = await walkIds(listThreads, budget);
+    const threads = await walkIds(listThreads, meter);
     const ids: string[] = [];
     let { readBytes, truncated } = threads;
 
-    // Each thread's messages take what the threads and the threads before them left of the budget.
+    // Each thread's messages draw on the same meter, so the threads and messages before them leave less for the ones after.
     for (const threadId of threads.ids) {
-        const messages = await walkIds(async (cursor) => await listFiles(threadId, cursor), budget - readBytes);
+        const messages = await walkIds(async (cursor) => await listFiles(threadId, cursor), meter);
 
         ids.push(...messages.ids);
         readBytes += messages.readBytes;
@@ -83,51 +115,97 @@ export const collectAllMessageFileIds = async (
 };
 
 /**
- * Every chat file of one user for the export: the files behind their grants and the files their messages name, each once.
- * `listGrantedIds` reads one page of the grants; `listMessageFileIds` returns the message source (see
- * {@link collectAllMessageFileIds}); `readMetadata` reads one chunk of ids.
+ * Every chat file of one user for the export: the files behind their grants and the files their messages name, each once. The grants
+ * are walked first and their metadata read before the messages are walked, so a long history cannot leave a granted file out.
+ * `walkGrants` and `walkMessages` walk their ids against the meter; `readMetadata` reads one chunk of ids.
+ *
+ * Metadata chunks check only the bytes left: they are bounded by the ids the walks found, so a walk that spent the queries does not
+ * leave the files it already found unread.
  *
  * Kept apart from `gdpr.ts`: the export action imports this, and the job queue is reached through `gdpr.ts`, which the mobile and
  * extension type checks do not resolve.
  */
 export const collectAllChatFileMetadata = async <Row>(
-    walkGrants: (budget: number) => Promise<Walked>,
-    walkMessages: (budget: number) => Promise<Walked>,
+    walkGrants: (meter: ChatFileMeter) => Promise<Walked>,
+    walkMessages: (meter: ChatFileMeter) => Promise<Walked>,
     readMetadata: (fileIds: string[]) => Promise<{ readBytes: number; rows: Row[] }>,
     chunkSize: number = CHAT_FILE_METADATA_CHUNK,
-    readBudget: number = CHAT_FILES_READ_BYTES,
+    meter: ChatFileMeter = chatFileMeter(),
 ): Promise<{ rows: Row[]; truncated: boolean }> => {
-    // The walks and the metadata reads share one budget: each takes what the ones before it left, so the section cannot read past it.
-    const granted = await walkGrants(readBudget);
-    const messages = await walkMessages(Math.max(0, readBudget - granted.readBytes));
-    const all = [...new Set([...granted.ids, ...messages.ids])];
-    const rows: Row[] = [];
-    let readBytes = granted.readBytes + messages.readBytes;
-    const truncated = granted.truncated || messages.truncated;
+    const readChunks = async (fileIds: string[]): Promise<{ rows: Row[]; truncated: boolean }> => {
+        const rows: Row[] = [];
 
-    for (let start = 0; start < all.length; start += chunkSize) {
-        // Past the budget the rest of the files are not read: the section says so, as it does past its byte cap.
-        if (readBytes >= readBudget) {
-            return { rows, truncated: true };
+        for (let start = 0; start < fileIds.length; start += chunkSize) {
+            // Past the bytes the rest of the files are not read: the section says so, as it does past its byte cap.
+            if (meter.bytesLeft <= 0) {
+                return { rows, truncated: true };
+            }
+
+            const chunk = await readMetadata(fileIds.slice(start, start + chunkSize));
+
+            meter.bytesLeft -= chunk.readBytes;
+            meter.queriesLeft -= 1;
+            rows.push(...chunk.rows);
         }
 
-        const chunk = await readMetadata(all.slice(start, start + chunkSize));
+        return { rows, truncated: false };
+    };
 
-        readBytes += chunk.readBytes;
-        rows.push(...chunk.rows);
+    const granted = await walkGrants(meter);
+    const grantedIds = [...new Set(granted.ids)];
+    const grantedRead = await readChunks(grantedIds);
+
+    // The message walk stops short of a reserve, so the files it finds still get their metadata read even when it runs long.
+    const walkMeter = chatFileMeter(
+        Math.max(0, meter.bytesLeft - CHAT_FILE_METADATA_RESERVE_BYTES),
+        Math.max(0, meter.queriesLeft - CHAT_FILE_METADATA_RESERVE_QUERIES),
+    );
+    const queriesBefore = walkMeter.queriesLeft;
+    const messages = await walkMessages(walkMeter);
+
+    meter.bytesLeft -= messages.readBytes;
+    meter.queriesLeft -= queriesBefore - walkMeter.queriesLeft;
+
+    const alreadyRead = new Set(grantedIds);
+    const messageIds: string[] = [];
+    const messageSet = new Set(messages.ids);
+
+    for (const id of messageSet) {
+        if (!alreadyRead.has(id)) {
+            messageIds.push(id);
+        }
     }
 
-    return { rows, truncated };
+    const messageRead = await readChunks(messageIds);
+
+    return {
+        rows: [...grantedRead.rows, ...messageRead.rows],
+        truncated: granted.truncated || grantedRead.truncated || messages.truncated || messageRead.truncated,
+    };
+};
+
+/** The section as the export writes it, with its braces stripped: from the `chatFiles` key to the end of its value. */
+const chatFileSectionText = (chatFiles: unknown): string => {
+    const text = JSON.stringify({ chatFiles }, null, 2);
+
+    // The export object's own braces wrap the section, so the section is what sits between the key and the closing `\n}`.
+    return text.slice(text.indexOf('"chatFiles"'), -2);
 };
 
 /**
- * What the section takes beyond its rows, as the export writes it: the `chatFiles` and `files` keys, the brackets and the flag. Reserved
- * whole, so the rows that fit are never over-counted by less than this and the section never runs past its budget.
+ * The section with no rows: its keys, the empty brackets and the flag. `false` is the longer flag, so a cut section (which writes `true`)
+ * is never measured larger than it is.
  */
-const CHAT_FILE_SECTION_FRAME_BYTES = 256;
+const CHAT_FILE_SECTION_EMPTY_BYTES = new TextEncoder().encode(chatFileSectionText({ files: [], truncated: false })).byteLength;
 
-/** What one row takes in the array beyond its own lines: the line break and indent before it, and the comma after it. */
+/**
+ * What one row adds in the array: the line break and six spaces before its lines, and the comma after it. With the row's own lines this
+ * is exact for every row but the last, whose comma the closing line takes the place of; {@link CHAT_FILE_ARRAY_OPEN_BYTES} balances it.
+ */
 const CHAT_FILE_ROW_FRAME_BYTES = 8;
+
+/** The array's closing line replaces its `[]` once it holds a row. */
+const CHAT_FILE_ARRAY_OPEN_BYTES = 4;
 
 /**
  * The rows that fit in the section's byte budget, in order, measured as the export writes them: each row's lines indented to the depth
@@ -137,13 +215,13 @@ const CHAT_FILE_ROW_FRAME_BYTES = 8;
 export const capChatFiles = <Row>(rows: Row[], budget: number = CHAT_FILE_EXPORT_BYTES): { files: Row[]; truncated: boolean } => {
     const encoder = new TextEncoder();
     const files: Row[] = [];
-    let bytes = CHAT_FILE_SECTION_FRAME_BYTES;
+    let bytes = CHAT_FILE_SECTION_EMPTY_BYTES;
 
     for (const row of rows) {
         // An array element sits three levels deep (`chatFiles` → `files` → element), so each of its lines is indented six spaces more.
         const written = JSON.stringify(row, null, 2).replaceAll("\n", "\n      ");
 
-        bytes += encoder.encode(written).byteLength + CHAT_FILE_ROW_FRAME_BYTES;
+        bytes += encoder.encode(written).byteLength + CHAT_FILE_ROW_FRAME_BYTES + (files.length === 0 ? CHAT_FILE_ARRAY_OPEN_BYTES : 0);
 
         if (bytes > budget) {
             return { files, truncated: true };

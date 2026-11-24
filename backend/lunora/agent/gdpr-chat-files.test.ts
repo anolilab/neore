@@ -12,7 +12,15 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
 import { addFile } from "./files";
-import { type IdsPage, capChatFiles, collectAllChatFileMetadata, collectAllMessageFileIds, walkIds } from "./export-pages";
+import {
+    CHAT_FILE_METADATA_CHUNK,
+    type IdsPage,
+    capChatFiles,
+    chatFileMeter,
+    collectAllChatFileMetadata,
+    collectAllMessageFileIds,
+    walkIds,
+} from "./export-pages";
 import {
     CHAT_FILE_EXPORT_PAGE,
     CHAT_FILE_HASH_MAX,
@@ -135,22 +143,24 @@ const staleLinkOf = async (userId: string, hash: string): Promise<string> =>
 const exportedFor = async (userId: string): Promise<{ files: ExportedFile[]; pages: number }> => {
     let pages = 0;
     const read = (await collectAllChatFileMetadata(
-        async (budget) =>
+        async (meter) =>
             await walkIds(async (cursor) => {
                 pages += 1;
 
                 return (await harness.run(async (ctx: any) => await ctx.runQuery(collectGrantedChatFileIdsForExport, { cursor, userId }))) as IdsPage;
-            }, budget),
-        async (budget) =>
+            }, meter),
+        async (meter) =>
             await collectAllMessageFileIds(
                 async (cursor) => (await harness.run(async (ctx: any) => await ctx.runQuery(collectThreadIdsForExport, { cursor, userId }))) as IdsPage,
                 async (threadId, cursor) =>
                     (await harness.run(
                         async (ctx: any) => await ctx.runQuery(collectMessageFileIdsForExport, { cursor, threadId: threadId as never }),
                     )) as IdsPage,
-                budget,
+                meter,
             ),
         async (fileIds) => await harness.run(async (ctx: any) => await ctx.runQuery(chatFileMetadataForExport, { fileIds })),
+        CHAT_FILE_METADATA_CHUNK,
+        chatFileMeter(),
     )) as { rows: ExportedFile[]; truncated: boolean };
 
     return { files: read.rows, pages };
@@ -254,7 +264,7 @@ describe("chat files in the GDPR export", () => {
         const reads: string[][] = [];
 
         const { rows } = await collectAllChatFileMetadata(
-            async (budget) => await walkIds(async (cursor) => grantPages[cursor ?? ""] ?? { cursor: null, ids: [] }, budget),
+            async (meter) => await walkIds(async (cursor) => grantPages[cursor ?? ""] ?? { cursor: null, ids: [] }, meter),
             async () => {
                 return { ids: ["d", "a"], readBytes: 0, truncated: false };
             },
@@ -271,10 +281,8 @@ describe("chat files in the GDPR export", () => {
             2,
         );
 
-        expect(reads).toEqual([
-            ["a", "b"],
-            ["c", "d"],
-        ]);
+        // The granted ids are read first (a, b, then c); the message ids come after, without the ones already read.
+        expect(reads).toEqual([["a", "b"], ["c"], ["d"]]);
         expect(rows.map((row) => row.id)).toEqual(["a", "b", "c", "d"]);
     });
 
@@ -282,10 +290,10 @@ describe("chat files in the GDPR export", () => {
         const reads: string[][] = [];
 
         const { rows, truncated } = await collectAllChatFileMetadata(
-            async (budget) =>
+            async (meter) =>
                 await walkIds(async () => {
                     return { cursor: null, ids: ["a", "b", "c", "d", "e", "f"] };
-                }, budget),
+                }, meter),
             async () => {
                 return { ids: [], readBytes: 0, truncated: false };
             },
@@ -300,7 +308,7 @@ describe("chat files in the GDPR export", () => {
                 };
             },
             2,
-            15,
+            chatFileMeter(15),
         );
 
         // Chunks of two, ten bytes each: two chunks read (20 bytes, past 15), the third is not.
@@ -323,7 +331,7 @@ describe("chat files in the GDPR export", () => {
         const { ids } = await collectAllMessageFileIds(
             async (cursor) => threadPages[cursor ?? ""] ?? { cursor: null, ids: [] },
             async (threadId, cursor) => messagePages[`${threadId}:${cursor ?? ""}`] ?? { cursor: null, ids: [] },
-            Infinity,
+            chatFileMeter(),
         );
 
         expect(ids).toEqual(["x", "y", "z"]);
@@ -336,12 +344,12 @@ describe("chat files in the GDPR export", () => {
             p2: { cursor: null, ids: ["c"], readBytes: 10 },
         };
 
-        expect(await walkIds(async (cursor) => pages[cursor ?? ""] ?? { cursor: null, ids: [] }, 15)).toEqual({
+        expect(await walkIds(async (cursor) => pages[cursor ?? ""] ?? { cursor: null, ids: [] }, chatFileMeter(15))).toEqual({
             ids: ["a", "b"],
             readBytes: 20,
             truncated: true,
         });
-        expect(await walkIds(async (cursor) => pages[cursor ?? ""] ?? { cursor: null, ids: [] }, 100)).toEqual({
+        expect(await walkIds(async (cursor) => pages[cursor ?? ""] ?? { cursor: null, ids: [] }, chatFileMeter(100))).toEqual({
             ids: ["a", "b", "c"],
             readBytes: 30,
             truncated: false,
@@ -360,12 +368,55 @@ describe("chat files in the GDPR export", () => {
 
                 return { cursor: null, ids: [threadId], readBytes: 10 };
             },
-            15,
+            chatFileMeter(15),
         );
 
         // Thread t1 reads 10 bytes, t2 reads 10 more (past 15): t3 is not read, and the walk says it stopped short.
         expect(messageReads).toEqual(["t1", "t2"]);
         expect(walked).toEqual({ ids: ["t1", "t2"], readBytes: 20, truncated: true });
+    });
+
+    it("stops a walk once its query allowance is spent, and says so", async () => {
+        const pages: Record<string, IdsPage> = {
+            "": { cursor: "p1", ids: ["a"] },
+            p1: { cursor: "p2", ids: ["b"] },
+            p2: { cursor: null, ids: ["c"] },
+        };
+
+        expect(await walkIds(async (cursor) => pages[cursor ?? ""] ?? { cursor: null, ids: [] }, chatFileMeter(Infinity, 2))).toEqual({
+            ids: ["a", "b"],
+            readBytes: 0,
+            truncated: true,
+        });
+    });
+
+    it("reads the granted files' metadata before a long message history spends the allowance", async () => {
+        const { rows, truncated } = await collectAllChatFileMetadata(
+            async (meter) =>
+                await walkIds(async () => {
+                    return { cursor: null, ids: ["granted"] };
+                }, meter),
+            async (meter) => {
+                // The message walk spends what is left of the bytes, as a long history does.
+                meter.bytesLeft = 0;
+
+                return { ids: ["message-only"], readBytes: 0, truncated: true };
+            },
+            async (fileIds) => {
+                return {
+                    readBytes: 10,
+                    rows: fileIds.map((id) => {
+                        return { id };
+                    }),
+                };
+            },
+            CHAT_FILE_METADATA_CHUNK,
+            chatFileMeter(20),
+        );
+
+        // The reserve keeps the walk from taking the metadata reads: the file it found before running long is read too.
+        expect(rows.map((row) => row.id)).toEqual(["granted", "message-only"]);
+        expect(truncated).toBe(true);
     });
 
     it("keeps the rows whose section, as the export writes it, fits the budget, and flags the cut", () => {
@@ -379,6 +430,17 @@ describe("chat files in the GDPR export", () => {
             expect(sectionBytes({ files: cut.files, truncated: cut.truncated })).toBeLessThanOrEqual(budget);
             expect(cut.truncated).toBe(cut.files.length < rows.length);
             expect(cut.files).toEqual(rows.slice(0, cut.files.length));
+        }
+    });
+
+    it("keeps a row that fits the section's budget exactly, and cuts the first one that does not", () => {
+        const rows = [{ id: "a".repeat(40) }, { id: "b".repeat(40) }, { id: "c".repeat(40) }];
+
+        for (const count of [1, 2, 3]) {
+            const exact = sectionBytes({ files: rows.slice(0, count), truncated: false });
+
+            expect(capChatFiles(rows, exact).files).toHaveLength(count);
+            expect(capChatFiles(rows, exact - 1).files).toHaveLength(count - 1);
         }
     });
 
