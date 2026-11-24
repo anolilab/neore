@@ -241,7 +241,7 @@ describe("where a sub-agent's chat opens", () => {
         expect(harness.openBeside).not.toHaveBeenCalled();
     });
 
-    it("opens the main view when every pane is taken, where the chat always opened", async () => {
+    it("opens the main view when every pane is taken, where the chat always opened, showing its pane first", async () => {
         harness.openBeside.mockResolvedValue("full");
         const { link } = renderRunningCard();
 
@@ -250,5 +250,7 @@ describe("where a sub-agent's chat opens", () => {
         await vi.waitFor(() => {
             expect(harness.navigate).toHaveBeenCalledWith(MAIN_VIEW);
         });
+        // The route may already name the chat, so the pane is shown before the navigation, as on the main view.
+        expect(harness.showInSplitView).toHaveBeenCalledWith("child-1");
     });
 });

@@ -45,11 +45,13 @@ export const useOpenChatClick = (): ((threadId: string, click: ChatClick) => voi
                 return;
             }
 
-            // Every pane taken: the chat opens in the main view, where it always opened.
+            // Every pane taken: the chat opens in the main view, where it always opened. A route that already names the chat does not
+            // move, so its pane is shown first, as on the main view.
             const openBeside = async () => {
                 const result = await openThreadBesideFocusedPane(threadId);
 
                 if (result === "full") {
+                    await showThreadInSplitView(threadId);
                     await openInMainView();
                 }
             };
