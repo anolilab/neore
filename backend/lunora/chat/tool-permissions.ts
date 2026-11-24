@@ -883,7 +883,13 @@ export const recordApprovalPreference = async (ctx: PreferenceCtx, decision: Too
         // A tool that spends money or sends out as the person is never stored as `auto`: the throw rolls the claim back,
         // so the call still waits for an answer. Hour and today allows are not refused here.
         if (isAlwaysAllowRefused(key)) {
-            throw new LunoraError("BAD_REQUEST", "This tool asks every time: approve this call, or allow it for an hour or today");
+            // A person-only tool takes no timed allow either, so the message offers only the single approval.
+            throw new LunoraError(
+                "BAD_REQUEST",
+                isGrantableKey(key)
+                    ? "This tool asks every time: approve this call, or allow it for an hour or today"
+                    : "This tool asks every time: approve this call",
+            );
         }
 
         await writeToolPermission(ctx, key, "auto");

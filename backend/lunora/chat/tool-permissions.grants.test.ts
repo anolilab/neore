@@ -229,6 +229,19 @@ describe("Always allow on a tool that spends money or sends out as the person", 
         await expect(record("today", key)).rejects.toMatchObject({ code: "BAD_REQUEST" });
     });
 
+    it("offers only a single approval for a person-only tool, and offers a period for the rest", async () => {
+        const personMessage = await record("always", "builtin:mergePullRequest")
+            .then(() => "")
+            .catch((error: unknown) => (error as Error).message);
+        const periodMessage = await record("always", "builtin:imageGeneration")
+            .then(() => "")
+            .catch((error: unknown) => (error as Error).message);
+
+        expect(personMessage).toContain("approve this call");
+        expect(personMessage).not.toContain("hour");
+        expect(periodMessage).toContain("an hour or today");
+    });
+
     it("leaves a running hour allow as it was when Always is refused", async () => {
         const key = "builtin:imageGeneration";
 
