@@ -182,6 +182,11 @@ const KeyboardShortcutsHandler: React.FC<{
                 return;
             }
 
+            // A held key repeats its keydown: a repeat is never a second delete.
+            if (event.repeat) {
+                return;
+            }
+
             event.preventDefault();
             onShortcut?.("deleteThread", event);
         },

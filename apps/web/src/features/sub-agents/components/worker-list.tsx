@@ -16,7 +16,7 @@ import { skipToken, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArchiveIcon, Bot, SquareIcon } from "lucide-react";
 import type { FC } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
@@ -84,6 +84,8 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
     // so a dialog opened in one chat cannot archive a worker after the person has moved to another.
     const [archiveTarget, setArchiveTarget] = useState<{ leadThreadId: string | undefined; workerId: string } | undefined>(undefined);
     const pendingArchive = archiveTarget !== undefined && archiveTarget.leadThreadId === threadId ? archiveTarget.workerId : undefined;
+    // Leaving a lead chat ends its pending archive, so returning to it does not reopen the dialog.
+    useEffect(() => () => setArchiveTarget(undefined), [threadId]);
     const archiveWorker = (workerId: string) => {
         updateThread({ status: "archived", threadId: workerId as Id<"threads"> }).catch(() => showError(t`Failed to archive the worker`));
     };
