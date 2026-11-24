@@ -8,6 +8,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 import { internal } from "../_generated/internal";
+import { messengerTextPart, typedTextOf } from "../chat/lib/attached-text";
 import schema from "../schema";
 import { compressThreadMemories } from "./compress";
 import { extractMemories } from "./extract";
@@ -142,6 +143,47 @@ describe("extraction evidence", () => {
         // Saved, without the assistant's words as its quote.
         expect(byText.has("The user likes Hamburg's harbour a lot")).toBe(true);
         expect(byText.get("The user likes Hamburg's harbour a lot")?.evidence).toBeUndefined();
+    });
+
+    it("quotes the words typed before an attachment in the same part, never the attachment or the lines the app wrote", async () => {
+        expect.assertions(2);
+
+        // As messenger saves a received message (and `execute.ts` reads it on a regenerate): the caption, then the attachment lines.
+        const text =
+            "I work as a nurse in Hamburg\n\n[Document: cv.pdf]\nSenior nurse at the city hospital\n\n[Attached file: badge.heic (image/heic) — its contents cannot be read here]";
+
+        generateText.mockResolvedValue({
+            output: {
+                facts: [
+                    { confidence: 90, importance: 80, memory: "The user is a nurse in Hamburg", quote: "I work as a nurse in Hamburg", type: "identity" },
+                    {
+                        confidence: 90,
+                        importance: 80,
+                        memory: "The user is a senior nurse at the city hospital",
+                        quote: "Senior nurse at the city hospital",
+                        type: "identity",
+                    },
+                ],
+            },
+        });
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(extractMemories, {
+                    assistantResponse: "Noted.",
+                    promptMessageId: "message-1",
+                    quotablePrompt: typedTextOf({ content: [messengerTextPart(text)], role: "user" }),
+                    threadId,
+                    userId: USER,
+                    userMessage: text,
+                }),
+        );
+
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("memories").collect());
+        const byText = new Map<string, { evidence?: { quote?: string } }>(rows.map((row: any) => [row.memory, row]));
+
+        expect(byText.get("The user is a nurse in Hamburg")?.evidence?.quote).toBe("I work as a nurse in Hamburg");
+        expect(byText.get("The user is a senior nurse at the city hospital")?.evidence).toBeUndefined();
     });
 });
 

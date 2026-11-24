@@ -18,6 +18,7 @@
     "add-run-args-system-context",
     "add-steer-text-length",
     "backfill-approval-organization",
+    "backfill-message-typed-text",
     "drop-agent-option-fields",
     "session-options-to-session-state",
     "widen-not-typed-steer-collaborator",
@@ -11783,6 +11784,12 @@
           "kind": "boolean",
           "nullable": false,
           "optional": false,
+          "unique": false
+        },
+        "typedText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
           "unique": false
         },
         "usage": {

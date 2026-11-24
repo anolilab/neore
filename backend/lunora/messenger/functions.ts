@@ -10,6 +10,7 @@ import { v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { changeMessageFiles } from "../agent/files";
+import { messengerTextPart } from "../chat/lib/attached-text";
 import { insertMessageRow, insertThread, patchMessage, patchThread } from "../agent/table-writes";
 import { AI_DISCLOSURE_CLAIM_TTL_MS, claimOnce, hasClaim, MESSENGER_CLAIM_TTL_MS } from "../lib/claim-once";
 import { timingSafeEqual } from "../lib/crypto";
@@ -498,7 +499,7 @@ export const saveMessengerMessage = internalMutation
         const messageId = await insertMessageRow(ctx.db, {
             ...(attached && { fileIds: attached }),
             message: {
-                content: [...(text ? [{ text, type: "text" as const }] : []), ...(parts ?? [])],
+                content: [...(text ? [messengerTextPart(text)] : []), ...(parts ?? [])],
                 role: "user",
             },
             order,
@@ -544,7 +545,7 @@ export const completeMessengerMessage = internalMutation
 
         await patchMessage(ctx.db, messageId, {
             ...(attached && { fileIds: attached }),
-            message: { content: [...(text ? [{ text, type: "text" as const }] : []), ...(parts ?? [])], role: "user" },
+            message: { content: [...(text ? [messengerTextPart(text)] : []), ...(parts ?? [])], role: "user" },
             status: "completed",
             text,
         });

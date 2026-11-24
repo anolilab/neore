@@ -94,6 +94,7 @@ const KeyboardShortcutsSheet = ({ shortcuts }: { shortcuts: Partial<KeyboardShor
         nextItem: t`Next item`,
         openModelPicker: t`Open model picker`,
         prevItem: t`Previous item`,
+        promptSearch: t`Search sent prompts (in the composer)`,
         sidebarLeft: t`Toggle left sidebar`,
         sidebarRight: t`Toggle right sidebar`,
     };
