@@ -127,15 +127,20 @@ For generate_element, add the result as a FabricImage object in the canvas JSON 
                 return { code: quota.code, documentId, error: quota.message, message: quota.message, operation };
             }
 
-            await context.runMutation(internal.agent.documents.updateDocumentInternal, {
+            // The write answers the document as it stands now, so the edit runs on its current preview, not the copy read above.
+            const current = await context.runMutation(internal.agent.documents.updateDocumentInternal, {
                 documentId: documentId as Id<"documents">,
                 messageId: context.messageId,
             });
 
+            if (!current.content) {
+                return { documentId, error: "No image preview", message: "The design has no image preview to edit", operation };
+            }
+
             // Use image editing internal action
             const editOperation = operation === "remove_background" || operation === "upscale" ? operation : "style_transfer";
             const editResult = await context.runAction(internal.chat.functions.editImage, {
-                imageUrl: documentRow.content,
+                imageUrl: current.content,
                 operation: editOperation,
                 prompt,
             });

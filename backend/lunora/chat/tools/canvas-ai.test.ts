@@ -9,7 +9,10 @@ type Document = { content?: string; threadId?: string; userId: string };
 const state = vi.hoisted(() => {
     return {
         document: null as Document | null,
+        editedFrom: "",
         log: [] as string[],
+        /** What the message write answers with, when a test needs the document to have changed since the read. */
+        written: null as Document | null,
     };
 });
 
@@ -47,8 +50,9 @@ const tool = canvasAITool as unknown as CanvasTool;
 const makeContext = (chargeOk = true) => {
     return {
         messageId: "message-1",
-        runAction: async (reference: string) => {
+        runAction: async (reference: string, args: { imageUrl?: string }) => {
             state.log.push(`action:${reference}`);
+            state.editedFrom = args.imageUrl ?? "";
 
             return { resultUrl: "https://fal.example/edited.png" };
         },
@@ -61,7 +65,7 @@ const makeContext = (chargeOk = true) => {
 
             state.log.push(`write:${reference}`);
 
-            return undefined;
+            return state.written ?? state.document;
         },
         runQuery: async (reference: string) => {
             if (reference === "getUserAuthFlagsQuery") {
@@ -85,7 +89,9 @@ const sideEffects = () => state.log.filter((entry) => entry === "charge" || entr
 
 beforeEach(() => {
     state.document = { content: "data:image/png;base64,AAAA", threadId: "thread-1", userId: "user-1" };
+    state.editedFrom = "";
     state.log.length = 0;
+    state.written = null;
 });
 
 describe("canvas edits draw on the daily image allowance", () => {
@@ -94,6 +100,14 @@ describe("canvas edits draw on the daily image allowance", () => {
 
         expect(state.log).toStrictEqual(["read:getDocumentInternal", "charge", "write:updateDocumentInternal", "action:editImage"]);
         expect(output.resultUrl).toBe("https://fal.example/edited.png");
+    });
+
+    it("edits the preview the write answers with, not the copy read before the charge", async () => {
+        state.written = { content: "data:image/png;base64,BBBB", threadId: "thread-1", userId: "user-1" };
+
+        await tool.execute(makeContext(), { documentId: "doc-1", operation: "upscale" });
+
+        expect(state.editedFrom).toBe("data:image/png;base64,BBBB");
     });
 
     it("writes nothing and calls no provider when the allowance is spent", async () => {
