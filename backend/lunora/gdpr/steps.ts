@@ -460,16 +460,16 @@ export const collectSharedPins = internalAction.input({ userId: v.string() }).ac
  * (`gdpr/workflows/deletion-workflow.ts`). A collaborator's pins are written on the owner's shard, so the caller's own shard holds none.
  */
 export const erasePinsOnOwnerShards = internalAction
-    .input({ release: v.optional(v.boolean()), userId: v.string() })
-    .output(v.null())
-    .action(async ({ args: { release, userId }, ctx: context }) => {
+    .input({ userId: v.string() })
+    .output(v.object({ owners: v.array(v.string()) }))
+    .action(async ({ args: { userId }, ctx: context }) => {
         const routes = await readAllPages(
             async (cursor) => await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, { cursor, userId }),
         );
         const owners = [...new Set(routes.map((route) => route.ownerId))];
 
-        // Each owner shard is fenced before it is swept: a pin write of this account that commits on it from now on is refused in its own
-        // transaction, so nothing it writes escapes the sweep. The fence is lifted once the second sweep has run (`release`).
+        // Each owner shard is fenced before it is swept, and stays fenced until the routes are gone (`releasePinFences`): a pin write of
+        // this account on that shard is refused in its own transaction for the whole erasure, so nothing it commits can escape the sweep.
         for (const ownerId of owners) {
             await callOnShard(internal.lib.account_moves.fencePinsOnShardFor, { userId }, { shardKey: ownerId });
         }
@@ -489,10 +489,20 @@ export const erasePinsOnOwnerShards = internalAction
             }
         }
 
-        if (release === true) {
-            for (const ownerId of owners) {
-                await callOnShard(internal.lib.account_moves.unfencePinsOnShardFor, { userId }, { shardKey: ownerId });
-            }
+        return { owners };
+    });
+
+/**
+ * Lifts the erasure's fences on the owner shards, once the routes are gone (`gdpr/workflows/deletion-workflow.ts`). `owners` is every owner
+ * the sweeps fenced, recorded durably by the workflow. Lifting earlier would reopen the shard to pin writes while a route could still
+ * name it.
+ */
+export const releasePinFences = internalAction
+    .input({ owners: v.array(v.string()), userId: v.string() })
+    .output(v.null())
+    .action(async ({ args: { owners, userId } }) => {
+        for (const ownerId of owners) {
+            await callOnShard(internal.lib.account_moves.unfencePinsOnShardFor, { userId }, { shardKey: ownerId });
         }
 
         return null;

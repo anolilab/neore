@@ -2,7 +2,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
-import { admitPinWriteUnlessMoving, isErasing } from "../../lib/account-moves";
+import { admitPinWriteUnlessMoving, isErasing, refusesPinWrite } from "../../lib/account-moves";
 import { authMutation, authQuery, internalMutation, internalQuery, rateLimit } from "../../lib/crpc";
 import { MAX_LENGTH } from "../../lib/validators";
 import { systemDb } from "../../lib/rls/scope";
@@ -304,25 +304,26 @@ export const createPin = authMutation
             throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
         }
 
-        const pinId = await withSharedPinRoute(
-            context,
-            threadId as Id<"threads">,
-            userId,
-            now,
-            async () =>
-                await context.db.insert("threadPins", {
-                    createdAt: now,
-                    // A message pin is stored as before (no kind), so old and new rows read the same.
-                    ...(kind === "image" && { imageIndex, kind }),
-                    ...(kind === "image" && imageKey !== undefined && { imageKey }),
-                    messageId,
-                    messageRole,
-                    selectedText,
-                    threadId: threadId as Id<"threads">,
-                    updatedAt: now,
-                    userId,
-                }),
-        );
+        const pinId = await withSharedPinRoute(context, threadId as Id<"threads">, userId, now, async () => {
+            // The last check, after the route write and right before the insert. No external call sits between them, so an erasure
+            // that fences this shard either runs before this check (the write is refused) or after the insert (its sweep sees the pin).
+            if (await refusesPinWrite(context, userId, now)) {
+                throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
+            }
+
+            return await context.db.insert("threadPins", {
+                createdAt: now,
+                // A message pin is stored as before (no kind), so old and new rows read the same.
+                ...(kind === "image" && { imageIndex, kind }),
+                ...(kind === "image" && imageKey !== undefined && { imageKey }),
+                messageId,
+                messageRole,
+                selectedText,
+                threadId: threadId as Id<"threads">,
+                updatedAt: now,
+                userId,
+            });
+        });
 
         context.log.event("chat.create_pin", { hasSelectedText: selectedText !== undefined, kind: kind ?? "message", messageRole });
 
@@ -380,26 +381,26 @@ export const createDocumentPin = authMutation
             throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
         }
 
-        const pinId = await withSharedPinRoute(
-            context,
-            threadId as Id<"threads">,
-            userId,
-            now,
-            async () =>
-                await context.db.insert("threadPins", {
-                    createdAt: now,
-                    documentId: document._id,
-                    documentKind: document.kind,
-                    kind: "document",
-                    messageId: document.messageId,
-                    // Documents are made by the assistant, so the quoted message is an assistant message.
-                    messageRole: "assistant",
-                    selectedText: document.title,
-                    threadId: threadId as Id<"threads">,
-                    updatedAt: now,
-                    userId,
-                }),
-        );
+        const pinId = await withSharedPinRoute(context, threadId as Id<"threads">, userId, now, async () => {
+            // The last check, as in `createPin`: after the route write, right before the insert.
+            if (await refusesPinWrite(context, userId, now)) {
+                throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
+            }
+
+            return await context.db.insert("threadPins", {
+                createdAt: now,
+                documentId: document._id,
+                documentKind: document.kind,
+                kind: "document",
+                messageId: document.messageId,
+                // Documents are made by the assistant, so the quoted message is an assistant message.
+                messageRole: "assistant",
+                selectedText: document.title,
+                threadId: threadId as Id<"threads">,
+                updatedAt: now,
+                userId,
+            });
+        });
 
         context.log.event("chat.create_document_pin", { documentKind: document.kind });
 

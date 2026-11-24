@@ -74,6 +74,11 @@ const runWorkflow = async (
             throw new Error("audit failed");
         }
 
+        // The owner sweeps report the owner shards they fenced; this fake fenced none.
+        if (current === "erase-pins-on-owner-shards" || current === "erase-pins-on-owner-shards-again") {
+            return { owners: [] };
+        }
+
         // Batched steps are drained until `hasMore` is false; everything else returns null.
         if (minimiseFails && current === "minimise-gdpr-records-posthog-failed") {
             throw new Error("minimise failed");
