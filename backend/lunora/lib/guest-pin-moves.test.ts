@@ -36,6 +36,8 @@ const REFERENCES: MergeReferences = {
     list: reference("listShardRowsPage"),
     listClear: reference("listShardRowsToClear"),
     listPinRoutes: reference("listSharedPinRoutesForExport"),
+    listUncleared: reference("listUnclearedImports"),
+    missingOnGuest: reference("listRowsMissingOnGuest"),
     movePinRoute: reference("moveSharedPinRouteOf"),
     nextPinRoute: reference("nextSharedPinRoute"),
     noteGeneration: reference("noteMergeGeneration"),
@@ -146,6 +148,9 @@ const build = ({
                           });
 
                 return { continueCursor: null, isDone: true, page } as never;
+            }
+            case "listUnclearedImports": {
+                return { ids: [], next: null } as never;
             }
             case "moveSharedPinRouteOf": {
                 for (const route of state.routes) {

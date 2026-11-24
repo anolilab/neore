@@ -321,7 +321,7 @@ export const releaseClaim = async (ctx: ClaimCtx, scope: string, key: string, cl
  * Correct under both byte-wise (SQLite) and code-unit ordering, which a sentinel suffix such as U+FFFF is not
  * for a key continuing with an astral character.
  */
-const prefixEnd = (prefix: string): string => {
+export const prefixEnd = (prefix: string): string => {
     const last = prefix.length - 1;
 
     return `${prefix.slice(0, last)}${String.fromCodePoint(prefix.codePointAt(last)! + 1)}`;

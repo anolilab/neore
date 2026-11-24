@@ -66,7 +66,8 @@
 - **Guest merges** (`lib/account-merge.ts`; [reference](../../../docs/agents/guest-merge.md)): keep every step safe
   to run twice; save progress through `releaseMergeLease`, never from the job payload; every writing step checks the
   lease generation first. Import markers, progress records and the pins-left signal never get a time to live. Every
-  stop (cap, sweep drop, erasure, gone account, shared store) ends its markers and keeps the guest.
+  stop (cap, sweep drop, erasure, gone account, shared store) ends its markers and keeps the guest. A copy of a row the
+  guest deleted (before or during the clear) is taken back only while it matches its import marker; the marker stays.
 
 - **Secret detection** — `lib/secret-redaction.ts` (`redactSecrets`, `containsSecret`)
   is the one detector for provider keys, JWTs, `Bearer` values, private key blocks,

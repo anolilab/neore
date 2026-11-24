@@ -21,8 +21,10 @@ import {
     dropImportMarkersPage,
     dropRowsGoneFromGuest,
     importShardRows,
+    listRowsMissingOnGuest,
     listShardRowsPage,
     listShardRowsToClear,
+    listUnclearedImports,
     MERGE_CALLS_PER_RUN,
     MERGE_FENCE_SCOPE,
     MERGE_GENERATION_SCOPE,
@@ -138,6 +140,8 @@ const REFERENCES: MergeReferences = {
     list: ref("listShardRowsPage"),
     listClear: ref("listShardRowsToClear"),
     listPinRoutes: { __lunoraRef: "chat_pins_functions:listSharedPinRoutesForExport" },
+    listUncleared: ref("listUnclearedImports"),
+    missingOnGuest: ref("listRowsMissingOnGuest"),
     movePinRoute: ref("moveSharedPinRouteOf"),
     nextPinRoute: ref("nextSharedPinRoute"),
     noteGeneration: ref("noteMergeGeneration"),
@@ -295,7 +299,7 @@ const fakeShards = (
             }
             case "deleteShardRows": {
                 if (stuck) {
-                    return { fenced: false, gone: [] } as never;
+                    return { changed: [], fenced: false, gone: [] } as never;
                 }
 
                 const shard = shards.get(shardKey) ?? new Map<string, Row[]>();
@@ -307,7 +311,7 @@ const fakeShards = (
                     (shard.get(table) ?? []).filter((row) => !ids.has(row._id)),
                 );
 
-                return { fenced: false, gone: [] } as never;
+                return { changed: [], fenced: false, gone: [] } as never;
             }
             case "dropImportMarkersPage": {
                 return { fenced: false, hasMore: false } as never;
@@ -352,6 +356,10 @@ const fakeShards = (
                     });
 
                 return { continueCursor: null, isDone: true, page } as never;
+            }
+            // Every copied row is read again by the clear here: no marker is left that the clear never read.
+            case "listUnclearedImports": {
+                return { ids: [], next: null } as never;
             }
             case "moveSharedPinRouteOf": {
                 const left = pinRows.filter((pin) => pin.userId === args.from && pin.threadId === args.threadId).length;
@@ -1727,8 +1735,10 @@ describe("mergeGuestInto across two real shards", () => {
         dropRowsGoneFromGuest: { fn: dropRowsGoneFromGuest, kind: "mutation" },
         handOverOrganizationContributors: { fn: handOverOrganizationContributors, kind: "mutation" },
         importShardRows: { fn: importShardRows, kind: "mutation" },
+        listRowsMissingOnGuest: { fn: listRowsMissingOnGuest, kind: "query" },
         listShardRowsPage: { fn: listShardRowsPage, kind: "query" },
         listShardRowsToClear: { fn: listShardRowsToClear, kind: "query" },
+        listUnclearedImports: { fn: listUnclearedImports, kind: "query" },
         noteMergeGeneration: { fn: noteMergeGeneration, kind: "mutation" },
         releaseMergeLease: { fn: releaseMergeLease, kind: "mutation" },
         resolvePinsLeft: { fn: resolvePinsLeft, kind: "mutation" },
@@ -2041,6 +2051,69 @@ describe("mergeGuestInto across two real shards", () => {
 
             expect(late).not.toBe("");
             expect(await merge.threadsOn("user")).toStrictEqual([{ _id: copied, title: "before", userId: "user" }]);
+            expect(await merge.threadsOn("guest")).toStrictEqual([]);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("never brings over a row the guest deleted between the copy and the clear's read", async () => {
+        const merge = twoShards();
+
+        try {
+            const kept = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("kept")))) as string;
+            const deleted = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("deleted")))) as string;
+
+            // Copied already: the guest deletes it before the clear reads the table, so the clear never sees it.
+            merge.onceBefore("listShardRowsToClear", async () => {
+                await merge.shards.guest.run(async (context: any) => await context.db.delete("threads", deleted));
+            });
+
+            await mergeToEnd(merge.call, "guest", "user");
+
+            expect(await merge.threadsOn("user")).toStrictEqual([{ _id: kept, title: "kept", userId: "user" }]);
+            expect(await merge.threadsOn("guest")).toStrictEqual([]);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("keeps the account's edit of a copied row the guest deleted before the clear's read", async () => {
+        const merge = twoShards();
+
+        try {
+            const id = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("guest title")))) as string;
+
+            merge.onceBefore("listShardRowsToClear", async () => {
+                await merge.shards.guest.run(async (context: any) => await context.db.delete("threads", id));
+                await merge.shards.user.run(async (context: any) => await context.db.patch("threads", id, { title: "the account's title", updatedAt: 2 }));
+            });
+
+            await mergeToEnd(merge.call, "guest", "user");
+
+            expect(await merge.threadsOn("user")).toStrictEqual([{ _id: id, title: "the account's title", userId: "user" }]);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("never brings over a row the guest deleted after the clear kept it for a change, before the clear read it again", async () => {
+        const merge = twoShards();
+
+        try {
+            const id = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("first")))) as string;
+
+            // Changed between the clear's read and its delete: kept on the guest's shard for the next read, then deleted before it.
+            merge.onceBefore("deleteShardRows", async () => {
+                await merge.shards.guest.run(async (context: any) => await context.db.patch("threads", id, { title: "second", updatedAt: 2 }));
+                merge.onceBefore("listShardRowsToClear", async () => {
+                    await merge.shards.guest.run(async (context: any) => await context.db.delete("threads", id));
+                });
+            });
+
+            await mergeToEnd(merge.call, "guest", "user");
+
+            expect(await merge.threadsOn("user")).toStrictEqual([]);
             expect(await merge.threadsOn("guest")).toStrictEqual([]);
         } finally {
             merge.close();
@@ -2857,15 +2930,18 @@ describe("the account-move markers a merge holds", () => {
             beginMergeRun,
             deleteShardRows,
             dropImportMarkersPage,
+            dropRowsGoneFromGuest,
             handOverOrganizationContributors,
             importShardRows,
+            listRowsMissingOnGuest,
             listShardRowsPage,
             listShardRowsToClear,
+            listUnclearedImports,
             noteMergeGeneration,
             releaseMergeLease,
             resolvePinsLeft,
         };
-        const QUERIES = new Set(["listShardRowsPage", "listShardRowsToClear"]);
+        const QUERIES = new Set(["listRowsMissingOnGuest", "listShardRowsPage", "listShardRowsToClear", "listUnclearedImports"]);
         const shards = { guest: lunoraTest(schemaWithShardedTables([]) as never), user: lunoraTest(schemaWithShardedTables([]) as never) };
         const call: ShardCall = async (reference, args, shardKey) => {
             const name = reference.__lunoraRef.split(":", 2)[1]!;
@@ -3652,15 +3728,18 @@ describe("what a finished merge leaves behind", () => {
         beginMergeRun,
         deleteShardRows,
         dropImportMarkersPage,
+        dropRowsGoneFromGuest,
         handOverOrganizationContributors,
         importShardRows,
+        listRowsMissingOnGuest,
         listShardRowsPage,
         listShardRowsToClear,
+        listUnclearedImports,
         noteMergeGeneration,
         releaseMergeLease,
         resolvePinsLeft,
     };
-    const QUERIES = new Set(["listShardRowsPage", "listShardRowsToClear"]);
+    const QUERIES = new Set(["listRowsMissingOnGuest", "listShardRowsPage", "listShardRowsToClear", "listUnclearedImports"]);
 
     /** Every merge claim on the shard, by scope. */
     const mergeClaimsOn = async (harness: ReturnType<typeof lunoraTest>) =>

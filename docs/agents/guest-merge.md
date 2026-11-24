@@ -39,6 +39,16 @@ deleted by the merge: the clear's import may just have written it on the new sha
 copy there only while it still matches its import marker (the account never changed it), and keeps the marker, so no
 later import writes it again. An absent source row is never a confirmation of the copy that was read from it.
 
+A row the copy brought over and the guest deleted before the clear read its table is never seen by the clear. The
+clear's import records every row of its page it is about to delete (`guest-merge-cleared`, keyed as the import marker,
+written before the guest's delete, so a run cut off in between keeps the copy); a row `deleteShardRows` keeps for a
+changed digest loses its record until the clear reads it again. Once the clear has emptied a table, the `reconcile`
+phase pages its import markers on the new shard (`listUnclearedImports`, the clear's page size, so an audited table's
+drop stays within the D1 budget), asks the guest's shard which of those without a record it no longer holds
+(`listRowsMissingOnGuest`), and hands them to `dropRowsGoneFromGuest`: an unchanged copy goes, an account-edited one
+stays, the marker stays. Three calls a step, its cursor the last marker key, safe to run again. The records go with the
+markers (`dropImportMarkersPage`) and count for `mergeCleanupPending`.
+
 `auth/hooks.ts#deleteMergedGuest` reads the guest's `user` row from the primary: a replica that has not seen it yet
 would pass for the anonymous plugin's deletion and the guest would stay.
 
