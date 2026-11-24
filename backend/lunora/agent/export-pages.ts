@@ -13,6 +13,12 @@ export const CHAT_FILE_METADATA_CHUNK = 100;
  */
 export const CHAT_FILE_EXPORT_BYTES = 8 * 1024 * 1024;
 
+/**
+ * The chat-file metadata reads are held to this many bytes of stored rows (each row is read whole, extracted text included). Past it the
+ * rest of the files are not read, and the section is flagged. The export action's other sections read against their own budgets.
+ */
+export const CHAT_FILE_READ_BYTES = 16 * 1024 * 1024;
+
 /** Walks one source to its end, returning every id it yields. */
 const walkIds = async (read: (cursor: string | null) => Promise<IdsPage>): Promise<string[]> => {
     const ids: string[] = [];
@@ -60,9 +66,10 @@ export const collectAllMessageFileIds = async (
 export const collectAllChatFileMetadata = async <Row>(
     listGrantedIds: (cursor: string | null) => Promise<IdsPage>,
     listMessageFileIds: () => Promise<string[]>,
-    readMetadata: (fileIds: string[]) => Promise<Row[]>,
+    readMetadata: (fileIds: string[]) => Promise<{ readBytes: number; rows: Row[] }>,
     chunkSize: number = CHAT_FILE_METADATA_CHUNK,
-): Promise<Row[]> => {
+    readBudget: number = CHAT_FILE_READ_BYTES,
+): Promise<{ rows: Row[]; truncated: boolean }> => {
     const ids = new Set<string>(await walkIds(listGrantedIds));
 
     const messageIds = await listMessageFileIds();
@@ -73,12 +80,21 @@ export const collectAllChatFileMetadata = async <Row>(
 
     const all = [...ids];
     const rows: Row[] = [];
+    let readBytes = 0;
 
     for (let start = 0; start < all.length; start += chunkSize) {
-        rows.push(...(await readMetadata(all.slice(start, start + chunkSize))));
+        // Past the budget the rest of the files are not read: the section says so, as it does past its byte cap.
+        if (readBytes >= readBudget) {
+            return { rows, truncated: true };
+        }
+
+        const chunk = await readMetadata(all.slice(start, start + chunkSize));
+
+        readBytes += chunk.readBytes;
+        rows.push(...chunk.rows);
     }
 
-    return rows;
+    return { rows, truncated: false };
 };
 
 /**

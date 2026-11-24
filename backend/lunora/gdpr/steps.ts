@@ -823,7 +823,7 @@ export const generateExportFile = internalAction
                   );
         // The user's chat files (uploads and generated images), metadata only: the files behind their grants and the files their messages
         // name (`agent/export-pages.ts`), read here a page per query, as the sections above are. Held to a byte budget, with a flag when cut.
-        const chatFileRows = await collectAllChatFileMetadata(
+        const chatFileRead = await collectAllChatFileMetadata(
             async (cursor) => await context.runQuery(internal.agent.gdpr.collectGrantedChatFileIdsForExport, { cursor, userId: args.userId }),
             async () =>
                 await collectAllMessageFileIds(
@@ -833,7 +833,9 @@ export const generateExportFile = internalAction
                 ),
             async (fileIds) => await context.runQuery(internal.agent.gdpr.chatFileMetadataForExport, { fileIds: fileIds as Id<"chatFiles">[] }),
         );
-        const chatFiles = capChatFiles(chatFileRows);
+        const chatFileCapped = capChatFiles(chatFileRead.rows);
+        // Cut by the byte cap or by the read budget: either way the section says so.
+        const chatFiles = { files: chatFileCapped.files, truncated: chatFileCapped.truncated || chatFileRead.truncated };
         const exportData = {
             acpSessions,
             bots: args.bots ?? { bots: [] },

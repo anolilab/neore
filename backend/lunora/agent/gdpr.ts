@@ -177,34 +177,44 @@ export const collectMessageFileIdsForExport = internalQuery
 export const chatFileMetadataForExport = internalQuery
     .input({ fileIds: v.array(v.id("chatFiles")) })
     .output(
-        v.array(
-            v.object({
-                createdAt: v.number(),
-                filename: v.optional(v.string()),
-                filenameCut: v.boolean(),
-                hash: v.string(),
-                id: v.string(),
-                mediaType: v.string(),
-            }),
-        ),
+        v.object({
+            // The bytes the query read: each whole row, as stored. The export action meters its chunks against a budget with this.
+            readBytes: v.number(),
+            rows: v.array(
+                v.object({
+                    createdAt: v.number(),
+                    filename: v.optional(v.string()),
+                    filenameCut: v.boolean(),
+                    hash: v.string(),
+                    id: v.string(),
+                    mediaType: v.string(),
+                }),
+            ),
+        }),
     )
     .query(async ({ args: { fileIds }, ctx }) => {
         if (fileIds.length === 0) {
-            return [];
+            return { readBytes: 0, rows: [] };
         }
 
         const { page } = await ctx.db.chatFiles.findMany({ where: { _id: { in: fileIds } } });
+        const files = storedRows(page);
+        // The whole row is read, extracted text included, so the bytes read are the row's size as stored, not the metadata's.
+        const readBytes = files.reduce((total, file) => total + JSON.stringify(file).length, 0);
 
-        return storedRows(page).map((file) => {
-            return {
-                createdAt: file._creationTime,
-                filename: file.filename?.slice(0, CHAT_FILE_NAME_MAX),
-                filenameCut: (file.filename?.length ?? 0) > CHAT_FILE_NAME_MAX,
-                hash: file.hash,
-                id: file._id,
-                mediaType: file.mediaType.slice(0, CHAT_FILE_TYPE_MAX),
-            };
-        });
+        return {
+            readBytes,
+            rows: files.map((file) => {
+                return {
+                    createdAt: file._creationTime,
+                    filename: file.filename?.slice(0, CHAT_FILE_NAME_MAX),
+                    filenameCut: (file.filename?.length ?? 0) > CHAT_FILE_NAME_MAX,
+                    hash: file.hash,
+                    id: file._id,
+                    mediaType: file.mediaType.slice(0, CHAT_FILE_TYPE_MAX),
+                };
+            }),
+        };
     });
 
 /** The file-to-chat links of the user's own chats (`chatFileThreads`, keyed by owner). */

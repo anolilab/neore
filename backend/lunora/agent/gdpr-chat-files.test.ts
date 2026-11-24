@@ -124,7 +124,7 @@ const staleLinkOf = async (userId: string, hash: string): Promise<string> =>
 /** The whole export for one user: the grants and the message files, then the metadata read, as the export action does. */
 const exportedFor = async (userId: string): Promise<{ files: ExportedFile[]; pages: number }> => {
     let pages = 0;
-    const files = (await collectAllChatFileMetadata(
+    const read = (await collectAllChatFileMetadata(
         async (cursor) => {
             pages += 1;
 
@@ -139,9 +139,9 @@ const exportedFor = async (userId: string): Promise<{ files: ExportedFile[]; pag
                     )) as IdsPage,
             ),
         async (fileIds) => await harness.run(async (ctx: any) => await ctx.runQuery(chatFileMetadataForExport, { fileIds })),
-    )) as ExportedFile[];
+    )) as { rows: ExportedFile[]; truncated: boolean };
 
-    return { files, pages };
+    return { files: read.rows, pages };
 };
 
 describe("chat files in the GDPR export", () => {
@@ -233,15 +233,18 @@ describe("chat files in the GDPR export", () => {
         };
         const reads: string[][] = [];
 
-        const rows = await collectAllChatFileMetadata(
+        const { rows } = await collectAllChatFileMetadata(
             async (cursor) => grantPages[cursor ?? ""] ?? { cursor: null, ids: [] },
             async () => ["d", "a"],
             async (fileIds) => {
                 reads.push(fileIds);
 
-                return fileIds.map((id) => {
-                    return { id };
-                });
+                return {
+                    readBytes: 0,
+                    rows: fileIds.map((id) => {
+                        return { id };
+                    }),
+                };
             },
             2,
         );
@@ -251,6 +254,34 @@ describe("chat files in the GDPR export", () => {
             ["c", "d"],
         ]);
         expect(rows.map((row) => row.id)).toEqual(["a", "b", "c", "d"]);
+    });
+
+    it("stops reading once the read budget is spent, and says so", async () => {
+        const reads: string[][] = [];
+
+        const { rows, truncated } = await collectAllChatFileMetadata(
+            async () => {
+                return { cursor: null, ids: ["a", "b", "c", "d", "e", "f"] };
+            },
+            async () => [],
+            async (fileIds) => {
+                reads.push(fileIds);
+
+                return {
+                    readBytes: 10,
+                    rows: fileIds.map((id) => {
+                        return { id };
+                    }),
+                };
+            },
+            2,
+            15,
+        );
+
+        // Chunks of two, ten bytes each: two chunks read (20 bytes, past 15), the third is not.
+        expect(reads).toHaveLength(2);
+        expect(rows).toHaveLength(4);
+        expect(truncated).toBe(true);
     });
 
     it("walks every thread and every page of each thread's messages", async () => {
@@ -291,7 +322,7 @@ describe("chat files in the GDPR export", () => {
         expect(steps).toContain("internal.agent.gdpr.collectThreadIdsForExport");
         expect(steps).toContain("internal.agent.gdpr.collectMessageFileIdsForExport");
         expect(steps).toContain("internal.agent.gdpr.chatFileMetadataForExport");
-        expect(steps).toContain("capChatFiles(chatFileRows)");
+        expect(steps).toContain("capChatFiles(chatFileRead.rows)");
         expect(steps).toContain("\n            chatFiles,\n");
     });
 });
