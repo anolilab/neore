@@ -38,7 +38,16 @@ export type AiUserPreferencesPatch = Partial<
 
 /** The `userSettings` columns other modules set. */
 export type UserSettingsPatch = Partial<
-    Pick<Doc<"userSettings">, "dailyBriefEnabled" | "dailyBriefOfferDismissedAt" | "setupStepsSkipped" | "taskEmailEnabled">
+    Pick<
+        Doc<"userSettings">,
+        | "chatFailedToastEnabled"
+        | "chatFinishedToastEnabled"
+        | "chatInputToastEnabled"
+        | "dailyBriefEnabled"
+        | "dailyBriefOfferDismissedAt"
+        | "setupStepsSkipped"
+        | "taskEmailEnabled"
+    >
 >;
 
 /**

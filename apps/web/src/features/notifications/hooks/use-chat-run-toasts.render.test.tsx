@@ -1,0 +1,140 @@
+// @vitest-environment jsdom
+
+/**
+ * Each chat toast is gated by its own setting: a toggle that is off suppresses only its toast, and the other two still
+ * show. A toast fires on a transition (a run ending, a reply erroring, a call starting to wait), never on the first snapshot.
+ */
+import { renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { toAppError } from "@/features/chat/core/context/chat-action-shared";
+import type { AppError } from "@/lib/errors";
+
+import type { ChatToastSettings } from "../lib/chat-toasts";
+import useChatRunToasts from "./use-chat-run-toasts";
+
+const toastSuccess = vi.hoisted(() => vi.fn());
+const toastWarning = vi.hoisted(() => vi.fn());
+const toastError = vi.hoisted(() => vi.fn());
+
+vi.mock("sonner", () => {
+    return { toast: { error: toastError, success: toastSuccess, warning: toastWarning } };
+});
+vi.mock("@lingui/react/macro", () => {
+    return {
+        useLingui: () => {
+            return { i18n: { locale: "en" }, t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
+        },
+    };
+});
+
+interface Props {
+    activeStreamId: string | null;
+    error: AppError | null;
+    messages: ReadonlyArray<{ parts?: ReadonlyArray<unknown> }>;
+    settings: ChatToastSettings | null | undefined;
+    threadId: string | undefined;
+}
+
+// A thread with its first message in it: a call can only start waiting after that.
+const userMessage: Props["messages"] = [{ parts: [{ text: "hello", type: "text" }] }];
+const idle: Props = { activeStreamId: null, error: null, messages: userMessage, settings: {}, threadId: "thread-1" };
+const streaming = (props: Props): Props => {
+    return { ...props, activeStreamId: "stream-1" };
+};
+const waitingOn = (toolCallId: string): Props["messages"] => [{ parts: [{ state: "approval-requested", toolCallId, type: "tool-shell" }] }];
+
+/** Starts a run, then ends it cleanly. */
+const finishRun = (rerender: (props: Props) => void, props: Props): void => {
+    rerender(streaming(props));
+    rerender({ ...props, activeStreamId: null });
+};
+
+const setup = (initial: Props) => renderHook((props: Props) => useChatRunToasts(props), { initialProps: initial });
+
+beforeEach(() => {
+    toastSuccess.mockClear();
+    toastWarning.mockClear();
+    toastError.mockClear();
+});
+
+describe("useChatRunToasts: each toggle suppresses its own toast", () => {
+    it("shows no finished toast when the finished toggle is off", () => {
+        const { rerender } = setup({ ...idle, settings: { chatFinishedToastEnabled: false } });
+
+        finishRun(rerender, { ...idle, settings: { chatFinishedToastEnabled: false } });
+
+        expect(toastSuccess).not.toHaveBeenCalled();
+    });
+
+    it("shows no failed toast when the failed toggle is off", () => {
+        const { rerender } = setup({ ...idle, settings: { chatFailedToastEnabled: false } });
+
+        rerender({ ...idle, error: toAppError(new Error("Reply failed")), settings: { chatFailedToastEnabled: false } });
+
+        expect(toastError).not.toHaveBeenCalled();
+    });
+
+    it("shows no needs-input toast when the input toggle is off", () => {
+        const { rerender } = setup({ ...idle, settings: { chatInputToastEnabled: false } });
+
+        rerender({ ...idle, messages: waitingOn("call-1"), settings: { chatInputToastEnabled: false } });
+
+        expect(toastWarning).not.toHaveBeenCalled();
+    });
+});
+
+describe("useChatRunToasts: the other toasts still show", () => {
+    it("shows the failed and needs-input toasts while the finished toggle is off", () => {
+        const { rerender } = setup({ ...idle, settings: { chatFinishedToastEnabled: false } });
+
+        rerender({ ...idle, error: toAppError(new Error("Reply failed")), settings: { chatFinishedToastEnabled: false } });
+        rerender({ ...idle, error: null, messages: waitingOn("call-2"), settings: { chatFinishedToastEnabled: false } });
+
+        expect(toastError).toHaveBeenCalledTimes(1);
+        expect(toastWarning).toHaveBeenCalledTimes(1);
+        expect(toastSuccess).not.toHaveBeenCalled();
+    });
+
+    it("shows the finished and needs-input toasts while the failed toggle is off", () => {
+        const { rerender } = setup({ ...idle, settings: { chatFailedToastEnabled: false } });
+
+        finishRun(rerender, { ...idle, settings: { chatFailedToastEnabled: false } });
+        rerender({ ...idle, messages: waitingOn("call-3"), settings: { chatFailedToastEnabled: false } });
+
+        expect(toastSuccess).toHaveBeenCalledTimes(1);
+        expect(toastWarning).toHaveBeenCalledTimes(1);
+        expect(toastError).not.toHaveBeenCalled();
+    });
+
+    it("shows the finished and failed toasts while the needs-input toggle is off", () => {
+        const { rerender } = setup({ ...idle, settings: { chatInputToastEnabled: false } });
+
+        rerender({ ...idle, messages: waitingOn("call-4"), settings: { chatInputToastEnabled: false } });
+        finishRun(rerender, { ...idle, messages: waitingOn("call-4"), settings: { chatInputToastEnabled: false } });
+
+        // The run ended with its call still waiting: no finished toast, but the failed one (not waiting) still shows.
+        rerender({ ...idle, error: toAppError(new Error("Reply failed")), settings: { chatInputToastEnabled: false } });
+
+        expect(toastWarning).not.toHaveBeenCalled();
+        expect(toastError).toHaveBeenCalledTimes(1);
+    });
+
+    it("announces nothing for a call already waiting when the thread opens", () => {
+        setup({ ...idle, messages: waitingOn("call-open") });
+
+        expect(toastWarning).not.toHaveBeenCalled();
+    });
+
+    it("shows all three toasts when every toggle is absent (the default)", () => {
+        const { rerender } = setup({ ...idle, settings: {} });
+
+        finishRun(rerender, { ...idle, settings: {} });
+        rerender({ ...idle, error: toAppError(new Error("Reply failed")), settings: {} });
+        rerender({ ...idle, error: null, messages: waitingOn("call-5"), settings: {} });
+
+        expect(toastSuccess).toHaveBeenCalledTimes(1);
+        expect(toastError).toHaveBeenCalledTimes(1);
+        expect(toastWarning).toHaveBeenCalledTimes(1);
+    });
+});

@@ -28,6 +28,7 @@ import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { openLoginPrompt } from "@/features/auth/stores/login-prompt-store";
 import useLocalModelTurn from "@/features/local-models/hooks/use-local-model-turn";
+import useChatRunToasts from "@/features/notifications/hooks/use-chat-run-toasts";
 import type { UIMessage } from "@/lib/agent";
 import { trackEvent } from "@/lib/analytics";
 import type { AppError } from "@/lib/errors";
@@ -613,6 +614,9 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     if (activeStreamId && isRegenerating) {
         setIsRegenerating(false);
     }
+
+    // In-app toasts for a run that failed, finished, or waits for the person (each gated by its setting).
+    useChatRunToasts({ activeStreamId, error, messages, settings: userSettings, threadId });
 
     // Track stream completion when activeStreamId transitions from non-null to null
     const { t } = useLingui();
