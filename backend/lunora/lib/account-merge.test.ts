@@ -718,7 +718,7 @@ describe("mergeGuestInto", () => {
             user: {},
         });
 
-        await mergeGuestInto(call, REFERENCES, "guest", "user");
+        await mergeToEnd(call, "guest", "user");
 
         expect(shards.get("user")?.get("pullRequestStateScans") ?? []).toStrictEqual([]);
         expect(shards.get("guest")?.get("pullRequestStateScans")).toStrictEqual([]);
@@ -731,7 +731,7 @@ describe("mergeGuestInto", () => {
             user: { pullRequestStateScans: [own] },
         });
 
-        await mergeGuestInto(call, REFERENCES, "guest", "user");
+        await mergeToEnd(call, "guest", "user");
 
         expect(shards.get("user")?.get("pullRequestStateScans")).toStrictEqual([own]);
         expect(shards.get("guest")?.get("pullRequestStateScans")).toStrictEqual([]);

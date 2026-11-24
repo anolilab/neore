@@ -1566,7 +1566,7 @@ export const deleteShardRows = internalMutation
 
             if (row === null) {
                 gone.push(id);
-            } else if ((await rowDigest(args.table, row)) === digest) {
+            } else if (NOT_COPIED.has(args.table) || (await rowDigest(args.table, row)) === digest) {
                 await db.delete(args.table, id);
                 deleted = true;
             } else {
@@ -2977,6 +2977,24 @@ const clearPage = async (
 
     if (rows.length === 0) {
         return { calls: 1, kept: [], outcome: "empty" };
+    }
+
+    // Never copied, so there is no copy to confirm: the rows go off the guest's shard, fenced by the lease like any clear.
+    if (NOT_COPIED.has(table)) {
+        await call(
+            references.deleteRows,
+            {
+                from,
+                generation,
+                rows: rows.map((row) => {
+                    return { digest: "", id: String(row._id) };
+                }),
+                table,
+            },
+            from,
+        );
+
+        return { calls: 2, kept: [], outcome: "page" };
     }
 
     const {
