@@ -17,10 +17,21 @@ export const isMergeDestination = async (context: Pick<QueryCtx, "db">, userId: 
  * Whether `guestId` is still a guest a merge may move rows from: its `user` row is there and is a guest's. Read from the
  * primary, so the merge's own deletion of the guest, or an erasure, is seen at once.
  */
-export const isMergeSource = async (context: Pick<QueryCtx, "db">, guestId: string): Promise<boolean> => {
+export const isMergeSource = async (context: Pick<QueryCtx, "db">, guestId: string): Promise<boolean> => (await mergeSourceState(context, guestId)) === "guest";
+
+/**
+ * What `guestId`'s `user` row is, from the primary: `guest`, `missing`, or `account` (a real user's, never a merge's source).
+ * `missing` alone never means the merge is done: the anonymous plugin deletes the guest's row in the sign-up request that
+ * queued the merge, before any of its rows have moved; only the merge's own progress says it got past its `guest` step.
+ */
+export const mergeSourceState = async (context: Pick<QueryCtx, "db">, guestId: string): Promise<"account" | "guest" | "missing"> => {
     const user = (await context.db.user.findFirst({ consistency: "primary", where: { _id: context.db.asId("user", guestId) } })) as {
         isAnonymous?: boolean | null;
     } | null;
 
-    return user?.isAnonymous === true;
+    if (user === null) {
+        return "missing";
+    }
+
+    return user.isAnonymous === true ? "guest" : "account";
 };

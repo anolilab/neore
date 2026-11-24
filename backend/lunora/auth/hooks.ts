@@ -165,8 +165,9 @@ const cascadeDelete = async (ctx: MutationCtx, user: Id<"user">): Promise<void> 
 /**
  * Delete a guest whose rows have been moved to the account it converted to, the way the anonymous plugin deletes it
  * when the conversion completes in the guest's own browser. The last step of `lib/account-merge.ts#runGuestMerge`,
- * run on the guest's shard. Only ever an anonymous user: a missing or real one is left alone, so a second run (queue
- * redelivery) or a wrong id does nothing. A guest still named by a thread follow (one written after the merge read its
+ * run on the guest's shard. Never a real account: one is left alone. A guest whose `user` row is already gone (the
+ * anonymous plugin deletes it in the sign-up request that queues the merge) is ended all the same once its shard is
+ * empty, its generation and pins-left signal dropped; a second run then finds nothing left to drop. A guest still named by a thread follow (one written after the merge read its
  * last page) is kept and `followsRemain` is set, and one still named by a shared pin route (a pin made after the merge's
  * pin step) is kept with `pinsRemain`, and one whose shard still holds a row (written to a table after the merge cleared
  * it) with `rowsRemain` naming the first such table, so the merge moves the row first and tries again. A merge run whose
@@ -191,41 +192,49 @@ export const deleteMergedGuest = internalMutation
             return { deleted: false, fenced: true };
         }
 
-        const user = (await ctx.db.user.findFirst({ where: { _id: ctx.db.asId("user", args.userId) } })) as {
+        const guestId = ctx.db.asId("user", args.userId);
+        const user = (await ctx.db.user.findFirst({ where: { _id: guestId } })) as {
             _id: Id<"user">;
             isAnonymous?: boolean | null;
         } | null;
 
-        if (user?.isAnonymous !== true) {
+        // A real account is never deleted here. A missing row is the anonymous plugin's deletion at sign-up: the merge
+        // still empties the guest's shard, and this step still ends it, so no row and no generation is left behind.
+        if (user !== null && user.isAnonymous !== true) {
             return { deleted: false };
         }
 
-        if (!onGuestShard(user._id)) {
-            authLogger.warn(`[auth] kept guest ${user._id}: its shard serves other users too, so the merge moved none of its rows`);
+        if (!onGuestShard(guestId)) {
+            authLogger.warn(`[auth] kept guest ${guestId}: its shard serves other users too, so the merge moved none of its rows`);
 
             return { deleted: false, sharedShard: true };
         }
 
-        if (await guestHasFollowRows(ctx.db, user._id)) {
+        if (await guestHasFollowRows(ctx.db, guestId)) {
             return { deleted: false, followsRemain: true };
         }
 
         // A pin the guest made on another owner's thread after the merge's pin step: its route still names the guest.
-        if (await guestHasPinRoutes(ctx.db, user._id)) {
+        if (await guestHasPinRoutes(ctx.db, guestId)) {
             return { deleted: false, pinsRemain: true };
         }
 
-        const rowsRemain = await firstTableWithGuestRows(ctx, user._id);
+        const rowsRemain = await firstTableWithGuestRows(ctx, guestId);
 
         if (rowsRemain !== null) {
             return { deleted: false, rowsRemain };
         }
 
-        await cascadeDelete(ctx, user._id);
+        await cascadeDelete(ctx, guestId);
         // Its `global` step dropped this already; a guest gone takes its shard's pins-left signal with it in any case.
-        await dropPinsLeft(ctx.db, user._id);
+        await dropPinsLeft(ctx.db, guestId);
         // Never lapses while the merge is unfinished; with the guest gone, nothing is left for it to fence.
-        await dropMergeGeneration(ctx.db, user._id);
+        await dropMergeGeneration(ctx.db, guestId);
+
+        if (user === null) {
+            return { deleted: false };
+        }
+
         await ctx.db.delete("user", user._id);
 
         return { deleted: true };

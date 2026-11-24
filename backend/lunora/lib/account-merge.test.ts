@@ -82,8 +82,11 @@ vi.mock("../auth/lib/merge-destination", async (importOriginal) => {
 
             return !goneAccounts.has(userId);
         },
-        // The guest's `user` row, `.global()` too: a guest is gone once it is in the same set.
+        // The guest's `user` row, `.global()` too: a guest is gone once it is in the same set. A harness that holds the
+        // `user` table reads the real row; one that does not (most of them) sees a guest.
         isMergeSource: async (_context: unknown, guestId: string) => !goneAccounts.has(guestId),
+        mergeSourceState: async (context: Parameters<typeof actual.mergeSourceState>[0], guestId: string) =>
+            goneAccounts.has(guestId) ? "missing" : await actual.mergeSourceState(context, guestId).catch(() => "guest" as const),
     };
 });
 
@@ -1291,10 +1294,51 @@ describe("deleteMergedGuest", () => {
             const sessions = await harness.run(async (context: any) => await context.db.session.findMany({ where: { userId: guest } }));
 
             expect(sessions.page).toStrictEqual([]);
-            // A second run (queue redelivery) finds nothing to do.
+            // A second run (queue redelivery) finds nothing to do, and leaves no generation behind.
             await expect(deleteGuest(harness, guest)).resolves.toStrictEqual({
                 deleted: false,
             });
+            expect(await claimKeysOf(harness, MERGE_GENERATION_SCOPE)).toStrictEqual([]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("still moves and ends a guest whose `user` row the anonymous plugin deleted at sign-up", async () => {
+        const harness = harnessWithUsers();
+
+        try {
+            const guest = await insertUser(harness, true);
+            const thread = (await harness.run(
+                async (context: any) =>
+                    await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "mine", updatedAt: 1, userId: guest }),
+            )) as string;
+
+            // The plugin's `deleteUser` right after `onLinkAccount` queued the merge.
+            await harness.run(async (context: any) => await context.db.delete("user", guest));
+
+            // The merge's first run: its progress is short of the `guest` step, so the missing row does not end it.
+            expect(await harness.run(async (context: any) => await context.runMutation(noteMergeGeneration, { from: guest, generation: 1 }))).toStrictEqual({
+                current: true,
+            });
+            // Its `guest` step sends it back for the row it has not moved yet.
+            expect(await harness.run(async (context: any) => await context.runMutation(deleteMergedGuest, { generation: 1, userId: guest }))).toStrictEqual({
+                deleted: false,
+                rowsRemain: "threads",
+            });
+
+            await harness.run(async (context: any) => await context.db.delete("threads", thread));
+
+            // Once the shard is empty the step ends the guest: no generation is left on its shard.
+            expect(await harness.run(async (context: any) => await context.runMutation(deleteMergedGuest, { generation: 1, userId: guest }))).toStrictEqual({
+                deleted: false,
+            });
+            expect(await claimKeysOf(harness, MERGE_GENERATION_SCOPE)).toStrictEqual([]);
+            // A run whose progress is past that step writes none again.
+            expect(
+                await harness.run(async (context: any) => await context.runMutation(noteMergeGeneration, { from: guest, generation: 2, pastGuest: true })),
+            ).toStrictEqual({ current: false, guestGone: true });
+            expect(await claimKeysOf(harness, MERGE_GENERATION_SCOPE)).toStrictEqual([]);
         } finally {
             harness.close();
         }
@@ -1435,7 +1479,24 @@ describe("deleteMergedGuest", () => {
             const member = await insertUser(harness, false);
             const result = await deleteGuest(harness, member);
 
-            expect(result).toStrictEqual({ deleted: false });
+            // A real account's shard gets no generation, so the step is refused before it reads anything.
+            expect(result).toStrictEqual({ deleted: false, fenced: true });
+            expect(await claimKeysOf(harness, MERGE_GENERATION_SCOPE)).toStrictEqual([]);
+            // Even with one written by hand, the account is left alone.
+            await harness.run(
+                async (context: any) =>
+                    await context.db.insert("idempotencyClaims", {
+                        claimedAt: 0,
+                        expiresAt: IMPORT_MARKER_EXPIRES_AT,
+                        key: member,
+                        result: JSON.stringify({ generation: 1 }),
+                        scope: MERGE_GENERATION_SCOPE,
+                        userId: member,
+                    }),
+            );
+            expect(await harness.run(async (context: any) => await context.runMutation(deleteMergedGuest, { generation: 1, userId: member }))).toStrictEqual({
+                deleted: false,
+            });
             await expect(userExists(harness, member)).resolves.toBe(true);
         } finally {
             harness.close();
@@ -3545,6 +3606,88 @@ describe("what a finished merge leaves behind", () => {
             expect(await mergeClaimsOn(shards.guest)).toStrictEqual([]);
             expect(await mergeClaimsOn(shards.user)).toStrictEqual([MERGE_FENCE_SCOPE]);
             expect(await shards.user.run(async (context: any) => await context.db.query("threads").take(5))).toHaveLength(1);
+        } finally {
+            goneAccounts.delete("guest");
+            shards.guest.close();
+            shards.user.close();
+        }
+    });
+    it("moves every row of a guest whose `user` row the anonymous plugin deleted before the first run", async () => {
+        const shards = { guest: lunoraTest(schemaWithShardedTables([]) as never), user: lunoraTest(schemaWithShardedTables([]) as never) };
+        const call: ShardCall = async (reference, args, shardKey) => {
+            const name = reference.__lunoraRef.split(":", 2)[1]!;
+
+            switch (name) {
+                // `auth/hooks.ts#deleteMergedGuest` for a guest whose row is already gone (tested there): it sends the merge
+                // back for a row still on the shard, and ends the guest once the shard is empty.
+                case "deleteMergedGuest": {
+                    const left = (await shards.guest.run(async (context: any) => {
+                        if (!(await mergeGenerationCurrent(context.db, "guest", args.generation as number))) {
+                            return "fenced";
+                        }
+
+                        const table = await firstTableWithGuestRows(context, "guest");
+
+                        if (table === null) {
+                            await dropPinsLeft(context.db, "guest");
+                            await dropMergeGeneration(context.db, "guest");
+                        }
+
+                        return table;
+                    })) as string | null;
+
+                    if (left === "fenced") {
+                        return { deleted: false, fenced: true } as never;
+                    }
+
+                    return (left === null ? { deleted: false } : { deleted: false, rowsRemain: left }) as never;
+                }
+                case "listSharedPinRoutesForExport": {
+                    return { continueCursor: null, isDone: true, page: [] } as never;
+                }
+                case "nextSharedPinRoute": {
+                    return null as never;
+                }
+                case "reassignGlobalRows": {
+                    return { done: true, reassigned: 0 } as never;
+                }
+                case "reassignThreadFollowsPage": {
+                    return { hasMore: false, moved: 0 } as never;
+                }
+                default: {
+                    return (await shards[shardKey as keyof typeof shards].run(async (context: any) =>
+                        QUERIES.has(name) ? await context.runQuery(PROCEDURES[name], args) : await context.runMutation(PROCEDURES[name], args),
+                    )) as never;
+                }
+            }
+        };
+
+        try {
+            for (const title of ["a", "b", "c"]) {
+                await shards.guest.run(
+                    async (context: any) =>
+                        await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title, updatedAt: 1, userId: "guest" }),
+                );
+            }
+
+            await shards.user.run(async (context: any) => await context.runMutation(recordGuestMerge, { from: "guest", to: "user" }));
+            // The plugin's `deleteUser`, in the same sign-up request that queued the merge.
+            goneAccounts.add("guest");
+
+            await mergeToEnd(call, "guest", "user");
+
+            const moved = (await shards.user.run(async (context: any) => await context.db.query("threads").take(10))) as { title: string; userId: string }[];
+
+            expect(moved.map((row) => row.title).toSorted((a, b) => a.localeCompare(b))).toStrictEqual(["a", "b", "c"]);
+            expect(moved.every((row) => row.userId === "user")).toBe(true);
+            expect(await shards.guest.run(async (context: any) => await context.db.query("threads").take(10))).toStrictEqual([]);
+            expect(await mergeClaimsOn(shards.guest)).toStrictEqual([]);
+            expect(await mergeClaimsOn(shards.user)).toStrictEqual([MERGE_FENCE_SCOPE]);
+
+            // The merge did finish: a late redelivery still reports it done and writes nothing.
+            expect(await mergeGuestInto(call, REFERENCES, "guest", "user")).toStrictEqual({ moved: 0, next: null, superseded: true });
+            expect(await mergeClaimsOn(shards.guest)).toStrictEqual([]);
+            expect(await mergeClaimsOn(shards.user)).toStrictEqual([MERGE_FENCE_SCOPE]);
         } finally {
             goneAccounts.delete("guest");
             shards.guest.close();

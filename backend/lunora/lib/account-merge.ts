@@ -75,7 +75,7 @@ import { v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import type { MutationCtx } from "../_generated/server";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
-import { isMergeDestination, isMergeSource } from "../auth/lib/merge-destination";
+import { isMergeDestination, mergeSourceState } from "../auth/lib/merge-destination";
 import { mergeSkippedSteps } from "../auth/lib/setup-step-limits";
 import { beginAccountMove, endAccountMove, hasAccountMove, isErasing, MERGE_MARKER_MAX_AGE_MS, pinWritesInFlightUntil } from "./account-moves";
 import { AUDIT_TABLES } from "./audit-triggers";
@@ -814,15 +814,17 @@ export const releaseMergeLease = internalMutation
 
 /**
  * On the GUEST's shard: record `generation` as the newest, unless a newer one is already here (`current: false`: this
- * run was superseded before it began and must do nothing). `guestGone` (with `current: false`) once the guest is no
- * longer a guest's `user` row (deleted by this merge's `guest` step, by another path, or erased): nothing is written,
- * since the guest's deletion and its erasure are what drop this row, and one written after them would never go. With no
- * row on its shard, every delete there refuses the run ({@link mergeGenerationCurrent}); the run only ends the merge
- * (its `markers` phase). The `user` row is read only when no generation is here: at a merge's first run and after the
- * guest is gone.
+ * run was superseded before it began and must do nothing). `guestGone` (with `current: false`) only once this merge
+ * itself got past its `guest` step (`pastGuest`: its progress is in the `markers` phase) and no generation is here, or
+ * when the id is a real account's: nothing is written, since the `guest` step drops this row, and one written after it
+ * would never go. A missing `user` row alone is no reason to stop: the anonymous plugin deletes the guest's in the very
+ * sign-up request that queues the merge, before any row has moved, so a merge short of its `markers` phase writes its
+ * generation and runs every step; its `guest` step drops the row again once the guest's shard is empty
+ * (`auth/hooks.ts#deleteMergedGuest`). With no row on its shard, every delete there refuses the run
+ * ({@link mergeGenerationCurrent}). The `user` row is read only when no generation is here.
  */
 export const noteMergeGeneration = internalMutation
-    .input({ from: v.string(), generation: v.number() })
+    .input({ from: v.string(), generation: v.number(), pastGuest: v.optional(v.boolean()) })
     .output(v.object({ current: v.boolean(), guestGone: v.optional(v.boolean()) }))
     .mutation(async ({ args, ctx }) => {
         const { now } = ctx;
@@ -833,8 +835,13 @@ export const noteMergeGeneration = internalMutation
             return { current: false };
         }
 
-        if (row === null && !(await isMergeSource(ctx, args.from))) {
-            return { current: false, guestGone: true };
+        if (row === null) {
+            const source = await mergeSourceState(ctx, args.from);
+
+            // A real account's rows are never moved; a guest this merge already deleted has nothing left to move.
+            if (source === "account" || (source === "missing" && args.pastGuest === true)) {
+                return { current: false, guestGone: true };
+            }
         }
 
         await writeClaim(ctx.db, MERGE_GENERATION_SCOPE, args.from, now, {
@@ -2100,7 +2107,12 @@ export const mergeGuestInto = async (
     // (its first calls included) gives it back too: its redelivery takes the next generation at once and counts against the
     // queue's retries and `maxRuns`, instead of finding the lease busy and queueing itself again without end.
     try {
-        const { current, guestGone }: { current: boolean; guestGone?: boolean } = await call(references.noteGeneration, { from, generation }, from);
+        const { current, guestGone }: { current: boolean; guestGone?: boolean } = await call(
+            references.noteGeneration,
+            // Only the merge's own progress says its `guest` step is done, never a missing `user` row (see `noteMergeGeneration`).
+            { from, generation, ...(state.phase === "markers" && { pastGuest: true }) },
+            from,
+        );
 
         if (current || guestGone === true) {
             const begun: { cleanup?: boolean; finished: boolean; pinWritesUntil: number | null; stopped: boolean; superseded?: boolean } = await call(
@@ -2120,7 +2132,7 @@ export const mergeGuestInto = async (
             } else if (begun.stopped) {
                 early = { stopped: true };
             } else if (guestGone === true) {
-                // The guest is gone (this merge's own `guest` step, or its deletion or erasure elsewhere): nothing is left to
+                // This merge's own `guest` step already deleted the guest (or the id is a real account's): nothing is left to
                 // move, and its shard refuses every delete, so only the merge's end is left to run.
                 enter(state, "markers");
             } else if (begun.pinWritesUntil !== null) {
