@@ -53,9 +53,10 @@ const KEEP_NEW_USERS = new Set(["aiUserPreferences", "userSettings"]);
 
 /**
  * Tables whose rows are copied for the guest alone: another user's row on the guest's shard stays where it is, so the
- * clear pass takes only the guest's rows of these, even when the two shards are separate stores.
+ * clear pass takes only the guest's rows of these, even when the two shards are separate stores. The Events log and its
+ * watermark are copied for the guest only too (`mcpEvents` keeps the guest's events, and the watermark is not copied).
  */
-const COPIED_FOR_GUEST_ONLY = new Set([...KEEP_NEW_USERS, "runWebhooks"]);
+const COPIED_FOR_GUEST_ONLY = new Set([...KEEP_NEW_USERS, "mcpEvents", "mcpEventWatermarks", "runWebhooks"]);
 
 /** The claim scope of the store probe: a marker written on the new account's shard and looked for on the guest's. */
 export const MERGE_PROBE_SCOPE = "guest-merge-probe";

@@ -1453,6 +1453,32 @@ describe("mergeGuestInto on real shard procedures", () => {
             store.close();
         }
     });
+
+    it("moves the guest's Events and clears only the guest's, leaving another user's log and watermark on the guest's store", async () => {
+        const guestStore = lunoraTest(schemaWithShardedTables([]) as never);
+        const userStore = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const guest = await guestUser(guestStore);
+            const event = { createdAt: 1, data: "{}", name: "run.completed", timestamp: 1 };
+
+            await insert(guestStore, "mcpEvents", { ...event, eventId: "run:a", seq: 1, userId: guest });
+            await insert(guestStore, "mcpEvents", { ...event, eventId: "run:b", seq: 1, userId: "stranger" });
+            await insert(guestStore, "mcpEventWatermarks", { seq: 1, userId: guest });
+            await insert(guestStore, "mcpEventWatermarks", { seq: 4, userId: "stranger" });
+
+            await mergeGuestInto(realShards({ [guest]: guestStore, user: userStore }), REFERENCES, guest, "user");
+
+            expect(await rowsOf(userStore, "mcpEvents", "user")).toStrictEqual([expect.objectContaining({ eventId: "run:a", seq: 1 })]);
+            expect(await rowsOf(guestStore, "mcpEvents", "stranger")).toStrictEqual([expect.objectContaining({ eventId: "run:b" })]);
+            expect(await rowsOf(guestStore, "mcpEvents", guest)).toStrictEqual([]);
+            expect(await rowsOf(guestStore, "mcpEventWatermarks", "stranger")).toStrictEqual([expect.objectContaining({ seq: 4 })]);
+            expect(await rowsOf(guestStore, "mcpEventWatermarks", guest)).toStrictEqual([]);
+        } finally {
+            guestStore.close();
+            userStore.close();
+        }
+    });
 });
 
 describe("importShardRows for the organization ledger", () => {
