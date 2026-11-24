@@ -70,7 +70,6 @@ import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
 import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
 import { readChildThreads } from "./lib/child-threads";
 import { capSearchTerms, matchesQueryTerms, queryTerms } from "./lib/search-terms";
-import { newChatPermissionMode } from "./lib/thread-permission-mode";
 import { callerRestrictsFull, ownerNewChatMode } from "./lib/new-chat-mode";
 import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGranted, type ThreadGateOutcome } from "./lib/thread-gate";
 import { type TypedPromptRow, vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
