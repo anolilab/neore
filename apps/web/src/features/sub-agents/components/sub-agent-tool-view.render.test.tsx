@@ -67,7 +67,7 @@ vi.mock("@/features/layout/stores/ui-state-store", () => {
 });
 
 vi.mock("@/features/chat/split/desktop-layout", () => {
-    return { useIsDesktop: () => harness.isDesktop };
+    return { isDesktopNow: () => harness.isDesktop, useIsDesktop: () => harness.isDesktop };
 });
 
 vi.mock("@/features/chat/split/focus-composer", () => {
@@ -270,6 +270,21 @@ describe("where a sub-agent's chat opens", () => {
     it("still opens the main view when showing the pane fails on the main view", async () => {
         harness.preferences = { splitViewEnabled: true, subAgentOpenPlace: "main" };
         harness.showInSplitView.mockRejectedValueOnce(new Error("storage unavailable"));
+        const { link } = renderRunningCard();
+
+        fireEvent.click(link);
+
+        await vi.waitFor(() => {
+            expect(harness.navigate).toHaveBeenCalledWith(MAIN_VIEW);
+        });
+    });
+
+    it("opens the main view when the window narrows while its pane opens, so the address names the chat shown", async () => {
+        harness.openBeside.mockImplementationOnce(async () => {
+            harness.isDesktop = false;
+
+            return "opened";
+        });
         const { link } = renderRunningCard();
 
         fireEvent.click(link);

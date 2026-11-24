@@ -13,6 +13,9 @@ const subscribeDesktop = (notify: () => void): (() => void) => {
     return () => media.removeEventListener("change", notify);
 };
 
+/** Whether the window is wide enough for the split view to lay its panes out side by side, read when it is needed. */
+export const isDesktopNow = (): boolean => globalThis.matchMedia(DESKTOP_QUERY).matches;
+
 /** Whether the split view lays its panes out side by side. Read on the server as desktop, so the first render matches. */
 export const useIsDesktop = (): boolean =>
     useSyncExternalStore(

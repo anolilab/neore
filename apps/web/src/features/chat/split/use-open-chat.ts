@@ -7,7 +7,7 @@ import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 
 import type { ChatClick } from "./chat-open-place";
 import { chatOpenPlaceFor, readChatOpenPlace } from "./chat-open-place";
-import { useIsDesktop } from "./desktop-layout";
+import { isDesktopNow, useIsDesktop } from "./desktop-layout";
 import { requestComposerFocus } from "./focus-composer";
 import { openThreadBesideFocusedPane, showThreadInSplitView } from "./split-layout-store";
 
@@ -80,9 +80,9 @@ export const useOpenChatClick = (): ((threadId: string, click: ChatClick, origin
                     result = undefined;
                 }
 
-                // The split view may have been turned off while the layout was read: a pane then sits in a hidden layout, so the chat opens
-                // in the main view instead.
-                const isPaneVisible = (result === "focused" || result === "opened") && isSplitViewOnNow();
+                // The split view may have been turned off, or the window narrowed, while the layout was read: the pane then sits in a hidden
+                // layout or is the only one shown while the address names another chat, so the chat opens in the main view instead.
+                const isPaneVisible = (result === "focused" || result === "opened") && isSplitViewOnNow() && isDesktopNow();
 
                 if (isPaneVisible) {
                     if (click.detail === 0) {
