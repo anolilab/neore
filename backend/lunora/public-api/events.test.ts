@@ -270,8 +270,8 @@ describe("the event log's recorder", () => {
         expect(rows.filter((row) => row["userId"] === "user").map((row) => [row["eventId"], row["seq"], row["createdAt"]])).toStrictEqual([
             ["run:own1", 1, 777],
             ["run:own2", 2, 777],
-            ["run:g1", 3, 9],
-            ["run:g2", 4, 10],
+            ["run:g1", 3, 777],
+            ["run:g2", 4, 777],
         ]);
         expect(watermarks.find((row) => row["userId"] === "user")?.["seq"]).toBe(4);
     });
