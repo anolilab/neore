@@ -19,8 +19,9 @@ since housekeeping reads only the most active shards.
 An erasure takes every claim tagged with the account, its erasing marker too, so the lease, each run's start and the
 sweep read the new account's `user` row (`auth/lib/merge-destination.ts`, primary): once it is gone the merge stops,
 writes nothing there and keeps the guest. Lease and generation never lapse while a merge is unfinished; a finished one
-leaves only its fence. A missing guest `user` row (the anonymous plugin deletes it at sign-up) never ends a merge:
-only its progress (`markers`) says the `guest` step ran. A sweep pass spends ≤ `MERGE_SWEEP_STATEMENTS` of D1.
+leaves only its fence: `releaseMergeLease` drops its lease, and the sweep drops a lapsed one with the record when a
+run wrote the fence and died before its release. A missing guest `user` row (the anonymous plugin deletes it at
+sign-up) never ends a merge: only its progress (`markers`) says the `guest` step ran. A sweep pass spends ≤ `MERGE_SWEEP_STATEMENTS` of D1.
 
 Import markers (`guest-merge-row`), progress records and the pins-left signal (`guest-merge-pins-left`) never lapse,
 and a lapsed one still counts: each goes only when the merge has done what it records (its end, the run cap, the

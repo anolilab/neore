@@ -28,6 +28,7 @@ import {
     listUnclearedImports,
     MERGE_CALLS_PER_RUN,
     MERGE_FENCE_SCOPE,
+    MERGE_FENCE_TTL_MS,
     MERGE_GENERATION_SCOPE,
     MERGE_LEASE_CALLS,
     MERGE_LEASE_SCOPE,
@@ -4158,6 +4159,78 @@ describe("what a finished merge leaves behind", () => {
             goneAccounts.delete("guest");
             shards.guest.close();
             shards.user.close();
+        }
+    });
+});
+
+describe("the sweep and a finished merge's lease", () => {
+    /** A run took the lease, wrote the fence and died before `releaseMergeLease`: its record and lease are left. */
+    const finishedRunDiedBeforeRelease = async (harness: ReturnType<typeof lunoraTest>) => {
+        await harness.run(async (context: any) => await context.runMutation(acquireMergeLease, { from: "guest", to: "user" }));
+        await harness.run(
+            async (context: any) =>
+                await context.db.insert("idempotencyClaims", {
+                    claimedAt: Date.now(),
+                    expiresAt: Date.now() + MERGE_FENCE_TTL_MS,
+                    key: "guest",
+                    scope: MERGE_FENCE_SCOPE,
+                    userId: "user",
+                }),
+        );
+    };
+
+    it("drops a finished merge's lapsed lease along with its record", async () => {
+        vi.useFakeTimers({ now: 1_000_000_000, toFake: ["Date"] });
+
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            await finishedRunDiedBeforeRelease(harness);
+            expect(await claimKeysOf(harness, MERGE_LEASE_SCOPE)).toStrictEqual(["guest"]);
+
+            // Past the lease and the stall: no run holds the merge any more.
+            vi.setSystemTime(Date.now() + MERGE_STALL_MS + 1);
+
+            expect(await harness.run(async (context: any) => await context.runMutation(resumeStalledGuestMerges, {}))).toStrictEqual({
+                dropped: 1,
+                resumed: 0,
+            });
+            expect(await claimKeysOf(harness, MERGE_PROGRESS_SCOPE)).toStrictEqual([]);
+            expect(await claimKeysOf(harness, MERGE_LEASE_SCOPE)).toStrictEqual([]);
+            expect(await claimKeysOf(harness, MERGE_FENCE_SCOPE)).toStrictEqual(["guest"]);
+        } finally {
+            harness.close();
+            vi.useRealTimers();
+        }
+    });
+
+    it("keeps a finished merge's lease and record while a run still holds the lease", async () => {
+        vi.useFakeTimers({ now: 1_000_000_000, toFake: ["Date"] });
+
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            await finishedRunDiedBeforeRelease(harness);
+            // The record is stale, but a run renewed the lease just now.
+            vi.setSystemTime(Date.now() + MERGE_STALL_MS + 1);
+            await harness.run(async (context: any) => {
+                const lease = await context.db
+                    .query("idempotencyClaims")
+                    .withIndex("by_scope_key", (q: any) => q.eq("scope", MERGE_LEASE_SCOPE).eq("key", "guest"))
+                    .first();
+
+                await context.db.patch("idempotencyClaims", lease._id, { result: JSON.stringify({ generation: 1, until: Date.now() + 60_000 }) });
+            });
+
+            expect(await harness.run(async (context: any) => await context.runMutation(resumeStalledGuestMerges, {}))).toStrictEqual({
+                dropped: 0,
+                resumed: 0,
+            });
+            expect(await claimKeysOf(harness, MERGE_LEASE_SCOPE)).toStrictEqual(["guest"]);
+            expect(await claimKeysOf(harness, MERGE_PROGRESS_SCOPE)).toStrictEqual(["guest"]);
+        } finally {
+            harness.close();
+            vi.useRealTimers();
         }
     });
 });

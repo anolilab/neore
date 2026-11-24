@@ -1160,6 +1160,12 @@ export const resumeStalledMerges = async (ctx: MutationCtx): Promise<{ dropped: 
         if (finished) {
             await ctx.db.delete("idempotencyClaims", row._id);
 
+            // As `releaseMergeLease` does for a finished merge: a run that wrote the fence and died before its release left
+            // the lease, which never lapses. No run holds it (a held one was passed over above), so it goes with the record.
+            if (lease !== null) {
+                await ctx.db.delete("idempotencyClaims", lease._id);
+            }
+
             dropped += 1;
 
             continue;
