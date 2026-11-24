@@ -9,6 +9,9 @@
  */
 import type { TriggerBuilder, TriggerCtx } from "lunorash/server";
 
+import type { Id } from "../_generated/dataModel";
+import type { QueryCtx } from "../_generated/server";
+
 import { hasEnoughTurns, SEARCH_KINDS, SEARCH_VECTOR_FIELD, type SearchRow, searchKindsChanged } from "./thread-search-plan";
 
 type Internal = (typeof import("../_generated/internal"))["internal"];
@@ -132,6 +135,30 @@ const userTurnsOf = (thread: Record<string, unknown>): number => (typeof thread.
 /** Whether a messages row is a user turn of a thread. */
 const isUserTurn = (row: { message?: { role?: unknown }; threadId?: string }): row is { message: { role: "user" }; threadId: string } =>
     row.message?.role === "user" && row.threadId !== undefined;
+
+/**
+ * The user turns `messages` holds for `threadId`, counted as the triggers count them: for a writer that puts a thread
+ * row in after some of its messages, whose inserts found no thread to count on (a guest merge's import).
+ */
+export const countUserTurns = async (db: QueryCtx["db"], threadId: Id<"threads">): Promise<number> => {
+    let count = 0;
+    let cursor: string | null = null;
+
+    for (;;) {
+        const { continueCursor, isDone, page } = await db
+            .query("messages")
+            .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
+            .paginate({ cursor, numItems: 100 });
+
+        count += page.filter((row) => isUserTurn(row as never)).length;
+
+        if (isDone) {
+            return count;
+        }
+
+        cursor = continueCursor;
+    }
+};
 
 /**
  * Moves a thread's user-turn count by `delta`, and schedules a sync when the move crosses the gate,
