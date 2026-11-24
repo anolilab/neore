@@ -6,12 +6,25 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/to
 import type { ReactNode, RefObject } from "react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
-import { subscribeTurnEnded } from "@/features/chat/core/utils/turn-ended";
+import { subscribeTurnEnded, turnEndedGeneration } from "@/features/chat/core/utils/turn-ended";
 import { prefillComposer, useComposerTakesPrefill } from "@/features/chat/thread/composer-prefill";
 
 import { catchUpPrompt, catchUpRunId, hostOfPullRequestUrl, isPlainBranchName, isPlainRepo } from "../lib/catch-up-prompt";
 import { focusIsLost, useReportFocusLoss } from "../lib/focus-loss";
 import { useBranchComparison, usePullRequest } from "../lib/use-develop";
+
+/**
+ * What a control last heard, per thread and pull request, kept while it is not mounted (a split pane without focus unmounts it,
+ * its chat goes on): the count of the thread's ended turns it had heard, and whether a turn's end reads again.
+ */
+const heard = new Map<string, { generation: number; rereads: boolean }>();
+
+/** Whether a turn of `threadId` ended while no control for `key` was mounted; a first mount has missed nothing. */
+const missedTurn = (key: string, threadId: string): boolean => {
+    const last = heard.get(key);
+
+    return last !== undefined && turnEndedGeneration(threadId) > last.generation;
+};
 
 /** The shown control; it reports when a read removes it while it holds focus, which the browser would drop to the page. */
 const Shown = ({ children, onFocusLost }: { children: ReactNode; onFocusLost: () => void }) => {
@@ -53,6 +66,9 @@ const CatchUpControl = ({
     // One run per mounted control: a second click makes the same prompt, and the composer adds the same text only once.
     // A retry of the same run still goes ahead: the fork's local branch takes the next free number instead of stopping.
     const [run] = useState(catchUpRunId);
+    const key = `${threadId}\u0000${link.repository}#${String(link.number)}`;
+    // A turn ended while this was not mounted: the cached reads predate it, so nothing shows until they are read again.
+    const [stale, setStale] = useState(() => missedTurn(key, threadId));
     const address = { number: link.number, repository: link.repository };
     const pull = usePullRequest(address);
     const detail = pull.data?.status === "ok" ? pull.data.detail : undefined;
@@ -62,40 +78,51 @@ const CatchUpControl = ({
     const comparisonAnswered =
         open && !comparison.isError && compared !== undefined && compared.baseBranch === detail.baseBranch && compared.headSha === detail.headSha;
     const behind = comparisonAnswered && compared.behindBy > 0;
-    // Whether a turn's end reads again: set by a read that confirmed behind, cleared only by one that confirmed the pull request
-    // closed, merged, a draft or caught up. A failed read hides the control but leaves this as it was, so the next turn's end reads
-    // again and the control comes back once the host answers behind.
-    const rereads = useRef(false);
     const settled = !pull.isError && detail !== undefined && (!open || (comparisonAnswered && !behind));
 
+    // Whether a turn's end reads again (`heard`, so a remount knows it too): set by a read that confirmed behind, cleared only by
+    // one that confirmed the pull request closed, merged, a draft or caught up. A failed read hides the control but leaves this as
+    // it was, so the next turn's end reads again and the control comes back once the host answers behind.
     useEffect(() => {
-        if (behind && !pull.isError) {
-            rereads.current = true;
-        } else if (settled) {
-            rereads.current = false;
-        }
-    });
+        const generation = heard.get(key)?.generation ?? turnEndedGeneration(threadId);
 
-    const reread = useEffectEvent(() => {
-        if (!rereads.current) {
+        // While a missed turn's read has not answered, the cached reads say nothing new.
+        if (stale) {
             return;
         }
 
+        if (behind && !pull.isError) {
+            heard.set(key, { generation, rereads: true });
+        } else if (settled || !heard.has(key)) {
+            heard.set(key, { generation, rereads: false });
+        }
+    });
+
+    const readAgain = useEffectEvent(async (): Promise<void> => {
         // The revision the comparison is keyed on; none while the pull request's read has no answer.
         const revision = open ? { baseBranch: detail.baseBranch, headSha: detail.headSha } : undefined;
 
         // The pull request first: a turn that pushed or retargeted it gives the comparison a new key, which its query reads by
         // itself. Only the same base and head keep the old key, and the base branch may have moved, so only then is it read again.
-        const readAgain = async (): Promise<void> => {
-            const result = await pull.refetch();
-            const next = !result.isError && result.data?.status === "ok" ? result.data.detail : undefined;
+        const result = await pull.refetch();
+        const next = !result.isError && result.data?.status === "ok" ? result.data.detail : undefined;
 
-            if (revision !== undefined && next?.baseBranch === revision.baseBranch && next.headSha === revision.headSha) {
-                await comparison.refetch();
-            }
-        };
+        if (revision !== undefined && next?.baseBranch === revision.baseBranch && next.headSha === revision.headSha) {
+            await comparison.refetch();
+        }
+    });
 
-        void readAgain();
+    /**
+     * Notes every ended turn of the thread as heard, and reads again when the last read said behind (or a failed read hid it
+     * after that), or when a missed turn finds a cached "behind". Returns that read, or nothing when there is none: with no cached
+     * pull request its own first read is fresh.
+     */
+    const hear = useEffectEvent((): Promise<void> | undefined => {
+        const rereads = heard.get(key)?.rereads === true;
+
+        heard.set(key, { generation: turnEndedGeneration(threadId), rereads });
+
+        return (rereads || (stale && behind)) && pull.data !== undefined ? readAgain() : undefined;
     });
     const lostFocus = useRef(false);
 
@@ -112,10 +139,33 @@ const CatchUpControl = ({
     });
 
     // A turn that ended may have pushed the rebased branch (or merged or closed the pull request): one read, while it shows or
-    // while a failed read hides a pull request last known to be behind.
-    useEffect(() => subscribeTurnEnded(threadId, () => reread()), [threadId]);
+    // while a failed read hides a pull request last known to be behind. One read too for the turns that ended while this was
+    // not mounted; until it answers the cached "behind" is not shown.
+    useEffect(() => {
+        if (!stale) {
+            return;
+        }
 
-    if (pull.isError || !behind) {
+        const done = hear();
+
+        if (done === undefined) {
+            setStale(false);
+        } else {
+            void done.then(() => {
+                setStale(false);
+            });
+        }
+    }, [stale]);
+
+    useEffect(
+        () =>
+            subscribeTurnEnded(threadId, () => {
+                void hear();
+            }),
+        [key, threadId],
+    );
+
+    if (stale || pull.isError || !behind) {
         return null;
     }
 
@@ -180,7 +230,8 @@ type CatchUpProps = Parameters<typeof CatchUpControl>[0];
 
 /**
  * Mounts the control, and with it its host reads, only where the thread has a composer on the page that takes the prompt
- * (`useComposerPrefill`): a split pane without focus, or a thread whose composer is not shown, reads nothing.
+ * (`useComposerPrefill`): a split pane without focus, or a thread whose composer is not shown, reads nothing. A turn that ends
+ * meanwhile is not lost: the remount sees it (`turnEndedGeneration`) and reads again before it shows a cached "behind".
  */
 const ThreadPullRequestCatchUp = ({ link, returnFocusTo, threadId }: CatchUpProps) =>
     useComposerTakesPrefill(threadId) ? <CatchUpControl link={link} returnFocusTo={returnFocusTo} threadId={threadId} /> : null;

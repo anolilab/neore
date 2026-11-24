@@ -5,7 +5,18 @@
  */
 const listeners = new Map<string, Set<() => void>>();
 
+/**
+ * How many turns of each thread ended on this page, kept after the listeners go: a control that was not mounted when a turn
+ * ended (a split pane without focus) compares this with the count it last heard and knows it missed one.
+ */
+const generations = new Map<string, number>();
+
+/** The count of turns of `threadId` that ended on this page so far; 0 when none did. */
+export const turnEndedGeneration = (threadId: string): number => generations.get(threadId) ?? 0;
+
 export const markTurnEnded = (threadId: string): void => {
+    generations.set(threadId, turnEndedGeneration(threadId) + 1);
+
     const forThread = listeners.get(threadId) ?? [];
 
     for (const listener of forThread) {
@@ -27,4 +38,9 @@ export const subscribeTurnEnded = (threadId: string, listener: () => void): (() 
             listeners.delete(threadId);
         }
     };
+};
+
+/** Forgets every thread's count of ended turns, so one test's turns do not count as missed in the next. */
+export const resetTurnEndedForTests = (): void => {
+    generations.clear();
 };

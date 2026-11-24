@@ -9,7 +9,7 @@ import type { ReactElement, ReactNode } from "react";
 import { createRef } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { markTurnEnded } from "@/features/chat/core/utils/turn-ended";
+import { markTurnEnded, resetTurnEndedForTests } from "@/features/chat/core/utils/turn-ended";
 
 import ThreadPullRequestCatchUp from "./thread-pull-request-catch-up";
 
@@ -140,6 +140,7 @@ const REBASE_ON_RUN_BASE = /`git rebase --no-update-refs refs\/neore\/pull-7-[\d
 
 describe("ThreadPullRequestCatchUp", () => {
     beforeEach(() => {
+        resetTurnEndedForTests();
         prefill.mockReset();
         reads.mockClear();
         refetch.mockReset();
@@ -435,6 +436,68 @@ describe("ThreadPullRequestCatchUp", () => {
         turnEnds();
 
         expect(refetch).not.toHaveBeenCalled();
+    });
+
+    it("reads again once on a remount after a turn ended while it was not mounted, and shows no cached Behind meanwhile", async () => {
+        // Its own thread: what a control heard is kept per thread and pull request across mounts.
+        const missed = () => <ThreadPullRequestCatchUp link={{ number: 7, repository: "octo/hello" }} threadId="thread-missed" />;
+
+        given("open", "behind");
+
+        const view = render(missed());
+
+        expect(screen.getByText("Behind main")).toBeTruthy();
+
+        // The pane loses focus: its composer, and with it the control, goes away; the chat goes on and the turn ends.
+        composer.takes = false;
+        view.rerender(missed());
+        turnEnds("thread-missed");
+
+        expect(refetch).not.toHaveBeenCalled();
+
+        // The turn pushed; the host has not answered the read yet.
+        let answer: (value: { data?: unknown }) => void = () => {};
+
+        refetch.mockImplementationOnce(
+            async () =>
+                await new Promise<{ data?: unknown }>((resolve) => {
+                    answer = resolve;
+                }),
+        );
+        composer.takes = true;
+        view.rerender(missed());
+
+        expect(refetch).toHaveBeenCalledTimes(1);
+        // The cached comparison still says behind, but it predates the turn.
+        expect(screen.queryByText("Behind main")).toBeNull();
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
+
+        await act(async () => {
+            answer({ data: pull.current.data });
+            await Promise.resolve();
+        });
+
+        // Same revision: the base branch may have moved, so the comparison is read too, and the host still says behind.
+        expect(compareRefetch).toHaveBeenCalledTimes(1);
+        expect(refetch).toHaveBeenCalledTimes(1);
+        expect(screen.getByText("Behind main")).toBeTruthy();
+    });
+
+    it("reads nothing extra on a remount when no turn ended while it was not mounted", () => {
+        const quiet = () => <ThreadPullRequestCatchUp link={{ number: 7, repository: "octo/hello" }} threadId="thread-quiet" />;
+
+        given("open", "behind");
+
+        const view = render(quiet());
+
+        composer.takes = false;
+        view.rerender(quiet());
+        composer.takes = true;
+        view.rerender(quiet());
+
+        expect(screen.getByText("Behind main")).toBeTruthy();
+        expect(refetch).not.toHaveBeenCalled();
+        expect(compareRefetch).not.toHaveBeenCalled();
     });
 
     it("makes no extra read at the end of a turn while it does not show", () => {
