@@ -1,7 +1,8 @@
 /**
  * An account whose pins are being moved or erased. A guest merge (`lib/account-merge.ts`) and an account erasure
  * (`gdpr/workflows/deletion-workflow.ts`) mark the account before they touch its pins; a pin write by a marked account is refused
- * (`chat/pins/functions.ts`). The marker is global and read on the primary, so every shard sees a move that has started.
+ * (`chat/pins/functions.ts`), and so is a run webhook save or rotation (`run-webhooks/functions.ts`), which the merge copies before it
+ * clears the guest's shard. The marker is global and read on the primary, so every shard sees a move that has started.
  *
  * A marker belongs to the operation that wrote it: a merge ends only its own marker, so an erasure that overlaps it keeps its fence.
  *

@@ -740,6 +740,8 @@ export const generateExportFile = internalAction
         // Review drafts on pull requests (`source-control/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
         reviewDrafts: v.optional(v.any()),
+        // The outbound run webhook's URL and switch, never its secret (`run-webhooks/gdpr.ts`). Optional for the same reason.
+        runWebhooks: v.optional(v.any()),
         settings: v.any(),
         // The pins the caller made on threads shared with them, read from each owner's shard (`collectSharedPins`). Optional for
         // the same in-flight-replay reason as `threadTags`.
@@ -921,6 +923,7 @@ export const generateExportFile = internalAction
             pullRequestGuides: args.pullRequestGuides ?? { guides: [] },
             pullRequestThreads: args.pullRequestThreads ?? { links: [] },
             reviewDrafts: args.reviewDrafts ?? { drafts: [] },
+            runWebhooks: args.runWebhooks ?? { runWebhooks: [] },
             settings: args.settings,
             sharedThreadPins: args.sharedThreadPins ?? [],
             subAgentRuns: activity?.subAgentRuns ?? [],

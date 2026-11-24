@@ -506,6 +506,15 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 ),
         );
         await drain(
+            "delete-user-run-webhooks",
+            async (round) =>
+                await context.run(
+                    internal.run_webhooks.gdpr.deleteUserRunWebhooks,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-run-webhooks", round) },
+                ),
+        );
+        await drain(
             "delete-user-pages",
             async (round) =>
                 await context.run(internal.pages.gdpr.deleteUserPages, { userId: args.userId }, { dedupId: stepDedupId(scope, "delete-user-pages", round) }),

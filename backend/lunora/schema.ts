@@ -2752,6 +2752,19 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_user_and_pull", ["userId", "hostOrigin", "repository", "number"]),
 
+    // The user's outbound run webhook (`run-webhooks/`): one row per user. The secret is encrypted ("tool-keys") and is never
+    // read back; a rotation replaces it.
+    runWebhooks: defineTable({
+        createdAt: v.number(),
+        enabled: v.boolean(),
+        secretCiphertext: v.string(),
+        updatedAt: v.number(),
+        url: v.string(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId", ["userId"]),
+
     sandboxActions: defineTable({
         action: v.string(),
         command: v.optional(v.string()),

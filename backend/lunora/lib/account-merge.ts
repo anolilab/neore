@@ -63,6 +63,9 @@
  * there belongs to an object the guest owns. Where development's
  * `SHARD_ROUTING=off` runs every user on one shard that is not so, and the merge
  * moves, deletes and checks no row there and keeps the guest ({@link onGuestShard}).
+ * Where the guest's and the new account's keys serve one store (local routing can),
+ * the clear takes only the guest's rows of a user-sharded table ({@link clearPlanOf},
+ * found by {@link probeSharedStore}), so the new account's rows there are never deleted.
  *
  * A merge whose job runs out of redeliveries is not lost: each run saves where it stopped beside its lease
  * ({@link MERGE_PROGRESS_SCOPE}), and the housekeeping sweep ({@link resumeStalledGuestMerges}) queues it again from
@@ -97,6 +100,7 @@ import { ORGANIZATION_RECORD_LATE_MS } from "../usage/activity-logic";
 import { patchRow } from "./patch";
 import { SEARCH_INTERNAL_FIELDS } from "../agent/thread-search-plan";
 import { countUserTurns } from "../agent/thread-search-triggers";
+import { copyMergedRunWebhooks } from "../run-webhooks/table-writes";
 
 /** Rows moved per round trip. */
 export const MERGE_PAGE_SIZE = 100;
@@ -118,8 +122,28 @@ export const CLEAR_PAGE_BYTES = 512 * 1024;
 
 const pageSizeFor = (table: string): number => (table in AUDIT_TABLES ? AUDITED_MERGE_PAGE_SIZE : MERGE_PAGE_SIZE);
 
+/** The column a user-sharded table is sharded on, which names the row's owner. Undefined for a table that is not user-sharded. */
+export const shardOwnerField = (table: string): string | undefined => {
+    const shardMode = (schema as unknown as { tables: Record<string, { shardMode?: { field?: string; kind?: string } }> }).tables[table]?.shardMode;
+
+    return shardMode?.kind === "shardBy" ? shardMode.field : undefined;
+};
+
 /** The guest's own copy of these is dropped: the new account already has its seeded row. */
 const KEEP_NEW_USERS = new Set(["aiUserPreferences", "userSettings"]);
+
+/**
+ * Tables whose rows are copied for the guest alone: another user's row on the guest's shard stays where it is, so the
+ * clear takes only the guest's rows of these, even when the two shards are separate stores. A webhook is one row per user,
+ * copied by its own rule (`copyMergedRunWebhooks`), so the account's own one is never doubled.
+ */
+const COPIED_FOR_GUEST_ONLY = new Set([...KEEP_NEW_USERS, "runWebhooks"]);
+
+/** The claim scope of the store probe: a marker written on the new account's shard and looked for on the guest's. */
+export const MERGE_PROBE_SCOPE = "guest-merge-probe";
+
+/** How long the probe marker is kept: far past the write-then-read of one attempt, which releases it; the purge cron drops a lost one. */
+const MERGE_PROBE_TTL_MS = 60 * 60 * 1000;
 
 /** Ephemeral bookkeeping that is not the guest's content. */
 const NOT_MOVED = new Set(["cronRuns", "idempotencyClaims", "rateLimits"]);
@@ -471,12 +495,19 @@ export const listShardRowsToClear = internalQuery
             return { digests: await Promise.all(rows.map(async (row) => await rowDigest(args.table, row))), rows };
         };
 
+        const ownerField = shardOwnerField(args.table);
+
         if (args.ownedBy !== undefined) {
+            // A table with no owner column has no rows of one user to list: none, never the whole table.
+            if (ownerField === undefined) {
+                return { digests: [], rows: [] };
+            }
+
             const facades = ctx.db as unknown as Record<
                 string,
-                { findMany: (options: { limit: number; where: { userId: string } }) => Promise<{ page: Record<string, unknown>[] }> }
+                { findMany: (options: { limit: number; where: Record<string, string> }) => Promise<{ page: Record<string, unknown>[] }> }
             >;
-            const { page } = await facades[args.table]!.findMany({ limit: read, where: { userId: args.ownedBy } });
+            const { page } = await facades[args.table]!.findMany({ limit: read, where: { [ownerField]: args.ownedBy } });
 
             return await withDigests(page);
         }
@@ -1341,6 +1372,21 @@ export const importShardRows = internalMutation
 
         if (KEEP_NEW_USERS.has(args.table)) {
             return { fenced: false, held: 0, imported: 0, present: ids };
+        }
+
+        if (args.table === "runWebhooks") {
+            // The guest's own webhook alone (a shard that also holds other users' rows lists them too): copied under the
+            // account's own rule, which keeps an existing one and refuses another user's row under its id. Confirmed either
+            // way, so the clear may take the guest's copy.
+            const guestRows = rows.filter((row) => row["userId"] === args.from);
+            const imported = await copyMergedRunWebhooks(
+                ctx,
+                guestRows.map((row) => rewriteOwner(row, args.from, args.to)),
+                args.from,
+                args.to,
+            );
+
+            return { fenced: false, held: 0, imported, present: guestRows.map((row) => row._id as string) };
         }
 
         let imported = 0;
@@ -2228,6 +2274,8 @@ interface MergeContext {
     /** The lease generation this run holds ({@link MERGE_LEASE_SCOPE}). */
     generation: number;
     references: MergeReferences;
+    /** Whether the two shard keys serve one store, probed by the run's first clear page ({@link probeSharedStore}). */
+    sharedStore?: boolean;
     tables: string[];
     to: string;
 }
@@ -2324,7 +2372,14 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
             return await stopKeepingGuest(context, state, { forGood: true });
         }
 
-        const { calls, kept, outcome } = await clearPage(call, references, table, { from, generation, skip: state.kept, to });
+        // Probed once per run, so every page of the run clears alike; the probe's calls are counted against the run's budget.
+        if (context.sharedStore === undefined) {
+            context.sharedStore = await probeSharedStore(call, references, from, to);
+            state.calls -= PROBE_CALLS;
+        }
+
+        const plan = clearPlanOf(context.sharedStore, table, from, to);
+        const { calls, kept, outcome } = await clearPage(call, references, table, { from, generation, plan, skip: state.kept, to });
 
         state.calls -= calls;
 
@@ -2953,6 +3008,65 @@ export const mergeGuestInto = async (
     return { moved: state.moved, next: progress(), ...(state.deferMs !== null && { delayMs: state.deferMs }) };
 };
 
+/** Cross-shard calls {@link probeSharedStore} makes: the marker, its read, and its release. */
+const PROBE_CALLS = 3;
+
+/**
+ * Whether the guest's and the new account's shard keys serve one store: a marker written under `to` and looked for under
+ * `from`. Each attempt writes a key of its own, so a marker a crashed earlier attempt left (and which may lapse at any
+ * moment) is never what this attempt reads. A write that did not take a fresh claim, or a read that fails, throws: only a
+ * marker this attempt wrote and then missed may answer "separate", the answer that clears other users' rows.
+ */
+const probeSharedStore = async (call: ShardCall, references: MergeReferences, from: string, to: string): Promise<boolean> => {
+    const key = `${from}:${to}:${crypto.randomUUID()}`;
+    const written: unknown = await call(references.markProbe, { key, scope: MERGE_PROBE_SCOPE, ttlMs: MERGE_PROBE_TTL_MS, userId: to }, to);
+
+    if (written !== true) {
+        throw new Error(`the store probe for the merge of guest ${from} into ${to} was not written; the merge runs again`);
+    }
+
+    const held: unknown = await call(references.probeHeld, { key, scope: MERGE_PROBE_SCOPE }, from);
+
+    if (typeof held !== "boolean") {
+        throw new TypeError(`the store probe for the merge of guest ${from} into ${to} gave no answer; the merge runs again`);
+    }
+
+    // The marker has done its job; the purge cron drops it if this release is lost.
+    try {
+        await call(references.releaseProbe, { key, scope: MERGE_PROBE_SCOPE }, to);
+    } catch (error) {
+        authLogger.warn(`[auth] the store probe marker for the merge of guest ${from} into ${to} was not released:`, error);
+    }
+
+    return held;
+};
+
+/** What the clear takes off the guest's shard of one table: every row there, the guest's rows alone, or nothing. */
+type ClearPlan = "none" | "owned" | "whole";
+
+/**
+ * How the clear takes `table` off the guest's shard. On separate stores the guest's shard holds only the guest's rows and
+ * the rows the copy put on the new shard, so a table is cleared whole, except a copied-for-guest-only one (owned). On one
+ * store, another user's row there is the new account's row too: only the guest's rows of an owned table go, and a table
+ * with no owner column is not cleared at all. A copied-for-guest-only table with no owner column stops the merge before
+ * it clears anything, since its clear would take another user's rows too.
+ */
+export const clearPlanOf = (sharedStore: boolean, table: string, from: string, to: string): ClearPlan => {
+    if (!sharedStore && !COPIED_FOR_GUEST_ONLY.has(table)) {
+        return "whole";
+    }
+
+    if (shardOwnerField(table) !== undefined) {
+        return "owned";
+    }
+
+    if (sharedStore) {
+        return "none";
+    }
+
+    throw new Error(`${table} is cleared for the guest alone but has no owner column; the merge of guest ${from} into ${to} stops before clearing`);
+};
+
 /**
  * Clear one page of `table` on the guest's shard: the page is imported again before it is deleted, so a row written or
  * edited there since the table was copied arrives as it is now; only ids the new shard confirms are deleted. A row the
@@ -2967,11 +3081,15 @@ const clearPage = async (
     call: ShardCall,
     references: MergeReferences,
     table: string,
-    { from, generation, skip, to }: { from: string; generation: number; skip: string[]; to: string },
+    { from, generation, plan, skip, to }: { from: string; generation: number; plan: ClearPlan; skip: string[]; to: string },
 ): Promise<{ calls: number; kept: string[]; outcome: "empty" | "erasing" | "fenced" | "page" }> => {
+    if (plan === "none") {
+        return { calls: 0, kept: [], outcome: "empty" };
+    }
+
     const { digests, rows }: { digests: string[]; rows: Record<string, unknown>[] } = await call(
         references.listClear,
-        { from, ...(KEEP_NEW_USERS.has(table) && { ownedBy: from }), ...(skip.length > 0 && { skip }), table },
+        { from, ...(plan === "owned" && { ownedBy: from }), ...(skip.length > 0 && { skip }), table },
         from,
     );
 
@@ -3084,15 +3202,21 @@ export interface MergeReferences {
     listClear: { __lunoraRef: string };
     listPinRoutes: { __lunoraRef: string };
     listUncleared: { __lunoraRef: string };
+    /** `claimKey`, run on the new account's shard to leave the store probe's marker. */
+    markProbe: { __lunoraRef: string };
     missingOnGuest: { __lunoraRef: string };
     movePinRoute: { __lunoraRef: string };
     nextPinRoute: { __lunoraRef: string };
     noteGeneration: { __lunoraRef: string };
     pinsLeft: { __lunoraRef: string };
+    /** `claimHeld`, run on the guest's shard: `true` when it sees the marker, so both keys serve one store. */
+    probeHeld: { __lunoraRef: string };
     reassignFollows: { __lunoraRef: string };
     reassignGlobal: { __lunoraRef: string };
     reassignPins: { __lunoraRef: string };
     releaseLease: { __lunoraRef: string };
+    /** `releaseKey`, run on the new account's shard to drop the probe's marker once read. */
+    releaseProbe: { __lunoraRef: string };
     resolvePinsLeft: { __lunoraRef: string };
     routeOwner: { __lunoraRef: string };
     stopKeepingGuest: { __lunoraRef: string };
@@ -3131,15 +3255,18 @@ export const runGuestMerge = internalAction
                 listClear: internal.lib.account_merge.listShardRowsToClear,
                 listPinRoutes: internal.chat.pins.functions.listSharedPinRoutesForExport,
                 listUncleared: internal.lib.account_merge.listUnclearedImports,
+                markProbe: internal.lib.claim_once.claimKey,
                 missingOnGuest: internal.lib.account_merge.listRowsMissingOnGuest,
                 movePinRoute: internal.lib.account_merge.moveSharedPinRouteOf,
                 nextPinRoute: internal.lib.account_merge.nextSharedPinRoute,
                 noteGeneration: internal.lib.account_merge.noteMergeGeneration,
                 pinsLeft: internal.lib.account_merge.pinsLeftShard,
+                probeHeld: internal.lib.claim_once.claimHeld,
                 reassignFollows: internal.lib.account_merge.reassignThreadFollowsPage,
                 reassignGlobal: internal.lib.account_merge.reassignGlobalRows,
                 reassignPins: internal.chat.pins.functions.reassignUserPinsOnThread,
                 releaseLease: internal.lib.account_merge.releaseMergeLease,
+                releaseProbe: internal.lib.claim_once.releaseKey,
                 resolvePinsLeft: internal.lib.account_merge.resolvePinsLeft,
                 routeOwner: internal.lib.account_merge.sharedPinRouteOwner,
                 stopKeepingGuest: internal.lib.account_merge.stopMergeKeepingGuest,

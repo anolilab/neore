@@ -7,7 +7,6 @@
  * login names that teammate (`teammateIds`), which only its owner sets. A run decides from its thread, never from anything
  * the client sends, and only in a turn with nothing but safe text in front of the model (`site-login-turn.ts`).
  */
-import { env } from "cloudflare:workers";
 import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
@@ -15,8 +14,7 @@ import { internalQuery, type MutationCtx, type QueryCtx } from "../_generated/se
 import { encryptKey } from "../lib/encryption";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow, withoutUndefined } from "../lib/patch";
-import { currentShard, ROOT_SHARD_KEY, servesUser } from "../lib/shard-context";
-import { isShardRoutingEnabled } from "../lib/shard-namespace";
+import { onOwnShard } from "../lib/own-shard";
 import { SIGN_IN_URL_MAX, SITE_LOGIN_CHANGED, SITE_LOGIN_SIGN_IN_PAGE_REFUSED } from "./lib/site-login-shape";
 import { normalizeSignInUrl, normalizeSiteOrigin, SITE_ORIGIN_MAX } from "./lib/site-origin";
 import { type SiteLoginTurn, siteLoginTurnVerdict } from "./site-login-turn";
@@ -49,14 +47,6 @@ const ownLogins = async (ctx: Pick<QueryCtx, "db">, userId: string): Promise<Doc
         .query("savedSiteLogins")
         .withIndex("by_userId_origin", (q) => q.eq("userId", userId))
         .take(MAX_SITE_LOGINS);
-
-/**
- * A collaborator reaches every procedure on the shard of a thread shared with them, and any signed-in caller can name
- * `__root__`. Logins live only on their owner's own shard, so anywhere else a write is refused and a read finds nothing:
- * a row stranded there would escape that user's export and erasure. No shard context at all (unit tests) counts as own,
- * and so does `__root__` while development runs every user on it (`SHARD_ROUTING=off`), where export and erasure do too.
- */
-const onOwnShard = (userId: string): boolean => (currentShard() !== ROOT_SHARD_KEY || !isShardRoutingEnabled(env)) && servesUser(userId);
 
 /**
  * An admin acting as the owner saves, changes and deletes no login: the agent types a login in the owner's own turns, so

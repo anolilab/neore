@@ -64,8 +64,8 @@ import {
     USER_REFERENCE_FIELDS,
 } from "./account-merge";
 import { IMPORT_MARKER_EXPIRES_AT, IMPORT_MARKER_SCOPE, MERGE_CLEARED_SCOPE, MERGE_PINS_LEFT_SCOPE, pinsLeftShard, resolvePinsLeft } from "./account-merge";
-import { dropMergeGeneration, dropPinsLeft, mergeGenerationCurrent, moveSharedPinRouteOf } from "./account-merge";
-import { purgeExpiredClaims } from "./claim-once";
+import { clearPlanOf, dropMergeGeneration, dropPinsLeft, mergeGenerationCurrent, moveSharedPinRouteOf } from "./account-merge";
+import { claimHeld, claimKey, purgeExpiredClaims, releaseKey } from "./claim-once";
 import { eraseWaitUntil, isAccountMoving } from "./account-moves";
 import { runInShard } from "./shard-context";
 import { schemaWithShardedTables } from "./test-schema";
@@ -145,15 +145,18 @@ const REFERENCES: MergeReferences = {
     listClear: ref("listShardRowsToClear"),
     listPinRoutes: { __lunoraRef: "chat_pins_functions:listSharedPinRoutesForExport" },
     listUncleared: ref("listUnclearedImports"),
+    markProbe: ref("claimKey"),
     missingOnGuest: ref("listRowsMissingOnGuest"),
     movePinRoute: ref("moveSharedPinRouteOf"),
     nextPinRoute: ref("nextSharedPinRoute"),
     noteGeneration: ref("noteMergeGeneration"),
     pinsLeft: ref("pinsLeftShard"),
+    probeHeld: ref("claimHeld"),
     reassignFollows: ref("reassignThreadFollowsPage"),
     reassignGlobal: ref("reassignGlobalRows"),
     reassignPins: { __lunoraRef: "chat_pins_functions:reassignUserPinsOnThread" },
     releaseLease: ref("releaseMergeLease"),
+    releaseProbe: ref("releaseKey"),
     resolvePinsLeft: ref("resolvePinsLeft"),
     routeOwner: ref("sharedPinRouteOwner"),
     stopKeepingGuest: ref("stopMergeKeepingGuest"),
@@ -283,6 +286,13 @@ const fakeShards = (
             }
             case "beginMergeRun": {
                 return { finished: false, pinWritesUntil: null, stopped: false } as never;
+            }
+            case "claimHeld": {
+                return false as never;
+            }
+            // The store probe: this fake keeps the two shards on separate stores, so the marker is not seen from the guest's.
+            case "claimKey": {
+                return true as never;
             }
             case "deleteMergedGuest": {
                 onGuestDeletion?.(pinRows, routes);
@@ -416,6 +426,9 @@ const fakeShards = (
                 }
 
                 return { hasMore: pinRows.some((each) => each.ownerId === shardKey && each.threadId === args.threadId && each.userId === args.from) } as never;
+            }
+            case "releaseKey": {
+                return null as never;
             }
             case "releaseMergeLease": {
                 return null as never;
@@ -1761,6 +1774,93 @@ describe("deleteMergedGuest", () => {
     });
 });
 
+describe("importShardRows for runWebhooks", () => {
+    const webhook = (fields: Record<string, unknown>) => {
+        return { createdAt: 1, enabled: true, secretCiphertext: "v1:cipher", updatedAt: 1, url: "https://example.com/hook", ...fields };
+    };
+
+    const run = async (guestRows: Record<string, unknown>[], seed?: Record<string, unknown>) => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            return await harness.run(async (context: any) => {
+                if (seed) {
+                    await context.db.insert("runWebhooks", seed);
+                }
+
+                const { generation } = await context.runMutation(acquireMergeLease, { from: "guest", to: "user" });
+
+                await context.runMutation(importShardRows, { from: "guest", generation, rows: guestRows, table: "runWebhooks", to: "user" });
+
+                const stored = await context.db.query("runWebhooks").take(MERGE_PAGE_SIZE);
+
+                return stored.filter((row: Record<string, unknown>) => row.userId === "user");
+            });
+        } finally {
+            harness.close();
+        }
+    };
+
+    it("copies the guest's webhook across when the new account has none", async () => {
+        const rows = await run([webhook({ _id: "g1", url: "https://example.com/guest", userId: "guest" })]);
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ url: "https://example.com/guest", userId: "user" });
+    });
+
+    it("keeps the new account's own webhook and copies no second one beside it", async () => {
+        const rows = await run(
+            [webhook({ _id: "g1", url: "https://example.com/guest", userId: "guest" })],
+            webhook({ url: "https://example.com/own", userId: "user" }),
+        );
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ url: "https://example.com/own" });
+    });
+
+    it("stops the merge when another user's webhook holds the guest webhook's id", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const outcome = await harness.run(async (context: any) => {
+                const held = await context.db.insert("runWebhooks", webhook({ _id: "g1", url: "https://example.com/other", userId: "stranger" }));
+                const { generation } = await context.runMutation(acquireMergeLease, { from: "guest", to: "user" });
+
+                try {
+                    await context.runMutation(importShardRows, {
+                        from: "guest",
+                        generation,
+                        rows: [webhook({ _id: held, url: "https://example.com/guest", userId: "guest" })],
+                        table: "runWebhooks",
+                        to: "user",
+                    });
+
+                    return "imported";
+                } catch (error) {
+                    return (error as Error).message;
+                }
+            });
+
+            expect(outcome).toContain("already exists on the new account's shard as another user's row");
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+describe("clearPlanOf", () => {
+    it("clears a table whole on separate stores, except a table copied for the guest alone, which it clears the guest's rows of", () => {
+        expect(clearPlanOf(false, "threads", "guest", "user")).toBe("whole");
+        expect(clearPlanOf(false, "runWebhooks", "guest", "user")).toBe("owned");
+    });
+
+    it("clears only the guest's rows of a user-sharded table on a store the new account shares, and none of a table with no owner", () => {
+        expect(clearPlanOf(true, "threads", "guest", "user")).toBe("owned");
+        expect(clearPlanOf(true, "runWebhooks", "guest", "user")).toBe("owned");
+        expect(clearPlanOf(true, "notAUserShardedTable", "guest", "user")).toBe("none");
+    });
+});
+
 describe("importShardRows for userSettings", () => {
     const run = async (guestRows: Record<string, unknown>[], seed?: Record<string, unknown>, crowd: Record<string, unknown>[] = []) => {
         const harness = lunoraTest(schemaWithShardedTables([]) as never);
@@ -1921,6 +2021,8 @@ describe("mergeGuestInto across two real shards", () => {
         abandonPinsLeft: { fn: abandonPinsLeft, kind: "mutation" },
         acquireMergeLease: { fn: acquireMergeLease, kind: "mutation" },
         beginMergeRun: { fn: beginMergeRun, kind: "mutation" },
+        claimHeld: { fn: claimHeld, kind: "query" },
+        claimKey: { fn: claimKey, kind: "mutation" },
         deleteShardRows: { fn: deleteShardRows, kind: "mutation" },
         dropImportMarkersPage: { fn: dropImportMarkersPage, kind: "mutation" },
         dropRowsGoneFromGuest: { fn: dropRowsGoneFromGuest, kind: "mutation" },
@@ -1931,6 +2033,7 @@ describe("mergeGuestInto across two real shards", () => {
         listShardRowsToClear: { fn: listShardRowsToClear, kind: "query" },
         listUnclearedImports: { fn: listUnclearedImports, kind: "query" },
         noteMergeGeneration: { fn: noteMergeGeneration, kind: "mutation" },
+        releaseKey: { fn: releaseKey, kind: "mutation" },
         releaseMergeLease: { fn: releaseMergeLease, kind: "mutation" },
         resolvePinsLeft: { fn: resolvePinsLeft, kind: "mutation" },
         stopMergeKeepingGuest: { fn: stopMergeKeepingGuest, kind: "mutation" },
@@ -3449,6 +3552,8 @@ describe("the account-move markers a merge holds", () => {
         const PROCEDURES: Record<string, unknown> = {
             acquireMergeLease,
             beginMergeRun,
+            claimHeld,
+            claimKey,
             deleteShardRows,
             dropImportMarkersPage,
             dropRowsGoneFromGuest,
@@ -3459,10 +3564,11 @@ describe("the account-move markers a merge holds", () => {
             listShardRowsToClear,
             listUnclearedImports,
             noteMergeGeneration,
+            releaseKey,
             releaseMergeLease,
             resolvePinsLeft,
         };
-        const QUERIES = new Set(["listRowsMissingOnGuest", "listShardRowsPage", "listShardRowsToClear", "listUnclearedImports"]);
+        const QUERIES = new Set(["claimHeld", "listRowsMissingOnGuest", "listShardRowsPage", "listShardRowsToClear", "listUnclearedImports"]);
         const shards = { guest: lunoraTest(schemaWithShardedTables([]) as never), user: lunoraTest(schemaWithShardedTables([]) as never) };
         const call: ShardCall = async (reference, args, shardKey) => {
             const name = reference.__lunoraRef.split(":", 2)[1]!;
@@ -4247,6 +4353,8 @@ describe("what a finished merge leaves behind", () => {
         abandonPinsLeft,
         acquireMergeLease,
         beginMergeRun,
+        claimHeld,
+        claimKey,
         deleteShardRows,
         dropImportMarkersPage,
         dropRowsGoneFromGuest,
@@ -4257,10 +4365,11 @@ describe("what a finished merge leaves behind", () => {
         listShardRowsToClear,
         listUnclearedImports,
         noteMergeGeneration,
+        releaseKey,
         releaseMergeLease,
         resolvePinsLeft,
     };
-    const QUERIES = new Set(["listRowsMissingOnGuest", "listShardRowsPage", "listShardRowsToClear", "listUnclearedImports"]);
+    const QUERIES = new Set(["claimHeld", "listRowsMissingOnGuest", "listShardRowsPage", "listShardRowsToClear", "listUnclearedImports"]);
 
     /** Every merge claim on the shard, by scope. */
     const mergeClaimsOn = async (harness: ReturnType<typeof lunoraTest>) =>

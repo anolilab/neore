@@ -34,6 +34,7 @@ export default defineConfig({
     resolve: {
         alias: {
             // `fileURLToPath`, not `.pathname`: the latter yields "/C:/…" on Windows.
+            "cloudflare:sockets": fileURLToPath(new URL("test/stubs/cloudflare-sockets.ts", import.meta.url)),
             "cloudflare:workers": fileURLToPath(new URL("test/stubs/cloudflare-workers.ts", import.meta.url)),
         },
     },

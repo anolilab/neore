@@ -37,15 +37,18 @@ const REFERENCES: MergeReferences = {
     listClear: reference("listShardRowsToClear"),
     listPinRoutes: reference("listSharedPinRoutesForExport"),
     listUncleared: reference("listUnclearedImports"),
+    markProbe: reference("claimKey"),
     missingOnGuest: reference("listRowsMissingOnGuest"),
     movePinRoute: reference("moveSharedPinRouteOf"),
     nextPinRoute: reference("nextSharedPinRoute"),
     noteGeneration: reference("noteMergeGeneration"),
     pinsLeft: reference("pinsLeftShard"),
+    probeHeld: reference("claimHeld"),
     reassignFollows: reference("reassignThreadFollowsPage"),
     reassignGlobal: reference("reassignGlobalRows"),
     reassignPins: reference("reassignUserPinsOnThread"),
     releaseLease: reference("releaseMergeLease"),
+    releaseProbe: reference("releaseKey"),
     resolvePinsLeft: reference("resolvePinsLeft"),
     routeOwner: reference("sharedPinRouteOwner"),
     stopKeepingGuest: reference("stopMergeKeepingGuest"),
@@ -120,6 +123,13 @@ const build = ({
                 state.marked = true;
 
                 return { finished: false, pinWritesUntil: null, stopped: false } as never;
+            }
+            case "claimHeld": {
+                return false as never;
+            }
+            // The store probe: this harness keeps the two shards on separate stores, so the marker is not seen from the guest's.
+            case "claimKey": {
+                return true as never;
             }
             case "deleteMergedGuest": {
                 return (state.routes.some((route) => route.userId === args.userId) ? { deleted: false, pinsRemain: true } : { deleted: true }) as never;
@@ -208,6 +218,9 @@ const build = ({
                 }
 
                 return { hasMore: false } as never;
+            }
+            case "releaseKey": {
+                return null as never;
             }
             case "releaseMergeLease": {
                 return null as never;

@@ -78,140 +78,8 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             )) as boolean;
 
         await progress({ currentStep: "collecting_profile", progress: 10, status: "processing" });
-        const profile = await context.step.do(
-            "collect-profile",
-            async () => await context.run(internal.gdpr.steps.collectProfile, { userId }, { dedupId: stepDedupId(scope, "collect-profile") }),
-        );
-
-        await progress({ currentStep: "collecting_settings", progress: 20 });
-        const settings = await context.step.do(
-            "collect-settings",
-            async () => await context.run(internal.gdpr.steps.collectSettings, { userId }, { dedupId: stepDedupId(scope, "collect-settings") }),
-        );
-
-        await progress({ currentStep: "collecting_conversations", progress: 30 });
-        const conversations = await context.step.do(
-            "collect-conversations",
-            async () => await context.run(internal.gdpr.steps.collectConversations, { userId }, { dedupId: stepDedupId(scope, "collect-conversations") }),
-        );
-        const sharedThreadPins = await context.step.do(
-            "collect-shared-pins",
-            async () => await context.run(internal.gdpr.steps.collectSharedPins, { userId }, { dedupId: stepDedupId(scope, "collect-shared-pins") }),
-        );
-
-        await progress({ currentStep: "collecting_files", progress: 50 });
-        const files = await context.step.do(
-            "collect-files",
-            async () => await context.run(internal.gdpr.steps.collectFiles, { userId }, { dedupId: stepDedupId(scope, "collect-files") }),
-        );
-
-        await progress({ currentStep: "collecting_prompts", progress: 60 });
-        const prompts = await context.step.do(
-            "collect-prompts",
-            async () => await context.run(internal.gdpr.steps.collectPrompts, { userId }, { dedupId: stepDedupId(scope, "collect-prompts") }),
-        );
-
-        const threadTags = await context.step.do(
-            "collect-thread-tags",
-            async () => await context.run(internal.gdpr.steps.collectThreadTags, { userId }, { dedupId: stepDedupId(scope, "collect-thread-tags") }),
-        );
-
-        const tasks = await context.step.do(
-            "collect-tasks",
-            async () => await context.run(internal.tasks.gdpr.collectTasksForExport, { userId }, { dedupId: stepDedupId(scope, "collect-tasks") }),
-        );
-        const memories = await context.step.do(
-            "collect-memories",
-            async () => await context.run(internal.memory.gdpr.collectMemoriesForExport, { userId }, { dedupId: stepDedupId(scope, "collect-memories") }),
-        );
-        const evals = await context.step.do(
-            "collect-evals",
-            async () => await context.run(internal.evals.gdpr.collectEvalsForExport, { userId }, { dedupId: stepDedupId(scope, "collect-evals") }),
-        );
-        // A page per step, so no checkpoint outgrows the log's size limit however many drafts there are. The first
-        // step keeps the old name: an in-flight run's recorded result has no cursor and reads as the only page.
-        const reviewDrafts = await collectAllReviewDrafts(async (cursor, page) => {
-            const name = page === 0 ? "collect-review-drafts" : `collect-review-drafts-${String(page)}`;
-
-            return await context.step.do(
-                name,
-                async () =>
-                    await context.run(internal.source_control.gdpr.collectReviewDraftsForExport, { cursor, userId }, { dedupId: stepDedupId(scope, name) }),
-            );
-        });
-        const pullRequestGuides = await collectAllGuides(async (cursor, page) => {
-            const name = `collect-pull-request-guides-${String(page)}`;
-
-            return await context.step.do(
-                name,
-                async () =>
-                    await context.run(
-                        internal.source_control.gdpr.collectGuidesForExport,
-                        { cursor, userId },
-                        { dedupId: stepDedupId(scope, "collect-pull-request-guides", page) },
-                    ),
-            );
-        });
-        const pullRequestThreads = await collectAllPullRequestThreads(async (cursor, page) => {
-            const name = `collect-pull-request-threads-${String(page)}`;
-
-            return await context.step.do(
-                name,
-                async () =>
-                    await context.run(
-                        internal.source_control.gdpr.collectPullRequestThreadsForExport,
-                        { cursor, userId },
-                        { dedupId: stepDedupId(scope, "collect-pull-request-threads", page) },
-                    ),
-            );
-        });
-        const watchedRepositories = await context.step.do(
-            "collect-watched-repositories",
-            // An id of its own: a replay skips finished steps, which shifts the body's positional dispatch ids.
-            async () =>
-                await context.run(
-                    internal.source_control.gdpr.collectWatchedRepositoriesForExport,
-                    { userId },
-                    { dedupId: stepDedupId(scope, "collect-watched-repositories") },
-                ),
-        );
-        const bots = await context.step.do(
-            "collect-bots",
-            async () => await context.run(internal.bots.gdpr.collectBotsForExport, { userId }, { dedupId: stepDedupId(scope, "collect-bots") }),
-        );
-        const codingAgentRuns = await context.step.do(
-            "collect-coding-agent-runs",
-            async () =>
-                await context.run(
-                    internal.coding_agents.gdpr.collectCodingAgentRunsForExport,
-                    { userId },
-                    { dedupId: stepDedupId(scope, "collect-coding-agent-runs") },
-                ),
-        );
-
-        const notifications = await context.step.do(
-            "collect-notifications",
-            async () =>
-                await context.run(
-                    internal.notifications.gdpr.collectNotificationsForExport,
-                    { userId },
-                    { dedupId: stepDedupId(scope, "collect-notifications") },
-                ),
-        );
-        const pages = await context.step.do(
-            "collect-pages",
-            async () => await context.run(internal.pages.gdpr.collectPagesForExport, { userId }, { dedupId: stepDedupId(scope, "collect-pages") }),
-        );
-        const devices = await context.step.do(
-            "collect-devices",
-            async () => await context.run(internal.devices.gdpr.collectDevicesForExport, { userId }, { dedupId: stepDedupId(scope, "collect-devices") }),
-        );
         // Where this run stores its browser pages (`browser/export-pages.ts`).
         const browserPrefix = browserExportPrefix(userId, scope);
-        const activity = await context.step.do(
-            "collect-activity",
-            async () => await context.run(internal.gdpr.steps.collectActivityForExport, { userId }, { dedupId: stepDedupId(scope, "collect-activity") }),
-        );
 
         // `context.run` is typed `Promise<unknown>` — the runner does not thread a
         // function's return type through — so `step.do` infers `unknown` and the
@@ -348,6 +216,150 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
         };
 
         try {
+            // The collect steps run inside the try, so one that fails for good fails the export as generation does, and the request
+            // does not stay `processing` until the sweep.
+            const profile = await context.step.do(
+                "collect-profile",
+                async () => await context.run(internal.gdpr.steps.collectProfile, { userId }, { dedupId: stepDedupId(scope, "collect-profile") }),
+            );
+
+            await progress({ currentStep: "collecting_settings", progress: 20 });
+            const settings = await context.step.do(
+                "collect-settings",
+                async () => await context.run(internal.gdpr.steps.collectSettings, { userId }, { dedupId: stepDedupId(scope, "collect-settings") }),
+            );
+
+            await progress({ currentStep: "collecting_conversations", progress: 30 });
+            const conversations = await context.step.do(
+                "collect-conversations",
+                async () => await context.run(internal.gdpr.steps.collectConversations, { userId }, { dedupId: stepDedupId(scope, "collect-conversations") }),
+            );
+            const sharedThreadPins = await context.step.do(
+                "collect-shared-pins",
+                async () => await context.run(internal.gdpr.steps.collectSharedPins, { userId }, { dedupId: stepDedupId(scope, "collect-shared-pins") }),
+            );
+
+            await progress({ currentStep: "collecting_files", progress: 50 });
+            const files = await context.step.do(
+                "collect-files",
+                async () => await context.run(internal.gdpr.steps.collectFiles, { userId }, { dedupId: stepDedupId(scope, "collect-files") }),
+            );
+
+            await progress({ currentStep: "collecting_prompts", progress: 60 });
+            const prompts = await context.step.do(
+                "collect-prompts",
+                async () => await context.run(internal.gdpr.steps.collectPrompts, { userId }, { dedupId: stepDedupId(scope, "collect-prompts") }),
+            );
+
+            const threadTags = await context.step.do(
+                "collect-thread-tags",
+                async () => await context.run(internal.gdpr.steps.collectThreadTags, { userId }, { dedupId: stepDedupId(scope, "collect-thread-tags") }),
+            );
+
+            const tasks = await context.step.do(
+                "collect-tasks",
+                async () => await context.run(internal.tasks.gdpr.collectTasksForExport, { userId }, { dedupId: stepDedupId(scope, "collect-tasks") }),
+            );
+            const memories = await context.step.do(
+                "collect-memories",
+                async () => await context.run(internal.memory.gdpr.collectMemoriesForExport, { userId }, { dedupId: stepDedupId(scope, "collect-memories") }),
+            );
+            const evals = await context.step.do(
+                "collect-evals",
+                async () => await context.run(internal.evals.gdpr.collectEvalsForExport, { userId }, { dedupId: stepDedupId(scope, "collect-evals") }),
+            );
+            // A page per step, so no checkpoint outgrows the log's size limit however many drafts there are. The first
+            // step keeps the old name: an in-flight run's recorded result has no cursor and reads as the only page.
+            const reviewDrafts = await collectAllReviewDrafts(async (cursor, page) => {
+                const name = page === 0 ? "collect-review-drafts" : `collect-review-drafts-${String(page)}`;
+
+                return await context.step.do(
+                    name,
+                    async () =>
+                        await context.run(internal.source_control.gdpr.collectReviewDraftsForExport, { cursor, userId }, { dedupId: stepDedupId(scope, name) }),
+                );
+            });
+            const pullRequestGuides = await collectAllGuides(async (cursor, page) => {
+                const name = `collect-pull-request-guides-${String(page)}`;
+
+                return await context.step.do(
+                    name,
+                    async () =>
+                        await context.run(
+                            internal.source_control.gdpr.collectGuidesForExport,
+                            { cursor, userId },
+                            { dedupId: stepDedupId(scope, "collect-pull-request-guides", page) },
+                        ),
+                );
+            });
+            const pullRequestThreads = await collectAllPullRequestThreads(async (cursor, page) => {
+                const name = `collect-pull-request-threads-${String(page)}`;
+
+                return await context.step.do(
+                    name,
+                    async () =>
+                        await context.run(
+                            internal.source_control.gdpr.collectPullRequestThreadsForExport,
+                            { cursor, userId },
+                            { dedupId: stepDedupId(scope, "collect-pull-request-threads", page) },
+                        ),
+                );
+            });
+            const watchedRepositories = await context.step.do(
+                "collect-watched-repositories",
+                // An id of its own: a replay skips finished steps, which shifts the body's positional dispatch ids.
+                async () =>
+                    await context.run(
+                        internal.source_control.gdpr.collectWatchedRepositoriesForExport,
+                        { userId },
+                        { dedupId: stepDedupId(scope, "collect-watched-repositories") },
+                    ),
+            );
+            const bots = await context.step.do(
+                "collect-bots",
+                async () => await context.run(internal.bots.gdpr.collectBotsForExport, { userId }, { dedupId: stepDedupId(scope, "collect-bots") }),
+            );
+            const codingAgentRuns = await context.step.do(
+                "collect-coding-agent-runs",
+                async () =>
+                    await context.run(
+                        internal.coding_agents.gdpr.collectCodingAgentRunsForExport,
+                        { userId },
+                        { dedupId: stepDedupId(scope, "collect-coding-agent-runs") },
+                    ),
+            );
+
+            const notifications = await context.step.do(
+                "collect-notifications",
+                async () =>
+                    await context.run(
+                        internal.notifications.gdpr.collectNotificationsForExport,
+                        { userId },
+                        { dedupId: stepDedupId(scope, "collect-notifications") },
+                    ),
+            );
+            const runWebhooks = await context.step.do(
+                "collect-run-webhooks",
+                async () =>
+                    await context.run(
+                        internal.run_webhooks.gdpr.collectRunWebhookForExport,
+                        { userId },
+                        { dedupId: stepDedupId(scope, "collect-run-webhooks") },
+                    ),
+            );
+            const pages = await context.step.do(
+                "collect-pages",
+                async () => await context.run(internal.pages.gdpr.collectPagesForExport, { userId }, { dedupId: stepDedupId(scope, "collect-pages") }),
+            );
+            const devices = await context.step.do(
+                "collect-devices",
+                async () => await context.run(internal.devices.gdpr.collectDevicesForExport, { userId }, { dedupId: stepDedupId(scope, "collect-devices") }),
+            );
+            const activity = await context.step.do(
+                "collect-activity",
+                async () => await context.run(internal.gdpr.steps.collectActivityForExport, { userId }, { dedupId: stepDedupId(scope, "collect-activity") }),
+            );
+
             // Browser sessions, the sites a run asked to clear, the extensions and the sessions' actions: a page per step, each stored as an
             // object under the run's prefix. Only the page count reaches the export file's action, which reads the pages itself, so no
             // dispatch body (Lunora's 1 MiB) or step result carries the whole history. Inside the try, so a page that fails for good
@@ -419,6 +431,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                             pullRequestThreads,
                             requestId,
                             reviewDrafts,
+                            runWebhooks,
                             settings,
                             sharedThreadPins,
                             tasks,

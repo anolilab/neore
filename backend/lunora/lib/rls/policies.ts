@@ -217,6 +217,7 @@ const OWNER_TABLES = [
     "pullRequestThreads",
     "requestedSecrets",
     "reviewDrafts",
+    "runWebhooks",
     "sandboxSessions",
     "savedSiteLogins",
     "session",
