@@ -535,6 +535,11 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         close();
     };
 
+    // The palette closes for a confirmation it asked for; backing out of that confirmation brings it back.
+    const reopenPalette = () => {
+        setOpen(true);
+    };
+
     const handlePinUnpinThread = () => {
         if (!currentThreadId || currentThreadId === "default") {
             return;
@@ -543,7 +548,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         const currentThread = allThreads.find((candidate) => candidate.id === currentThreadId);
 
         if (currentThread?.isPinned && handleUnpinThread) {
-            handleUnpinThread(currentThreadId);
+            handleUnpinThread(currentThreadId, { onCancel: reopenPalette });
         } else if (!currentThread?.isPinned && handlePinThread) {
             handlePinThread(currentThreadId);
         }
@@ -596,7 +601,9 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         const currentThread = allThreads.find((candidate) => candidate.id === currentThreadId);
 
         if (currentThread && updateThread) {
-            updateThread(currentThreadId, currentThreadModel, currentThread.status === "archived" ? "active" : "archived");
+            updateThread(currentThreadId, currentThreadModel, currentThread.status === "archived" ? "active" : "archived", {
+                onCancel: reopenPalette,
+            });
             close();
         }
     };
@@ -1008,6 +1015,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                                                                                 item.threadId!,
                                                                                 currentThreadModel,
                                                                                 item.status === "archived" ? "active" : "archived",
+                                                                                { onCancel: reopenPalette },
                                                                             );
                                                                             close();
                                                                         }

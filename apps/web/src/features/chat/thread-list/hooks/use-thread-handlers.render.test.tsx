@@ -10,6 +10,10 @@ const settings = vi.hoisted(() => {
 });
 // Every thread mutation the hook sends, in order: the confirmation tests check what reached the server.
 const calls: { args: unknown; fn: string }[] = [];
+// The chat the person has open; a test changes it to show a pending confirmation does not follow them.
+const openChat = vi.hoisted(() => {
+    return { id: "root" as string | undefined };
+});
 const deleteThreadMetadata = vi.fn();
 const removeOptimisticDeletion = vi.fn();
 const navigate = vi.fn();
@@ -121,6 +125,7 @@ vi.mock("@/features/chat/core/hooks/use-thread-manager", () => {
 
 vi.mock("@/features/chat/core/stores/thread-store-hooks", () => {
     return {
+        useCurrentThreadId: () => openChat.id,
         useOptimisticActions: () => {
             return {
                 clearOptimisticPin: vi.fn(),
@@ -191,6 +196,7 @@ describe("chat action confirmations", () => {
         calls.length = 0;
         settings.value = undefined;
         settings.pending = false;
+        openChat.id = "root";
         rendered.mockClear();
     });
 
@@ -386,6 +392,70 @@ describe("chat action confirmations", () => {
 
         expect(calls).toStrictEqual([{ args: { model: "model-a", status: "active", threadId: "t1" }, fn: "updateThread" }]);
         expect(screen.queryByText("Archive this chat?")).toBeNull();
+    });
+
+    it("calls the caller's onCancel when the archive confirmation is backed out of, and runs nothing", async () => {
+        settings.value = { confirmBeforeArchiveChat: true };
+        const onCancel = vi.fn();
+
+        render(<Confirmable />);
+
+        act(() => {
+            current().updateThread("t1", "model-a", "archived", { onCancel });
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+        await act(flush);
+
+        expect(onCancel).toHaveBeenCalledTimes(1);
+        expect(calls).toHaveLength(0);
+    });
+
+    it("calls the caller's onCancel when the unpin confirmation is backed out of", async () => {
+        settings.value = { confirmBeforeUnpinChat: true };
+        const onCancel = vi.fn();
+
+        render(<Confirmable />);
+
+        act(() => {
+            current().handleUnpinThread("t1", { onCancel });
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+        await act(flush);
+
+        expect(onCancel).toHaveBeenCalledTimes(1);
+        expect(calls).toHaveLength(0);
+    });
+
+    it("does not call onCancel once the archive is confirmed", async () => {
+        settings.value = { confirmBeforeArchiveChat: true };
+        const onCancel = vi.fn();
+
+        render(<Confirmable />);
+
+        act(() => {
+            current().updateThread("t1", "model-a", "archived", { onCancel });
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+        await act(flush);
+
+        expect(calls).toHaveLength(1);
+        expect(onCancel).not.toHaveBeenCalled();
+    });
+
+    it("drops a pending archive once another chat is open, so confirming it does nothing", async () => {
+        settings.value = { confirmBeforeArchiveChat: true };
+        const view = render(<Confirmable />);
+
+        act(() => {
+            current().updateThread("t1", "model-a", "archived");
+        });
+        expect(screen.getByText("Archive this chat?")).toBeTruthy();
+
+        openChat.id = "other";
+        view.rerender(<Confirmable />);
+
+        expect(screen.queryByText("Archive this chat?")).toBeNull();
+        expect(calls).toHaveLength(0);
     });
 
     it("exposes delete as confirmed by default, for its callers to ask about", () => {

@@ -6,11 +6,11 @@ import { shardOptionsFor } from "@neore/client-runtime";
 import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useThreadManager } from "@/features/chat/core/hooks/use-thread-manager";
-import { useOptimisticActions, useThreadActions } from "@/features/chat/core/stores/thread-store-hooks";
+import { useCurrentThreadId, useOptimisticActions, useThreadActions } from "@/features/chat/core/stores/thread-store-hooks";
 import { routeIsOn, survivingPaneAfterDelete } from "@/features/chat/split/split-layout-store";
 import { focusThreadSearchToggle } from "@/features/keyboard/lib/thread-search-target";
 import type { DownloadFormat } from "@/lib/download";
@@ -28,8 +28,15 @@ interface ConfirmationRequest {
     afterConfirm?: () => void;
     confirmLabel: string;
     description: string;
+    /** Runs when the person cancels or dismisses the confirmation, not on confirm: for a caller that closed something to ask. */
+    onCancel?: () => void;
     run: () => void;
     title: string;
+}
+
+/** Options a caller passes when it asks: `onCancel` runs if the person backs out of the confirmation. */
+interface AskOptions {
+    onCancel?: () => void;
 }
 
 /**
@@ -75,11 +82,22 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
     // One confirmation at a time: the request the dialog shows, and whether it is open.
     const [pendingRequest, setPendingRequest] = useState<ConfirmationRequest | undefined>(undefined);
     const [dialogOpen, setDialogOpen] = useState(false);
+    // Set by the dialog's confirm for the request being shown, so its close is not taken for a cancel.
+    const confirmedRef = useRef(false);
 
     const askFirst = useCallback((request: ConfirmationRequest) => {
+        confirmedRef.current = false;
         setPendingRequest(request);
         setDialogOpen(true);
     }, []);
+
+    // A pending archive or unpin is about the chat that was open when it was asked. Once another chat is open, it is dropped
+    // unconfirmed, so a confirm cannot act on a chat the person has left.
+    const openChatId = useCurrentThreadId();
+
+    useEffect(() => {
+        setDialogOpen(false);
+    }, [openChatId]);
 
     const lunora = useLunora();
     const { mutateAsync: pinThreadMutation } = useMutation(crpc.chat.functions.pinThread.mutationOptions());
@@ -287,7 +305,7 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
     );
 
     const handleUnpinThread = useCallback(
-        (threadId: string) => {
+        (threadId: string, options?: AskOptions) => {
             if (!confirmations.unpin) {
                 void unpinNow(threadId);
 
@@ -298,6 +316,7 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
                 afterConfirm: focusListAfterSidebarAction(),
                 confirmLabel: t`Unpin`,
                 description: t`The chat will no longer be pinned. You can pin it again from the list.`,
+                onCancel: options?.onCancel,
                 run: () => {
                     void unpinNow(threadId);
                 },
@@ -346,7 +365,7 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
 
     // Restoring runs at once; only archiving asks, when the setting is on.
     const updateThread = useCallback(
-        (threadId: string, model: string, status: "archived" | "active") => {
+        (threadId: string, model: string, status: "archived" | "active", options?: AskOptions) => {
             if (status !== "archived" || !confirmations.archive) {
                 void applyThreadStatus(threadId, model, status);
 
@@ -356,6 +375,7 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
             askFirst({
                 afterConfirm: focusListAfterSidebarAction(),
                 confirmLabel: t`Archive`,
+                onCancel: options?.onCancel,
                 description: t`Archived chats stay searchable, and you can restore them from the archive.`,
                 run: () => {
                     void applyThreadStatus(threadId, model, status);
@@ -425,6 +445,7 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
             onConfirm={() => {
                 const request = pendingRequest;
 
+                confirmedRef.current = true;
                 setDialogOpen(false);
                 request?.run();
 
@@ -433,7 +454,22 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
                     globalThis.setTimeout(request.afterConfirm, 0);
                 }
             }}
-            onOpenChange={setDialogOpen}
+            onOpenChange={(open) => {
+                setDialogOpen(open);
+
+                if (open) {
+                    return;
+                }
+
+                // A confirm and this close come from the same click, in either order: read the flag once that click has finished.
+                const request = pendingRequest;
+
+                queueMicrotask(() => {
+                    if (!confirmedRef.current) {
+                        request?.onCancel?.();
+                    }
+                });
+            }}
             open={dialogOpen}
             title={pendingRequest?.title ?? ""}
         />

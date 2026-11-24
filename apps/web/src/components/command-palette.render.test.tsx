@@ -19,7 +19,9 @@ const harness = vi.hoisted(() => {
         /** The chat the palette acts on; `undefined` shows no current-thread actions. */
         currentThreadId: undefined as string | undefined,
         deleteBranch: undefined as undefined | ReturnType<typeof vi.fn>,
+        handleUnpinThread: vi.fn(),
         navigate: vi.fn(),
+        updateThread: vi.fn(),
         scrollToMessage: vi.fn(),
         searchArgs: [] as unknown[],
         /** The thread rows the palette lists; a test may replace them. */
@@ -195,8 +197,8 @@ vi.mock("@/features/chat/thread-list/hooks/use-thread-handlers", () => {
                 confirmDialog: null,
                 handleCreateBranch: vi.fn(),
                 handlePinThread: vi.fn(),
-                handleUnpinThread: vi.fn(),
-                updateThread: vi.fn(),
+                handleUnpinThread: harness.handleUnpinThread,
+                updateThread: harness.updateThread,
             };
         },
     };
@@ -492,6 +494,25 @@ describe("command palette thread delete confirmation", () => {
         fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
         expect(await screen.findByRole("combobox")).toBeTruthy();
+    });
+
+    it("reopens the palette when its archive confirmation is backed out of, instead of leaving it closed", async () => {
+        harness.updateThread.mockClear();
+        renderPalette();
+        await openPalette();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Archive thread" }));
+
+        expect(harness.updateThread.mock.calls[0]?.[0]).toBe("thread-1");
+        expect(useCommandDialogStore.getState().isOpen).toBe(false);
+
+        const options = harness.updateThread.mock.calls[0]?.[3] as { onCancel: () => void };
+
+        act(() => {
+            options.onCancel();
+        });
+
+        expect(useCommandDialogStore.getState().isOpen).toBe(true);
     });
 
     it("drops a pending delete of the open chat once another chat is open, so a confirm cannot delete the chat it left", async () => {
