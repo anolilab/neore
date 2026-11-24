@@ -1464,7 +1464,7 @@ msgstr "{pages, plural, other {# 页}}"
 msgid "{prefixed}, selected"
 msgstr "{prefixed}，已选择"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:134
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:242
 msgid "{project}: {spendShare} of spend"
 msgstr "{project}：支出的 {spendShare}"
 
@@ -9022,7 +9022,7 @@ msgstr "无法加载市场，请稍后重试。"
 msgid "Could not load the memories."
 msgstr "无法加载记忆。"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:94
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:202
 msgid "Could not load the project breakdown."
 msgstr "无法加载按项目的明细。"
 
@@ -9343,6 +9343,10 @@ msgstr "无法更新参与者"
 #: src/features/chat/thread-list/thread-options-menu.tsx:100
 msgid "Couldn't load follow state"
 msgstr "无法加载关注状态"
+
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:167
+msgid "Counted in whole weeks (Monday to Sunday, UTC) once each week has ended, so this week's usage shows next week."
+msgstr "按完整的周（周一至周日，UTC）在每周结束后统计，因此本周的用量下周才会显示。"
 
 #: src/features/settings/lib/settings-keywords.ts:31
 msgid "country"
@@ -20045,7 +20049,7 @@ msgid "Loading triggers..."
 msgstr "正在加载触发器..."
 
 #: src/features/projects/components/project-usage-summary.tsx:56
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:86
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:194
 msgid "Loading usage…"
 msgstr "正在加载用量…"
 
@@ -21255,6 +21259,7 @@ msgid "Min"
 msgstr "Min"
 
 #: src/features/develop/components/inbox-list.tsx:51
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:185
 msgid "Mine"
 msgstr "我的"
 
@@ -23229,7 +23234,7 @@ msgid "No progress: {0}"
 msgstr "无进展：{0}"
 
 #: src/features/projects/components/project-repo-picker.tsx:105
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:66
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:127
 #: src/features/tasks/components/task-form-dialog.tsx:430
 #: src/features/tasks/components/task-form-dialog.tsx:442
 msgid "No project"
@@ -23289,7 +23294,7 @@ msgstr "未选择参考图"
 msgid "No remote MCP servers match your search."
 msgstr "没有与搜索匹配的远程 MCP 服务器。"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:98
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:206
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:85
 msgid "No replies recorded for this period."
 msgstr "此期间没有记录到回复。"
@@ -24155,7 +24160,7 @@ msgstr "仅列出的工具"
 msgid "Only organization owners can manage billing settings"
 msgstr "只有组织所有者才能管理账单设置"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:152
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:260
 msgid "Only part of this period is included."
 msgstr "仅包含此期间的一部分。"
 
@@ -25078,6 +25083,7 @@ msgstr "普通点击会先被检查，然后真实执行。页面可能在检查
 #: src/features/auth/components/organization/organization-logo.tsx:62
 #: src/features/auth/components/organization/organization-view.tsx:64
 #: src/features/layout/lib/dashboard-page-names.ts:32
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:186
 #: src/features/settings/lib/settings-navigation.ts:110
 #: src/features/skills/components/skill-form-dialog.tsx:476
 #: src/features/skills/components/skill-item.tsx:130
@@ -25195,7 +25201,8 @@ msgstr "其他有昵称的模型"
 msgid "Other presets"
 msgstr "其他预设"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:62
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:123
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:138
 msgid "Other projects"
 msgstr "其他项目"
 
@@ -26971,7 +26978,7 @@ msgstr "{toolName} 的进度"
 #: src/features/devices/components/devices-settings.tsx:121
 #: src/features/projects/components/project-repo-picker.tsx:145
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:451
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:104
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:212
 #: src/features/tasks/components/task-form-dialog.tsx:427
 msgid "Project"
 msgstr "项目"
@@ -26988,7 +26995,7 @@ msgstr "项目上下文"
 msgid "Project Context"
 msgstr "项目上下文"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:58
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:119
 msgid "Project no longer available"
 msgstr "项目已不可用"
 
@@ -27006,6 +27013,10 @@ msgstr "项目：{0}"
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:606
 msgid "Projects"
 msgstr "项目"
+
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:143
+msgid "Projects no longer in the organization"
+msgstr "不再属于该组织的项目"
 
 #: src/features/marketing/data/models-data.ts:66
 msgid "Projects requiring clean, readable text and typography rendered within generated images"
@@ -28671,7 +28682,7 @@ msgstr "重新播放欢迎导览，回顾 Neore 的核心功能。"
 #: src/features/projects/components/project-usage-summary.tsx:38
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:150
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:252
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:105
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:213
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:92
 msgid "Replies"
 msgstr "回复"
@@ -28700,7 +28711,7 @@ msgstr "回复将被朗读"
 msgid "Replies will no longer be read aloud"
 msgstr "回复将不再被朗读"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:81
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:163
 msgid "Replies, tokens and spend per project for the selected period"
 msgstr "所选期间内每个项目的回复、令牌和花费"
 
@@ -31051,7 +31062,7 @@ msgstr "无法测量的分片未计入合计：{0}。"
 msgid "Share"
 msgstr "分享"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:109
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:217
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:96
 msgid "Share of spend"
 msgstr "支出占比"
@@ -32234,7 +32245,7 @@ msgstr "Nano Banana 2 的极速档，用于快速文生图"
 #: src/features/projects/components/project-usage-summary.tsx:43
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:151
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:253
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:107
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:215
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:94
 msgid "Spend"
 msgstr "支出"
@@ -36592,7 +36603,7 @@ msgid "Token usage and cost breakdown per model for the selected period"
 msgstr "所选期间内每个模型的 token 用量和成本明细"
 
 #: src/features/projects/components/project-usage-summary.tsx:40
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:106
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:214
 #: src/features/settings/components/chat/usage-settings.tsx:319
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:93
 msgid "Tokens"
@@ -38013,7 +38024,7 @@ msgstr "用量分析"
 msgid "Usage Analytics"
 msgstr "用量分析"
 
-#: src/features/settings/components/chat/usage-project-breakdown.tsx:79
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:159
 msgid "Usage by project"
 msgstr "按项目的用量"
 
@@ -39599,6 +39610,10 @@ msgstr "拉取请求的提交以谁的身份创建"
 msgid "Who answers"
 msgstr "谁来回答"
 
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:172
+msgid "Whose usage"
+msgstr "谁的用量"
+
 #. placeholder {0}: model.name
 #: src/features/marketing/components/model-detail-page.tsx:175
 msgid "Why {0}"
@@ -40471,6 +40486,10 @@ msgstr "你所在的组织不允许在你的电脑上运行智能体。"
 #: src/features/home/components/daily-brief-offer.tsx:96
 msgid "Your organization manages the Daily Brief."
 msgstr "每日简报由你的组织管理。"
+
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:164
+msgid "Your organization's projects, summed over every member, for the selected period"
+msgstr "所选期间内，组织所有成员汇总的项目用量"
 
 #: src/features/home/components/home-page.tsx:144
 msgid "Your overview could not be loaded."

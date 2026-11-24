@@ -3,6 +3,8 @@ import { LunoraError, v } from "lunorash/server";
 import { buildUsageJson, spliceUsageJson, usageObjectKey } from "./usage-export-steps";
 import { readStoredText } from "../lib/storage-read";
 import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
+import { callOnShard } from "../lib/cross-shard";
+import { collectOrganizationReplyPages } from "../usage/organization";
 import { collectAcpSessionPages } from "../acp/gdpr";
 import { BROWSER_EXPORT_BYTES, browserExportPageKey, readAllBrowserPages } from "../browser/export-pages";
 import { collectAllFeedback } from "../feedback/gdpr";
@@ -18,7 +20,15 @@ import { queueEmail } from "../email/mailer";
 import { SITE_URL } from "../env";
 import { withDependency } from "../lib/dependency";
 import { storedPage, storedRows } from "../lib/stored-row";
-import { callOnShard } from "../lib/cross-shard";
+
+/**
+ * The organization ledger the export holds, in bytes. Past it the oldest rows are cut and the file says so (`organizationRepliesCut`), so
+ * the rest of the export still succeeds.
+ */
+const ORGANIZATION_REPLY_EXPORT_BYTES = 4 * 1024 * 1024;
+
+/** The stored usage object's keys and braces around its two arrays: a few dozen bytes, allowed for in the read limit. */
+const USAGE_OBJECT_WRAPPER_BYTES = 1024;
 
 const TRAILING_SLASH = /\/$/;
 
@@ -731,9 +741,14 @@ export const generateExportFile = internalAction
     })
     .action(async ({ args, ctx: context }) => {
         const activity = args.activity as { knowledgeCollections?: unknown[]; subAgentRuns?: unknown[]; usageDaily?: unknown[] } | undefined;
-        // The usage JSON, already read and checked by `prepareUsageForExport` in its own action. It is spliced into the file as
-        // text, so this action does not read it against its own budget.
-        const usageJson = args.usageKey === undefined ? undefined : await readStoredText(context.storage, args.usageKey, { maxBytes: USAGE_EXPORT_BYTES });
+        // The usage JSON, already read and checked by `prepareUsageForExport` in its own action: the usage rows and the organization ledger.
+        // It is spliced into the file as text, so this action does not read it against its own budget.
+        const usageJson =
+            args.usageKey === undefined
+                ? undefined
+                : await readStoredText(context.storage, args.usageKey, {
+                      maxBytes: USAGE_EXPORT_BYTES + ORGANIZATION_REPLY_EXPORT_BYTES + USAGE_OBJECT_WRAPPER_BYTES,
+                  });
         // Read here, a page per query, so no workflow step result or action argument carries the history.
         const acpSessions =
             args.acpSessions ??
@@ -854,13 +869,16 @@ export const generateExportFile = internalAction
             threadFollows: threadFollows.section,
             threadTags: args.threadTags ?? [],
             triggers: { triggers: triggers.triggers },
-            // An export from before the usage pieces existed carries its rows in `activity`; otherwise the usage JSON is spliced in below.
-            ...(usageJson === undefined && { usageDaily: activity?.usageDaily ?? [] }),
+            // An export from before the usage pieces existed carries its rows in `activity`, and no ledger; otherwise the usage JSON is spliced
+            // in below, with the ledger.
+            ...(usageJson === undefined && { organizationReplies: [], organizationRepliesCut: false, usageDaily: activity?.usageDaily ?? [] }),
+            // A usage JSON stored before the ledger was in it holds the rows alone: the ledger is then empty, and nothing was cut.
+            ...(usageJson?.startsWith("[") && { organizationReplies: [], organizationRepliesCut: false }),
             watchedRepositories: args.watchedRepositories ?? { watched: [] },
         };
 
         const head = JSON.stringify(exportData, null, 2);
-        // The usage JSON is an array already, so it is written as the file's last key rather than parsed and serialized again.
+        // The usage JSON is written as the file's last keys rather than parsed and serialized again.
         const jsonString = usageJson === undefined ? head : spliceUsageJson(head, usageJson);
         const blob = new Blob([jsonString], { type: "application/json" });
 
@@ -907,8 +925,18 @@ export const prepareUsageForExport = internalAction
             return null;
         }
 
+        // The organization ledger, read here in this action's own read budget, a page at a time on the member's shard: its newest rows that fit
+        // the budget (`organizationRepliesCut` says whether older ones were left out). It is stored in the usage object, so its record, its
+        // confirmation and its purge are the usage object's.
+        const ledger = await collectOrganizationReplyPages(
+            async (cursor) => await callOnShard(internal.usage.organization.collectOrganizationRepliesForExport, { cursor, userId }, { shardKey: userId }),
+            ORGANIZATION_REPLY_EXPORT_BYTES,
+        );
+
         const key = usageObjectKey(requestId);
-        const blob = new Blob([text], { type: "application/json" });
+        const blob = new Blob([`{"usageDaily":${text},"organizationReplies":${JSON.stringify(ledger.rows)},"organizationRepliesCut":${String(ledger.cut)}}`], {
+            type: "application/json",
+        });
 
         // Recorded before the object is written, so a run that dies after this is found by the sweep (`usage/gdpr.ts`).
         await context.runMutation(internal.usage.gdpr.recordUsageFile, { key, requestId, userId });
