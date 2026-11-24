@@ -91,6 +91,20 @@ describe("injectPromptCaching", () => {
         });
     });
 
+    it("keeps the other provider options already on the system message", () => {
+        const withOptions: ModelMessage = {
+            content: "You are helpful.",
+            providerOptions: { openrouter: { trace: "abc" } },
+            role: "system",
+        };
+        const result = injectPromptCaching([withOptions, { content: "hi", role: "user" }], "openrouter");
+
+        expect(result.messages[0]?.providerOptions).toEqual({
+            anthropic: { cacheControl: CACHE },
+            openrouter: { trace: "abc" },
+        });
+    });
+
     it("does not add a second breakpoint when the last message is the system message", () => {
         const result = injectPromptCaching([system], "openrouter");
 

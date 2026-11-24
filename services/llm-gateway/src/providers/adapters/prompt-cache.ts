@@ -63,15 +63,8 @@ export const injectPromptCaching = (
 
         if (message.role === "system") {
             if (budget > 0 && typeof message.content === "string" && !hasMessageBreakpoint(message)) {
-                // Convert string content to structured format with cache control
-                result[i] = {
-                    ...message,
-                    content: message.content,
-                    // AI SDK experimental provider options for cache control
-                    providerOptions: {
-                        anthropic: { cacheControl: CACHE_CONTROL },
-                    },
-                } as ModelMessage;
+                // Merges into the existing provider options, so other providers' options on this message survive
+                result[i] = withCacheControl(message);
                 budget--;
             }
 
