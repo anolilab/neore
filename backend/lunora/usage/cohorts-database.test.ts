@@ -86,6 +86,66 @@ describe("cohort slots in the database", () => {
         expect(entries).toStrictEqual({ contributors: ["org-1:user", "org-2:guest"], slots: 0 });
     });
 
+    it("does not seal a cohort whose duplicate booking failed after another member claimed the next slot", async () => {
+        const scope = await harness.run(async (ctx: any) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "admin", userId: ADMIN });
+
+            for (const userId of ["m0", "m1", "m2"]) {
+                await insertContributor(ctx, { createdAt: 1, organizationId: "org-1", userId });
+            }
+
+            // A second booking of m0 claims slot 3; before its contributor row is refused, m3 is booked and claims slot 4.
+            let raced = false;
+            const db = new Proxy(ctx.db, {
+                get: (target, property) => {
+                    if (property === "insert") {
+                        return async (table: string, row: { userId?: string }) => {
+                            if (table === "usageOrganizationContributors" && row.userId === "m0" && !raced) {
+                                raced = true;
+                                await insertContributor(ctx, { createdAt: 2, organizationId: "org-1", userId: "m3" });
+                            }
+
+                            return await target.insert(table, row);
+                        };
+                    }
+
+                    const value = Reflect.get(target, property);
+
+                    return typeof value === "function" ? value.bind(target) : value;
+                },
+            });
+            const racing = Object.create(ctx, { db: { value: db } });
+
+            await insertContributor(racing, { createdAt: 2, organizationId: "org-1", userId: "m0" });
+
+            const { page } = await ctx.db.usageOrganizationCohortSlots.findMany({ where: { organizationId: "org-1" } });
+
+            return {
+                scope: await ctx.runQuery(organizationUsageScope, { organizationId: "org-1", slotsSettledBefore: Number.MAX_SAFE_INTEGER, userId: ADMIN }),
+                slots: page.map((row: any) => row.slot as number).toSorted((a: number, b: number) => a - b),
+            };
+        });
+
+        // Slot 3 was given back after slot 4 was taken: the top slot ends cohort 0, but it holds four members and is not sealed.
+        expect(scope.slots).toEqual([0, 1, 2, 4]);
+        expect(scope.scope.members.map((member: { userId: string }) => member.userId)).toEqual(["m0", "m1", "m2", "m3"]);
+        expect(scope.scope.sealedCohorts).toEqual([]);
+    });
+
+    it("seals a cohort once each of its slots was filled", async () => {
+        const scope = await harness.run(async (ctx: any) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "admin", userId: ADMIN });
+
+            for (let index = 0; index < COHORT_SIZE; index += 1) {
+                await insertContributor(ctx, { createdAt: index, organizationId: "org-1", userId: `m${String(index)}` });
+            }
+
+            return await ctx.runQuery(organizationUsageScope, { organizationId: "org-1", slotsSettledBefore: Number.MAX_SAFE_INTEGER, userId: ADMIN });
+        });
+
+        expect(scope.sealedCohorts).toEqual([0]);
+    });
+
     it("keeps a released cohort's members when a contributor is booked after the first read", async () => {
         await harness.run(async (ctx: any) => {
             await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "admin", userId: ADMIN });

@@ -1,7 +1,7 @@
 import type { MutationCtx } from "../_generated/server";
 import { describe, expect, it } from "vitest";
 
-import { allocateCohort, COHORT_SIZE, cohortOfBooking } from "./cohorts";
+import { allocateCohort, COHORT_SIZE, cohortOfBooking, sealedCohortsOf } from "./cohorts";
 
 type Slot = { organizationId: string; slot: number };
 
@@ -95,5 +95,14 @@ describe("allocateCohort", () => {
         const live: Slot[] = [{ organizationId: "org-2", slot: 0 }];
 
         expect(await allocateCohort(racingCtx(live, [...live]), "org-1")).toBe(0);
+    });
+});
+
+describe("sealedCohortsOf", () => {
+    it("seals a cohort only when each of its slots was filled, whatever the top slot", () => {
+        expect(sealedCohortsOf([0, 1, 2, 3, 4, 5, 6])).toEqual([0]);
+        // Slot 3 was released after slot 4 was claimed: cohort 0 never had five members.
+        expect(sealedCohortsOf([0, 1, 2, 4, 5, 6, 7, 8, 9])).toEqual([1]);
+        expect(sealedCohortsOf([])).toEqual([]);
     });
 });

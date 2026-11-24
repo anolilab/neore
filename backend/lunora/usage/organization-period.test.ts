@@ -82,7 +82,7 @@ const seed = async (projectOf: (member: number, week: number) => string, weeks: 
             await ctx.db.insert("usageOrganizationContributors", { cohort: cohortOfBooking(member), createdAt: member, organizationId: "org-1", userId });
 
             if (slots) {
-                await ctx.db.insert("usageOrganizationCohortSlots", { claimedAt: 0, organizationId: "org-1", slot: member });
+                await ctx.db.insert("usageOrganizationCohortSlots", { claimedAt: 0, filled: true, organizationId: "org-1", slot: member });
             }
 
             for (const week of weeks) {

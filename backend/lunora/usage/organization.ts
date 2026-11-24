@@ -50,6 +50,12 @@ const SHARD_CONCURRENCY = 8;
 const SCOPE_BATCH = 10;
 
 /**
+ * Filled booking slots one scope batch reads to tell which cohorts are sealed: the batch's members span at most `SCOPE_BATCH + 1` cohorts,
+ * of five slots each. A cohort past the slots read counts as not sealed.
+ */
+const SEAL_SLOTS_READ = (SCOPE_BATCH + 1) * COHORT_SIZE;
+
+/**
  * The members a project needs to be named, and a cohort's week to show when the cohort is still filling. A group is fixed by its place in
  * the organization's member order, not by who was active in the period, so no change of period start can swap the members a total covers.
  */
@@ -224,8 +230,8 @@ export const organizationUsageScope = internalQuery
                 // Whether contributors follow this batch.
                 more: v.boolean(),
                 projects: v.array(v.object({ projectId: v.string(), title: v.string() })),
-                // How many cohorts, from the first, have every booking slot taken (`sealedCohortsOf`); read with the project list, else 0.
-                sealedCohorts: v.number(),
+                // The cohorts this batch reads from their first member on whose every booking slot was filled (`sealedCohortsOf`).
+                sealedCohorts: v.array(v.number()),
                 truncated: v.boolean(),
             }),
         ),
@@ -240,15 +246,18 @@ export const organizationUsageScope = internalQuery
 
         // Everyone with rows under the organization, current members and those who left, a batch at a time by user id: a key no change moves,
         // so someone added mid-way is not counted twice.
-        // The top settled slot (claimed before `slotsSettledBefore`), read before the contributors: a cohort sealed by then can gain no
-        // member, and its members' rows have landed, so the batch below holds all of it. A slot claimed later may not have its member yet.
-        const topSlot =
-            withProjects === false || slotsSettledBefore === undefined
+        // The filled settled slots (claimed before `slotsSettledBefore`) from the batch's first cohort on, read before the contributors: a
+        // slot is marked filled only after its member's row landed, so a cohort sealed by then can gain no member and the batch below holds
+        // all of it. Counted per cohort, never inferred from the top slot: a released claim leaves a gap that later slots do not fill.
+        const firstCohort = afterCohort ?? 0;
+        const filledSlots =
+            slotsSettledBefore === undefined
                 ? undefined
-                : await systemDb(ctx).usageOrganizationCohortSlots.findFirst({
+                : await systemDb(ctx).usageOrganizationCohortSlots.findMany({
                       consistency: "primary",
-                      orderBy: [{ slot: "desc" }],
-                      where: { claimedAt: { lte: slotsSettledBefore }, organizationId },
+                      limit: SEAL_SLOTS_READ,
+                      orderBy: [{ slot: "asc" }],
+                      where: { claimedAt: { lte: slotsSettledBefore }, filled: true, organizationId, slot: { gte: firstCohort * COHORT_SIZE } },
                   });
         const [contributors, projects] = await Promise.all([
             contributorBatch(
@@ -271,7 +280,10 @@ export const organizationUsageScope = internalQuery
             projects: listed.slice(0, MAX_PROJECTS).map((row) => {
                 return { projectId: row._id as string, title: row.title };
             }),
-            sealedCohorts: sealedCohortsOf(topSlot?.slot),
+            // The cursor's cohort started in an earlier batch, before this slot read: only that batch's read may seal it.
+            sealedCohorts: sealedCohortsOf((filledSlots?.page ?? []).map((row) => row.slot)).filter(
+                (cohort) => afterCohort === undefined || cohort !== afterCohort,
+            ),
             truncated: listed.length > MAX_PROJECTS,
         };
     });
@@ -375,7 +387,7 @@ const zero = (): Totals => {
 export interface ReleaseGroup {
     members: ReadonlyArray<Pick<MemberWalk, "cells" | "erasing" | "merging" | "truncated">>;
     /**
-     * Every booking slot of the cohort is taken (`sealedCohorts`) and the walk read all its members in this call: the cohort can gain no
+     * Every booking slot of the cohort was filled (`sealedCohorts`) and the walk read all its members in this call: the cohort can gain no
      * member, so its weeks show with the members it has, even when it lost some. Otherwise a week needs {@link MIN_MEMBERS_PER_GROUP} active.
      */
     whole: boolean;
@@ -575,7 +587,7 @@ export const getOrganizationProjectUsage = authAction
         // The project list is read once, with the call's first batch: every member of the call is then summed against the same list.
         let projects: { projectId: string; title: string }[] | undefined;
         let projectsCut = false;
-        let sealedCohorts = 0;
+        const sealedCohorts = new Set<number>();
         let remaining = false;
 
         for (;;) {
@@ -594,7 +606,10 @@ export const getOrganizationProjectUsage = authAction
             if (projects === undefined) {
                 projects = scope.projects;
                 projectsCut = scope.truncated;
-                sealedCohorts = scope.sealedCohorts;
+            }
+
+            for (const cohort of scope.sealedCohorts) {
+                sealedCohorts.add(cohort);
             }
 
             const batch = scope.members;
@@ -683,7 +698,7 @@ export const getOrganizationProjectUsage = authAction
                 const continued = index === 0 && opened !== undefined && opened.cohort === cohort;
                 const unfinished = partialKept && index === groups.length - 1;
 
-                return { members, whole: cohort < sealedCohorts && !continued && !unfinished };
+                return { members, whole: sealedCohorts.has(cohort) && !continued && !unfinished };
             }),
             new Set(listed.map((project) => project.projectId)),
             !projectsCut,

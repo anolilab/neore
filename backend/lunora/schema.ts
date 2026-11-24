@@ -4045,6 +4045,8 @@ export const schema = defineSchema({
     usageOrganizationCohortSlots: defineTable({
         // When the slot was claimed: the organization view counts a cohort sealed only once its last slot has settled (`SLOT_SETTLE_MS`).
         claimedAt: v.number(),
+        // Set once the slot's contributor row has landed: a cohort is sealed only when each of its slots is (`sealedCohortsOf`).
+        filled: v.optional(v.literal(true)),
         organizationId: v.string(),
         slot: v.number(),
     })
