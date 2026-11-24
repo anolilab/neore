@@ -42,8 +42,9 @@ export const catchUpRunId = (): string => crypto.randomUUID().replaceAll("-", ""
  * is checked to be `repository` and its branch to be the pull request's head. For a fork, or a head the host no longer names, the
  * prompt holds no push at all. The steps are for an agent that runs git with the person's own access (a host-run thread, or a
  * paired device or server): a delegated cloud coding-agent run never pushes (`buildAgentPrompt`, and its run script drops the
- * credential before the agent starts), so the prompt says not to hand the steps to one. A rebase that stops on a conflict is
- * continued or aborted, never left half done, and nothing is pushed unless the build and the tests pass and every fix is
+ * credential before the agent starts), so the prompt says not to hand the steps to one. A branch with merge commits is not rebased
+ * at all (a rebase drops them, and any conflict resolution made in one): the prompt stops and suggests merging the base. A
+ * rebase that stops on a conflict is continued or aborted, never left half done, and nothing is pushed unless the build and the tests pass and every fix is
  * committed. Callers pass plain names only ({@link isPlainBranchName}, {@link isPlainRepo}, and a `run` of letters and digits).
  */
 export const catchUpPrompt = ({
@@ -81,6 +82,9 @@ export const catchUpPrompt = ({
         "Run these steps yourself, in a checkout where git uses the person's own access to origin (their computer, or a device or server they paired). Do not hand them to a cloud coding agent run: it cannot push, and its result becomes a new pull request instead of updating this one.";
     // Every stop after the fetch (step 3) still deletes what it fetched: the refs are this run's alone.
     const stopAfterFetch = "do step 9, then stop and say so";
+    // A plain rebase drops merge commits, and with them any conflict resolution made only in one. Rewriting with
+    // `--rebase-merges` can still lose those resolutions, so a branch with merges is not rewritten at all.
+    const checkMerges = `If \`git rev-list --merges ${base}..${pullRef}\` prints anything, do not rebase: do step 9, then stop and tell the person that the branch has merge commits, which a rebase would drop along with any conflict resolutions made in them, so Catch up does not rewrite it; suggest merging ${baseBranch} into it instead.`;
     // `--no-update-refs` overrides a `rebase.updateRefs` setting: other local branches pointing into these commits stay where they are.
     // Step 8 loops back here when the base moves, so the repeat rebase gets it too.
     const finish = [
@@ -93,7 +97,8 @@ export const catchUpPrompt = ({
         `9. Whether the steps finished or you stopped at any step after step 3, delete the refs this run fetched: ${refs.map((ref) => `\`git update-ref -d ${ref}\``).join(", ")}.`;
 
     if (!headInBaseRepository) {
-        // Named for this run: a branch a former run left for the person to carry to the fork never stops this one.
+        // Named for this run, then numbered past any branch that already exists: a retry of the same control (same run) or a
+        // branch a former run left for the person to carry to the fork never stops this one.
         const local = `pr-${pull}-${run}`;
 
         return [
@@ -104,9 +109,9 @@ export const catchUpPrompt = ({
             checkClean,
             `3. Fetch by name, which also works in a clone of one branch: ${fetchBaseAndPull}.`,
             // Branches are shared by every linked worktree: one checked out in another already exists here too.
-            `4. Run \`git switch -c ${local} ${pullRef}\` (if a branch ${local} already exists, ${stopAfterFetch}).`,
+            `4. ${checkMerges} Otherwise choose the branch name: start with ${local}, and while \`git show-ref --verify --quiet refs/heads/<name>\` succeeds for it, try ${local}-2, ${local}-3 and so on. Then run \`git switch -c <name> ${pullRef}\` with the name you chose in place of <name>.`,
             ...finish,
-            `8. Only once step 7 passed and \`git status --porcelain\` prints nothing: leave the rebased commits on ${local} and say so, naming that branch, for the person to bring to the fork. Do not push to any branch or remote.`,
+            `8. Only once step 7 passed and \`git status --porcelain\` prints nothing: leave the rebased commits on the branch you chose in step 4 and say so, naming that branch, for the person to bring to the fork. Do not push to any branch or remote.`,
             cleanUp([base, pullRef]),
         ].join("\n");
     }
@@ -125,7 +130,7 @@ export const catchUpPrompt = ({
         checkOrigin,
         checkClean,
         `3. Fetch by name, which also works in a clone of one branch: \`git fetch origin +refs/heads/${headBranch}:${head}\`, ${fetchBaseAndPull}.`,
-        `4. If \`git rev-parse ${head}\` differs from \`git rev-parse ${pullRef}\`, ${stopAfterFetch}: origin's ${headBranch} is not this pull request's head right now. Otherwise record the commit \`git rev-parse ${pullRef}\` printed and say it: step 8 leases on that commit. ${checkOtherWorktree} Otherwise run \`git switch --no-guess ${headBranch}\` (\`git switch -c ${headBranch} ${head}\` when there is no local branch of that name), then \`git merge --ff-only ${head}\`. If that fails, or \`git rev-parse HEAD\` then differs from \`git rev-parse ${head}\`, the local branch has commits origin does not: ${stopAfterFetch}.`,
+        `4. If \`git rev-parse ${head}\` differs from \`git rev-parse ${pullRef}\`, ${stopAfterFetch}: origin's ${headBranch} is not this pull request's head right now. ${checkMerges} Otherwise record the commit \`git rev-parse ${pullRef}\` printed and say it: step 8 leases on that commit. ${checkOtherWorktree} Otherwise run \`git switch --no-guess ${headBranch}\` (\`git switch -c ${headBranch} ${head}\` when there is no local branch of that name), then \`git merge --ff-only ${head}\`. If that fails, or \`git rev-parse HEAD\` then differs from \`git rev-parse ${head}\`, the local branch has commits origin does not: ${stopAfterFetch}.`,
         ...finish,
         // The base can move during the rebase and the checks: a push onto the base fetched in step 3 would leave the branch behind again.
         `8. Only once step 7 passed and \`git status --porcelain\` prints nothing, run \`git fetch origin +refs/heads/${baseBranch}:${base}\` again. If \`git merge-base --is-ancestor ${base} HEAD\` fails, the base moved: go back to step 5 once. If it has moved again when you are back here, do not push: leave the rebased commits in place and say that another Catch up is needed; ${stopAfterFetch}. Otherwise push only this pull request's branch: \`git push --no-follow-tags --force-with-lease=refs/heads/${headBranch}:${leaseCommit} origin HEAD:refs/heads/${headBranch}\`, writing the commit you recorded in step 4 in place of ${leaseCommit}. If this environment cannot push or the push is refused, leave the rebased commits in place and say so. Do not push to any other branch or remote.`,

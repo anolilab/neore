@@ -26,6 +26,7 @@ import { useBranchComparison, usePullRequest } from "../lib/use-develop";
 const CatchUpControl = ({ isRunning, link, threadId }: { isRunning: boolean; link: { number: number; repository: string }; threadId: string }) => {
     const { t } = useLingui();
     // One run per mounted control: a second click makes the same prompt, and the composer adds the same text only once.
+    // A retry of the same run still goes ahead: the fork's local branch takes the next free number instead of stopping.
     const [run] = useState(catchUpRunId);
     const address = { number: link.number, repository: link.repository };
     const pull = usePullRequest(address);

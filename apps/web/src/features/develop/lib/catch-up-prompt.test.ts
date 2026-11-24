@@ -74,7 +74,7 @@ const FORK = catchUpPrompt({ ...PULL, headInBaseRepository: false });
 describe(catchUpPrompt, () => {
     describe.each([
         ["a head in the base repository", SAME_REPO, "git switch --no-guess feat/x"],
-        ["a fork", FORK, "git switch -c pr-42-a1b2c3d4 "],
+        ["a fork", FORK, "git switch -c <name> "],
     ])("for %s", (_name: string, prompt: string, firstSwitch: string) => {
         const commands = commandsOf(prompt);
 
@@ -103,6 +103,16 @@ describe(catchUpPrompt, () => {
                 [6, "git rebase --continue"],
                 [6, "git rebase --abort"],
             ]);
+        });
+
+        it("stops before any rebase when the pull request's head has merge commits, and suggests merging the base", () => {
+            const merges = commandsMatching(commands, "git rev-list --merges ");
+
+            expect(merges).toEqual([{ command: "git rev-list --merges refs/neore/pull-42-a1b2c3d4-base..refs/neore/pull-42-a1b2c3d4-head", step: 4 }]);
+            expect(commands.indexOf(merges[0] as Command)).toBeLessThan(firstIndex(commands, firstSwitch));
+            expect(stepsOf(prompt).get(4)).toContain("do not rebase: do step 9, then stop");
+            expect(stepsOf(prompt).get(4)).toContain("suggest merging release/2.0 into it instead");
+            expect(prompt).not.toContain("--rebase-merges");
         });
 
         it("deletes exactly the refs it fetched, last, and every stop after the fetch goes through that step", () => {
@@ -180,7 +190,7 @@ describe(catchUpPrompt, () => {
         const commands = commandsOf(FORK);
 
         expect(commandsMatching(commands, "git push")).toEqual([]);
-        expect(commandsMatching(commands, "git switch")).toEqual([{ command: "git switch -c pr-42-a1b2c3d4 refs/neore/pull-42-a1b2c3d4-head", step: 4 }]);
+        expect(commandsMatching(commands, "git switch")).toEqual([{ command: "git switch -c <name> refs/neore/pull-42-a1b2c3d4-head", step: 4 }]);
         expect(commandsMatching(commands, "git worktree")).toEqual([]);
         expect(FORK).not.toContain("refs/heads/feat/x");
         expect(fetchedRefs(commands).toSorted(byName)).toEqual(["refs/neore/pull-42-a1b2c3d4-base", "refs/neore/pull-42-a1b2c3d4-head"]);
@@ -189,9 +199,20 @@ describe(catchUpPrompt, () => {
     it("for a fork, makes a branch of this run's own, so the branch a former run left for the person does not stop the next", () => {
         const next = catchUpPrompt({ ...PULL, headInBaseRepository: false, run: "0f0f0f0f" });
 
-        expect(commandsMatching(commandsOf(next), "git switch")[0]?.command).toBe("git switch -c pr-42-0f0f0f0f refs/neore/pull-42-0f0f0f0f-head");
+        expect(stepsOf(next).get(4)).toContain("start with pr-42-0f0f0f0f,");
         expect(next).not.toContain("pr-42-a1b2c3d4");
         expect(next).not.toMatch(BARE_FORK_BRANCH);
+    });
+
+    it("for a fork, numbers past a branch that already exists, so retrying the same control does not stop, and names the branch it chose", () => {
+        const commands = commandsOf(FORK);
+        const stepFour = stepsOf(FORK).get(4) ?? "";
+
+        // The existence check comes before the branch is made, and takes the next number instead of stopping.
+        expect(firstIndex(commands, "git show-ref --verify --quiet refs/heads/<name>")).toBeLessThan(firstIndex(commands, "git switch -c <name> "));
+        expect(stepFour).toContain("try pr-42-a1b2c3d4-2, pr-42-a1b2c3d4-3 and so on");
+        expect(stepFour).not.toContain("already exists");
+        expect(stepsOf(FORK).get(8)).toContain("the branch you chose in step 4");
     });
 
     it("for a head named like the pull request's own ref, still pushes only that branch and keeps the pull request's head apart", () => {
