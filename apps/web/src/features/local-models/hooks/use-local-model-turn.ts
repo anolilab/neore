@@ -143,7 +143,7 @@ const useLocalModelTurn = (model: string, savedMessageIds: ReadonlySet<string>):
             try {
                 const result = await runLocalTurn({
                     baseUrl: target.baseUrl,
-                    describeStop: (info) => i18n._(describeLocalError(info)),
+                    describeError: (info) => i18n._(describeLocalError(info)),
                     history,
                     modelId: target.modelId,
                     onUpdate: (text, reasoning) => {

@@ -3,13 +3,13 @@ import { describe, expect, it } from "vitest";
 import type { ReplyGuard } from "./reply-guard";
 import { createReplyGuard, LOCAL_REASONING_LIMIT_CHARS, LOCAL_REPEAT_LIMIT, LOCAL_REPEAT_MAX_BLOCK_LINES } from "./reply-guard";
 
-/** Feeds `text` in pieces of `size` characters and returns the first stop, if any. */
+/** Feeds `text` in pieces of `size` characters and returns the kind of the first stop, if any. */
 const feedContent = (guard: ReplyGuard, text: string, size = text.length) => {
     for (let index = 0; index < text.length; index += size) {
         const stop = guard.pushContent(text.slice(index, index + size));
 
         if (stop) {
-            return stop;
+            return stop.kind;
         }
     }
 
@@ -88,6 +88,26 @@ describe(createReplyGuard, () => {
         const longBlock = `${blockLines.join("\n")}\n`;
 
         expect(feedContent(guard, longBlock.repeat(LOCAL_REPEAT_LIMIT))).toBe("repeat-loop");
+    });
+
+    it("does not treat nested lines that differ only in indentation as a repeat", () => {
+        expect.assertions(1);
+
+        // Code nested step by step: the same words at each depth are not the same line.
+        const lines = Array.from({ length: LOCAL_REPEAT_LIMIT }, (_, depth) => `${" ".repeat(depth * 4)}if ready:`);
+        const nested = `${lines.join("\n")}\n`;
+
+        expect(feedContent(createReplyGuard(), nested)).toBeUndefined();
+    });
+
+    it("reports where the reply ends inside the delta that completes the repeat", () => {
+        expect.assertions(1);
+
+        const guard = createReplyGuard();
+        const line = "Let me try that again.\n";
+        const delta = `${line.repeat(LOCAL_REPEAT_LIMIT)}text that must not be kept`;
+
+        expect(guard.pushContent(delta)).toStrictEqual({ keep: line.length * LOCAL_REPEAT_LIMIT, kind: "repeat-loop" });
     });
 
     it("stops reasoning once it passes the limit, and not before", () => {

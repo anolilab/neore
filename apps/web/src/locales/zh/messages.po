@@ -1407,7 +1407,7 @@ msgstr "{name} 已安装"
 msgid "{name} is offline. Open the desktop app on it and try again."
 msgstr "{name} 处于离线状态。请在该电脑上打开桌面应用后重试。"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:250
+#: ../../packages/chat-ui/src/chat/message-item.tsx:241
 #: src/features/chat/thread/streaming-placeholder.tsx:508
 msgid "{name} is responding"
 msgstr "{name} 正在回复"
@@ -4614,7 +4614,7 @@ msgstr "附加文件或整个集合，供 AI 在此对话中参考和引用。"
 msgid "Attached files"
 msgstr "已附加的文件"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:122
+#: ../../packages/chat-ui/src/chat/message-item.tsx:121
 msgid "Attached image"
 msgstr "附加的图片"
 
@@ -5507,8 +5507,8 @@ msgstr "头脑风暴提升团队效率的方法"
 msgid "Brainstorming"
 msgstr "头脑风暴"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:150
-#: ../../packages/chat-ui/src/chat/message-item.tsx:212
+#: ../../packages/chat-ui/src/chat/message-item.tsx:149
+#: ../../packages/chat-ui/src/chat/message-item.tsx:203
 #: src/features/chat/core/hooks/use-thread-manager.ts:148
 #: src/features/chat/core/hooks/use-thread-manager.ts:161
 #: src/features/tasks/components/task-form-dialog.tsx:336
@@ -5521,8 +5521,8 @@ msgstr "分支"
 msgid "Branch condition is required"
 msgstr "分支条件为必填项"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:150
-#: ../../packages/chat-ui/src/chat/message-item.tsx:212
+#: ../../packages/chat-ui/src/chat/message-item.tsx:149
+#: ../../packages/chat-ui/src/chat/message-item.tsx:203
 msgid "Branch from here"
 msgstr "从此处创建分支"
 
@@ -8349,7 +8349,6 @@ msgstr "保留原图的上下文感知编辑"
 msgid "Context-aware generation"
 msgstr "上下文感知生成"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:194
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
 #: src/features/auth/components/device-code-parts.tsx:189
 #: src/features/chat/host/host-composer.tsx:969
@@ -8565,7 +8564,7 @@ msgstr "已复制到剪贴板"
 msgid "Copied!"
 msgstr "已复制！"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:77
+#: ../../packages/chat-ui/src/chat/message-item.tsx:76
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:225
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
@@ -8626,7 +8625,7 @@ msgstr "复制最后一个代码块"
 msgid "Copy Last Code Block"
 msgstr "复制最后一个代码块"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:77
+#: ../../packages/chat-ui/src/chat/message-item.tsx:76
 msgid "Copy message"
 msgstr "复制消息"
 
@@ -15239,7 +15238,7 @@ msgstr "修复“{step}”步骤"
 msgid "Fix the failing checks on pull request {address}. Read each failing check's log, find the cause and fix it on the pull request's branch. Before you push, run the failing tests or builds locally and show that they pass; after you push, confirm the checks are green on the pull request. Tell me which checks you fixed and how you know they pass."
 msgstr "修复拉取请求 {address} 中未通过的检查项。阅读每个未通过检查项的日志，找出原因，并在拉取请求的分支上修复。推送之前，在本地运行未通过的测试或构建，并证明它们已通过；推送之后，确认拉取请求上的检查项均为绿色。告诉我你修复了哪些检查项，以及你如何确认它们已通过。"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:114
+#: ../../packages/chat-ui/src/chat/message-item.tsx:113
 msgid "Flagged for review"
 msgstr "已标记待审核"
 
@@ -25976,8 +25975,8 @@ msgstr "Pika Labs 2.2——专注叙事的生成"
 msgid "Pika Labs 2.2 — narrative-focused video model with strong storytelling and motion control"
 msgstr "Pika Labs 2.2 — 注重叙事的视频模型，具备出色的故事表现力和运动控制"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:145
-#: ../../packages/chat-ui/src/chat/message-item.tsx:202
+#: ../../packages/chat-ui/src/chat/message-item.tsx:144
+#: ../../packages/chat-ui/src/chat/message-item.tsx:193
 #: src/features/chat/thread-list/group-header.tsx:135
 #: src/features/chat/thread/text-selection-menu.tsx:504
 msgid "Pin"
@@ -26001,8 +26000,8 @@ msgstr "置顶图像"
 msgid "Pin memory"
 msgstr "置顶记忆"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:145
-#: ../../packages/chat-ui/src/chat/message-item.tsx:202
+#: ../../packages/chat-ui/src/chat/message-item.tsx:144
+#: ../../packages/chat-ui/src/chat/message-item.tsx:193
 #: src/features/chat/thread/message-item.tsx:384
 msgid "Pin message"
 msgstr "置顶消息"
@@ -28100,12 +28099,12 @@ msgstr "刷新"
 msgid "Refresh installed models"
 msgstr "刷新已安装的模型"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:207
+#: ../../packages/chat-ui/src/chat/message-item.tsx:198
 #: src/features/chat/thread/message-item.tsx:390
 msgid "Regenerate"
 msgstr "重新生成"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:207
+#: ../../packages/chat-ui/src/chat/message-item.tsx:198
 msgid "Regenerate response"
 msgstr "重新生成回复"
 
@@ -29895,7 +29894,7 @@ msgstr "扫描不了？复制此密钥并在身份验证应用中手动输入。
 msgid "scan this QR code. it will generate a 6 digit code for you to enter below."
 msgstr "扫描此二维码，它会生成一个 6 位数的验证码，请在下方输入。"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:114
+#: ../../packages/chat-ui/src/chat/message-item.tsx:113
 msgid "Scanning..."
 msgstr "正在扫描..."
 

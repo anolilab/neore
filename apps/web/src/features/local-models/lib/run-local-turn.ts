@@ -32,8 +32,8 @@ export interface SaveLocalTurnInput {
 
 export interface RunLocalTurnOptions {
     baseUrl: string;
-    /** The words saved as the reply's error when the reply guard stopped it. Defaults to the stop's kind. */
-    describeStop?: (info: LocalErrorInfo) => string;
+    /** The words saved as a failed reply's error when the server gave no detail, and for a reply guard stop. Defaults to the kind. */
+    describeError?: (info: LocalErrorInfo) => string;
     /** Diagnosis is injectable because the real one probes the network. */
     diagnose?: (error: unknown, baseUrl: string) => Promise<LocalErrorInfo>;
     fetchImpl?: typeof fetch;
@@ -74,7 +74,7 @@ export const buildLocalHistory = (messages: ReadonlyArray<HistoryMessage>, syste
 export const runLocalTurn = async (options: RunLocalTurnOptions): Promise<RunLocalTurnResult> => {
     const {
         baseUrl,
-        describeStop = (info: LocalErrorInfo) => info.kind,
+        describeError = (info: LocalErrorInfo) => info.kind,
         diagnose = diagnoseLocalError,
         fetchImpl,
         history,
@@ -131,12 +131,15 @@ export const runLocalTurn = async (options: RunLocalTurnOptions): Promise<RunLoc
                     return;
                 }
 
-                text += delta.content;
+                // A chunk can carry the repeat that ends the reply and text past it: keep only what comes up to the repeat.
+                const repeat = guard.pushContent(delta.content);
+
+                text += repeat ? delta.content.slice(0, repeat.keep) : delta.content;
                 reasoning += delta.reasoning;
                 onUpdate(text, reasoning);
                 armIdle();
 
-                const cause = guard.pushContent(delta.content) ?? guard.pushReasoning(delta.reasoning);
+                const cause = repeat ? repeat.kind : guard.pushReasoning(delta.reasoning);
 
                 if (cause) {
                     stopWith(cause);
@@ -154,7 +157,7 @@ export const runLocalTurn = async (options: RunLocalTurnOptions): Promise<RunLoc
     // The guard's stop wins over whatever the stream did next: a stream that ended on its own right after the stop is still a stop.
     if (state.stop) {
         const info: LocalErrorInfo = { kind: state.stop };
-        const { threadId } = await save({ error: describeStop(info), outcome: "failed", prompt, reasoning, reply: text });
+        const { threadId } = await save({ error: describeError(info), outcome: "failed", prompt, reasoning, reply: text });
 
         return { error: info, outcome: "failed", saved: true, threadId };
     }
@@ -178,7 +181,8 @@ export const runLocalTurn = async (options: RunLocalTurnOptions): Promise<RunLoc
             return { error: info, saved: false };
         }
 
-        const { threadId } = await save({ error: info.detail ?? info.kind, outcome: "failed", prompt, reasoning, reply: text });
+        // The server's own words when it sent any; otherwise the same sentence the thread shows for this kind, never a bare code.
+        const { threadId } = await save({ error: info.detail ?? describeError(info), outcome: "failed", prompt, reasoning, reply: text });
 
         return { error: info, outcome: "failed", saved: true, threadId };
     }

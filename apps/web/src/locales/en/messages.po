@@ -1406,7 +1406,7 @@ msgstr "{name} is installed"
 msgid "{name} is offline. Open the desktop app on it and try again."
 msgstr "{name} is offline. Open the desktop app on it and try again."
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:250
+#: ../../packages/chat-ui/src/chat/message-item.tsx:241
 #: src/features/chat/thread/streaming-placeholder.tsx:508
 msgid "{name} is responding"
 msgstr "{name} is responding"
@@ -4613,7 +4613,7 @@ msgstr "Attach files or whole collections for the AI to reference and cite in th
 msgid "Attached files"
 msgstr "Attached files"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:122
+#: ../../packages/chat-ui/src/chat/message-item.tsx:121
 msgid "Attached image"
 msgstr "Attached image"
 
@@ -5506,8 +5506,8 @@ msgstr "Brainstorm ways to improve team productivity"
 msgid "Brainstorming"
 msgstr "Brainstorming"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:150
-#: ../../packages/chat-ui/src/chat/message-item.tsx:212
+#: ../../packages/chat-ui/src/chat/message-item.tsx:149
+#: ../../packages/chat-ui/src/chat/message-item.tsx:203
 #: src/features/chat/core/hooks/use-thread-manager.ts:148
 #: src/features/chat/core/hooks/use-thread-manager.ts:161
 #: src/features/tasks/components/task-form-dialog.tsx:336
@@ -5520,8 +5520,8 @@ msgstr "Branch"
 msgid "Branch condition is required"
 msgstr "Branch condition is required"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:150
-#: ../../packages/chat-ui/src/chat/message-item.tsx:212
+#: ../../packages/chat-ui/src/chat/message-item.tsx:149
+#: ../../packages/chat-ui/src/chat/message-item.tsx:203
 msgid "Branch from here"
 msgstr "Branch from here"
 
@@ -8348,7 +8348,6 @@ msgstr "Context-aware edits that preserve the original"
 msgid "Context-aware generation"
 msgstr "Context-aware generation"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:194
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
 #: src/features/auth/components/device-code-parts.tsx:189
 #: src/features/chat/host/host-composer.tsx:969
@@ -8564,7 +8563,7 @@ msgstr "Copied to clipboard"
 msgid "Copied!"
 msgstr "Copied!"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:77
+#: ../../packages/chat-ui/src/chat/message-item.tsx:76
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:225
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
@@ -8625,7 +8624,7 @@ msgstr "Copy last code block"
 msgid "Copy Last Code Block"
 msgstr "Copy Last Code Block"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:77
+#: ../../packages/chat-ui/src/chat/message-item.tsx:76
 msgid "Copy message"
 msgstr "Copy message"
 
@@ -15238,7 +15237,7 @@ msgstr "Fix the \"{step}\" step"
 msgid "Fix the failing checks on pull request {address}. Read each failing check's log, find the cause and fix it on the pull request's branch. Before you push, run the failing tests or builds locally and show that they pass; after you push, confirm the checks are green on the pull request. Tell me which checks you fixed and how you know they pass."
 msgstr "Fix the failing checks on pull request {address}. Read each failing check's log, find the cause and fix it on the pull request's branch. Before you push, run the failing tests or builds locally and show that they pass; after you push, confirm the checks are green on the pull request. Tell me which checks you fixed and how you know they pass."
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:114
+#: ../../packages/chat-ui/src/chat/message-item.tsx:113
 msgid "Flagged for review"
 msgstr "Flagged for review"
 
@@ -25975,8 +25974,8 @@ msgstr "Pika Labs 2.2 — narrative-focused generation"
 msgid "Pika Labs 2.2 — narrative-focused video model with strong storytelling and motion control"
 msgstr "Pika Labs 2.2 — narrative-focused video model with strong storytelling and motion control"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:145
-#: ../../packages/chat-ui/src/chat/message-item.tsx:202
+#: ../../packages/chat-ui/src/chat/message-item.tsx:144
+#: ../../packages/chat-ui/src/chat/message-item.tsx:193
 #: src/features/chat/thread-list/group-header.tsx:135
 #: src/features/chat/thread/text-selection-menu.tsx:504
 msgid "Pin"
@@ -26000,8 +25999,8 @@ msgstr "Pin image"
 msgid "Pin memory"
 msgstr "Pin memory"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:145
-#: ../../packages/chat-ui/src/chat/message-item.tsx:202
+#: ../../packages/chat-ui/src/chat/message-item.tsx:144
+#: ../../packages/chat-ui/src/chat/message-item.tsx:193
 #: src/features/chat/thread/message-item.tsx:384
 msgid "Pin message"
 msgstr "Pin message"
@@ -28099,12 +28098,12 @@ msgstr "Refresh"
 msgid "Refresh installed models"
 msgstr "Refresh installed models"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:207
+#: ../../packages/chat-ui/src/chat/message-item.tsx:198
 #: src/features/chat/thread/message-item.tsx:390
 msgid "Regenerate"
 msgstr "Regenerate"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:207
+#: ../../packages/chat-ui/src/chat/message-item.tsx:198
 msgid "Regenerate response"
 msgstr "Regenerate response"
 
@@ -29894,7 +29893,7 @@ msgstr "Scan not working? Copy this code key and enter it manually in your authe
 msgid "scan this QR code. it will generate a 6 digit code for you to enter below."
 msgstr "scan this QR code. it will generate a 6 digit code for you to enter below."
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:114
+#: ../../packages/chat-ui/src/chat/message-item.tsx:113
 msgid "Scanning..."
 msgstr "Scanning..."
 

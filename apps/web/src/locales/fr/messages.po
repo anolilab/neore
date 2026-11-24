@@ -1407,7 +1407,7 @@ msgstr "{name} est installé"
 msgid "{name} is offline. Open the desktop app on it and try again."
 msgstr "{name} est hors ligne. Ouvrez l’application de bureau sur cet ordinateur et réessayez."
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:250
+#: ../../packages/chat-ui/src/chat/message-item.tsx:241
 #: src/features/chat/thread/streaming-placeholder.tsx:508
 msgid "{name} is responding"
 msgstr "{name} répond"
@@ -4614,7 +4614,7 @@ msgstr "Joignez des fichiers ou des collections entières que l’IA pourra cons
 msgid "Attached files"
 msgstr "Fichiers joints"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:122
+#: ../../packages/chat-ui/src/chat/message-item.tsx:121
 msgid "Attached image"
 msgstr "Image jointe"
 
@@ -5507,8 +5507,8 @@ msgstr "Trouver des idées pour améliorer la productivité de l’équipe"
 msgid "Brainstorming"
 msgstr "Brainstorming"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:150
-#: ../../packages/chat-ui/src/chat/message-item.tsx:212
+#: ../../packages/chat-ui/src/chat/message-item.tsx:149
+#: ../../packages/chat-ui/src/chat/message-item.tsx:203
 #: src/features/chat/core/hooks/use-thread-manager.ts:148
 #: src/features/chat/core/hooks/use-thread-manager.ts:161
 #: src/features/tasks/components/task-form-dialog.tsx:336
@@ -5521,8 +5521,8 @@ msgstr "Branche"
 msgid "Branch condition is required"
 msgstr "La condition de branche est obligatoire"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:150
-#: ../../packages/chat-ui/src/chat/message-item.tsx:212
+#: ../../packages/chat-ui/src/chat/message-item.tsx:149
+#: ../../packages/chat-ui/src/chat/message-item.tsx:203
 msgid "Branch from here"
 msgstr "Créer une branche à partir d’ici"
 
@@ -8349,7 +8349,6 @@ msgstr "Des retouches contextuelles qui préservent l’original"
 msgid "Context-aware generation"
 msgstr "Génération contextuelle"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:194
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
 #: src/features/auth/components/device-code-parts.tsx:189
 #: src/features/chat/host/host-composer.tsx:969
@@ -8565,7 +8564,7 @@ msgstr "Copié dans le presse-papiers"
 msgid "Copied!"
 msgstr "Copié !"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:77
+#: ../../packages/chat-ui/src/chat/message-item.tsx:76
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:225
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
@@ -8626,7 +8625,7 @@ msgstr "Copier le dernier bloc de code"
 msgid "Copy Last Code Block"
 msgstr "Copier le dernier bloc de code"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:77
+#: ../../packages/chat-ui/src/chat/message-item.tsx:76
 msgid "Copy message"
 msgstr "Copier le message"
 
@@ -15239,7 +15238,7 @@ msgstr "Corriger l’étape « {step} »"
 msgid "Fix the failing checks on pull request {address}. Read each failing check's log, find the cause and fix it on the pull request's branch. Before you push, run the failing tests or builds locally and show that they pass; after you push, confirm the checks are green on the pull request. Tell me which checks you fixed and how you know they pass."
 msgstr "Corrige les vérifications en échec de la pull request {address}. Lis le journal de chaque vérification en échec, trouve la cause et corrige-la sur la branche de la pull request. Avant de pousser, exécute localement les tests ou builds en échec et montre qu’ils passent ; après le push, confirme que les vérifications sont au vert sur la pull request. Dis-moi quelles vérifications tu as corrigées et comment tu sais qu’elles passent."
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:114
+#: ../../packages/chat-ui/src/chat/message-item.tsx:113
 msgid "Flagged for review"
 msgstr "Signalé pour examen"
 
@@ -25976,8 +25975,8 @@ msgstr "Pika Labs 2.2 — génération axée sur la narration"
 msgid "Pika Labs 2.2 — narrative-focused video model with strong storytelling and motion control"
 msgstr "Pika Labs 2.2 — modèle vidéo axé sur la narration, avec un fort sens du récit et un contrôle du mouvement"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:145
-#: ../../packages/chat-ui/src/chat/message-item.tsx:202
+#: ../../packages/chat-ui/src/chat/message-item.tsx:144
+#: ../../packages/chat-ui/src/chat/message-item.tsx:193
 #: src/features/chat/thread-list/group-header.tsx:135
 #: src/features/chat/thread/text-selection-menu.tsx:504
 msgid "Pin"
@@ -26001,8 +26000,8 @@ msgstr "Épingler l’image"
 msgid "Pin memory"
 msgstr "Épingler le souvenir"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:145
-#: ../../packages/chat-ui/src/chat/message-item.tsx:202
+#: ../../packages/chat-ui/src/chat/message-item.tsx:144
+#: ../../packages/chat-ui/src/chat/message-item.tsx:193
 #: src/features/chat/thread/message-item.tsx:384
 msgid "Pin message"
 msgstr "Épingler le message"
@@ -28100,12 +28099,12 @@ msgstr "Actualiser"
 msgid "Refresh installed models"
 msgstr "Actualiser les modèles installés"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:207
+#: ../../packages/chat-ui/src/chat/message-item.tsx:198
 #: src/features/chat/thread/message-item.tsx:390
 msgid "Regenerate"
 msgstr "Régénérer"
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:207
+#: ../../packages/chat-ui/src/chat/message-item.tsx:198
 msgid "Regenerate response"
 msgstr "Régénérer la réponse"
 
@@ -29895,7 +29894,7 @@ msgstr "Le scan ne fonctionne pas ? Copiez cette clé et saisissez-la manuelleme
 msgid "scan this QR code. it will generate a 6 digit code for you to enter below."
 msgstr "scannez ce QR code. Il générera un code à 6 chiffres à saisir ci-dessous."
 
-#: ../../packages/chat-ui/src/chat/message-item.tsx:114
+#: ../../packages/chat-ui/src/chat/message-item.tsx:113
 msgid "Scanning..."
 msgstr "Analyse..."
 

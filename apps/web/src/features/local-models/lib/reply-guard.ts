@@ -39,7 +39,7 @@ const repeatsAtTail = (lines: ReadonlyArray<string>, size: number): boolean => {
     const start = lines.length - span;
     const block = lines.slice(start, start + size);
 
-    if (block.join("\n").length < LOCAL_REPEAT_MIN_CHARS) {
+    if (block.map((line) => line.trim()).join("\n").length < LOCAL_REPEAT_MIN_CHARS) {
         return false;
     }
 
@@ -54,9 +54,15 @@ const repeatsAtTail = (lines: ReadonlyArray<string>, size: number): boolean => {
     return true;
 };
 
+/** A repeat found in a content delta: keep the delta's first `keep` characters, through the newline that completed the repeat. */
+export interface ContentStop {
+    keep: number;
+    kind: "repeat-loop";
+}
+
 export interface ReplyGuard {
-    /** Feed visible reply text; returns the stop once the reply repeats. */
-    pushContent: (text: string) => ReplyStopKind | undefined;
+    /** Feed visible reply text; returns the stop, and where in this delta the reply ends, once it repeats. */
+    pushContent: (text: string) => ContentStop | undefined;
     /** Feed reasoning text; returns the stop once it passes its limit. */
     pushReasoning: (text: string) => ReplyStopKind | undefined;
 }
@@ -69,19 +75,20 @@ export const createReplyGuard = (): ReplyGuard => {
 
     return {
         pushContent: (text) => {
-            let rest = text;
-            let newline = rest.indexOf("\n");
+            let offset = 0;
+            let newline = text.indexOf("\n");
 
             while (newline !== -1) {
-                partial += rest.slice(0, newline);
-                rest = rest.slice(newline + 1);
-                newline = rest.indexOf("\n");
+                partial += text.slice(offset, newline);
+                offset = newline + 1;
+                newline = text.indexOf("\n", offset);
 
-                const line = partial.trim();
+                // Indentation is part of a line: nested code lines that differ only in depth are not repeats.
+                const line = partial.trimEnd();
 
                 partial = "";
 
-                if (!line) {
+                if (!line.trim()) {
                     continue;
                 }
 
@@ -93,12 +100,12 @@ export const createReplyGuard = (): ReplyGuard => {
 
                 for (let size = 1; size <= LOCAL_REPEAT_MAX_BLOCK_LINES; size += 1) {
                     if (repeatsAtTail(lines, size)) {
-                        return "repeat-loop";
+                        return { keep: offset, kind: "repeat-loop" };
                     }
                 }
             }
 
-            partial += rest;
+            partial += text.slice(offset);
 
             return undefined;
         },

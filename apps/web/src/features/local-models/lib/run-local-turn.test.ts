@@ -109,6 +109,32 @@ describe(runLocalTurn, () => {
         expect(save).toHaveBeenCalledWith({ error: "out of memory", outcome: "failed", prompt: "hi", reasoning: "", reply: "partial" });
     });
 
+    it("saves a localized sentence, not a bare code, when a failed reply has no server detail", async () => {
+        expect.assertions(1);
+
+        // Pulled, not started: erroring a stream in `start` would discard the partial chunk before it is read.
+        const encoder = new TextEncoder();
+        const partial = encoder.encode(frame({ content: "partial" }));
+        let sent = false;
+        const failing = new ReadableStream({
+            pull(controller) {
+                if (!sent) {
+                    sent = true;
+                    controller.enqueue(partial);
+
+                    return;
+                }
+
+                controller.error(new TypeError("Failed to fetch"));
+            },
+        });
+        const { options, save } = setup(async () => new Response(failing), { describeError: (info) => `described ${info.kind}` });
+
+        await runLocalTurn(options);
+
+        expect(save).toHaveBeenCalledWith({ error: "described unreachable", outcome: "failed", prompt: "hi", reasoning: "", reply: "partial" });
+    });
+
     it("saves what arrived before a stop, and nothing for a stop before the first token", async () => {
         expect.assertions(3);
 
@@ -169,6 +195,17 @@ describe("reply guard stops", () => {
         const { options, save } = setup(holdingFetch(Array.from({ length: LOCAL_REPEAT_LIMIT + 2 }, () => frame({ content: line }))));
 
         await expect(runLocalTurn(options)).resolves.toStrictEqual({ error: { kind: "repeat-loop" }, outcome: "failed", saved: true, threadId: "thread-1" });
+        expect(save).toHaveBeenCalledWith({ error: "repeat-loop", outcome: "failed", prompt: "hi", reasoning: "", reply: line.repeat(LOCAL_REPEAT_LIMIT) });
+    });
+
+    it("does not save text that arrives in the same chunk after the repeat", async () => {
+        expect.assertions(2);
+
+        const line = "I will try the same thing again.\n";
+        const chunk = frame({ content: `${line.repeat(LOCAL_REPEAT_LIMIT)}after the loop` });
+        const { options, save } = setup(holdingFetch([chunk]));
+
+        await expect(runLocalTurn(options)).resolves.toMatchObject({ error: { kind: "repeat-loop" }, outcome: "failed" });
         expect(save).toHaveBeenCalledWith({ error: "repeat-loop", outcome: "failed", prompt: "hi", reasoning: "", reply: line.repeat(LOCAL_REPEAT_LIMIT) });
     });
 
