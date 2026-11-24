@@ -34,6 +34,7 @@
         "./chat/goals": "./lunora/chat/goals/shared.ts",
         "./chat/low-risk-trust": "./lunora/chat/lib/low-risk-trust.ts",
         "./chat/permission-mode": "./lunora/chat/lib/thread-permission-mode.ts",
+        "./chat/pins/pinnable": "./lunora/chat/pins/pinnable.ts",
         "./chat/tags": "./lunora/chat/tags/logic.ts",
         "./dataModel": "./lunora/_generated/dataModel.ts",
         "./document-limits": "./lunora/lib/document-limits.ts",

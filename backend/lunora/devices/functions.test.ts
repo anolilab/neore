@@ -968,6 +968,21 @@ describe("the relay", () => {
         await expect(createCall({ deviceId, threadId, userId: ownerId })).resolves.toEqual({ error: "ineligible" });
     });
 
+    it.each(["instructions_list", "instructions_read"])("never signs %s for a chat, even when the stored manifest lists it", async (toolName) => {
+        const { deviceId } = await pairedDevice(ownerId);
+        const threadId = await insertThread(ownerId);
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("devices", deviceId, { manifest: [...TOOLS, { ...TOOLS[0], name: toolName }] }));
+
+        await expect(
+            harness.run(
+                async (ctx: any) =>
+                    await ctx.runMutation(internals.createDeviceCall, { deviceId, input: "{}", taintedBy: [], threadId, toolName, userId: ownerId }),
+            ),
+        ).resolves.toEqual({ error: "ineligible" });
+        expect(await harness.run(async (ctx: any) => await ctx.db.deviceCalls.findMany({ where: { deviceId } }))).toMatchObject({ page: [] });
+    });
+
     it("expiring a call the device already finished returns the finished state", async () => {
         const { deviceId, secret } = await pairedDevice(ownerId);
         const threadId = await insertThread(ownerId);

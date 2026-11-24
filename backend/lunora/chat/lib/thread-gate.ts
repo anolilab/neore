@@ -20,13 +20,15 @@ export type ThreadGateOutcome = "denied" | "locked" | "ok";
 
 export interface ThreadGateArgs {
     level: ThreadPermission;
+    /** Read the grant from the primary. A write that relies on the grant passes it, so a replica's stale grant cannot admit it. */
+    primary?: boolean;
     threadId: Id<"threads">;
     unlockProof?: string | null;
     userId: string;
 }
 
 export const threadGateOutcome = async (context: Pick<QueryContext, "db">, args: ThreadGateArgs): Promise<ThreadGateOutcome> => {
-    const access = await resolveThreadReadAccess(context, args.threadId, args.userId, args.unlockProof);
+    const access = await resolveThreadReadAccess(context, args.threadId, args.userId, args.unlockProof, { primary: args.primary });
 
     if (access?.kind === "locked") {
         return "locked";

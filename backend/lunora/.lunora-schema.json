@@ -11,6 +11,7 @@
     "add-group-pause-file-ids",
     "add-headless-approved",
     "add-headless-resume-bounds",
+    "add-purchase-look-browser",
     "add-run-args-impersonated",
     "add-run-args-system-context",
     "add-steer-text-length",
@@ -119,6 +120,63 @@
           "unique": false
         },
         "userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
+    },
+    "accountMoves": {
+      "commitOrdered": false,
+      "fields": {
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "kind": {
+          "kind": "union",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"erasing\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"importing\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"merging\""
+            }
+          ]
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_user": {
           "fields": [
             "userId"
           ],
@@ -3351,6 +3409,35 @@
           "optional": true,
           "unique": false
         },
+        "browserClickMode": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"all\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"page\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"pointer\""
+            }
+          ]
+        },
         "browserSettings": {
           "kind": "object",
           "nullable": false,
@@ -4262,6 +4349,13 @@
               "nullable": false,
               "optional": false,
               "unique": false,
+              "literal": "\"login\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
               "literal": "\"navigate\""
             },
             {
@@ -4499,6 +4593,34 @@
           "optional": true,
           "unique": false
         },
+        "resolution": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"declined\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"done\""
+            }
+          ]
+        },
+        "resolvedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "run": {
           "kind": "string",
           "nullable": false,
@@ -4523,9 +4645,23 @@
           "nullable": false,
           "optional": false,
           "unique": false
+        },
+        "waitedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
+        "by_threadId_run_askedAt": {
+          "fields": [
+            "threadId",
+            "run",
+            "askedAt"
+          ],
+          "unique": false
+        },
         "by_threadId_site_askedAt": {
           "fields": [
             "threadId",
@@ -4716,6 +4852,50 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "purchaseLooks": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "object",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "fields": {
+              "browser": {
+                "kind": "string",
+                "nullable": false,
+                "optional": true,
+                "unique": false
+              },
+              "target": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "toolCallId": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              }
+            }
+          }
+        },
+        "purchaseLostCalls": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
         },
         "reapedHolds": {
           "kind": "array",
@@ -5587,6 +5767,12 @@
           "optional": true,
           "unique": false
         },
+        "fixesSetupStep": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "log": {
           "kind": "string",
           "nullable": false,
@@ -5674,6 +5860,53 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "setupFailure": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "logTail": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "step": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            }
+          }
+        },
+        "setupFixOf": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "codingAgentRuns"
+        },
+        "setupFixRunId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "codingAgentRuns"
+        },
+        "setupFixRunIds": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "id",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "ref": "codingAgentRuns"
+          }
         },
         "startedAt": {
           "kind": "number",
@@ -6338,7 +6571,7 @@
         "threadId": {
           "kind": "id",
           "nullable": false,
-          "optional": false,
+          "optional": true,
           "unique": false,
           "ref": "threads"
         },
@@ -7186,6 +7419,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "vectorText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -7258,6 +7497,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "vectorText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -7330,6 +7575,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "vectorText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -7402,6 +7653,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "vectorText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -7474,6 +7731,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "vectorText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -7546,6 +7809,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "vectorText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -7618,6 +7887,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "vectorText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -9284,6 +9559,12 @@
     "followupSuggestions": {
       "commitOrdered": false,
       "fields": {
+        "charged": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "createdAt": {
           "kind": "number",
           "nullable": false,
@@ -9294,6 +9575,18 @@
           "kind": "string",
           "nullable": false,
           "optional": false,
+          "unique": false
+        },
+        "order": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "replyAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
           "unique": false
         },
         "suggestions": {
@@ -9325,6 +9618,13 @@
         "by_thread": {
           "fields": [
             "threadId"
+          ],
+          "unique": false
+        },
+        "by_thread_and_message": {
+          "fields": [
+            "threadId",
+            "lastMessageId"
           ],
           "unique": false
         }
@@ -11402,6 +11702,12 @@
         },
         "finishReason": {
           "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "localRun": {
+          "kind": "boolean",
           "nullable": false,
           "optional": true,
           "unique": false
@@ -21797,6 +22103,34 @@
       },
       "shardMode": "shardBy:userId"
     },
+    "pinWriteLeases": {
+      "commitOrdered": false,
+      "fields": {
+        "expiresAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_user": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
+    },
     "playgroundApiKeys": {
       "commitOrdered": false,
       "fields": {
@@ -24901,6 +25235,13 @@
           "unique": false,
           "refined": true
         },
+        "signInUrl": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "refined": true
+        },
         "teammateIds": {
           "kind": "array",
           "nullable": false,
@@ -25107,6 +25448,34 @@
       "relations": {},
       "shardMode": "global:d1"
     },
+    "shardPinFences": {
+      "commitOrdered": false,
+      "fields": {
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_user": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
     "shardRoutes": {
       "commitOrdered": false,
       "fields": {
@@ -25139,6 +25508,60 @@
         "by_owner": {
           "fields": [
             "ownerId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
+    },
+    "sharedPinRoutes": {
+      "commitOrdered": false,
+      "fields": {
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "ownerId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "threadId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "threads"
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_owner": {
+          "fields": [
+            "ownerId"
+          ],
+          "unique": false
+        },
+        "by_thread": {
+          "fields": [
+            "threadId"
+          ],
+          "unique": false
+        },
+        "by_user_and_thread": {
+          "fields": [
+            "userId",
+            "threadId"
           ],
           "unique": false
         }
@@ -29006,6 +29429,19 @@
           "optional": false,
           "unique": false
         },
+        "documentId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "documents"
+        },
+        "documentKind": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "imageIndex": {
           "kind": "number",
           "nullable": false,
@@ -29029,6 +29465,13 @@
               "nullable": false,
               "optional": false,
               "unique": false,
+              "literal": "\"document\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
               "literal": "\"image\""
             },
             {
@@ -29043,7 +29486,7 @@
         "messageId": {
           "kind": "string",
           "nullable": false,
-          "optional": false,
+          "optional": true,
           "unique": false
         },
         "messageRole": {
@@ -29104,6 +29547,20 @@
         "by_thread": {
           "fields": [
             "threadId"
+          ],
+          "unique": false
+        },
+        "by_thread_and_document": {
+          "fields": [
+            "threadId",
+            "documentId"
+          ],
+          "unique": false
+        },
+        "by_user_and_document": {
+          "fields": [
+            "userId",
+            "documentId"
           ],
           "unique": false
         },
@@ -29573,6 +30030,52 @@
           "optional": true,
           "unique": false
         },
+        "followupDispatch": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "claimedAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "expiresAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "requestId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            }
+          }
+        },
+        "followupRevoke": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "claimedAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "expiresAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            }
+          }
+        },
         "groupChat": {
           "kind": "object",
           "nullable": false,
@@ -29812,6 +30315,27 @@
           "optional": true,
           "unique": false
         },
+        "pinnedGoal": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "maxRounds": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "text": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "refined": true
+            }
+          }
+        },
         "projectId": {
           "kind": "id",
           "nullable": false,
@@ -29837,6 +30361,74 @@
           "optional": true,
           "unique": false,
           "literal": "\"host\""
+        },
+        "searchClaim": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "expiresAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "id": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "texts": {
+              "kind": "array",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "of": {
+                "kind": "object",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "fields": {
+                  "kind": {
+                    "kind": "union",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "members": [
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "literal": "\"summary\""
+                      },
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "literal": "\"title\""
+                      }
+                    ]
+                  },
+                  "text": {
+                    "kind": "string",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "searchRefusedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         },
         "snoozeChosenAt": {
           "kind": "number",
@@ -29886,6 +30478,12 @@
           "optional": true,
           "unique": false
         },
+        "summaryVectorId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "tagIds": {
           "kind": "array",
           "nullable": false,
@@ -29922,6 +30520,12 @@
           "optional": true,
           "unique": false
         },
+        "titleVectorId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "updatedAt": {
           "kind": "number",
           "nullable": false,
@@ -29930,6 +30534,12 @@
         },
         "userId": {
           "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "userTurnCount": {
+          "kind": "number",
           "nullable": false,
           "optional": true,
           "unique": false
@@ -33401,6 +34011,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "writeId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {

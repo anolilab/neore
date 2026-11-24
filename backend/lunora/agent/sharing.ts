@@ -224,6 +224,8 @@ export const deleteThreadAccess = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
+        // Run only under the chat's revoke hold (`holdFollowupRevoke`, in `chat/sharing.ts`): no suggestion request starts on the chat
+        // until the hold is released, so this delete is not raced by one.
         await ctx.db.delete("threadAccess", args.accessId);
 
         return null;

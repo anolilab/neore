@@ -12,6 +12,7 @@ import { isUniqueViolation } from "../lib/error-helpers";
 import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { currentShard, ROOT_SHARD_KEY } from "../lib/shard-context";
+import { hostSpelling } from "../lib/url-host";
 import { controlStateOf, watchableSessionId } from "./live-view-logic";
 // ── Utility ─────────────────────────────────────────────────────────────
 
@@ -46,6 +47,98 @@ export const getActiveSession = internalQuery
         threadId: v.id("threads"),
     })
     .query(async ({ args: { threadId }, ctx }) => await activeThreadSession(ctx.db, threadId));
+
+/** The owner's allowed and blocked domains for the agent's browser (`aiUserPreferences.browserSettings`), for `validateDomain`. */
+export const getBrowserDomainSettings = internalQuery
+    .input({ userId: v.string() })
+    .output(v.object({ domainAllowlist: v.optional(v.array(v.string())), domainBlocklist: v.optional(v.array(v.string())), enabled: v.optional(v.boolean()) }))
+    .query(async ({ args, ctx }) => {
+        const preferences = await ctx.db
+            .query("aiUserPreferences")
+            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+            .first();
+
+        return preferences?.browserSettings ?? {};
+    });
+
+/** How the owner's agent clicks (`aiUserPreferences.browserClickMode`); absent is the default, "page". */
+export const getBrowserClickMode = internalQuery
+    .input({ userId: v.string() })
+    .output(v.union(v.literal("page"), v.literal("pointer"), v.literal("all")))
+    .query(async ({ args, ctx }) => {
+        const preferences = await ctx.db
+            .query("aiUserPreferences")
+            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+            .first();
+
+        return preferences?.browserClickMode ?? "page";
+    });
+
+/**
+ * How many purchase decision looks a session keeps. Past the cap the oldest go first, to `purchaseLostCalls`: their approved
+ * clicks are refused. An approved click takes its own look (`takePurchaseLook`), so only decisions never clicked accumulate.
+ */
+const PURCHASE_LOOKS_KEPT = 50;
+
+/** How many evicted tool calls a session remembers, so their approved clicks are refused rather than run unchecked. */
+const PURCHASE_LOST_KEPT = 200;
+
+/**
+ * The target a purchase decision looked at for one tool call, and the browser it read it on (the renderer's session id, or
+ * `NO_PROVIDER_SESSION`). Written by the decision's own look, before the person is asked; a click the person approves is checked
+ * against both, so a browser the provider replaced while they were asked is never clicked. An empty target: the decision's look
+ * could not read the target.
+ */
+export const recordPurchaseLook = internalMutation
+    .input({ browser: v.string(), sessionId: v.id("browserSessions"), target: v.string(), toolCallId: v.string() })
+    .mutation(async ({ args: { browser, sessionId, target, toolCallId }, ctx }) => {
+        const session = await ctx.db.get("browserSessions", sessionId);
+
+        if (session) {
+            const kept = (session.purchaseLooks ?? []).filter((look) => look.toolCallId !== toolCallId);
+            const all = [...kept, { browser, target, toolCallId }];
+            const evicted = all.slice(0, -PURCHASE_LOOKS_KEPT).map((look) => look.toolCallId);
+
+            await patchRow(ctx.db, "browserSessions", session, {
+                purchaseLooks: all.slice(-PURCHASE_LOOKS_KEPT),
+                purchaseLostCalls: [...(session.purchaseLostCalls ?? []), ...evicted].slice(-PURCHASE_LOST_KEPT),
+            });
+        }
+    });
+
+/**
+ * Takes the decision of one tool call, and forgets it. `target`: the element the person was shown. `unreadable`: its decision
+ * could not read one. `lost`: its target was pushed out before the click ran. `none`: no decision looked at the page (ask
+ * mode asks without a look), so the click is not checked.
+ */
+export const takePurchaseLook = internalMutation
+    .input({ sessionId: v.id("browserSessions"), toolCallId: v.string() })
+    .output(
+        v.object({
+            browser: v.optional(v.string()),
+            kind: v.union(v.literal("lost"), v.literal("none"), v.literal("target"), v.literal("unreadable")),
+            target: v.optional(v.string()),
+        }),
+    )
+    .mutation(async ({ args: { sessionId, toolCallId }, ctx }) => {
+        const session = await ctx.db.get("browserSessions", sessionId);
+
+        if (!session) {
+            return { kind: "none" as const };
+        }
+
+        const look = session.purchaseLooks?.find((entry) => entry.toolCallId === toolCallId);
+
+        if (look !== undefined) {
+            await patchRow(ctx.db, "browserSessions", session, {
+                purchaseLooks: (session.purchaseLooks ?? []).filter((entry) => entry.toolCallId !== toolCallId),
+            });
+
+            return look.target === "" ? { kind: "unreadable" as const } : { browser: look.browser, kind: "target" as const, target: look.target };
+        }
+
+        return (session.purchaseLostCalls ?? []).includes(toolCallId) ? { kind: "lost" as const } : { kind: "none" as const };
+    });
 
 export const createSession = internalMutation
     .input({
@@ -360,33 +453,65 @@ const askKind = (row: { inText?: boolean; reported?: boolean } | null): "detecte
     return row.inText === true ? "detected_in_text" : "detected";
 };
 
+/**
+ * The spellings an ask about `site` may be stored under. One asked before sites lost their trailing dots
+ * (`lib/url-host.ts#urlHost`) keeps the host as the URL parser wrote it, `shop.example.` or `shop.example..`, and a reply
+ * running across that change must still find its ask and its decline there. No migration: a stored ask matters for the
+ * hand-back window, so these reads can go once every reply from before the change has ended.
+ */
+const siteSpellings = (site: string): string[] => (site === "" ? [site] : [site, `${site}.`, `${site}..`]);
+
+type HumanCheckRow = Doc<"browserHumanChecks">;
+
+/** The run's ask about `site`, under any of its spellings; `null` for none. */
+const runSiteAsk = async (db: QueryCtx["db"], threadId: Id<"threads">, run: string, site: string): Promise<HumanCheckRow | null> => {
+    for (const spelling of siteSpellings(site)) {
+        const row = await db
+            .query("browserHumanChecks")
+            .withIndex("by_threadId_site_run", (q) => q.eq("threadId", threadId).eq("site", spelling).eq("run", run))
+            .first();
+
+        if (row !== null) {
+            return row;
+        }
+    }
+
+    return null;
+};
+
 /** How the person was asked about `site` in this run, else (with `askedSince`) the thread's latest ask since then; `null` for none. */
 export const wasHumanCheckAsked = internalQuery
     .input({ askedSince: v.optional(v.number()), run: v.string(), site: v.string(), threadId: v.id("threads") })
     .output(v.union(v.literal("detected"), v.literal("detected_in_text"), v.literal("reported"), v.null()))
     .query(async ({ args: { askedSince, run, site, threadId }, ctx }) => {
-        const inRun = await ctx.db
-            .query("browserHumanChecks")
-            .withIndex("by_threadId_site_run", (q) => q.eq("threadId", threadId).eq("site", site).eq("run", run))
-            .first();
+        const inRun = await runSiteAsk(ctx.db, threadId, run, site);
 
         if (inRun !== null || askedSince === undefined) {
             return askKind(inRun);
         }
 
-        const recent = await ctx.db
-            .query("browserHumanChecks")
-            .withIndex("by_threadId_site_askedAt", (q) => q.eq("threadId", threadId).eq("site", site).gte("askedAt", askedSince))
-            .order("desc")
-            .first();
+        let recent: HumanCheckRow | null = null;
+
+        for (const spelling of siteSpellings(site)) {
+            const row = await ctx.db
+                .query("browserHumanChecks")
+                .withIndex("by_threadId_site_askedAt", (q) => q.eq("threadId", threadId).eq("site", spelling).gte("askedAt", askedSince))
+                .order("desc")
+                .first();
+
+            if (row !== null && (recent === null || row.askedAt > recent.askedAt)) {
+                recent = row;
+            }
+        }
 
         return askKind(recent);
     });
 
 /**
- * The person is asked about `site` once per run: `true` for the first ask, which records it, `false` when another
- * action of the run asked already. Insert-if-absent on the unique key, with no read first: of two claims at once, the
- * insert that loses answers `false`. The row names the thread's owner, whose shard holds it, whoever's turn asked (a
+ * The person is asked about `site` once per run: the new ask's id for the first ask, which records it, `null` when
+ * another action of the run asked already (also one the person declined: a later reply may ask again, as the person
+ * can ask the agent to try once more). Insert-if-absent on the unique key: of two claims at once, the insert that
+ * loses answers `null`. The row names the thread's owner, whose shard holds it, whoever's turn asked (a
  * collaborator's id there would outlive their account and escape the owner's erasure); a thread with no owner names
  * the shard it lives on. A thread that is gone asks nobody.
  * A report on a site the run already asked about (a sign-in wall after a check) marks that ask `reported`: what the
@@ -394,31 +519,27 @@ export const wasHumanCheckAsked = internalQuery
  */
 export const claimHumanCheckAsk = internalMutation
     .input({ inText: v.optional(v.boolean()), reported: v.optional(v.boolean()), run: v.string(), site: v.string(), threadId: v.id("threads") })
-    .output(v.boolean())
+    .output(v.union(v.null(), v.id("browserHumanChecks")))
     .mutation(async ({ args: { inText, reported, run, site, threadId }, ctx }) => {
         const thread = await ctx.db.get("threads", threadId);
 
         if (!thread) {
-            return false;
+            return null;
         }
 
-        if (reported === true) {
-            const asked = await ctx.db
-                .query("browserHumanChecks")
-                .withIndex("by_threadId_site_run", (q) => q.eq("threadId", threadId).eq("site", site).eq("run", run))
-                .first();
+        // Also an ask stored under the site's dotted spelling, which the unique key does not see.
+        const asked = await runSiteAsk(ctx.db, threadId, run, site);
 
-            if (asked !== null) {
-                if (asked.reported !== true) {
-                    await ctx.db.patch("browserHumanChecks", asked._id, { reported: true });
-                }
-
-                return false;
+        if (asked !== null) {
+            if (reported === true && asked.reported !== true) {
+                await ctx.db.patch("browserHumanChecks", asked._id, { reported: true });
             }
+
+            return null;
         }
 
         try {
-            await ctx.db.insert("browserHumanChecks", {
+            return await ctx.db.insert("browserHumanChecks", {
                 askedAt: ctx.now,
                 ...(inText === true && reported !== true && { inText }),
                 ...(reported === true && { reported }),
@@ -431,13 +552,62 @@ export const claimHumanCheckAsk = internalMutation
             });
         } catch (error) {
             if (isUniqueViolation(error)) {
-                return false;
+                return null;
             }
 
             throw error;
         }
+    });
 
-        return true;
+/** The run's ask on `site`, else the run's latest ask since `askedSince`. */
+const runAsk = async (db: QueryCtx["db"], threadId: Id<"threads">, run: string, site: string | undefined, askedSince: number) => {
+    if (site !== undefined) {
+        return await runSiteAsk(db, threadId, run, site);
+    }
+
+    return await db
+        .query("browserHumanChecks")
+        .withIndex("by_threadId_run_askedAt", (q) => q.eq("threadId", threadId).eq("run", run).gte("askedAt", askedSince))
+        .order("desc")
+        .first();
+};
+
+const vAnswer = v.union(v.null(), v.object({ answer: v.union(v.literal("declined"), v.literal("done"), v.literal("open")), site: v.string() }));
+
+/**
+ * The person's answer on the card for an ask of the run `run`: on `site`, else its latest since `askedSince`. `null`: no
+ * such ask; `open`: not answered yet.
+ */
+export const humanCheckAnswer = internalQuery
+    .input({ askedSince: v.number(), run: v.string(), site: v.optional(v.string()), threadId: v.id("threads") })
+    .output(vAnswer)
+    .query(async ({ args: { askedSince, run, site, threadId }, ctx }) => {
+        const row = await runAsk(ctx.db, threadId, run, site, askedSince);
+
+        return row === null ? null : { answer: row.resolution ?? "open", site: hostSpelling(row.site) };
+    });
+
+/**
+ * The start of `wait_for_person` on the run's latest ask: its answer, and `waited` when the agent already waited on it
+ * (it is not waited on again). Records the wait on the ask.
+ */
+export const beginHumanCheckWait = internalMutation
+    .input({ askedSince: v.number(), run: v.string(), threadId: v.id("threads") })
+    .output(
+        v.union(v.null(), v.object({ answer: v.union(v.literal("declined"), v.literal("done"), v.literal("open")), site: v.string(), waited: v.boolean() })),
+    )
+    .mutation(async ({ args: { askedSince, run, threadId }, ctx }) => {
+        const row = await runAsk(ctx.db, threadId, run, undefined, askedSince);
+
+        if (row === null) {
+            return null;
+        }
+
+        if (row.waitedAt === undefined && row.resolution === undefined) {
+            await ctx.db.patch("browserHumanChecks", row._id, { waitedAt: ctx.now });
+        }
+
+        return { answer: row.resolution ?? "open", site: hostSpelling(row.site), waited: row.waitedAt !== undefined };
     });
 
 // ── Browser Extension Functions (Phase 2) ───────────────────────────────

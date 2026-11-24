@@ -38,6 +38,25 @@ describe("withCallerShard", () => {
         expect(((await batch.json()) as { calls: { shardKey: string }[] }).calls.map((call) => call.shardKey)).toStrictEqual(["__root__", "user-a"]);
     });
 
+    it("sends the run webhook's calls, which carry no routing argument, to the caller's shard, where export and erasure read", async () => {
+        const paths = ["getRunWebhook", "saveRunWebhook", "rotateRunWebhookSecret", "sendRunWebhookTest"].map((name) => `run_webhooks_functions:${name}`);
+        const single = await withCallerShard(rpc({ args: { enabled: true, url: "https://hooks.example.com" }, functionPath: paths[1] }), "user-a");
+        const batch = await withCallerShard(
+            rpc(
+                {
+                    calls: paths.map((functionPath, id) => {
+                        return { args: {}, functionPath, id };
+                    }),
+                },
+                "/_lunora/rpc-batch",
+            ),
+            "user-a",
+        );
+
+        expect(await single.json()).toMatchObject({ shardKey: "user-a" });
+        expect(((await batch.json()) as { calls: { shardKey: string }[] }).calls.map((call) => call.shardKey)).toStrictEqual(paths.map(() => "user-a"));
+    });
+
     it("keeps a shard the caller named — a shared thread's owner", async () => {
         const request = rpc({ args: {}, functionPath: "x:y", shardKey: "owner-b" });
 

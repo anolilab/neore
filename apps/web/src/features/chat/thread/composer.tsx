@@ -31,7 +31,6 @@ import type { FC, RefObject } from "react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
-import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import ComposerAskAside from "@/features/chat/aside/composer-ask-aside";
 import BrowserLiveView from "@/features/chat/browser-live-view/browser-live-view";
 import CompactionChip from "@/features/chat/compaction/compaction-chip";
@@ -303,7 +302,9 @@ const ComposerInputWrapper: FC<{
     onSubmit: () => void;
     onSubmitOverride?: (text: string, attachments: PendingAttachment[], draftFrom?: DraftOrigin) => Promise<void>;
     placeholder?: string;
-}> = ({ compact, disabled, inputRef, onOpenDraw, onSubmit, onSubmitOverride, placeholder }) => {
+    /** Whether the suggested next prompt may show here: text chats only. */
+    suggestPrompt?: boolean;
+}> = ({ compact, disabled, inputRef, onOpenDraw, onSubmit, onSubmitOverride, placeholder, suggestPrompt = true }) => {
     const cyclingPlaceholder = useCyclingPlaceholder();
 
     return (
@@ -318,6 +319,7 @@ const ComposerInputWrapper: FC<{
             onSubmitOverride={onSubmitOverride}
             placeholder={placeholder ?? cyclingPlaceholder}
             ref={inputRef}
+            suggestPrompt={suggestPrompt}
         />
     );
 };
@@ -352,7 +354,6 @@ const Composer: FC<ComposerProps> = ({
 
     // favoriteModelIds is handled by the tiptap editor internally
     useFavoriteModels();
-    const { data: userSettings } = useUserSettings();
     const { isAnonymous } = useIsAnonymous();
     const currentModel = useCurrentModel();
     const flaggedModels = useFeatureFlaggedModels();
@@ -455,7 +456,6 @@ const Composer: FC<ComposerProps> = ({
         return mode;
     }, [isNewThread, threadId, storeNewThreadMode, storeUserChangedMode, storeThreadMode, thread?.mode]);
 
-    const isEnableFollowupSuggestions = userSettings?.enableFollowupSuggestions !== false;
     const prefersReducedMotion = useReducedMotion();
 
     // Get model mode and default models (memoized together since they share the same data source)
@@ -712,9 +712,9 @@ const Composer: FC<ComposerProps> = ({
                             {!minimal && isEmpty && <ThreadWelcomeSuggestions className="-mb-5 pb-5.5" key={threadId} />}
 
                             {/* Followup suggestions - only for text mode, hide while streaming or regenerating */}
-                            {!minimal && isEnableFollowupSuggestions && !isImageModel && !isVideoModel && !isAudioModel && !isStreaming && !isSubmitting && (
-                                <ComposerFollowupSuggestions />
-                            )}
+                            {/* The owner's setting decides whether a thread has suggestions (the cache is written only when it is on), so a viewer's own
+                                setting does not hide a shared thread's panel. */}
+                            {!minimal && !isImageModel && !isVideoModel && !isAudioModel && !isStreaming && !isSubmitting && <ComposerFollowupSuggestions />}
 
                             {/* Project hint for a new thread's first message - not in a comparison fan-out, which files nothing */}
                             {!minimal && !onSubmitOverride && !isStreaming && !isSubmitting && <ComposerProjectHint />}
@@ -797,7 +797,7 @@ const Composer: FC<ComposerProps> = ({
                                 )}
                             </AnimatePresence>
                             {/* Run until done - a goal needs an account and a text message */}
-                            {composerMode === "text" && !isAnonymous && <ComposerGoal disabled={isSSEStreaming} />}
+                            {composerMode === "text" && !isAnonymous && <ComposerGoal disabled={isSSEStreaming} threadId={validThreadId} />}
                             {/* MCP server selector - only for text mode */}
                             <AnimatePresence initial={animateEntrance} mode="popLayout">
                                 {composerMode === "text" && (
@@ -859,6 +859,7 @@ const Composer: FC<ComposerProps> = ({
                         onSubmit={() => {}}
                         onSubmitOverride={onSubmitOverride}
                         placeholder={placeholder}
+                        suggestPrompt={composerMode === "text" && !minimal}
                     />
                 </ComposerBase>
             </div>

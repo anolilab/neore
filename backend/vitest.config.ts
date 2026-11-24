@@ -14,7 +14,8 @@ import { timeSharding } from "../scripts/vitest/time-sharding";
  * hook timeout when they share the machine with the rest of the suite. They run
  * alone, after the parallel group has finished (`sequence.groupOrder`).
  */
-const SERIAL_FILES = ["lunora/admin/shard-footprint.test.ts"];
+// `browser/gdpr.test.ts` writes and reads 40 MB of typed actions to pass the transaction's 32 MiB read limit.
+const SERIAL_FILES = ["lunora/admin/shard-footprint.test.ts", "lunora/browser/gdpr.test.ts"];
 
 export default defineConfig({
     resolve: {

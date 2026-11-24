@@ -54,6 +54,7 @@ import {
     saveSecretAsProviderKeyTool,
     searchMemoryTool,
     setMcpServerSecretTool,
+    signInWithSavedLoginTool,
     shellExecutionTool,
     spotifySearchTool,
     stockChartTool,
@@ -168,6 +169,7 @@ const SEARCH_MODE_TOOLS: Record<SearchMode, ToolName[]> = {
     chat: [
         ToolName.CodeExecution,
         ToolName.Browser,
+        ToolName.SignInWithSavedLogin,
         ToolName.DateTime,
         ...SANDBOX_TOOLS,
         ...CODING_AGENT_TOOLS,
@@ -222,6 +224,7 @@ const SEARCH_MODE_TOOLS: Record<SearchMode, ToolName[]> = {
         ToolName.CodeExecution,
         ToolName.CurrencyConverter,
         ToolName.Browser,
+        ToolName.SignInWithSavedLogin,
         ...SANDBOX_TOOLS,
         ...SUB_AGENT_TOOLS,
         ...DOCUMENT_TOOLS,
@@ -420,6 +423,7 @@ const ALL_TOOLS: Record<ToolName, unknown> = {
     [ToolName.SetMcpServerSecret]: setMcpServerSecretTool,
     // Sandbox Tools
     [ToolName.ShellExecution]: shellExecutionTool,
+    [ToolName.SignInWithSavedLogin]: signInWithSavedLoginTool,
 
     [ToolName.SpotifySearch]: spotifySearchTool,
     [ToolName.StockChart]: stockChartTool,
@@ -459,7 +463,7 @@ const ALL_TOOLS: Record<ToolName, unknown> = {
  * Tools grouped by category
  */
 const TOOLS_BY_CATEGORY = {
-    browser: [ToolName.Browser],
+    browser: [ToolName.Browser, ToolName.SignInWithSavedLogin],
     codeExecution: [ToolName.CodeExecution],
     codingAgent: [ToolName.DelegateToCodingAgent],
     computation: [ToolName.WolframAlpha],

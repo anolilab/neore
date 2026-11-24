@@ -32,6 +32,7 @@ import { internalAction, internalMutation, internalQuery } from "../_generated/s
 import { mergeSkippedSteps } from "../auth/lib/setup-step-limits";
 import { authLogger } from "./logger";
 import { callOnShard } from "./cross-shard";
+import { enqueueJob } from "./job-queue";
 import schema from "../schema";
 import { dropPushDevicesOf } from "../notifications/push-device-writes";
 import { mergeThreadFollowsPage } from "../chat/follows/follow-writes";
@@ -43,6 +44,18 @@ export const MERGE_PAGE_SIZE = 100;
 
 /** The guest's own copy of these is dropped: the new account already has its seeded row. */
 const KEEP_NEW_USERS = new Set(["aiUserPreferences", "userSettings"]);
+
+/**
+ * Tables whose rows are copied for the guest alone: another user's row on the guest's shard stays where it is, so the
+ * clear pass takes only the guest's rows of these, even when the two shards are separate stores.
+ */
+const COPIED_FOR_GUEST_ONLY = new Set([...KEEP_NEW_USERS, "runWebhooks"]);
+
+/** The claim scope of the store probe: a marker written on the new account's shard and looked for on the guest's. */
+export const MERGE_PROBE_SCOPE = "guest-merge-probe";
+
+/** How long the probe marker is kept: far past the write-then-read of one attempt, which releases it; the purge cron drops a lost one. */
+const MERGE_PROBE_TTL_MS = 60 * 60 * 1000;
 
 /** Ephemeral bookkeeping that is not the guest's content. */
 const NOT_MOVED = new Set(["cronRuns", "idempotencyClaims", "rateLimits"]);
@@ -76,6 +89,8 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     promptHistory: ["userId", "contentBy"],
     prompts: ["userId", "contentBy"],
     shardRoutes: ["ownerId"],
+    // A guest's pins on a shared thread stay findable by the guest's new account, and the owner-side route follows an owner who moved.
+    sharedPinRoutes: ["userId", "ownerId"],
     skillRatings: ["userId"],
     skills: ["userId"],
     threadAccess: ["userId", "ownerId", "grantedBy"],
@@ -86,10 +101,14 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
 /** `.global()` tables with a `userId` the generic re-pointing loop deliberately leaves alone, and why. */
 export const GLOBAL_USER_TABLES_NOT_REASSIGNED: Readonly<Record<string, string>> = {
     account: "better-auth links the anonymous user itself",
+    accountMoves:
+        "the move marker of the account being merged or erased: it refuses pin writes from that account and names no content, and that account ends with the move, so nothing re-points it",
     deviceCode: "a guest cannot approve a code, and a pending one lapses in 30 minutes",
     documentHistory: "an audit trail records who acted; it is not re-attributed",
     member: "a guest joins no organization",
     memberCredits: "a guest joins no organization",
+    pinWriteLeases:
+        "the in-flight pin-write lease of the account being merged or erased: it names no content, and the move removes it when it ends, so nothing re-points it",
     pushDevices:
         "tied to the guest's session, which ends with the guest: the notifications module drops them, and the phone registers again under the new sign-in",
     session: "better-auth's own; the guest's sessions end with the guest",
@@ -131,7 +150,7 @@ export const listShardRowsPage = internalQuery
     });
 
 /** The column a user-sharded table is sharded on, which names the row's owner. Undefined for a table that is not user-sharded. */
-const shardOwnerField = (table: string): string | undefined => {
+export const shardOwnerField = (table: string): string | undefined => {
     const shardMode = (schema as unknown as { tables: Record<string, { shardMode?: { field?: string; kind?: string } }> }).tables[table]?.shardMode;
 
     return shardMode?.kind === "shardBy" ? shardMode.field : undefined;
@@ -140,13 +159,18 @@ const shardOwnerField = (table: string): string | undefined => {
 /**
  * On the GUEST's shard: the ids of the first page of `table` — for the delete pass. With `ownedBy`, only that user's rows,
  * so a shard that also holds the new account's rows (one shard serving both, as local routing can) keeps them. A table that
- * is not user-sharded has no owner to filter on and is listed whole.
+ * is not user-sharded has no owner to filter on: asked for one user's rows of it, this lists none, never the whole table,
+ * which on a shared store holds everyone's rows. Without `ownedBy`, the first page of any table.
  */
 export const listShardRowIds = internalQuery
     .input({ ownedBy: v.optional(v.string()), table: v.string() })
     .output(v.array(v.string()))
     .query(async ({ args, ctx }) => {
         const ownerField = shardOwnerField(args.table);
+
+        if (args.ownedBy !== undefined && ownerField === undefined) {
+            return [];
+        }
 
         if (args.ownedBy !== undefined && ownerField !== undefined) {
             const facades = ctx.db as unknown as Record<
@@ -210,6 +234,7 @@ export const importShardRows = internalMutation
                 imported: await copyMergedRunWebhooks(
                     ctx,
                     guestRows.map((row) => rewriteOwner(row, args.from, args.to)),
+                    args.from,
                     args.to,
                 ),
             };
@@ -245,6 +270,17 @@ export const importShardRows = internalMutation
                 imported += 1;
 
                 continue;
+            }
+
+            // A row here under the same id is this row: the shard is shared, or an earlier pass copied it (re-owned to the new
+            // account, or a collaborator's row kept as it is). One owned by anyone else is a different row; skipping it would
+            // let the clear pass delete the guest's copy, so the merge stops before anything is cleared.
+            if (ownerField !== undefined) {
+                const existingOwner = existing[ownerField];
+
+                if (existingOwner !== args.from && existingOwner !== args.to && existingOwner !== row[ownerField]) {
+                    throw new Error(`${args.table} row ${id} already exists on the new account's shard as another user's row; the merge into ${args.to} stops`);
+                }
             }
 
             // The guest's own row, already on this shard under its id (a shared shard): re-own it in place, so the same id is
@@ -374,6 +410,36 @@ const moveThreadFollows = async (call: ShardCall, references: MergeReferences, f
 };
 
 /**
+ * Whether the guest's and the new account's shard keys serve one store: a marker written under `to` and looked for under
+ * `from`. Each attempt writes a key of its own, so a marker a crashed earlier attempt left (and which may lapse at any
+ * moment) is never what this attempt reads. A write that did not take a fresh claim, or a read that fails, throws: only a
+ * marker this attempt wrote and then missed may answer "separate", the answer that clears other users' rows.
+ */
+const probeSharedStore = async (call: ShardCall, references: MergeReferences, from: string, to: string): Promise<boolean> => {
+    const key = `${from}:${to}:${crypto.randomUUID()}`;
+    const written: unknown = await call(references.markProbe, { key, scope: MERGE_PROBE_SCOPE, ttlMs: MERGE_PROBE_TTL_MS }, to);
+
+    if (written !== true) {
+        throw new Error(`the store probe for the merge of guest ${from} into ${to} was not written; the merge runs again`);
+    }
+
+    const held: unknown = await call(references.probeHeld, { key, scope: MERGE_PROBE_SCOPE }, from);
+
+    if (typeof held !== "boolean") {
+        throw new TypeError(`the store probe for the merge of guest ${from} into ${to} gave no answer; the merge runs again`);
+    }
+
+    // The marker has done its job; the purge cron drops it if this release is lost.
+    try {
+        await call(references.releaseProbe, { key, scope: MERGE_PROBE_SCOPE }, to);
+    } catch (error) {
+        authLogger.warn(`[auth] the store probe marker for the merge of guest ${from} into ${to} was not released:`, error);
+    }
+
+    return held;
+};
+
+/**
  * Move everything of guest `from` to user `to`. Runs where a shard client is
  * available (the better-auth link hook in `auth.ts`).
  */
@@ -418,14 +484,37 @@ export const mergeGuestInto = async (call: ShardCall, references: MergeReference
         throw new Error(`guest ${from} still has rows past the merge's round cap; the merge into ${to} runs again`);
     }
 
-    // Then clear the guest's shard.
+    // Then clear the guest's shard. Whether both shard keys serve one store (as local routing can) decides what goes: on one
+    // store, another user's row there is the same row the new account's shard holds, so only the guest's rows are cleared,
+    // and a table with no owner column (not user-sharded) is not cleared at all: its rows are the new account's rows too, and
+    // every other user's. On separate stores, the guest's store holds only rows written under the guest's key, and the copy
+    // pass put every one of them on the new shard, a collaborator's row included, so the guest's copy of each goes as well;
+    // that holds for a table with no owner column too. Probed on every run, so a redelivered merge decides the same way.
+    const sharedStore = await probeSharedStore(call, references, from, to);
+    const clearPlan = tables.flatMap((table): { ownedBy?: string; table: string }[] => {
+        if (!sharedStore && !COPIED_FOR_GUEST_ONLY.has(table)) {
+            return [{ table }];
+        }
+
+        if (shardOwnerField(table) !== undefined) {
+            return [{ ownedBy: from, table }];
+        }
+
+        if (sharedStore) {
+            return [];
+        }
+
+        // A table copied for the guest alone must name its owner, or its clear would take another user's row too.
+        throw new Error(`${table} is cleared for the guest alone but has no owner column; the merge of guest ${from} into ${to} stops before clearing`);
+    });
     let drained = true;
 
-    for (const table of tables) {
+    for (const listArgs of clearPlan) {
+        const { table } = listArgs;
         let emptied = false;
 
         for (let round = 0; round < MAX_ROUNDS_PER_TABLE; round += 1) {
-            const ids: string[] = await call(references.listIds, { ownedBy: from, table }, from);
+            const ids: string[] = await call(references.listIds, listArgs, from);
 
             if (ids.length === 0) {
                 emptied = true;
@@ -480,36 +569,171 @@ export interface MergeReferences {
     importRows: { __lunoraRef: string };
     list: { __lunoraRef: string };
     listIds: { __lunoraRef: string };
+    /** `claimKey`, run on the new account's shard to leave the store probe's marker. */
+    markProbe: { __lunoraRef: string };
+    /** `claimHeld`, run on the guest's shard: `true` when it sees the marker, so both keys serve one store. */
+    probeHeld: { __lunoraRef: string };
     reassignFollows: { __lunoraRef: string };
     reassignGlobal: { __lunoraRef: string };
+    /** `releaseKey`, run on the new account's shard to drop the probe's marker once read. */
+    releaseProbe: { __lunoraRef: string };
 }
+
+/** The route reads and the batch move that the guest's pin moves need. Injected, so the order of the passes can be tested. */
+export type GuestPinMoves = {
+    listRoutes: (
+        routeUserId: string,
+        cursor: string | null,
+    ) => Promise<{ continueCursor: string | null; isDone: boolean; page: { ownerId: string; threadId: string }[] }>;
+    mergeRows: () => Promise<{ moved: number }>;
+    moveBatch: (route: { ownerId: string; threadId: string }) => Promise<{ hasMore: boolean }>;
+};
+
+/** Moves the pins of every route `routeUserId` holds, one batch per call on each route's owner shard. Each move is idempotent. */
+export const movePinsOnRoutesOf = async (moves: GuestPinMoves, routeUserId: string): Promise<void> => {
+    let cursor: string | null = null;
+    let isDone = false;
+
+    while (!isDone) {
+        const routes = await moves.listRoutes(routeUserId, cursor);
+
+        for (const route of routes.page) {
+            let more = true;
+
+            while (more) {
+                const batch = await moves.moveBatch(route);
+
+                more = batch.hasMore;
+            }
+        }
+
+        isDone = routes.isDone;
+        cursor = routes.continueCursor;
+    }
+};
+
+/**
+ * The guest's pins move before and after the rows. Before: the guest's pins on other owners' threads move while their routes still name the
+ * guest. After: a parallel merge of the owner can move a thread's shard, and so the guest's pins, between the first pass reading a route and
+ * the rows re-pointing it; the routes the surviving account holds now name the shard that holds the pins, and the second pass reaches them.
+ */
+export const moveGuestPins = async (moves: GuestPinMoves, from: string, to: string): Promise<{ moved: number }> => {
+    await movePinsOnRoutesOf(moves, from);
+
+    const result = await moves.mergeRows();
+
+    await movePinsOnRoutesOf(moves, to);
+
+    return result;
+};
+
+/** The claim a guest merge holds while one of its deliveries moves the guest's pins. Long enough for a merge run and its deferrals. */
+export const GUEST_MERGE_SCOPE = "guest-merge";
+export const GUEST_MERGE_CLAIM_TTL_MS = 30 * 60 * 1000;
+/** How long a duplicate delivery waits before it looks again, while another delivery of the same merge holds the claim. */
+export const GUEST_MERGE_RECHECK_MS = 30 * 1000;
 
 /**
  * The move, as a queue job on the NEW user's shard (`auth.ts` enqueues it).
  * Off the sign-up request: a guest's rows are one round trip per table and
  * page, far too long to hold the request that creates the account. Redelivery
  * is safe — see the module comment.
+ *
+ * A move that is still in flight is deferred, not failed: the job runs again once the last pin write the guest's lease covers has run
+ * out. The merging marker stays meanwhile, so no new write gets in.
  */
 export const runGuestMerge = internalAction
     .input({ from: v.string(), to: v.string() })
     .output(v.object({ moved: v.number() }))
-    .action(async ({ args }) => {
-        const result = await mergeGuestInto(
-            async (reference, callArgs, shardKey) => (await callOnShard(reference as never, callArgs as never, { shardKey })) as never,
-            {
-                deleteGuest: internal.auth.hooks.deleteMergedGuest,
-                deleteRows: internal.lib.account_merge.deleteShardRows,
-                importRows: internal.lib.account_merge.importShardRows,
-                list: internal.lib.account_merge.listShardRowsPage,
-                listIds: internal.lib.account_merge.listShardRowIds,
-                reassignFollows: internal.lib.account_merge.reassignThreadFollowsPage,
-                reassignGlobal: internal.lib.account_merge.reassignGlobalRows,
-            },
-            args.from,
-            args.to,
-        );
+    .action(async ({ args, ctx: context }) => {
+        // One delivery of this merge moves the guest's pins at a time. A duplicate delivery (a queue redelivery that overlaps a running
+        // merge) waits for the running one, so the first to finish cannot remove a marker the other is still moving pins under.
+        const claimedAt = await context.runMutation(internal.lib.claim_once.claimKeyFenced, {
+            key: args.from,
+            scope: GUEST_MERGE_SCOPE,
+            ttlMs: GUEST_MERGE_CLAIM_TTL_MS,
+        });
 
-        authLogger.info(`[auth] moved ${String(result.moved)} rows from guest ${args.from} to ${args.to}`);
+        if (claimedAt === null) {
+            await enqueueJob(internal.lib.account_merge.runGuestMerge, args, { delayMs: GUEST_MERGE_RECHECK_MS, shardKey: args.to });
 
-        return result;
+            return { moved: 0 };
+        }
+
+        try {
+            // The guest is marked as merging before its pins move, so a pin it writes meanwhile is refused (`lib/account-moves.ts`).
+            await context.runMutation(internal.lib.account_moves.beginAccountMoveFor, { kind: "merging", userId: args.from });
+
+            // The destination is marked as receiving rows before any lands on it. Its erasure waits for that marker, and this check stops the
+            // merge if the erasure has begun: each side writes its marker before it reads the other's, so one of them always sees the other.
+            await context.runMutation(internal.lib.account_moves.beginAccountMoveFor, { kind: "importing", userId: args.to });
+            const { erasing: destinationErasing } = await context.runMutation(internal.lib.account_moves.isErasingFor, { userId: args.to });
+
+            if (destinationErasing) {
+                await context.runMutation(internal.lib.account_moves.endAccountMoveFor, { kind: "importing", userId: args.to });
+                await context.runMutation(internal.lib.account_moves.endAccountMoveFor, { kind: "merging", userId: args.from });
+
+                return { moved: 0 };
+            }
+
+            // An erasure of the guest has priority: it removes the guest's pins, so a merge that moved one now would leave it under the new
+            // account. The merge stops, and its own markers go.
+            const { erasing } = await context.runMutation(internal.lib.account_moves.isErasingFor, { userId: args.from });
+
+            if (erasing) {
+                await context.runMutation(internal.lib.account_moves.endAccountMoveFor, { kind: "importing", userId: args.to });
+                await context.runMutation(internal.lib.account_moves.endAccountMoveFor, { kind: "merging", userId: args.from });
+
+                return { moved: 0 };
+            }
+
+            const { until } = await context.runMutation(internal.lib.account_moves.pinWritesInFlightFor, { userId: args.from });
+
+            if (until !== null) {
+                // One extra second for clock skew between the writer and this job, so the lease has run out when the job runs.
+                await enqueueJob(internal.lib.account_merge.runGuestMerge, args, { delayMs: Math.max(0, until - Date.now()) + 1000, shardKey: args.to });
+
+                return { moved: 0 };
+            }
+
+            const moves: GuestPinMoves = {
+                listRoutes: async (routeUserId, cursor) =>
+                    await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, { cursor, userId: routeUserId }),
+                mergeRows: async () =>
+                    await mergeGuestInto(
+                        async (reference, callArgs, shardKey) => (await callOnShard(reference as never, callArgs as never, { shardKey })) as never,
+                        {
+                            deleteGuest: internal.auth.hooks.deleteMergedGuest,
+                            deleteRows: internal.lib.account_merge.deleteShardRows,
+                            importRows: internal.lib.account_merge.importShardRows,
+                            list: internal.lib.account_merge.listShardRowsPage,
+                            listIds: internal.lib.account_merge.listShardRowIds,
+                            markProbe: internal.lib.claim_once.claimKey,
+                            probeHeld: internal.lib.claim_once.claimHeld,
+                            reassignFollows: internal.lib.account_merge.reassignThreadFollowsPage,
+                            reassignGlobal: internal.lib.account_merge.reassignGlobalRows,
+                            releaseProbe: internal.lib.claim_once.releaseKey,
+                        },
+                        args.from,
+                        args.to,
+                    ),
+                moveBatch: async (route) =>
+                    await callOnShard(
+                        internal.chat.pins.functions.reassignUserPinsOnThread,
+                        { from: args.from, threadId: route.threadId as never, to: args.to },
+                        { shardKey: route.ownerId },
+                    ),
+            };
+
+            const result = await moveGuestPins(moves, args.from, args.to);
+
+            await context.runMutation(internal.lib.account_moves.endAccountMoveFor, { kind: "importing", userId: args.to });
+            await context.runMutation(internal.lib.account_moves.endAccountMoveFor, { kind: "merging", userId: args.from });
+
+            authLogger.info(`[auth] moved ${String(result.moved)} rows from guest ${args.from} to ${args.to}`);
+
+            return result;
+        } finally {
+            await context.runMutation(internal.lib.claim_once.releaseKey, { claimedAt, key: args.from, scope: GUEST_MERGE_SCOPE });
+        }
     });

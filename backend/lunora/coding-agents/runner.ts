@@ -50,6 +50,7 @@ import {
     TIMEOUT_EXIT_CODE,
 } from "./commands";
 import { expandSecrets, redactSecrets } from "./redact";
+import { completeTailLines } from "./setup-fix";
 import type { HostDriver } from "../source-control/driver";
 import { createBoundRequester, HostApiError } from "../source-control/origin-fetch";
 
@@ -90,6 +91,8 @@ export interface RunSpec {
     providerKey: string;
     repo: ParsedRepo;
     runId: string;
+    /** A fix run for a failed repository setup step: the script leaves that step out so the agent can repair it. */
+    skipRepoSetup?: boolean;
     /** Wall-clock budget for the whole run; also the sandbox's own lifetime. */
     timeoutMs: number;
 }
@@ -152,6 +155,7 @@ export const startRun = async (
             agent: spec.agent,
             ...(spec.branch !== undefined && { branch: spec.branch }),
             repo: spec.repo,
+            skipRepoSetup: spec.skipRepoSetup === true,
             timeoutSeconds: (spec.timeoutMs - WRAP_UP_MS) / 1000,
         });
 
@@ -243,6 +247,27 @@ export const pollRun = async (
     const rendered = input.agent === "claude_code" ? formatClaudeChunk(redacted) : { text: redacted };
 
     return { offset: input.offset + utf8Length(consumed), ...(status && { status }), ...rendered };
+};
+
+/** Bytes read from the end of the run log for "Fix setup": far more than the stored tail, so its last lines are whole. */
+export const SETUP_TAIL_READ_BYTES = 65_536;
+
+/**
+ * The end of the run log once a setup step has failed, redacted. A poll reads at most {@link READ_CHUNK_BYTES} from its
+ * offset, so the chunk it saw can stop well short of the failure; this reads the file's own end instead.
+ */
+export const readSetupLogTail = async (sandbox: Pick<SandboxHandle, "run">, secrets: ReadonlyArray<string>): Promise<string> => {
+    const result = await sandbox.run(`tail -c ${String(SETUP_TAIL_READ_BYTES)} ${RUN_LOG_PATH} 2>/dev/null`, {
+        cwd: "/home/user",
+        timeoutMs: COMMAND_TIMEOUT_MS,
+    });
+
+    // A failed read is an error, not an empty log: the caller then keeps the log its poll already has.
+    if (result.exitCode !== 0) {
+        throw new Error(`Reading the setup log tail exited with ${String(result.exitCode)}.`);
+    }
+
+    return redactSecrets(completeTailLines(result.stdout, utf8Length(result.stdout) >= SETUP_TAIL_READ_BYTES), secrets);
 };
 
 /**

@@ -93,7 +93,7 @@ export const vDeviceCallView = v.object({
     output: v.optional(v.string()),
     status: vDeviceCallStatus,
     taintedBy: v.array(vDeviceTaintSource),
-    threadId: v.string(),
+    threadId: v.optional(v.string()),
     toolName: v.string(),
     truncated: v.optional(v.boolean()),
 });

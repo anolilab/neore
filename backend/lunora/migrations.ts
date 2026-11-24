@@ -321,3 +321,15 @@ export const addRunArgsSystemContext = defineMigration({
     // `undefined` leaves every row untouched (`MigrationTransform`).
     up: () => undefined,
 });
+
+/**
+ * A session's stored purchase looks (`browserSessions.purchaseLooks`) gained an optional `browser`: the renderer session the look
+ * was read on (`browser/functions.ts#recordPurchaseLook`). Nothing to fill: a look without it reads as another browser, so its
+ * approved click is refused (`browser-node.ts`). A no-op, so `lunora prepare` records the added optional key in the baseline.
+ */
+export const addPurchaseLookBrowser = defineMigration({
+    id: "add-purchase-look-browser",
+    table: "browserSessions",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});

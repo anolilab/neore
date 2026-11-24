@@ -17,6 +17,7 @@ use std::time::Duration;
 
 use device_core::frame::{read_frame, stream_chunk_of, write_frame, CHUNK_TAG};
 use device_core::host::{run_request, RunParams};
+use device_core::test_dir::TestDir;
 use serde_json::{json, Value};
 use vectors::{Observed, Sandbox};
 
@@ -222,7 +223,8 @@ fn the_host_says_what_it_can_sandbox_before_anything_else() {
 #[test]
 fn the_vectors_give_the_same_results_in_process_and_over_stdio() {
     let sandbox = vectors::sandbox();
-    let (in_process_root, stdio_root) = (vectors::fixture("in-process"), vectors::fixture("stdio"));
+    let ((_in_process, in_process_root), (_stdio, stdio_root)) =
+        (vectors::fixture("in-process"), vectors::fixture("stdio"));
     let mut host = Host::start();
 
     host.next();
@@ -277,7 +279,7 @@ fn a_shell_command_is_refused_before_it_spawns_when_the_sandbox_is_required_and_
         return;
     }
 
-    let root = vectors::fixture("refusal");
+    let (_fixture, root) = vectors::fixture("refusal");
     let mut host = Host::start();
 
     host.next();
@@ -312,7 +314,7 @@ fn a_long_command_does_not_hold_up_a_file_read() {
         return;
     }
 
-    let root = vectors::fixture("concurrent");
+    let (_fixture, root) = vectors::fixture("concurrent");
     let mut host = Host::start();
 
     host.next();
@@ -339,7 +341,7 @@ fn a_long_command_does_not_hold_up_a_file_read() {
 #[cfg(unix)]
 #[test]
 fn a_command_in_flight_is_still_stopped_by_its_timeout_after_stdin_closes() {
-    let root = vectors::fixture("eof-in-flight");
+    let (_fixture, root) = vectors::fixture("eof-in-flight");
     let mut host = Host::start();
 
     host.next();
@@ -432,7 +434,7 @@ fn the_host_refuses_to_start_without_stdio() {
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 #[test]
 fn the_host_holds_no_socket() {
-    let root = vectors::fixture("sockets");
+    let (_fixture, root) = vectors::fixture("sockets");
     let mut host = Host::start();
 
     host.next();
@@ -532,17 +534,18 @@ fn the_host_sees_only_the_clean_environment() {
 }
 
 /// A folder of `names`, each holding its own name, to list and archive.
-fn folder_of(label: &str, names: &[&str]) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("neore-host-files-{label}-{}", std::process::id()));
+fn folder_of(label: &str, names: &[&str]) -> (TestDir, PathBuf) {
+    let dir = TestDir::new(&format!("host-files-{label}"));
 
-    let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(dir.join("root")).unwrap();
 
     for name in names {
         std::fs::write(dir.join("root").join(name), name).unwrap();
     }
 
-    std::fs::canonicalize(dir.join("root")).unwrap()
+    let root = std::fs::canonicalize(dir.join("root")).unwrap();
+
+    (dir, root)
 }
 
 fn files(root: &Path, path: &str) -> Value {
@@ -551,7 +554,7 @@ fn files(root: &Path, path: &str) -> Value {
 
 #[test]
 fn a_folder_is_listed_a_page_at_a_time_inside_the_shared_folders() {
-    let root = folder_of("list", &["e", "b", "d", "a", "c"]);
+    let (_dir, root) = folder_of("list", &["e", "b", "d", "a", "c"]);
     let mut host = Host::start();
 
     host.next();
@@ -634,7 +637,7 @@ mod tar {
 
     #[test]
     fn a_folder_streams_as_chunks_then_a_response_that_says_what_it_holds() {
-        let root = folder_of("tar", &["one", "two"]);
+        let (_dir, root) = folder_of("tar", &["one", "two"]);
         let mut host = Host::start();
 
         host.next();
@@ -672,7 +675,7 @@ mod tar {
     /// ends the archive.
     #[test]
     fn a_cancel_stops_an_archive_that_is_still_being_written() {
-        let root = folder_of("cancel", &[]);
+        let (_dir, root) = folder_of("cancel", &[]);
 
         std::fs::write(root.join("big"), vec![7u8; 24 * 1024 * 1024]).unwrap();
 
@@ -803,13 +806,8 @@ fn wait_for_file(file: &Path) -> String {
 }
 
 #[cfg(unix)]
-fn agent_folder(label: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("neore-host-agent-{label}-{}", std::process::id()));
-
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).unwrap();
-
-    dir.canonicalize().unwrap()
+fn agent_folder(label: &str) -> TestDir {
+    TestDir::new(&format!("host-agent-{label}")).canonical()
 }
 
 #[cfg(unix)]

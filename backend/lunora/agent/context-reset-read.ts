@@ -4,7 +4,8 @@
  */
 import { v } from "lunorash/server";
 
-import { internalQuery } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
+import { internalQuery, type QueryCtx } from "../_generated/server";
 import { leafRowOf } from "./agent-switch";
 import { getThreadRow } from "./branch-rows";
 import { resetForTip } from "./context-reset";
@@ -16,21 +17,31 @@ export const getContextReset = internalQuery
     })
     /** `branched`: whether the thread ever branched, so a reader without a named prompt knows if its rows are all on one path. */
     .output(v.union(v.object({ branched: v.boolean(), order: v.number() }), v.null()))
-    .query(async ({ args, ctx }) => {
-        const thread = await ctx.db.get("threads", args.threadId);
+    .query(async ({ args, ctx }) => await contextResetOf(ctx, args.threadId, args.promptMessageId));
 
-        // Unset = never cleared: nothing to cut, and no path is walked.
-        if (!thread?.hasContextReset) {
-            return null;
-        }
+/**
+ * The context reset (`/clear`) the tip of the thread's path (or of `promptMessageId`) holds, or `null`. Shared by the reader and by a
+ * write that must check the reset in its own transaction (`agent/followup-suggestions.ts`).
+ */
+export const contextResetOf = async (
+    ctx: Pick<QueryCtx, "db">,
+    threadId: Id<"threads">,
+    promptMessageId?: Id<"messages">,
+): Promise<{ branched: boolean; order: number } | null> => {
+    const thread = await ctx.db.get("threads", threadId);
 
-        const tip = args.promptMessageId ? await getThreadRow(ctx, args.threadId, args.promptMessageId) : await leafRowOf(ctx, thread);
+    // Unset = never cleared: nothing to cut, and no path is walked.
+    if (!thread?.hasContextReset) {
+        return null;
+    }
 
-        if (!tip) {
-            return null;
-        }
+    const tip = promptMessageId ? await getThreadRow(ctx as QueryCtx, threadId, promptMessageId) : await leafRowOf(ctx as QueryCtx, thread);
 
-        const reset = await resetForTip(ctx, thread, tip);
+    if (!tip) {
+        return null;
+    }
 
-        return reset ? { branched: thread.activeLeafMessageId !== undefined, order: reset.order } : null;
-    });
+    const reset = await resetForTip(ctx as QueryCtx, thread, tip);
+
+    return reset ? { branched: thread.activeLeafMessageId !== undefined, order: reset.order } : null;
+};

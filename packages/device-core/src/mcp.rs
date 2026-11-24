@@ -844,10 +844,11 @@ impl McpManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_dir::TestDir;
 
-    /// A state root of this test's own, under the OS temp folder.
-    fn temp_root(name: &str) -> PathBuf {
-        std::env::temp_dir().join(format!("neore-mcp-test-{name}-{}", std::process::id()))
+    /// A state root of this test's own, under the OS temp folder, removed when the test ends.
+    fn temp_root(name: &str) -> TestDir {
+        TestDir::at(&format!("mcp-test-{name}"))
     }
 
     #[test]
@@ -877,7 +878,8 @@ sleep 1
             name: "fake".into(),
             network: NetworkTier::Off,
         };
-        let mut process = McpProcess::spawn(&config, None, &temp_root("speaks")).unwrap();
+        let root = temp_root("speaks");
+        let mut process = McpProcess::spawn(&config, None, &root).unwrap();
 
         let tools = process.list_tools().unwrap();
         assert_eq!(tools.len(), 1);
@@ -903,7 +905,8 @@ sleep 1
             name: "fake".into(),
             network: NetworkTier::Off,
         };
-        let manager = McpManager::new(temp_root("restart-config"));
+        let root = temp_root("restart-config");
+        let manager = McpManager::new(root.to_path_buf());
 
         let first = manager.process(&config("1"), None).unwrap();
         assert!(Arc::ptr_eq(
@@ -927,7 +930,9 @@ sleep 1
             network: NetworkTier::Off,
         };
 
-        assert!(McpProcess::spawn(&config, None, &temp_root("dead")).is_err());
+        let root = temp_root("dead");
+
+        assert!(McpProcess::spawn(&config, None, &root).is_err());
     }
 
     // ── Sandboxed servers ────────────────────────────────────────────────────
@@ -935,7 +940,7 @@ sleep 1
     /// Folders for a sandbox test: a shared folder, an outside one holding a secret, and a stand-in home.
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     struct Folders {
-        base: PathBuf,
+        base: TestDir,
         home: PathBuf,
         outside: PathBuf,
         shared: PathBuf,
@@ -966,13 +971,6 @@ sleep 1
                 network,
                 ..Policy::for_roots(std::slice::from_ref(&self.shared), Some(&self.home))
             }
-        }
-    }
-
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
-    impl Drop for Folders {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.base);
         }
     }
 
@@ -1273,7 +1271,8 @@ sleep 1"#
     #[cfg(unix)]
     #[test]
     fn a_replacement_that_cannot_start_leaves_the_old_server_stopped() {
-        let manager = McpManager::new(temp_root("replace-fails"));
+        let root = temp_root("replace-fails");
+        let manager = McpManager::new(root.to_path_buf());
         let old = manager.process(&idle_server("svc"), None).unwrap();
         let pid = old.lock().unwrap().child.id() as libc::pid_t;
 
@@ -1297,7 +1296,7 @@ sleep 1"#
         use std::time::{Duration, Instant};
 
         let root = temp_root("forget-in-flight");
-        let manager = Arc::new(McpManager::new(root.clone()));
+        let manager = Arc::new(McpManager::new(root.to_path_buf()));
         let entered = Arc::new(AtomicBool::new(false));
 
         // A call on `gone` holds its server's lock, then the server dies under it.
@@ -1351,7 +1350,7 @@ sleep 1"#
     #[test]
     fn stopping_a_refused_server_kills_it_and_keeps_its_folder() {
         let root = temp_root("refused");
-        let manager = McpManager::new(root.clone());
+        let manager = McpManager::new(root.to_path_buf());
         let old = manager.process(&idle_server("svc"), None).unwrap();
         let folder = root.join(sanitize("svc"));
 
@@ -1416,15 +1415,13 @@ sleep 1"#
             wait_until(|| pid_gone(orphan)),
             "the group outlived the server"
         );
-
-        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[cfg(unix)]
     #[test]
     fn stopping_a_server_twice_signals_its_group_once() {
-        let mut process =
-            McpProcess::spawn(&idle_server("twice"), None, &temp_root("twice")).unwrap();
+        let root = temp_root("twice");
+        let mut process = McpProcess::spawn(&idle_server("twice"), None, &root).unwrap();
 
         process.kill();
         assert!(process.reaped);
@@ -1440,7 +1437,6 @@ sleep 1"#
         use std::os::unix::fs::{symlink, PermissionsExt};
 
         let root = temp_root("state-trust");
-        let _ = std::fs::remove_dir_all(&root);
 
         let state = prepare_state(&root, "ok").unwrap();
 
@@ -1471,17 +1467,13 @@ sleep 1"#
         std::fs::create_dir_all(&loose).unwrap();
         std::fs::set_permissions(&loose, std::fs::Permissions::from_mode(0o777)).unwrap();
         assert!(prepare_state(&loose, "x").unwrap_err().contains("private"));
-
-        let _ = std::fs::remove_dir_all(&root);
-        let _ = std::fs::remove_dir_all(&elsewhere);
-        let _ = std::fs::remove_dir_all(&loose);
     }
 
     #[cfg(unix)]
     #[test]
     fn forgetting_waits_for_a_call_in_flight_before_deleting_its_folder() {
         let root = temp_root("forget-busy");
-        let manager = Arc::new(McpManager::new(root.clone()));
+        let manager = Arc::new(McpManager::new(root.to_path_buf()));
         let config = idle_server("busy");
         let folder = root.join(sanitize("busy"));
 
@@ -1515,15 +1507,13 @@ sleep 1"#
             "the folder was deleted under a running call"
         );
         assert!(manager.processes.lock().unwrap().is_empty());
-
-        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[cfg(unix)]
     #[test]
     fn forgetting_a_name_stops_a_server_whose_name_shares_its_folder() {
         let root = temp_root("forget-alias");
-        let manager = McpManager::new(root.clone());
+        let manager = McpManager::new(root.to_path_buf());
 
         std::fs::create_dir_all(root.join("old_name")).unwrap();
         manager.process(&idle_server("old_name"), None).unwrap();
@@ -1534,14 +1524,12 @@ sleep 1"#
 
         assert!(manager.processes.lock().unwrap().is_empty());
         assert!(!root.join(sanitize("old_name")).exists());
-
-        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
     fn forgetting_a_server_removes_its_private_folder() {
         let root = temp_root("forget");
-        let manager = McpManager::new(root.clone());
+        let manager = McpManager::new(root.to_path_buf());
         let state = prepare_state(&root, "Docs Server").unwrap();
 
         std::fs::write(state.join("cache.bin"), "x").unwrap();
@@ -1551,8 +1539,6 @@ sleep 1"#
         manager.forget(&["Docs Server".to_owned()]);
 
         assert!(!state.exists());
-
-        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]

@@ -89,7 +89,8 @@ export const toolPermissionKey = (source: ToolSource, toolName: string, owner?: 
  * own provider key on a long sandbox run and can push to their GitHub;
  * `delegateToSubAgent` and `messageWorker` start a background run charged to their task quota —
  * so the user sees the task before anything starts. `replyToReviewComment` and `rerunFailedChecks` act on a pull request
- * as the user (`mergePullRequest` asks every time: it needs a person). Headless callers lose them
+ * as the user (`mergePullRequest` asks every time: it needs a person; so does `signInWithSavedLogin`, which types a saved
+ * password for them). Headless callers lose them
  * (`ask` degrades to `off`), which is intended — except a sub-agent's own
  * delegation, which inherits the consent its parent call was given
  * (`sub-agents/execute.ts`).
@@ -103,6 +104,7 @@ export const BUILTIN_TOOLS_ASK_BY_DEFAULT: ReadonlySet<string> = new Set([
     "replyToReviewComment",
     "requestSecret",
     "rerunFailedChecks",
+    "signInWithSavedLogin",
 ]);
 
 const SUB_AGENT_BUILTINS: ReadonlySet<string> = new Set(["delegateToSubAgent", "messageWorker"]);
@@ -340,6 +342,27 @@ const needsApprovalUnless =
     };
 
 /**
+ * An `ask` tool that reads its target before it asks (`looksBeforeAsk`, the browser's clicks): its own `needsApproval` runs with
+ * `asking` set, so its read is kept for the approved click, and the call always asks. A read that throws still asks; its
+ * empty record then refuses the approved click.
+ */
+const askAfterLook = (own: OwnApproval): OwnApproval =>
+    async function needsApprovalAfterLook(this: unknown, input: unknown, options: NeedsApprovalOptions): Promise<boolean> {
+        try {
+            if (typeof own === "function") {
+                await (own as (this: unknown, input: unknown, options: unknown) => unknown).call(this, input, { ...options, asking: true });
+            }
+        } catch {
+            // The read failed: the call still asks, and its record stays empty.
+        }
+
+        // Always asks. A call whose preread skipped the look (no action budget then) must not reach `execute` unapproved: a budget
+        // freed before `execute` would let an ordinary-looking click run that nobody approved. The approval is then refused at
+        // `execute` (no record), which fails closed.
+        return true;
+    } as OwnApproval;
+
+/**
  * A timed allow's check: once the grant has lapsed the call asks (unless the quick check clears it), and it still asks
  * whenever the tool's own check does. A tool can decide per call that a person must click (a message to a worker on a
  * computer), and neither a grant nor the quick check lifts that.
@@ -356,11 +379,36 @@ const withLapse = (own: OwnApproval, expiresAt: number, afterLapse: AfterLapse):
     }
 
     return function needsApprovalOrLapsed(this: unknown, input: never, options: never) {
-        const ownAnswer = (own as (this: unknown, input: never, options: never) => boolean | Promise<boolean>).call(this, input, options);
-        const settle = (asked: boolean): boolean | Promise<boolean> => asked || lapsed(input, options);
+        // A call made after the lapse asks, so the tool's own check is asked as an ask is (`asking`): its decision keeps the
+        // target it reads, and the approved click is checked against it. A call inside the grant is looked at as before.
+        const isLapsed = Date.now() >= expiresAt;
+        const ownOptions = isLapsed ? ({ ...(options as NeedsApprovalOptions), asking: true } as never) : options;
+        const ownAnswer = (own as (this: unknown, input: never, options: never) => boolean | Promise<boolean>).call(this, input, ownOptions);
+        // The grant can run out during the tool's own check (a renderer read takes seconds). A check that started inside the grant
+        // ran without asking, so it recorded nothing: it runs again, asking, so the approved click has a target to be checked against.
+        const settle = async (asked: boolean): Promise<boolean> => {
+            if (asked) {
+                return true;
+            }
+
+            const isLapsedNow = await lapsed(input, options);
+
+            if (isLapsedNow && !isLapsed) {
+                try {
+                    await (own as (this: unknown, input: never, options: never) => unknown).call(this, input, {
+                        ...(options as NeedsApprovalOptions),
+                        asking: true,
+                    } as never);
+                } catch {
+                    // The look failed: the call still asks, and its record stays empty.
+                }
+            }
+
+            return isLapsedNow;
+        };
 
         return typeof ownAnswer === "boolean" ? settle(ownAnswer) : ownAnswer.then(settle);
-    } as OwnApproval;
+    } as unknown as OwnApproval;
 };
 
 /**
@@ -405,7 +453,16 @@ export const applyToolPermissions = (
 
         if (mode === "ask") {
             requiresApproval.push(name);
-            result[name] = { ...tool, needsApproval: check ? needsApprovalUnless(check, descriptor) : true } as ToolSet[string];
+
+            let askAnswer: OwnApproval = true;
+
+            if (check) {
+                askAnswer = needsApprovalUnless(check, descriptor);
+            } else if ((tool as { looksBeforeAsk?: boolean }).looksBeforeAsk === true) {
+                askAnswer = askAfterLook(tool.needsApproval);
+            }
+
+            result[name] = { ...tool, needsApproval: askAnswer } as ToolSet[string];
             continue;
         }
 
