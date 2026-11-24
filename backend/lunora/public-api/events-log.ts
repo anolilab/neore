@@ -67,7 +67,13 @@ export const recordRunEnd = async (
     input: { outcome: "succeeded" | "failed"; starterId?: string; streamId: string; threadId: string },
 ): Promise<void> => {
     const thread = await ctx.db.get("threads", input.threadId as Id<"threads">);
-    const owner = thread?.userId ?? input.starterId;
+
+    // A thread row that is gone was deleted: its run's log is not reachable from this shard, so nothing is recorded here.
+    if (!thread) {
+        return;
+    }
+
+    const owner = thread.userId ?? input.starterId;
 
     if (owner === undefined) {
         return;

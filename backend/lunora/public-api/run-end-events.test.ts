@@ -297,6 +297,28 @@ describe("a run whose thread has no owner in the Events log", () => {
     });
 });
 
+describe("a run whose thread row was deleted in the Events log", () => {
+    it("records nothing, since the log is not reachable from the shard the run ends on", async () => {
+        const gone = await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "Gone", userId: OWNER }));
+        const goneStream = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    messageId: "gone-prompt",
+                    status: "streaming",
+                    streamingConfig: { contentType: "text", model: "test-model" },
+                    threadId: gone,
+                    userId: "collaborator",
+                }),
+        );
+
+        await harness.run(async (ctx: any) => await ctx.db.delete("threads", gone));
+        await harness.run(async (ctx: any) => await ctx.runMutation(addChunk, { final: true, runEnd: "succeeded", streamId: goneStream, text: "Done." }));
+
+        expect(await eventsOf()).toStrictEqual([]);
+    });
+});
+
 describe("a run that ends without its own final chunk in the Events log", () => {
     it("writes one run.failed when a live stream is set to error", async () => {
         await harness.run(async (ctx: any) => await ctx.runMutation(setStreamStatus, { status: "error", streamId }));
