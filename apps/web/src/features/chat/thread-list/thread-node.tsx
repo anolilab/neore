@@ -57,6 +57,7 @@ import { THREAD_CATEGORY_LABELS } from "@/features/chat/tags/thread-categories";
 import ThreadTagChips from "@/features/chat/tags/thread-tag-chips";
 import ThreadTagsMenu from "@/features/chat/tags/thread-tags-menu";
 import { usePullRequestCount } from "@/features/develop/components/pull-request-counts";
+import { focusThreadSearchToggle } from "@/features/keyboard/lib/thread-search-target";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { useHasOpened } from "@/hooks/use-has-opened";
 import { LOAD_MARKS, useLoadMarkWhenVisible } from "@/lib/analytics/load-marks";
@@ -1093,6 +1094,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                                 return;
                                             }
 
+                                            // The row leaves at once and takes this button with it, so focus goes to the search toggle first, which stays.
+                                            focusThreadSearchToggle();
                                             handleDeleteThread(node.threadId);
                                         }}
                                         size="icon-sm"
@@ -1118,6 +1121,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
 
                                 handleDeleteThread(node.threadId);
                                 setShowDeleteDialog(false);
+                                // The dialog returns focus to the button that opened it on close, and that button leaves with the row: the toggle gets focus after the return.
+                                globalThis.setTimeout(focusThreadSearchToggle, 0);
                             }}
                             onOpenChange={setShowDeleteDialog}
                             open={showDeleteDialog}
