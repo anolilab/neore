@@ -255,6 +255,13 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     const [pendingDelete, setPendingDelete] = useState<{ run: () => void } | undefined>(undefined);
     // Set by the delete prompt's own confirm, so closing it after a confirm does not bring the palette back.
     const deleteConfirmedRef = useRef(false);
+
+    // Every new prompt starts unconfirmed: the dialog's action button does not always go through its close callback.
+    useEffect(() => {
+        if (pendingDelete !== undefined) {
+            deleteConfirmedRef.current = false;
+        }
+    }, [pendingDelete]);
     // Leaving the open chat drops its pending delete, so a confirm cannot delete a chat other than the one the prompt was opened from.
     useEffect(() => () => setPendingDelete(undefined), [currentThreadId]);
     // The filters and the project the palette is narrowed to. Each closes with the palette.
