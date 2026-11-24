@@ -9,6 +9,8 @@ import { MAX_LENGTH } from "../lib/validators";
 import schema from "../schema";
 import { connectorTrustId, MAX_TRUSTED_SERVERS, mcpTrustId } from "./lib/low-risk-trust";
 import { MAX_TOOL_GRANTS } from "./lib/tool-permission-grants";
+import { ALWAYS_ALLOW_REFUSED_BUILTINS } from "./lib/tool-permissions";
+import { ToolName } from "./tools";
 import {
     consumeLowRiskCheck,
     getLowRiskApprovalContext,
@@ -179,6 +181,67 @@ describe("recordApprovalPreference", () => {
         await record("hour", KEY);
 
         expect(await grantsOf()).toStrictEqual({ [KEY]: NOW + 3_600_000 });
+    });
+});
+
+describe("Always allow on a tool that spends money or sends out as the person", () => {
+    const PAID_KEYS = [...ALWAYS_ALLOW_REFUSED_BUILTINS].map((name) => `builtin:${name}`);
+    const TODAY_END = Date.UTC(2026, 9, 31, 0, 0);
+
+    const overridesOf = async (): Promise<Record<string, string> | undefined> => {
+        const row = await stored();
+
+        return row?.toolPermissions;
+    };
+
+    it("names only real built-in tools, so a rename cannot quietly drop one from the list", () => {
+        const builtins = new Set<string>(Object.values(ToolName));
+
+        for (const name of ALWAYS_ALLOW_REFUSED_BUILTINS) {
+            expect(builtins.has(name)).toBe(true);
+        }
+    });
+
+    it.each(PAID_KEYS)("refuses Always for %s and stores no auto", async (key) => {
+        await expect(record("always", key)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+        expect(await stored()).toBeNull();
+    });
+
+    it.each(PAID_KEYS)("still stores an hour allow for %s, without an override", async (key) => {
+        await record("hour", key);
+
+        expect(await grantsOf()).toStrictEqual({ [key]: NOW + 3_600_000 });
+        expect(await overridesOf()).toBeUndefined();
+    });
+
+    it.each(PAID_KEYS)("still stores a today allow for %s, without an override", async (key) => {
+        await record("today", key);
+
+        expect(await grantsOf()).toStrictEqual({ [key]: TODAY_END });
+        expect(await overridesOf()).toBeUndefined();
+    });
+
+    it("leaves a running hour allow as it was when Always is refused", async () => {
+        const key = "builtin:imageGeneration";
+
+        await record("hour", key);
+        await expect(record("always", key)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+        expect(await grantsOf()).toStrictEqual({ [key]: NOW + 3_600_000 });
+        expect(await overridesOf()).toBeUndefined();
+    });
+
+    it("still grants Always for a free built-in", async () => {
+        await record("always", "builtin:weather");
+
+        expect(await overridesOf()).toStrictEqual({ "builtin:weather": "auto" });
+    });
+
+    it("refuses only the built-in itself: an MCP tool with the same name is still grantable", async () => {
+        await record("always", "mcp:Images:imageGeneration");
+
+        expect(await overridesOf()).toStrictEqual({ "mcp:Images:imageGeneration": "auto" });
     });
 });
 

@@ -109,6 +109,33 @@ export const BUILTIN_TOOLS_ASK_BY_DEFAULT: ReadonlySet<string> = new Set([
 
 const SUB_AGENT_BUILTINS: ReadonlySet<string> = new Set(["delegateToSubAgent", "messageWorker"]);
 
+/**
+ * Built-ins that "Always allow" never grants. Each one spends money or sends something out as the person, and a stored
+ * `auto` would let every later call run unasked. An `always` answer for them is refused and the call still asks; an hour
+ * or today allow is unaffected.
+ *
+ * - imageGeneration, imageEditing, videoGeneration, musicGeneration: paid per generation on a metered provider (FAL),
+ *   each one counted against the user's daily bucket.
+ * - delegateToCodingAgent: spends the user's own provider key on a sandbox run that can push to their GitHub.
+ * - delegateToSubAgent, messageWorker: start a run charged to the task quota, or send more work to a worker.
+ * - replyToReviewComment: posts a comment on a pull request as the person.
+ *
+ * `tool-permissions.grants.test.ts` checks that every name here is a real built-in.
+ */
+export const ALWAYS_ALLOW_REFUSED_BUILTINS: ReadonlySet<string> = new Set([
+    "delegateToCodingAgent",
+    "delegateToSubAgent",
+    "imageEditing",
+    "imageGeneration",
+    "messageWorker",
+    "musicGeneration",
+    "replyToReviewComment",
+    "videoGeneration",
+]);
+
+/** Whether an `always` answer for this permission key is refused: a built-in listed in {@link ALWAYS_ALLOW_REFUSED_BUILTINS}. */
+export const isAlwaysAllowRefused = (key: string): boolean => key.startsWith("builtin:") && ALWAYS_ALLOW_REFUSED_BUILTINS.has(key.slice("builtin:".length));
+
 export { BUILTIN_TOOLS_NEEDING_A_PERSON } from "./person-tools";
 
 /**
