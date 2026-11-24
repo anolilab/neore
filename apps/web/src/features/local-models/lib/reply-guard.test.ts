@@ -90,6 +90,21 @@ describe(createReplyGuard, () => {
         expect(feedContent(guard, longBlock.repeat(LOCAL_REPEAT_LIMIT))).toBe("repeat-loop");
     });
 
+    it("does not join identical lines that are separated by many blank lines", () => {
+        expect.assertions(1);
+
+        // Six copies of one substantial line, each followed by five blank lines: they are not a run of consecutive lines.
+        const spaced = `${"A substantial line of formatted output.\n\n\n\n\n\n".repeat(LOCAL_REPEAT_LIMIT)}`;
+
+        expect(feedContent(createReplyGuard(), spaced)).toBeUndefined();
+    });
+
+    it("still stops a loop whose repeats are separated by one blank line", () => {
+        expect.assertions(1);
+
+        expect(feedContent(createReplyGuard(), "Let me try that again.\n\n".repeat(LOCAL_REPEAT_LIMIT))).toBe("repeat-loop");
+    });
+
     it("does not treat nested lines that differ only in indentation as a repeat", () => {
         expect.assertions(1);
 

@@ -84,14 +84,10 @@ export const createReplyGuard = (): ReplyGuard => {
                 newline = text.indexOf("\n", offset);
 
                 // Indentation is part of a line: nested code lines that differ only in depth are not repeats.
+                // A blank line stays in the window as a line: lines that are not next to each other are not one run.
                 const line = partial.trimEnd();
 
                 partial = "";
-
-                if (!line.trim()) {
-                    continue;
-                }
-
                 lines.push(line);
 
                 if (lines.length > WINDOW_LINES) {

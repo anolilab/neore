@@ -532,7 +532,7 @@ const MessageItem: FC<MessageItemProps> = memo(
                 {message.role === "assistant" && message.status === "failed" && isLast && (
                     <Button className="mb-2 h-7 gap-1.5 text-xs" onClick={handleReload} size="sm" variant="outline">
                         <RefreshCwIcon aria-hidden="true" className="size-3" />
-                        {t`Continue`}
+                        <Trans>Continue</Trans>
                     </Button>
                 )}
             </>
