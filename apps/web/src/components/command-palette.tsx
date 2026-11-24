@@ -46,6 +46,7 @@ import type { FC } from "react";
 import React, { useEffect, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 
+import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
 import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
@@ -250,6 +251,8 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
 
     // The palette's input text: message search follows it, and picking a project clears it.
     const [searchInput, setSearchInput] = useState("");
+    // The thread delete waiting for confirmation. It opens the same destructive dialog the sidebar row uses.
+    const [pendingDelete, setPendingDelete] = useState<{ run: () => void } | undefined>(undefined);
     // The filters and the project the palette is narrowed to. Each closes with the palette.
     const [scope, setScope] = useState<PaletteScope>(NO_PALETTE_SCOPE);
     const [projectFilter, setProjectFilter] = useState<ProjectFilter | undefined>(undefined);
@@ -347,8 +350,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     const { hasMore: hasMoreProjects, isError: isProjectListFailed, projects } = useProjectList(shouldQuery && scope.projects);
 
     const setLoadingStates = () => {};
-    const { askFirst, confirmBeforeDelete, confirmDialog, handleCreateBranch, handlePinThread, handleUnpinThread, updateThread } =
-        useThreadHandlers(setLoadingStates);
+    const { confirmBeforeDelete, confirmDialog, handleCreateBranch, handlePinThread, handleUnpinThread, updateThread } = useThreadHandlers(setLoadingStates);
     // An admin acting as the owner may not archive or delete their chats: the server refuses both.
     const isImpersonating = useImpersonating();
 
@@ -538,15 +540,10 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         close();
     };
 
-    // With the setting on, the palette closes and the confirmation opens; the delete runs only on confirm.
+    // With the setting on, the palette closes and the destructive dialog opens; the delete runs only on confirm.
     const askBeforeDelete = (run: () => void) => {
         close();
-        askFirst({
-            confirmLabel: t`Delete`,
-            description: t`Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation.`,
-            run,
-            title: t`Delete thread?`,
-        });
+        setPendingDelete({ run });
     };
 
     const handleDeleteCurrentThread = () => {
@@ -872,6 +869,22 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     return (
         <>
             {confirmDialog}
+            <DeleteConfirmationDialog
+                description={t`Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation.`}
+                onConfirm={() => {
+                    const pending = pendingDelete;
+
+                    setPendingDelete(undefined);
+                    pending?.run();
+                }}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setPendingDelete(undefined);
+                    }
+                }}
+                open={pendingDelete !== undefined}
+                title={t`Delete thread?`}
+            />
             <CommandDialog
                 onOpenChange={(newOpen) => {
                     setOpen(newOpen);

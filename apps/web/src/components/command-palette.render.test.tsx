@@ -415,15 +415,11 @@ describe("command palette thread delete confirmation", () => {
         fireEvent.click(await screen.findByRole("button", { name: "Delete thread" }));
 
         expect(harness.deleteBranch).not.toHaveBeenCalled();
-        expect(harness.askFirst).toHaveBeenCalledTimes(1);
+        expect(harness.askFirst).not.toHaveBeenCalled();
+        // The same destructive dialog the sidebar row opens; nothing deletes until its delete button is pressed.
+        expect(await screen.findByText("Delete thread?")).toBeTruthy();
 
-        const request = harness.askFirst.mock.calls[0]?.[0] as { run: () => void; title: string };
-
-        expect(request.title).toBe("Delete thread?");
-
-        await act(async () => {
-            request.run();
-        });
+        fireEvent.click(screen.getByRole("button", { name: "Delete" }));
 
         expect(harness.deleteBranch).toHaveBeenCalledWith("thread-1");
     });
@@ -447,15 +443,10 @@ describe("command palette thread delete confirmation", () => {
         fireEvent.click(await screen.findByRole("option", { name: "Delete thread" }));
 
         expect(harness.deleteBranch).not.toHaveBeenCalled();
-        expect(harness.askFirst).toHaveBeenCalledTimes(1);
+        expect(harness.askFirst).not.toHaveBeenCalled();
+        expect(await screen.findByText("Delete thread?")).toBeTruthy();
 
-        const request = harness.askFirst.mock.calls[0]?.[0] as { run: () => void; title: string };
-
-        expect(request.title).toBe("Delete thread?");
-
-        await act(async () => {
-            request.run();
-        });
+        fireEvent.click(screen.getByRole("button", { name: "Delete" }));
 
         expect(harness.deleteBranch).toHaveBeenCalledWith("thread-1");
     });
