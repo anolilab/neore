@@ -10585,8 +10585,8 @@ msgid "Delete Open Thread"
 msgstr "開いているスレッドを削除"
 
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:78
-msgid "Delete open thread (asks first)"
-msgstr "開いているスレッドを削除（確認あり）"
+msgid "Delete open thread"
+msgstr "開いているスレッドを削除"
 
 #: src/features/auth/components/organization/delete-organization-card.tsx:37
 #: src/features/auth/components/organization/delete-organization-card.tsx:42

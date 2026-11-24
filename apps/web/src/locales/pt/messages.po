@@ -10585,8 +10585,8 @@ msgid "Delete Open Thread"
 msgstr "Excluir conversa aberta"
 
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:78
-msgid "Delete open thread (asks first)"
-msgstr "Excluir a conversa aberta (pede confirmação)"
+msgid "Delete open thread"
+msgstr "Excluir o tópico aberto"
 
 #: src/features/auth/components/organization/delete-organization-card.tsx:37
 #: src/features/auth/components/organization/delete-organization-card.tsx:42
