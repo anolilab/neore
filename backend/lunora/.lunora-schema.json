@@ -7372,6 +7372,12 @@
     "embeddings_1024": {
       "commitOrdered": false,
       "fields": {
+        "archived": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "model": {
           "kind": "string",
           "nullable": false,
@@ -7450,6 +7456,12 @@
     "embeddings_128": {
       "commitOrdered": false,
       "fields": {
+        "archived": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "model": {
           "kind": "string",
           "nullable": false,
@@ -7528,6 +7540,12 @@
     "embeddings_1408": {
       "commitOrdered": false,
       "fields": {
+        "archived": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "model": {
           "kind": "string",
           "nullable": false,
@@ -7606,6 +7624,12 @@
     "embeddings_1536": {
       "commitOrdered": false,
       "fields": {
+        "archived": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "model": {
           "kind": "string",
           "nullable": false,
@@ -7684,6 +7708,12 @@
     "embeddings_256": {
       "commitOrdered": false,
       "fields": {
+        "archived": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "model": {
           "kind": "string",
           "nullable": false,
@@ -7762,6 +7792,12 @@
     "embeddings_512": {
       "commitOrdered": false,
       "fields": {
+        "archived": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "model": {
           "kind": "string",
           "nullable": false,
@@ -7840,6 +7876,12 @@
     "embeddings_768": {
       "commitOrdered": false,
       "fields": {
+        "archived": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "model": {
           "kind": "string",
           "nullable": false,
