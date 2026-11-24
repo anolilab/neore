@@ -22,6 +22,7 @@ import {
     chatFileSectionBudget,
     collectAllChatFileMetadata,
     collectAllMessageFileIds,
+    readChunkMetadata,
     textBytes,
     walkIds,
     withChatFiles,
@@ -31,6 +32,7 @@ import {
     CHAT_FILE_HASH_MAX,
     CHAT_FILE_NAME_MAX,
     chatFileMetadataForExport,
+    repairChatFileMetadataForExport,
     collectGrantedChatFileIdsForExport,
     collectMessageFileIdsForExport,
     collectThreadIdsForExport,
@@ -169,7 +171,20 @@ const exportedFor = async (userId: string): Promise<{ files: ExportedFile[]; pag
                     )) as IdsPage,
                 meter,
             ),
-        async (fileIds) => await harness.run(async (ctx: any) => await ctx.runQuery(chatFileMetadataForExport, { fileIds })),
+        async (fileIds) =>
+            await readChunkMetadata(
+                fileIds,
+                async (ids) =>
+                    (await harness.run(async (ctx: any) => await ctx.runQuery(chatFileMetadataForExport, { fileIds: ids }))) as {
+                        readBytes: number;
+                        rows: ExportedFile[];
+                    },
+                async (ids) =>
+                    (await harness.run(async (ctx: any) => await ctx.runMutation(repairChatFileMetadataForExport, { fileIds: ids }))) as {
+                        readBytes: number;
+                        rows: ExportedFile[];
+                    },
+            ),
         CHAT_FILE_METADATA_CHUNK,
         chatFileMeter(),
     )) as { rows: ExportedFile[]; truncated: boolean };
@@ -275,9 +290,10 @@ describe("chat files in the GDPR export", () => {
 
             await Promise.all(page.map(async (row: any) => await ctx.db.delete("chatFileMetadata", row._id)));
         });
+        // The export repairs the missing row from the file (`repairChatFileMetadataForExport`), so the file is still exported.
         const before = await exportedFor(A);
 
-        expect(before.files.map((file) => file.id)).not.toContain(fileId);
+        expect(before.files.map((file) => file.id)).toContain(fileId);
 
         await store(A, "retried.png", "hash-retried");
 
@@ -303,6 +319,37 @@ describe("chat files in the GDPR export", () => {
         const after = await exportedFor(A);
 
         expect(after.files.map((file) => file.id)).toContain(fileId);
+    });
+
+    it("exports a file stored before its export metadata was written, and writes that metadata", async () => {
+        // A file row with a grant and no metadata row: what a store before `chatFileMetadata` looked like.
+        const legacy = (await harness.run(async (ctx: any) => {
+            const fileId = await ctx.db.insert("chatFiles", {
+                extractionStatus: "pending",
+                filename: "legacy.png",
+                hash: "hash-legacy",
+                lastTouchedAt: 1,
+                mediaType: "image/png",
+                refcount: 1,
+                storageId: "agent-files/hash-legacy",
+            });
+
+            await ctx.db.insert("chatFileAccess", { createdAt: 1, fileId, userId: A });
+
+            return fileId;
+        })) as string;
+
+        const { files } = await exportedFor(A);
+
+        expect(files.map((file) => file.id)).toContain(legacy);
+
+        const written = (await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.chatFileMetadata.findMany({ where: { fileId: legacy } });
+
+            return page.length;
+        })) as number;
+
+        expect(written).toBe(1);
     });
 
     it("lists a file once when two stores of the same bytes each wrote its metadata", async () => {

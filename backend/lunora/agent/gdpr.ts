@@ -7,13 +7,14 @@
 import { v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
-import { internalQuery, type MutationCtx } from "../_generated/server";
+import { internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
 import { BATCH, type BatchResult, deleteParentsWithChildren, full } from "../gdpr/batch";
 import { gdprLogger } from "../lib/logger";
-import { storedRows } from "../lib/stored-row";
+import { storedRow, storedRows } from "../lib/stored-row";
 import { MAX_LENGTH } from "../lib/validators";
 import { eraseProjectRuleFilesForUser, eraseProjectsRuleFiles, markProjectsRuleFilesErasing, RULE_FILE_ROWS_PER_PAGE } from "../projects/gdpr";
 import { erasePinsNamingDocuments } from "../chat/gdpr";
+import { ensureChatFileMetadata } from "./files";
 import { deleteVectorRow } from "./table-writes";
 import type { VectorTableName } from "./vector/tables";
 
@@ -234,17 +235,65 @@ export const chatFileMetadataForExport = internalQuery
 
         return {
             readBytes,
-            rows: rowsOf.map((row) => {
-                return {
-                    createdAt: row.createdAt,
-                    filename: row.filename?.slice(0, CHAT_FILE_NAME_MAX),
-                    filenameCut: (row.filename?.length ?? 0) > CHAT_FILE_NAME_MAX,
-                    hash: row.hash.slice(0, CHAT_FILE_HASH_MAX),
-                    id: row.fileId,
-                    mediaType: row.mediaType.slice(0, CHAT_FILE_TYPE_MAX),
-                };
-            }),
+            rows: rowsOf.map((row) => chatFileExportRow(row)),
         };
+    });
+
+/** A file's row in the export, with its name, type and hash cut to their limits. */
+const chatFileExportRow = (row: { createdAt: number; fileId: string; filename?: string; hash: string; mediaType: string }) => {
+    return {
+        createdAt: row.createdAt,
+        filename: row.filename?.slice(0, CHAT_FILE_NAME_MAX),
+        filenameCut: (row.filename?.length ?? 0) > CHAT_FILE_NAME_MAX,
+        hash: row.hash.slice(0, CHAT_FILE_HASH_MAX),
+        id: row.fileId,
+        mediaType: row.mediaType.slice(0, CHAT_FILE_TYPE_MAX),
+    };
+};
+
+/**
+ * The export's view of files that have none: stored before `chatFileMetadata` was written, or whose write did not land. Each file row is
+ * read and its metadata written (`ensureChatFileMetadata`), then answered as {@link chatFileMetadataForExport} answers. The export action
+ * calls this for the ids that query found nothing for (`agent/export-pages.ts#readChunkMetadata`), so a file is never left out for the
+ * want of a row.
+ */
+export const repairChatFileMetadataForExport = internalMutation
+    .input({ fileIds: v.array(v.id("chatFiles")) })
+    .output(
+        v.object({
+            readBytes: v.number(),
+            rows: v.array(
+                v.object({
+                    createdAt: v.number(),
+                    filename: v.optional(v.string()),
+                    filenameCut: v.boolean(),
+                    hash: v.string(),
+                    id: v.string(),
+                    mediaType: v.string(),
+                }),
+            ),
+        }),
+    )
+    .mutation(async ({ args: { fileIds }, ctx }) => {
+        let readBytes = 0;
+        const rows = [];
+
+        for (const fileId of fileIds) {
+            const file = storedRow(await ctx.db.chatFiles.findFirst({ where: { _id: fileId } }));
+
+            if (!file) {
+                continue;
+            }
+
+            // The whole row is read, as the metadata query's reads are counted: the export meters these against its budget.
+            readBytes += rowBytes(file);
+            await ensureChatFileMetadata(ctx, file);
+            rows.push(
+                chatFileExportRow({ createdAt: file._creationTime, fileId: file._id, filename: file.filename, hash: file.hash, mediaType: file.mediaType }),
+            );
+        }
+
+        return { readBytes, rows };
     });
 
 /** The file-to-chat links of the user's own chats (`chatFileThreads`, keyed by owner). */

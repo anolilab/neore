@@ -95,7 +95,7 @@ export const addFile = internalMutation
  * The export's view of a file (`chatFileMetadata`), written only if it is missing. The file row and this row are two writes, so a store
  * whose second write did not land leaves a file the export cannot see; the next store of the same bytes finds the row and completes this.
  */
-const ensureChatFileMetadata = async (
+export const ensureChatFileMetadata = async (
     context: MutationContext,
     file: { _creationTime: number; _id: Id<"chatFiles">; filename?: string; hash: string; mediaType: string },
 ): Promise<void> => {

@@ -233,6 +233,28 @@ export const capChatFiles = <Row>(rows: Row[], budget: number = CHAT_FILE_EXPORT
     return { files, truncated: false };
 };
 
+/**
+ * One chunk's metadata for the export: the rows `read` finds, and for each file it found none for, the row `repair` writes (the file row is
+ * read and its metadata written, for a file stored before the metadata was written). Each file is answered once.
+ */
+export const readChunkMetadata = async <Row extends { id: string }>(
+    fileIds: string[],
+    read: (fileIds: string[]) => Promise<{ readBytes: number; rows: Row[] }>,
+    repair: (fileIds: string[]) => Promise<{ readBytes: number; rows: Row[] }>,
+): Promise<{ readBytes: number; rows: Row[] }> => {
+    const found = await read(fileIds);
+    const answered = new Set(found.rows.map((row) => row.id));
+    const missing = fileIds.filter((id) => !answered.has(id));
+
+    if (missing.length === 0) {
+        return found;
+    }
+
+    const repaired = await repair(missing);
+
+    return { readBytes: found.readBytes + repaired.readBytes, rows: [...found.rows, ...repaired.rows] };
+};
+
 /** The UTF-8 bytes of a text, as the file's size limit counts them. */
 export const textBytes = (text: string): number => new TextEncoder().encode(text).byteLength;
 
