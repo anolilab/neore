@@ -247,6 +247,7 @@ export const NOT_USER_REFERENCE_FIELDS: Readonly<Record<string, string>> = {
     dispatchedBy: "a dispatch source",
     isAdvancedUser: "a flag",
     lastUserMessageAt: "a time",
+    pauseResetUnreported: "a flag: the provider gave no reset time for a rate-limit pause",
     platformUserId: "the person's id on a messenger platform",
     platformUsername: "the person's name on a messenger platform",
     resumedBy: "an approval id",
