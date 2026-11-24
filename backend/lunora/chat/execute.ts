@@ -76,7 +76,7 @@ import { defaultModelUnderRules, readsImagesAndCallsTools } from "../lib/utility
 import { injectsSkillText } from "./lib/low-risk-approval";
 import { closeMCPClientsThenSettle } from "./lib/mcp-tools";
 import { labelMcpToolCalls } from "./lib/mcp-tool-labels";
-import { isStreamStopped, pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgressSink } from "./lib/persist-stream";
+import { isStreamStopped, pipeToPersistentChunks, type PipedStream, STOP_POLL_MS, stopWhenStopped, toolProgressSink } from "./lib/persist-stream";
 import { CAP_WRAP_UP_INSTRUCTION, endedOnStepCap } from "./lib/cap-wrap-up";
 import { collectApprovalRequestIds } from "./lib/tool-approval-claim";
 import { MAX_LENGTH } from "../lib/validators";
@@ -922,10 +922,20 @@ export const runStreamingAgent = internalAction
                     !stopping.signal.aborted &&
                     !(await isStreamStopped(ctx, streamId))
                 ) {
+                    // Nothing else polls this call's stream (there is no pipe), so a sidebar stop is looked for here and aborts the
+                    // call: the stop then ends the run as any other stop does.
+                    const wrapUpStop = new AbortController();
+                    const watchForStop = setInterval(async () => {
+                        if (await isStreamStopped(ctx, streamId)) {
+                            wrapUpStop.abort();
+                        }
+                    }, STOP_POLL_MS);
+
                     try {
                         const wrapUp = await threadObject.streamText(
                             {
                                 ...streamTextArgs,
+                                abortSignal: AbortSignal.any([stopping.signal, wrapUpStop.signal]),
                                 // No tool can be called: the model is told so, and the call offers none.
                                 onStepFinish: undefined,
                                 promptMessageId: lastSavedRowId,
@@ -951,7 +961,12 @@ export const runStreamingAgent = internalAction
                             return;
                         }
 
-                        streamLogger.warn(`[BgAgent] Stream ${streamId}: the step-cap wrap-up failed; the reply stands without it:`, error);
+                        // A stop that aborted the call is the stop's to report, not a failed wrap-up.
+                        if (!wrapUpStop.signal.aborted) {
+                            streamLogger.warn(`[BgAgent] Stream ${streamId}: the step-cap wrap-up failed; the reply stands without it:`, error);
+                        }
+                    } finally {
+                        clearInterval(watchForStop);
                     }
                 }
 

@@ -16,7 +16,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { enabledModelOf, MODEL_REGISTRY } from "@neore/ai/models";
 import { jsonSchema } from "ai";
-import { MockLanguageModelV3 } from "ai/test";
+import { MockLanguageModelV3, simulateReadableStream } from "ai/test";
 import { v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -532,6 +532,45 @@ describe("runStreamingAgent: a reply that spends its step cap", () => {
 
         expect(JSON.stringify(state.replies)).not.toContain("Wrap-up that must not run");
     });
+
+    it("aborts a wrap-up that a stop reaches while it generates, and saves none of its text", async () => {
+        const steps = probeSteps(CAP);
+        let calls = 0;
+
+        modelState.model = new MockLanguageModelV3({
+            doStream: async ({ abortSignal }) => {
+                calls += 1;
+
+                if (calls <= CAP) {
+                    return { stream: simulateReadableStream({ chunkDelayInMs: null, chunks: steps[calls - 1]!, initialDelayInMs: null }) };
+                }
+
+                // The wrap-up: a stop lands while it generates, and its text waits for the abort that the stop causes.
+                await harness.run(async (ctx: any) => await ctx.runMutation(stopActiveForThread, { threadId: ids.threadId }));
+
+                return {
+                    stream: new ReadableStream({
+                        start(controller) {
+                            controller.enqueue({ type: "stream-start", warnings: [] });
+                            controller.enqueue({ id: "t", type: "text-start" });
+                            controller.enqueue({ delta: "Wrap-up a stop must end.", id: "t", type: "text-delta" });
+                            abortSignal?.addEventListener("abort", () => {
+                                controller.error(new Error("aborted"));
+                            });
+                        },
+                    }) as never,
+                };
+            },
+        });
+
+        await run();
+
+        const state = await readState();
+
+        expect(calls).toBe(CAP + 1);
+        expect(JSON.stringify(state.replies)).not.toContain("Wrap-up a stop must end");
+        expect(state.streamStatus).toBe("done");
+    }, 20_000);
 
     it("makes no wrap-up call when the reply finishes in text before the cap", async () => {
         modelState.model = scriptedModel([probeSteps(1)[0]!, textStep("Done, after one probe.")]);
