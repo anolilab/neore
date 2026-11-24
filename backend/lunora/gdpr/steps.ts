@@ -872,11 +872,13 @@ export const generateExportFile = internalAction
                     meter,
                 ),
             // A file with no metadata row (stored before it was written) is repaired here, from its file row (`agent/gdpr.ts`).
-            async (fileIds) =>
+            async (fileIds, bytesLeft) =>
                 await readChunkMetadata(
                     fileIds,
+                    bytesLeft,
                     async (ids) => await context.runQuery(internal.agent.gdpr.chatFileMetadataForExport, { fileIds: ids as Id<"chatFiles">[] }),
-                    async (ids) => await context.runMutation(internal.agent.gdpr.repairChatFileMetadataForExport, { fileIds: ids as Id<"chatFiles">[] }),
+                    // One file per repair mutation (`readChunkMetadata`): each reads its file row whole.
+                    async (id) => await context.runMutation(internal.agent.gdpr.repairChatFileMetadataForExport, { fileIds: [id as Id<"chatFiles">] }),
                 ),
             CHAT_FILE_METADATA_CHUNK,
             chatFileMeter(

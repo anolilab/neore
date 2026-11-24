@@ -98,12 +98,13 @@ export const addFile = internalMutation
 export const ensureChatFileMetadata = async (
     context: MutationContext,
     file: { _creationTime: number; _id: Id<"chatFiles">; filename?: string; hash: string; mediaType: string },
-): Promise<void> => {
+): Promise<number> => {
     // Primary: a lagging replica that misses the row writes a second one (the export lists a file once, but the row is waste).
     const { page } = await context.db.chatFileMetadata.findMany({ consistency: "primary", where: { fileId: file._id } });
 
     if (page.length > 0) {
-        return;
+        // The bytes of the row read, so a caller that meters its reads counts them too.
+        return new TextEncoder().encode(JSON.stringify(page)).byteLength;
     }
 
     // The file's own creation time, not the repair's: the export dates a file by it.
@@ -114,6 +115,8 @@ export const ensureChatFileMetadata = async (
         hash: file.hash,
         mediaType: file.mediaType,
     });
+
+    return 0;
 };
 
 export async function addFileHandler(context: MutationContext, args: InferArgs<typeof addFileFields>) {

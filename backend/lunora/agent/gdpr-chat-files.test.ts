@@ -171,16 +171,17 @@ const exportedFor = async (userId: string): Promise<{ files: ExportedFile[]; pag
                     )) as IdsPage,
                 meter,
             ),
-        async (fileIds) =>
+        async (fileIds, bytesLeft) =>
             await readChunkMetadata(
                 fileIds,
+                bytesLeft,
                 async (ids) =>
                     (await harness.run(async (ctx: any) => await ctx.runQuery(chatFileMetadataForExport, { fileIds: ids }))) as {
                         readBytes: number;
                         rows: ExportedFile[];
                     },
-                async (ids) =>
-                    (await harness.run(async (ctx: any) => await ctx.runMutation(repairChatFileMetadataForExport, { fileIds: ids }))) as {
+                async (id) =>
+                    (await harness.run(async (ctx: any) => await ctx.runMutation(repairChatFileMetadataForExport, { fileIds: [id] }))) as {
                         readBytes: number;
                         rows: ExportedFile[];
                     },
@@ -319,6 +320,27 @@ describe("chat files in the GDPR export", () => {
         const after = await exportedFor(A);
 
         expect(after.files.map((file) => file.id)).toContain(fileId);
+    });
+
+    it("repairs one file per mutation, and stops the repairs once the chunk's budget is spent", async () => {
+        const repaired: string[] = [];
+
+        const chunk = await readChunkMetadata(
+            ["a", "b", "c"],
+            10,
+            async () => {
+                return { readBytes: 0, rows: [] };
+            },
+            async (id) => {
+                repaired.push(id);
+
+                return { readBytes: 10, rows: [{ id }] };
+            },
+        );
+
+        expect(repaired).toEqual(["a"]);
+        expect(chunk.rows).toEqual([{ id: "a" }]);
+        expect(chunk.truncated).toBe(true);
     });
 
     it("exports a file stored before its export metadata was written, and writes that metadata", async () => {

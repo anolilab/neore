@@ -289,7 +289,7 @@ export const repairChatFileMetadataForExport = internalMutation
 
             // The whole row is read, as the metadata query's reads are counted: the export meters these against its budget.
             readBytes += rowBytes(file);
-            await ensureChatFileMetadata(ctx, file);
+            readBytes += await ensureChatFileMetadata(ctx, file);
             rows.push(
                 chatFileExportRow({ createdAt: file._creationTime, fileId: file._id, filename: file.filename, hash: file.hash, mediaType: file.mediaType }),
             );
