@@ -34,7 +34,8 @@ const ConfirmRow: FC<ConfirmRowProperties> = ({ checked, description, id, label,
 );
 
 /**
- * Whether unpinning, archiving and deleting a chat asks first, mounted in the chat card. Each switch saves on its own.
+ * Whether unpinning, archiving and deleting a chat asks first, mounted in the chat card. Each switch saves on its own,
+ * through the settings write queue, so quick toggles of one switch land in the order they were made.
  * "Off" is sent as `false`, never `undefined`, because the server's patch treats `undefined` as "leave alone".
  */
 const ChatActionConfirmControls: FC = () => {
@@ -44,17 +45,18 @@ const ChatActionConfirmControls: FC = () => {
     const confirmations = chatActionConfirmations(userSettings);
 
     const save = (key: ConfirmSettingKey, checked: boolean) => {
-        updateUserSettings.mutate(
-            { [key]: checked },
-            {
-                onError: () => {
-                    toast.error(t`Failed to save settings`);
-                },
-                onSuccess: () => {
-                    toast.success(t`Settings saved`);
-                },
-            },
-        );
+        updateUserSettings
+            .updateLatest(() => {
+                return { [key]: checked };
+            })
+            .then(() => {
+                toast.success(t`Settings saved`);
+
+                return undefined;
+            })
+            .catch(() => {
+                toast.error(t`Failed to save settings`);
+            });
     };
 
     return (

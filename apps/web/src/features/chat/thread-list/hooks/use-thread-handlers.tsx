@@ -18,7 +18,7 @@ import { ValidationError } from "@/lib/errors";
 import { useCRPC, useLunora, useLunoraActionOptions } from "@/lib/lunora/crpc";
 import { showError, showSuccess } from "@/lib/toast";
 
-import { chatActionConfirmations } from "../lib/chat-action-confirmations";
+import { chatActionConfirmations, CONFIRM_EVERYTHING } from "../lib/chat-action-confirmations";
 import type { BranchNode, LoadingStates } from "../types";
 
 /** What a confirmation asks, and the action it runs only on confirm. */
@@ -50,7 +50,8 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
     const { clearOptimisticPin, clearOptimisticStatus, removeOptimisticDeletion, setOptimisticPin, setOptimisticStatus } = useOptimisticActions();
     const crpc = useCRPC();
     const { data: userSettings } = useUserSettings();
-    const confirmations = chatActionConfirmations(userSettings);
+    // Until the settings are known, every action asks: a missing answer must not skip a prompt someone opted into.
+    const confirmations = userSettings === undefined ? CONFIRM_EVERYTHING : chatActionConfirmations(userSettings);
     // One confirmation at a time: the request the dialog shows, and whether it is open.
     const [pendingRequest, setPendingRequest] = useState<ConfirmationRequest | undefined>(undefined);
     const [dialogOpen, setDialogOpen] = useState(false);

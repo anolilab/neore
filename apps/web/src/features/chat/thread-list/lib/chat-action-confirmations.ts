@@ -23,3 +23,9 @@ export const chatActionConfirmations = (settings: ChatActionConfirmationSettings
         unpin: settings?.confirmBeforeUnpinChat === true,
     };
 };
+
+/**
+ * What the actions ask while the settings are not known (still loading, or the read failed). Everything asks, so a
+ * missing answer never skips a prompt someone opted into.
+ */
+export const CONFIRM_EVERYTHING: ChatActionConfirmations = { archive: true, delete: true, unpin: true };

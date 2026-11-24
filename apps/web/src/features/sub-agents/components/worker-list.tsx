@@ -11,13 +11,17 @@ import type { Id } from "@neore/backend/dataModel";
 import { useUnlockProof } from "@neore/client-runtime";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
+import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArchiveIcon, Bot, SquareIcon } from "lucide-react";
 import type { FC } from "react";
+import { useState } from "react";
 
 import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
+import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useUpdateThread } from "@/features/chat/core/hooks/use-threads";
+import { chatActionConfirmations, CONFIRM_EVERYTHING } from "@/features/chat/thread-list/lib/chat-action-confirmations";
 import { quietMinutesAt, useNow, useQuietMinutes, useStopWorker } from "@/features/sub-agents/hooks/use-stop-worker";
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -73,6 +77,14 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
     const { data: workers } = useQuery(
         crpc.sub_agents.functions.listWorkers.queryOptions(threadId && afterFirstPaint ? { leadThreadId: threadId as Id<"threads">, unlockProof } : skipToken),
     );
+
+    const { data: userSettings } = useUserSettings();
+    const confirmations = userSettings === undefined ? CONFIRM_EVERYTHING : chatActionConfirmations(userSettings);
+    // The worker whose archive waits for confirmation, by worker id; absent when none is pending.
+    const [archiveTarget, setArchiveTarget] = useState<string | undefined>(undefined);
+    const archiveWorker = (workerId: string) => {
+        updateThread({ status: "archived", threadId: workerId as Id<"threads"> }).catch(() => showError(t`Failed to archive the worker`));
+    };
 
     const now = useNow((workers ?? []).some((worker) => worker.lastActivityAt !== null));
 
@@ -131,9 +143,13 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
                             <Button
                                 aria-label={t`Archive ${worker.name}`}
                                 onClick={() => {
-                                    updateThread({ status: "archived", threadId: worker.workerId as Id<"threads"> }).catch(() =>
-                                        showError(t`Failed to archive the worker`),
-                                    );
+                                    if (confirmations.archive) {
+                                        setArchiveTarget(worker.workerId);
+
+                                        return;
+                                    }
+
+                                    archiveWorker(worker.workerId);
                                 }}
                                 size="icon-sm"
                                 type="button"
@@ -145,6 +161,24 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
                     </li>
                 ))}
             </ul>
+            <ConfirmDialog
+                confirmLabel={t`Archive`}
+                description={t`Archived chats stay searchable, and you can restore them from the archive.`}
+                onConfirm={() => {
+                    if (archiveTarget !== undefined) {
+                        archiveWorker(archiveTarget);
+                    }
+
+                    setArchiveTarget(undefined);
+                }}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setArchiveTarget(undefined);
+                    }
+                }}
+                open={archiveTarget !== undefined}
+                title={t`Archive this chat?`}
+            />
         </section>
     );
 };

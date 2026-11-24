@@ -128,11 +128,9 @@ const userSettings = vi.hoisted(() => {
     return { value: undefined as Record<string, boolean> | undefined };
 });
 
-vi.mock("@/features/auth/hooks/use-user-settings", () => {
+vi.mock("./hooks/use-confirm-before-delete", () => {
     return {
-        useUserSettings: () => {
-            return { data: userSettings.value };
-        },
+        useConfirmBeforeDelete: () => userSettings.value?.confirmBeforeDeleteChat !== false,
     };
 });
 

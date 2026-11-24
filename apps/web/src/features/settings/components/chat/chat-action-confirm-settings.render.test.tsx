@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const userSettings = vi.hoisted(() => {
     return { value: undefined as Record<string, boolean> | undefined };
 });
-const mutate = vi.hoisted(() => vi.fn());
+const updateLatest = vi.hoisted(() => vi.fn<(build: (current: unknown) => unknown) => Promise<void>>(() => Promise.resolve()));
 
 vi.mock("@lingui/react/macro", () => {
     return {
@@ -21,7 +21,7 @@ vi.mock("@lingui/react/macro", () => {
 vi.mock("@/features/auth/hooks/use-user-settings", () => {
     return {
         useUpdateUserSettings: () => {
-            return { mutate };
+            return { updateLatest };
         },
         useUserSettings: () => {
             return { data: userSettings.value };
@@ -37,9 +37,16 @@ const DELETE = "Confirm before deleting a chat";
 
 const isOn = (name: string): boolean => screen.getByRole("switch", { name }).getAttribute("aria-checked") === "true";
 
+/** The patch the last save built, as the settings write queue would send it. */
+const lastPatch = (): unknown => {
+    const build = updateLatest.mock.calls[0]?.[0];
+
+    return build?.(undefined);
+};
+
 describe("ChatActionConfirmControls", () => {
     beforeEach(() => {
-        mutate.mockClear();
+        updateLatest.mockClear();
         userSettings.value = undefined;
     });
 
@@ -60,12 +67,13 @@ describe("ChatActionConfirmControls", () => {
         expect(isOn(DELETE)).toBe(false);
     });
 
-    it("saves unpinning under its own key when it is turned on", () => {
+    it("saves unpinning under its own key, through the write queue, when it is turned on", () => {
         render(<ChatActionConfirmControls />);
 
         fireEvent.click(screen.getByRole("switch", { name: UNPIN }));
 
-        expect(mutate).toHaveBeenCalledWith({ confirmBeforeUnpinChat: true }, expect.any(Object));
+        expect(updateLatest).toHaveBeenCalledTimes(1);
+        expect(lastPatch()).toStrictEqual({ confirmBeforeUnpinChat: true });
     });
 
     it("saves archiving under its own key when it is turned on", () => {
@@ -73,7 +81,7 @@ describe("ChatActionConfirmControls", () => {
 
         fireEvent.click(screen.getByRole("switch", { name: ARCHIVE }));
 
-        expect(mutate).toHaveBeenCalledWith({ confirmBeforeArchiveChat: true }, expect.any(Object));
+        expect(lastPatch()).toStrictEqual({ confirmBeforeArchiveChat: true });
     });
 
     it("saves deleting as off, not as undefined, when it is turned off", () => {
@@ -81,6 +89,6 @@ describe("ChatActionConfirmControls", () => {
 
         fireEvent.click(screen.getByRole("switch", { name: DELETE }));
 
-        expect(mutate).toHaveBeenCalledWith({ confirmBeforeDeleteChat: false }, expect.any(Object));
+        expect(lastPatch()).toStrictEqual({ confirmBeforeDeleteChat: false });
     });
 });

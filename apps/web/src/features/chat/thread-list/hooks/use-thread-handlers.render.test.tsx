@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const deleteBranch = vi.fn();
 // The stored settings the hook reads; `undefined` is a user who has never saved them.
 const settings = vi.hoisted(() => {
-    return { value: undefined as Record<string, boolean> | undefined };
+    return { pending: false, value: undefined as Record<string, boolean> | undefined };
 });
 // Every thread mutation the hook sends, in order: the confirmation tests check what reached the server.
 const calls: { args: unknown; fn: string }[] = [];
@@ -106,7 +106,7 @@ vi.mock("@/lib/lunora/crpc", () => {
 vi.mock("@/features/auth/hooks/use-user-settings", () => {
     return {
         useUserSettings: () => {
-            return { data: settings.value };
+            return { data: settings.pending ? undefined : (settings.value ?? null) };
         },
     };
 });
@@ -190,6 +190,7 @@ describe("chat action confirmations", () => {
     beforeEach(() => {
         calls.length = 0;
         settings.value = undefined;
+        settings.pending = false;
         rendered.mockClear();
     });
 
@@ -245,6 +246,18 @@ describe("chat action confirmations", () => {
         fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
         await act(flush);
 
+        expect(calls).toHaveLength(0);
+    });
+
+    it("asks before unpinning while the settings are still loading, so a missing answer skips no prompt", () => {
+        settings.pending = true;
+        render(<Confirmable />);
+
+        act(() => {
+            current().handleUnpinThread("t1");
+        });
+
+        expect(screen.getByText("Unpin this chat?")).toBeTruthy();
         expect(calls).toHaveLength(0);
     });
 
