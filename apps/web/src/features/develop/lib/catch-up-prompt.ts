@@ -81,8 +81,10 @@ export const catchUpPrompt = ({
         "Run these steps yourself, in a checkout where git uses the person's own access to origin (their computer, or a device or server they paired). Do not hand them to a cloud coding agent run: it cannot push, and its result becomes a new pull request instead of updating this one.";
     // Every stop after the fetch (step 3) still deletes what it fetched: the refs are this run's alone.
     const stopAfterFetch = "do step 9, then stop and say so";
+    // `--no-update-refs` overrides a `rebase.updateRefs` setting: other local branches pointing into these commits stay where they are.
+    // Step 8 loops back here when the base moves, so the repeat rebase gets it too.
     const finish = [
-        `5. Run \`git rebase ${base}\`.`,
+        `5. Run \`git rebase --no-update-refs ${base}\`.`,
         `6. When the rebase stops on a conflict, resolve it so the result keeps the intent of both sides: this branch's change and what landed on the base. Stage the resolved files with \`git add\` and run \`git rebase --continue\`, and repeat for each later conflict until the rebase completes. If a conflict cannot be resolved, run \`git rebase --abort\`, ${stopAfterFetch}.`,
         `7. Check that the build and the tests still pass. Fix what the rebase broke and commit each fix on this branch. If the build or the tests still fail, do not push: leave the rebased commits in place, ${stopAfterFetch}.`,
     ];

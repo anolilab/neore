@@ -102,7 +102,7 @@ const given = (state: string, mergeState: string | undefined, headBranch = "feat
 
 const control = (isRunning = false) => <ThreadPullRequestCatchUp isRunning={isRunning} link={{ number: 7, repository: "octo/hello" }} threadId="thread-1" />;
 
-const REBASE_ON_RUN_BASE = /`git rebase refs\/neore\/pull-7-[\da-f]{8}-base`/u;
+const REBASE_ON_RUN_BASE = /`git rebase --no-update-refs refs\/neore\/pull-7-[\da-f]{8}-base`/u;
 
 describe("ThreadPullRequestCatchUp", () => {
     beforeEach(() => {
