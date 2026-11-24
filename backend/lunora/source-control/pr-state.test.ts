@@ -4,11 +4,13 @@
  * and a host answer lands only for the check that leased it.
  */
 import { lunoraTest } from "@lunora/testing";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { autoArchiveCutoff } from "../agent/auto-archive-logic";
+import { internal } from "../_generated/internal";
 import { runInShard } from "../lib/shard-context";
 import schema from "../schema";
-import { PR_STATE_MAX_AGE_MS, dispatchLinkedPullRequestChecks, recordLinkState } from "./pr-state";
+import { PR_STATE_MAX_AGE_MS, dispatchLinkedPullRequestChecks, recordLinkState, scheduleArchiveAfterClose } from "./pr-state";
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -174,6 +176,37 @@ describe("dispatchLinkedPullRequestChecks", () => {
 
         // Sweep one reads the 500 closed links, finds nothing stale and moves on; sweep two reads the page holding the open link.
         expect(dispatched).toEqual([0, 1]);
+    });
+});
+
+describe("scheduleArchiveAfterClose", () => {
+    const NOW = 1_000_000_000_000;
+
+    /** Runs the scheduling against the harness's own database, with a scheduler the test can read. */
+    const scheduleFor = (days: number | undefined) =>
+        harness.run(async (ctx: any) => {
+            if (days !== undefined) {
+                await ctx.db.insert("userSettings", { autoArchiveAfterDays: days, userId: OWNER });
+            }
+
+            const threadId = await ctx.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Thread", updatedAt: 1, userId: OWNER });
+            const runAfter = vi.fn(async () => "job");
+
+            await scheduleArchiveAfterClose({ db: ctx.db, now: NOW, scheduler: { runAfter } as never }, { threadId, userId: OWNER });
+
+            return { runAfter, threadId };
+        });
+
+    it("schedules the chat's archive check at once, as of now, when its link is recorded closed", async () => {
+        const { runAfter, threadId } = await scheduleFor(30);
+
+        expect(runAfter).toHaveBeenCalledWith(0, internal.agent.auto_archive.archiveIfStillIdle, { cutoff: autoArchiveCutoff(NOW, 30), threadId });
+    });
+
+    it("schedules nothing when auto-archive is off, since nothing archives then", async () => {
+        const { runAfter } = await scheduleFor(undefined);
+
+        expect(runAfter).not.toHaveBeenCalled();
     });
 });
 

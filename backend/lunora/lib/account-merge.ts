@@ -125,6 +125,12 @@ const KEEP_NEW_USERS = new Set(["aiUserPreferences", "userSettings"]);
 const NOT_MOVED = new Set(["cronRuns", "idempotencyClaims", "rateLimits"]);
 
 /**
+ * Dropped with the guest's shard, never copied: a scan position into the guest's pull-request links, which the merge
+ * re-inserts under new ids, so a carried cursor would point at nothing. The new account's sweep starts from its first link.
+ */
+const NOT_COPIED = new Set(["pullRequestStateScans"]);
+
+/**
  * The tables whose rows live on a user's shard — everything but `.global()` — sorted, but `threads` just before
  * `messages`: a thread is on the new shard before its messages come, so the messages trigger there counts each one it
  * imports (`userTurnCount`, {@link DERIVED_FIELDS}), and the guest's thread is cleared before its messages, whose
@@ -2377,6 +2383,13 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
 
         if (table === undefined) {
             enter(state, "clear");
+
+            return false;
+        }
+
+        // Skipped, not copied: the clear phase still drops the guest's rows of it.
+        if (NOT_COPIED.has(table)) {
+            nextTable(state, tables, "clear");
 
             return false;
         }

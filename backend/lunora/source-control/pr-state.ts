@@ -11,7 +11,7 @@
  */
 import { v } from "lunorash/server";
 
-import type { Doc } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalAction, internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
 import {
@@ -161,6 +161,31 @@ export const dispatchLinkedPullRequestChecks = internalMutation
         return { dispatched: due.length };
     });
 
+/**
+ * A link just recorded as closed or merged makes its chat due for archive now, not at the next housekeeping pass: the sweep
+ * read the chat's links before this answer. The check runs the archive rule as of now, so a chat that became active
+ * meanwhile, or that another open link keeps, is still not archived.
+ */
+export const scheduleArchiveAfterClose = async (
+    ctx: { db: MutationCtx["db"]; now: number; scheduler: MutationCtx["scheduler"] },
+    link: { threadId: Id<"threads">; userId: string },
+): Promise<void> => {
+    const settings = await ctx.db
+        .query("userSettings")
+        .withIndex("by_userId", (q) => q.eq("userId", link.userId))
+        .unique();
+    const days = settings?.autoArchiveAfterDays;
+
+    if (!isAutoArchiveDays(days) || days === 0) {
+        return;
+    }
+
+    await ctx.scheduler.runAfter(0, internal.agent.auto_archive.archiveIfStillIdle, {
+        cutoff: autoArchiveCutoff(ctx.now, days),
+        threadId: link.threadId,
+    });
+};
+
 /** What the host read needs from a link, read on the user's shard. Null when the link is gone. */
 export const readLinkForStateCheck = internalQuery
     .input({ linkId: v.id("pullRequestThreads") })
@@ -183,6 +208,10 @@ export const recordLinkState = internalMutation
 
         if (link !== null && link.stateCheckedAt === args.lease) {
             await ctx.db.patch("pullRequestThreads", link._id, { state: args.state, stateCheckedAt: ctx.now });
+
+            if (args.state !== "open") {
+                await scheduleArchiveAfterClose(ctx, link);
+            }
         }
 
         return null;
