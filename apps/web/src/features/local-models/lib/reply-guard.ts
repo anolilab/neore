@@ -8,8 +8,10 @@
  * wanted, and Continue starts it again from the same prompt.
  */
 
-/** A line or block seen this many times in a row ends the reply. */
+/** A block of two or more lines seen this many times in a row ends the reply. */
 export const LOCAL_REPEAT_LIMIT = 6;
+/** One line seen this many times in a row ends the reply. Higher than for blocks: a requested "write it ten times" is a real list. */
+export const LOCAL_LINE_REPEAT_LIMIT = 20;
 /** The longest block, in lines, that counts as repeating. */
 export const LOCAL_REPEAT_MAX_BLOCK_LINES = 4;
 /** A repeated block shorter than this (trimmed, joined) is ignored: `}` or `---` repeat in real code and tables. */
@@ -32,8 +34,8 @@ const HIGH_SURROGATE = /^[\uD800-\uDBFF]$/u;
 /** Drops a high surrogate at the end of kept text: the limit cut off its low half, so it is not a character to save. */
 export const dropTrailingHighSurrogate = (text: string): string => (HIGH_SURROGATE.test(text.charAt(text.length - 1)) ? text.slice(0, -1) : text);
 
-/** The completed lines the repeat check can still see: enough for the longest block repeated the limit's times. */
-const WINDOW_LINES = LOCAL_REPEAT_LIMIT * LOCAL_REPEAT_MAX_BLOCK_LINES;
+/** The completed lines the repeat check can still see: enough for the longest block, and a line, repeated the limit's times. */
+const WINDOW_LINES = Math.max(LOCAL_LINE_REPEAT_LIMIT, LOCAL_REPEAT_LIMIT * LOCAL_REPEAT_MAX_BLOCK_LINES);
 
 /** The shortest run of lines that the block repeats: the block itself when no shorter run does. */
 const shortestMotif = (block: ReadonlyArray<string>): ReadonlyArray<string> => {
@@ -46,9 +48,9 @@ const shortestMotif = (block: ReadonlyArray<string>): ReadonlyArray<string> => {
     return block;
 };
 
-/** Whether the last `size` lines are one block repeated {@link LOCAL_REPEAT_LIMIT} times in a row. */
-const repeatsAtTail = (lines: ReadonlyArray<string>, size: number): boolean => {
-    const span = size * LOCAL_REPEAT_LIMIT;
+/** Whether the last `size` lines are one block repeated `limit` times in a row. */
+const repeatsAtTail = (lines: ReadonlyArray<string>, size: number, limit: number): boolean => {
+    const span = size * limit;
 
     if (lines.length < span) {
         return false;
@@ -57,16 +59,22 @@ const repeatsAtTail = (lines: ReadonlyArray<string>, size: number): boolean => {
     const start = lines.length - span;
     const block = lines.slice(start, start + size);
 
-    // The minimum is for the motif: `---` repeated is too short to count however many lines it takes.
-    if (
-        shortestMotif(block)
-            .map((line) => line.trim())
-            .join("\n").length < LOCAL_REPEAT_MIN_CHARS
-    ) {
+    // A block made of a shorter repeating run is that run repeated: it is judged at the run's own size and limit, so one line
+    // is not also a two-line block that stops it at twelve copies.
+    const motif = shortestMotif(block);
+
+    if (motif.length < size) {
         return false;
     }
 
-    for (let copy = 1; copy < LOCAL_REPEAT_LIMIT; copy += 1) {
+    // The minimum is for the motif: `---` repeated is too short to count however many lines it takes.
+    const motifText = motif.map((line) => line.trim()).join("\n");
+
+    if (motifText.length < LOCAL_REPEAT_MIN_CHARS) {
+        return false;
+    }
+
+    for (let copy = 1; copy < limit; copy += 1) {
         for (let index = 0; index < size; index += 1) {
             if (lines[start + copy * size + index] !== block[index]) {
                 return false;
@@ -113,7 +121,7 @@ export const createReplyGuard = (): ReplyGuard => {
         }
 
         for (let size = 1; size <= LOCAL_REPEAT_MAX_BLOCK_LINES; size += 1) {
-            if (repeatsAtTail(lines, size)) {
+            if (repeatsAtTail(lines, size, size === 1 ? LOCAL_LINE_REPEAT_LIMIT : LOCAL_REPEAT_LIMIT)) {
                 return true;
             }
         }

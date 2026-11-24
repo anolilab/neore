@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { classifyLocalError } from "./local-errors";
-import { LOCAL_IDLE_TIMEOUT_MS, LOCAL_REASONING_LIMIT_CHARS, LOCAL_REPEAT_LIMIT } from "./reply-guard";
+import { LOCAL_IDLE_TIMEOUT_MS, LOCAL_LINE_REPEAT_LIMIT, LOCAL_REASONING_LIMIT_CHARS } from "./reply-guard";
 import type { RunLocalTurnOptions } from "./run-local-turn";
 import { buildLocalHistory, runLocalTurn } from "./run-local-turn";
 
@@ -192,21 +192,33 @@ describe("reply guard stops", () => {
         expect.assertions(2);
 
         const line = "I will try the same thing again.\n";
-        const { options, save } = setup(holdingFetch(Array.from({ length: LOCAL_REPEAT_LIMIT + 2 }, () => frame({ content: line }))));
+        const { options, save } = setup(holdingFetch(Array.from({ length: LOCAL_LINE_REPEAT_LIMIT + 2 }, () => frame({ content: line }))));
 
         await expect(runLocalTurn(options)).resolves.toStrictEqual({ error: { kind: "repeat-loop" }, outcome: "failed", saved: true, threadId: "thread-1" });
-        expect(save).toHaveBeenCalledWith({ error: "repeat-loop", outcome: "failed", prompt: "hi", reasoning: "", reply: line.repeat(LOCAL_REPEAT_LIMIT) });
+        expect(save).toHaveBeenCalledWith({
+            error: "repeat-loop",
+            outcome: "failed",
+            prompt: "hi",
+            reasoning: "",
+            reply: line.repeat(LOCAL_LINE_REPEAT_LIMIT),
+        });
     });
 
     it("does not save text that arrives in the same chunk after the repeat", async () => {
         expect.assertions(2);
 
         const line = "I will try the same thing again.\n";
-        const chunk = frame({ content: `${line.repeat(LOCAL_REPEAT_LIMIT)}after the loop` });
+        const chunk = frame({ content: `${line.repeat(LOCAL_LINE_REPEAT_LIMIT)}after the loop` });
         const { options, save } = setup(holdingFetch([chunk]));
 
         await expect(runLocalTurn(options)).resolves.toMatchObject({ error: { kind: "repeat-loop" }, outcome: "failed" });
-        expect(save).toHaveBeenCalledWith({ error: "repeat-loop", outcome: "failed", prompt: "hi", reasoning: "", reply: line.repeat(LOCAL_REPEAT_LIMIT) });
+        expect(save).toHaveBeenCalledWith({
+            error: "repeat-loop",
+            outcome: "failed",
+            prompt: "hi",
+            reasoning: "",
+            reply: line.repeat(LOCAL_LINE_REPEAT_LIMIT),
+        });
     });
 
     it("does not start the idle clock until the server has answered", async () => {
@@ -285,8 +297,8 @@ describe("reply guard stops", () => {
         expect.assertions(2);
 
         const line = "I will try the same thing again.";
-        const reply = `${`${line}\n`.repeat(LOCAL_REPEAT_LIMIT - 1)}${line}`;
-        const { options, save } = setup(async () => sseResponse([`${line}\n`.repeat(LOCAL_REPEAT_LIMIT - 1), line]));
+        const reply = `${`${line}\n`.repeat(LOCAL_LINE_REPEAT_LIMIT - 1)}${line}`;
+        const { options, save } = setup(async () => sseResponse([`${line}\n`.repeat(LOCAL_LINE_REPEAT_LIMIT - 1), line]));
 
         await expect(runLocalTurn(options)).resolves.toMatchObject({ error: { kind: "repeat-loop" }, outcome: "failed", saved: true });
         expect(save).toHaveBeenCalledWith({ error: "repeat-loop", outcome: "failed", prompt: "hi", reasoning: "", reply });

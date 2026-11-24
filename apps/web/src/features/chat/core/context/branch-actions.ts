@@ -97,6 +97,13 @@ export const runReloadMessage = async (env: ReloadMessageEnv, messageId: string)
         return undefined;
     }
 
+    // A local reply continues only on the model that wrote it: the browser cannot send it to the gateway or to another model.
+    const failedMessage = currentMessages[messageIndex];
+
+    if (failedMessage?.localReply === true && (!localTarget || (failedMessage.model !== undefined && failedMessage.model !== model))) {
+        return "model-unavailable";
+    }
+
     const turn = startTurn();
 
     // Optimistically hide all messages after the user message

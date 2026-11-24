@@ -523,6 +523,9 @@ const MessageItem: FC<MessageItemProps> = memo(
             // The prompt is on a page that is not loaded: say so, rather than doing nothing.
             if (started === false) {
                 toast.error(t`Load the earlier messages, then try again: this reply's prompt is not loaded.`);
+            } else if (started === "model-unavailable") {
+                // A local reply is not sent to another model: the viewer selects the model that wrote it.
+                toast.error(t`Select the model that wrote this reply to continue it.`);
             }
         }, [reloadMessage, message.id, t]);
 

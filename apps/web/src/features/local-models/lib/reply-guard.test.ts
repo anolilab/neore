@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ReplyGuard } from "./reply-guard";
-import { createReplyGuard, LOCAL_REASONING_LIMIT_CHARS, LOCAL_REPEAT_LIMIT, LOCAL_REPEAT_MAX_BLOCK_LINES } from "./reply-guard";
+import { createReplyGuard, LOCAL_LINE_REPEAT_LIMIT, LOCAL_REASONING_LIMIT_CHARS, LOCAL_REPEAT_LIMIT, LOCAL_REPEAT_MAX_BLOCK_LINES } from "./reply-guard";
 
 /** Feeds `text` in pieces of `size` characters and returns the kind of the first stop, if any. */
 const feedContent = (guard: ReplyGuard, text: string, size = text.length) => {
@@ -23,7 +23,7 @@ describe(createReplyGuard, () => {
         const guard = createReplyGuard();
         const line = "Let me try that again.\n";
 
-        expect(feedContent(guard, line.repeat(LOCAL_REPEAT_LIMIT - 1))).toBeUndefined();
+        expect(feedContent(guard, line.repeat(LOCAL_LINE_REPEAT_LIMIT - 1))).toBeUndefined();
         expect(feedContent(guard, line)).toBe("repeat-loop");
     });
 
@@ -42,7 +42,7 @@ describe(createReplyGuard, () => {
 
         const guard = createReplyGuard();
 
-        expect(feedContent(guard, "Same line of text here.\n".repeat(LOCAL_REPEAT_LIMIT), 3)).toBe("repeat-loop");
+        expect(feedContent(guard, "Same line of text here.\n".repeat(LOCAL_LINE_REPEAT_LIMIT), 3)).toBe("repeat-loop");
     });
 
     it("does not stop a reply whose repeats are broken up or too short to be a loop", () => {
@@ -94,7 +94,7 @@ describe(createReplyGuard, () => {
         expect.assertions(1);
 
         // A Markdown hard break ends a line with two spaces: lines that end with different spaces are not the same line.
-        const endings = Array.from({ length: LOCAL_REPEAT_LIMIT }, (_, index) => `Keep going on it.${" ".repeat(index)}\n`);
+        const endings = Array.from({ length: LOCAL_LINE_REPEAT_LIMIT }, (_, index) => `Keep going on it.${" ".repeat(index)}\n`);
 
         expect(feedContent(createReplyGuard(), endings.join(""))).toBeUndefined();
     });
@@ -118,7 +118,7 @@ describe(createReplyGuard, () => {
         expect.assertions(1);
 
         // Code nested step by step: the same words at each depth are not the same line.
-        const lines = Array.from({ length: LOCAL_REPEAT_LIMIT }, (_, depth) => `${" ".repeat(depth * 4)}if ready:`);
+        const lines = Array.from({ length: LOCAL_LINE_REPEAT_LIMIT }, (_, depth) => `${" ".repeat(depth * 4)}if ready:`);
         const nested = `${lines.join("\n")}\n`;
 
         expect(feedContent(createReplyGuard(), nested)).toBeUndefined();
@@ -129,9 +129,9 @@ describe(createReplyGuard, () => {
 
         const guard = createReplyGuard();
         const line = "Let me try that again.\n";
-        const delta = `${line.repeat(LOCAL_REPEAT_LIMIT)}text that must not be kept`;
+        const delta = `${line.repeat(LOCAL_LINE_REPEAT_LIMIT)}text that must not be kept`;
 
-        expect(guard.pushContent(delta)).toStrictEqual({ keep: line.length * LOCAL_REPEAT_LIMIT, kind: "repeat-loop" });
+        expect(guard.pushContent(delta)).toStrictEqual({ keep: line.length * LOCAL_LINE_REPEAT_LIMIT, kind: "repeat-loop" });
     });
 
     it("does not cut reasoning between the halves of an emoji", () => {
@@ -162,8 +162,16 @@ describe(createReplyGuard, () => {
         const line = "Let me try that again.";
 
         // The sixth repeat is the unfinished last line: nothing completes it while the stream runs.
-        expect(feedContent(guard, `${line}\n`.repeat(LOCAL_REPEAT_LIMIT - 1) + line)).toBeUndefined();
+        expect(feedContent(guard, `${line}\n`.repeat(LOCAL_LINE_REPEAT_LIMIT - 1) + line)).toBeUndefined();
         expect(guard.finish()).toBe("repeat-loop");
+    });
+
+    it("does not stop a line repeated the requested number of times, but does stop a runaway one", () => {
+        expect.assertions(2);
+
+        // "Write it ten times" is a list, not a loop: a single line needs far more copies than that to count as one.
+        expect(feedContent(createReplyGuard(), "I will not talk in class.\n".repeat(10))).toBeUndefined();
+        expect(feedContent(createReplyGuard(), "I will not talk in class.\n".repeat(LOCAL_LINE_REPEAT_LIMIT))).toBe("repeat-loop");
     });
 
     it("does not stop a short line repeated over many lines, since its motif is too short to count", () => {
@@ -178,7 +186,7 @@ describe(createReplyGuard, () => {
 
         const guard = createReplyGuard();
 
-        expect(feedContent(guard, "Let me try that again.\n".repeat(LOCAL_REPEAT_LIMIT - 1))).toBeUndefined();
+        expect(feedContent(guard, "Let me try that again.\n".repeat(LOCAL_LINE_REPEAT_LIMIT - 1))).toBeUndefined();
         expect(guard.finish()).toBeUndefined();
     });
 });
