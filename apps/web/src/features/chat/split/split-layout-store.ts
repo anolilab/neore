@@ -24,7 +24,23 @@ type SplitLayoutState = {
 const savedLayout = { read: false };
 
 const guardedLocalStorage: StateStorage = {
-    getItem: (name) => localStorage.getItem(name),
+    // A value that does not parse is treated as no saved layout. Otherwise it would fail every read, and the write guard would then block
+    // every save for good.
+    getItem: (name) => {
+        const raw = localStorage.getItem(name);
+
+        if (raw === null) {
+            return null;
+        }
+
+        try {
+            JSON.parse(raw);
+
+            return raw;
+        } catch {
+            return null;
+        }
+    },
     removeItem: (name) => localStorage.removeItem(name),
     setItem: (name, value) => {
         if (savedLayout.read) {

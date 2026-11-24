@@ -345,6 +345,20 @@ const ChatSplitView: FC<ChatSplitViewProps> = ({ headerSlot = null, initialMessa
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // A saved layout read after the view started without it (a retry, once storage recovers) replaces the layout: the route's chat
+    // is shown again. Changes made while the saved layout was unreadable are not kept: nothing is saved until it has been read.
+    useEffect(
+        () =>
+            useSplitLayoutStore.persist.onFinishHydration(() => {
+                const route = routeRef.current;
+
+                if (route !== undefined) {
+                    dispatch({ threadId: route, type: "show" });
+                }
+            }),
+        [dispatch],
+    );
+
     useEffect(() => {
         if (!ready || lastRouteThreadId.current === routeThreadId) {
             return;

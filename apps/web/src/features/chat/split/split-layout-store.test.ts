@@ -29,6 +29,25 @@ describe("readSavedLayoutOrEmpty", () => {
     });
 });
 
+describe("a corrupt saved layout", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+        localStorage.removeItem("chat-split-layout");
+    });
+
+    it("reads as no saved layout, so the layout saves again", async () => {
+        // A fresh store: the module's own store has already been hydrated by the tests above.
+        vi.resetModules();
+        localStorage.setItem("chat-split-layout", "{not json");
+        const store = await import("./split-layout-store");
+
+        await expect(store.hydrateSplitLayout()).resolves.toBeUndefined();
+        store.useSplitLayoutStore.getState().dispatch({ threadId: "a", type: "open" });
+
+        expect(localStorage.getItem("chat-split-layout")).toContain('"a"');
+    });
+});
+
 describe("hydrateSplitLayout", () => {
     afterEach(() => {
         vi.restoreAllMocks();
