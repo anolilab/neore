@@ -1786,7 +1786,7 @@ describe("the usage-limit settings of a rate-limited run", () => {
         expect(await snoozedUntil()).toBeUndefined();
     });
 
-    it("a failed settings read leaves a rate-limited reply waiting for the person, never resuming it", async () => {
+    it("a failed settings read resumes a rate-limited reply as an absent setting does, with no snooze", async () => {
         modelState.usagePrefsFail = true;
         modelState.model = planned([rateLimited()]);
 
@@ -1794,8 +1794,8 @@ describe("the usage-limit settings of a rate-limited run", () => {
 
         const state = await readState();
 
-        expect(state.pauseAwaitsPerson).toBe(true);
-        expect(enqueued).toHaveLength(0);
+        expect(state.pauseAwaitsPerson).toBeUndefined();
+        expect(enqueued).toHaveLength(1);
         expect(await snoozedUntil()).toBeUndefined();
     });
 

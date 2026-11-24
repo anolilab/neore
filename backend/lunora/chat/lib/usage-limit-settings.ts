@@ -12,12 +12,6 @@ export interface UsageLimitPreferences {
 
 export const DEFAULT_USAGE_LIMIT_PREFERENCES: UsageLimitPreferences = { resumeAfterLimit: true, snoozeUntilReset: false };
 
-/**
- * What a run uses when the person's settings cannot be read. The saved choice might be "off", so the run waits for the person
- * rather than resuming against it; nothing is snoozed. A failed read is not an absent setting (absent is the default above).
- */
-export const UNREADABLE_USAGE_LIMIT_PREFERENCES: UsageLimitPreferences = { resumeAfterLimit: false, snoozeUntilReset: false };
-
 /** The two stored settings (`userSettings`) as the flags a pause reads. */
 export const usageLimitPreferencesOf = (
     settings: { resumeAfterUsageLimit?: boolean; snoozeUntilUsageLimitReset?: boolean } | undefined,

@@ -1224,8 +1224,8 @@ export const getUserPreferencesQuery = internalQuery
                 // A failed read carries no personalization, so nothing an admin wrote reaches the prompt.
                 personalizationByImpersonator: false,
                 profession: undefined,
-                // Likewise a failed read waits for the person rather than resuming against a saved "off" (`readUsageLimitPreferences`).
-                resumeAfterUsageLimit: false,
+                // A failed read resumes as an absent setting does (`readUsageLimitPreferences`): on, with no snooze.
+                resumeAfterUsageLimit: true,
                 // A failed read is not an absent setting: the resume is off for it (`readResumeInterruptedRuns`).
                 resumeInterruptedRuns: false,
                 threadSummariesEnabled: false,

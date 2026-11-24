@@ -38,7 +38,7 @@ import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "./paid-model";
 import { compressContextMessages, getFallbackContextWindow, getMaxSteps } from "./auto-continue";
 import { isLocalBrowserProvider, toGatewayFormat } from "./custom-providers";
 import type { GatewayCustomProviderConfig } from "./gateway-language-model";
-import { type UsageLimitPreferences, UNREADABLE_USAGE_LIMIT_PREFERENCES, usageLimitPreferencesOf } from "./usage-limit-settings";
+import { DEFAULT_USAGE_LIMIT_PREFERENCES, type UsageLimitPreferences, usageLimitPreferencesOf } from "./usage-limit-settings";
 import { gatewayFetch } from "../../lib/services";
 import getAgent from "./get-agent";
 import type { AutoApprovals } from "./low-risk-approval";
@@ -1101,12 +1101,12 @@ export const readResumeInterruptedRuns = async (userId: string): Promise<boolean
 
 /**
  * The person's usage-limit settings (`usage-limit-settings.ts`), read on their own shard as `readResumeInterruptedRuns` is.
- * A failed read leaves the run waiting for the person (`UNREADABLE_USAGE_LIMIT_PREFERENCES`), never resuming against a saved "off".
+ * A failed read is the default (resume on, no snooze), as an absent setting is.
  */
 export const readUsageLimitPreferences = async (userId: string): Promise<UsageLimitPreferences> =>
     await callOnShard(internal.auth.functions.getUserPreferencesQuery, { userId }, { shardKey: userId })
         .then(usageLimitPreferencesOf)
-        .catch(() => UNREADABLE_USAGE_LIMIT_PREFERENCES);
+        .catch(() => DEFAULT_USAGE_LIMIT_PREFERENCES);
 
 /** What `stampSavedToolCalls` needs of a run: its labels and auto-approvals, and the rows it saved. */
 export interface SavedToolCallStamp {
