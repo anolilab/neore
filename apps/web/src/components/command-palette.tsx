@@ -43,7 +43,7 @@ import {
     Trash2,
 } from "lucide-react";
 import type { FC } from "react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
@@ -253,6 +253,8 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     const [searchInput, setSearchInput] = useState("");
     // The thread delete waiting for confirmation. It opens the same destructive dialog the sidebar row uses.
     const [pendingDelete, setPendingDelete] = useState<{ run: () => void } | undefined>(undefined);
+    // Set by the delete prompt's own confirm, so closing it after a confirm does not bring the palette back.
+    const deleteConfirmedRef = useRef(false);
     // Leaving the open chat drops its pending delete, so a confirm cannot delete a chat other than the one the prompt was opened from.
     useEffect(() => () => setPendingDelete(undefined), [currentThreadId]);
     // The filters and the project the palette is narrowed to. Each closes with the palette.
@@ -876,13 +878,26 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                 onConfirm={() => {
                     const pending = pendingDelete;
 
+                    deleteConfirmedRef.current = true;
                     setPendingDelete(undefined);
                     pending?.run();
                 }}
                 onOpenChange={(open) => {
-                    if (!open) {
-                        setPendingDelete(undefined);
+                    if (open) {
+                        return;
                     }
+
+                    setPendingDelete(undefined);
+                    // A confirm and this close come from the same click, in either order. The flag is read once that click has
+                    // finished: a confirmed delete has run, and the flag is used up ready for the next prompt. Otherwise the prompt was
+                    // cancelled or dismissed, and the palette comes back with its input focused.
+                    queueMicrotask(() => {
+                        if (deleteConfirmedRef.current) {
+                            deleteConfirmedRef.current = false;
+                        } else {
+                            setOpen(true);
+                        }
+                    });
                 }}
                 open={pendingDelete !== undefined}
                 title={t`Delete thread?`}

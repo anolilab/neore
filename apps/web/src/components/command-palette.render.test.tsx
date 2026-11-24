@@ -461,6 +461,39 @@ describe("command palette thread delete confirmation", () => {
         expect(harness.deleteBranch).toHaveBeenCalledWith("thread-1");
     });
 
+    it("returns to the palette when the delete prompt is cancelled, so keyboard focus is not lost", async () => {
+        renderPalette();
+        await openPalette();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Delete thread" }));
+        expect(await screen.findByText("Delete thread?")).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        await waitFor(() => expect(useCommandDialogStore.getState().isOpen).toBe(true));
+        expect(await screen.findByRole("combobox")).toBeTruthy();
+        expect(harness.deleteBranch).not.toHaveBeenCalled();
+    });
+
+    it("returns to the palette after a cancel that follows a confirmed delete", async () => {
+        renderPalette();
+        await openPalette();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Delete thread" }));
+        fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+
+        await waitFor(() => expect(harness.deleteBranch).toHaveBeenCalledTimes(1));
+        expect(useCommandDialogStore.getState().isOpen).toBe(false);
+
+        await openPalette();
+        fireEvent.click(await screen.findByRole("button", { name: "Delete thread" }));
+        expect(await screen.findByText("Delete thread?")).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        expect(await screen.findByRole("combobox")).toBeTruthy();
+    });
+
     it("drops a pending delete of the open chat once another chat is open, so a confirm cannot delete the chat it left", async () => {
         harness.currentThreadId = "thread-1";
         const view = renderPalette();
