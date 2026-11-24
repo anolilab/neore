@@ -104,8 +104,8 @@ describe("ownerNewChatMode reads the owner's setting", () => {
         await setDefault("full");
 
         const [owner, impersonated] = await harness.run(async (ctx: any) => [
-            await ownerNewChatMode(ctx, OWNER, false),
-            await ownerNewChatMode(ctx, OWNER, true),
+            await ownerNewChatMode(ctx, OWNER, async () => false),
+            await ownerNewChatMode(ctx, OWNER, async () => true),
         ]);
 
         expect(owner).toBe("full");

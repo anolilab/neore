@@ -19,12 +19,22 @@ type CallerCtx = MutationCtx & { user: { impersonatedBy?: string | null; userId:
 export const callerRestrictsFull = async (ctx: CallerCtx): Promise<boolean> =>
     Boolean(ctx.user.impersonatedBy) || (await callerSessionNotOwn(ctx)) || requestSignInIsGrant(await ctx.auth.getIdentity());
 
-/** The mode to store on a new chat of `userId`, or `undefined` to store nothing (the defaults). Read in the caller's transaction. */
-export const ownerNewChatMode = async (ctx: Pick<MutationCtx, "db">, userId: string, restrictsFull: boolean): Promise<ThreadPermissionMode | undefined> => {
+/**
+ * The mode to store on a new chat of `userId`, or `undefined` to store nothing (the defaults). Read in the caller's transaction.
+ * `restrictsFull` is asked only when the owner's default is `full`: the restriction changes nothing else, so no other chat pays for
+ * the session read.
+ */
+export const ownerNewChatMode = async (
+    ctx: Pick<MutationCtx, "db">,
+    userId: string,
+    restrictsFull: () => Promise<boolean>,
+): Promise<ThreadPermissionMode | undefined> => {
     const settings = await ctx.db
         .query("userSettings")
         .withIndex("by_userId", (q) => q.eq("userId", userId))
         .unique();
 
-    return newChatPermissionMode(settings?.defaultPermissionMode, restrictsFull);
+    const defaultMode = settings?.defaultPermissionMode;
+
+    return newChatPermissionMode(defaultMode, defaultMode === "full" ? await restrictsFull() : false);
 };

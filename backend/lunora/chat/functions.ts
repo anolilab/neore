@@ -582,9 +582,10 @@ export const createThread = authMutation
             // The mode is read before the thread exists, so a failed read writes nothing. A chat with a bot starts in the bot's mode and
             // never in the owner's default: a bot with no stored mode is Auto, which stores nothing. An admin acting as the owner cannot
             // set a mode, so their chat never takes `full` from the bot or the default.
-            const impersonated = await callerRestrictsFull(context);
-            const botMode = bot?.permissionMode && !(bot.permissionMode === "full" && impersonated) ? bot.permissionMode : undefined;
-            const startMode = bot ? botMode : await ownerNewChatMode(context, userId, impersonated);
+            // The session is read only where it can change the mode: a bot's `full`, or the owner's `full` default.
+            const restrictsFull = () => callerRestrictsFull(context);
+            const botMode = bot?.permissionMode && !(bot.permissionMode === "full" && (await restrictsFull())) ? bot.permissionMode : undefined;
+            const startMode = bot ? botMode : await ownerNewChatMode(context, userId, restrictsFull);
 
             const { threadId } = await agent.createThread(context, {
                 title: threadTitle,
@@ -749,7 +750,7 @@ export const createThreadWithInitialMessage = internalMutation
             // a `clientMessageId` must leave either the thread, its prompt and the claim's record, or none of them.
             // The owner's default mode for a new chat, read here and written with the insert: the claim's invariant allows no nested
             // mutation, so the default cannot be copied on afterwards.
-            const startMode = await ownerNewChatMode(context, userId, impersonated === true);
+            const startMode = await ownerNewChatMode(context, userId, async () => impersonated === true);
 
             const threadId = await insertThread(context.db, {
                 ...withoutUndefined({ customSystemPrompt, enabledFeatures, language, mode, reasoningEffort, statelessMode }),
