@@ -12,6 +12,7 @@ import type { Id } from "../../_generated/dataModel";
 import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
 import { toolsLogger } from "../../lib/logger";
+import { type ImageQuotaCode, takeImageQuota } from "./image-quota";
 
 type CanvasAIOperation = "remove_background" | "upscale" | "style_transfer" | "generate_element";
 
@@ -22,6 +23,7 @@ const canvasAITool = createTool<
         prompt?: string;
     },
     {
+        code?: ImageQuotaCode;
         documentId: string;
         error?: string;
         message: string;
@@ -50,6 +52,19 @@ For generate_element, add the result as a FabricImage object in the canvas JSON 
         toolsLogger.debug(`[canvasAI] Operation: ${operation} on document ${documentId}`);
 
         try {
+            // Every operation works on a design of this user and thread, so that is checked before any allowance is taken. The same
+            // owner and thread check as `update-document`: another user's or thread's design is refused as not found.
+            const documentRow = await context.runQuery(internal.agent.documents.getDocumentInternal, { documentId: documentId as Id<"documents"> });
+
+            if (!documentRow || documentRow.userId !== context.userId || (documentRow.threadId && documentRow.threadId !== context.threadId)) {
+                return {
+                    documentId,
+                    error: "Document not found",
+                    message: "Design document not found",
+                    operation,
+                };
+            }
+
             if (operation === "generate_element") {
                 if (!prompt) {
                     return {
@@ -58,6 +73,12 @@ For generate_element, add the result as a FabricImage object in the canvas JSON 
                         message: "generate_element operation requires a prompt",
                         operation,
                     };
+                }
+
+                const quota = await takeImageQuota(context, context.userId, 1);
+
+                if (!quota.ok) {
+                    return { code: quota.code, documentId, error: quota.message, message: quota.message, operation };
                 }
 
                 // Use image generation internal action
@@ -91,26 +112,46 @@ For generate_element, add the result as a FabricImage object in the canvas JSON 
                 };
             }
 
-            // For canvas-wide operations, use the document's PNG preview
-            // The preview is stored in the document's content field as a data URL
-            const documentRow = await context.runMutation(internal.agent.documents.updateDocumentInternal, {
-                documentId: documentId as Id<"documents">,
-                messageId: context.messageId,
-            });
+            // Canvas-wide operations edit the document's PNG preview, which is stored in its content field as a data URL. The message is
+            // written only once the request is accepted and paid for.
+            if (operation === "style_transfer" && !prompt) {
+                return { documentId, error: "Missing prompt", message: "style_transfer operation requires a prompt", operation };
+            }
 
-            if (!documentRow) {
-                return {
-                    documentId,
-                    error: "Document not found",
-                    message: "Design document not found",
-                    operation,
-                };
+            if (!documentRow.content) {
+                return { documentId, error: "No image preview", message: "The design has no image preview to edit", operation };
+            }
+
+            const quota = await takeImageQuota(context, context.userId, 1);
+
+            if (!quota.ok) {
+                return { code: quota.code, documentId, error: quota.message, message: quota.message, operation };
+            }
+
+            // The write answers the document as it stands now, so the edit runs on its current preview, not the copy read above.
+            // A write that throws (the document was deleted after the charge) changes nothing, so the unit goes back before the error.
+            const current = await context
+                .runMutation(internal.agent.documents.updateDocumentInternal, {
+                    documentId: documentId as Id<"documents">,
+                    messageId: context.messageId,
+                })
+                .catch(async (error: unknown) => {
+                    await quota.refund();
+
+                    throw error;
+                });
+
+            if (!current.content) {
+                // The preview was cleared between the read and this write: the edit cannot run, so the unit taken for it goes back.
+                await quota.refund();
+
+                return { documentId, error: "No image preview", message: "The design has no image preview to edit", operation };
             }
 
             // Use image editing internal action
             const editOperation = operation === "remove_background" || operation === "upscale" ? operation : "style_transfer";
             const editResult = await context.runAction(internal.chat.functions.editImage, {
-                imageUrl: documentRow.content ?? "",
+                imageUrl: current.content,
                 operation: editOperation,
                 prompt,
             });
