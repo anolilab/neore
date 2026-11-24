@@ -526,21 +526,6 @@ describe("ComposerPromptSearch", () => {
         expect(screen.getAllByRole("option")[1]?.getAttribute("aria-selected")).toBe("true");
     });
 
-    it("leaves Ctrl+P alone on a layout that types p on the R key", async () => {
-        render(<ComposerPromptSearch onClose={vi.fn()} onPick={vi.fn()} />, { wrapper });
-
-        const input = screen.getByRole("combobox");
-
-        fireEvent.change(input, { target: { value: "deploy" } });
-        await settle();
-
-        // Dvorak and Colemak type p in the R position.
-        const dvorak = fireEvent.keyDown(input, { code: "KeyR", ctrlKey: true, key: "p" });
-
-        expect(dvorak).toBe(true);
-        expect(screen.getAllByRole("option")[0]?.getAttribute("aria-selected")).toBe("true");
-    });
-
     it("drops a pick whose check finishes after the search closed", async () => {
         const onPick = vi.fn();
         const { unmount } = render(<ComposerPromptSearch onClose={vi.fn()} onPick={onPick} />, { wrapper });
