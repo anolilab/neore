@@ -79,6 +79,7 @@ import { hasClaimWithPrefix, releaseClaimsWithPrefix } from "./claim-once";
 import { authLogger } from "./logger";
 import { callOnShard } from "./cross-shard";
 import { enqueueJob } from "./job-queue";
+import { noteShardActivity } from "./shard-housekeeping";
 import { currentShard } from "./shard-context";
 import schema from "../schema";
 import { dropPushDevicesOf } from "../notifications/push-device-writes";
@@ -207,7 +208,11 @@ export const onGuestShard = (guestId: string): boolean => {
 
 const NO_ROWS = { continueCursor: null, isDone: true, page: [] };
 
-/** On the GUEST's shard: one page of `table`, from `cursor`; none on a shard that is not the guest's own ({@link onGuestShard}). */
+/**
+ * On the GUEST's shard: one page of `table`, from `cursor`; none on a shard that is not the guest's own ({@link onGuestShard}).
+ * The page goes to the new shard whole, so it is cut at {@link CLEAR_PAGE_BYTES} as the clear's are: a page that passes
+ * it is read again with only the rows that fit, so its cursor resumes right after the last row sent.
+ */
 export const listShardRowsPage = internalQuery
     .input({ cursor: v.union(v.string(), v.null()), from: v.string(), table: v.string() })
     .output(v.object({ continueCursor: v.union(v.string(), v.null()), isDone: v.boolean(), page: v.array(v.any()) }))
@@ -216,9 +221,10 @@ export const listShardRowsPage = internalQuery
             return NO_ROWS;
         }
 
-        const { continueCursor, isDone, page } = await rawDb(ctx)
-            .query(args.table)
-            .paginate({ cursor: args.cursor, numItems: pageSizeFor(args.table) });
+        const read = async (size: number) => await rawDb(ctx).query(args.table).paginate({ cursor: args.cursor, numItems: size });
+        const full = await read(pageSizeFor(args.table));
+        const fits = withinClearBytes(full.page).length;
+        const { continueCursor, isDone, page } = fits < full.page.length ? await read(fits) : full;
 
         return { continueCursor, isDone, page };
     });
@@ -244,8 +250,8 @@ const PLAIN_BYTES = new Set(["DataView", "Uint8Array"]);
  * A stored value as deterministic text: object keys sorted, absent (`undefined`) keys dropped, and every value JSON
  * cannot carry tagged with its type. These are the types Lunora's storage codec (`@lunora/wire`) gives back: a bigint by
  * its digits, binary by the hex of its bytes (a typed array other than `Uint8Array` with its type), a date by its time,
- * a URL by its address, a `Map` by its entries and a `Set` by its members (each sorted by its own text, so insertion
- * order does not count), an `Error` by its name, message, fields and cause. JSON throws on a bigint and writes every
+ * a URL by its address, a `Map` by its entries and a `Set` by its members (in their iteration order, which the codec
+ * stores, so a change of order alone is a change), an `Error` by its name, message, fields and cause. JSON throws on a bigint and writes every
  * `ArrayBuffer`, `Map` and `Set` as `{}`; this tells them apart, so two rows with the same text hold the same values.
  * The tags (`<bigint:…>`) are no JSON token, so they cannot meet a string or an array of the row's own. A value no
  * Lunora column holds throws: a row that cannot be compared is never deleted.
@@ -296,18 +302,11 @@ export const canonicalValue = (value: unknown): string => {
     }
 
     if (value instanceof Map) {
-        const entries = [...value.entries()]
-            .map(([key, item]) => [canonicalValue(key), canonicalValue(item)] as const)
-            .toSorted(([a], [b]) => byCodeUnit(a, b));
-
-        return `<map:${entries.map(([key, item]) => `${key}=>${item}`).join(",")}>`;
+        return `<map:${[...value.entries()].map(([key, item]) => `${canonicalValue(key)}=>${canonicalValue(item)}`).join(",")}>`;
     }
 
     if (value instanceof Set) {
-        return `<set:${[...value]
-            .map((item) => canonicalValue(item))
-            .toSorted(byCodeUnit)
-            .join(",")}>`;
+        return `<set:${[...value].map((item) => canonicalValue(item)).join(",")}>`;
     }
 
     if (value instanceof Error) {
@@ -579,11 +578,12 @@ export const mergeGenerationCurrent = async (db: MutationCtx["db"], from: string
 
 /**
  * On the NEW user's shard: take the guest's merge lease with the next generation, or `busyUntil` while another delivery
- * holds it. The generation counts on from the last one even after a lease lapsed.
+ * holds it. The generation counts on from the last one even after a lease lapsed. `saved` is the merge's progress record
+ * ({@link MERGE_PROGRESS_SCOPE}): a delivery whose payload is behind it goes on from the record, never back.
  */
 export const acquireMergeLease = internalMutation
     .input({ from: v.string(), to: v.string() })
-    .output(v.object({ busyUntil: v.optional(v.number()), generation: v.number() }))
+    .output(v.object({ busyUntil: v.optional(v.number()), generation: v.number(), saved: v.optional(v.object({ ...vMergeProgressFields })) }))
     .mutation(async ({ args, ctx }) => {
         const { now } = ctx;
         const row = await claimAt(ctx.db, MERGE_LEASE_SCOPE, args.from, now);
@@ -600,14 +600,18 @@ export const acquireMergeLease = internalMutation
             result: JSON.stringify({ generation, until: now + MERGE_LEASE_MS }),
             userId: args.to,
         });
-        await recordMergeStart(ctx.db, args.from, args.to, now);
+        await recordMergeStart(ctx, args.from, args.to, now);
 
-        return { generation };
+        const record = await claimAt(ctx.db, MERGE_PROGRESS_SCOPE, args.from, now);
+        const saved = record === null ? null : savedProgressOf(record.result).progress;
+
+        return { generation, ...(saved !== null && { saved }) };
     });
 
 /**
  * On the NEW user's shard: give the lease back at the end of a run, while it is still `generation`'s; the generation stays.
- * With it the run's `progress` is saved for {@link resumeStalledGuestMerges}, and a finished merge's record goes.
+ * With it the run's `progress` is saved for {@link resumeStalledGuestMerges}, and a finished merge's record goes. Only a
+ * later run than the record's moves it ({@link MergeProgress.run}), so the record never goes back.
  */
 export const releaseMergeLease = internalMutation
     .input({ from: v.string(), generation: v.number(), progress: v.optional(v.object({ ...vMergeProgressFields })) })
@@ -625,8 +629,12 @@ export const releaseMergeLease = internalMutation
         if ((await mergeFinished(ctx.db, args.from, now)) && !(await mergeCleanupPending(ctx, args.from, row.userId))) {
             await dropMergeProgress(ctx.db, args.from);
         } else if (args.progress !== undefined && row.userId !== undefined) {
-            // The lease is tagged with the new account (`acquireMergeLease`), so the record is too.
-            await saveMergeProgress(ctx.db, args.from, row.userId, args.progress, now);
+            const record = await claimAt(ctx.db, MERGE_PROGRESS_SCOPE, args.from, now);
+
+            if (record === null || args.progress.run > runOf(savedProgressOf(record.result).progress)) {
+                // The lease is tagged with the new account (`acquireMergeLease`), so the record is too.
+                await saveMergeProgress(ctx, args.from, row.userId, args.progress, now);
+            }
         }
 
         return null;
@@ -673,15 +681,35 @@ export const MERGE_STALL_MS = 30 * 60 * 1000;
 /** Stalled merges one housekeeping pass restarts on a shard; each costs two `.global()` reads (the erasure markers). */
 export const MERGE_RESUMES_PER_SWEEP = 8;
 
-/** Progress records one housekeeping pass reads on a shard: this shard's own rows, no D1 statement. */
+/**
+ * Progress records one housekeeping pass reads on a shard: this shard's own rows, no D1 statement. The next pass reads on
+ * after the last one this pass looked at ({@link MERGE_SWEEP_SCOPE}), so records it skipped never hide the ones behind them.
+ */
 const MERGE_PROGRESS_SCAN = 32;
 
-const saveMergeProgress = async (db: MutationCtx["db"], from: string, to: string, progress: MergeProgress | null, now: number): Promise<void> => {
-    await writeClaim(db, MERGE_PROGRESS_SCOPE, from, now, {
+/**
+ * The claim scope of where the stalled-merge sweep reads on from, on the NEW account's shard: one row (key `cursor`), its
+ * `result` the guest id of the last progress record a pass looked at. Dropped once a pass reaches the end of the records;
+ * tagged with that record's new account, so its erasure takes it.
+ */
+export const MERGE_SWEEP_SCOPE = "guest-merge-sweep";
+
+const MERGE_SWEEP_KEY = "cursor";
+
+/** The run count a saved progress stands at: `0` for a merge recorded from the start. */
+const runOf = (progress: MergeProgress | null): number => progress?.run ?? 0;
+
+/**
+ * Writes the merge's progress record and notes the new account's shard as active: housekeeping visits a shard only within
+ * `HOUSEKEEPING_HORIZON_MS` of its last activity, so a merge that stalls on an idle account's shard is still swept.
+ */
+const saveMergeProgress = async (ctx: Pick<MutationCtx, "db">, from: string, to: string, progress: MergeProgress | null, now: number): Promise<void> => {
+    await writeClaim(ctx.db, MERGE_PROGRESS_SCOPE, from, now, {
         expiresAt: now + IMPORT_MARKER_TTL_MS,
         result: JSON.stringify({ progress, savedAt: now }),
         userId: to,
     });
+    await noteShardActivity(ctx, to, now);
 };
 
 const dropMergeProgress = async (db: MutationCtx["db"], from: string): Promise<void> => {
@@ -693,9 +721,9 @@ const dropMergeProgress = async (db: MutationCtx["db"], from: string): Promise<v
 };
 
 /** A record for a merge that has none yet, from the start; one already here keeps its progress, a finished merge gets none. */
-const recordMergeStart = async (db: MutationCtx["db"], from: string, to: string, now: number): Promise<void> => {
-    if ((await storedClaim(db, MERGE_PROGRESS_SCOPE, from)) === null && !(await mergeFinished(db, from, now))) {
-        await saveMergeProgress(db, from, to, null, now);
+const recordMergeStart = async (ctx: Pick<MutationCtx, "db">, from: string, to: string, now: number): Promise<void> => {
+    if ((await storedClaim(ctx.db, MERGE_PROGRESS_SCOPE, from)) === null && !(await mergeFinished(ctx.db, from, now))) {
+        await saveMergeProgress(ctx, from, to, null, now);
     }
 };
 
@@ -718,7 +746,7 @@ export const recordGuestMerge = internalMutation
     .input({ from: v.string(), to: v.string() })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await recordMergeStart(ctx.db, args.from, args.to, ctx.now);
+        await recordMergeStart(ctx, args.from, args.to, ctx.now);
 
         return null;
     });
@@ -726,28 +754,38 @@ export const recordGuestMerge = internalMutation
 /**
  * Housekeeping sweep (`shardSweeps()`), on the NEW account's shard: restarts each guest merge that no job carries on any
  * more. A merge is stalled when its record has not moved for {@link MERGE_STALL_MS} and no run holds its lease; it is
- * queued again from its saved progress, and the record's time moves so the next pass waits for that job. Two deliveries
- * of one merge are safe (the lease and its generation decide), so a job that was only slow costs a redundant run. A
- * finished merge's record goes instead (one whose import markers or account-move markers are still to drop is restarted
- * for that), as does one either account's erasure has stopped (the erasure has priority) and one past
- * {@link MAX_MERGE_RUNS}, which keeps the guest and its rows.
+ * queued again from its saved progress, and the record's time moves first, so the next pass waits for that job. The time
+ * moves before the job is sent and in the transaction that read the record: a job that runs at once saves its own newer
+ * progress after this write, never under it. Two deliveries of one merge are safe (the lease and its generation decide),
+ * so a job that was only slow costs a redundant run. A finished merge's record goes instead (one whose import markers or
+ * account-move markers are still to drop is restarted for that), as does one either account's erasure has stopped (the
+ * erasure has priority) and one past {@link MAX_MERGE_RUNS}, which keeps the guest and its rows. Each pass reads at most
+ * {@link MERGE_PROGRESS_SCAN} records, on from where the last one stopped ({@link MERGE_SWEEP_SCOPE}).
  */
 export const resumeStalledGuestMerges = internalMutation
     .input({})
     .output(v.object({ dropped: v.number(), resumed: v.number() }))
     .mutation(async ({ ctx }) => {
         const { now } = ctx;
+        const cursor = await claimAt(ctx.db, MERGE_SWEEP_SCOPE, MERGE_SWEEP_KEY, now);
+        const after = cursor?.result;
         const rows = await ctx.db
             .query("idempotencyClaims")
-            .withIndex("by_scope_key", (q) => q.eq("scope", MERGE_PROGRESS_SCOPE))
+            .withIndex("by_scope_key", (q) =>
+                after === undefined ? q.eq("scope", MERGE_PROGRESS_SCOPE) : q.eq("scope", MERGE_PROGRESS_SCOPE).gt("key", after),
+            )
             .take(MERGE_PROGRESS_SCAN);
         let dropped = 0;
         let resumed = 0;
+        /** The last record this pass looked at, where the next one reads on from. */
+        let last: { key: string; userId: string | undefined } | null = null;
 
         for (const row of rows) {
             if (dropped + resumed >= MERGE_RESUMES_PER_SWEEP) {
                 break;
             }
+
+            last = { key: row.key, userId: row.userId };
 
             const from = row.key;
             const to = row.userId;
@@ -778,10 +816,21 @@ export const resumeStalledGuestMerges = internalMutation
                 continue;
             }
 
+            await saveMergeProgress(ctx, from, to, progress, now);
             await enqueueJob(internal.lib.account_merge.runGuestMerge, { from, ...(progress !== null && { resume: progress }), to }, { shardKey: to });
-            await saveMergeProgress(ctx.db, from, to, progress, now);
             authLogger.info(`[auth] restarted the stalled merge of guest ${from} into ${to}`);
             resumed += 1;
+        }
+
+        const tag = last?.userId ?? cursor?.userId;
+
+        // A pass that looked at the last record starts the next one from the first again.
+        if (last === null || (rows.length < MERGE_PROGRESS_SCAN && last.key === rows.at(-1)?.key)) {
+            if (cursor !== null) {
+                await ctx.db.delete("idempotencyClaims", cursor._id);
+            }
+        } else if (tag !== undefined) {
+            await writeClaim(ctx.db, MERGE_SWEEP_SCOPE, MERGE_SWEEP_KEY, now, { expiresAt: now + IMPORT_MARKER_TTL_MS, result: last.key, userId: tag });
         }
 
         return { dropped, resumed };
@@ -1452,22 +1501,33 @@ export const mergeGuestInto = async (
     references: MergeReferences,
     from: string,
     to: string,
-    { budget = MERGE_CALLS_PER_RUN, maxRuns = MAX_MERGE_RUNS, resume }: { budget?: number; maxRuns?: number; resume?: MergeProgress } = {},
+    { budget = MERGE_CALLS_PER_RUN, maxRuns = MAX_MERGE_RUNS, resume: payload }: { budget?: number; maxRuns?: number; resume?: MergeProgress } = {},
 ): Promise<{ busyUntil?: number; delayMs?: number; moved: number; next: MergeProgress | null; stopped?: boolean; superseded?: boolean }> => {
-    const run = resume?.run ?? 0;
+    const tooManyRuns = (): Error => new Error(`the merge of guest ${from} into ${to} did not finish in ${String(maxRuns)} runs; the guest and its rows stay`);
 
-    if (run >= maxRuns) {
-        throw new Error(`the merge of guest ${from} into ${to} did not finish in ${String(maxRuns)} runs; the guest and its rows stay`);
+    if ((payload?.run ?? 0) >= maxRuns) {
+        throw tooManyRuns();
     }
 
     // One delivery at a time: the lease's generation goes with every write, and a later one's makes this one's stale.
-    const lease: { busyUntil?: number; generation: number } = await call(references.acquireLease, { from, to }, to);
+    const lease: { busyUntil?: number; generation: number; saved?: MergeProgress } = await call(references.acquireLease, { from, to }, to);
 
     if (lease.busyUntil !== undefined) {
-        return { busyUntil: lease.busyUntil, moved: resume?.moved ?? 0, next: null };
+        return { busyUntil: lease.busyUntil, moved: payload?.moved ?? 0, next: null };
     }
 
-    const { generation } = lease;
+    const { generation, saved } = lease;
+    // A delivery queued before a later run's (a redelivery, or a job the sweep sent while one was only slow) goes on from
+    // the record that run saved, never from its own older payload: the merge's position only moves forward.
+    const resume = saved !== undefined && saved.run > (payload?.run ?? 0) ? saved : payload;
+    const run = resume?.run ?? 0;
+
+    if (run >= maxRuns) {
+        await call(references.releaseLease, { from, generation }, to);
+
+        throw tooManyRuns();
+    }
+
     const tables = shardLocalTables();
     // A table no longer in the schema (a deploy between runs): its phase starts over, which is safe for both.
     const index = resume === undefined ? 0 : Math.max(0, tables.indexOf(resume.table));

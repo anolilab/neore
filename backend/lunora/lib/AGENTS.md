@@ -68,7 +68,9 @@
   tagged with it so its erasure drops it). `resumeStalledGuestMerges` (`shardSweeps()`) queues a merge
   again when its lease is free and its progress older than `MERGE_STALL_MS`; it drops a finished,
   erased or over-cap one. Restarts rely on the lease generation, never on the queue: keep every step
-  safe to run twice, and save progress through `releaseMergeLease`, never from the job payload.
+  safe to run twice, and save progress through `releaseMergeLease`, never from the job payload. The
+  record only moves forward (a later `run` writes it; a delivery behind it starts from it), the sweep
+  moves its time before it sends the job, and each save notes the shard as active for housekeeping.
   Everything after the lease is taken runs inside the `try` that gives it back. A fenced merge with
   import markers or account-move markers left is not finished: its runs drain the `markers` phase.
   The merge reads the guest's shard whole only on that shard itself (`onGuestShard`); never on a

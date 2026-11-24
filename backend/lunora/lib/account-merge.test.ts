@@ -330,14 +330,16 @@ describe("canonicalValue", () => {
         expect(canonicalValue({ a: 1, b: [2] })).toBe(canonicalValue({ a: 1, b: [2] }));
     });
 
-    it("compares a Map and a Set the store gives back by content, whatever their insertion order", () => {
+    it("compares a Map and a Set the store gives back by content and order, which the storage codec keeps", () => {
         const entries: [unknown, unknown][] = [
             [1n, new Set([1, 2])],
             ["b", 2],
         ];
-        const reversed: [unknown, unknown][] = entries.toReversed().map(([key, item]) => [key, item instanceof Set ? new Set([...item].toReversed()) : item]);
 
-        expect(canonicalValue(new Map(entries))).toBe(canonicalValue(new Map(reversed)));
+        expect(canonicalValue(new Map(entries))).toBe(canonicalValue(new Map(entries.map(([key, item]) => [key, item instanceof Set ? new Set(item) : item]))));
+        // A change of order alone is a change: a row reordered after the clear read it is not deleted on the old digest.
+        expect(canonicalValue(new Map(entries))).not.toBe(canonicalValue(new Map(entries.toReversed())));
+        expect(canonicalValue(new Set([1, 2]))).not.toBe(canonicalValue(new Set([1, 2].toReversed())));
         expect(canonicalValue(new Map([["a", 1]]))).not.toBe(canonicalValue(new Map([["a", 2]])));
         expect(canonicalValue(new Set(["a"]))).not.toBe(canonicalValue(new Set(["b"])));
         // Not one another, nor the `{}` and array JSON would write for them.
@@ -2305,6 +2307,220 @@ describe("how a run ends", () => {
         }
 
         expect(last.superseded).toBeUndefined();
+    });
+});
+
+describe("listShardRowsPage", () => {
+    it("cuts a page of large rows at the cross-shard byte budget, and the next page starts right after it", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+        const big = "x".repeat(300 * 1024);
+
+        try {
+            const ids = (await harness.run(async (context: any) => {
+                const inserted: string[] = [];
+
+                for (const title of ["a", "b", "c"]) {
+                    inserted.push(
+                        await context.db.insert("threads", {
+                            mode: "text",
+                            model: "gpt-4o",
+                            status: "active",
+                            title: `${title}${big}`,
+                            updatedAt: 1,
+                            userId: "guest",
+                        }),
+                    );
+                }
+
+                return inserted;
+            })) as string[];
+            const seen: string[] = [];
+            let cursor: string | null = null;
+
+            for (;;) {
+                const page = (await harness.run(
+                    async (context: any) => await context.runQuery(listShardRowsPage, { cursor, from: "guest", table: "threads" }),
+                )) as { continueCursor: string | null; isDone: boolean; page: { _id: string }[] };
+
+                // Two of these rows already pass the budget, so each page holds one.
+                expect(page.page).toHaveLength(1);
+
+                seen.push(...page.page.map((row) => row._id));
+
+                if (page.isDone || page.continueCursor === null) {
+                    break;
+                }
+
+                ({ continueCursor: cursor } = page);
+            }
+
+            expect(seen.toSorted((a, b) => a.localeCompare(b))).toStrictEqual(ids.toSorted((a, b) => a.localeCompare(b)));
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+describe("the merge's progress record", () => {
+    const recordOf = async (harness: ReturnType<typeof lunoraTest>, from = "guest") => {
+        const row = (await harness.run(
+            async (context: any) =>
+                await context.db
+                    .query("idempotencyClaims")
+                    .withIndex("by_scope_key", (q: any) => q.eq("scope", MERGE_PROGRESS_SCOPE).eq("key", from))
+                    .first(),
+        )) as { result: string } | null;
+
+        return row === null ? null : (JSON.parse(row.result) as { progress: MergeProgress | null; savedAt: number });
+    };
+    const acquire = async (harness: ReturnType<typeof lunoraTest>, to = "user") =>
+        (await harness.run(async (context: any) => await context.runMutation(acquireMergeLease, { from: "guest", to }))) as {
+            generation: number;
+            saved?: MergeProgress;
+        };
+    const release = async (harness: ReturnType<typeof lunoraTest>, generation: number, progress: MergeProgress) =>
+        await harness.run(async (context: any) => await context.runMutation(releaseMergeLease, { from: "guest", generation, progress }));
+
+    it("never moves back: a stale release keeps the later run's record, and the next lease hands that record out", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const later: MergeProgress = { cursor: "c", moved: 40, phase: "clear", run: 5, table: "threads" };
+            const first = await acquire(harness);
+
+            await release(harness, first.generation, later);
+
+            // An older delivery takes the next lease: it is told where the merge is.
+            const stale = await acquire(harness);
+
+            expect(stale.saved).toStrictEqual(later);
+
+            // Should it still give back an older position, the record stays.
+            await release(harness, stale.generation, { cursor: null, moved: 3, phase: "copy", run: 2, table: "threads" });
+
+            const kept = await recordOf(harness);
+
+            expect(kept?.progress).toStrictEqual(later);
+
+            const next = await acquire(harness);
+
+            await release(harness, next.generation, { ...later, run: 6 });
+
+            const moved = await recordOf(harness);
+
+            expect(moved?.progress).toStrictEqual({ ...later, run: 6 });
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("notes the new account's shard as active with each save, so housekeeping visits an idle account's shard", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+        // Its own key: the activity note is throttled per isolate and key.
+        const to = "idle-account-of-a-stalled-merge";
+
+        try {
+            await acquire(harness, to);
+
+            const census = (await harness.run(
+                async (context: any) => await context.db.shardActivity.findMany({ consistency: "primary", where: { shardKey: to } }),
+            )) as { page: { lastActiveAt: number }[] };
+
+            expect(census.page).toHaveLength(1);
+            expect(census.page[0]!.lastActiveAt).toBeGreaterThan(Date.now() - 60_000);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("goes on from the record when the delivery's own payload is behind it", async () => {
+        const { call } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } });
+        const saved: MergeProgress = { cursor: null, moved: 7, phase: "markers", run: 9, table: "" };
+        const made: string[] = [];
+        const result = await mergeGuestInto(
+            async (reference, args, shardKey) => {
+                const name = reference.__lunoraRef.split(":", 2)[1]!;
+
+                made.push(name);
+
+                return name === "acquireMergeLease" ? ({ generation: 2, saved } as never) : await call(reference, args, shardKey);
+            },
+            REFERENCES,
+            "guest",
+            "user",
+            { resume: { cursor: null, moved: 0, phase: "copy", run: 2, table: "threads" } },
+        );
+
+        // The copy the payload names is not run again: the record's markers phase is all that is left.
+        expect(made).not.toContain("listShardRowsPage");
+        expect(made).toContain("dropImportMarkersPage");
+        expect(result).toStrictEqual({ moved: 7, next: null });
+    });
+
+    it("fails at the run cap the record has reached, giving the lease back", async () => {
+        const { call } = fakeShards({});
+        const made: string[] = [];
+
+        await expect(
+            mergeGuestInto(
+                async (reference, args, shardKey) => {
+                    const name = reference.__lunoraRef.split(":", 2)[1]!;
+
+                    made.push(name);
+
+                    return name === "acquireMergeLease"
+                        ? ({ generation: 2, saved: { cursor: null, moved: 0, phase: "copy", run: 10, table: "threads" } } as never)
+                        : await call(reference, args, shardKey);
+                },
+                REFERENCES,
+                "guest",
+                "user",
+                { maxRuns: 10, resume: { cursor: null, moved: 0, phase: "copy", run: 3, table: "threads" } },
+            ),
+        ).rejects.toThrow("did not finish in 10 runs");
+        expect(made).toStrictEqual(["acquireMergeLease", "releaseMergeLease"]);
+    });
+
+    it("lets the sweep reach a stalled merge behind more fresh records than one pass reads", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+        const sweep = async () =>
+            (await harness.run(async (context: any) => await context.runMutation(resumeStalledGuestMerges, {}))) as { dropped: number; resumed: number };
+
+        try {
+            await harness.run(async (context: any) => {
+                const now = Date.now();
+                const record = (key: string, savedAt: number) => {
+                    return {
+                        claimedAt: now,
+                        expiresAt: now + 60_000,
+                        key,
+                        result: JSON.stringify({ progress: null, savedAt }),
+                        scope: MERGE_PROGRESS_SCOPE,
+                        userId: "user",
+                    };
+                };
+
+                for (let index = 0; index < 40; index += 1) {
+                    await context.db.insert("idempotencyClaims", record(`fresh-${String(index).padStart(2, "0")}`, now));
+                }
+
+                await context.db.insert("idempotencyClaims", record("stalled", now - MERGE_STALL_MS - 1));
+            });
+            transport.queued = [];
+
+            // The first pass reads only fresh records; the next reads on after them and finds the stalled one.
+            expect(await sweep()).toStrictEqual({ dropped: 0, resumed: 0 });
+            expect(await sweep()).toStrictEqual({ dropped: 0, resumed: 1 });
+            expect(transport.queued.map((job) => job.args)).toStrictEqual([{ from: "stalled", to: "user" }]);
+
+            // That pass reached the last record, so the next starts from the first again.
+            transport.queued = [];
+
+            expect(await sweep()).toStrictEqual({ dropped: 0, resumed: 0 });
+            expect(transport.queued).toStrictEqual([]);
+        } finally {
+            harness.close();
+        }
     });
 });
 
