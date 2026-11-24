@@ -90,6 +90,15 @@ describe(createReplyGuard, () => {
         expect(feedContent(guard, longBlock.repeat(LOCAL_REPEAT_LIMIT))).toBe("repeat-loop");
     });
 
+    it("does not treat lines that differ only in trailing spaces as a repeat", () => {
+        expect.assertions(1);
+
+        // A Markdown hard break ends a line with two spaces: lines that end with different spaces are not the same line.
+        const endings = Array.from({ length: LOCAL_REPEAT_LIMIT }, (_, index) => `Keep going on it.${" ".repeat(index)}\n`);
+
+        expect(feedContent(createReplyGuard(), endings.join(""))).toBeUndefined();
+    });
+
     it("does not join identical lines that are separated by many blank lines", () => {
         expect.assertions(1);
 

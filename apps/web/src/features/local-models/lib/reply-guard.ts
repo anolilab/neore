@@ -25,6 +25,8 @@ const REPLY_STOP_KINDS: ReadonlyArray<ReplyStopKind> = ["idle", "reasoning-limit
 
 export const isReplyStopKind = (kind: string): kind is ReplyStopKind => (REPLY_STOP_KINDS as ReadonlyArray<string>).includes(kind);
 
+const TRAILING_CR = /\r$/u;
+
 /** The completed lines the repeat check can still see: enough for the longest block repeated the limit's times. */
 const WINDOW_LINES = LOCAL_REPEAT_LIMIT * LOCAL_REPEAT_MAX_BLOCK_LINES;
 
@@ -89,9 +91,9 @@ export const createReplyGuard = (): ReplyGuard => {
                 offset = newline + 1;
                 newline = text.indexOf("\n", offset);
 
-                // Indentation is part of a line: nested code lines that differ only in depth are not repeats.
+                // Indentation and trailing spaces are part of a line (a Markdown hard break is one): only a CR from CRLF is dropped.
                 // A blank line stays in the window as a line: lines that are not next to each other are not one run.
-                const line = partial.trimEnd();
+                const line = partial.replace(TRAILING_CR, "");
 
                 partial = "";
                 lines.push(line);
