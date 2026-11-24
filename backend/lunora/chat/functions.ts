@@ -579,8 +579,10 @@ export const createThread = authMutation
             }
 
             // The mode is read before the thread exists, so a failed read writes nothing. A bot's own mode wins; a bot with none starts in
-            // the owner's default, as any new chat does. An admin acting as the owner, or a grant, never takes `full` from the bot or the
-            // default. The session is read only where it can change the mode: a bot's `full`, or the owner's `full` default.
+            // the owner's default, as any new chat does. An admin acting as the owner, or any grant, never takes `full` from the bot or the
+            // default. A grant is the browser extension, the desktop app or the phone app, so a Full bot started from one of those apps
+            // takes the owner's default instead, and keeps `full` only in the web app. The session is read only where it can change the
+            // mode: a bot's `full`, or the owner's `full` default.
             const restrictsFull = () => callerRestrictsFull(context);
             const botMode = bot?.permissionMode && !(bot.permissionMode === "full" && (await restrictsFull())) ? bot.permissionMode : undefined;
             const startMode = botMode ?? (await ownerNewChatMode(context, userId, restrictsFull));
