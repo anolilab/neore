@@ -6,7 +6,9 @@
 const listeners = new Map<string, Set<() => void>>();
 
 export const markTurnEnded = (threadId: string): void => {
-    for (const listener of listeners.get(threadId) ?? []) {
+    const forThread = listeners.get(threadId) ?? [];
+
+    for (const listener of forThread) {
         listener();
     }
 };
