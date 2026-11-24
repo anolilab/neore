@@ -2682,6 +2682,60 @@ describe("mergeGuestInto across two real shards", () => {
                 merge.close();
             }
         });
+
+        /** The guest's erasure begins and takes `id` off the guest's shard, as its own deletion would. */
+        const eraseGuestRow = async (merge: ReturnType<typeof twoShards>, id: string) => {
+            await merge.shards.user.run(async (context: any) => await context.db.insert("accountMoves", { createdAt: 1, kind: "erasing", userId: "guest" }));
+            await merge.shards.guest.run(async (context: any) => await context.db.delete("threads", id));
+        };
+
+        it("keeps the copy the clear's import wrote when the erasure takes the guest's row before the clear's delete", async () => {
+            const merge = twoShards();
+
+            try {
+                const id = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("guest title")))) as string;
+
+                merge.onceBefore("deleteShardRows", async () => await eraseGuestRow(merge, id));
+
+                expect(await lastRun(merge.call)).toStrictEqual({ moved: 1, next: null, stopped: true });
+                // Moved before the erasure began: the new account's, not taken back for a row the erasure deleted.
+                expect(await merge.threadsOn("user")).toStrictEqual([{ _id: id, title: "guest title", userId: "user" }]);
+                expect(merge.guestDeletions).toStrictEqual([]);
+                expect(await movesOf(merge.shards.user, "user")).toStrictEqual([]);
+                expect(await progressRecordOf(merge.shards.user, "guest")).toBeNull();
+            } finally {
+                merge.close();
+            }
+        });
+
+        it("keeps a copied row the reconcile finds missing on the guest's shard once the erasure took it", async () => {
+            const merge = twoShards();
+
+            try {
+                const id = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("guest title")))) as string;
+
+                let erased = false;
+                // Copied already; in the run that reaches the threads' clear, the erasure takes the row before its read: the
+                // clear finds the table empty, and the reconcile finds the row gone from the guest's shard.
+                const call: ShardCall = async (reference, args, shardKey) => {
+                    if (!erased && reference.__lunoraRef.endsWith(":listShardRowsToClear") && args.table === "threads") {
+                        erased = true;
+                        await eraseGuestRow(merge, id);
+                    }
+
+                    return await merge.call(reference, args, shardKey);
+                };
+
+                expect(await lastRun(call)).toStrictEqual({ moved: 1, next: null, stopped: true });
+                expect(erased).toBe(true);
+                expect(await merge.threadsOn("user")).toStrictEqual([{ _id: id, title: "guest title", userId: "user" }]);
+                expect(merge.guestDeletions).toStrictEqual([]);
+                expect(await movesOf(merge.shards.user, "user")).toStrictEqual([]);
+                expect(await progressRecordOf(merge.shards.user, "guest")).toBeNull();
+            } finally {
+                merge.close();
+            }
+        });
     });
 
     describe("the stalled-merge sweep", () => {

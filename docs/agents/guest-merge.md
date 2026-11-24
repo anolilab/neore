@@ -106,8 +106,10 @@ check and before any write (`stoppedForErasure`). Seeing one, it writes nothing 
 markers end, the progress record goes, the result says `erasing`, and the run ends `stopped` with no further call, so no
 clear page is deleted on the guest's shard and the guest stays for its erasure to take. The deletion waits for the merge's
 markers and erases only the guest's shard, so without this a later import of the same run would have handed guest rows to
-the new account after the erasure began. The reconcile's and the clear's take-backs (`dropRowsGoneFromGuest`) are not
-fenced: they only remove copies from the new account.
+the new account after the erasure began. The clear's and the reconcile's take-backs (`dropRowsGoneFromGuest`) are fenced
+the same way, before they touch a clear record or a row: once an erasure has begun, a guest row that is gone may be the
+erasure's deletion, not the guest's, and the copy written before it is the new account's. The take-back then says
+`erasing` and the run ends `stopped`, never `superseded`.
 
 Rule for what moved before the erasure: a row, global row, follow or route a step wrote before that step saw the guest's
 erasing marker is the new account's, as anything the account holds is, and goes only with the new account's own erasure;

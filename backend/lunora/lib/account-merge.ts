@@ -1268,12 +1268,13 @@ export const resumeStalledGuestMergesOnTick = internalMutation
 
 /**
  * The erasure fence of every step that hands the guest's data to the new account (the copy's and the clear's imports, the
- * contributor hand-over, the `global` and follows re-points, a pin route's move). {@link beginMergeRun} checks for an
- * erasure only at the run's start; one of either account that begins during the run is seen here, in the transaction that
- * would write, before anything is written. The merge then stops in that transaction and keeps the guest: its markers end
- * (so the erasure waits no longer), its progress record goes (nothing for the sweep to restart), and nothing more of the
- * guest's moves or is deleted on its shard; the guest's erasure takes what is left there. What a step wrote before the
- * erasure's marker was visible to it stays the new account's (`docs/agents/guest-merge.md`).
+ * contributor hand-over, the `global` and follows re-points, a pin route's move), and of the take-backs of copies whose
+ * guest row is gone ({@link dropRowsGoneFromGuest}), which the erasure's own deletions would mislead. {@link beginMergeRun}
+ * checks for an erasure only at the run's start; one of either account that begins during the run is seen here, in the
+ * transaction that would write, before anything is written. The merge then stops in that transaction and keeps the guest:
+ * its markers end (so the erasure waits no longer), its progress record goes (nothing for the sweep to restart), and
+ * nothing more of the guest's moves or is deleted on its shard; the guest's erasure takes what is left there. What a step
+ * wrote before the erasure's marker was visible to it stays the new account's (`docs/agents/guest-merge.md`).
  */
 const stoppedForErasure = async (ctx: Pick<MutationCtx, "db">, from: string, to: string, now: number): Promise<boolean> => {
     if (!(await isErasing(ctx, from)) && !(await isErasing(ctx, to))) {
@@ -1583,16 +1584,22 @@ export const deleteShardRows = internalMutation
  * it again; it goes with the merge's end. `changed`: rows the guest's shard kept for a newer digest, which lose the
  * clear's record ({@link MERGE_CLEARED_SCOPE}) until the clear reads them again, so a deletion before that read still
  * reaches the reconcile. Also the reconcile's drop ({@link listUnclearedImports}). `fenced` as for {@link importShardRows}.
+ * Once an erasure of either account has begun, a row missing on the guest's shard may be the erasure's deletion, not the
+ * guest's: nothing is taken back or changed, the merge stops ({@link stoppedForErasure}) and the result says `erasing`.
  */
 export const dropRowsGoneFromGuest = internalMutation
     .input({ changed: v.optional(v.array(v.string())), from: v.string(), generation: v.number(), ids: v.array(v.string()), table: v.string(), to: v.string() })
-    .output(v.object({ dropped: v.number(), fenced: v.boolean() }))
+    .output(v.object({ dropped: v.number(), erasing: v.optional(v.boolean()), fenced: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
         const db = rawDb(ctx);
         const { now } = ctx;
 
         if ((await mergeFinished(ctx.db, args.from, now)) || !(await holdMergeLease(ctx.db, args.from, args.generation, now))) {
             return { dropped: 0, fenced: true };
+        }
+
+        if (await stoppedForErasure(ctx, args.from, args.to, now)) {
+            return { dropped: 0, erasing: true, fenced: false };
         }
 
         const changed = args.changed ?? [];
@@ -2620,7 +2627,16 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
 
             if (missing.length > 0) {
                 state.calls -= 1;
-                const { fenced }: { fenced: boolean } = await call(references.dropGone, { from, generation, ids: missing, table, to }, to);
+                const { erasing, fenced }: { erasing?: boolean; fenced: boolean } = await call(
+                    references.dropGone,
+                    { from, generation, ids: missing, table, to },
+                    to,
+                );
+
+                // An erasure began: a row missing on the guest's shard may be its deletion, so the copies stay the new account's.
+                if (erasing === true) {
+                    return stoppedByErasure(state);
+                }
 
                 if (fenced) {
                     state.superseded = true;
@@ -2930,7 +2946,7 @@ export const mergeGuestInto = async (
  * guest deleted after the read is gone before the delete: its copy is taken back from the new shard, unless the account
  * changed it since. `empty` when the table holds none of the guest's rows any more (one call), `page` after a page (three
  * calls, four with a row gone or changed since the read), `fenced` when another delivery already finished the merge,
- * `erasing` when its import found an erasure begun and stopped the merge ({@link stoppedForErasure}).
+ * `erasing` when its import or its take-back found an erasure begun and stopped the merge ({@link stoppedForErasure}).
  * `calls`: how many it made. `kept`: the page's rows the new shard keeps (other content under their ids): they stay on the
  * guest's shard, and the next read passes them (`skip`), so the table can empty all the same.
  */
@@ -2996,13 +3012,18 @@ const clearPage = async (
         // Gone from the guest's shard since the read: the import just wrote what the guest no longer has. Changed since: the
         // clear reads it again, and until then the reconcile may take it back.
         if (deleted.gone.length > 0 || deleted.changed.length > 0) {
-            const dropped: { fenced: boolean } = await call(
+            const dropped: { erasing?: boolean; fenced: boolean } = await call(
                 references.dropGone,
                 { changed: deleted.changed, from, generation, ids: deleted.gone, table, to },
                 to,
             );
 
             calls += 1;
+
+            // An erasure began since the import: a row gone from the guest's shard may be its doing, so the copy stays.
+            if (dropped.erasing === true) {
+                return { calls, kept, outcome: "erasing" };
+            }
 
             if (dropped.fenced) {
                 return { calls, kept, outcome: "fenced" };
