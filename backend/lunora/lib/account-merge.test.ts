@@ -230,6 +230,16 @@ describe("mergeGuestInto", () => {
         expect(deletedGuests).toStrictEqual([]);
     });
 
+    it("deletes nothing and fails for the queue to redeliver when the round cap leaves rows uncopied", async () => {
+        const threads: Row[] = Array.from({ length: 2002 }, (_, index) => ({ _id: `t${index}`, userId: "guest" }));
+        const { call, deletedGuests, shards } = fakeShards({ guest: { threads } }, 2);
+
+        await expect(mergeGuestInto(call, REFERENCES, "guest", "user")).rejects.toThrow("round cap");
+
+        expect(deletedGuests).toStrictEqual([]);
+        expect(shards.get("guest")?.get("threads")).toHaveLength(2002);
+    });
+
     it("fails, for the queue to redeliver, when a follow still names the guest at its deletion", async () => {
         const { call } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } }, 2, { followsRemain: true });
 

@@ -381,9 +381,12 @@ export const mergeGuestInto = async (call: ShardCall, references: MergeReference
     let moved = 0;
     const tables = shardLocalTables();
 
-    // Copy everything first.
+    // Copy everything first. A table whose copy the round cap stops is not copied through, and the deletion below must not run for it.
+    let copied = true;
+
     for (const table of tables) {
         let cursor: string | null = null;
+        let tableCopied = false;
 
         for (let round = 0; round < MAX_ROUNDS_PER_TABLE; round += 1) {
             const page: { continueCursor: string | null; isDone: boolean; page: Record<string, unknown>[] } = await call(
@@ -398,11 +401,21 @@ export const mergeGuestInto = async (call: ShardCall, references: MergeReference
             }
 
             if (page.isDone || page.continueCursor === null) {
+                tableCopied = true;
+
                 break;
             }
 
             cursor = page.continueCursor;
         }
+
+        copied &&= tableCopied;
+    }
+
+    // Stopped by the round cap with rows not yet copied: fail before anything is deleted, so the guest keeps them. The queue redelivers
+    // the merge, and a repeated copy is harmless (rows are skipped by id, events by event id).
+    if (!copied) {
+        throw new Error(`guest ${from} still has rows past the merge's round cap; the merge into ${to} runs again`);
     }
 
     // Then clear the guest's shard.
