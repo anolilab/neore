@@ -41232,5 +41232,5 @@ msgid "The limit has reset. Waiting for you to resume"
 msgstr "Limit został zresetowany. Czeka na Twoje wznowienie"
 
 #: src/features/chat/thread/rate-limit-pause-notice.tsx
-msgid "A message you send here is sent when the reply ends."
-msgstr "Wiadomość wysłana tutaj zostanie wysłana, gdy odpowiedź się zakończy."
+msgid "A message you send here is queued, and it is sent after you resume the reply."
+msgstr "Wiadomość wysłana tutaj trafi do kolejki i zostanie wysłana po wznowieniu odpowiedzi."
