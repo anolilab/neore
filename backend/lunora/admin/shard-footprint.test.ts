@@ -7,7 +7,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
-import { decodeCensusCursor, encodeCensusCursor, measureShardPage } from "./cleanup";
+import { CENSUS_CURSOR_MAX_LENGTH, decodeCensusCursor, encodeCensusCursor, measureShardPage } from "./cleanup";
 import {
     addMessageRow,
     approxRowBytes,
@@ -19,6 +19,7 @@ import {
     keepTop,
     LARGE_TOOL_ROW_BYTES,
     largestRowsOf,
+    AGE_BAND_START_DAYS,
     LARGEST_THREAD_COUNT,
     mergeBreakdowns,
     MAX_SHARD_CALLS_PER_ACTION,
@@ -27,6 +28,7 @@ import {
     runScanRounds,
     type ScanEntry,
     startCensus,
+    SHARDS_PER_CALL,
     startFootprint,
     type ThreadClass,
     willRetry,
@@ -439,6 +441,44 @@ describe("census scheduling", () => {
 
         expect(entries[0]?.status).toBe("failed");
         expect(entries[0]?.succeeded).toBe(true);
+    });
+
+    it("seals a worst-case census cursor within the input bound, so a continuation is never refused", async () => {
+        const groups = ["active", "archived", "other", "pinned"] as const;
+        const breakdown = groups.flatMap((group) =>
+            AGE_BAND_START_DAYS.map((sinceDays) => {
+                return {
+                    approxBytes: 9_999_999_999,
+                    group,
+                    largeToolBytes: 9_999_999_999,
+                    largeToolRows: 99_999,
+                    messageRows: 99_999_999,
+                    sinceDays,
+                    threads: 99_999,
+                    toolBytes: 9_999_999_999,
+                };
+            }),
+        );
+        const state = {
+            ...startFootprint(),
+            breakdown,
+            carriedLargestRows: Array.from({ length: LARGEST_THREAD_COUNT }, (_, i) => 99_999_999 - i),
+            currentRows: 99_999,
+            currentThreadId: "t".repeat(40),
+            messageRows: 99_999_999,
+            threads: 99_999,
+        };
+        const cursor: CensusCursor = {
+            census: "census-cursor",
+            censusDone: false,
+            pending: Array.from({ length: SHARDS_PER_CALL }, (_, i) => {
+                return { shardKey: `user-${String(i)}-${"x".repeat(40)}`, state };
+            }),
+            startedAt: NOW,
+        };
+        const encoded = await encodeCensusCursor(cursor);
+
+        expect(encoded.length).toBeLessThanOrEqual(CENSUS_CURSOR_MAX_LENGTH);
     });
 
     it("round-trips the census cursor sealed, so the browser cannot read or alter it, and rejects anything else", async () => {

@@ -40,6 +40,11 @@ const workflowContext = () => {
 
         rounds.set(entry.ref, round);
 
+        // The owner sweep reports the owner shards it fenced; the fake reports none unless a test says so.
+        if (entry.ref === "gdpr_steps:erasePinsOnOwnerShards") {
+            return { owners: [], ...(answer(entry.ref, round, args) as object) };
+        }
+
         return answer(entry.ref, round, args);
     };
 
@@ -77,7 +82,7 @@ beforeEach(() => {
     failOn = undefined;
     rounds.clear();
     answer = () => {
-        return { cursor: null, hasMore: false };
+        return { cursor: null, hasMore: false, owners: [] };
     };
 });
 
@@ -409,7 +414,8 @@ const replayingContext = (
                 }
 
                 if (!isProgress) {
-                    return { cursor: null, hasMore: false };
+                    // The owner sweeps report the owner shards they fenced; this fake fenced none.
+                    return { cursor: null, hasMore: false, owners: [] };
                 }
 
                 const from = args["fromStatus"] as string[] | undefined;
@@ -619,5 +625,40 @@ describe("account deletion workflow: the owner-shard sweep", () => {
         expect(grace).toBeLessThan(again);
         expect(again).toBeLessThan(drain);
         expect(sleeps).toContain("2 minutes");
+    });
+});
+
+describe("account deletion workflow: the owner fences outlive the route drain", () => {
+    it("lifts the fences after the routes are drained, on every owner either sweep fenced", async () => {
+        // Both sweeps fence owner shards; the replay fake reports the owners it fenced.
+        answer = (ref) => {
+            if (ref === "gdpr_steps:erasePinsOnOwnerShards") {
+                return { cursor: null, hasMore: false, owners: ["owner-a", "owner-b"] };
+            }
+
+            return { cursor: null, hasMore: false, owners: [] };
+        };
+
+        await execute();
+
+        const names = stepNames();
+        const drain = names.indexOf("delete-user-shared-pin-routes");
+        const release = names.indexOf("release-pin-fences");
+
+        // A write refused by a fence is only safe to lift after no route names the shard: the release comes after the drain.
+        expect(release).toBeGreaterThan(-1);
+        expect(release).toBeGreaterThan(drain);
+
+        const releaseRun = runs().find((entry) => entry.ref === "gdpr_steps:releasePinFences");
+
+        expect(releaseRun?.args).toStrictEqual({ owners: ["owner-a", "owner-b"], userId: USER });
+    });
+
+    it("does not lift the fences in the second sweep, so no write is admitted between the sweeps and the drain", async () => {
+        await execute();
+
+        const secondSweep = runs().find((entry) => entry.ref === "gdpr_steps:erasePinsOnOwnerShards" && entry.dedupId?.includes("again"));
+
+        expect(secondSweep?.args).not.toHaveProperty("release");
     });
 });
