@@ -1,8 +1,8 @@
 /**
  * Auto-inject prompt caching hints for providers that support it.
  *
- * Anthropic models via OpenRouter: inject cache_control on the system prompt, the last tool
- * definition, and the end of the conversation. This gives 90% discount on cached input tokens.
+ * Anthropic models via OpenRouter: inject cache_control on the system prompt and at the end of the
+ * conversation. This gives 90% discount on cached input tokens.
  */
 import type { ModelMessage } from "ai";
 
@@ -31,31 +31,29 @@ const withCacheControl = (message: ModelMessage): ModelMessage =>
 /**
  * Inject prompt caching directives into messages for supported providers.
  *
- * Breakpoints are added in priority order, and only while the request stays within the
- * provider's limit of four. Breakpoints already on the incoming messages and tools count
- * against that limit.
- *   1. The last system message gets cache_control on its content (OpenRouter and Requesty)
- *   2. The last tool definition gets cache_control (OpenRouter and Requesty)
- *   3. The last message of the conversation gets cache_control, so the next turn reads
- *      the whole prefix from cache (OpenRouter only: the Requesty converter drops
- *      message-level provider options, so the hint would never be sent)
+ * Only OpenRouter is in scope. It forwards message-level cache hints. Requesty's converter drops
+ * message-level options and tool cache hints, and the gateway's tool conversion drops them too, so
+ * a tool hint never reached the provider and is not set here.
  *
- * Other providers are returned unchanged. This is transparent to the caller — messages
- * are returned with cache hints injected without requiring client-side awareness.
+ * Breakpoints are added in priority order, and only while the request stays within the provider's
+ * limit of four. Breakpoints already on the incoming messages count against that limit.
+ *   1. The last system message gets cache_control on its content
+ *   2. The last message of the conversation gets cache_control, so the next turn reads the whole
+ *      prefix from cache
+ *
+ * Other providers are returned unchanged. This is transparent to the caller — messages are
+ * returned with cache hints injected without requiring client-side awareness.
  */
 export const injectPromptCaching = (
     messages: ModelMessage[],
     provider: string,
     toolSchemas?: ToolDefinition[],
 ): { messages: ModelMessage[]; tools?: ToolDefinition[] } => {
-    // Only inject for providers that proxy to Anthropic with caching support
-    if (provider !== "openrouter" && provider !== "requesty") {
+    if (provider !== "openrouter") {
         return { messages, tools: toolSchemas };
     }
 
-    const existing =
-        messages.filter((message) => hasMessageBreakpoint(message)).length + (toolSchemas ?? []).filter((tool) => tool.cache_control !== undefined).length;
-    let budget = MAX_CACHE_BREAKPOINTS - existing;
+    let budget = MAX_CACHE_BREAKPOINTS - messages.filter((message) => hasMessageBreakpoint(message)).length;
 
     const result = [...messages];
 
@@ -81,27 +79,14 @@ export const injectPromptCaching = (
         }
     }
 
-    // 2. Inject cache_control on the last tool definition for Anthropic prompt caching
-    let cachedTools = toolSchemas;
-    const lastTool = toolSchemas?.at(-1);
-
-    if (toolSchemas && lastTool && budget > 0 && lastTool.cache_control === undefined) {
-        cachedTools = [...toolSchemas];
-        cachedTools[cachedTools.length - 1] = {
-            ...lastTool,
-            cache_control: CACHE_CONTROL,
-        };
-        budget--;
-    }
-
-    // 3. Breakpoint at the end of the conversation. Skipped when the system step already
-    // tagged that message, and for Requesty, whose converter would drop it.
+    // 2. Breakpoint at the end of the conversation. Skipped when the system step already tagged
+    // that message, since then it already carries a breakpoint.
     const lastIndex = result.length - 1;
     const last = result[lastIndex];
 
-    if (last && provider === "openrouter" && budget > 0 && !hasMessageBreakpoint(last)) {
+    if (last && budget > 0 && !hasMessageBreakpoint(last)) {
         result[lastIndex] = withCacheControl(last);
     }
 
-    return { messages: result, tools: cachedTools };
+    return { messages: result, tools: toolSchemas };
 };

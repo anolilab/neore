@@ -1,8 +1,7 @@
 /**
- * `injectPromptCaching` places Anthropic cache breakpoints for OpenRouter and Requesty: the system
- * prompt and the last tool for both, and the end of the conversation for OpenRouter only. Anthropic
- * allows at most four breakpoints per request, counting any already present, and every other
- * provider must come back untouched.
+ * `injectPromptCaching` places Anthropic cache breakpoints for OpenRouter only: the system prompt
+ * and the end of the conversation. Anthropic allows at most four breakpoints per request, counting
+ * any already present, and every other provider must come back untouched.
  */
 import type { ModelMessage } from "ai";
 import { describe, expect, it } from "vitest";
@@ -25,6 +24,14 @@ const growingConversation = (turns: number): ModelMessage[] => [
     }),
 ];
 
+const hinted = (text: string, role: "assistant" | "user"): ModelMessage => {
+    return {
+        content: text,
+        providerOptions: { anthropic: { cacheControl: CACHE } },
+        role,
+    };
+};
+
 const tools: ToolDefinition[] = [
     { description: "Search the web", name: "search", parameters: { type: "object" } },
     { description: "Fetch a page", name: "fetch", parameters: { type: "object" } },
@@ -33,11 +40,8 @@ const tools: ToolDefinition[] = [
 const breakpointsOn = (messages: ModelMessage[]): number[] =>
     messages.flatMap((message, index) => (message.providerOptions?.anthropic?.cacheControl === undefined ? [] : [index]));
 
-const countBreakpoints = (messages: ModelMessage[], toolDefinitions: ToolDefinition[] | undefined): number =>
-    breakpointsOn(messages).length + (toolDefinitions ?? []).filter((tool) => tool.cache_control !== undefined).length;
-
 describe("injectPromptCaching", () => {
-    it("places a breakpoint on the last message for openrouter", () => {
+    it("places the system and conversation-end breakpoints for openrouter", () => {
         const messages = growingConversation(5);
         const result = injectPromptCaching(messages, "openrouter", tools);
 
@@ -45,50 +49,32 @@ describe("injectPromptCaching", () => {
         expect(result.messages.at(-1)?.providerOptions?.anthropic?.cacheControl).toEqual(CACHE);
     });
 
-    it("keeps system and tool breakpoints for requesty but skips the message one its converter would drop", () => {
-        const result = injectPromptCaching(growingConversation(5), "requesty", tools);
+    it("leaves tool definitions untouched, since the gateway's tool conversion drops tool hints", () => {
+        const result = injectPromptCaching(growingConversation(3), "openrouter", tools);
 
-        expect(breakpointsOn(result.messages)).toEqual([0]);
-        expect(result.tools?.[1]?.cache_control).toEqual(CACHE);
-    });
-
-    it("counts breakpoints already on the incoming messages against the limit", () => {
-        const hinted = (text: string): ModelMessage => {
-            return {
-                content: text,
-                providerOptions: { anthropic: { cacheControl: CACHE } },
-                role: "user",
-            };
-        };
-        const messages: ModelMessage[] = [hinted("a"), hinted("b"), hinted("c"), hinted("d"), { content: "latest", role: "user" }];
-        const result = injectPromptCaching(messages, "openrouter", tools);
-
-        expect(breakpointsOn(result.messages)).toEqual([0, 1, 2, 3]);
+        expect(result.tools).toBe(tools);
         expect(result.tools?.every((tool) => tool.cache_control === undefined)).toBe(true);
     });
 
-    it("fills the remaining budget with system and tool before the message, and stays at four", () => {
-        const hinted = (text: string): ModelMessage => {
-            return {
-                content: text,
-                providerOptions: { anthropic: { cacheControl: CACHE } },
-                role: "assistant",
-            };
-        };
-        const messages: ModelMessage[] = [system, hinted("a"), hinted("b"), { content: "latest", role: "user" }];
+    it("counts breakpoints already on the incoming messages against the limit", () => {
+        const messages: ModelMessage[] = [
+            hinted("a", "user"),
+            hinted("b", "user"),
+            hinted("c", "user"),
+            hinted("d", "user"),
+            { content: "latest", role: "user" },
+        ];
         const result = injectPromptCaching(messages, "openrouter", tools);
 
-        expect(breakpointsOn(result.messages)).toEqual([0, 1, 2]);
-        expect(result.tools?.[1]?.cache_control).toEqual(CACHE);
-        expect(countBreakpoints(result.messages, result.tools)).toBe(ANTHROPIC_MAX_CACHE_BREAKPOINTS);
+        expect(breakpointsOn(result.messages)).toEqual([0, 1, 2, 3]);
     });
 
-    it("keeps the system breakpoint and the last-tool breakpoint alongside it", () => {
-        const result = injectPromptCaching(growingConversation(3), "openrouter", tools);
+    it("fills the remaining budget with the system prompt and the conversation end, and stops at four", () => {
+        const messages: ModelMessage[] = [system, hinted("a", "assistant"), hinted("b", "assistant"), { content: "latest", role: "user" }];
+        const result = injectPromptCaching(messages, "openrouter", tools);
 
-        expect(result.messages[0]?.providerOptions?.anthropic?.cacheControl).toEqual(CACHE);
-        expect(result.tools?.[0]?.cache_control).toBeUndefined();
-        expect(result.tools?.[1]?.cache_control).toEqual(CACHE);
+        expect(breakpointsOn(result.messages)).toEqual([0, 1, 2, 3]);
+        expect(breakpointsOn(result.messages)).toHaveLength(ANTHROPIC_MAX_CACHE_BREAKPOINTS);
     });
 
     it("keeps the other provider options already on the last message", () => {
@@ -115,7 +101,7 @@ describe("injectPromptCaching", () => {
         const result = injectPromptCaching([], "openrouter", tools);
 
         expect(result.messages).toEqual([]);
-        expect(result.tools?.[1]?.cache_control).toEqual(CACHE);
+        expect(result.tools).toBe(tools);
     });
 
     it("does not mutate the caller's messages", () => {
@@ -130,21 +116,20 @@ describe("injectPromptCaching", () => {
     it("stays under Anthropic's breakpoint limit however long the conversation grows", () => {
         for (const turns of [1, 2, 10, 60]) {
             const result = injectPromptCaching(growingConversation(turns), "openrouter", tools);
-            const count = countBreakpoints(result.messages, result.tools);
+            const count = breakpointsOn(result.messages).length;
 
-            expect(count).toBe(3);
+            expect(count).toBe(2);
             expect(count).toBeLessThan(ANTHROPIC_MAX_CACHE_BREAKPOINTS);
         }
     });
 
-    it.each(["anthropic", "custom", "openai", "google", "groq", "cloudflare"])("leaves %s messages and tools unchanged", (provider) => {
+    it.each(["anthropic", "custom", "openai", "google", "groq", "cloudflare", "requesty"])("leaves %s messages and tools unchanged", (provider) => {
         const messages = growingConversation(4);
         const result = injectPromptCaching(messages, provider, tools);
 
         expect(result.messages).toBe(messages);
         expect(result.tools).toBe(tools);
         expect(breakpointsOn(result.messages)).toEqual([]);
-        expect(tools.every((tool) => tool.cache_control === undefined)).toBe(true);
     });
 
     it("returns undefined tools for an out-of-scope provider that sent none", () => {
