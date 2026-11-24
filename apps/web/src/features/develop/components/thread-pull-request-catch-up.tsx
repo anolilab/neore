@@ -34,7 +34,7 @@ const Shown = ({ children, onFocusLost }: { children: ReactNode; onFocusLost: ()
  * whose read answered, is keyed by its base branch and head commit, and counts only when it names that same branch and commit:
  * a push or a retarget reads again. Shows nothing while either read has no answer, on a failure (a failed refresh too: a cached
  * "behind" is not known to hold), or once the pull request is merged or closed. A background refresh that has not failed keeps
- * it, so it does not flicker. While it shows, the end of an agent turn in this thread reads the pull request and the comparison
+ * it, so it does not flicker. While it shows, or while a failed read hides it after the host said behind, the end of an agent turn in this thread reads the pull request and the comparison
  * again: that turn may have pushed the caught-up branch. The end comes from the chat's own stream state (`turn-ended.ts`), not
  * from the header's read of the thread, so a turn that ends before that read answers still counts. Nor for a branch name that is not plain enough to put in a command.
  * Whether the prompt pushes is the host's word on the head's repository, never a guess from names or commits: a fork's branch
@@ -59,27 +59,38 @@ const CatchUpControl = ({
     const open = detail?.state === "open" && !detail.draft;
     const comparison = useBranchComparison(address, open ? { baseBranch: detail.baseBranch, headSha: detail.headSha } : undefined);
     const compared = comparison.data?.status === "ok" ? comparison.data : undefined;
-    const behind =
-        open &&
-        !comparison.isError &&
-        compared !== undefined &&
-        compared.baseBranch === detail.baseBranch &&
-        compared.headSha === detail.headSha &&
-        compared.behindBy > 0;
+    const comparisonAnswered =
+        open && !comparison.isError && compared !== undefined && compared.baseBranch === detail.baseBranch && compared.headSha === detail.headSha;
+    const behind = comparisonAnswered && compared.behindBy > 0;
+    // Whether a turn's end reads again: set by a read that confirmed behind, cleared only by one that confirmed the pull request
+    // closed, merged, a draft or caught up. A failed read hides the control but leaves this as it was, so the next turn's end reads
+    // again and the control comes back once the host answers behind.
+    const rereads = useRef(false);
+    const settled = !pull.isError && detail !== undefined && (!open || (comparisonAnswered && !behind));
+
+    useEffect(() => {
+        if (behind && !pull.isError) {
+            rereads.current = true;
+        } else if (settled) {
+            rereads.current = false;
+        }
+    });
+
     const reread = useEffectEvent(() => {
-        if (!behind) {
+        if (!rereads.current) {
             return;
         }
 
-        const { baseBranch, headSha } = detail;
+        // The revision the comparison is keyed on; none while the pull request's read has no answer.
+        const revision = open ? { baseBranch: detail.baseBranch, headSha: detail.headSha } : undefined;
 
         // The pull request first: a turn that pushed or retargeted it gives the comparison a new key, which its query reads by
         // itself. Only the same base and head keep the old key, and the base branch may have moved, so only then is it read again.
         const readAgain = async (): Promise<void> => {
-            const { data } = await pull.refetch();
-            const next = data?.status === "ok" ? data.detail : undefined;
+            const result = await pull.refetch();
+            const next = !result.isError && result.data?.status === "ok" ? result.data.detail : undefined;
 
-            if (next?.baseBranch === baseBranch && next.headSha === headSha) {
+            if (revision !== undefined && next?.baseBranch === revision.baseBranch && next.headSha === revision.headSha) {
                 await comparison.refetch();
             }
         };
@@ -100,7 +111,8 @@ const CatchUpControl = ({
         }
     });
 
-    // A turn that ended may have pushed the rebased branch (or merged or closed the pull request): one read, only while it shows.
+    // A turn that ended may have pushed the rebased branch (or merged or closed the pull request): one read, while it shows or
+    // while a failed read hides a pull request last known to be behind.
     useEffect(() => subscribeTurnEnded(threadId, () => reread()), [threadId]);
 
     if (pull.isError || !behind) {

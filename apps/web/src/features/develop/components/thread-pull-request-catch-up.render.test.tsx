@@ -344,6 +344,99 @@ describe("ThreadPullRequestCatchUp", () => {
         expect(compareRefetch).not.toHaveBeenCalled();
     });
 
+    it.each([
+        [
+            "a failed comparison",
+            () => {
+                compare.current = { isError: true };
+            },
+        ],
+        [
+            "a failed pull request read",
+            () => {
+                pull.current = { ...pull.current, isError: true };
+            },
+        ],
+        [
+            "a pull request read the host refused",
+            () => {
+                pull.current = { data: { status: "rate_limited" } };
+            },
+        ],
+    ])("hides the control on %s at a turn's end, reads again at the next one, and shows it once the host says behind", async (_case, fail) => {
+        given("open", "behind");
+
+        const view = render(control());
+
+        turnEnds();
+
+        await vi.waitFor(() => {
+            expect(compareRefetch).toHaveBeenCalledTimes(1);
+        });
+
+        // The turn-end read failed.
+        fail();
+        view.rerender(control());
+
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
+        expect(screen.queryByText("Behind main")).toBeNull();
+
+        turnEnds();
+
+        expect(refetch).toHaveBeenCalledTimes(2);
+
+        // The host answers again: still behind.
+        given("open", "behind");
+        view.rerender(control());
+
+        expect(screen.getByRole("button", BUTTON)).toBeTruthy();
+    });
+
+    it.each([
+        [
+            "caught up",
+            () => {
+                comparedAs(0);
+            },
+        ],
+        [
+            "closed",
+            () => {
+                given("closed", "behind");
+            },
+        ],
+        [
+            "merged",
+            () => {
+                given("merged", "behind");
+            },
+        ],
+        [
+            "a draft",
+            () => {
+                given("open", "behind", "feat/x", { draft: true, headInBaseRepository: true });
+            },
+        ],
+    ])("stops reading at a turn's end once a read confirms the pull request %s", (_case, settle) => {
+        given("open", "behind");
+
+        const view = render(control());
+
+        settle();
+        view.rerender(control());
+        turnEnds();
+
+        expect(refetch).not.toHaveBeenCalled();
+        expect(compareRefetch).not.toHaveBeenCalled();
+
+        // A failed read after that does not bring the reads back.
+        compare.current = { isError: true };
+        view.rerender(control());
+        turnEnds();
+
+        expect(refetch).not.toHaveBeenCalled();
+    });
+
     it("makes no extra read at the end of a turn while it does not show", () => {
         given("open", "clean");
         render(control());
