@@ -2,11 +2,25 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 
-import { hydrateSplitLayout, survivingPaneAfterDelete, useSplitLayoutStore } from "./split-layout-store";
+import { hydrateSplitLayout, readSavedLayoutOrEmpty, survivingPaneAfterDelete, useSplitLayoutStore } from "./split-layout-store";
 
 const layoutOf = (panes: string[]) => {
     return { focus: 0, panes, sizes: {} };
 };
+
+describe("readSavedLayoutOrEmpty", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it("resolves when the saved layout cannot be read, and keeps the empty layout", async () => {
+        vi.spyOn(useSplitLayoutStore.persist, "hasHydrated").mockReturnValue(false);
+        vi.spyOn(useSplitLayoutStore.persist, "rehydrate").mockRejectedValueOnce(new Error("storage unavailable"));
+
+        await expect(readSavedLayoutOrEmpty()).resolves.toBeUndefined();
+        expect(useSplitLayoutStore.getState().layout.panes).toEqual([]);
+    });
+});
 
 describe("hydrateSplitLayout", () => {
     afterEach(() => {

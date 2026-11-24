@@ -73,6 +73,18 @@ export const hydrateSplitLayout = (): Promise<void> => {
     return hydration.pending;
 };
 
+/**
+ * The saved layout for the split view's own start. A layout that cannot be read starts empty instead of holding the view back: the
+ * route's chat still shows. The chat-opening paths use `hydrateSplitLayout` directly, so they can fall back on a failed read.
+ */
+export const readSavedLayoutOrEmpty = async (): Promise<void> => {
+    try {
+        await hydrateSplitLayout();
+    } catch {
+        // The saved layout stays empty; a later read may still succeed.
+    }
+};
+
 /** Whether the chat reads: a missing chat answers null or fails, and either way it is not a survivor. */
 const readable = async (fetchThread: (threadId: string) => Promise<unknown>, threadId: string): Promise<boolean> => {
     try {

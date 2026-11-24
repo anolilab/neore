@@ -22,7 +22,7 @@ import { setSplitViewMounted } from "./composer-drafts";
 import { useIsDesktop } from "./desktop-layout";
 import { leaveSplitView, restoreLiveComposerFor, syncFocusedModel, watchPaneFocus } from "./pane-state";
 import { MIN_PANE_PX } from "./split-layout";
-import { hydrateSplitLayout, useSplitLayoutStore } from "./split-layout-store";
+import { readSavedLayoutOrEmpty, useSplitLayoutStore } from "./split-layout-store";
 import { useChatHasDraft } from "./use-chat-has-draft";
 
 /** The space between two panes: the resize handle itself, so there is no line between them. */
@@ -321,7 +321,7 @@ const ChatSplitView: FC<ChatSplitViewProps> = ({ headerSlot = null, initialMessa
     useEffect(() => {
         let cancelled = false;
         const start = async () => {
-            await hydrateSplitLayout();
+            await readSavedLayoutOrEmpty();
 
             if (cancelled) {
                 return;
