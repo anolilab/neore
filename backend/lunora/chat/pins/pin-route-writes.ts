@@ -13,6 +13,16 @@ export const firstPinRouteOf = async (db: QueryCtx["db"], userId: string): Promi
     return route === undefined ? null : { ownerId: route.ownerId, threadId: route.threadId };
 };
 
+/**
+ * The owner shard `userId`'s route on `threadId` names now, or `null` once there is none. Primary: an owner's merge re-points
+ * it (`ownerId`) when it moves the thread, and a merge's second pin pass must see that at once.
+ */
+export const pinRouteOwnerOf = async (db: QueryCtx["db"], userId: string, threadId: string): Promise<string | null> => {
+    const { page } = await db.sharedPinRoutes.findMany({ consistency: "primary", limit: 1, where: { threadId: threadId as never, userId } });
+
+    return page.at(0)?.ownerId ?? null;
+};
+
 /** Whether a route still names `userId`: a guest is deleted only once none does. */
 export const guestHasPinRoutes = async (db: MutationCtx["db"], userId: string): Promise<boolean> => (await firstPinRouteOf(db, userId)) !== null;
 

@@ -11,6 +11,7 @@ import { FOLLOW_MERGE_PAGE_SIZE } from "../chat/follows/follow-writes";
 import { requireOwnCollectionId } from "../knowledge/documents-shared";
 import type { MergeProgress, MergeReferences, ShardCall } from "./account-merge";
 import {
+    abandonPinsLeft,
     acquireMergeLease,
     beginMergeRun,
     canonicalValue,
@@ -36,12 +37,14 @@ import {
     GLOBAL_USER_TABLES_NOT_REASSIGNED,
     firstTableWithGuestRows,
     mergeGuestInto,
+    NOT_USER_REFERENCE_FIELDS,
     reassignGlobalRows,
     reassignThreadFollowsPage,
     releaseMergeLease,
     rewriteOwner,
     runGuestMerge,
     shardLocalTables,
+    USER_REFERENCE_FIELDS,
 } from "./account-merge";
 import { IMPORT_MARKER_EXPIRES_AT, IMPORT_MARKER_SCOPE, MERGE_PINS_LEFT_SCOPE, pinsLeftShard, resolvePinsLeft } from "./account-merge";
 import { purgeExpiredClaims } from "./claim-once";
@@ -97,6 +100,7 @@ const ref = (name: string) => {
 };
 
 const REFERENCES: MergeReferences = {
+    abandonPinsLeft: ref("abandonPinsLeft"),
     acquireLease: ref("acquireMergeLease"),
     beginRun: ref("beginMergeRun"),
     deleteGuest: { __lunoraRef: "auth_hooks:deleteMergedGuest" },
@@ -115,6 +119,8 @@ const REFERENCES: MergeReferences = {
     reassignPins: { __lunoraRef: "chat_pins_functions:reassignUserPinsOnThread" },
     releaseLease: ref("releaseMergeLease"),
     resolvePinsLeft: ref("resolvePinsLeft"),
+    routeOwner: ref("sharedPinRouteOwner"),
+    stopKeepingGuest: ref("stopMergeKeepingGuest"),
 };
 
 /** A guest's pin on a thread another user owns, and its `.global()` route, as the fake shards keep them. */
@@ -170,6 +176,10 @@ const fakeShards = (
     let followsLeft = follows;
     /** Owner shards whose own merge's clear has moved their pins away (`pinsLeftShard`). */
     const pinsLeft = new Set<string>();
+    /** Of those, the ones whose merge stopped before re-pointing their routes (`abandonPinsLeft`). */
+    const abandoned = new Set<string>();
+    /** Each merge that stopped and kept its guest (`stopMergeKeepingGuest`). */
+    const keptGuests: string[] = [];
     const pinRows = pins.map((pin) => {
         return { ...pin };
     });
@@ -200,6 +210,13 @@ const fakeShards = (
         const table = args.table as string;
 
         switch (name) {
+            case "abandonPinsLeft": {
+                if (pinsLeft.has(args.from as string)) {
+                    abandoned.add(args.from as string);
+                }
+
+                return null as never;
+            }
             case "acquireMergeLease": {
                 return { generation: 1 } as never;
             }
@@ -298,7 +315,7 @@ const fakeShards = (
                 return { current: true } as never;
             }
             case "pinsLeftShard": {
-                return { left: pinsLeft.has(args.ownerId as string) } as never;
+                return { abandoned: abandoned.has(args.ownerId as string), left: pinsLeft.has(args.ownerId as string) } as never;
             }
             case "reassignGlobalRows": {
                 reassigned.push({ from: args.from as string, to: args.to as string });
@@ -321,15 +338,24 @@ const fakeShards = (
                     pin.userId = args.to as string;
                 }
 
-                return { hasMore: pinRows.some((each) => each.threadId === args.threadId && each.userId === args.from) } as never;
+                return { hasMore: pinRows.some((each) => each.ownerId === shardKey && each.threadId === args.threadId && each.userId === args.from) } as never;
             }
             case "releaseMergeLease": {
                 return null as never;
             }
             case "resolvePinsLeft": {
                 pinsLeft.delete(args.from as string);
+                abandoned.delete(args.from as string);
 
                 return { fenced: false } as never;
+            }
+            case "sharedPinRouteOwner": {
+                return (routes.find((route) => route.userId === args.userId && route.threadId === args.threadId)?.ownerId ?? null) as never;
+            }
+            case "stopMergeKeepingGuest": {
+                keptGuests.push(args.from as string);
+
+                return { superseded: false } as never;
             }
             default: {
                 throw new Error(`unexpected ${String(name)}`);
@@ -337,7 +363,7 @@ const fakeShards = (
         }
     };
 
-    return { call, deletedGuests, followPageCalls: () => followPageCalls, pinRows, pinsLeft, reassigned, routeMoves, routes, shards };
+    return { abandoned, call, deletedGuests, followPageCalls: () => followPageCalls, keptGuests, pinRows, pinsLeft, reassigned, routeMoves, routes, shards };
 };
 
 /** A class instance and a pattern: no Lunora column holds either. */
@@ -413,14 +439,44 @@ describe("canonicalValue", () => {
     });
 });
 
+/** A column name that may hold a user id: each one on a shard-local table is decided in `USER_REFERENCE_FIELDS` or not. */
+const USER_LIKE_COLUMN = /user|owner|by$|author|actor|member|recipient|invitee|creator|sender|editor|requester|^referenceId$/iu;
+
 describe("rewriteOwner", () => {
-    it("re-points every top-level field naming the guest, and nothing else", () => {
-        expect(rewriteOwner({ _id: "t1", grantedBy: "guest", title: "guest notes", userId: "guest" }, "guest", "user")).toStrictEqual({
+    it("re-points every user-reference field naming the guest, and nothing else", () => {
+        expect(rewriteOwner({ _id: "t1", resolvedBy: "guest", title: "guest notes", userId: "guest" }, "guest", "user")).toStrictEqual({
             _id: "t1",
-            grantedBy: "user",
+            resolvedBy: "user",
             title: "guest notes",
             userId: "user",
         });
+    });
+
+    it("keeps a content field whose value happens to be the guest's id", () => {
+        expect(rewriteOwner({ _id: "t1", createdBy: "guest", note: "guest", title: "guest", userId: "guest" }, "guest", "user")).toStrictEqual({
+            _id: "t1",
+            createdBy: "user",
+            note: "guest",
+            title: "guest",
+            userId: "user",
+        });
+    });
+
+    it("decides every shard-local column with a user-like name: a user reference, or not one for a stated reason", async () => {
+        const { default: schema } = await vi.importActual<typeof import("../schema")>("../schema");
+        const { tables } = schema as unknown as { tables: Record<string, { shape: Record<string, unknown> }> };
+        const userLike = USER_LIKE_COLUMN;
+        const undecided = shardLocalTables(schema).flatMap((table) =>
+            Object.keys(tables[table]!.shape)
+                .filter((field) => userLike.test(field) && !USER_REFERENCE_FIELDS.has(field) && !(field in NOT_USER_REFERENCE_FIELDS))
+                .map((field) => `${table}.${field}`),
+        );
+
+        expect(undecided).toStrictEqual([]);
+        // Each listed one is a column somewhere: a stale entry would hide nothing, but says what is no longer true.
+        const columns = new Set(shardLocalTables(schema).flatMap((table) => Object.keys(tables[table]!.shape)));
+
+        expect([...USER_REFERENCE_FIELDS, ...Object.keys(NOT_USER_REFERENCE_FIELDS)].filter((field) => !columns.has(field))).toStrictEqual([]);
     });
 });
 
@@ -566,8 +622,8 @@ describe("mergeGuestInto", () => {
             },
             "guest",
             "user",
-            // The run's own calls and one copy step (three calls: the most any step takes, so the pins step fits too).
-            { budget: MERGE_LEASE_CALLS + 3 },
+            // The run's own calls and one step of the costliest phase (the second pin pass's four calls), so every step fits.
+            { budget: MERGE_LEASE_CALLS + 4 },
         );
 
         // Five pages of two, each read once: no run starts the table over.
@@ -716,7 +772,7 @@ describe("mergeGuestInto", () => {
         });
 
         // A small budget, so the pin step spans runs and every later run is a resumed one.
-        const { runs } = await mergeToEnd(call, "guest", "user", { budget: 7 });
+        const { runs } = await mergeToEnd(call, "guest", "user", { budget: MERGE_LEASE_CALLS + 4 });
 
         expect(runs.length).toBeGreaterThan(1);
         expect(pinRows.every((pin) => pin.userId === "user")).toBe(true);
@@ -761,6 +817,66 @@ describe("mergeGuestInto", () => {
         const { next } = await mergeGuestInto(call, REFERENCES, "guest", "user", { budget: MERGE_LEASE_CALLS + 4, resume });
 
         expect(next).toMatchObject({ phase: "repins", route: 1, routeThread: "shared-2" });
+    });
+
+    it("follows a route the owner's merge re-points after the second pin pass read it, so the guest's pin is moved where it went", async () => {
+        // The owner's merge copied the pin to its new shard and cleared it here, signalling so; its route still names this shard.
+        const { call, deletedGuests, pinRows, pinsLeft, routes } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } }, 2, {
+            pins: [{ ownerId: "owner-a", threadId: "shared-1", userId: "guest" }],
+        });
+
+        pinRows[0]!.ownerId = "owner-n";
+        pinsLeft.add("owner-a");
+
+        let raced = false;
+
+        await mergeToEnd(
+            async (reference, args, shardKey) => {
+                const name = reference.__lunoraRef.split(":", 2)[1]!;
+                const result: never = await call(reference, args, shardKey);
+
+                // Right after the pass read the route: the owner's `global` step re-points it, then drops its signal.
+                if (name === "listSharedPinRoutesForExport" && !raced) {
+                    raced = true;
+                    routes[0]!.ownerId = "owner-n";
+                    pinsLeft.delete("owner-a");
+                }
+
+                return result;
+            },
+            "guest",
+            "user",
+        );
+
+        expect(raced).toBe(true);
+        expect(pinRows).toStrictEqual([{ ownerId: "owner-n", threadId: "shared-1", userId: "user" }]);
+        expect(deletedGuests).toHaveLength(1);
+    });
+
+    it("stops and keeps the guest when the owner's merge it waits on stopped before re-pointing its routes", async () => {
+        const { abandoned, call, deletedGuests, keptGuests, pinRows, pinsLeft } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } }, 2, {
+            pins: [{ ownerId: "owner-a", threadId: "shared-1", userId: "guest" }],
+        });
+
+        // Moved off the owner's shard by a merge that then stopped (an erasure, its run cap): no route will lead to it.
+        pinRows[0]!.ownerId = "owner-n";
+        pinsLeft.add("owner-a");
+        abandoned.add("owner-a");
+
+        const results: Awaited<ReturnType<typeof mergeGuestInto>>[] = [];
+        let resume: MergeProgress | undefined;
+
+        do {
+            results.push(await mergeGuestInto(call, REFERENCES, "guest", "user", resume === undefined ? {} : { resume }));
+            resume = results.at(-1)!.next ?? undefined;
+        } while (resume !== undefined && results.length < 50);
+
+        // It ends at the route it would have waited on, never deferring towards its run cap; the guest, whose pin nothing
+        // leads to, is kept, and its stop reported.
+        expect(results.at(-1)).toMatchObject({ next: null, stopped: true });
+        expect(results.every((result) => result.delayMs === undefined)).toBe(true);
+        expect(keptGuests).toStrictEqual(["guest"]);
+        expect(deletedGuests).toStrictEqual([]);
     });
 
     it("is safe to run twice", async () => {
@@ -1039,7 +1155,10 @@ describe("deleteMergedGuest", () => {
             );
 
             expect(await deleteGuest(harness, guest)).toStrictEqual({ deleted: true });
-            expect(await harness.run(async (context: any) => await context.runMutation(pinsLeftShard, { ownerId: guest }))).toStrictEqual({ left: false });
+            expect(await harness.run(async (context: any) => await context.runMutation(pinsLeftShard, { ownerId: guest }))).toStrictEqual({
+                abandoned: false,
+                left: false,
+            });
         } finally {
             harness.close();
         }
@@ -1340,6 +1459,7 @@ describe("clearing the guest's settings", () => {
  */
 describe("mergeGuestInto across two real shards", () => {
     const PROCEDURES: Record<string, { fn: unknown; kind: "mutation" | "query" }> = {
+        abandonPinsLeft: { fn: abandonPinsLeft, kind: "mutation" },
         acquireMergeLease: { fn: acquireMergeLease, kind: "mutation" },
         beginMergeRun: { fn: beginMergeRun, kind: "mutation" },
         deleteShardRows: { fn: deleteShardRows, kind: "mutation" },
@@ -1477,6 +1597,20 @@ describe("mergeGuestInto across two real shards", () => {
                 ].toSorted(byId),
             );
             expect(await merge.threadsOn("guest")).toStrictEqual([]);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("re-owns a moved thread and keeps its title as it was, even when the title is the guest's id", async () => {
+        const merge = twoShards();
+
+        try {
+            const id = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("guest")))) as string;
+
+            await mergeToEnd(merge.call, "guest", "user");
+
+            expect(await merge.threadsOn("user")).toStrictEqual([{ _id: id, title: "guest", userId: "user" }]);
         } finally {
             merge.close();
         }
@@ -1953,7 +2087,10 @@ describe("mergeGuestInto across two real shards", () => {
                     await age(merge);
 
                     expect(await sweep(merge)).toStrictEqual({ dropped: 1, resumed: 0 });
-                    expect(transport.queued).toStrictEqual([]);
+                    // No restart: only the note to the guest's shard that its merge stopped before its routes moved.
+                    expect(transport.queued.map((job) => [job.ref.__lunoraRef, job.args])).toStrictEqual([
+                        ["lib_account_merge:abandonPinsLeft", { from: "guest" }],
+                    ]);
                     expect(await progressOf(merge)).toBeNull();
                 } finally {
                     merge.close();
@@ -2073,7 +2210,9 @@ describe("mergeGuestInto across two real shards", () => {
                 goneAccounts.add("user");
 
                 expect(await sweep(merge)).toStrictEqual({ dropped: 1, resumed: 0 });
-                expect(transport.queued).toStrictEqual([]);
+                expect(transport.queued.map((job) => [job.ref.__lunoraRef, job.args])).toStrictEqual([
+                    ["lib_account_merge:abandonPinsLeft", { from: "guest" }],
+                ]);
                 expect(await progressOf(merge)).toBeNull();
                 expect(await sweep(merge)).toStrictEqual({ dropped: 0, resumed: 0 });
             } finally {
@@ -2356,7 +2495,8 @@ describe("the account-move markers a merge holds", () => {
         );
 
         expect(result).toStrictEqual({ moved: 0, next: null, stopped: true });
-        expect(made).toStrictEqual(["acquireMergeLease", "noteMergeGeneration", "beginMergeRun", "releaseMergeLease"]);
+        // Last, on the guest's shard: a pins-left signal of its, if any, says the merge stopped before its routes moved.
+        expect(made).toStrictEqual(["acquireMergeLease", "noteMergeGeneration", "beginMergeRun", "releaseMergeLease", "abandonPinsLeft"]);
         expect(shards.get("guest")?.get("threads")).toHaveLength(1);
     });
 
@@ -2788,7 +2928,7 @@ describe("the merge's progress record", () => {
                 { maxRuns: 10, resume: { cursor: null, moved: 0, phase: "copy", run: 3, table: "threads" } },
             ),
         ).rejects.toThrow("did not finish in 10 runs");
-        expect(made).toStrictEqual(["acquireMergeLease", "releaseMergeLease"]);
+        expect(made).toStrictEqual(["acquireMergeLease", "releaseMergeLease", "abandonPinsLeft"]);
     });
 
     it("lets the sweep reach a stalled merge behind more fresh records than one pass reads", async () => {
@@ -2854,7 +2994,10 @@ describe("pins the clear moves off a guest's shard", () => {
 
             await harness.run(async (context: any) => await context.runMutation(noteMergeGeneration, { from: "owner", generation: 1 }));
 
-            expect(await harness.run(async (context: any) => await context.runMutation(pinsLeftShard, { ownerId: "owner" }))).toStrictEqual({ left: false });
+            expect(await harness.run(async (context: any) => await context.runMutation(pinsLeftShard, { ownerId: "owner" }))).toStrictEqual({
+                abandoned: false,
+                left: false,
+            });
 
             const { digests } = (await harness.run(
                 async (context: any) => await context.runQuery(listShardRowsToClear, { from: "owner", table: "threadPins" }),
@@ -2867,7 +3010,10 @@ describe("pins the clear moves off a guest's shard", () => {
                     await context.runMutation(deleteShardRows, { from: "owner", generation: 1, rows: [{ digest: digests[0]!, id: pin }], table: "threadPins" }),
             );
 
-            expect(await harness.run(async (context: any) => await context.runMutation(pinsLeftShard, { ownerId: "owner" }))).toStrictEqual({ left: true });
+            expect(await harness.run(async (context: any) => await context.runMutation(pinsLeftShard, { ownerId: "owner" }))).toStrictEqual({
+                abandoned: false,
+                left: true,
+            });
             expect(
                 await harness.run(
                     async (context: any) =>
@@ -2877,6 +3023,61 @@ describe("pins the clear moves off a guest's shard", () => {
                             .first(),
                 ),
             ).not.toBeNull();
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("marks a stopped merge's signal abandoned, never writes one where none is, and a later clear arms it again", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+        const left = async (ownerId: string) => await harness.run(async (context: any) => await context.runMutation(pinsLeftShard, { ownerId }));
+        const abandon = async (from: string) => await harness.run(async (context: any) => await context.runMutation(abandonPinsLeft, { from }));
+
+        try {
+            // No signal: the stopped merge's clear moved no pin, so another merge has nothing to wait on or stop for.
+            await abandon("quiet");
+
+            expect(await left("quiet")).toStrictEqual({ abandoned: false, left: false });
+
+            await harness.run(async (context: any) => {
+                await context.db.insert("idempotencyClaims", {
+                    claimedAt: 1,
+                    expiresAt: IMPORT_MARKER_EXPIRES_AT,
+                    key: "owner",
+                    result: "",
+                    scope: MERGE_PINS_LEFT_SCOPE,
+                    userId: "owner",
+                });
+            });
+            await abandon("owner");
+
+            expect(await left("owner")).toStrictEqual({ abandoned: true, left: true });
+
+            // A later run of that merge clears pins again: they are on their way once more, and its `global` step re-points them.
+            const pin = (await harness.run(async (context: any) => {
+                const threadId = await context.db.insert("threads", {
+                    mode: "text",
+                    model: "gpt-4o",
+                    status: "active",
+                    title: "T",
+                    updatedAt: 1,
+                    userId: "owner",
+                });
+
+                return await context.db.insert("threadPins", { createdAt: 1, messageRole: "user", threadId, updatedAt: 1, userId: "collaborator" });
+            })) as string;
+
+            await harness.run(async (context: any) => await context.runMutation(noteMergeGeneration, { from: "owner", generation: 2 }));
+            const { digests } = (await harness.run(
+                async (context: any) => await context.runQuery(listShardRowsToClear, { from: "owner", table: "threadPins" }),
+            )) as { digests: string[] };
+
+            await harness.run(
+                async (context: any) =>
+                    await context.runMutation(deleteShardRows, { from: "owner", generation: 2, rows: [{ digest: digests[0]!, id: pin }], table: "threadPins" }),
+            );
+
+            expect(await left("owner")).toStrictEqual({ abandoned: false, left: true });
         } finally {
             harness.close();
         }
@@ -3076,7 +3277,7 @@ describe("a merge's unfinished state never lapses", () => {
             vi.setSystemTime(Date.now() + 31 * DAY);
             await harness.run(async (context: any) => await context.runMutation(purgeExpiredClaims, {}));
 
-            expect(await left()).toStrictEqual({ left: true });
+            expect(await left()).toStrictEqual({ abandoned: false, left: true });
 
             // The owner's merge resumes with a new run; a superseded delivery's global step does not end the signal, the current one's does.
             await harness.run(async (context: any) => await context.runMutation(noteMergeGeneration, { from: "owner", generation: 3 }));
@@ -3084,11 +3285,11 @@ describe("a merge's unfinished state never lapses", () => {
             expect(await harness.run(async (context: any) => await context.runMutation(resolvePinsLeft, { from: "owner", generation: 2 }))).toStrictEqual({
                 fenced: true,
             });
-            expect(await left()).toStrictEqual({ left: true });
+            expect(await left()).toStrictEqual({ abandoned: false, left: true });
             expect(await harness.run(async (context: any) => await context.runMutation(resolvePinsLeft, { from: "owner", generation: 3 }))).toStrictEqual({
                 fenced: false,
             });
-            expect(await left()).toStrictEqual({ left: false });
+            expect(await left()).toStrictEqual({ abandoned: false, left: false });
         } finally {
             harness.close();
             vi.useRealTimers();

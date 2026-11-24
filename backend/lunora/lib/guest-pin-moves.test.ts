@@ -24,6 +24,7 @@ const reference = (name: string) => {
 };
 
 const REFERENCES: MergeReferences = {
+    abandonPinsLeft: reference("abandonPinsLeft"),
     acquireLease: reference("acquireMergeLease"),
     beginRun: reference("beginMergeRun"),
     deleteGuest: reference("deleteMergedGuest"),
@@ -42,6 +43,8 @@ const REFERENCES: MergeReferences = {
     reassignPins: reference("reassignUserPinsOnThread"),
     releaseLease: reference("releaseMergeLease"),
     resolvePinsLeft: reference("resolvePinsLeft"),
+    routeOwner: reference("sharedPinRouteOwner"),
+    stopKeepingGuest: reference("stopMergeKeepingGuest"),
 };
 
 /** A guest pin write as `createPin` makes it: refused once the account is marked, otherwise a new pin on the owner shard. */
@@ -102,6 +105,9 @@ const build = ({
         const name = target.__lunoraRef.split(":", 2)[1];
 
         switch (name) {
+            case "abandonPinsLeft": {
+                return null as never;
+            }
             case "acquireMergeLease": {
                 return { generation: 1 } as never;
             }
@@ -175,7 +181,7 @@ const build = ({
                     repointRoutes();
                 }
 
-                return { left } as never;
+                return { abandoned: false, left } as never;
             }
             case "reassignGlobalRows": {
                 return { done: true, reassigned: 0 } as never;
@@ -198,6 +204,9 @@ const build = ({
             }
             case "resolvePinsLeft": {
                 return { fenced: false } as never;
+            }
+            case "sharedPinRouteOwner": {
+                return (state.routes.find((route) => route.userId === args.userId && route.threadId === args.threadId)?.ownerId ?? null) as never;
             }
             default: {
                 throw new Error(`unexpected ${String(name)}`);

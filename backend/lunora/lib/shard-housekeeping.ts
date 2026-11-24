@@ -167,6 +167,10 @@ export const noteShardActivity = async (ctx: CensusCtx, shardKey: string | undef
 /**
  * Tell the root tick that `shardKey` (default: this shard) has timed work due
  * at `dueAt`. Keeps the EARLIEST due time; {@link runShardTick} resets it.
+ * A due time already passed may be in {@link dispatchDueShards}' hands, whose
+ * tick can run before this caller's work is visible: it is moved by a
+ * millisecond, still due, so that dispatch sees it changed and leaves it armed
+ * for the next one instead of clearing it.
  */
 export const noteShardDue = async (ctx: CensusCtx, dueAt: number, shardKey: string | undefined = currentUserShard()): Promise<void> => {
     if (shardKey === undefined) {
@@ -174,16 +178,19 @@ export const noteShardDue = async (ctx: CensusCtx, dueAt: number, shardKey: stri
     }
 
     await bestEffort("noteShardDue", async () => {
-        const row = await censusRow(ctx, shardKey);
+        const row = await censusRow(ctx, shardKey, "primary");
+        const now = Date.now();
 
         if (!row) {
-            await ctx.db.insert("shardActivity", { lastActiveAt: Date.now(), nextDueAt: dueAt, shardKey });
+            await ctx.db.insert("shardActivity", { lastActiveAt: now, nextDueAt: dueAt, shardKey });
 
             return;
         }
 
         if (row.nextDueAt === undefined || dueAt < row.nextDueAt) {
             await ctx.db.patch("shardActivity", row._id, { nextDueAt: dueAt });
+        } else if (row.nextDueAt <= now) {
+            await ctx.db.patch("shardActivity", row._id, { nextDueAt: row.nextDueAt < now ? row.nextDueAt + 1 : row.nextDueAt - 1 });
         }
     });
 };
@@ -297,13 +304,37 @@ export const dispatchDueShards = internalMutation
             where: { nextDueAt: { lte: now } },
         });
 
+        let dispatched = 0;
+
         for (const row of due) {
-            await runAfterOnShard(ctx.scheduler, 0, internal.lib.shard_housekeeping.runShardTick, {}, row.shardKey);
-            // Cleared here, re-armed by the shard tick — so a slow tick is not dispatched twice.
-            await patchRow(ctx.db, "shardActivity", row, { nextDueAt: undefined });
+            // Read again, primary, right before the clear: only the due time this dispatch read is consumed. One written since
+            // (`noteShardDue` moves a passed one) stays armed, so its work is dispatched again, never lost to this clear.
+            const fresh = await censusRow(ctx, row.shardKey, "primary");
+
+            if (fresh?.nextDueAt === undefined || fresh.nextDueAt > now) {
+                // Dispatched, or re-armed by a tick, since this read: nothing is due here any more.
+                continue;
+            }
+
+            if (fresh.nextDueAt === row.nextDueAt) {
+                // Cleared before the tick is sent, re-armed by the shard tick — so a slow tick is not dispatched twice, and work
+                // noted after this clear arms a due time of its own.
+                await patchRow(ctx.db, "shardActivity", fresh, { nextDueAt: undefined });
+            }
+
+            try {
+                await runAfterOnShard(ctx.scheduler, 0, internal.lib.shard_housekeeping.runShardTick, {}, row.shardKey);
+            } catch (error) {
+                // Armed again, so the next dispatch sends it.
+                await noteShardDue(ctx, fresh.nextDueAt, row.shardKey);
+
+                throw error;
+            }
+
+            dispatched += 1;
         }
 
-        return { dispatched: due.length };
+        return { dispatched };
     });
 
 /** Root, every ten minutes: send {@link runShardHousekeeping} to each shard that needs it. */

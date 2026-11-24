@@ -79,6 +79,11 @@
   a lapsed one still counts: each goes only when the merge has done what it records (its end, the run cap, the `global`
   step that re-points the moved pins' routes) or with the erasure of the account it is tagged with. A time to live there
   would lose a stalled merge, write again a row the account deleted, or let another merge's `repins` step skip a pin.
+  A merge that ends before its `global` step (an erasure, a gone account, the run cap) marks its pins-left signal
+  `abandoned`: a `repins` step that meets it stops its own merge and keeps that guest, never waits to its cap. That step
+  re-reads its route's owner (primary) after the signal check and follows a route re-pointed meanwhile. The import copies
+  re-point only `USER_REFERENCE_FIELDS`; content equal to the guest's id stays. The root dispatch clears a shard's due
+  time only while it still holds the value it read; `noteShardDue` moves a passed one, so a save then is never cleared.
   Everything after the lease is taken runs inside the `try` that gives it back. A fenced merge with
   import markers or account-move markers left is not finished: its runs drain the `markers` phase.
   Every step that touches a marker checks the lease generation first (`beginMergeRun` included). The new account's
