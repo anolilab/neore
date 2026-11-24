@@ -3,10 +3,10 @@
  * live path (a real connect and a real certificate check) is not covered here and must be checked on a dev run.
  */
 /* eslint-disable sonarjs/no-hardcoded-ip -- the addresses under test are literals: private, reserved and public ones */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { EgressConnect, EgressDependencies, EgressSocket } from "./egress";
-import { EgressError, isCloudflareAddress, isPublicIPv4, isPublicIPv6, postCheckedHttps } from "./egress";
+import { addressTimeoutMs, EgressError, isCloudflareAddress, isPublicIPv4, isPublicIPv6, postCheckedHttps } from "./egress";
 
 const textStream = (text: string) =>
     new ReadableStream<Uint8Array>({
@@ -45,6 +45,7 @@ const fakeConnect = (response: string, readable: () => ReadableStream<Uint8Array
     const close = vi.fn(async () => {});
     const tls: EgressSocket = {
         close,
+        opened: Promise.resolve(),
         readable: readable(),
         startTls: vi.fn(() => tls),
         writable: new WritableStream<Uint8Array>({
@@ -55,6 +56,7 @@ const fakeConnect = (response: string, readable: () => ReadableStream<Uint8Array
     };
     const plain: EgressSocket = {
         close: vi.fn(async () => {}),
+        opened: Promise.resolve(),
         readable: silentStream(),
         startTls: vi.fn(() => tls),
         writable: new WritableStream<Uint8Array>(),
@@ -72,6 +74,74 @@ const dependencies = (fetch: EgressDependencies["fetch"], connection: FakeConnec
 };
 
 const HOOK = "https://hooks.example.com/run?x=1";
+
+/**
+ * A `connect` that behaves per address: `unreachable` fails the connection before anything is written, `tls-fails` connects
+ * but fails the TLS handshake, `reset` takes the request and then drops the connection, `body-fails` takes the head and
+ * fails on the body, and a string is the response that address answers with. Every socket opened is kept in `sockets`.
+ */
+const perAddressConnect = (behaviour: Record<string, string>) => {
+    const tried: string[] = [];
+    const tls: { address: string; hostname: string }[] = [];
+    const sockets: { address: string; close: ReturnType<typeof vi.fn>; kind: "plain" | "tls" }[] = [];
+    const writes: Record<string, number> = {};
+    const fail = (message: string): Promise<never> => {
+        const promise = Promise.reject(new Error(message));
+
+        promise.catch(() => undefined);
+
+        return promise;
+    };
+    const connect = vi.fn(((address) => {
+        tried.push(address.hostname);
+
+        const mode = behaviour[address.hostname] ?? "unreachable";
+        const socketFor = (kind: "plain" | "tls"): EgressSocket => {
+            const close = vi.fn(async () => {});
+
+            sockets.push({ address: address.hostname, close, kind });
+
+            let opened: Promise<unknown> = Promise.resolve();
+
+            if (mode === "unreachable") {
+                opened = fail("connection refused");
+            } else if (kind === "tls" && mode === "tls-fails") {
+                opened = fail("handshake failed");
+            }
+
+            return {
+                close,
+                opened,
+                readable:
+                    mode === "reset"
+                        ? new ReadableStream<Uint8Array>({
+                              start(controller) {
+                                  controller.error(new Error("connection reset"));
+                              },
+                          })
+                        : textStream(mode),
+                startTls: vi.fn(({ expectedServerHostname }) => {
+                    tls.push({ address: address.hostname, hostname: expectedServerHostname });
+
+                    return socketFor("tls");
+                }),
+                writable: new WritableStream<Uint8Array>({
+                    write() {
+                        writes[address.hostname] = (writes[address.hostname] ?? 0) + 1;
+
+                        if (mode === "body-fails" && writes[address.hostname]! > 1) {
+                            throw new Error("connection reset while writing");
+                        }
+                    },
+                }),
+            };
+        };
+
+        return socketFor("plain");
+    }) as EgressConnect);
+
+    return { connect, sockets, tls, tried, writes };
+};
 
 describe("isPublicIPv4", () => {
     it.each([
@@ -373,6 +443,284 @@ describe("postCheckedHttps", () => {
         const result = await postCheckedHttps({ body: "", headers: {}, url: HOOK }, dependencies(dnsFetch({ A: ["93.184.216.34"] }), connection));
 
         expect(result).toEqual({ status: 201 });
+    });
+
+    it("moves on to the next checked address when one cannot be reached, keeping the host name for the certificate", async () => {
+        const { connect, tls, tried } = perAddressConnect({ "2a00:1450::1": "HTTP/1.1 204 No Content\r\n\r\n" });
+
+        const result = await postCheckedHttps(
+            { body: "", headers: {}, url: HOOK },
+            { connect, fetch: dnsFetch({ A: ["93.184.216.34"], AAAA: ["2a00:1450::1"] }) },
+        );
+
+        expect(result).toEqual({ status: 204 });
+        expect(tried).toStrictEqual(["93.184.216.34", "2a00:1450::1"]);
+        expect(tls.every(({ hostname }) => hostname === "hooks.example.com")).toBe(true);
+    });
+
+    it("fails as a connection failure when no checked address can be reached", async () => {
+        const { connect, tried } = perAddressConnect({});
+
+        await expect(
+            postCheckedHttps({ body: "", headers: {}, url: HOOK }, { connect, fetch: dnsFetch({ A: ["93.184.216.34", "8.8.8.8"] }) }),
+        ).rejects.toMatchObject({ code: "bad_response" });
+        expect(tried).toStrictEqual(["93.184.216.34", "8.8.8.8"]);
+    });
+
+    it("tries no other address once the request was written, so a receiver never gets it twice", async () => {
+        const { connect, tried } = perAddressConnect({ "8.8.8.8": "HTTP/1.1 204 No Content\r\n\r\n", "93.184.216.34": "reset" });
+
+        await expect(
+            postCheckedHttps({ body: "", headers: {}, url: HOOK }, { connect, fetch: dnsFetch({ A: ["93.184.216.34", "8.8.8.8"] }) }),
+        ).rejects.toMatchObject({ code: "bad_response" });
+        expect(tried).toStrictEqual(["93.184.216.34"]);
+    });
+
+    it("tries no other address when the head was written and the body write fails", async () => {
+        const { connect, tried, writes } = perAddressConnect({ "8.8.8.8": "HTTP/1.1 204 No Content\r\n\r\n", "93.184.216.34": "body-fails" });
+
+        await expect(
+            postCheckedHttps({ body: "{}", headers: {}, url: HOOK }, { connect, fetch: dnsFetch({ A: ["93.184.216.34", "8.8.8.8"] }) }),
+        ).rejects.toMatchObject({ code: "bad_response" });
+        expect(writes["93.184.216.34"]).toBe(2);
+        expect(tried).toStrictEqual(["93.184.216.34"]);
+    });
+
+    it("closes both sockets of an address whose TLS setup fails before trying the next one", async () => {
+        const { connect, sockets, tried } = perAddressConnect({ "8.8.8.8": "HTTP/1.1 204 No Content\r\n\r\n", "93.184.216.34": "tls-fails" });
+
+        const result = await postCheckedHttps({ body: "", headers: {}, url: HOOK }, { connect, fetch: dnsFetch({ A: ["93.184.216.34", "8.8.8.8"] }) });
+
+        expect(result).toEqual({ status: 204 });
+        expect(tried).toStrictEqual(["93.184.216.34", "8.8.8.8"]);
+
+        const failed = sockets.filter(({ address }) => address === "93.184.216.34");
+
+        expect(failed.map(({ kind }) => kind)).toStrictEqual(["plain", "tls"]);
+        expect(failed.every(({ close }) => close.mock.calls.length > 0)).toBe(true);
+        // Both closes started before the next address was connected.
+        const nextConnectOrder = connect.mock.invocationCallOrder[1]!;
+
+        expect(failed.every(({ close }) => close.mock.invocationCallOrder[0]! < nextConnectOrder)).toBe(true);
+    });
+
+    it("closes the plain socket when starting TLS throws", async () => {
+        const reachable = perAddressConnect({ "8.8.8.8": "HTTP/1.1 204 No Content\r\n\r\n" });
+        const plainClose = vi.fn(async () => {});
+        const connect = vi.fn(((address, options) => {
+            if (address.hostname === "93.184.216.34") {
+                return {
+                    close: plainClose,
+                    opened: Promise.resolve(),
+                    readable: silentStream(),
+                    startTls: () => {
+                        throw new Error("TLS could not start");
+                    },
+                    writable: new WritableStream<Uint8Array>(),
+                };
+            }
+
+            return reachable.connect(address, options);
+        }) as EgressConnect);
+
+        const result = await postCheckedHttps({ body: "", headers: {}, url: HOOK }, { connect, fetch: dnsFetch({ A: ["93.184.216.34", "8.8.8.8"] }) });
+
+        expect(result).toEqual({ status: 204 });
+        expect(reachable.tried).toStrictEqual(["8.8.8.8"]);
+        // Closed before the next address was connected (and again by the final cleanup, which is harmless).
+        expect(plainClose.mock.invocationCallOrder[0]!).toBeLessThan(reachable.connect.mock.invocationCallOrder[0]!);
+    });
+
+    it("opens nothing for a host with a refused address among reachable ones", async () => {
+        const { connect, tried } = perAddressConnect({ "8.8.8.8": "HTTP/1.1 204 No Content\r\n\r\n" });
+
+        await expect(
+            postCheckedHttps({ body: "", headers: {}, url: HOOK }, { connect, fetch: dnsFetch({ A: ["93.184.216.34", "10.0.0.5", "8.8.8.8"] }) }),
+        ).rejects.toMatchObject({ code: "blocked_address" });
+        expect(tried).toStrictEqual([]);
+    });
+
+    it("never gives one address more than the time left before the deadline", () => {
+        expect(addressTimeoutMs(10_000, 10_000, true)).toBe(3334);
+        expect(addressTimeoutMs(10_000, 1200, true)).toBe(1200);
+        expect(addressTimeoutMs(10_000, 0, true)).toBe(0);
+        expect(addressTimeoutMs(10_000, -5, true)).toBe(0);
+    });
+
+    it("gives the last address all the time left before the deadline", () => {
+        expect(addressTimeoutMs(10_000, 10_000, false)).toBe(10_000);
+        expect(addressTimeoutMs(10_000, 6666, false)).toBe(6666);
+        expect(addressTimeoutMs(10_000, -5, false)).toBe(0);
+    });
+
+    describe("with a slow receiver", () => {
+        beforeEach(() => {
+            vi.useFakeTimers();
+        });
+
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        /** Wraps `connect` so the TLS setup of `slowAddress` takes `tlsMs`, and every address in `silent` never connects. */
+        const slowConnect = (connect: EgressConnect, slowAddress: string, tlsMs: number, silent: string[] = []): EgressConnect =>
+            vi.fn(((address, options) => {
+                const socket = connect(address, options);
+
+                if (silent.includes(address.hostname)) {
+                    return { ...socket, opened: new Promise<never>(() => {}) };
+                }
+
+                if (address.hostname !== slowAddress) {
+                    return socket;
+                }
+
+                return {
+                    ...socket,
+                    startTls: (tlsOptions: { expectedServerHostname: string }) => {
+                        const tlsSocket = socket.startTls(tlsOptions);
+
+                        return {
+                            ...tlsSocket,
+                            opened: new Promise<void>((resolve) => {
+                                setTimeout(resolve, tlsMs);
+                            }),
+                        };
+                    },
+                };
+            }) as EgressConnect);
+
+        it("waits for a single address whose connection and TLS setup take 5 seconds", async () => {
+            const { connect, tried } = perAddressConnect({ "93.184.216.34": "HTTP/1.1 204 No Content\r\n\r\n" });
+            const result = postCheckedHttps(
+                { body: "", headers: {}, url: HOOK },
+                { connect: slowConnect(connect, "93.184.216.34", 5000), fetch: dnsFetch({ A: ["93.184.216.34"] }) },
+            );
+
+            await vi.advanceTimersByTimeAsync(5000);
+
+            await expect(result).resolves.toEqual({ status: 204 });
+            expect(tried).toStrictEqual(["93.184.216.34"]);
+        });
+
+        it("moves on from a silent first address after its share and gives the last one the rest", async () => {
+            const { connect, tried } = perAddressConnect({ "8.8.8.8": "HTTP/1.1 204 No Content\r\n\r\n" });
+            const result = postCheckedHttps(
+                { body: "", headers: {}, url: HOOK },
+                {
+                    connect: slowConnect(connect, "8.8.8.8", 5000, ["93.184.216.34"]),
+                    fetch: dnsFetch({ A: ["93.184.216.34", "8.8.8.8"] }),
+                },
+            );
+
+            result.catch(() => undefined);
+
+            await vi.advanceTimersByTimeAsync(3333);
+            expect(tried).toStrictEqual(["93.184.216.34"]);
+
+            await vi.advanceTimersByTimeAsync(1);
+            expect(tried).toStrictEqual(["93.184.216.34", "8.8.8.8"]);
+
+            // 5 s of TLS setup is more than a third of the deadline, but the last address has the 6.6 s left.
+            await vi.advanceTimersByTimeAsync(5000);
+
+            await expect(result).resolves.toEqual({ status: 204 });
+        });
+
+        /** Settles `promise` into a flag, so a test can see whether it is done without waiting on it. */
+        const track = <T>(promise: Promise<T>): { settled: () => boolean } => {
+            let done = false;
+
+            // The test awaits `promise` itself; this copy only marks when it settles.
+            promise
+                .finally(() => {
+                    done = true;
+                })
+                .catch(() => undefined);
+
+            return { settled: () => done };
+        };
+
+        it("moves on to the next address when the first one never answers, within the deadline", async () => {
+            const { connect, sockets, tried } = perAddressConnect({ "8.8.8.8": "HTTP/1.1 204 No Content\r\n\r\n" });
+            // The first address drops every packet: its connection never opens and never fails.
+            const silentFirst = vi.fn(((address, options) => {
+                const socket = connect(address, options);
+
+                return address.hostname === "93.184.216.34" ? { ...socket, opened: new Promise<never>(() => {}) } : socket;
+            }) as EgressConnect);
+
+            const result = postCheckedHttps(
+                { body: "", headers: {}, timeoutMs: 300, url: HOOK },
+                { connect: silentFirst, fetch: dnsFetch({ A: ["93.184.216.34", "8.8.8.8"] }) },
+            );
+            const state = track(result);
+
+            // The first of two addresses has a third of the deadline.
+            await vi.advanceTimersByTimeAsync(99);
+            expect(tried).toStrictEqual(["93.184.216.34"]);
+
+            await vi.advanceTimersByTimeAsync(1);
+            expect(tried).toStrictEqual(["93.184.216.34", "8.8.8.8"]);
+            // Answered by the second address well before the shared deadline.
+            expect(state.settled()).toBe(true);
+            await expect(result).resolves.toEqual({ status: 204 });
+
+            // The silent address's socket was closed before the next address was connected.
+            const silent = sockets.find(({ address }) => address === "93.184.216.34")!;
+
+            expect(silent.close.mock.invocationCallOrder[0]!).toBeLessThan(connect.mock.invocationCallOrder[1]!);
+        });
+
+        it("gives the next address a turn when a TLS setup never finishes", async () => {
+            const { connect, tried } = perAddressConnect({ "8.8.8.8": "HTTP/1.1 204 No Content\r\n\r\n" });
+            const hangingTls = vi.fn(((address, options) => {
+                const socket = connect(address, options);
+
+                if (address.hostname !== "93.184.216.34") {
+                    return socket;
+                }
+
+                const tlsSocket = { ...socket, opened: new Promise<never>(() => {}) };
+
+                return { ...socket, opened: Promise.resolve(), startTls: () => tlsSocket };
+            }) as EgressConnect);
+
+            const result = postCheckedHttps(
+                { body: "", headers: {}, timeoutMs: 300, url: HOOK },
+                { connect: hangingTls, fetch: dnsFetch({ A: ["93.184.216.34", "8.8.8.8"] }) },
+            );
+            const state = track(result);
+
+            await vi.advanceTimersByTimeAsync(100);
+
+            expect(state.settled()).toBe(true);
+            await expect(result).resolves.toEqual({ status: 204 });
+            expect(tried).toStrictEqual(["93.184.216.34", "8.8.8.8"]);
+        });
+
+        it.each([
+            ["two", ["93.184.216.34", "8.8.8.8"]],
+            ["four", ["93.184.216.34", "8.8.8.8", "9.9.9.9", "1.1.1.1"]],
+        ])("times out when all %s addresses are silent, and writes nothing", async (_count, addresses) => {
+            const { connect, tried, writes } = perAddressConnect({});
+            const silent = vi.fn(((address, options) => {
+                return { ...connect(address, options), opened: new Promise<never>(() => {}) };
+            }) as EgressConnect);
+
+            const result = postCheckedHttps({ body: "", headers: {}, timeoutMs: 60, url: HOOK }, { connect: silent, fetch: dnsFetch({ A: addresses }) });
+            const state = track(result);
+
+            // One deadline for all addresses, not one per address: nothing is left pending once the shared 60 ms are up.
+            await vi.advanceTimersByTimeAsync(59);
+            expect(state.settled()).toBe(false);
+
+            await vi.advanceTimersByTimeAsync(1);
+            expect(state.settled()).toBe(true);
+            await expect(result).rejects.toMatchObject({ code: "timeout" });
+            expect(tried.length).toBeLessThanOrEqual(addresses.length);
+            expect(Object.keys(writes)).toStrictEqual([]);
+        });
     });
 
     it("returns the timeout even when a graceful close never finishes", async () => {

@@ -137,6 +137,24 @@ describe("data export workflow: failure", () => {
         expect(ran("gdpr_steps:sendExportReadyEmail")).toHaveLength(0);
     });
 
+    it.each(["gdpr_steps:collectProfile", "run_webhooks_gdpr:collectRunWebhookForExport", "gdpr_steps:collectActivityForExport"])(
+        "marks the request failed and notifies the user when the collect step %s fails for good",
+        async (ref) => {
+            stubs[ref] = () => {
+                throw new Error("collect failed: secret internals");
+            };
+
+            await expect(execute()).resolves.toBeUndefined();
+
+            expect(progressWith("failed")).toHaveLength(1);
+            expect(progressWith("failed")[0]?.args).toMatchObject({ errorMessage: "Failed to generate export file" });
+            expect(progressWith("completed")).toHaveLength(0);
+            expect(ran("gdpr_steps:generateExportFile")).toHaveLength(0);
+            expect(ran("notifications_functions:createNotification")[0]?.args).toMatchObject({ outcome: "failure" });
+            expect(ran("browser_gdpr:deleteBrowserExportPages")).toHaveLength(1);
+        },
+    );
+
     it("fails the request when generation returns no storage id", async () => {
         generate = () => undefined;
 
