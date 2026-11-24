@@ -15,7 +15,7 @@ const harness = vi.hoisted(() => {
         requestComposerFocus: vi.fn((_threadId: string) => undefined),
         preferences: { splitViewEnabled: true, subAgentOpenPlace: undefined as unknown },
         run: undefined as Record<string, unknown> | undefined,
-        showInSplitView: vi.fn(async (_threadId: string) => undefined),
+        showInSplitView: vi.fn((_threadId: string): Promise<void> => Promise.resolve()),
     };
 });
 
@@ -277,6 +277,27 @@ describe("where a sub-agent's chat opens", () => {
         await vi.waitFor(() => {
             expect(harness.navigate).toHaveBeenCalledWith(MAIN_VIEW);
         });
+    });
+
+    it("does not navigate for an earlier click once a later click has opened a side pane", async () => {
+        harness.preferences = { splitViewEnabled: true, subAgentOpenPlace: "main" };
+        // The first click's pane settles a moment later, after the second click has been made.
+        harness.showInSplitView.mockImplementationOnce(
+            () =>
+                new Promise<void>((resolve) => {
+                    setTimeout(resolve, 0);
+                }),
+        );
+        const { link } = renderRunningCard();
+
+        fireEvent.click(link);
+        fireEvent.click(link, { ctrlKey: true });
+
+        await new Promise((resolve) => {
+            setTimeout(resolve, 10);
+        });
+        expect(harness.openBeside).toHaveBeenCalledWith("child-1", "parent-1");
+        expect(harness.navigate).not.toHaveBeenCalled();
     });
 
     it("opens the main view when the window narrows while its pane opens, so the address names the chat shown", async () => {

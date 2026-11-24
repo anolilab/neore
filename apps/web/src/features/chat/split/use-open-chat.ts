@@ -11,6 +11,12 @@ import { isDesktopNow, useIsDesktop } from "./desktop-layout";
 import { requestComposerFocus } from "./focus-composer";
 import { openThreadBesideFocusedPane, showThreadInSplitView } from "./split-layout-store";
 
+/**
+ * The number of the latest click. A click that a later one has overtaken must not navigate or move focus: its route change would
+ * commit after the later chat has taken focus and pull focus back to the earlier one.
+ */
+const openIntents = { latest: 0 };
+
 /** Whether the split view is on now. Read when it is needed: it can be turned off while a saved layout is being read. */
 const isSplitViewOnNow = (): boolean => useUIStateStore.getState().preferences.splitViewEnabled === true;
 
@@ -37,7 +43,15 @@ export const useOpenChatClick = (): ((threadId: string, click: ChatClick, origin
 
     return useCallback(
         (threadId, click, originThreadId) => {
+            openIntents.latest += 1;
+            const intent = openIntents.latest;
+            const isLatest = (): boolean => intent === openIntents.latest;
+
             const openInMainView = async (): Promise<void> => {
+                if (!isLatest()) {
+                    return;
+                }
+
                 await navigate({ params: { threadId }, search: {}, to: "/chat/$threadId" });
             };
 
@@ -50,7 +64,7 @@ export const useOpenChatClick = (): ((threadId: string, click: ChatClick, origin
 
                 const isShown = await showPaneQuietly(threadId);
 
-                if (isShown && click.detail === 0) {
+                if (isShown && click.detail === 0 && isLatest()) {
                     requestComposerFocus(threadId);
                 }
             };
@@ -85,7 +99,7 @@ export const useOpenChatClick = (): ((threadId: string, click: ChatClick, origin
                 const isPaneVisible = (result === "focused" || result === "opened") && isSplitViewOnNow() && isDesktopNow();
 
                 if (isPaneVisible) {
-                    if (click.detail === 0) {
+                    if (click.detail === 0 && isLatest()) {
                         requestComposerFocus(threadId);
                     }
 
