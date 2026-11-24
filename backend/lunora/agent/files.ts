@@ -679,6 +679,11 @@ export const deleteFiles = internalMutation
                 await Promise.all(metadata.map((row) => ctx.db.delete("chatFileMetadata", row._id)));
                 await ctx.db.delete("chatFiles", fileId);
 
+                // A repair or a reuse that wrote the metadata between the two deletes left a row for a file that is now gone: clear it.
+                const { page: late } = await ctx.db.chatFileMetadata.findMany({ consistency: "primary", where: { fileId } });
+
+                await Promise.all(late.map((row) => ctx.db.delete("chatFileMetadata", row._id)));
+
                 return fileId;
             }),
         );

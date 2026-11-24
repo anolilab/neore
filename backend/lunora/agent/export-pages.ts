@@ -270,8 +270,8 @@ export const readChunkMetadata = async <Row extends { id: string }>(
         rows.push(...repaired.rows);
     }
 
-    // A chunk that spent its budget says so, even when its last repair overshot it: the export's next chunk would stop, and so must this one.
-    return { readBytes, rows, truncated: readBytes >= bytesLeft };
+    // Every file was answered: nothing is left out, even when the last repair overshot the budget (the next chunk stops at the budget).
+    return { readBytes, rows, truncated: false };
 };
 
 /** The UTF-8 bytes of a text, as the file's size limit counts them. */

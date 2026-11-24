@@ -343,7 +343,7 @@ describe("chat files in the GDPR export", () => {
         expect(chunk.truncated).toBe(true);
     });
 
-    it("flags a chunk whose last repair overshoots the budget, even with no file left", async () => {
+    it("does not flag a complete chunk whose last repair overshoots the budget, since nothing is left out", async () => {
         const chunk = await readChunkMetadata(
             ["a"],
             5,
@@ -356,7 +356,7 @@ describe("chat files in the GDPR export", () => {
         );
 
         expect(chunk.rows).toEqual([{ id: "a" }]);
-        expect(chunk.truncated).toBe(true);
+        expect(chunk.truncated).toBe(false);
     });
 
     it("exports a file stored before its export metadata was written, and writes that metadata", async () => {

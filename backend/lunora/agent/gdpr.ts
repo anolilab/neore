@@ -281,7 +281,8 @@ export const repairChatFileMetadataForExport = internalMutation
         const rows = [];
 
         for (const fileId of fileIds) {
-            const file = storedRow(await ctx.db.chatFiles.findFirst({ where: { _id: fileId } }));
+            // Primary: a lagging replica can still return a file the reaper has just deleted, and the repair would write its metadata.
+            const file = storedRow(await ctx.db.chatFiles.findFirst({ consistency: "primary", where: { _id: fileId } }));
 
             if (!file) {
                 continue;
@@ -289,10 +290,20 @@ export const repairChatFileMetadataForExport = internalMutation
 
             // The whole row is read, as the metadata query's reads are counted: the export meters these against its budget.
             readBytes += rowBytes(file);
-            // Touched, as a store of the bytes is: the unused-file reaper leaves a file touched in the last day alone, so a file
-            // exported now is not reaped between this read and the metadata write (a reap that lands first would leave the metadata).
-            await ctx.db.patch("chatFiles", file._id, { lastTouchedAt: ctx.now });
             readBytes += await ensureChatFileMetadata(ctx, file);
+
+            // A reaper that deleted the file between the read and the write leaves the metadata just written orphaned: check the file
+            // row again, at primary, and take the metadata back if it is gone. (The reaper also clears its file's metadata after the row.)
+            const stillThere = storedRow(await ctx.db.chatFiles.findFirst({ consistency: "primary", where: { _id: fileId } }));
+
+            if (!stillThere) {
+                const { page: orphans } = await ctx.db.chatFileMetadata.findMany({ consistency: "primary", where: { fileId } });
+
+                await Promise.all(orphans.map(async (row) => await ctx.db.delete("chatFileMetadata", row._id)));
+
+                continue;
+            }
+
             rows.push(
                 chatFileExportRow({ createdAt: file._creationTime, fileId: file._id, filename: file.filename, hash: file.hash, mediaType: file.mediaType }),
             );
