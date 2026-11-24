@@ -42,7 +42,8 @@ import {
     runGuestMerge,
     shardLocalTables,
 } from "./account-merge";
-import { IMPORT_MARKER_SCOPE, MERGE_PINS_LEFT_SCOPE, pinsLeftShard } from "./account-merge";
+import { IMPORT_MARKER_EXPIRES_AT, IMPORT_MARKER_SCOPE, MERGE_PINS_LEFT_SCOPE, pinsLeftShard } from "./account-merge";
+import { purgeExpiredClaims } from "./claim-once";
 import { eraseWaitUntil } from "./account-moves";
 import { runInShard } from "./shard-context";
 import { schemaWithShardedTables } from "./test-schema";
@@ -2026,14 +2027,17 @@ describe("the account-move markers a merge holds", () => {
 
     it("leaves the markers alone for an older delivery that resumes after a newer one took the lease", async () => {
         const harness = lunoraTest(schemaWithShardedTables([]) as never);
-        const markersOf = async () =>
-            (
-                (await harness.run(async (context: any) => await context.db.accountMoves.findMany({ consistency: "primary", where: {} }))) as {
-                    page: { createdAt: number; kind: string; userId: string }[];
-                }
-            ).page.map(({ createdAt, kind, userId }) => {
+        /** The account-move markers, by what each is: the read has no order. */
+        const markersOf = async () => {
+            const { page } = (await harness.run(async (context: any) => await context.db.accountMoves.findMany({ consistency: "primary", where: {} }))) as {
+                page: { createdAt: number; kind: string; userId: string }[];
+            };
+            const markers = page.map(({ createdAt, kind, userId }) => {
                 return { createdAt, kind, userId };
             });
+
+            return markers.toSorted((a, b) => `${a.userId}:${a.kind}`.localeCompare(`${b.userId}:${b.kind}`));
+        };
 
         try {
             const older = (await harness.run(async (context: any) => await context.runMutation(acquireMergeLease, { from: "guest", to: "user" }))) as {
@@ -2064,7 +2068,11 @@ describe("the account-move markers a merge holds", () => {
             );
 
             expect(begun).toStrictEqual({ cleanup: false, finished: false, pinWritesUntil: null, stopped: false, superseded: true });
-            expect(await markersOf()).toStrictEqual([...before, { createdAt: 1, kind: "erasing", userId: "guest" }]);
+            expect(await markersOf()).toStrictEqual(
+                [...before, { createdAt: 1, kind: "erasing", userId: "guest" }].toSorted((a, b) =>
+                    `${a.userId}:${a.kind}`.localeCompare(`${b.userId}:${b.kind}`),
+                ),
+            );
             expect(await progressRecordOf(harness, "guest")).not.toBeNull();
         } finally {
             harness.close();
@@ -2693,6 +2701,81 @@ describe("pins the clear moves off a guest's shard", () => {
             ).not.toBeNull();
         } finally {
             harness.close();
+        }
+    });
+});
+
+describe("import markers outlive any merge", () => {
+    const DAY = 24 * 60 * 60 * 1000;
+
+    it("keeps a deleted row deleted when the merge resumes past the old 30-day time to live, even with its marker lapsed", async () => {
+        vi.useFakeTimers({ now: 1_000_000_000, toFake: ["Date"] });
+
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+        const markerOf = async (key: string) =>
+            (await harness.run(
+                async (context: any) =>
+                    await context.db
+                        .query("idempotencyClaims")
+                        .withIndex("by_scope_key", (q: any) => q.eq("scope", IMPORT_MARKER_SCOPE).eq("key", key))
+                        .first(),
+            )) as { _id: string; expiresAt: number } | null;
+
+        try {
+            // The guest's row as the merge reads it: here only so it has an id of this table.
+            const row = (await harness.run(async (context: any) => {
+                const id = await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "a", updatedAt: 1, userId: "guest" });
+                const stored = await context.db.get("threads", id);
+
+                await context.db.delete("threads", id);
+
+                return stored;
+            })) as Record<string, unknown>;
+            const id = row._id as string;
+            const importOnce = async () =>
+                (await harness.run(async (context: any) => {
+                    const { generation } = await context.runMutation(acquireMergeLease, { from: "guest", to: "user" });
+                    const result = await context.runMutation(importShardRows, { from: "guest", generation, rows: [row], table: "threads", to: "user" });
+
+                    await context.runMutation(releaseMergeLease, { from: "guest", generation });
+
+                    return result;
+                })) as { imported: number };
+
+            const first = await importOnce();
+
+            expect(first.imported).toBe(1);
+
+            const key = `guest:threads:${id}`;
+
+            const written = await markerOf(key);
+
+            expect(written?.expiresAt).toBe(IMPORT_MARKER_EXPIRES_AT);
+
+            // The new account deletes the moved row; the merge stalls and resumes long after.
+            await harness.run(async (context: any) => await context.db.delete("threads", id));
+            vi.setSystemTime(Date.now() + 31 * DAY);
+            await harness.run(async (context: any) => await context.runMutation(purgeExpiredClaims, {}));
+
+            expect(await markerOf(key)).not.toBeNull();
+
+            const resumed = await importOnce();
+
+            expect(resumed.imported).toBe(0);
+            expect(await harness.run(async (context: any) => await context.db.get("threads", id))).toBeNull();
+
+            // A marker that did lapse (written while markers still had a time to live) still says the merge wrote the row.
+            const lapsed = (await markerOf(key))!;
+
+            await harness.run(async (context: any) => await context.db.patch("idempotencyClaims", lapsed._id, { expiresAt: Date.now() - 1 }));
+
+            const afterLapse = await importOnce();
+
+            expect(afterLapse.imported).toBe(0);
+            expect(await harness.run(async (context: any) => await context.db.get("threads", id))).toBeNull();
+        } finally {
+            harness.close();
+            vi.useRealTimers();
         }
     });
 });

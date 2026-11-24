@@ -70,7 +70,10 @@
   erased or over-cap one. Restarts rely on the lease generation, never on the queue: keep every step
   safe to run twice, and save progress through `releaseMergeLease`, never from the job payload. The
   record only moves forward (a later `run` writes it; a delivery behind it starts from it), the sweep
-  moves its time before it sends the job, and each save notes the shard as active for housekeeping.
+  moves its time before it sends the job, and each save arms the shard's timed work (`noteShardDue`) for its stall: the
+  minute tick runs the sweep there (`resumeStalledGuestMergesOnTick`), since housekeeping reads only the most active shards.
+  Import markers (`guest-merge-row`) never lapse and a lapsed one still counts: only the merge's end or the new account's
+  erasure drops them, or a long merge would write again a row the account deleted.
   Everything after the lease is taken runs inside the `try` that gives it back. A fenced merge with
   import markers or account-move markers left is not finished: its runs drain the `markers` phase.
   Every step that touches a marker checks the lease generation first (`beginMergeRun` included). The new account's

@@ -82,7 +82,7 @@ import { hasClaimWithPrefix, releaseClaimsWithPrefix } from "./claim-once";
 import { authLogger } from "./logger";
 import { callOnShard } from "./cross-shard";
 import { enqueueJob } from "./job-queue";
-import { noteShardActivity } from "./shard-housekeeping";
+import { noteShardActivity, noteShardDue } from "./shard-housekeeping";
 import { currentShard } from "./shard-context";
 import schema from "../schema";
 import { dropPushDevicesOf } from "../notifications/push-device-writes";
@@ -425,12 +425,25 @@ const carrySetupSteps = async (ctx: { db: unknown }, guestRows: Record<string, u
 /**
  * The claim scope of import markers: one per row a merge wrote on the new shard, keyed `<guest>:<table>:<id>`, its
  * `result` the digest of what was written. Tagged with the new account, so its erasure takes them; dropped at the end
- * of the merge ({@link dropImportMarkersPage}), and past {@link IMPORT_MARKER_TTL_MS} by the claim purge.
+ * of the merge ({@link dropImportMarkersPage}) and with the new account's erasure, never by time: a merge has no end
+ * date, and a marker gone before it ends would let the merge write again a row the account deleted
+ * ({@link IMPORT_MARKER_EXPIRES_AT}).
  */
 export const IMPORT_MARKER_SCOPE = "guest-merge-row";
 
-/** Far past any merge's runs; a marker gone early only keeps the new account's row as it is. */
+/**
+ * The time to live of the merge's other claims (lease, generation, progress), each written again by every run. Not the
+ * import markers': a run writes a marker only with its row, so a merge that runs longer than this would see its first
+ * markers lapse.
+ */
 export const IMPORT_MARKER_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * An import marker's `expiresAt`: it never lapses, so the claim purge never takes it. It goes only with the end of the
+ * merge or the new account's erasure; a merge given up on keeps its markers until then, so a later delivery still
+ * leaves alone every row the account deleted.
+ */
+export const IMPORT_MARKER_EXPIRES_AT = Number.MAX_SAFE_INTEGER;
 
 const markerKey = (from: string, table: string, id: string): string => `${from}:${table}:${id}`;
 
@@ -778,6 +791,10 @@ const saveMergeProgress = async (ctx: Pick<MutationCtx, "db">, from: string, to:
         userId: to,
     });
     await noteShardActivity(ctx, to, now);
+    // Housekeeping reads only the most recently active shards, so a merge stalled on a shard behind them would never be
+    // swept. The shard's timed work is dispatched by due time instead: the tick there checks for the stall
+    // (`resumeStalledGuestMergesOnTick`) and re-arms while a record is left.
+    await noteShardDue(ctx, now + MERGE_STALL_MS, to);
 };
 
 const dropMergeProgress = async (db: MutationCtx["db"], from: string): Promise<void> => {
@@ -830,78 +847,114 @@ export const recordGuestMerge = internalMutation
  * erasure has priority) and one past {@link MAX_MERGE_RUNS}, which keeps the guest and its rows. Each pass reads at most
  * {@link MERGE_PROGRESS_SCAN} records, on from where the last one stopped ({@link MERGE_SWEEP_SCOPE}).
  */
+const resumeStalledMerges = async (ctx: MutationCtx): Promise<{ dropped: number; nextCheckAt?: number; resumed: number }> => {
+    const { now } = ctx;
+    const cursor = await claimAt(ctx.db, MERGE_SWEEP_SCOPE, MERGE_SWEEP_KEY, now);
+    const after = cursor?.result;
+    const rows = await ctx.db
+        .query("idempotencyClaims")
+        .withIndex("by_scope_key", (q) => (after === undefined ? q.eq("scope", MERGE_PROGRESS_SCOPE) : q.eq("scope", MERGE_PROGRESS_SCOPE).gt("key", after)))
+        .take(MERGE_PROGRESS_SCAN);
+    let dropped = 0;
+    let resumed = 0;
+    /** The last record this pass looked at, where the next one reads on from. */
+    let last: { key: string; userId: string | undefined } | null = null;
+    /** The soonest a record this pass looked at and kept can stall. */
+    let nextCheckAt: number | undefined;
+    const checkAt = (at: number): void => {
+        nextCheckAt = nextCheckAt === undefined ? at : Math.min(nextCheckAt, at);
+    };
+
+    for (const row of rows) {
+        if (dropped + resumed >= MERGE_RESUMES_PER_SWEEP) {
+            break;
+        }
+
+        last = { key: row.key, userId: row.userId };
+
+        const from = row.key;
+        const to = row.userId;
+        const { progress, savedAt } = savedProgressOf(row.result);
+
+        if (savedAt > now - MERGE_STALL_MS) {
+            checkAt(savedAt + MERGE_STALL_MS);
+
+            continue;
+        }
+
+        const lease = await claimAt(ctx.db, MERGE_LEASE_SCOPE, from, now);
+
+        if (lease !== null && generationOf(lease.result).until > now) {
+            checkAt(generationOf(lease.result).until);
+
+            continue;
+        }
+
+        const ended =
+            to === undefined ||
+            row.expiresAt <= now ||
+            ((await mergeFinished(ctx.db, from, now)) && !(await mergeCleanupPending(ctx, from, to))) ||
+            (progress !== null && progress.run >= MAX_MERGE_RUNS) ||
+            (await isErasing(ctx, to)) ||
+            (await isErasing(ctx, from));
+
+        if (ended) {
+            await ctx.db.delete("idempotencyClaims", row._id);
+            dropped += 1;
+
+            continue;
+        }
+
+        await saveMergeProgress(ctx, from, to, progress, now);
+        await enqueueJob(internal.lib.account_merge.runGuestMerge, { from, ...(progress !== null && { resume: progress }), to }, { shardKey: to });
+        authLogger.info(`[auth] restarted the stalled merge of guest ${from} into ${to}`);
+        resumed += 1;
+        checkAt(now + MERGE_STALL_MS);
+    }
+
+    const tag = last?.userId ?? cursor?.userId;
+
+    // A pass that looked at the last record starts the next one from the first again.
+    if (last === null || (rows.length < MERGE_PROGRESS_SCAN && last.key === rows.at(-1)?.key)) {
+        if (cursor !== null) {
+            await ctx.db.delete("idempotencyClaims", cursor._id);
+            // The records before the cursor were not read here: the next pass reads them.
+            checkAt(now);
+        }
+    } else {
+        // Records past this pass's last are left to the next one.
+        checkAt(now);
+
+        if (tag !== undefined) {
+            await writeClaim(ctx.db, MERGE_SWEEP_SCOPE, MERGE_SWEEP_KEY, now, { expiresAt: now + IMPORT_MARKER_TTL_MS, result: last.key, userId: tag });
+        }
+    }
+
+    return { dropped, resumed, ...(nextCheckAt !== undefined && { nextCheckAt }) };
+};
+
+/** {@link resumeStalledMerges} from the housekeeping sweep (`shardSweeps()`). */
 export const resumeStalledGuestMerges = internalMutation
     .input({})
     .output(v.object({ dropped: v.number(), resumed: v.number() }))
     .mutation(async ({ ctx }) => {
-        const { now } = ctx;
-        const cursor = await claimAt(ctx.db, MERGE_SWEEP_SCOPE, MERGE_SWEEP_KEY, now);
-        const after = cursor?.result;
-        const rows = await ctx.db
-            .query("idempotencyClaims")
-            .withIndex("by_scope_key", (q) =>
-                after === undefined ? q.eq("scope", MERGE_PROGRESS_SCOPE) : q.eq("scope", MERGE_PROGRESS_SCOPE).gt("key", after),
-            )
-            .take(MERGE_PROGRESS_SCAN);
-        let dropped = 0;
-        let resumed = 0;
-        /** The last record this pass looked at, where the next one reads on from. */
-        let last: { key: string; userId: string | undefined } | null = null;
-
-        for (const row of rows) {
-            if (dropped + resumed >= MERGE_RESUMES_PER_SWEEP) {
-                break;
-            }
-
-            last = { key: row.key, userId: row.userId };
-
-            const from = row.key;
-            const to = row.userId;
-            const { progress, savedAt } = savedProgressOf(row.result);
-
-            if (savedAt > now - MERGE_STALL_MS) {
-                continue;
-            }
-
-            const lease = await claimAt(ctx.db, MERGE_LEASE_SCOPE, from, now);
-
-            if (lease !== null && generationOf(lease.result).until > now) {
-                continue;
-            }
-
-            const ended =
-                to === undefined ||
-                row.expiresAt <= now ||
-                ((await mergeFinished(ctx.db, from, now)) && !(await mergeCleanupPending(ctx, from, to))) ||
-                (progress !== null && progress.run >= MAX_MERGE_RUNS) ||
-                (await isErasing(ctx, to)) ||
-                (await isErasing(ctx, from));
-
-            if (ended) {
-                await ctx.db.delete("idempotencyClaims", row._id);
-                dropped += 1;
-
-                continue;
-            }
-
-            await saveMergeProgress(ctx, from, to, progress, now);
-            await enqueueJob(internal.lib.account_merge.runGuestMerge, { from, ...(progress !== null && { resume: progress }), to }, { shardKey: to });
-            authLogger.info(`[auth] restarted the stalled merge of guest ${from} into ${to}`);
-            resumed += 1;
-        }
-
-        const tag = last?.userId ?? cursor?.userId;
-
-        // A pass that looked at the last record starts the next one from the first again.
-        if (last === null || (rows.length < MERGE_PROGRESS_SCAN && last.key === rows.at(-1)?.key)) {
-            if (cursor !== null) {
-                await ctx.db.delete("idempotencyClaims", cursor._id);
-            }
-        } else if (tag !== undefined) {
-            await writeClaim(ctx.db, MERGE_SWEEP_SCOPE, MERGE_SWEEP_KEY, now, { expiresAt: now + IMPORT_MARKER_TTL_MS, result: last.key, userId: tag });
-        }
+        const { dropped, resumed } = await resumeStalledMerges(ctx);
 
         return { dropped, resumed };
+    });
+
+/**
+ * {@link resumeStalledGuestMerges} from the shard's minute tick (`shard-housekeeping.ts#runShardTick`), which the root
+ * dispatches by due time, so a shard behind any number of more recently active ones is still reached. `nextCheckAt`: when
+ * the tick should run the sweep again, absent once no record is left here.
+ */
+export const resumeStalledGuestMergesOnTick = internalMutation
+    .input({})
+    .output(v.object({ nextCheckAt: v.optional(v.number()) }))
+    .mutation(async ({ ctx }) => {
+        const { nextCheckAt } = await resumeStalledMerges(ctx);
+
+        return nextCheckAt === undefined ? {} : { nextCheckAt };
     });
 
 /**
@@ -948,7 +1001,8 @@ export const importShardRows = internalMutation
                 .query("idempotencyClaims")
                 .withIndex("by_scope_key", (q) => q.eq("scope", IMPORT_MARKER_SCOPE).eq("key", key))
                 .first();
-            const written = marker !== null && marker.expiresAt > now ? (marker.result ?? null) : null;
+            // A marker counts however old it is: one written before markers stopped lapsing still says the merge wrote the row.
+            const written = marker === null ? null : (marker.result ?? null);
             const existing = (await db.get(args.table, id)) as Record<string, unknown> | null;
             let write = false;
 
@@ -977,14 +1031,14 @@ export const importShardRows = internalMutation
                 if (marker === null) {
                     await ctx.db.insert("idempotencyClaims", {
                         claimedAt: now,
-                        expiresAt: now + IMPORT_MARKER_TTL_MS,
+                        expiresAt: IMPORT_MARKER_EXPIRES_AT,
                         key,
                         result: wanted,
                         scope: IMPORT_MARKER_SCOPE,
                         userId: args.to,
                     });
                 } else {
-                    await ctx.db.patch("idempotencyClaims", marker._id, { expiresAt: now + IMPORT_MARKER_TTL_MS, result: wanted });
+                    await ctx.db.patch("idempotencyClaims", marker._id, { expiresAt: IMPORT_MARKER_EXPIRES_AT, result: wanted });
                 }
             }
         }

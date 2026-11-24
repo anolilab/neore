@@ -9,7 +9,7 @@
  * tick schedules the work onto each of them (`shardKey`), where it runs against
  * that shard's rows exactly as it used to run against root's.
  *
- * - **Timed work** (schedule triggers, recurring tasks): each shard keeps
+ * - **Timed work** (schedule triggers, recurring tasks, stalled guest merges): each shard keeps
  *   `nextDueAt` in its census row. The one-minute tick dispatches
  *   {@link runShardTick} to every shard that is due; the tick recomputes the
  *   shard's next due time from its own tables.
@@ -401,6 +401,13 @@ export const runShardTick = internalMutation
             await ctx.runMutation(internal.acp.ingest.reapHostStreams, {});
         });
 
+        // Guest merges into this shard's account that no job carries on (`lib/account-merge.ts`): each save of a merge's progress arms
+        // this tick, so a stalled merge is reached however many more active shards the housekeeping dispatch reads first.
+        let mergeCheckAt: number | undefined;
+        const mergesChecked = await bestEffort("resumeStalledGuestMergesOnTick", async () => {
+            ({ nextCheckAt: mergeCheckAt } = await ctx.runMutation(internal.lib.account_merge.resumeStalledGuestMergesOnTick, {}));
+        });
+
         const { now } = ctx;
         // The earliest export run due here. A read that fails must not stop the re-arming below: the shard is then armed for now, as
         // a reap that failed is.
@@ -448,11 +455,12 @@ export const runShardTick = internalMutation
             task?.nextRunAt,
             repoPoll?.nextPollAt,
             exportRunRead?.deleteAt,
+            mergeCheckAt,
             ...stuckChecks.map((row) => row?.stuckCheckAt),
         ].filter((at): at is number => at !== undefined);
 
-        // The dispatch cleared this shard's due time; a reap or an export-run read that failed recorded no next time, so try again.
-        if (!reaped || exportRunRead === undefined) {
+        // The dispatch cleared this shard's due time; a reap, a merge check or an export-run read that failed recorded no next time, so try again.
+        if (!reaped || !mergesChecked || exportRunRead === undefined) {
             candidates.push(now);
         }
 

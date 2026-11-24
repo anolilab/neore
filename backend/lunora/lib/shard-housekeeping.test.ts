@@ -1,17 +1,22 @@
 import { lunoraTest } from "@lunora/testing";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
 import { RATE_LIMIT_RETENTION_MS, RATE_LIMIT_SWEEP_PAGE, sweepDormantShardRateLimits, sweepExpiredRateLimits } from "./rate-limit-sweep";
 import { createRatelimit, getRateLimitKey } from "./rate-limiter";
 import { runInShard } from "./shard-context";
+import { MERGE_STALL_MS, recordGuestMerge } from "./account-merge";
 import {
     dispatchDormantRateLimitSweeps,
+    dispatchDueShards,
+    dispatchShardHousekeeping,
     DISPATCH_BATCH,
     HOUSEKEEPING_HORIZON_MS,
     HOUSEKEEPING_IDLE_INTERVAL_MS,
     markRateLimitsPending,
     needsHousekeeping,
+    runShardTick,
     settleRateLimitsPending,
 } from "./shard-housekeeping";
 
@@ -26,6 +31,23 @@ vi.mock(
             },
         }) as never,
 );
+
+// The shard tick's own steps run as registered procedures; the dispatch targets stay plain references, so their paths show.
+const registry = vi.hoisted(() => new Map<string, unknown>());
+
+vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
+
+beforeAll(async () => {
+    registerModule(registry, "source_control_freshness_internal", await import("../source-control/freshness-internal"));
+    registerModule(registry, "triggers_schedule", await import("../triggers/schedule"));
+    registerModule(registry, "triggers_functions", await import("../triggers/functions"));
+    registerModule(registry, "triggers_events", await import("../triggers/events"));
+    registerModule(registry, "acp_ingest", await import("../acp/ingest"));
+    registerModule(registry, "usage_gdpr", await import("../usage/gdpr"));
+    const { resumeStalledGuestMergesOnTick } = await import("./account-merge");
+
+    registry.set("lib_account_merge:resumeStalledGuestMergesOnTick", resumeStalledGuestMergesOnTick);
+});
 
 const NOW = 10_000_000_000;
 
@@ -362,5 +384,90 @@ describe("the dormant-shard rate-limit sweep", () => {
                 path: "lib_shard_housekeeping:markRateLimitsPending",
             },
         ]);
+    });
+});
+
+describe("a stalled guest merge behind more active shards", () => {
+    let harness: ReturnType<typeof lunoraTest>;
+
+    beforeEach(() => {
+        vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+        harness = lunoraTest(schema as never);
+        enqueued.length = 0;
+    });
+
+    afterEach(() => {
+        harness.close();
+        vi.useRealTimers();
+    });
+
+    /** What a root dispatch schedules, by shard. */
+    const dispatchWith = async (reference: unknown): Promise<{ path: string; shardKey?: string }[]> =>
+        await harness.run(async (ctx: any) => {
+            const scheduled: { path: string; shardKey?: string }[] = [];
+
+            ctx.scheduler.runAfter = async (_delay: number, target: { __lunoraRef: string }, _args: unknown, options?: { shardKey?: string }) => {
+                scheduled.push({ path: target.__lunoraRef, shardKey: options?.shardKey });
+
+                return "job";
+            };
+
+            await ctx.runMutation(reference, {});
+
+            return scheduled;
+        });
+
+    const dueOf = async (shardKey: string): Promise<number | undefined> =>
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.shardActivity.findFirst({ where: { shardKey } });
+
+            return row?.nextDueAt ?? undefined;
+        });
+
+    it("is reached by the minute tick, which the housekeeping dispatch's most-recent page never gets to", async () => {
+        // The merge is handed over on the new account's shard: its progress record arms the shard's timed work.
+        await runInShard("user", async () => await harness.run(async (ctx: any) => await ctx.runMutation(recordGuestMerge, { from: "guest", to: "user" })));
+
+        expect(await dueOf("user")).toBe(NOW + MERGE_STALL_MS);
+
+        // Its job dies; over the next hour more than a housekeeping page of shards turn active, each swept since.
+        vi.setSystemTime(NOW + MERGE_STALL_MS + 60_000);
+        await harness.run(async (ctx: any) => {
+            const user = await ctx.db.shardActivity.findFirst({ where: { shardKey: "user" } });
+
+            await ctx.db.patch("shardActivity", user._id, { housekeptAt: NOW });
+
+            for (let index = 0; index < DISPATCH_BATCH * 5 + 1; index += 1) {
+                await ctx.db.insert("shardActivity", { housekeptAt: Date.now(), lastActiveAt: Date.now() - 1000 - index, shardKey: `newer-${index}` });
+            }
+        });
+        vi.setSystemTime(NOW + HOUSEKEEPING_IDLE_INTERVAL_MS);
+
+        // Housekeeping reads the most recently active page only: the merge's shard is behind it.
+        const housekept = await dispatchWith(dispatchShardHousekeeping);
+
+        expect(housekept.map((job) => job.shardKey)).not.toContain("user");
+
+        // The minute dispatch reads by due time and reaches it.
+        expect(await dispatchWith(dispatchDueShards)).toContainEqual({ path: "lib_shard_housekeeping:runShardTick", shardKey: "user" });
+
+        // There the tick restarts the merge and arms the shard again for the restarted job's stall.
+        await runInShard("user", async () => await harness.run(async (ctx: any) => await ctx.runMutation(runShardTick, {})));
+
+        expect(enqueued.filter((job) => job.path.endsWith("runGuestMerge"))).toStrictEqual([
+            { args: { from: "guest", to: "user" }, options: { shardKey: "user" }, path: "lib_account_merge:runGuestMerge" },
+        ]);
+        expect(await dueOf("user")).toBe(Date.now() + MERGE_STALL_MS);
+    });
+
+    it("stops arming the tick once the shard holds no merge record", async () => {
+        await runInShard("user", async () => {
+            await harness.run(async (ctx: any) => {
+                await ctx.db.insert("shardActivity", { lastActiveAt: NOW, shardKey: "user" });
+                await ctx.runMutation(runShardTick, {});
+            });
+        });
+
+        expect(await dueOf("user")).toBeUndefined();
     });
 });
