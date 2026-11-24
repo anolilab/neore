@@ -307,7 +307,7 @@ msgstr "{0, plural, other {# 个文件}}"
 
 #. placeholder {0}: items.length
 #. placeholder {0}: option.value
-#: ../../packages/ui/src/components/image-gallery.tsx:407
+#: ../../packages/ui/src/components/image-gallery.tsx:446
 #: src/features/chat/thread/composer-image-settings.tsx:227
 msgid "{0, plural, one {# image} other {# images}}"
 msgstr "{0, plural, other {# 张图片}}"
@@ -765,12 +765,12 @@ msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "已选择 {0}/{MAX_PARALLEL} 个"
 
 #. placeholder {0}: referenceImageIds.length
-#: src/features/chat/thread/media-gallery-view.tsx:370
+#: src/features/chat/thread/media-gallery-view.tsx:372
 msgid "{0} of {MAX_REFERENCE_IMAGES} references selected"
 msgstr "已选择 {0}/{MAX_REFERENCE_IMAGES} 张参考图"
 
 #. placeholder {0}: selection.length
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:248
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:250
 msgid "{0} of {maxReferences} selected"
 msgstr "已选择 {0}/{maxReferences} 个"
 
@@ -1290,11 +1290,11 @@ msgstr "{metricLabel} > 每小时 {threshold}"
 msgid "{metricLabel} > {threshold} per month"
 msgstr "{metricLabel} > 每月 {threshold}"
 
-#: src/features/chat/thread/media-gallery-view.tsx:345
+#: src/features/chat/thread/media-gallery-view.tsx:347
 msgid "{mins}m"
 msgstr "{mins} 分"
 
-#: src/features/chat/thread/media-gallery-view.tsx:345
+#: src/features/chat/thread/media-gallery-view.tsx:347
 msgid "{mins}m {secs}s"
 msgstr "{mins} 分 {secs} 秒"
 
@@ -1537,7 +1537,7 @@ msgstr "{rowsNeeded, plural, other {需要再添加 # 行才能粘贴剪贴板�
 msgid "{secondLabel} ×{secondCount}"
 msgstr "{secondLabel} ×{secondCount}"
 
-#: src/features/chat/thread/media-gallery-view.tsx:339
+#: src/features/chat/thread/media-gallery-view.tsx:341
 msgid "{seconds}s"
 msgstr "{seconds} 秒"
 
@@ -2745,7 +2745,7 @@ msgstr "添加矩形"
 msgid "Add reference image"
 msgstr "添加参考图"
 
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:210
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:212
 msgid "Add reference images"
 msgstr "添加参考图"
 
@@ -3567,7 +3567,7 @@ msgstr "已启用所有模型"
 msgid "All models. <0>One workspace.</0>"
 msgstr "所有模型。<0>一个工作区。</0>"
 
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:227
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:229
 msgid "All my images"
 msgstr "我的所有图片"
 
@@ -4556,8 +4556,8 @@ msgstr "请你的其他助手列出它记住的内容，粘贴其回答，并选
 msgid "Aspect ratio"
 msgstr "宽高比"
 
-#: src/features/chat/thread/media-gallery-view.tsx:456
-#: src/features/chat/thread/media-gallery-view.tsx:541
+#: src/features/chat/thread/media-gallery-view.tsx:458
+#: src/features/chat/thread/media-gallery-view.tsx:543
 #: src/features/workflow/components/nodes/video-node.tsx:178
 msgid "Aspect Ratio"
 msgstr "宽高比"
@@ -4741,7 +4741,7 @@ msgstr "自动"
 #: src/features/chat/thread/composer-permission-mode.tsx:41
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:65
-#: src/features/chat/thread/media-gallery-view.tsx:509
+#: src/features/chat/thread/media-gallery-view.tsx:511
 #: src/features/settings/components/chat/bots-settings.tsx:132
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Auto"
@@ -6002,7 +6002,7 @@ msgstr "加拿大"
 #: src/features/auth/components/team/leave-team-dialog.tsx:76
 #: src/features/auth/components/team/team-settings-dialog.tsx:209
 #: src/features/canvas/canvas-panel.tsx:121
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:256
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:258
 #: src/features/chat/forward/forward-dialog.tsx:169
 #: src/features/chat/forward/forward-selection-bar.tsx:78
 #: src/features/chat/group/create-group-chat-button.tsx:240
@@ -6888,9 +6888,9 @@ msgstr "清理失败"
 
 #: ../../packages/ui/src/components/combobox.tsx:108
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:233
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:252
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:254
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:96
-#: src/features/chat/thread/media-gallery-view.tsx:380
+#: src/features/chat/thread/media-gallery-view.tsx:382
 #: src/features/prompts/components/prompt-list.tsx:614
 #: src/features/settings/components/chat/api-keys-settings.tsx:401
 #: src/features/settings/components/chat/models-settings.tsx:477
@@ -9923,7 +9923,7 @@ msgstr "个性化"
 msgid "Customize"
 msgstr "自定义"
 
-#: src/features/chat/thread/media-gallery-view.tsx:437
+#: src/features/chat/thread/media-gallery-view.tsx:439
 msgid "Customize and regenerate"
 msgstr "自定义并重新生成"
 
@@ -10885,7 +10885,7 @@ msgstr "描述如何转换这张图片..."
 msgid "Describe the image to generate..."
 msgstr "描述要生成的图片..."
 
-#: src/features/chat/thread/media-gallery-view.tsx:446
+#: src/features/chat/thread/media-gallery-view.tsx:448
 msgid "Describe the image you want to create..."
 msgstr "描述你想创建的图像..."
 
@@ -10910,7 +10910,7 @@ msgstr "描述任务、预期结果以及重复时间：每天、每周，或 UT
 msgid "Describe the video to generate..."
 msgstr "描述要生成的视频..."
 
-#: src/features/chat/thread/media-gallery-view.tsx:446
+#: src/features/chat/thread/media-gallery-view.tsx:448
 msgid "Describe the video you want to create..."
 msgstr "描述你想创建的视频..."
 
@@ -10977,7 +10977,7 @@ msgstr "请输入描述"
 msgid "Description must be {SKILL_DESCRIPTION_MAX} characters or less"
 msgstr "描述不能超过 {SKILL_DESCRIPTION_MAX} 个字符"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:337
+#: ../../packages/ui/src/components/image-gallery.tsx:376
 msgid "Deselect"
 msgstr "取消选择"
 
@@ -10986,7 +10986,7 @@ msgstr "取消选择"
 msgid "Deselect all"
 msgstr "取消全选"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:238
+#: ../../packages/ui/src/components/image-gallery.tsx:263
 msgid "Deselect image"
 msgstr "取消选择图片"
 
@@ -11466,6 +11466,7 @@ msgstr "下载"
 
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:109
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:183
+#: ../../packages/ui/src/components/save-file-button.tsx:27
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:82
 #: src/features/canvas/canvas-panel.tsx:811
 #: src/features/canvas/canvas-panel.tsx:828
@@ -11490,6 +11491,7 @@ msgid "Download {displayName}"
 msgstr "下载 {displayName}"
 
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:118
+#: ../../packages/ui/src/components/save-file-button.tsx:27
 msgid "Download {filename}"
 msgstr "下载 {filename}"
 
@@ -11500,6 +11502,11 @@ msgstr "下载 {fileName}"
 #: src/features/chat/thread/sandbox-files.tsx:241
 msgid "Download {name} ({size})"
 msgstr "下载 {name}（{size}）"
+
+#: ../../packages/ui/src/components/image-gallery.tsx:254
+#: ../../packages/ui/src/components/image-gallery.tsx:367
+msgid "Download {tileName} ({position})"
+msgstr "下载 {tileName} ({position})"
 
 #: src/features/settings/components/privacy/data-export.tsx:98
 msgid "Download a copy of all your personal data in JSON format (GDPR Article 20 - Right to Data Portability)"
@@ -11724,7 +11731,7 @@ msgstr "复制所选（{selectedNonGroupCount}）"
 
 #: src/features/admin/components/ban-user-dialog.tsx:117
 #: src/features/chat/header/temporary-chat-dropdown.tsx:300
-#: src/features/chat/thread/media-gallery-view.tsx:567
+#: src/features/chat/thread/media-gallery-view.tsx:569
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:136
 msgid "Duration"
 msgstr "时长"
@@ -14007,7 +14014,7 @@ msgstr "关联账号失败"
 msgid "Failed to load analytics. Ensure the LLM Gateway is running and reachable."
 msgstr "加载分析数据失败。请确保 LLM Gateway 正在运行且可访问。"
 
-#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:84
+#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:85
 msgid "Failed to load audio"
 msgstr "加载音频失败"
 
@@ -14028,7 +14035,7 @@ msgstr "加载电子表格失败"
 msgid "Failed to load usage data. Ensure the LLM Gateway is running and reachable."
 msgstr "加载用量数据失败。请确保 LLM Gateway 正在运行且可访问。"
 
-#: ../../packages/ui/src/components/file-renderers/video-player.tsx:92
+#: ../../packages/ui/src/components/file-renderers/video-player.tsx:98
 msgid "Failed to load video stream."
 msgstr "加载视频流失败。"
 
@@ -15829,7 +15836,9 @@ msgstr "加利西亚语"
 msgid "Galician (Spain)"
 msgstr "加利西亚语（西班牙）"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:193
+#: ../../packages/ui/src/components/image-gallery.tsx:168
+#: ../../packages/ui/src/components/image-gallery.tsx:207
+#: ../../packages/ui/src/components/image-gallery.tsx:299
 msgid "Gallery item"
 msgstr "图库项目"
 
@@ -15971,7 +15980,7 @@ msgstr "为创意写作故事构思点子"
 msgid "Generate image"
 msgstr "生成图像"
 
-#: src/features/chat/thread/media-gallery-view.tsx:620
+#: src/features/chat/thread/media-gallery-view.tsx:622
 #: src/features/workflow/templates/index.ts:106
 msgid "Generate Image"
 msgstr "生成图像"
@@ -15997,7 +16006,7 @@ msgstr "为 2025 年构思独特的商业点子"
 msgid "Generate video"
 msgstr "生成视频"
 
-#: src/features/chat/thread/media-gallery-view.tsx:620
+#: src/features/chat/thread/media-gallery-view.tsx:622
 #: src/features/workflow/templates/index.ts:424
 msgid "Generate Video"
 msgstr "生成视频"
@@ -16027,15 +16036,15 @@ msgstr "生成的图像"
 msgid "Generated Image"
 msgstr "生成的图像"
 
-#: src/features/chat/thread/media-gallery-view.tsx:353
+#: src/features/chat/thread/media-gallery-view.tsx:355
 msgid "Generated images will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成的图像将显示在这里。在下方输入框中描述你想创作的内容即可开始。"
 
-#: src/features/chat/thread/media-gallery-view.tsx:244
+#: src/features/chat/thread/media-gallery-view.tsx:245
 msgid "Generated video"
 msgstr "生成的视频"
 
-#: src/features/chat/thread/media-gallery-view.tsx:354
+#: src/features/chat/thread/media-gallery-view.tsx:356
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成的视频将显示在这里。在下方输入框中描述你想创作的内容即可开始。"
 
@@ -16048,7 +16057,7 @@ msgid "Generating draft…"
 msgstr "正在生成草稿…"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:530
-#: src/features/chat/thread/media-gallery-view.tsx:403
+#: src/features/chat/thread/media-gallery-view.tsx:405
 msgid "Generating image..."
 msgstr "正在生成图像..."
 
@@ -16061,7 +16070,7 @@ msgid "Generating response"
 msgstr "正在生成回复"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:531
-#: src/features/chat/thread/media-gallery-view.tsx:403
+#: src/features/chat/thread/media-gallery-view.tsx:405
 msgid "Generating video..."
 msgstr "正在生成视频..."
 
@@ -17209,7 +17218,7 @@ msgstr "历史"
 msgid "Hit rate"
 msgstr "命中率"
 
-#: ../../packages/ui/src/components/file-renderers/video-player.tsx:92
+#: ../../packages/ui/src/components/file-renderers/video-player.tsx:98
 msgid "HLS playback is not supported in this browser."
 msgstr "此浏览器不支持 HLS 播放。"
 
@@ -17566,7 +17575,7 @@ msgid "Image generation"
 msgstr "图像生成"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:177
-#: src/features/chat/thread/media-gallery-view.tsx:350
+#: src/features/chat/thread/media-gallery-view.tsx:352
 #: src/features/marketing/components/landing-page.tsx:287
 #: src/features/marketing/components/model-detail-page.tsx:87
 #: src/features/workflow/components/gallery/publish-dialog.tsx:28
@@ -23021,7 +23030,7 @@ msgid "No icon found"
 msgstr "未找到图标"
 
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:171
-#: src/features/chat/thread/media-gallery-view.tsx:351
+#: src/features/chat/thread/media-gallery-view.tsx:353
 msgid "No images yet"
 msgstr "还没有图片"
 
@@ -23037,7 +23046,7 @@ msgstr "已有一段时间没有输入：控制权将在一分钟内交还给智
 msgid "No instruction files were found in this repository."
 msgstr "此仓库中没有找到指令文件。"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:489
+#: ../../packages/ui/src/components/image-gallery.tsx:528
 msgid "No items"
 msgstr "无项目"
 
@@ -23215,7 +23224,7 @@ msgstr "无项目"
 msgid "No projects available. Create a project first."
 msgstr "没有可用的项目。请先创建一个项目。"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:400
+#: ../../packages/ui/src/components/image-gallery.tsx:439
 msgid "No prompt"
 msgstr "无提示词"
 
@@ -23257,7 +23266,7 @@ msgstr "此记忆未保留引文。"
 msgid "No ratings yet"
 msgstr "还没有评分"
 
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:248
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:250
 msgid "No references selected"
 msgstr "未选择参考图"
 
@@ -23466,7 +23475,7 @@ msgstr "未找到变量"
 msgid "No versions yet. Versions are saved as you edit."
 msgstr "还没有版本。编辑时会自动保存版本。"
 
-#: src/features/chat/thread/media-gallery-view.tsx:351
+#: src/features/chat/thread/media-gallery-view.tsx:353
 msgid "No videos yet"
 msgstr "还没有视频"
 
@@ -25667,7 +25676,7 @@ msgstr "粘贴风格参考图片 URL..."
 msgid "Path"
 msgstr "路径"
 
-#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:93
+#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:96
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:168
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:233
 msgid "Pause"
@@ -25938,7 +25947,7 @@ msgstr "选择要作为一个 Markdown 文件分享的技能、计划任务、we
 msgid "Pick the computer or server the project's folder is on."
 msgstr "选择项目文件夹所在的电脑或服务器。"
 
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:212
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:214
 msgid "Pick up to {maxReferences} images. The order you select them is the order the model will see them."
 msgstr "最多选择 {maxReferences} 张图片。你选择的顺序就是模型看到它们的顺序。"
 
@@ -26097,7 +26106,7 @@ msgstr "规划"
 msgid "Platform"
 msgstr "平台"
 
-#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:93
+#: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:96
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:168
 msgid "Play"
 msgstr "播放"
@@ -26857,8 +26866,8 @@ msgstr "专业"
 msgid "Professional"
 msgstr "专业"
 
-#: src/features/chat/thread/media-gallery-view.tsx:527
-#: src/features/chat/thread/media-gallery-view.tsx:606
+#: src/features/chat/thread/media-gallery-view.tsx:529
+#: src/features/chat/thread/media-gallery-view.tsx:608
 msgid "Professional Camera Controls"
 msgstr "专业相机控制"
 
@@ -26995,8 +27004,8 @@ msgstr "提升为管理员"
 msgid "prompt"
 msgstr "提示词"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:400
-#: src/features/chat/thread/media-gallery-view.tsx:441
+#: ../../packages/ui/src/components/image-gallery.tsx:439
+#: src/features/chat/thread/media-gallery-view.tsx:443
 #: src/features/settings/components/chat/trigger-settings.tsx:1017
 #: src/features/workflow/templates/index.ts:96
 #: src/features/workflow/templates/index.ts:230
@@ -27330,7 +27339,7 @@ msgid "Put several agents with their own roles in one thread. A review panel can
 msgstr "将多个各具角色的智能体放在同一对话中。审查小组可从安全和性能角度检查更改，辩论则可在综合前论证双方观点。"
 
 #: src/features/chat/thread/composer-image-settings.tsx:181
-#: src/features/chat/thread/media-gallery-view.tsx:481
+#: src/features/chat/thread/media-gallery-view.tsx:483
 msgid "Quality"
 msgstr "质量"
 
@@ -30385,7 +30394,7 @@ msgstr "选择一个对象以编辑其属性"
 msgid "Select an organization to manage teams"
 msgstr "选择一个组织以管理团队"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:337
+#: ../../packages/ui/src/components/image-gallery.tsx:376
 msgid "Select as reference"
 msgstr "选为参考"
 
@@ -30409,7 +30418,7 @@ msgstr "选择文件"
 msgid "Select files to upload"
 msgstr "选择要上传的文件"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:238
+#: ../../packages/ui/src/components/image-gallery.tsx:263
 msgid "Select image as reference"
 msgstr "选择图像作为参考"
 
@@ -30539,7 +30548,7 @@ msgstr "选择你的消息"
 msgid "Selected {requestNoun}"
 msgstr "已选{requestNoun}"
 
-#: src/features/chat/thread/media-gallery-view.tsx:365
+#: src/features/chat/thread/media-gallery-view.tsx:367
 msgid "Selected reference"
 msgstr "已选参考"
 
@@ -33113,7 +33122,7 @@ msgid "style"
 msgstr "风格"
 
 #: src/features/chat/thread/composer-image-settings.tsx:205
-#: src/features/chat/thread/media-gallery-view.tsx:502
+#: src/features/chat/thread/media-gallery-view.tsx:504
 #: src/features/workflow/components/nodes/character-ref-node.tsx:26
 msgid "Style"
 msgstr "风格"
@@ -35320,7 +35329,7 @@ msgstr "然后下载一个模型并使用此基础 URL："
 msgid "There are no credits left to answer this. Add credits and try again."
 msgstr "积分已用完，无法回答。请充值积分后重试。"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:490
+#: ../../packages/ui/src/components/image-gallery.tsx:529
 msgid "There are no items to display."
 msgstr "没有可显示的项目。"
 
@@ -36077,7 +36086,7 @@ msgstr "此任务尚未运行。"
 msgid "This text is only hidden characters, so there is nothing to save."
 msgstr "此文本仅包含隐藏字符，因此没有可保存的内容。"
 
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:226
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:228
 msgid "This thread"
 msgstr "此对话"
 
@@ -37950,7 +37959,7 @@ msgid "Usage dashboard"
 msgstr "用量仪表盘"
 
 #. placeholder {0}: selection.length
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:259
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:261
 msgid "Use {0, plural, one {# reference} other {# references}}"
 msgstr "使用 {0, plural, other {# 张参考图}}"
 
@@ -38033,7 +38042,7 @@ msgstr "从 MCP 客户端使用"
 msgid "Use lowercase letters, numbers and single hyphens only"
 msgstr "只能使用小写字母、数字和单个连字符"
 
-#: src/features/chat/thread/media-gallery-view.tsx:631
+#: src/features/chat/thread/media-gallery-view.tsx:633
 msgid "Use Original Prompt"
 msgstr "使用原始提示词"
 
@@ -38042,7 +38051,7 @@ msgstr "使用原始提示词"
 msgid "Use Prompt"
 msgstr "使用提示词"
 
-#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:259
+#: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:261
 msgid "Use selected"
 msgstr "使用所选"
 
@@ -38574,7 +38583,7 @@ msgstr "视频生成"
 msgid "Video generation"
 msgstr "视频生成"
 
-#: src/features/chat/thread/media-gallery-view.tsx:350
+#: src/features/chat/thread/media-gallery-view.tsx:352
 #: src/features/marketing/components/model-detail-page.tsx:95
 msgid "Video Generation"
 msgstr "视频生成"

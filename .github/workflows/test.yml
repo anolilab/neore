@@ -466,6 +466,10 @@ jobs:
                       # Unlocks `POST /e2e/invitations`, which `apps/web/e2e/seed.ts`
                       # seeds through; the suite reads it back from this file.
                       echo "E2E_SEED_TOKEN=\"$(openssl rand -hex 32)\""
+                      # The shard registry refuses to register a shard without it, so the
+                      # deletion workflow misses cross-shard rows and the account-deletion
+                      # e2e never sees them go. The host signs its registry calls with it.
+                      echo "LUNORA_RELAY_SECRET=\"$(openssl rand -hex 32)\""
 
                       # Loopback origins. They cannot live in wrangler.jsonc
                       # (`lunora build` blocks on loopback addresses there), and

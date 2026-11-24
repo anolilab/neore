@@ -34,12 +34,19 @@ vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await 
 
 // The harness is one database for every shard, so a call to another shard runs in the harness under test.
 const shard = vi.hoisted(() => {
-    return { harness: undefined as any };
+    return { harness: undefined as any, unreachableThreadId: undefined as string | undefined };
 });
 
 vi.mock("../lib/cross-shard", () => {
     return {
-        callOnShard: async (reference: never, args: never) => await shard.harness.run(async (ctx: any) => await ctx.runQuery(reference, args)),
+        callOnShard: async (reference: never, args: never) => {
+            // A test can make one thread's owner shard unreachable.
+            if (shard.unreachableThreadId !== undefined && (args as { threadId?: string }).threadId === shard.unreachableThreadId) {
+                throw new Error("the owner's shard cannot be reached");
+            }
+
+            return await shard.harness.run(async (ctx: any) => await ctx.runQuery(reference, args));
+        },
     };
 });
 
@@ -388,6 +395,51 @@ describe("collectSharedPins", () => {
 
             expect(shared).toStrictEqual([{ pins: [expect.objectContaining({ messageId: "m-1", note: "collaborator note" })], threadId }]);
         } finally {
+            shard.harness = undefined;
+            harness.close();
+        }
+    });
+
+    it("lists a shared thread whose owner shard cannot be read as unreadable, and still exports the others", async () => {
+        registry.set("chat_pins_functions:listPinsForExport", listPinsForExport);
+        registry.set("chat_pins_functions:listSharedPinRoutesForExport", listSharedPinRoutesForExport);
+
+        const harness = lunoraTest(schema as never);
+
+        shard.harness = harness;
+
+        try {
+            const [readableId, unreachableId] = await harness.run(async (context: any) => {
+                const ids: string[] = [];
+
+                for (const title of ["Readable", "Unreachable"]) {
+                    const threadId = await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title, userId: "user-owner" });
+
+                    await context.db.insert("threadPins", {
+                        createdAt: 3,
+                        messageId: `m-${title}`,
+                        messageRole: "assistant",
+                        note: `${title} note`,
+                        threadId,
+                        updatedAt: 4,
+                        userId: "user-collab",
+                    });
+                    await context.db.insert("sharedPinRoutes", { createdAt: 0, ownerId: "user-owner", threadId, userId: "user-collab" });
+                    ids.push(threadId);
+                }
+
+                return ids;
+            });
+
+            shard.unreachableThreadId = unreachableId;
+
+            const shared = await harness.action(async (context: any) => await context.runAction(collectSharedPins, { userId: "user-collab" }));
+
+            expect(shared).toHaveLength(2);
+            expect(shared).toContainEqual({ pins: [expect.objectContaining({ note: "Readable note" })], threadId: readableId });
+            expect(shared).toContainEqual({ pins: [], threadId: unreachableId, unreadable: true });
+        } finally {
+            shard.unreachableThreadId = undefined;
             shard.harness = undefined;
             harness.close();
         }

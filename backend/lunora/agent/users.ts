@@ -12,7 +12,7 @@ import { internalAction, internalMutation, internalQuery, type MutationCtx as Mu
 import { nullable, paginationOptionsValidator } from "../lib/validators";
 import { stream } from "../lib/streams";
 import { deleteFollowRowsOfThread } from "../chat/follows/functions";
-import { eraseThreadPinsAndRoutes } from "../chat/gdpr";
+import { eraseThreadPinsAndRoutesBatch } from "../chat/gdpr";
 import { deleteMessage } from "./messages";
 import { deleteStreamsPageForThreadId } from "./streams";
 import { vPaginationResult } from "./validators";
@@ -226,10 +226,12 @@ async function deletePageForUserId(context: MutationContext, args: DeleteAllArgs
         threadId: threadInProgress!,
     });
 
-    // The thread's follow rows go first, one batch per call; the thread goes once none are left.
-    if (streamResult.isDone && (await deleteFollowRowsOfThread(context, threadInProgress!))) {
-        // The pins on this thread and the routes to it go with it: a collaborator's pins are stored on this shard (`chat/gdpr.ts`).
-        await eraseThreadPinsAndRoutes(context, threadInProgress!);
+    // The thread's follow rows go first, one batch per call; the pins and routes to it go next, one batch per call too, and the thread
+    // goes once none of those are left (`chat/gdpr.ts`: a collaborator's pins are stored on this shard).
+    const threadDrained = streamResult.isDone && (await deleteFollowRowsOfThread(context, threadInProgress!));
+    const pinsBatch = threadDrained ? await eraseThreadPinsAndRoutesBatch(context, threadInProgress!) : { hasMore: true };
+
+    if (threadDrained && !pinsBatch.hasMore) {
         await context.db.delete("threads", threadInProgress);
         threadInProgress = null;
         messagesCursor = null;
