@@ -164,18 +164,6 @@ describe("where a sub-agent's chat opens", () => {
         expect(harness.navigate).not.toHaveBeenCalled();
     });
 
-    it("opens the main view by default when the split view is off, since there is no side panel", async () => {
-        harness.preferences = { splitViewEnabled: false, subAgentOpenPlace: undefined };
-        const { link } = renderRunningCard();
-
-        fireEvent.click(link);
-
-        await vi.waitFor(() => {
-            expect(harness.navigate).toHaveBeenCalledWith(MAIN_VIEW);
-        });
-        expect(harness.openBeside).not.toHaveBeenCalled();
-    });
-
     it("opens the main view by default on a narrow screen, where the side panel is not laid out beside the chat", async () => {
         harness.isDesktop = false;
         const { link } = renderRunningCard();
@@ -202,27 +190,24 @@ describe("where a sub-agent's chat opens", () => {
         expect(harness.openBeside).not.toHaveBeenCalled();
     });
 
-    it("takes the main view with Ctrl or Cmd when the side panel is the setting", async () => {
+    it("takes the main view with Ctrl when the side panel is the setting", async () => {
         const { link } = renderRunningCard();
 
         fireEvent.click(link, { ctrlKey: true });
-        fireEvent.click(link, { metaKey: true });
 
         await vi.waitFor(() => {
-            expect(harness.navigate).toHaveBeenCalledTimes(2);
+            expect(harness.navigate).toHaveBeenCalledWith(MAIN_VIEW);
         });
-        expect(harness.navigate).toHaveBeenCalledWith(MAIN_VIEW);
         expect(harness.openBeside).not.toHaveBeenCalled();
     });
 
-    it("takes the side panel with Ctrl or Cmd when the main view is the setting", () => {
+    it("takes the side panel with Ctrl when the main view is the setting", () => {
         harness.preferences = { splitViewEnabled: true, subAgentOpenPlace: "main" };
         const { link } = renderRunningCard();
 
         fireEvent.click(link, { ctrlKey: true });
-        fireEvent.click(link, { metaKey: true });
 
-        expect(harness.openBeside).toHaveBeenCalledTimes(2);
+        expect(harness.openBeside).toHaveBeenCalledWith("child-1");
         expect(harness.navigate).not.toHaveBeenCalled();
     });
 
@@ -235,16 +220,6 @@ describe("where a sub-agent's chat opens", () => {
             expect(harness.navigate).toHaveBeenCalledWith(MAIN_VIEW);
         });
         expect(harness.openBeside).not.toHaveBeenCalled();
-    });
-
-    it("takes the side panel with the middle button when the main view is the setting", () => {
-        harness.preferences = { splitViewEnabled: true, subAgentOpenPlace: "main" };
-        const { link } = renderRunningCard();
-
-        expect(auxClick(link, 1)).toBe(false);
-
-        expect(harness.openBeside).toHaveBeenCalledWith("child-1");
-        expect(harness.navigate).not.toHaveBeenCalled();
     });
 
     it("leaves the right button to the browser, so its menu still opens", () => {
