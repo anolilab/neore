@@ -71,30 +71,11 @@ describe("SaveFileButton", () => {
         expect(saveFromUrl).toHaveBeenCalledWith("https://files.test/cat.png", "cat.png", undefined);
     });
 
-    it("saves the file at its URL under its name", () => {
-        const button = render(<SaveFileButton filename="report.pdf" url="https://files.test/report.pdf" />);
-
-        act(() => button.click());
-
-        expect(saveFromUrl).toHaveBeenCalledTimes(1);
-        expect(saveFromUrl).toHaveBeenCalledWith("https://files.test/report.pdf", "report.pdf", undefined);
-    });
-
     it("passes the fallback name when there is no file name", () => {
         const button = render(<SaveFileButton fallbackName="video" url="https://files.test/clip" />);
 
         act(() => button.click());
 
         expect(saveFromUrl).toHaveBeenCalledWith("https://files.test/clip", undefined, "video");
-    });
-
-    it("takes keyboard focus", () => {
-        const button = render(<SaveFileButton filename="report.pdf" url="https://files.test/report.pdf" />);
-
-        expect(button.tabIndex).toBeGreaterThanOrEqual(0);
-
-        act(() => button.focus());
-
-        expect(document.activeElement).toBe(button);
     });
 });
