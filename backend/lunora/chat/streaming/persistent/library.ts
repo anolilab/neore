@@ -905,11 +905,14 @@ const hasLiveEdit = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<b
 
 /**
  * Lifts the snooze a rate-limit pause put on its thread (`pauseRunForRateLimit`). It puts back the value the snooze replaced
- * (`pauseSnooze.previousUntil`, if still ahead), so an owner's own snooze survives the pause. It does nothing while the
- * snooze is no longer the one this pause set, or while another paused reply on the same chat is still live: that reply
- * still needs the chat snoozed. Lifting writes no choice (`snoozeChosenAt` stays).
+ * (`pauseSnooze.previousUntil`, if still ahead), so an owner's own snooze survives the pause. `leaving` names paused replies
+ * that end in the same call (a Retry now resuming them), so they do not count as still paused.
+ *
+ * While another reply on the chat is still paused, the snooze stays: it passes to that reply (`pauseSnooze`), so the reply
+ * that ends last lifts it. Lifting does nothing once the snooze is no longer the one this pause set. Lifting writes no
+ * choice (`snoozeChosenAt` stays).
  */
-const liftPauseSnooze = async (ctx: MutationCtx, stream: Doc<"persistentStreams">): Promise<void> => {
+const liftPauseSnooze = async (ctx: MutationCtx, stream: Doc<"persistentStreams">, leaving: ReadonlySet<string> = new Set()): Promise<void> => {
     const { pauseSnooze } = stream;
 
     if (pauseSnooze === undefined) {
@@ -917,9 +920,12 @@ const liftPauseSnooze = async (ctx: MutationCtx, stream: Doc<"persistentStreams"
     }
 
     const threadId = stream.threadId as Id<"threads">;
-    const others = await liveStreamsOf(ctx, threadId);
+    const live = await liveStreamsOf(ctx, threadId);
+    const stillPaused = live.find((other) => other._id !== stream._id && other.pause !== undefined && !leaving.has(other._id));
 
-    if (others.some((other) => other._id !== stream._id && other.pause !== undefined)) {
+    if (stillPaused !== undefined) {
+        await patchRow(ctx.db, "persistentStreams", stillPaused, { pauseSnooze });
+
         return;
     }
 
@@ -1200,6 +1206,7 @@ export const retryPausedRunsNow = internalMutation
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         const live = await liveStreamsOf(ctx, args.threadId);
+        const resumes: Doc<"persistentStreams">[] = [];
         let resumed = false;
 
         for (const stream of live) {
@@ -1212,11 +1219,6 @@ export const retryPausedRunsNow = internalMutation
 
             const early = pause.retryAt > ctx.now;
 
-            // An early resume runs the reply now, so the snooze the pause put on its chat goes with the wait.
-            if (early) {
-                await liftPauseSnooze(ctx, stream);
-            }
-
             // A pause the person resumes has no queued resume that could be late: once its reset has passed it is due at once.
             if (!early && stream.pauseAwaitsPerson !== true && pause.retryAt > ctx.now - RESUME_OVERDUE_MS) {
                 continue;
@@ -1226,7 +1228,16 @@ export const retryPausedRunsNow = internalMutation
 
             await ctx.db.patch("persistentStreams", stream._id, { pause: due, ...(early && { earlySteps: [...(stream.earlySteps ?? []), pause.from] }) });
             await enqueueRunResume(due, 0);
+            resumes.push(stream);
             resumed = true;
+        }
+
+        // The snooze the waits put on the chat ends with the waits they end (an early resume runs the reply now). Lifted after the
+        // loop, so a reply resumed in this same call does not count as one still paused.
+        const leaving = new Set<string>(resumes.map((stream) => stream._id));
+
+        for (const stream of resumes) {
+            await liftPauseSnooze(ctx, stream, leaving);
         }
 
         return resumed;
