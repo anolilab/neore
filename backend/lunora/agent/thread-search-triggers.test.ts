@@ -14,7 +14,7 @@ const triggers = threadSearchTriggers({
     afterDelete: (handler: Handler) => handler,
     afterInsert: (handler: Handler) => handler,
     afterUpdate: (handler: Handler) => handler,
-} as never) as unknown as { threadSearchDelete: Handler; threadSearchInsert: Handler };
+} as never) as unknown as { threadSearchDelete: Handler; threadSearchInsert: Handler; threadSearchUpdate: Handler };
 
 const failingScheduler = () => {
     return { runAfter: vi.fn().mockRejectedValue(new Error("scheduler down")) };
@@ -57,6 +57,48 @@ describe("threadSearchTriggers", () => {
         ).resolves.toBeUndefined();
 
         warn.mockRestore();
+    });
+
+    it.each([
+        ["archive", "active", "archived"],
+        ["restore", "archived", "active"],
+    ])("schedules the vectors' archived flag on the owner's shard on %s", async (_name, before, after) => {
+        const scheduler = { runAfter: vi.fn(async () => "job") };
+        const row = { title: "Hello", titleVectorId: "v1", userId: "u1", userTurnCount: 4 };
+
+        await triggers.threadSearchUpdate({ scheduler }, { doc: { ...row, status: after }, id: "t1", previous: { ...row, status: before } });
+
+        expect(scheduler.runAfter).toHaveBeenCalledExactlyOnceWith(
+            0,
+            internal.agent.thread_vector_archived.syncThreadVectorArchived,
+            { threadId: "t1" },
+            // Until it lands: nothing later queues this flag again once the backfill is done.
+            { retry: CLEANUP_RETRY, shardKey: "u1" },
+        );
+    });
+
+    it("fails the archive when the flag update cannot be scheduled", async () => {
+        const row = { title: "Hello", titleVectorId: "v1", userId: "u1", userTurnCount: 4 };
+
+        await expect(
+            triggers.threadSearchUpdate(
+                { scheduler: failingScheduler() },
+                { doc: { ...row, status: "archived" }, id: "t1", previous: { ...row, status: "active" } },
+            ),
+        ).rejects.toThrow("scheduler down");
+    });
+
+    it("schedules no flag update for a thread without vectors, or a write that leaves the archive state", async () => {
+        const scheduler = { runAfter: vi.fn(async () => "job") };
+        const row = { title: "Hello", userId: "u1", userTurnCount: 4 };
+
+        await triggers.threadSearchUpdate({ scheduler }, { doc: { ...row, status: "archived" }, id: "t1", previous: { ...row, status: "active" } });
+        await triggers.threadSearchUpdate(
+            { scheduler },
+            { doc: { ...row, status: "active", titleVectorId: "v1" }, id: "t1", previous: { ...row, status: "active", titleVectorId: "v1" } },
+        );
+
+        expect(scheduler.runAfter).not.toHaveBeenCalled();
     });
 
     it("schedules an insert's sync with the retry policy, on the owner's shard", async () => {

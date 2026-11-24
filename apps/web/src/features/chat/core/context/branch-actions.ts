@@ -37,8 +37,7 @@ export interface EditMessageEnv extends BranchActionEnv {
     setOptimisticMessages: Dispatch<SetStateAction<UIMessage[]>>;
 }
 
-/** The body of the provider's `reloadMessage`: regenerates the reply after `messageId` as a sibling. */
-export const runReloadMessage = async (env: ReloadMessageEnv, messageId: string) => {
+const reloadMessageOnce = async (env: ReloadMessageEnv, messageId: string) => {
     const {
         authHeader,
         defaultLanguage,
@@ -65,7 +64,7 @@ export const runReloadMessage = async (env: ReloadMessageEnv, messageId: string)
     setError(null);
 
     if (!threadId || !isAuthenticated) {
-        return;
+        return undefined;
     }
 
     // Through the ref, so the actions context (every message row reads it)
@@ -74,7 +73,7 @@ export const runReloadMessage = async (env: ReloadMessageEnv, messageId: string)
     const messageIndex = currentMessages.findIndex((m) => m.id === messageId);
 
     if (messageIndex === -1) {
-        return;
+        return undefined;
     }
 
     let userMessageIndex = -1;
@@ -86,14 +85,23 @@ export const runReloadMessage = async (env: ReloadMessageEnv, messageId: string)
         }
     }
 
+    // The prompt is on a page that is not loaded: nothing to ask again from here. `false` tells the caller, so it can say so.
     if (userMessageIndex === -1) {
-        return;
+        return false;
     }
 
     const userMessage = currentMessages[userMessageIndex];
 
     if (!userMessage) {
-        return;
+        return undefined;
+    }
+
+    // A local reply continues only on the model that wrote it: the browser cannot send it to the gateway or to another model.
+    // A saved reply records the bare local model id, which is what the selected local target names.
+    const failedMessage = currentMessages[messageIndex];
+
+    if (failedMessage?.localReply === true && (!localTarget || (failedMessage.model !== undefined && failedMessage.model !== localTarget.modelId))) {
+        return "model-unavailable";
     }
 
     const turn = startTurn();
@@ -137,7 +145,7 @@ export const runReloadMessage = async (env: ReloadMessageEnv, messageId: string)
             threadId,
         });
 
-        return;
+        return true;
     }
 
     // Set optimistic regenerating state to show "Thinking..." immediately
@@ -215,6 +223,26 @@ export const runReloadMessage = async (env: ReloadMessageEnv, messageId: string)
         }
 
         handleError(error_);
+    }
+
+    return true;
+};
+
+/** Replies whose Continue or Regenerate is running: a second click on the same reply is not a second turn. */
+const reloadsInFlight = new Set<string>();
+
+/** The body of the provider's `reloadMessage`: regenerates the reply after `messageId` as a sibling. */
+export const runReloadMessage = async (env: ReloadMessageEnv, messageId: string) => {
+    if (reloadsInFlight.has(messageId)) {
+        return undefined;
+    }
+
+    reloadsInFlight.add(messageId);
+
+    try {
+        return await reloadMessageOnce(env, messageId);
+    } finally {
+        reloadsInFlight.delete(messageId);
     }
 };
 

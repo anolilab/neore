@@ -102,9 +102,29 @@ export const threadSearchTriggers = (t: TriggerBuilder) => {
                     { retry: SYNC_RETRY, shardKey: doc.userId },
                 );
             }
+
+            // Archived or restored, by whatever writer: the thread's vectors carry the flag a meaning search filters on.
+            // Not logged and swallowed as the sync is: no later write queues this again (the one-time backfill may be done),
+            // so a failed schedule fails the archive or restore, and the job retries until it lands (it is idempotent).
+            if (archivedChanged(event.previous as unknown as SearchRow, doc) && hasSearchVector(doc) && doc.userId !== undefined) {
+                const { internal } = await import("../_generated/internal");
+
+                await context.scheduler.runAfter(
+                    0,
+                    internal.agent.thread_vector_archived.syncThreadVectorArchived,
+                    { threadId: event.id },
+                    { retry: CLEANUP_RETRY, shardKey: doc.userId },
+                );
+            }
         }),
     };
 };
+
+/** Pure: whether a write moved the thread into or out of `archived`. */
+export const archivedChanged = (previous: Pick<SearchRow, "status">, doc: Pick<SearchRow, "status">): boolean =>
+    (previous.status === "archived") !== (doc.status === "archived");
+
+const hasSearchVector = (row: SearchRow): boolean => SEARCH_KINDS.some((kind) => row[SEARCH_VECTOR_FIELD[kind]] !== undefined);
 
 /** A thread's user-turn count; a thread written before the count existed has none. */
 const userTurnsOf = (thread: Record<string, unknown>): number => (typeof thread.userTurnCount === "number" ? thread.userTurnCount : 0);

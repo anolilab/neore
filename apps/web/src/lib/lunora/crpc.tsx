@@ -30,7 +30,7 @@ import type { ArgsOf, FunctionReference, LunoraClient, ReturnOf } from "@lunora/
 import { lunoraQueryOptions, useLunora } from "@lunora/react";
 import type { ApiTypes } from "@neore/backend/api";
 import { api } from "@neore/backend/api";
-import { getLiveQueryManager, LIVE_ARGS_META_KEY, LIVE_META_KEY, shardOptionsFor, withUnlockProof } from "@neore/client-runtime";
+import { getLiveQueryManager, LIVE_ARGS_META_KEY, LIVE_META_KEY, lunoraMutationKey, shardOptionsFor, withUnlockProof } from "@neore/client-runtime";
 import type { QueryKey, UseMutationOptions } from "@tanstack/react-query";
 import { hashKey, onlineManager, skipToken } from "@tanstack/react-query";
 import { useMemo } from "react";
@@ -227,6 +227,8 @@ const leaf = (client: LunoraClient, path: string[]): any => {
 
                     return await client.mutation(reference as never, withUnlockProof(args) as never, { ...shard, ...call } as never);
                 },
+                // The function's dispatch key (`chat_functions:updateThread`), named from the path so a bad one still throws only when called.
+                mutationKey: lunoraMutationKey(`${path.slice(0, -1).join("_")}:${path.at(-1)}`),
                 ...overrides,
             };
         },
