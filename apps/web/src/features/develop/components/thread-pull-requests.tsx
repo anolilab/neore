@@ -59,7 +59,7 @@ const LinkedPullRequest = ({
                 </span>
             </Link>
             {readStatus && <PullRequestFixes address={{ number: link.number, repository: link.repository }} returnFocusTo={linkRef} threadId={threadId} />}
-            {readStatus && <ThreadPullRequestCatchUp isRunning={isRunning} link={link} threadId={threadId} />}
+            {readStatus && <ThreadPullRequestCatchUp isRunning={isRunning} link={link} returnFocusTo={linkRef} threadId={threadId} />}
         </li>
     );
 };

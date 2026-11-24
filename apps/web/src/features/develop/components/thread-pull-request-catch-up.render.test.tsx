@@ -6,6 +6,7 @@
 
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
+import { createRef } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ThreadPullRequestCatchUp from "./thread-pull-request-catch-up";
@@ -327,5 +328,37 @@ describe("ThreadPullRequestCatchUp", () => {
         render(control());
 
         expect(screen.queryByRole("button", BUTTON)).toBeNull();
+    });
+    it("moves focus to the pull request's link when a read removes the focused control, and leaves other focus alone", () => {
+        const returnFocusTo = createRef<HTMLAnchorElement>();
+        const view = () => (
+            <>
+                <a href="#pr" ref={returnFocusTo}>
+                    octo/hello#7
+                </a>
+                <input aria-label="elsewhere" />
+                <ThreadPullRequestCatchUp isRunning={false} link={{ number: 7, repository: "octo/hello" }} returnFocusTo={returnFocusTo} threadId="thread-1" />
+            </>
+        );
+
+        given("open", "behind");
+
+        const { rerender } = render(view());
+
+        screen.getByRole("button", BUTTON).focus();
+        comparedAs(0);
+        rerender(view());
+
+        // eslint-disable-next-line testing-library/no-node-access -- where focus lands is what this asserts
+        expect(document.activeElement).toBe(screen.getByRole("link", { name: "octo/hello#7" }));
+
+        given("open", "behind");
+        rerender(view());
+        screen.getByRole("textbox", { name: "elsewhere" }).focus();
+        pull.current = { ...pull.current, isError: true };
+        rerender(view());
+
+        // eslint-disable-next-line testing-library/no-node-access -- where focus lands is what this asserts
+        expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "elsewhere" }));
     });
 });

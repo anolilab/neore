@@ -3,12 +3,27 @@
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
+import type { ReactNode, RefObject } from "react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { prefillComposer, useComposerTakesPrefill } from "@/features/chat/thread/composer-prefill";
 
 import { catchUpPrompt, catchUpRunId, hostOfPullRequestUrl, isPlainBranchName, isPlainRepo } from "../lib/catch-up-prompt";
+import { focusIsLost, useReportFocusLoss } from "../lib/focus-loss";
 import { useBranchComparison, usePullRequest } from "../lib/use-develop";
+
+/** The shown control; it reports when a read removes it while it holds focus, which the browser would drop to the page. */
+const Shown = ({ children, onFocusLost }: { children: ReactNode; onFocusLost: () => void }) => {
+    const ref = useRef<HTMLSpanElement>(null);
+
+    useReportFocusLoss(onFocusLost, ref);
+
+    return (
+        <span className="inline-flex items-center gap-1 text-xs" ref={ref}>
+            {children}
+        </span>
+    );
+};
 
 /**
  * Shows "Behind <base>" and a Catch up button beside an open linked pull request whose branch is behind its base. The button puts a
@@ -21,9 +36,19 @@ import { useBranchComparison, usePullRequest } from "../lib/use-develop";
  * it, so it does not flicker. While it shows, the end of an agent turn in this thread reads the pull request and the comparison
  * again: that turn may have pushed the caught-up branch. Nor for a branch name that is not plain enough to put in a command.
  * Whether the prompt pushes is the host's word on the head's repository, never a guess from names or commits: a fork's branch
- * is not pushed.
+ * is not pushed. When it goes away holding focus, focus moves to `returnFocusTo` (the pull request's link).
  */
-const CatchUpControl = ({ isRunning, link, threadId }: { isRunning: boolean; link: { number: number; repository: string }; threadId: string }) => {
+const CatchUpControl = ({
+    isRunning,
+    link,
+    returnFocusTo,
+    threadId,
+}: {
+    isRunning: boolean;
+    link: { number: number; repository: string };
+    returnFocusTo?: RefObject<HTMLElement | null>;
+    threadId: string;
+}) => {
     const { t } = useLingui();
     // One run per mounted control: a second click makes the same prompt, and the composer adds the same text only once.
     // A retry of the same run still goes ahead: the fork's local branch takes the next free number instead of stopping.
@@ -52,6 +77,19 @@ const CatchUpControl = ({ isRunning, link, threadId }: { isRunning: boolean; lin
         void comparison.refetch();
     });
     const wasRunning = useRef(isRunning);
+    const lostFocus = useRef(false);
+
+    useEffect(() => {
+        if (!lostFocus.current) {
+            return;
+        }
+
+        lostFocus.current = false;
+
+        if (focusIsLost()) {
+            returnFocusTo?.current?.focus();
+        }
+    });
 
     // A turn that ended may have pushed the rebased branch (or merged or closed the pull request): one read, only while it shows.
     useEffect(() => {
@@ -81,7 +119,11 @@ const CatchUpControl = ({ isRunning, link, threadId }: { isRunning: boolean; lin
     const sameRepo = detail.headInBaseRepository === true;
 
     return (
-        <span className="inline-flex items-center gap-1 text-xs">
+        <Shown
+            onFocusLost={() => {
+                lostFocus.current = true;
+            }}
+        >
             <span className="text-muted-foreground">{t`Behind ${base}`}</span>
             <Tooltip>
                 {/* A `render` element replaces the trigger, and TooltipTrigger does not forward its children into it: the label goes in the button. */}
@@ -115,7 +157,7 @@ const CatchUpControl = ({ isRunning, link, threadId }: { isRunning: boolean; lin
                         : t`Puts a prompt in the composer to rebase this fork's branch on ${base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent.`}
                 </TooltipContent>
             </Tooltip>
-        </span>
+        </Shown>
     );
 };
 
@@ -125,7 +167,7 @@ type CatchUpProps = Parameters<typeof CatchUpControl>[0];
  * Mounts the control, and with it its host reads, only where the thread has a composer on the page that takes the prompt
  * (`useComposerPrefill`): a split pane without focus, or a thread whose composer is not shown, reads nothing.
  */
-const ThreadPullRequestCatchUp = ({ isRunning, link, threadId }: CatchUpProps) =>
-    useComposerTakesPrefill(threadId) ? <CatchUpControl isRunning={isRunning} link={link} threadId={threadId} /> : null;
+const ThreadPullRequestCatchUp = ({ isRunning, link, returnFocusTo, threadId }: CatchUpProps) =>
+    useComposerTakesPrefill(threadId) ? <CatchUpControl isRunning={isRunning} link={link} returnFocusTo={returnFocusTo} threadId={threadId} /> : null;
 
 export default ThreadPullRequestCatchUp;
