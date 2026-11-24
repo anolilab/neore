@@ -109,8 +109,13 @@ vi.mock("@tanstack/react-router", () => {
 
 vi.mock("@tanstack/react-query", () => {
     return {
+        // Queries answer with nothing: the rows under test read their data from the props and the stores, not from these.
+        skipToken: Symbol("skipToken"),
         useMutation: () => {
             return { isPending: false, mutate: () => {}, mutateAsync: async () => {} };
+        },
+        useQuery: () => {
+            return { data: undefined, isLoading: false, isPending: false };
         },
         useQueryClient: () => {
             return {};

@@ -143,6 +143,16 @@ vi.mock("@/lib/lunora/crpc", () => {
         useCRPC: () => {
             return {
                 agent: entry,
+                auth: {
+                    functions: {
+                        // The user's settings are not part of these searches: the query answers nothing.
+                        getUserSettings: {
+                            queryOptions: () => {
+                                return { queryFn: async () => undefined, queryKey: ["userSettings"] };
+                            },
+                        },
+                    },
+                },
                 chat: {
                     composite: {
                         getThreadListData: {
