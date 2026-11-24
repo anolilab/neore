@@ -1860,6 +1860,8 @@ export const schema = defineSchema({
     // the provider; `flow` carries what completion needs (PKCE verifier and any
     // DCR client secret encrypted). Single-use: completion deletes the row.
     oauthStates: defineTable({
+        // RFC 9207: the server advertised `iss` on its responses, so the callback refuses one without it.
+        authorizationResponseIssParameterSupported: v.optional(v.boolean()),
         // Legacy target encoding (a slug, or `mcp:<name>` plus `mcpServer`), read
         // only for rows written before `target`; new rows carry `target` alone.
         connectorSlug: v.optional(v.string()),
@@ -4224,6 +4226,10 @@ export const schema = defineSchema({
         composerAutocompleteEnabled: v.optional(v.boolean()),
         // Opt-in Vim keys in the chat composer. Absent = off.
         composerVimMode: v.optional(v.boolean()),
+        // Ask before a chat is archived, deleted or unpinned in the web app. Archive and unpin: absent = off; delete: absent = on.
+        confirmBeforeArchiveChat: v.optional(v.boolean()),
+        confirmBeforeDeleteChat: v.optional(v.boolean()),
+        confirmBeforeUnpinChat: v.optional(v.boolean()),
         // Appearance: contrast mode (accepted values: `auth/fields.ts`). Absent = follow the system.
         contrast: v.optional(v.string()),
         customInstructions: v.optional(v.string()),

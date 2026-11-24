@@ -182,6 +182,11 @@ const KeyboardShortcutsHandler: React.FC<{
                 return;
             }
 
+            // A held key repeats its keydown: a repeat is never a second delete.
+            if (event.repeat) {
+                return;
+            }
+
             event.preventDefault();
             onShortcut?.("deleteThread", event);
         },
@@ -385,7 +390,7 @@ const KeyboardShortcutsHandler: React.FC<{
         convertedShortcuts.deleteThread,
         handleDeleteThread,
         {
-            description: "Delete the open thread (asks first)",
+            description: "Delete the open thread",
             enabled: !!shortcuts.deleteThread && typeof shortcuts.deleteThread === "string",
             // Never from a text field, as archive: these two options keep it out of the composer.
             enableOnContentEditable: false,

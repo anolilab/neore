@@ -14,7 +14,14 @@ import GlobalCommandPalette from "./command-palette";
 
 const harness = vi.hoisted(() => {
     return {
+        confirmBeforeDelete: true,
+        // Set by the delete-confirmation tests; `undefined` keeps the thread manager's delete unavailable, as before them.
+        /** The chat the palette acts on; `undefined` shows no current-thread actions. */
+        currentThreadId: undefined as string | undefined,
+        deleteBranch: undefined as undefined | ReturnType<typeof vi.fn>,
+        handleUnpinThread: vi.fn(),
         navigate: vi.fn(),
+        updateThread: vi.fn(),
         scrollToMessage: vi.fn(),
         searchArgs: [] as unknown[],
         /** The thread rows the palette lists; a test may replace them. */
@@ -173,19 +180,26 @@ vi.mock("@/features/chat/core/hooks/use-current-model", () => {
 vi.mock("@/features/chat/core/hooks/use-thread-manager", () => {
     return {
         useThreadManager: () => {
-            return { deleteBranch: undefined, switchToBranch: vi.fn() };
+            return { deleteBranch: harness.deleteBranch, switchToBranch: vi.fn() };
         },
     };
 });
 
 vi.mock("@/features/chat/core/stores/thread-store-hooks", () => {
-    return { useCurrentThreadId: () => undefined, useThreadMetadata: () => new Map() };
+    return { useCurrentThreadId: () => harness.currentThreadId, useThreadMetadata: () => new Map() };
 });
 
 vi.mock("@/features/chat/thread-list/hooks/use-thread-handlers", () => {
     return {
         default: () => {
-            return { handleCreateBranch: vi.fn(), handlePinThread: vi.fn(), handleUnpinThread: vi.fn(), updateThread: vi.fn() };
+            return {
+                confirmBeforeDelete: harness.confirmBeforeDelete,
+                confirmDialog: null,
+                handleCreateBranch: vi.fn(),
+                handlePinThread: vi.fn(),
+                handleUnpinThread: harness.handleUnpinThread,
+                updateThread: harness.updateThread,
+            };
         },
     };
 });
@@ -213,8 +227,13 @@ const isBefore = (earlier: Node, later: Node): boolean => earlier.compareDocumen
 
 const messageQueries = () => harness.searchArgs.filter((args) => args !== skipToken);
 
-const renderPalette = (queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })) =>
-    render(createElement(QueryClientProvider, { client: queryClient }, createElement(GlobalCommandPalette)));
+const renderPalette = (queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })) => {
+    const tree = () => createElement(QueryClientProvider, { client: queryClient }, createElement(GlobalCommandPalette));
+    const view = render(tree());
+
+    // A fresh element, so React re-renders the palette and reads the harness's current chat again.
+    return { ...view, rerenderPalette: () => view.rerender(tree()) };
+};
 
 /** Steps the fake clock past the search debounce (the meaning-search tests run on fake timers). */
 const waitPastDebounce = async () => {
@@ -372,6 +391,165 @@ describe("command palette message search", () => {
         await waitFor(() => expect(harness.navigate).toHaveBeenCalledTimes(1));
         expect(harness.navigate).toHaveBeenCalledWith({ hash: "message-message-9", params: { threadId: "thread-2" }, search: {}, to: "/chat/$threadId" });
         expect(harness.scrollToMessage).toHaveBeenCalledWith("message-9", { position: { order: 3, stepOrder: 0 }, threadId: "thread-2" });
+    });
+});
+
+describe("command palette thread delete confirmation", () => {
+    beforeEach(() => {
+        Element.prototype.getAnimations = () => [];
+        stubResizeObserver();
+        harness.confirmBeforeDelete = true;
+        harness.deleteBranch = vi.fn(async () => {
+            return { deletedIds: [], threadDeleted: true };
+        });
+    });
+
+    afterEach(() => {
+        act(() => {
+            useCommandDialogStore.getState().close();
+        });
+        harness.deleteBranch = undefined;
+        harness.currentThreadId = undefined;
+    });
+
+    it("asks before deleting a thread from its row, and deletes it only once confirmed", async () => {
+        renderPalette();
+        await openPalette();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Delete thread" }));
+
+        expect(harness.deleteBranch).not.toHaveBeenCalled();
+        // The same destructive dialog the sidebar row opens; nothing deletes until its delete button is pressed.
+        expect(await screen.findByText("Delete thread?")).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+        expect(harness.deleteBranch).toHaveBeenCalledWith("thread-1");
+    });
+
+    it("deletes a thread from its row at once, with no confirmation, when the setting is saved as off", async () => {
+        harness.confirmBeforeDelete = false;
+        renderPalette();
+        await openPalette();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Delete thread" }));
+
+        expect(harness.deleteBranch).toHaveBeenCalledWith("thread-1");
+    });
+
+    it("asks before deleting the open thread from the palette's thread actions, and deletes it only once confirmed", async () => {
+        harness.currentThreadId = "thread-1";
+        renderPalette();
+        await openPalette();
+
+        fireEvent.click(await screen.findByRole("option", { name: "Delete thread" }));
+
+        expect(harness.deleteBranch).not.toHaveBeenCalled();
+        expect(await screen.findByText("Delete thread?")).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+        expect(harness.deleteBranch).toHaveBeenCalledWith("thread-1");
+    });
+
+    it("deletes the open thread from the palette's thread actions at once when the setting is saved as off", async () => {
+        harness.confirmBeforeDelete = false;
+        harness.currentThreadId = "thread-1";
+        renderPalette();
+        await openPalette();
+
+        fireEvent.click(await screen.findByRole("option", { name: "Delete thread" }));
+
+        expect(harness.deleteBranch).toHaveBeenCalledWith("thread-1");
+    });
+
+    it("returns to the palette when the delete prompt is cancelled, so keyboard focus is not lost", async () => {
+        renderPalette();
+        await openPalette();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Delete thread" }));
+        expect(await screen.findByText("Delete thread?")).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        await waitFor(() => expect(useCommandDialogStore.getState().isOpen).toBe(true));
+        expect(await screen.findByRole("combobox")).toBeTruthy();
+        expect(harness.deleteBranch).not.toHaveBeenCalled();
+    });
+
+    it("returns to the palette after a cancel that follows a confirmed delete", async () => {
+        renderPalette();
+        await openPalette();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Delete thread" }));
+        fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+
+        await waitFor(() => expect(harness.deleteBranch).toHaveBeenCalledTimes(1));
+        expect(useCommandDialogStore.getState().isOpen).toBe(false);
+
+        await openPalette();
+        fireEvent.click(await screen.findByRole("button", { name: "Delete thread" }));
+        expect(await screen.findByText("Delete thread?")).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        expect(await screen.findByRole("combobox")).toBeTruthy();
+    });
+
+    it("reopens the palette when its archive confirmation is backed out of, instead of leaving it closed", async () => {
+        harness.updateThread.mockClear();
+        renderPalette();
+        await openPalette();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Archive thread" }));
+
+        expect(harness.updateThread.mock.calls[0]?.[0]).toBe("thread-1");
+        expect(useCommandDialogStore.getState().isOpen).toBe(false);
+
+        const options = harness.updateThread.mock.calls[0]?.[3] as { onCancel: () => void };
+
+        act(() => {
+            options.onCancel();
+        });
+
+        expect(useCommandDialogStore.getState().isOpen).toBe(true);
+    });
+
+    it("brings the palette back with its search text when its archive confirmation is backed out of", async () => {
+        harness.updateThread.mockClear();
+        renderPalette();
+        const input = await openPalette();
+
+        fireEvent.change(input, { target: { value: "alpha" } });
+        fireEvent.click(await screen.findByRole("button", { name: "Archive thread" }));
+
+        expect(useCommandDialogStore.getState().isOpen).toBe(false);
+
+        const options = harness.updateThread.mock.calls[0]?.[3] as { onCancel: () => void };
+
+        act(() => {
+            options.onCancel();
+        });
+
+        expect(useCommandDialogStore.getState().isOpen).toBe(true);
+        expect((screen.getByRole("combobox") as HTMLInputElement).value).toBe("alpha");
+    });
+
+    it("drops a pending delete of the open chat once another chat is open, so a confirm cannot delete the chat it left", async () => {
+        harness.currentThreadId = "thread-1";
+        const view = renderPalette();
+
+        await openPalette();
+
+        fireEvent.click(await screen.findByRole("option", { name: "Delete thread" }));
+        expect(await screen.findByText("Delete thread?")).toBeTruthy();
+
+        harness.currentThreadId = "thread-2";
+        view.rerenderPalette();
+
+        await waitFor(() => expect(screen.queryByText("Delete thread?")).toBeNull());
+        expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+        expect(harness.deleteBranch).not.toHaveBeenCalled();
     });
 });
 

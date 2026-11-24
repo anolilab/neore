@@ -7,6 +7,7 @@ describe(estimateCancelledUsage, () => {
     it("estimates nothing from nothing", () => {
         expect(estimateCancelledUsage({ emittedChars: 0, promptChars: 0, reasoningChars: 0 })).toStrictEqual({
             cachedTokens: 0,
+            cacheWriteTokens: 0,
             completionTokens: 0,
             promptTokens: 0,
             reasoningTokens: 0,
@@ -17,6 +18,7 @@ describe(estimateCancelledUsage, () => {
         // Completion is the total output, reasoning included: ceil((40 + 9) / 4) = 13.
         expect(estimateCancelledUsage({ emittedChars: 40, promptChars: 400, reasoningChars: 9 })).toStrictEqual({
             cachedTokens: 0,
+            cacheWriteTokens: 0,
             completionTokens: 13,
             promptTokens: 100,
             reasoningTokens: 3,

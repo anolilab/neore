@@ -23,6 +23,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { ReasoningEffortSelector } from "@/features/chat/model-settings/reasoning-effort-selector";
 import { ModelSelect } from "@/features/settings/components/chat/default-models-settings";
+import SubAgentOpenPlaceSettings from "@/features/settings/components/chat/sub-agent-open-place-settings";
 import { offerableBackupModels } from "@/features/settings/lib/backup-model-options";
 import { toCustomGatewayModels } from "@/features/settings/lib/custom-models";
 import useTaskProjects from "@/features/tasks/hooks/use-task-projects";
@@ -436,6 +437,8 @@ const SubAgentRolesSettings: FC = () => {
                     {t`"Always" is guidance to the assistant, not a hard rule. Ask it to do something itself and it will. Chats keep the model you picked for them; only sub-agents use these models.`}
                 </AlertDescription>
             </Alert>
+
+            <SubAgentOpenPlaceSettings />
 
             <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1 space-y-0.5">

@@ -12485,6 +12485,12 @@
     "oauthStates": {
       "commitOrdered": false,
       "fields": {
+        "authorizationResponseIssParameterSupported": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "connectorSlug": {
           "kind": "string",
           "nullable": false,
@@ -33342,6 +33348,24 @@
           "unique": false
         },
         "composerVimMode": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "confirmBeforeArchiveChat": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "confirmBeforeDeleteChat": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "confirmBeforeUnpinChat": {
           "kind": "boolean",
           "nullable": false,
           "optional": true,

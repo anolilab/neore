@@ -3,20 +3,58 @@ import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Doc, Id } from "@neore/backend/dataModel";
 import { shardOptionsFor } from "@neore/client-runtime";
+import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useThreadManager } from "@/features/chat/core/hooks/use-thread-manager";
-import { useOptimisticActions, useThreadActions } from "@/features/chat/core/stores/thread-store-hooks";
+import { useCurrentThreadId, useOptimisticActions, useThreadActions } from "@/features/chat/core/stores/thread-store-hooks";
 import { routeIsOn, survivingPaneAfterDelete } from "@/features/chat/split/split-layout-store";
+import { focusThreadSearchToggle } from "@/features/keyboard/lib/thread-search-target";
 import type { DownloadFormat } from "@/lib/download";
 import { handleDownload } from "@/lib/download";
 import { ValidationError } from "@/lib/errors";
 import { useCRPC, useLunora, useLunoraActionOptions } from "@/lib/lunora/crpc";
 import { showError, showSuccess } from "@/lib/toast";
 
+import { chatActionConfirmations, CONFIRM_EVERYTHING } from "../lib/chat-action-confirmations";
 import type { BranchNode, LoadingStates } from "../types";
+
+/** What a confirmation asks, and the action it runs only on confirm. */
+interface ConfirmationRequest {
+    /** Runs after the confirm, once the dialog has returned focus: for focus that must land on a control still on the page. */
+    afterConfirm?: () => void;
+    confirmLabel: string;
+    description: string;
+    /** Runs when the person cancels or dismisses the confirmation, not on confirm: for a caller that closed something to ask. */
+    onCancel?: () => void;
+    run: () => void;
+    title: string;
+}
+
+/** Options a caller passes when it asks: `onCancel` runs if the person backs out of the confirmation. */
+interface AskOptions {
+    onCancel?: () => void;
+}
+
+/**
+ * Where focus goes after a confirmed archive or unpin, when the control that asked was in the sidebar: that row leaves its
+ * group and unmounts, so focus lands on the search toggle, which stays. Read when the action is asked, before the dialog takes
+ * focus. From the shortcut, the palette or the chat, focus is left where it was.
+ */
+const focusListAfterSidebarAction = (): (() => void) | undefined => {
+    const origin = document.activeElement;
+
+    if (!(origin instanceof HTMLElement) || origin.closest('[data-slot="sidebar"]') === null) {
+        return undefined;
+    }
+
+    return () => {
+        focusThreadSearchToggle();
+    };
+};
 
 const updateLoadingState = <K extends keyof LoadingStates>(previous: LoadingStates, key: K, threadId: string, isAdding: boolean): LoadingStates => {
     const currentSet = previous[key] as Set<string>;
@@ -38,6 +76,28 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
     const { deleteThreadMetadata } = useThreadActions();
     const { clearOptimisticPin, clearOptimisticStatus, removeOptimisticDeletion, setOptimisticPin, setOptimisticStatus } = useOptimisticActions();
     const crpc = useCRPC();
+    const { data: userSettings } = useUserSettings();
+    // Until the settings are known, every action asks: a missing answer must not skip a prompt someone opted into.
+    const confirmations = userSettings === undefined ? CONFIRM_EVERYTHING : chatActionConfirmations(userSettings);
+    // One confirmation at a time: the request the dialog shows, and whether it is open.
+    const [pendingRequest, setPendingRequest] = useState<ConfirmationRequest | undefined>(undefined);
+    const [dialogOpen, setDialogOpen] = useState(false);
+    // Set by the dialog's confirm for the request being shown, so its close is not taken for a cancel.
+    const confirmedRef = useRef(false);
+
+    const askFirst = useCallback((request: ConfirmationRequest) => {
+        confirmedRef.current = false;
+        setPendingRequest(request);
+        setDialogOpen(true);
+    }, []);
+
+    // A pending archive or unpin is about the chat that was open when it was asked. Once another chat is open, it is dropped
+    // unconfirmed, so a confirm cannot act on a chat the person has left.
+    const openChatId = useCurrentThreadId();
+
+    useEffect(() => {
+        setDialogOpen(false);
+    }, [openChatId]);
 
     const lunora = useLunora();
     const { mutateAsync: pinThreadMutation } = useMutation(crpc.chat.functions.pinThread.mutationOptions());
@@ -216,7 +276,7 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
         [pinThreadMutation, setOptimisticPin, clearOptimisticPin, t],
     );
 
-    const handleUnpinThread = useCallback(
+    const unpinNow = useCallback(
         async (threadId: string) => {
             // Optimistic update - show unpinned immediately
             setOptimisticPin(threadId, false);
@@ -244,7 +304,29 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
         [unpinThreadMutation, handleUndoUnpinThread, setOptimisticPin, clearOptimisticPin, t],
     );
 
-    const updateThread = useCallback(
+    const handleUnpinThread = useCallback(
+        (threadId: string, options?: AskOptions) => {
+            if (!confirmations.unpin) {
+                void unpinNow(threadId);
+
+                return;
+            }
+
+            askFirst({
+                afterConfirm: focusListAfterSidebarAction(),
+                confirmLabel: t`Unpin`,
+                description: t`The chat will no longer be pinned. You can pin it again from the list.`,
+                onCancel: options?.onCancel,
+                run: () => {
+                    void unpinNow(threadId);
+                },
+                title: t`Unpin this chat?`,
+            });
+        },
+        [askFirst, confirmations.unpin, t, unpinNow],
+    );
+
+    const applyThreadStatus = useCallback(
         async (threadId: string, model: string, status: "archived" | "active") => {
             // Optimistic update - show new status immediately
             const previousStatus = status === "archived" ? "active" : "archived";
@@ -279,6 +361,29 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
                 });
         },
         [updateThreadAction, handleUndoArchiveThread, setOptimisticStatus, clearOptimisticStatus, t],
+    );
+
+    // Restoring runs at once; only archiving asks, when the setting is on.
+    const updateThread = useCallback(
+        (threadId: string, model: string, status: "archived" | "active", options?: AskOptions) => {
+            if (status !== "archived" || !confirmations.archive) {
+                void applyThreadStatus(threadId, model, status);
+
+                return;
+            }
+
+            askFirst({
+                afterConfirm: focusListAfterSidebarAction(),
+                confirmLabel: t`Archive`,
+                onCancel: options?.onCancel,
+                description: t`Archived chats stay searchable, and you can restore them from the archive.`,
+                run: () => {
+                    void applyThreadStatus(threadId, model, status);
+                },
+                title: t`Archive this chat?`,
+            });
+        },
+        [applyThreadStatus, askFirst, confirmations.archive, t],
     );
 
     const handleBulkDeleteThreads = useCallback(
@@ -332,7 +437,48 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
         [deleteThreadsMutation, deleteThreadMetadata, t, currentThreadId, navigate, lunora],
     );
 
+    // Rendered by the caller, once, so the dialog survives the menu that opened it.
+    const confirmDialog = (
+        <ConfirmDialog
+            confirmLabel={pendingRequest?.confirmLabel}
+            description={pendingRequest?.description}
+            onConfirm={() => {
+                const request = pendingRequest;
+
+                confirmedRef.current = true;
+                setDialogOpen(false);
+                request?.run();
+
+                // The dialog returns focus to the button that opened it on close, so a follow-up runs after that return.
+                if (request?.afterConfirm) {
+                    globalThis.setTimeout(request.afterConfirm, 0);
+                }
+            }}
+            onOpenChange={(open) => {
+                setDialogOpen(open);
+
+                if (open) {
+                    return;
+                }
+
+                // A confirm and this close come from the same click, in either order: read the flag once that click has finished.
+                const request = pendingRequest;
+
+                queueMicrotask(() => {
+                    if (!confirmedRef.current) {
+                        request?.onCancel?.();
+                    }
+                });
+            }}
+            open={dialogOpen}
+            title={pendingRequest?.title ?? ""}
+        />
+    );
+
     return {
+        // Delete is not gated here: each caller asks in its own dialog, so a gate here would ask twice.
+        confirmBeforeDelete: confirmations.delete,
+        confirmDialog,
         handleBulkDeleteThreads,
         handleCreateBranch,
         handleDeleteThread,
