@@ -139,6 +139,16 @@ describe("dispatchLinkedPullRequestChecks", () => {
         expect(dispatched).toEqual([0]);
     });
 
+    it("reaches an idle chat's link behind more than 80 links on archived chats, within two sweeps", async () => {
+        const archived = Array.from({ length: 85 }, () => {
+            return { threadArchived: true };
+        });
+        const { dispatched } = await seedAndSweep([...archived, {}], ON, 2);
+
+        // Sweep one looks up 80 archived chats and skips them; sweep two reaches the idle chat's link.
+        expect(dispatched).toEqual([0, 1]);
+    });
+
     it("skips a link whose thread is deleted", async () => {
         const { dispatched } = await seedAndSweep([{ threadDeleted: true }], ON);
 

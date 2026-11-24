@@ -114,6 +114,9 @@ export const dispatchLinkedPullRequestChecks = internalMutation
 
             if (thread !== null && selectAutoArchiveDue([candidateOf(thread)], cutoff, NO_EXCLUSIONS, 1).length === 1) {
                 due.push(link);
+            } else {
+                // Stamped as checked without a host read, so it moves behind the others instead of holding the front of the order.
+                await ctx.db.patch("pullRequestThreads", link._id, { stateCheckedAt: now });
             }
         }
 
