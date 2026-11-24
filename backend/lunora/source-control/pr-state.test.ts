@@ -6,7 +6,6 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { autoArchiveCutoff } from "../agent/auto-archive-logic";
 import { internal } from "../_generated/internal";
 import { runInShard } from "../lib/shard-context";
 import schema from "../schema";
@@ -180,33 +179,12 @@ describe("dispatchLinkedPullRequestChecks", () => {
 });
 
 describe("scheduleArchiveAfterClose", () => {
-    const NOW = 1_000_000_000_000;
+    it("schedules the chat's archive job at once, which reads the owner's setting when it runs", () => {
+        const runAfter = vi.fn(async () => "job");
 
-    /** Runs the scheduling against the harness's own database, with a scheduler the test can read. */
-    const scheduleFor = (days: number | undefined) =>
-        harness.run(async (ctx: any) => {
-            if (days !== undefined) {
-                await ctx.db.insert("userSettings", { autoArchiveAfterDays: days, userId: OWNER });
-            }
+        scheduleArchiveAfterClose({ scheduler: { runAfter } as never }, { threadId: "thread-1" as never });
 
-            const threadId = await ctx.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Thread", updatedAt: 1, userId: OWNER });
-            const runAfter = vi.fn(async () => "job");
-
-            await scheduleArchiveAfterClose({ db: ctx.db, now: NOW, scheduler: { runAfter } as never }, { threadId, userId: OWNER });
-
-            return { runAfter, threadId };
-        });
-
-    it("schedules the chat's archive check at once, as of now, when its link is recorded closed", async () => {
-        const { runAfter, threadId } = await scheduleFor(30);
-
-        expect(runAfter).toHaveBeenCalledWith(0, internal.agent.auto_archive.archiveIfStillIdle, { cutoff: autoArchiveCutoff(NOW, 30), threadId });
-    });
-
-    it("schedules nothing when auto-archive is off, since nothing archives then", async () => {
-        const { runAfter } = await scheduleFor(undefined);
-
-        expect(runAfter).not.toHaveBeenCalled();
+        expect(runAfter).toHaveBeenCalledWith(0, internal.agent.auto_archive.archiveClosedLinkChat, { threadId: "thread-1" });
     });
 });
 

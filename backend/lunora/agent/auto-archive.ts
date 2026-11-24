@@ -135,8 +135,48 @@ const threadKeptForOpenPullRequest = async (ctx: MutationCtx, userId: string | u
  * on the fresh row, its project's pin state, its live streams and any request waiting on the owner, in the same
  * transaction as the write, so nothing that happened after the scan is overwritten.
  */
+/** Archives one thread if, as read in this transaction, it is still due at `cutoff`. */
+const archiveThreadIfDue = async (ctx: MutationCtx, threadId: Id<"threads">, cutoff: number): Promise<boolean> => {
+    const thread = await ctx.db.get("threads", threadId);
+
+    if (!thread) {
+        return false;
+    }
+
+    // The project pin is read per thread, not from a capped list of pinned projects.
+    const project = thread.projectId ? await ctx.db.projects.findFirst({ where: { _id: thread.projectId } }) : null;
+    const pinnedProjectIds = new Set<string>(project && project.pinnedAt !== undefined && thread.projectId ? [thread.projectId] : []);
+
+    // The row checks run first, so a thread that is not due never reads its streams.
+    const due = selectAutoArchiveDue([candidateOf(thread)], cutoff, { liveThreadIds: new Set<string>(), pinnedProjectIds }, 1);
+
+    if (
+        due.length === 0 ||
+        (await threadHasLiveStream(ctx, threadId)) ||
+        (await threadWaitsOnPerson(ctx, threadId)) ||
+        (await threadHasLiveGuestLink(ctx, threadId)) ||
+        (await threadKeptForOpenPullRequest(ctx, thread.userId, threadId))
+    ) {
+        return false;
+    }
+
+    await markThreadArchived(ctx, threadId);
+
+    return true;
+};
+
 export const archiveIfStillIdle = internalMutation
     .input({ cutoff: v.number(), threadId: v.id("threads") })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => await archiveThreadIfDue(ctx, args.threadId, args.cutoff));
+
+/**
+ * Archives a chat that a closed or merged pull request made due (`source-control/pr-state.ts`). The owner's auto-archive
+ * setting and the cutoff are read here, in the same transaction as the decision, so a setting changed after the job was
+ * scheduled decides it: auto-archive off archives nothing, and a raised threshold keeps the chat.
+ */
+export const archiveClosedLinkChat = internalMutation
+    .input({ threadId: v.id("threads") })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         const thread = await ctx.db.get("threads", args.threadId);
@@ -145,26 +185,17 @@ export const archiveIfStillIdle = internalMutation
             return false;
         }
 
-        // The project pin is read per thread, not from a capped list of pinned projects.
-        const project = thread.projectId ? await ctx.db.projects.findFirst({ where: { _id: thread.projectId } }) : null;
-        const pinnedProjectIds = new Set<string>(project && project.pinnedAt !== undefined && thread.projectId ? [thread.projectId] : []);
+        const settings = await ctx.db
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", thread.userId))
+            .unique();
+        const days = settings?.autoArchiveAfterDays;
 
-        // The row checks run first, so a thread that is not due never reads its streams.
-        const due = selectAutoArchiveDue([candidateOf(thread)], args.cutoff, { liveThreadIds: new Set<string>(), pinnedProjectIds }, 1);
-
-        if (
-            due.length === 0 ||
-            (await threadHasLiveStream(ctx, args.threadId)) ||
-            (await threadWaitsOnPerson(ctx, args.threadId)) ||
-            (await threadHasLiveGuestLink(ctx, args.threadId)) ||
-            (await threadKeptForOpenPullRequest(ctx, thread.userId, args.threadId))
-        ) {
+        if (!isAutoArchiveDays(days) || days === 0) {
             return false;
         }
 
-        await markThreadArchived(ctx, args.threadId);
-
-        return true;
+        return await archiveThreadIfDue(ctx, args.threadId, autoArchiveCutoff(ctx.now, days));
     });
 
 const runAutoArchivePass = async (ctx: MutationCtx, cursor: string | null): Promise<void> => {

@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import schema from "../schema";
 import { pendingApprovalCutoff } from "../chat/lib/tool-approval-cleanup";
 import { MAX_LENGTH } from "../lib/validators";
-import { archiveIfStillIdle, autoArchiveContinue } from "./auto-archive";
+import { archiveClosedLinkChat, archiveIfStillIdle, autoArchiveContinue } from "./auto-archive";
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -202,6 +202,35 @@ describe("archiveIfStillIdle and live guest links", () => {
 
     it("archives an idle thread whose guest link has lapsed", async () => {
         expect(await archiveWithGuestLink(1)).toBe(true);
+    });
+});
+
+describe("archiveClosedLinkChat reads the owner's setting when it runs", () => {
+    const DAY = 86_400_000;
+
+    /** An idle thread last updated `updatedAt`, and the owner's auto-archive threshold in days (absent = off). */
+    const runClosedLinkChat = (days: number | undefined, updatedAt: number) =>
+        harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Old", updatedAt, userId: OWNER });
+
+            if (days !== undefined) {
+                await ctx.db.insert("userSettings", { autoArchiveAfterDays: days, userId: OWNER });
+            }
+
+            return await ctx.runMutation(archiveClosedLinkChat, { threadId });
+        });
+
+    it("archives an idle chat whose link closed, while auto-archive is on", async () => {
+        expect(await runClosedLinkChat(30, 1)).toBe(true);
+    });
+
+    it("keeps the chat when auto-archive was turned off after the job was scheduled", async () => {
+        expect(await runClosedLinkChat(undefined, 1)).toBe(false);
+    });
+
+    it("keeps the chat when the threshold was raised after the job was scheduled", async () => {
+        // Idle for 20 days: due under the 10-day threshold the job was scheduled with, not under the 30-day one it runs with.
+        expect(await runClosedLinkChat(30, Date.now() - 20 * DAY)).toBe(false);
     });
 });
 
