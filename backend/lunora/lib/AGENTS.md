@@ -73,6 +73,9 @@
   moves its time before it sends the job, and each save notes the shard as active for housekeeping.
   Everything after the lease is taken runs inside the `try` that gives it back. A fenced merge with
   import markers or account-move markers left is not finished: its runs drain the `markers` phase.
+  Every step that touches a marker checks the lease generation first (`beginMergeRun` included). The new account's
+  `importing` marker is shared by every merge into it: each merge holds it through its own `guest-merge-importing`
+  claim, and only the last live holder ends it; a merge's own cleanup is read from its own claims, never the marker.
   The merge reads the guest's shard whole only on that shard itself (`onGuestShard`); never on a
   shard that serves other users too (dev's `SHARD_ROUTING=off`).
 

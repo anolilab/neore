@@ -43,6 +43,7 @@ import {
     shardLocalTables,
 } from "./account-merge";
 import { IMPORT_MARKER_SCOPE, MERGE_PINS_LEFT_SCOPE, pinsLeftShard } from "./account-merge";
+import { eraseWaitUntil } from "./account-moves";
 import { runInShard } from "./shard-context";
 import { schemaWithShardedTables } from "./test-schema";
 
@@ -1905,6 +1906,27 @@ describe("mergeGuestInto across two real shards", () => {
     });
 });
 
+/** The merge's progress record on the new account's shard, or null. */
+const progressRecordOf = async (harness: ReturnType<typeof lunoraTest>, from: string) =>
+    await harness.run(
+        async (context: any) =>
+            await context.db
+                .query("idempotencyClaims")
+                .withIndex("by_scope_key", (q: any) => q.eq("scope", MERGE_PROGRESS_SCOPE).eq("key", from))
+                .first(),
+    );
+
+/** One run's start under its own lease, as a delivery makes it: take the lease, begin the run, give the lease back. */
+const beginRunOf = async (harness: ReturnType<typeof lunoraTest>, from = "guest", to = "user") =>
+    await harness.run(async (context: any) => {
+        const { generation } = (await context.runMutation(acquireMergeLease, { from, to })) as { generation: number };
+        const begun = await context.runMutation(beginMergeRun, { from, generation, to });
+
+        await context.runMutation(releaseMergeLease, { from, generation });
+
+        return begun;
+    });
+
 describe("the account-move markers a merge holds", () => {
     const movesOf = async (harness: ReturnType<typeof lunoraTest>, userId: string) =>
         (
@@ -1917,14 +1939,14 @@ describe("the account-move markers a merge holds", () => {
         const harness = lunoraTest(schemaWithShardedTables([]) as never);
 
         try {
-            const begun = await harness.run(async (context: any) => await context.runMutation(beginMergeRun, { from: "guest", to: "user" }));
+            const begun = await beginRunOf(harness);
 
-            expect(begun).toStrictEqual({ cleanup: false, finished: false, pinWritesUntil: null, stopped: false });
+            expect(begun).toStrictEqual({ cleanup: false, finished: false, pinWritesUntil: null, stopped: false, superseded: false });
             expect(await movesOf(harness, "guest")).toStrictEqual(["merging"]);
             expect(await movesOf(harness, "user")).toStrictEqual(["importing"]);
 
             // A later run renews the markers instead of adding a second pair.
-            await harness.run(async (context: any) => await context.runMutation(beginMergeRun, { from: "guest", to: "user" }));
+            await beginRunOf(harness);
 
             expect(await movesOf(harness, "guest")).toStrictEqual(["merging"]);
 
@@ -1950,9 +1972,9 @@ describe("the account-move markers a merge holds", () => {
             try {
                 await harness.run(async (context: any) => await context.db.insert("accountMoves", { createdAt: 1, kind: "erasing", userId: erased }));
 
-                const begun = await harness.run(async (context: any) => await context.runMutation(beginMergeRun, { from: "guest", to: "user" }));
+                const begun = await beginRunOf(harness);
 
-                expect(begun).toStrictEqual({ cleanup: false, finished: false, pinWritesUntil: null, stopped: true });
+                expect(begun).toStrictEqual({ cleanup: false, finished: false, pinWritesUntil: null, stopped: true, superseded: false });
                 expect(await movesOf(harness, erased)).toStrictEqual(["erasing"]);
                 expect(await movesOf(harness, erased === "guest" ? "user" : "guest")).toStrictEqual([]);
             } finally {
@@ -1969,9 +1991,9 @@ describe("the account-move markers a merge holds", () => {
 
             await harness.run(async (context: any) => await context.db.insert("pinWriteLeases", { expiresAt: until, userId: "guest" }));
 
-            const begun = await harness.run(async (context: any) => await context.runMutation(beginMergeRun, { from: "guest", to: "user" }));
+            const begun = await beginRunOf(harness);
 
-            expect(begun).toStrictEqual({ cleanup: false, finished: false, pinWritesUntil: until, stopped: false });
+            expect(begun).toStrictEqual({ cleanup: false, finished: false, pinWritesUntil: until, stopped: false, superseded: false });
         } finally {
             harness.close();
         }
@@ -1992,11 +2014,113 @@ describe("the account-move markers a merge holds", () => {
                     }),
             );
 
-            const begun = await harness.run(async (context: any) => await context.runMutation(beginMergeRun, { from: "guest", to: "user" }));
+            const begun = await beginRunOf(harness);
 
-            expect(begun).toStrictEqual({ cleanup: false, finished: true, pinWritesUntil: null, stopped: false });
+            expect(begun).toStrictEqual({ cleanup: false, finished: true, pinWritesUntil: null, stopped: false, superseded: false });
             expect(await movesOf(harness, "guest")).toStrictEqual([]);
             expect(await movesOf(harness, "user")).toStrictEqual([]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("leaves the markers alone for an older delivery that resumes after a newer one took the lease", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+        const markersOf = async () =>
+            (
+                (await harness.run(async (context: any) => await context.db.accountMoves.findMany({ consistency: "primary", where: {} }))) as {
+                    page: { createdAt: number; kind: string; userId: string }[];
+                }
+            ).page.map(({ createdAt, kind, userId }) => {
+                return { createdAt, kind, userId };
+            });
+
+        try {
+            const older = (await harness.run(async (context: any) => await context.runMutation(acquireMergeLease, { from: "guest", to: "user" }))) as {
+                generation: number;
+            };
+
+            // The older delivery pauses; its lease is given back and a newer one takes the merge on and marks both accounts.
+            await harness.run(async (context: any) => await context.runMutation(releaseMergeLease, { from: "guest", generation: older.generation }));
+
+            const newer = (await harness.run(async (context: any) => await context.runMutation(acquireMergeLease, { from: "guest", to: "user" }))) as {
+                generation: number;
+            };
+
+            await harness.run(async (context: any) => await context.runMutation(beginMergeRun, { from: "guest", generation: newer.generation, to: "user" }));
+
+            const before = await markersOf();
+
+            expect(before.map(({ kind, userId }) => `${userId}:${kind}`).toSorted((a, b) => a.localeCompare(b))).toStrictEqual([
+                "guest:merging",
+                "user:importing",
+            ]);
+
+            // An erasure of the guest begins: the older delivery, resuming, would stop the merge and drop the newer run's markers.
+            await harness.run(async (context: any) => await context.db.insert("accountMoves", { createdAt: 1, kind: "erasing", userId: "guest" }));
+
+            const begun = await harness.run(
+                async (context: any) => await context.runMutation(beginMergeRun, { from: "guest", generation: older.generation, to: "user" }),
+            );
+
+            expect(begun).toStrictEqual({ cleanup: false, finished: false, pinWritesUntil: null, stopped: false, superseded: true });
+            expect(await markersOf()).toStrictEqual([...before, { createdAt: 1, kind: "erasing", userId: "guest" }]);
+            expect(await progressRecordOf(harness, "guest")).not.toBeNull();
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("keeps the account's importing marker, and its erasure waiting, while another guest's merge into it is still running", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+        const finish = async (from: string) =>
+            await harness.run(async (context: any) => {
+                const { generation } = (await context.runMutation(acquireMergeLease, { from, to: "user" })) as { generation: number };
+                const dropped = await context.runMutation(dropImportMarkersPage, { from, generation, to: "user" });
+
+                await context.runMutation(releaseMergeLease, { from, generation });
+
+                return dropped;
+            });
+        const waitOf = async () => (await harness.run(async (context: any) => await eraseWaitUntil(context, "user", Date.now()))) as number | null;
+
+        try {
+            await beginRunOf(harness, "guest-a");
+            await beginRunOf(harness, "guest-b");
+
+            expect(await movesOf(harness, "user")).toStrictEqual(["importing"]);
+
+            expect(await finish("guest-a")).toStrictEqual({ fenced: false, hasMore: false });
+
+            // The first merge's end leaves the second's guard: the account's erasure still waits.
+            expect(await movesOf(harness, "guest-a")).toStrictEqual([]);
+            expect(await movesOf(harness, "guest-b")).toStrictEqual(["merging"]);
+            expect(await movesOf(harness, "user")).toStrictEqual(["importing"]);
+            expect(await waitOf()).not.toBeNull();
+
+            // The finished merge is over by its own state, not the shared marker: no cleanup left, its record gone, so the
+            // stalled-merge sweep does not restart it.
+            expect(await beginRunOf(harness, "guest-a")).toStrictEqual({
+                cleanup: false,
+                finished: true,
+                pinWritesUntil: null,
+                stopped: false,
+                superseded: false,
+            });
+            expect(await progressRecordOf(harness, "guest-a")).toBeNull();
+            expect(await progressRecordOf(harness, "guest-b")).not.toBeNull();
+
+            // A restarted end of the finished merge still leaves the other's guard.
+            await finish("guest-a");
+
+            expect(await movesOf(harness, "user")).toStrictEqual(["importing"]);
+
+            // The second merge's run renews its guard; once it ends too, the account's marker goes and the erasure may sweep.
+            await beginRunOf(harness, "guest-b");
+            await finish("guest-b");
+
+            expect(await movesOf(harness, "user")).toStrictEqual([]);
+            expect(await waitOf()).toBeNull();
         } finally {
             harness.close();
         }
@@ -2176,9 +2300,9 @@ describe("a merge's end past the fence", () => {
                 await context.db.insert("accountMoves", { createdAt: 1, kind: "importing", userId: "user" });
             });
 
-            const begun = await harness.run(async (context: any) => await context.runMutation(beginMergeRun, { from: "guest", to: "user" }));
+            const begun = await beginRunOf(harness);
 
-            expect(begun).toStrictEqual({ cleanup: true, finished: true, pinWritesUntil: null, stopped: false });
+            expect(begun).toStrictEqual({ cleanup: true, finished: true, pinWritesUntil: null, stopped: false, superseded: false });
 
             // A continuation from a stale progress, one markers page per run: the phase is the markers', whatever it says.
             const { runs } = await mergeToEnd(call, "guest", "user", {

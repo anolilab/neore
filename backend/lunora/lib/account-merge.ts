@@ -51,7 +51,10 @@
  * writes are refused, the run waits while one may still be in flight, an erasure
  * of either account stops the merge, and the new account's erasure waits for it.
  * The markers go with the last page of import markers; a run that finds the fence
- * with markers left does only that, renewing neither marker.
+ * with markers left does only that, renewing neither marker. Several guests can
+ * merge into one account: each holds the account's importing marker through its
+ * own claim ({@link MERGE_IMPORTING_SCOPE}), and the marker goes with the last
+ * holder. A delivery whose lease a newer one took touches no marker.
  *
  * The copy, the clear and the final check read the guest's shard whole: every row
  * there belongs to an object the guest owns. Where development's
@@ -73,7 +76,7 @@ import { internal } from "../_generated/internal";
 import type { MutationCtx } from "../_generated/server";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { mergeSkippedSteps } from "../auth/lib/setup-step-limits";
-import { beginAccountMove, endAccountMove, hasAccountMove, isErasing, pinWritesInFlightUntil } from "./account-moves";
+import { beginAccountMove, endAccountMove, hasAccountMove, isErasing, MERGE_MARKER_MAX_AGE_MS, pinWritesInFlightUntil } from "./account-moves";
 import { AUDIT_TABLES } from "./audit-triggers";
 import { hasClaimWithPrefix, releaseClaimsWithPrefix } from "./claim-once";
 import { authLogger } from "./logger";
@@ -454,18 +457,6 @@ const mergeFinished = async (db: MutationCtx["db"], from: string, now: number): 
 };
 
 /**
- * A finished merge (its fence is here) still has its end to run: import markers of the guest left on this shard, or the
- * account-move markers that go with the last of them. The fence goes in with the first page of dropped markers, so a
- * merge with more than a page of them is fenced before its markers phase is over; until this is `false`, a run carries
- * on with that phase alone, and the new account's erasure waits for the importing marker no longer than
- * `MERGE_MARKER_MAX_AGE_MS` after the last run renewed it.
- */
-const mergeCleanupPending = async (ctx: Pick<MutationCtx, "db">, from: string, to: string | undefined): Promise<boolean> =>
-    (await hasClaimWithPrefix(ctx, IMPORT_MARKER_SCOPE, `${from}:`)) ||
-    (to !== undefined && (await hasAccountMove(ctx, to, "importing"))) ||
-    (await hasAccountMove(ctx, from, "merging"));
-
-/**
  * The claim scope of a merge's lease, on the NEW account's shard: one row per guest (keyed by the guest's id), its `result`
  * `{"generation":n,"until":ms}`. Each run takes it with the next generation ({@link acquireMergeLease}), and every write
  * of rows there checks it ({@link holdMergeLease}): queues deliver at least once, so two deliveries of a merge can run at
@@ -541,6 +532,83 @@ const writeClaim = async (
         await db.patch("idempotencyClaims", row._id, { claimedAt: row.expiresAt > now ? row.claimedAt : now, ...fields });
     }
 };
+
+/**
+ * The claim scope of one merge's hold on the new account's importing marker, on the new account's shard: one row per
+ * merge, keyed `<newAccount>:<guest>`, live for `MERGE_MARKER_MAX_AGE_MS` after the run that last renewed it. Several
+ * guests can merge into one account at once, and the account has one importing marker: a merge that ends drops its own
+ * row and the marker only once no other merge's row is live, so the account's erasure keeps waiting for the others.
+ * Tagged with the new account, so its erasure takes it.
+ */
+export const MERGE_IMPORTING_SCOPE = "guest-merge-importing";
+
+const importingKey = (from: string, to: string): string => `${to}:${from}`;
+
+/** Marks the new account as importing for this merge: its own hold, then the account's shared marker, both renewed. */
+const beginImporting = async (ctx: Pick<MutationCtx, "db">, from: string, to: string, now: number): Promise<void> => {
+    await writeClaim(ctx.db, MERGE_IMPORTING_SCOPE, importingKey(from, to), now, {
+        expiresAt: now + MERGE_MARKER_MAX_AGE_MS,
+        result: "1",
+        userId: to,
+    });
+    await beginAccountMove(ctx, to, "importing", now);
+};
+
+/** Importing holds read per page by {@link otherMergeImporting}. */
+const IMPORTING_PROBE_BATCH = 50;
+
+/** Whether another merge into `to` still holds its importing marker live. Read a page at a time; `;` follows `:`. */
+const otherMergeImporting = async (ctx: Pick<MutationCtx, "db">, to: string, now: number): Promise<boolean> => {
+    let after = `${to}:`;
+
+    for (;;) {
+        const from = after;
+        const rows = await ctx.db
+            .query("idempotencyClaims")
+            .withIndex("by_scope_key", (q) => q.eq("scope", MERGE_IMPORTING_SCOPE).gt("key", from).lt("key", `${to};`))
+            .take(IMPORTING_PROBE_BATCH);
+
+        if (rows.some((row) => row.expiresAt > now)) {
+            return true;
+        }
+
+        if (rows.length < IMPORTING_PROBE_BATCH) {
+            return false;
+        }
+
+        after = rows.at(-1)!.key;
+    }
+};
+
+/**
+ * Ends this merge's hold on the new account's importing marker. The marker itself goes only when no other merge into the
+ * account holds it live; one given up on stops holding it once its row is past `MERGE_MARKER_MAX_AGE_MS`, as the marker
+ * stops fencing then.
+ */
+const endImporting = async (ctx: Pick<MutationCtx, "db">, from: string, to: string, now: number): Promise<void> => {
+    const own = await storedClaim(ctx.db, MERGE_IMPORTING_SCOPE, importingKey(from, to));
+
+    if (own !== null) {
+        await ctx.db.delete("idempotencyClaims", own._id);
+    }
+
+    if (!(await otherMergeImporting(ctx, to, now))) {
+        await endAccountMove(ctx, to, "importing");
+    }
+};
+
+/**
+ * A finished merge (its fence is here) still has its end to run: import markers of the guest left on this shard, this
+ * merge's hold on the new account's importing marker, or the guest's merging marker. All three are this merge's own: the
+ * account's importing marker is shared with other merges into it and says nothing about this one. The fence goes in with
+ * the first page of dropped markers, so a merge with more than a page of them is fenced before its markers phase is over;
+ * until this is `false`, a run carries on with that phase alone, and the new account's erasure waits for the importing
+ * marker no longer than `MERGE_MARKER_MAX_AGE_MS` after the last run renewed it.
+ */
+const mergeCleanupPending = async (ctx: Pick<MutationCtx, "db">, from: string, to: string | undefined): Promise<boolean> =>
+    (await hasClaimWithPrefix(ctx, IMPORT_MARKER_SCOPE, `${from}:`)) ||
+    (to !== undefined && (await storedClaim(ctx.db, MERGE_IMPORTING_SCOPE, importingKey(from, to))) !== null) ||
+    (await hasAccountMove(ctx, from, "merging"));
 
 /** A lease or generation row's `result`; throws on one this module did not write, so nothing runs on a guess. */
 const generationOf = (result: string | undefined): { generation: number; until: number } => {
@@ -960,7 +1028,7 @@ export const dropImportMarkersPage = internalMutation
 
         if (!hasMore) {
             // The merge is over: its account-move markers go with the last page, so they end exactly when it does.
-            await endAccountMove(ctx, args.to, "importing");
+            await endImporting(ctx, args.from, args.to, now);
             await endAccountMove(ctx, args.from, "merging");
         }
 
@@ -1158,31 +1226,57 @@ export const moveSharedPinRouteOf = internalMutation
  *   is not over ({@link mergeCleanupPending}): the run drops the rest of the import markers and then both account-move
  *   markers, and renews neither, so an erasure waiting on them is held back no longer than their age allows;
  * - `stopped`: either account is being erased, which has priority; the markers go and the merge ends;
- * - `pinWritesUntil`: a pin write of the guest's may still be in flight until then; the run waits for it.
+ * - `pinWritesUntil`: a pin write of the guest's may still be in flight until then; the run waits for it;
+ * - `superseded`: the lease is no longer `generation`'s, so a later delivery took the merge over; nothing is touched, so
+ *   an older delivery resuming late can neither end nor renew the markers the newer one is relying on.
  */
 export const beginMergeRun = internalMutation
-    .input({ from: v.string(), to: v.string() })
-    .output(v.object({ cleanup: v.boolean(), finished: v.boolean(), pinWritesUntil: v.union(v.number(), v.null()), stopped: v.boolean() }))
+    .input({ from: v.string(), generation: v.number(), to: v.string() })
+    .output(
+        v.object({
+            cleanup: v.boolean(),
+            finished: v.boolean(),
+            pinWritesUntil: v.union(v.number(), v.null()),
+            stopped: v.boolean(),
+            superseded: v.boolean(),
+        }),
+    )
     .mutation(async ({ args, ctx }) => {
         const { now } = ctx;
 
+        if (!(await holdMergeLease(ctx.db, args.from, args.generation, now))) {
+            return { cleanup: false, finished: false, pinWritesUntil: null, stopped: false, superseded: true };
+        }
+
         if (await mergeFinished(ctx.db, args.from, now)) {
-            return { cleanup: await mergeCleanupPending(ctx, args.from, args.to), finished: true, pinWritesUntil: null, stopped: false };
+            return {
+                cleanup: await mergeCleanupPending(ctx, args.from, args.to),
+                finished: true,
+                pinWritesUntil: null,
+                stopped: false,
+                superseded: false,
+            };
         }
 
         await beginAccountMove(ctx, args.from, "merging", now);
-        await beginAccountMove(ctx, args.to, "importing", now);
+        await beginImporting(ctx, args.from, args.to, now);
 
         if ((await isErasing(ctx, args.to)) || (await isErasing(ctx, args.from))) {
-            await endAccountMove(ctx, args.to, "importing");
+            await endImporting(ctx, args.from, args.to, now);
             await endAccountMove(ctx, args.from, "merging");
             // The merge ends here: nothing is left for the stalled-merge sweep to restart.
             await dropMergeProgress(ctx.db, args.from);
 
-            return { cleanup: false, finished: false, pinWritesUntil: null, stopped: true };
+            return { cleanup: false, finished: false, pinWritesUntil: null, stopped: true, superseded: false };
         }
 
-        return { cleanup: false, finished: false, pinWritesUntil: await pinWritesInFlightUntil(ctx, args.from, now), stopped: false };
+        return {
+            cleanup: false,
+            finished: false,
+            pinWritesUntil: await pinWritesInFlightUntil(ctx, args.from, now),
+            stopped: false,
+            superseded: false,
+        };
     });
 
 /** A caller into a named shard, as `createShardClient(...).call` is. */
@@ -1565,13 +1659,16 @@ export const mergeGuestInto = async (
         const { current }: { current: boolean } = await call(references.noteGeneration, { from, generation }, from);
 
         if (current) {
-            const begun: { cleanup?: boolean; finished: boolean; pinWritesUntil: number | null; stopped: boolean } = await call(
+            const begun: { cleanup?: boolean; finished: boolean; pinWritesUntil: number | null; stopped: boolean; superseded?: boolean } = await call(
                 references.beginRun,
-                { from, to },
+                { from, generation, to },
                 to,
             );
 
-            if (begun.finished && begun.cleanup === true) {
+            if (begun.superseded === true) {
+                // A later delivery holds the lease: this one leaves the merge, and its markers, to it.
+                early = { superseded: true };
+            } else if (begun.finished && begun.cleanup === true) {
                 // Fenced with its markers phase not over: only that phase is left, whatever the resumed progress says.
                 enter(state, "markers");
             } else if (begun.finished) {
