@@ -42,6 +42,19 @@ const lingui = vi.hoisted(() => {
     return { i18n: { _: (value: string) => value }, t };
 });
 
+// The chat-action confirmations are read from settings this test does not serve: every action asks, as before the settings load.
+vi.mock("./hooks/use-confirm-before-delete", () => {
+    return { useConfirmBeforeDelete: () => true };
+});
+vi.mock("@/features/auth/hooks/use-user-settings", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("@/features/auth/hooks/use-user-settings")>()),
+        useUserSettings: () => {
+            return { data: undefined };
+        },
+    };
+});
+
 // The options menu reads the follow state; these tests are about the row, not the follow items.
 vi.mock("../follows/use-thread-follow", () => {
     return {
