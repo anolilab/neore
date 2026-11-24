@@ -149,7 +149,7 @@ const build = ({
                     }
                 }
 
-                return null as never;
+                return { fenced: false } as never;
             }
             case "nextSharedPinRoute": {
                 // The snapshot is taken first: the owner converts after the read, which is the interleaving under test.

@@ -170,9 +170,17 @@ export const noteShardActivity = async (ctx: CensusCtx, shardKey: string | undef
  * A due time already passed may be in {@link dispatchDueShards}' hands, whose
  * tick can run before this caller's work is visible: it is moved by a
  * millisecond, still due, so that dispatch sees it changed and leaves it armed
- * for the next one instead of clearing it.
+ * for the next one instead of clearing it. `consumedBefore`: the shard tick's
+ * start; a due time at or before it is one this tick has done the work of
+ * (moved or not), so `dueAt` replaces it instead of the passed time staying and
+ * waking the shard again for nothing.
  */
-export const noteShardDue = async (ctx: CensusCtx, dueAt: number, shardKey: string | undefined = currentUserShard()): Promise<void> => {
+export const noteShardDue = async (
+    ctx: CensusCtx,
+    dueAt: number,
+    shardKey: string | undefined = currentUserShard(),
+    { consumedBefore }: { consumedBefore?: number } = {},
+): Promise<void> => {
     if (shardKey === undefined) {
         return;
     }
@@ -187,7 +195,7 @@ export const noteShardDue = async (ctx: CensusCtx, dueAt: number, shardKey: stri
             return;
         }
 
-        if (row.nextDueAt === undefined || dueAt < row.nextDueAt) {
+        if (row.nextDueAt === undefined || dueAt < row.nextDueAt || (consumedBefore !== undefined && row.nextDueAt <= consumedBefore)) {
             await ctx.db.patch("shardActivity", row._id, { nextDueAt: dueAt });
         } else if (row.nextDueAt <= now) {
             await ctx.db.patch("shardActivity", row._id, { nextDueAt: row.nextDueAt < now ? row.nextDueAt + 1 : row.nextDueAt - 1 });
@@ -496,7 +504,8 @@ export const runShardTick = internalMutation
         }
 
         if (candidates.length > 0) {
-            await noteShardDue(ctx, Math.max(Math.min(...candidates), now + MIN_TICK_INTERVAL_MS));
+            // A passed due time left armed (a save moved it while the dispatch read it) is this tick's to replace.
+            await noteShardDue(ctx, Math.max(Math.min(...candidates), now + MIN_TICK_INTERVAL_MS), undefined, { consumedBefore: now });
         }
 
         return null;

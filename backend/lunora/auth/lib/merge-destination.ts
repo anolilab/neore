@@ -12,3 +12,15 @@ export const isMergeDestination = async (context: Pick<QueryCtx, "db">, userId: 
 
     return user !== null && user.isAnonymous !== true;
 };
+
+/**
+ * Whether `guestId` is still a guest a merge may move rows from: its `user` row is there and is a guest's. Read from the
+ * primary, so the merge's own deletion of the guest, or an erasure, is seen at once.
+ */
+export const isMergeSource = async (context: Pick<QueryCtx, "db">, guestId: string): Promise<boolean> => {
+    const user = (await context.db.user.findFirst({ consistency: "primary", where: { _id: context.db.asId("user", guestId) } })) as {
+        isAnonymous?: boolean | null;
+    } | null;
+
+    return user?.isAnonymous === true;
+};

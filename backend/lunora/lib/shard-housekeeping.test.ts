@@ -34,7 +34,7 @@ vi.mock(
 );
 
 // The `user` table is `.global()`, which this harness does not hold: a merge's new account counts as present.
-vi.mock(import("../auth/lib/merge-destination"), () => ({ isMergeDestination: async () => true }) as never);
+vi.mock(import("../auth/lib/merge-destination"), () => ({ isMergeDestination: async () => true, isMergeSource: async () => true }) as never);
 
 // The shard tick's own steps run as registered procedures; the dispatch targets stay plain references, so their paths show.
 const registry = vi.hoisted(() => new Map<string, unknown>());
@@ -504,6 +504,21 @@ describe("a stalled guest merge behind more active shards", () => {
         // Still due, so the next dispatch sends the tick again, by when the saved progress is there to see.
         expect(await dueOf("user")).toBeLessThanOrEqual(NOW);
         expect(await dispatchWith(dispatchDueShards)).toStrictEqual([{ path: "lib_shard_housekeeping:runShardTick", shardKey: "user" }]);
+    });
+
+    it("replaces a passed due time left armed for the dispatch with the tick's own next time, so the shard is not woken again", async () => {
+        // A due time a save moved by a millisecond while the dispatch read it: still passed when the tick it sent runs.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("shardActivity", { lastActiveAt: NOW, nextDueAt: NOW - 60_000 + 1, shardKey: "user" });
+        });
+        await runInShard("user", async () => await harness.run(async (ctx: any) => await ctx.runMutation(recordGuestMerge, { from: "guest", to: "user" })));
+
+        expect(await dueOf("user")).toBeLessThanOrEqual(NOW);
+
+        await runInShard("user", async () => await harness.run(async (ctx: any) => await ctx.runMutation(runShardTick, {})));
+
+        expect(await dueOf("user")).toBe(NOW + MERGE_STALL_MS);
+        expect(await dispatchWith(dispatchDueShards)).toStrictEqual([]);
     });
 
     it("keeps a due time saved while the dispatched tick is being sent, after the dispatch's clear", async () => {

@@ -74,7 +74,8 @@
   minute tick runs the sweep there (`resumeStalledGuestMergesOnTick`), since housekeeping reads only the most active shards.
   An erasure takes every claim tagged with the account, its erasing marker too, so the lease, each run's start and the sweep
   read the new account's `user` row (`auth/lib/merge-destination.ts`, primary): once it is gone the merge stops, writes
-  nothing there and keeps the guest. The lease and generation never lapse while a merge is unfinished.
+  nothing there and keeps the guest. Lease and generation never lapse while a merge is unfinished; a finished one leaves
+  only its fence (no lease past it, no generation for a gone guest). A sweep pass spends ≤ `MERGE_SWEEP_STATEMENTS` of D1.
   Import markers (`guest-merge-row`), progress records and the pins-left signal (`guest-merge-pins-left`) never lapse, and
   a lapsed one still counts: each goes only when the merge has done what it records (its end, the run cap, the `global`
   step that re-points the moved pins' routes) or with the erasure of the account it is tagged with. A time to live there
@@ -83,10 +84,10 @@
   `abandoned`: a `repins` step that meets it stops its own merge and keeps that guest, never waits to its cap. That step
   re-reads its route's owner (primary) after the signal check and follows a route re-pointed meanwhile. The import copies
   re-point only `USER_REFERENCE_FIELDS`; content equal to the guest's id stays. The root dispatch clears a shard's due
-  time only while it still holds the value it read; `noteShardDue` moves a passed one, so a save then is never cleared.
-  Everything after the lease is taken runs inside the `try` that gives it back. A fenced merge with
-  import markers or account-move markers left is not finished: its runs drain the `markers` phase.
-  Every step that touches a marker checks the lease generation first (`beginMergeRun` included). The new account's
+  time only while it still holds the value it read; `noteShardDue` moves a passed one, so a save then is never cleared,
+  and the tick replaces a passed one with its own (`consumedBefore`). Everything after the lease is taken runs inside the
+  `try` that gives it back. A fenced merge with import or account-move markers left drains its `markers` phase. Every step
+  that writes checks the lease generation first (owner-shard pin moves: both accounts' erasure markers). The new account's
   `importing` marker is shared by every merge into it: each merge holds it through its own `guest-merge-importing`
   claim, and only the last live holder ends it; a merge's own cleanup is read from its own claims, never the marker.
   The merge reads the guest's shard whole only on that shard itself (`onGuestShard`); never on a

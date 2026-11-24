@@ -2,7 +2,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
-import { admitPinWriteUnlessMoving } from "../../lib/account-moves";
+import { admitPinWriteUnlessMoving, isErasing } from "../../lib/account-moves";
 import { authMutation, authQuery, internalMutation, internalQuery, rateLimit } from "../../lib/crpc";
 import { MAX_LENGTH } from "../../lib/validators";
 import { systemDb } from "../../lib/rls/scope";
@@ -225,12 +225,18 @@ export const eraseUserPinsOnThread = internalMutation
 
 /**
  * Moves one guest's pins on one thread to the new account, on the thread owner's shard, so a guest conversion keeps the pins the guest
- * made on a shared thread (`lib/account-merge.ts#runGuestMerge`).
+ * made on a shared thread (`lib/account-merge.ts#runGuestMerge`). Moves nothing once an erasure of either account has begun
+ * (`erasing`): the merge's lease lives on the new account's shard, out of reach here, so the erasure marker is the fence read
+ * where the pins are written; a delivery that lost its lease while an erasure stopped the merge cannot hand the erased pins on.
  */
 export const reassignUserPinsOnThread = internalMutation
     .input({ from: v.string().max(MAX_LENGTH.id), threadId: v.id("threads"), to: v.string().max(MAX_LENGTH.id) })
-    .output(v.object({ hasMore: v.boolean() }))
+    .output(v.object({ erasing: v.optional(v.boolean()), hasMore: v.boolean() }))
     .mutation(async ({ args, ctx: context }) => {
+        if ((await isErasing(context, args.from)) || (await isErasing(context, args.to))) {
+            return { erasing: true, hasMore: false };
+        }
+
         // One batch per call; the caller repeats it while `hasMore`. A pin the new account already has for the same document is dropped
         // instead of moved, so the account keeps one pin per document.
         const batch = await context.db
