@@ -23,7 +23,11 @@ export interface MergeRevision {
 export const useMergeStatus = (address: PullRequestAddress | undefined, enabled: boolean, revision: MergeRevision | undefined) => {
     const client = useLunora();
     const userId = useDevelopUser();
-    const options = createLunoraActionQueryOptions(client, api.source_control.merge_functions.getMergeStatus, address as PullRequestAddress);
+    // The host answers `unknown` for a pull request that has moved off this revision, so a cached answer is never another revision's.
+    const options = createLunoraActionQueryOptions(client, api.source_control.merge_functions.getMergeStatus, {
+        ...(address as PullRequestAddress),
+        ...revision,
+    });
 
     return useQuery({
         ...READ,

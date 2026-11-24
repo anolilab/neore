@@ -318,6 +318,29 @@ describe("getMergeStatus", () => {
         expect(merge.state).toBe(expected);
     });
 
+    it.each([
+        ["a retargeted base", { base: { ref: "release" }, head: { sha: "a".repeat(40) } }],
+        ["a pushed head", { base: { ref: "main" }, head: { sha: "b".repeat(40) } }],
+        ["an answer without base or head", {}],
+    ])("answers unknown, not the host's behind, for %s than the revision asked about", async (_case, revision) => {
+        const { request } = host({ [`${REPO}/pulls/7`]: { ...revision, mergeable_state: "behind" }, [REPO]: { allow_merge_commit: true } });
+
+        const merge = await githubDriver.getMergeStatus(request, REF, { baseBranch: "main", headSha: "a".repeat(40) });
+
+        expect(merge.state).toBe("unknown");
+    });
+
+    it("keeps the host's word when the pull request is still the revision asked about", async () => {
+        const { request } = host({
+            [`${REPO}/pulls/7`]: { base: { ref: "main" }, head: { sha: "a".repeat(40) }, mergeable_state: "behind" },
+            [REPO]: { allow_merge_commit: true },
+        });
+
+        const merge = await githubDriver.getMergeStatus(request, REF, { baseBranch: "main", headSha: "a".repeat(40) });
+
+        expect(merge.state).toBe("behind");
+    });
+
     it("reports auto-merge as enabled when the pull request has an auto-merge request, and offers nothing a repository does not allow", async () => {
         const { request } = host({ [`${REPO}/pulls/7`]: { auto_merge: { enabled_by: { login: "me" } }, mergeable_state: "clean" }, [REPO]: {} });
 

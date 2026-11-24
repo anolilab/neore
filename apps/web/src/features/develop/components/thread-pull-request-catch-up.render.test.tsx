@@ -15,7 +15,7 @@ const { composer, hostMerge, prefill, pull, reads } = vi.hoisted(() => {
     return {
         composer: { takes: true },
         /** What the host answers to a mergeability read (the real `useMergeStatus` runs over it, with its cache). */
-        hostMerge: vi.fn<() => Promise<{ state: string; status: string }>>(),
+        hostMerge: vi.fn<(args: unknown) => Promise<{ state: string; status: string }>>(),
         prefill: vi.fn(),
         reads: vi.fn(),
         pull: {
@@ -69,12 +69,12 @@ vi.mock("@neore/backend/api", () => {
 
 vi.mock("@/lib/lunora/crpc", () => {
     return {
-        createLunoraActionQueryOptions: () => {
+        createLunoraActionQueryOptions: (_client: unknown, _action: unknown, args: unknown) => {
             return {
                 queryFn: async () => {
                     reads();
 
-                    return await hostMerge();
+                    return await hostMerge(args);
                 },
             };
         },
@@ -278,6 +278,17 @@ describe("ThreadPullRequestCatchUp", () => {
         expect(hostMerge).toHaveBeenCalledTimes(2);
         expect(screen.queryByText("Behind release")).toBeNull();
         expect(screen.queryByRole("button", BUTTON)).toBeNull();
+    });
+
+    it("asks for the revision it shows, and shows nothing when the host answers that the pull request moved off it", async () => {
+        given("open", "behind");
+        // The backend answers `unknown` for a pull request whose base or head is no longer the one asked about.
+        hostMerge.mockResolvedValue({ state: "unknown", status: "ok" });
+        await renderCatchUp();
+
+        expect(hostMerge).toHaveBeenCalledWith({ baseBranch: "main", headSha: "abc123", number: 7, repository: "octo/hello" });
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
+        expect(screen.queryByText("Behind main")).toBeNull();
     });
 
     it("shares the merge panel's cached read of the same revision", async () => {

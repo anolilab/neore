@@ -174,6 +174,12 @@ export interface MergeStatus {
     state: MergeState;
 }
 
+/** The revision a mergeability read is asked for: an answer about another base or head is not given as this one's. */
+export interface MergeRevision {
+    baseBranch: string;
+    headSha: string;
+}
+
 export interface MergeRequest {
     /** The commit the person looked at: the host refuses the merge when the head has moved since. */
     headSha: string;

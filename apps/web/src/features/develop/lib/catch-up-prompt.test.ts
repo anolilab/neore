@@ -26,15 +26,23 @@ const expectCleanCheckFirst = (prompt: string, firstChange: string): void => {
  */
 const expectSafeFinish = (prompt: string, refs: string[]): void => {
     expect(prompt).toContain(
-        "Stage the resolved files with `git add` and run `git rebase --continue`, and repeat for each later conflict until the rebase completes. If a conflict cannot be resolved, run `git rebase --abort`, stop and say so.",
+        "Stage the resolved files with `git add` and run `git rebase --continue`, and repeat for each later conflict until the rebase completes. If a conflict cannot be resolved, run `git rebase --abort`, do step 9, then stop and say so.",
     );
     expect(prompt).toContain(
-        "7. Check that the build and the tests still pass. Fix what the rebase broke and commit each fix on this branch. If the build or the tests still fail, stop without pushing, leave the rebased commits in place and say so.",
+        "7. Check that the build and the tests still pass. Fix what the rebase broke and commit each fix on this branch. If the build or the tests still fail, do not push: leave the rebased commits in place, do step 9, then stop and say so.",
     );
     expect(prompt).toContain("\n8. Only once step 7 passed and `git status --porcelain` prints nothing");
     expect(prompt.indexOf("`git rebase --continue`")).toBeLessThan(prompt.indexOf("7. Check that the build"));
     expect(prompt.indexOf("7. Check that the build")).toBeLessThan(prompt.indexOf("\n8. "));
-    expect(prompt).toContain(`\n9. Delete the refs this run fetched: ${refs.map((ref) => `\`git update-ref -d ${ref}\``).join(", ")}.`);
+    // The cleanup covers every stop after the fetch, not only a run that reached the end.
+    expect(prompt).toContain(
+        `\n9. Whether the steps finished or you stopped at any step after step 3, delete the refs this run fetched: ${refs.map((ref) => `\`git update-ref -d ${ref}\``).join(", ")}.`,
+    );
+    // Steps 1 and 2 stop before anything is fetched; every later stop points to the cleanup.
+    const afterFetch = prompt.slice(prompt.indexOf("\n4. "), prompt.indexOf("\n9. "));
+
+    expect(afterFetch.match(/stop and say so/gu)?.length).toBe(afterFetch.match(/do step 9, then stop and say so/gu)?.length);
+    expect(prompt.slice(0, prompt.indexOf("\n3. "))).not.toContain("step 9");
     expect(prompt.endsWith(".")).toBe(true);
     expect(prompt.split("\n").at(-1)).toMatch(LAST_STEP);
 };
@@ -58,7 +66,10 @@ describe(catchUpPrompt, () => {
         expect(prompt).toContain("`git fetch origin +refs/heads/feat/x:refs/neore/pull-42-a1b2c3d4-branch`");
         expect(prompt).toContain("`git fetch origin +refs/pull/42/head:refs/neore/pull-42-a1b2c3d4-head`");
         expect(prompt).not.toContain("refs/remotes/origin");
-        expect(prompt).toContain("`git rev-parse refs/neore/pull-42-a1b2c3d4-branch` differs from `git rev-parse refs/neore/pull-42-a1b2c3d4-head`, stop");
+        expect(prompt).toContain(
+            "`git rev-parse refs/neore/pull-42-a1b2c3d4-branch` differs from `git rev-parse refs/neore/pull-42-a1b2c3d4-head`, do step 9, then stop and say so",
+        );
+        expect(prompt).toContain("the local branch has commits origin does not: do step 9, then stop and say so.");
         // The lease is the commit checked here: another run's fetch of refs/neore/pull-42-a1b2c3d4-head after this step cannot move it.
         expect(prompt).toContain(
             "Otherwise record the commit `git rev-parse refs/neore/pull-42-a1b2c3d4-head` printed and say it: step 8 leases on that commit. Then run `git switch --no-guess feat/x`",
@@ -76,7 +87,7 @@ describe(catchUpPrompt, () => {
         expect(prompt).not.toContain("--force-with-lease=refs/heads/feat/x:refs/neore/");
         expect(prompt).toContain("Do not push to any other branch or remote.");
         // The push comes after the build and test gate, never before it.
-        expect(prompt.indexOf("If the build or the tests still fail, stop without pushing")).toBeLessThan(prompt.indexOf("`git push"));
+        expect(prompt.indexOf("If the build or the tests still fail, do not push")).toBeLessThan(prompt.indexOf("`git push"));
         expectSafeFinish(prompt, ["refs/neore/pull-42-a1b2c3d4-branch", "refs/neore/pull-42-a1b2c3d4-base", "refs/neore/pull-42-a1b2c3d4-head"]);
         // A delegated cloud coding-agent run never pushes: the steps say to run them where git has the person's own access.
         expect(prompt).toContain("Do not hand them to a cloud coding agent run: it cannot push");
@@ -94,7 +105,7 @@ describe(catchUpPrompt, () => {
         expectCleanCheckFirst(prompt, "`git switch -c pr-42 refs/neore/pull-42-a1b2c3d4-head`");
         expect(prompt).toContain("`git fetch origin +refs/heads/release/2.0:refs/neore/pull-42-a1b2c3d4-base`");
         expect(prompt).toContain("`git fetch origin +refs/pull/42/head:refs/neore/pull-42-a1b2c3d4-head`");
-        expect(prompt).toContain("`git switch -c pr-42 refs/neore/pull-42-a1b2c3d4-head`");
+        expect(prompt).toContain("`git switch -c pr-42 refs/neore/pull-42-a1b2c3d4-head` (if a branch pr-42 already exists, do step 9, then stop and say so)");
         expect(prompt).toContain("`git rebase refs/neore/pull-42-a1b2c3d4-base`");
         // Origin's branch of the head's name is never fetched, switched to or compared: it may be another branch entirely.
         expect(prompt).not.toContain("refs/heads/feat/x");

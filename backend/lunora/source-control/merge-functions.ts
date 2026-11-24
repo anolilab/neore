@@ -11,7 +11,7 @@
  * `rejected` with the host's own reason. The token is used for the call and never
  * returned.
  */
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { authAction, rateLimit } from "../lib/crpc";
@@ -30,10 +30,14 @@ const vRef = {
     repository: v.string().max(MAX_LENGTH.short),
 };
 
-/** What the host says of mergeability, and which merge methods and auto-merge the repository allows. */
+/**
+ * What the host says of mergeability, and which merge methods and auto-merge the repository allows. Given the base
+ * branch and head commit the caller saw (both, or neither), a pull request that has since moved off them is answered
+ * `unknown`, never with the state of its newer revision.
+ */
 export const getMergeStatus = authAction
     .use(rateLimit("sourceControl/read"))
-    .input(vRef)
+    .input({ ...vRef, baseBranch: v.optional(v.string().max(MAX_LENGTH.short)), headSha: v.optional(v.string().max(MAX_LENGTH.short)) })
     .output(
         v.union(
             v.object({
@@ -60,8 +64,14 @@ export const getMergeStatus = authAction
             requireCapability("merge.auto");
         }
 
+        if ((args.baseBranch === undefined) !== (args.headSha === undefined)) {
+            throw new LunoraError("BAD_REQUEST", "Give both the base branch and the head commit, or neither");
+        }
+
+        const ref = { number: args.number, repository: args.repository };
+        const expected = args.baseBranch !== undefined && args.headSha !== undefined ? { baseBranch: args.baseBranch, headSha: args.headSha } : undefined;
         const token = await resolveGithubToken(ctx, ctx.user.userId);
-        const outcome = await readFromHost(DEVELOP_DRIVER, token, (request) => DEVELOP_DRIVER.getMergeStatus(request, args));
+        const outcome = await readFromHost(DEVELOP_DRIVER, token, (request) => DEVELOP_DRIVER.getMergeStatus(request, ref, expected));
 
         ctx.log.event("source_control.get_merge_status", { status: outcome.status });
 
