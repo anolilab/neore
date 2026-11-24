@@ -57,6 +57,11 @@ export const pollEvents = async (store: EventLogStore, query: PollQuery): Promis
         throw new RangeError("maxEvents must be an integer of at least 1");
     }
 
+    // A negative age puts the window's floor after `now`: every event reads as older, so the poll would skip them all and move the cursor past them.
+    if (query.maxAgeMs !== undefined && (!Number.isFinite(query.maxAgeMs) || query.maxAgeMs < 0)) {
+        throw new RangeError("maxAgeMs must be a finite number of at least 0");
+    }
+
     if (query.fromSeq === null) {
         // "Start from now": nothing is replayed, and the cursor is the log's current end.
         return { events: [], hasMore: false, nextSeq: await store.latestSeq(), truncated: false };
@@ -99,8 +104,12 @@ export const pollEvents = async (store: EventLogStore, query: PollQuery): Promis
             scanned += 1;
 
             if (floor !== undefined && event.timestamp < floor) {
-                // Older than the window the caller asked for: skipped, and that is a gap.
-                truncated = true;
+                // Older than the window the caller asked for. A gap only when it is an event the caller asked for: another name or
+                // thread in that window was never the caller's to receive.
+                if (matches(event, query)) {
+                    truncated = true;
+                }
+
                 from = event.seq;
                 continue;
             }

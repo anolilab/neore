@@ -1744,6 +1744,9 @@ const runChatStartOnShard = async (
                 mode: body.mode,
                 model: effectiveModel,
                 ...(threadOrganizationId && { organizationId: threadOrganizationId }),
+                // An impersonating admin's or a grant session's new chat never takes the owner's `full` default: a grant (the browser
+                // extension relays page text into a chat) would otherwise run unasked (`callerRestrictsFull`).
+                ...((placed?.impersonating === true || placed?.extension === true || requestSignInIsGrant(identity)) && { impersonated: true }),
                 reasoningEffort: body.reasoningEffort,
                 statelessMode: body.statelessMode,
                 // Temporary only when the client asked for it; the composer applies the user's default itself.

@@ -459,6 +459,16 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     { dedupId: stepDedupId(scope, "delete-user-streaming-messages", round) },
                 ),
         );
+        // Before the grants (`delete-user-integrations`): a project's chat files count only while the owner holds a grant for them.
+        await drain(
+            "release-user-project-images",
+            async (round) =>
+                await context.run(
+                    internal.gdpr.steps.deletion_steps.deleteUserProjectImages,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "release-user-project-images", round) },
+                ),
+        );
         await drain(
             "delete-user-integrations",
             async (round) =>

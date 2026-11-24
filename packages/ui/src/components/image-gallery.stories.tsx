@@ -66,10 +66,14 @@ export const SelectionDisabled: Story = {
     },
 };
 
+/** The alts of the two clear swatches the blocked story renders beside its flagged item. */
+const previewNames = new Set(items.slice(0, 2).map((item) => item.alt ?? ""));
+
 export const BlockedItem: Story = {
     args: { items: [{ id: "x", nsfwStatus: "blocked", src: swatch("Hidden", "#000000"), type: "image" }, ...items.slice(0, 2)] },
     play: async ({ canvas }) => {
-        await expect(await canvas.findAllByRole("button", { name: /swatch/ })).toHaveLength(2);
+        // The preview buttons are named exactly by their alt; each save button is "Download <alt> (<n>)" and is not counted here.
+        await expect(await canvas.findAllByRole("button", { name: (name) => previewNames.has(name) })).toHaveLength(2);
         await expect(canvas.getByText("Flagged")).toBeVisible();
     },
 };

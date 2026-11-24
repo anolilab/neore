@@ -8,6 +8,7 @@
  * thread, embeds through the gateway, inserts the vectors, then commits them in a
  * mutation. A commit that finds its text already changed deletes its own vectors.
  */
+import type { ModelFilterRules } from "@neore/ai/models";
 import { type Infer, LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
@@ -15,8 +16,10 @@ import { internal } from "../_generated/internal";
 import { type ActionCtx, internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { authAction, rateLimit } from "../lib/crpc";
+import { callOnShard } from "../lib/cross-shard";
 import { patchRow } from "../lib/patch";
 import { gatewayFetch } from "../lib/services";
+import { currentUserShard } from "../lib/shard-context";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { MAX_LENGTH } from "../lib/validators";
 import { deleteVectorRow } from "./table-writes";
@@ -31,6 +34,7 @@ import {
     MEANING_MIN_CHARS,
     MEANING_MIN_SCORE,
     MEANING_RESULT_LIMIT,
+    MEANING_SEARCH_REFUSED,
     MEANING_TOP_K,
     planThreadSearch,
     SEARCH_CLAIM_MS,
@@ -43,6 +47,7 @@ import {
     type SearchPlan,
 } from "./thread-search-plan";
 import { SYNC_RETRY } from "./thread-search-triggers";
+import { alignVectorArchived, isThreadArchived } from "./thread-vector-archived";
 import { findVectorRow, type VectorDimension, type VectorTableName } from "./vector/tables";
 import { searchVectors } from "./vector";
 
@@ -54,6 +59,7 @@ const vSlot = v.object({ text: v.union(v.string(), v.null()), vectorId: v.union(
 const vSearchState = v.union(
     v.null(),
     v.object({
+        archived: v.boolean(),
         eligible: v.boolean(),
         enoughTurns: v.boolean(),
         summary: vSlot,
@@ -79,6 +85,7 @@ export const readThreadSearchState = internalQuery
         }
 
         return {
+            archived: isThreadArchived(thread),
             eligible: isSearchEligible(thread),
             // The count the messages triggers keep on the thread (`agent/thread-search-triggers.ts`): no message scan.
             enoughTurns: hasEnoughTurns(thread.userTurnCount ?? 0),
@@ -95,10 +102,13 @@ const embeddingAllowedFor = async (ctx: ActionCtx, userId: string): Promise<bool
     return embeddingModelAllowed(await loadModelFilterRules(ctx, userId));
 };
 
-/** Embeds the texts through the gateway, billed to the thread's owner. `[]` when the owner's model rules refuse the model. */
-const embedTexts = async (ctx: ActionCtx, userId: string, texts: string[]): Promise<number[][]> => {
+/**
+ * Embeds the texts through the gateway, billed to the thread's owner. `[]` when the owner's model rules refuse the model.
+ * A caller that already read those rules passes them, so one request reads them once.
+ */
+const embedTexts = async (ctx: ActionCtx, userId: string, texts: string[], loadedRules?: ModelFilterRules): Promise<number[][]> => {
     const { createGatewayEmbeddingModel, embeddingModelAllowed } = await import("../chat/lib/gateway-embedding-model");
-    const modelFilterRules = await loadModelFilterRules(ctx, userId);
+    const modelFilterRules = loadedRules ?? (await loadModelFilterRules(ctx, userId));
 
     if (!embeddingModelAllowed(modelFilterRules)) {
         return [];
@@ -144,7 +154,7 @@ const textsStillWanted = async <T extends { kind: SearchKind; text: string }>(
 const embedAndCommit = async (
     ctx: ActionCtx,
     threadId: Id<"threads">,
-    userId: string,
+    { archived, userId }: { archived: boolean; userId: string },
     plan: SearchPlan,
     texts: { kind: SearchKind; text: string }[],
 ): Promise<void> => {
@@ -184,6 +194,8 @@ const embedAndCommit = async (
                 vectorDimension: SEARCH_DIMENSION as VectorDimension,
                 vectors: [
                     {
+                        // As read before the embed; the commit corrects it if an archive or restore landed since.
+                        archived,
                         messageId: undefined,
                         model: SEARCH_MODEL,
                         table: SEARCH_TABLE[entry.kind],
@@ -285,7 +297,7 @@ export const runThreadSearchSync = async (ctx: ActionCtx, args: { changed: Searc
     }
 
     try {
-        await embedAndCommit(ctx, args.threadId, state.userId, plan, texts);
+        await embedAndCommit(ctx, args.threadId, { archived: state.archived, userId: state.userId }, plan, texts);
     } finally {
         if (claimId !== undefined) {
             await ctx.runMutation(internal.agent.thread_search.releaseThreadSearch, { claimId, threadId: args.threadId });
@@ -387,6 +399,11 @@ export const commitThreadSearch = internalMutation
             if (Object.keys(changes).length > 0) {
                 await patchRow(ctx.db, "threads", thread, changes);
             }
+
+            // The flag was read before the embed: an archive or restore since then set nothing on these rows yet.
+            for (const vectorId of decision.accepted) {
+                await alignVectorArchived(ctx.db, thread, vectorId);
+            }
         }
 
         const rejected = args.embedded.map((vector) => vector.vectorId).filter((id) => !decision.accepted.includes(id));
@@ -457,28 +474,75 @@ export interface MeaningThread {
     title: string | null;
 }
 
+/** When each shard last asked for its vector backfill from this isolate (`startArchivedBackfill`), oldest first. */
+const backfillAskedAt = new Map<string, number>();
+
+export const BACKFILL_ASK_INTERVAL_MS = 10 * 60 * 1000;
+/** Shards {@link backfillAskedAt} remembers at most; past it, the oldest ask is forgotten (it may ask again sooner). */
+export const BACKFILL_ASKED_MAX = 1000;
+
+/** Records `userId`'s ask at `now`: drops asks past the interval and, over the cap, the oldest, so the map stays bounded. */
+const rememberBackfillAsk = (userId: string, now: number): void => {
+    // Delete first, so the re-inserted key moves to the end and the map stays in ask order.
+    backfillAskedAt.delete(userId);
+
+    for (const [key, askedAt] of backfillAskedAt) {
+        if (now - askedAt < BACKFILL_ASK_INTERVAL_MS && backfillAskedAt.size < BACKFILL_ASKED_MAX) {
+            break;
+        }
+
+        backfillAskedAt.delete(key);
+    }
+
+    backfillAskedAt.set(userId, now);
+};
+
+/** How many shards the throttle remembers (for tests). */
+export const backfillAsksRemembered = (): number => backfillAskedAt.size;
+
 /**
- * The palette's meaning search for one person: embed the query, read the nearest
- * title and summary vectors among their own, map each to its thread and keep the
- * best ones. Returns `[]` for a query too short to embed, or when the model is
- * refused for the person.
+ * Starts the shard's archived-flag backfill (`thread-vector-archived.ts`) if it never ran or its chain died. Housekeeping
+ * skips a shard idle past its horizon, and an RPC records no activity, so a returning user's search is what reaches it.
+ * At most once per shard per isolate per interval; best effort, a search never fails on it.
  */
-export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { query: string; userId: string }): Promise<MeaningThread[]> => {
+const startArchivedBackfill = async (ctx: ActionCtx, userId: string): Promise<void> => {
+    const now = Date.now();
+
+    if (now - (backfillAskedAt.get(userId) ?? 0) < BACKFILL_ASK_INTERVAL_MS) {
+        return;
+    }
+
+    rememberBackfillAsk(userId, now);
+
+    try {
+        // The sweep keys its walk on the shard it runs on, so it must run on `userId`'s: a call naming another shard
+        // (a shared thread's owner) or none at all would start nothing for this user.
+        await (currentUserShard() === userId
+            ? ctx.runMutation(internal.agent.thread_vector_archived.sweepThreadVectorArchived, {})
+            : callOnShard(internal.agent.thread_vector_archived.sweepThreadVectorArchived, {}, { shardKey: userId }));
+    } catch (error) {
+        console.warn("[agent/thread-search] Could not start the archived-flag backfill:", error);
+    }
+};
+
+/** The meaning search itself: {@link searchThreadsByMeaningFor} runs it beside the backfill start. */
+const searchByMeaning = async (ctx: ActionCtx, args: { archivedOnly?: boolean; query: string; userId: string }): Promise<MeaningThread[]> => {
     const query = args.query.trim();
 
     if (query.length < MEANING_MIN_CHARS) {
         return [];
     }
 
-    let queryVector: number[] | undefined;
+    // A refused model is said as such, not answered with an empty list the palette would show as "nothing related". Any
+    // other failure rejects too, so the palette says the search failed; its title matches do not depend on this call.
+    const { embeddingModelAllowed } = await import("../chat/lib/gateway-embedding-model");
+    const modelFilterRules = await loadModelFilterRules(ctx, args.userId);
 
-    try {
-        [queryVector] = await embedTexts(ctx, args.userId, [query.slice(0, 2000)]);
-    } catch (error) {
-        console.warn("[agent/thread-search] Query embedding failed; the palette shows title matches only:", error);
-
-        return [];
+    if (!embeddingModelAllowed(modelFilterRules)) {
+        throw new LunoraError("FORBIDDEN", "Search by meaning is not available under your model rules", { data: { code: MEANING_SEARCH_REFUSED } });
     }
+
+    const [queryVector] = await embedTexts(ctx, args.userId, [query.slice(0, 2000)], modelFilterRules);
 
     if (!queryVector || queryVector.length !== SEARCH_DIMENSION) {
         return [];
@@ -530,6 +594,7 @@ export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { query: s
     const scoreOf = new Map(ranked.map((entry) => [entry.threadId, entry.score] as const));
 
     return rows
+        .filter((row) => args.archivedOnly !== true || row.archived)
         .map((row) => {
             return { archived: row.archived, score: scoreOf.get(row.threadId) ?? 0, threadId: row.threadId, title: row.title };
         })
@@ -537,14 +602,37 @@ export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { query: s
         .slice(0, MEANING_RESULT_LIMIT);
 };
 
+/**
+ * The palette's meaning search for one person: embed the query, read the nearest
+ * title and summary vectors among their own, map each to its thread and keep the
+ * best ones. With `archivedOnly`, active threads are dropped before the result
+ * limit, so archived candidates ranked below them still fill it. The candidates are
+ * still the closest vectors overall: the search does not filter on the vectors'
+ * archived flag in the index yet, so an archived thread ranked below every candidate is not found.
+ * Returns `[]` for a query too short to embed. Throws `FORBIDDEN` with `data.code` {@link MEANING_SEARCH_REFUSED}
+ * when the person's model rules refuse the embedding model, so the palette tells that apart from "nothing related";
+ * rejects when the embedding fails.
+ */
+export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { archivedOnly?: boolean; query: string; userId: string }): Promise<MeaningThread[]> => {
+    // Runs beside the search, not ahead of it: the embed and vector reads do not queue behind a shard round-trip. An
+    // action ctx has no `waitUntil`, so it is awaited before returning; it never rejects.
+    const backfill = startArchivedBackfill(ctx, args.userId);
+
+    try {
+        return await searchByMeaning(ctx, args);
+    } finally {
+        await backfill;
+    }
+};
+
 export const searchThreadsByMeaning = authAction
     .use(rateLimit("threads/meaning"))
-    .input({ query: v.string().max(MAX_LENGTH.long) })
+    .input({ archivedOnly: v.optional(v.boolean()), query: v.string().max(MAX_LENGTH.long) })
     .output(v.array(v.object({ archived: v.boolean(), score: v.number(), threadId: v.string(), title: v.union(v.string(), v.null()) })))
     .action(async ({ args, ctx }) => {
         if (args.query.trim().length > 2000) {
             throw new LunoraError("BAD_REQUEST", "Query must be at most 2000 characters");
         }
 
-        return await searchThreadsByMeaningFor(ctx, { query: args.query, userId: ctx.user.userId });
+        return await searchThreadsByMeaningFor(ctx, { archivedOnly: args.archivedOnly, query: args.query, userId: ctx.user.userId });
     });

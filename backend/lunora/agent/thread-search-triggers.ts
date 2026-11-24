@@ -9,6 +9,9 @@
  */
 import type { TriggerBuilder, TriggerCtx } from "lunorash/server";
 
+import type { Id } from "../_generated/dataModel";
+import type { QueryCtx } from "../_generated/server";
+
 import { hasEnoughTurns, SEARCH_KINDS, SEARCH_VECTOR_FIELD, type SearchRow, searchKindsChanged } from "./thread-search-plan";
 
 type Internal = (typeof import("../_generated/internal"))["internal"];
@@ -102,9 +105,29 @@ export const threadSearchTriggers = (t: TriggerBuilder) => {
                     { retry: SYNC_RETRY, shardKey: doc.userId },
                 );
             }
+
+            // Archived or restored, by whatever writer: the thread's vectors carry the flag a meaning search filters on.
+            // Not logged and swallowed as the sync is: no later write queues this again (the one-time backfill may be done),
+            // so a failed schedule fails the archive or restore, and the job retries until it lands (it is idempotent).
+            if (archivedChanged(event.previous as unknown as SearchRow, doc) && hasSearchVector(doc) && doc.userId !== undefined) {
+                const { internal } = await import("../_generated/internal");
+
+                await context.scheduler.runAfter(
+                    0,
+                    internal.agent.thread_vector_archived.syncThreadVectorArchived,
+                    { threadId: event.id },
+                    { retry: CLEANUP_RETRY, shardKey: doc.userId },
+                );
+            }
         }),
     };
 };
+
+/** Pure: whether a write moved the thread into or out of `archived`. */
+export const archivedChanged = (previous: Pick<SearchRow, "status">, doc: Pick<SearchRow, "status">): boolean =>
+    (previous.status === "archived") !== (doc.status === "archived");
+
+const hasSearchVector = (row: SearchRow): boolean => SEARCH_KINDS.some((kind) => row[SEARCH_VECTOR_FIELD[kind]] !== undefined);
 
 /** A thread's user-turn count; a thread written before the count existed has none. */
 const userTurnsOf = (thread: Record<string, unknown>): number => (typeof thread.userTurnCount === "number" ? thread.userTurnCount : 0);
@@ -112,6 +135,30 @@ const userTurnsOf = (thread: Record<string, unknown>): number => (typeof thread.
 /** Whether a messages row is a user turn of a thread. */
 const isUserTurn = (row: { message?: { role?: unknown }; threadId?: string }): row is { message: { role: "user" }; threadId: string } =>
     row.message?.role === "user" && row.threadId !== undefined;
+
+/**
+ * The user turns `messages` holds for `threadId`, counted as the triggers count them: for a writer that puts a thread
+ * row in after some of its messages, whose inserts found no thread to count on (a guest merge's import).
+ */
+export const countUserTurns = async (db: QueryCtx["db"], threadId: Id<"threads">): Promise<number> => {
+    let count = 0;
+    let cursor: string | null = null;
+
+    for (;;) {
+        const { continueCursor, isDone, page } = await db
+            .query("messages")
+            .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
+            .paginate({ cursor, numItems: 100 });
+
+        count += page.filter((row) => isUserTurn(row as never)).length;
+
+        if (isDone) {
+            return count;
+        }
+
+        cursor = continueCursor;
+    }
+};
 
 /**
  * Moves a thread's user-turn count by `delta`, and schedules a sync when the move crosses the gate,

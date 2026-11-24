@@ -2,13 +2,33 @@ import { LunoraError, v } from "lunorash/server";
 
 import { buildUsageJson, spliceUsageJson, usageObjectKey } from "./usage-export-steps";
 import { readStoredText } from "../lib/storage-read";
+import {
+    CHAT_FILE_METADATA_CHUNK,
+    capChatFiles,
+    chatFileMeter,
+    chatFileSectionBudget,
+    collectAllChatFileMetadata,
+    collectAllMessageFileIds,
+    textBytes,
+    walkIds,
+    withChatFiles,
+} from "../agent/export-pages";
 import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
+import { callOnShard } from "../lib/cross-shard";
+import { collectOrganizationReplyPages } from "../usage/organization";
 import { collectAcpSessionPages } from "../acp/gdpr";
 import { BROWSER_EXPORT_BYTES, browserExportPageKey, readAllBrowserPages } from "../browser/export-pages";
 import { collectAllFeedback } from "../feedback/gdpr";
 import { collectAllTriggers } from "../triggers/export-pages";
 import { attachProjectRuleFiles, collectAllOwnedProjects, collectAllRepositories } from "../projects/export-pages";
-import { feedbackReadBudget, projectDetailsReadBudget, repositoriesReadBudget, threadFollowsReadBudget, triggerReadBudget } from "./read-budget";
+import {
+    chatFilesReadBudget,
+    feedbackReadBudget,
+    projectDetailsReadBudget,
+    repositoriesReadBudget,
+    threadFollowsReadBudget,
+    triggerReadBudget,
+} from "./read-budget";
 import { collectAllThreadFollows } from "../chat/follows/export-pages";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -18,7 +38,15 @@ import { queueEmail } from "../email/mailer";
 import { SITE_URL } from "../env";
 import { withDependency } from "../lib/dependency";
 import { storedPage, storedRows } from "../lib/stored-row";
-import { callOnShard } from "../lib/cross-shard";
+
+/**
+ * The organization ledger the export holds, in bytes. Past it the oldest rows are cut and the file says so (`organizationRepliesCut`), so
+ * the rest of the export still succeeds.
+ */
+const ORGANIZATION_REPLY_EXPORT_BYTES = 4 * 1024 * 1024;
+
+/** The stored usage object's keys and braces around its two arrays: a few dozen bytes, allowed for in the read limit. */
+const USAGE_OBJECT_WRAPPER_BYTES = 1024;
 
 const TRAILING_SLASH = /\/$/;
 
@@ -688,6 +716,8 @@ export const generateExportFile = internalAction
         // the same in-flight-replay reason as `threadTags`.
         evals: v.optional(v.any()),
         files: v.any(),
+        // The owner's Events log: their run and approval events (`public-api/gdpr.ts`). Optional for the same reason.
+        mcpEvents: v.optional(v.any()),
         // Memories (superseded history included) and reflection digests
         // (`memory/gdpr.ts`). Optional for the same in-flight-replay reason as `threadTags`.
         memories: v.optional(v.any()),
@@ -733,9 +763,14 @@ export const generateExportFile = internalAction
     })
     .action(async ({ args, ctx: context }) => {
         const activity = args.activity as { knowledgeCollections?: unknown[]; subAgentRuns?: unknown[]; usageDaily?: unknown[] } | undefined;
-        // The usage JSON, already read and checked by `prepareUsageForExport` in its own action. It is spliced into the file as
-        // text, so this action does not read it against its own budget.
-        const usageJson = args.usageKey === undefined ? undefined : await readStoredText(context.storage, args.usageKey, { maxBytes: USAGE_EXPORT_BYTES });
+        // The usage JSON, already read and checked by `prepareUsageForExport` in its own action: the usage rows and the organization ledger.
+        // It is spliced into the file as text, so this action does not read it against its own budget.
+        const usageJson =
+            args.usageKey === undefined
+                ? undefined
+                : await readStoredText(context.storage, args.usageKey, {
+                      maxBytes: USAGE_EXPORT_BYTES + ORGANIZATION_REPLY_EXPORT_BYTES + USAGE_OBJECT_WRAPPER_BYTES,
+                  });
         // Read here, a page per query, so no workflow step result or action argument carries the history.
         const acpSessions =
             args.acpSessions ??
@@ -822,6 +857,37 @@ export const generateExportFile = internalAction
                       BROWSER_EXPORT_BYTES,
                       browserCut === true,
                   );
+        // The user's chat files (uploads and generated images), metadata only: the files behind their grants and the files their messages
+        // name (`agent/export-pages.ts`), read here a page per query, as the sections above are. The walks and the metadata reads share
+        // one budget of bytes and queries, what every section above left of the action's read budget (`read-budget.ts`); past it the
+        // section is cut and flagged. The grants' metadata is read before the message walk, so a long history cannot leave them out.
+        const chatFileRead = await collectAllChatFileMetadata(
+            async (meter) =>
+                await walkIds(
+                    async (cursor) => await context.runQuery(internal.agent.gdpr.collectGrantedChatFileIdsForExport, { cursor, userId: args.userId }),
+                    meter,
+                ),
+            async (meter) =>
+                await collectAllMessageFileIds(
+                    async (cursor) => await context.runQuery(internal.agent.gdpr.collectThreadIdsForExport, { cursor, userId: args.userId }),
+                    async (threadId, cursor) =>
+                        await context.runQuery(internal.agent.gdpr.collectMessageFileIdsForExport, { cursor, threadId: threadId as Id<"threads"> }),
+                    meter,
+                ),
+            async (fileIds) => await context.runQuery(internal.agent.gdpr.chatFileMetadataForExport, { fileIds: fileIds as Id<"chatFiles">[] }),
+            CHAT_FILE_METADATA_CHUNK,
+            chatFileMeter(
+                chatFilesReadBudget(
+                    earlierReadBytes +
+                        repositories.readBytes +
+                        feedback.readBytes +
+                        ownedProjects.readBytes +
+                        threadFollows.readBytes +
+                        triggers.readBytes +
+                        ownedWithRules.readBytes,
+                ),
+            ),
+        );
         const exportData = {
             acpSessions,
             bots: args.bots ?? { bots: [] },
@@ -839,6 +905,7 @@ export const generateExportFile = internalAction
             feedback: feedback.section,
             files: args.files,
             knowledgeCollections: activity?.knowledgeCollections ?? [],
+            mcpEvents: args.mcpEvents ?? { events: [] },
             memories: args.memories ?? { digests: [], memories: [] },
             notifications: args.notifications ?? { notifications: [], pushSubscriptions: [] },
             pages: args.pages ?? { comments: [], favorites: [], grants: [], pages: [] },
@@ -857,13 +924,23 @@ export const generateExportFile = internalAction
             threadFollows: threadFollows.section,
             threadTags: args.threadTags ?? [],
             triggers: { triggers: triggers.triggers },
-            // An export from before the usage pieces existed carries its rows in `activity`; otherwise the usage JSON is spliced in below.
-            ...(usageJson === undefined && { usageDaily: activity?.usageDaily ?? [] }),
+            // An export from before the usage pieces existed carries its rows in `activity`, and no ledger; otherwise the usage JSON is spliced
+            // in below, with the ledger.
+            ...(usageJson === undefined && { organizationReplies: [], organizationRepliesCut: false, usageDaily: activity?.usageDaily ?? [] }),
+            // A usage JSON stored before the ledger was in it holds the rows alone: the ledger is then empty, and nothing was cut.
+            ...(usageJson?.startsWith("[") && { organizationReplies: [], organizationRepliesCut: false }),
             watchedRepositories: args.watchedRepositories ?? { watched: [] },
         };
 
-        const head = JSON.stringify(exportData, null, 2);
-        // The usage JSON is an array already, so it is written as the file's last key rather than parsed and serialized again.
+        // The rest of the export, serialized without the chat-file section. The section takes what the rest leaves under the file's size
+        // limit (usage JSON included, as it is spliced in), so the file is never written past it: a large history is cut and flagged.
+        const rest = JSON.stringify(exportData, null, 2);
+        const restBytes = textBytes(rest) + (usageJson === undefined ? 0 : textBytes(usageJson));
+        const chatFileCapped = capChatFiles(chatFileRead.rows, chatFileSectionBudget(restBytes, MAX_EXPORT_BYTES));
+        // Cut by the byte cap, by the file's size limit or by the read budget: each way the section says so.
+        const chatFiles = { files: chatFileCapped.files, truncated: chatFileCapped.truncated || chatFileRead.truncated };
+        const head = withChatFiles(rest, chatFiles);
+        // The usage JSON is written as the file's last keys rather than parsed and serialized again.
         const jsonString = usageJson === undefined ? head : spliceUsageJson(head, usageJson);
         const blob = new Blob([jsonString], { type: "application/json" });
 
@@ -910,8 +987,18 @@ export const prepareUsageForExport = internalAction
             return null;
         }
 
+        // The organization ledger, read here in this action's own read budget, a page at a time on the member's shard: its newest rows that fit
+        // the budget (`organizationRepliesCut` says whether older ones were left out). It is stored in the usage object, so its record, its
+        // confirmation and its purge are the usage object's.
+        const ledger = await collectOrganizationReplyPages(
+            async (cursor) => await callOnShard(internal.usage.organization.collectOrganizationRepliesForExport, { cursor, userId }, { shardKey: userId }),
+            ORGANIZATION_REPLY_EXPORT_BYTES,
+        );
+
         const key = usageObjectKey(requestId);
-        const blob = new Blob([text], { type: "application/json" });
+        const blob = new Blob([`{"usageDaily":${text},"organizationReplies":${JSON.stringify(ledger.rows)},"organizationRepliesCut":${String(ledger.cut)}}`], {
+            type: "application/json",
+        });
 
         // Recorded before the object is written, so a run that dies after this is found by the sweep (`usage/gdpr.ts`).
         await context.runMutation(internal.usage.gdpr.recordUsageFile, { key, requestId, userId });

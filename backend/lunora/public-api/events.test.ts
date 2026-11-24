@@ -131,6 +131,12 @@ describe("events/poll over a log", () => {
         await expect(pollEvents(log, { fromSeq: 0, maxEvents: 0, name: RUN_COMPLETED_EVENT, now: NOW })).rejects.toThrow("at least 1");
     });
 
+    it.each([-1, NaN, Infinity])("refuses a window of %s ms, which would read every event as older than the floor", async (maxAgeMs) => {
+        const log = logOf([run(1, 100)]);
+
+        await expect(pollEvents(log, { fromSeq: 0, maxAgeMs, maxEvents: 50, name: RUN_COMPLETED_EVENT, now: NOW })).rejects.toThrow("maxAgeMs");
+    });
+
     it("caps a batch at maxEvents, keeps the cursor before the first event not sent, and says hasMore", async () => {
         const log = logOf([run(1, 100), run(2, 200), run(3, 300), run(4, 400), run(5, 500)]);
 
@@ -169,6 +175,15 @@ describe("events/poll over a log", () => {
         expect(outcome.events.map((event) => event.eventId)).toStrictEqual(["run:2"]);
         expect(outcome.truncated).toBe(true);
         expect(outcome.nextSeq).toBe(2);
+    });
+
+    it("does not report a gap for an old event of another name or thread, which the caller never asked for", async () => {
+        const log = logOf([run(1, 5000, "t1", RUN_FAILED_EVENT), run(2, 5100, "t2"), run(3, 9500)]);
+        const outcome = await pollEvents(log, { fromSeq: 0, maxAgeMs: 1000, maxEvents: 50, name: RUN_COMPLETED_EVENT, now: NOW, threadId: "t1" });
+
+        expect(outcome.events.map((event) => event.eventId)).toStrictEqual(["run:3"]);
+        expect(outcome.truncated).toBe(false);
+        expect(outcome.nextSeq).toBe(3);
     });
 
     it("stops a scan that matches nothing and reports hasMore, so one poll cannot read the whole log", async () => {
@@ -270,8 +285,8 @@ describe("the event log's recorder", () => {
         expect(rows.filter((row) => row["userId"] === "user").map((row) => [row["eventId"], row["seq"], row["createdAt"]])).toStrictEqual([
             ["run:own1", 1, 777],
             ["run:own2", 2, 777],
-            ["run:g1", 3, 9],
-            ["run:g2", 4, 10],
+            ["run:g1", 3, 777],
+            ["run:g2", 4, 777],
         ]);
         expect(watermarks.find((row) => row["userId"] === "user")?.["seq"]).toBe(4);
     });

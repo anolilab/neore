@@ -4,10 +4,17 @@
  * the orchestrator's mutation and the writes are the owner's, not the GDPR module's.
  * Batching follows `gdpr/batch.ts`: at most `BATCH` rows per table, `{ hasMore }` back.
  */
-import type { Id } from "../_generated/dataModel";
-import type { MutationCtx } from "../_generated/server";
+import { v } from "lunorash/server";
+
+import type { Doc, Id } from "../_generated/dataModel";
+import { internalQuery, type MutationCtx } from "../_generated/server";
 import { BATCH, type BatchResult, deleteParentsWithChildren, full } from "../gdpr/batch";
 import { gdprLogger } from "../lib/logger";
+import { patchRow } from "../lib/patch";
+import { storedRows } from "../lib/stored-row";
+import { countedWorkflowFileIds } from "../workflow/images";
+import { changeRefcount } from "./files";
+import { MAX_LENGTH } from "../lib/validators";
 import { eraseProjectRuleFilesForUser, eraseProjectsRuleFiles, markProjectsRuleFilesErasing, RULE_FILE_ROWS_PER_PAGE } from "../projects/gdpr";
 import { erasePinsNamingDocuments } from "../chat/gdpr";
 import { deleteVectorRow } from "./table-writes";
@@ -76,6 +83,161 @@ export const eraseChatFileAccessForUser = async (ctx: MutationCtx, userId: strin
 
     return { hasMore: full(rows) };
 };
+
+/** Chat-file ids one export page reads (`collectGrantedChatFileIdsForExport`, and the walks of a user's threads and messages). */
+export const CHAT_FILE_EXPORT_PAGE = 100;
+
+/** A chat file's name and media type are cut to these lengths in the export, so one page of rows has a bounded size. */
+export const CHAT_FILE_NAME_MAX = 512;
+export const CHAT_FILE_TYPE_MAX = 255;
+/** A content hash is a SHA-256 in hex (64 characters); a longer one was not made by an upload, and is cut so a row stays small. */
+export const CHAT_FILE_HASH_MAX = 128;
+
+/**
+ * Messages read per query when looking for their files. A message row is read whole (there is no index on `fileIds`), and a message can
+ * be large, so the page is small: each query stays well inside the export action's read budget.
+ */
+export const CHAT_FILE_MESSAGE_PAGE = 20;
+
+/** The UTF-8 bytes a row takes as the query reads it: the unit the export's read budget counts in. */
+const rowBytes = (row: unknown): number => new TextEncoder().encode(JSON.stringify(row)).byteLength;
+
+/**
+ * One page of the ids of the files the user holds a grant for (`chatFileAccess`): their uploads and generated images. The grant is
+ * what makes a file theirs; the row itself is shared by content and has no owner. The caller walks it to its end.
+ *
+ * The links of their chats (`chatFileThreads`) are not read here. A link outlives the message that named the file (a deleted message
+ * releases the file's reference, not its link), so a link names files the chat no longer holds. The messages name what is still there
+ * (`collectMessageFileIdsForExport`).
+ */
+export const collectGrantedChatFileIdsForExport = internalQuery
+    .input({
+        cursor: v.optional(v.union(v.string().max(MAX_LENGTH.cursor), v.null())),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(
+        v.object({
+            cursor: v.union(v.string(), v.null()),
+            ids: v.array(v.string()),
+            // The bytes the query read: each grant row, as stored. The export action meters its walk against a budget with this.
+            readBytes: v.number(),
+        }),
+    )
+    .query(async ({ args: { cursor, userId }, ctx }) => {
+        // Primary, so a grant made moments before the export is in it (a lagging replica could omit it).
+        const grants = await ctx.db.chatFileAccess.findMany({
+            consistency: "primary",
+            cursor: cursor ?? null,
+            limit: CHAT_FILE_EXPORT_PAGE,
+            where: { userId },
+        });
+
+        return {
+            cursor: grants.isDone ? null : grants.continueCursor,
+            ids: grants.page.map((grant) => grant.fileId),
+            readBytes: grants.page.reduce((total, grant) => total + rowBytes(grant), 0),
+        };
+    });
+
+/** One page of the owner's thread ids, for walking their messages (`collectAllMessageFileIds`). */
+export const collectThreadIdsForExport = internalQuery
+    .input({
+        cursor: v.optional(v.union(v.string().max(MAX_LENGTH.cursor), v.null())),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(
+        v.object({
+            cursor: v.union(v.string(), v.null()),
+            ids: v.array(v.string()),
+            readBytes: v.number(),
+        }),
+    )
+    .query(async ({ args: { cursor, userId }, ctx }) => {
+        const page = await ctx.db
+            .query("threads")
+            .withIndex("by_user_and_status", (q) => q.eq("userId", userId))
+            .paginate({ cursor: cursor ?? null, numItems: CHAT_FILE_EXPORT_PAGE });
+
+        return {
+            cursor: page.isDone ? null : page.continueCursor,
+            ids: page.page.map((thread) => thread._id),
+            readBytes: page.page.reduce((total, thread) => total + rowBytes(thread), 0),
+        };
+    });
+
+/** One page of the file ids named by one thread's messages (`collectAllMessageFileIds` walks each thread's messages). */
+export const collectMessageFileIdsForExport = internalQuery
+    .input({
+        cursor: v.optional(v.union(v.string().max(MAX_LENGTH.cursor), v.null())),
+        threadId: v.id("threads"),
+    })
+    .output(
+        v.object({
+            cursor: v.union(v.string(), v.null()),
+            ids: v.array(v.string()),
+            readBytes: v.number(),
+        }),
+    )
+    .query(async ({ args: { cursor, threadId }, ctx }) => {
+        const page = await ctx.db
+            .query("messages")
+            .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
+            .paginate({ cursor: cursor ?? null, numItems: CHAT_FILE_MESSAGE_PAGE });
+
+        return {
+            cursor: page.isDone ? null : page.continueCursor,
+            ids: page.page.flatMap((message) => message.fileIds ?? []),
+            readBytes: page.page.reduce((total, message) => total + rowBytes(message), 0),
+        };
+    });
+
+/**
+ * The metadata of the given chat files, read in one query (the caller passes at most one chunk of ids). Metadata only, as a vault
+ * file's is: the bytes stay out of the export. A file whose row is already gone is left out.
+ */
+export const chatFileMetadataForExport = internalQuery
+    .input({ fileIds: v.array(v.id("chatFiles")) })
+    .output(
+        v.object({
+            // The bytes the query read: each whole row, as stored. The export action meters its chunks against a budget with this.
+            readBytes: v.number(),
+            rows: v.array(
+                v.object({
+                    createdAt: v.number(),
+                    filename: v.optional(v.string()),
+                    filenameCut: v.boolean(),
+                    hash: v.string(),
+                    id: v.string(),
+                    mediaType: v.string(),
+                }),
+            ),
+        }),
+    )
+    .query(async ({ args: { fileIds }, ctx }) => {
+        if (fileIds.length === 0) {
+            return { readBytes: 0, rows: [] };
+        }
+
+        // Primary, as the grants are: a file uploaded moments before the export must be in it.
+        const { page } = await ctx.db.chatFiles.findMany({ consistency: "primary", where: { _id: { in: fileIds } } });
+        const files = storedRows(page);
+        // The whole row is read, extracted text included, so the bytes read are the row's size as stored, not the metadata's.
+        const readBytes = files.reduce((total, file) => total + rowBytes(file), 0);
+
+        return {
+            readBytes,
+            rows: files.map((file) => {
+                return {
+                    createdAt: file._creationTime,
+                    filename: file.filename?.slice(0, CHAT_FILE_NAME_MAX),
+                    filenameCut: (file.filename?.length ?? 0) > CHAT_FILE_NAME_MAX,
+                    hash: file.hash.slice(0, CHAT_FILE_HASH_MAX),
+                    id: file._id,
+                    mediaType: file.mediaType.slice(0, CHAT_FILE_TYPE_MAX),
+                };
+            }),
+        };
+    });
 
 /** The file-to-chat links of the user's own chats (`chatFileThreads`, keyed by owner). */
 export const eraseChatFileThreadsForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
@@ -176,6 +338,54 @@ export const eraseProjectsForUser = async (ctx: MutationCtx, userId: string): Pr
     }
 
     return await eraseProjectRuleFilesForUser(ctx, userId);
+};
+
+/** A workflow with no nodes: what a project's workflow becomes once its chat files are released. */
+const EMPTY_WORKFLOW = { edges: [], nodes: [] };
+
+/** The projects one round releases, so a large account stays inside one mutation. The next round picks up the rest. */
+const PROJECTS_RELEASED_PER_ROUND = 20;
+
+/**
+ * The chat files the user's projects hold (image nodes and reference media), released while the owner still holds their grants: a file
+ * is counted only while the owner holds a grant for it (`workflow/images.ts#countedWorkflowFileIds`), so this runs before
+ * `eraseChatFileAccessForUser`. Once it does, nothing is counted and the release is a no-op. A project whose files are released has its
+ * workflow emptied in the same write, so a retried round releases nothing twice. The project rows go in `eraseProjectsForUser`.
+ */
+export const releaseProjectImagesForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
+    let cursor: string | null = null;
+    let released = 0;
+    let more = true;
+
+    while (more) {
+        const page = (await ctx.db.projects.findMany({ consistency: "primary", cursor, limit: BATCH, where: { userId } })) as {
+            continueCursor: string;
+            isDone: boolean;
+            page: Doc<"projects">[];
+        };
+
+        for (const project of page.page) {
+            const { previous } = await countedWorkflowFileIds(ctx.db, userId, project.workflowContent, undefined);
+
+            if (previous.length === 0) {
+                continue;
+            }
+
+            await changeRefcount(ctx, previous, []);
+            await patchRow(ctx.db, "projects", project, { workflowContent: EMPTY_WORKFLOW });
+
+            released += 1;
+
+            if (released >= PROJECTS_RELEASED_PER_ROUND) {
+                return { hasMore: true };
+            }
+        }
+
+        more = !page.isDone;
+        cursor = page.isDone ? null : page.continueCursor;
+    }
+
+    return { hasMore: false };
 };
 
 /** Deletes a batch of executions, each after its node rows; `true` when one was left for the next round. */

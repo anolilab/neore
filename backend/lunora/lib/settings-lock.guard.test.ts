@@ -24,7 +24,12 @@ const ORGANIZATION_ARGUMENT = 4;
 const ACTIVE_ORGANIZATION = /^(?:ctx|context)\.user\.activeOrganization\?\.id \?\? null$/;
 
 /** Writers that run without a signed-in user, so they have no organization to pass. */
-const WRITERS_WITHOUT_ORGANIZATION: ReadonlySet<string> = new Set(["consumeAsMcpHeader", "consumeAsProviderKey", "pruneExpiredToolPermissionGrants"]);
+const WRITERS_WITHOUT_ORGANIZATION: ReadonlySet<string> = new Set([
+    "consumeAsMcpHeader",
+    "consumeAsProviderKey",
+    "pruneExpiredToolPermissionGrants",
+    "rememberProjectRunner",
+]);
 
 const isScanned = (file: string): boolean => file.endsWith(".ts") && !file.endsWith(".test.ts") && !file.endsWith(".d.ts");
 

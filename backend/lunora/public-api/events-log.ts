@@ -8,6 +8,7 @@
  */
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import { noteRetentionWake } from "../lib/shard-housekeeping";
 import { RUN_COMPLETED_EVENT, RUN_FAILED_EVENT } from "./events-catalog";
 
 /** How long a poll can look back: a cursor older than this reads as truncated. */
@@ -51,6 +52,8 @@ export const recordMcpEvent = async (ctx: Pick<MutationCtx, "db" | "now">, input
         userId: input.userId,
     });
     await setWatermark(ctx, input.userId, watermark?._id, seq);
+    // The event expires a window from now: the shard is woken then, so the sweep finds it even with no other retained rows.
+    await noteRetentionWake(ctx, ctx.now + RETENTION_MS);
 
     return true;
 };
@@ -100,8 +103,12 @@ const setWatermark = async (ctx: Pick<MutationCtx, "db">, userId: string, rowId:
  * Appends a merged guest's events to `to`'s log (`lib/account-merge.ts`). A guest's `seq` means nothing in the new account's log,
  * so each row takes the next number after `to`'s watermark, in guest order. An event `to` already has (a redelivered page) is
  * skipped, so a page imported twice writes once. Returns the number appended.
+ *
+ * Each row's `createdAt` is the copy's own time, so it rises with `seq`: retention deletes by `createdAt`, and a guest's older
+ * `createdAt` would expire a merged row before the older rows below it, leaving a hole the poll never reports. The event's
+ * `timestamp` keeps the time it happened.
  */
-export const copyMergedMcpEvents = async (ctx: Pick<MutationCtx, "db">, rows: Record<string, unknown>[], to: string): Promise<number> => {
+export const copyMergedMcpEvents = async (ctx: Pick<MutationCtx, "db" | "now">, rows: Record<string, unknown>[], to: string): Promise<number> => {
     const watermark = await ctx.db.mcpEventWatermarks.findFirst({ where: { userId: to } });
     let seq = watermark?.seq ?? 0;
     let appended = 0;
@@ -119,7 +126,7 @@ export const copyMergedMcpEvents = async (ctx: Pick<MutationCtx, "db">, rows: Re
         appended += 1;
 
         await ctx.db.insert("mcpEvents", {
-            createdAt: row["createdAt"] as number,
+            createdAt: ctx.now,
             data: row["data"] as string,
             eventId,
             name: row["name"] as string,
@@ -131,6 +138,8 @@ export const copyMergedMcpEvents = async (ctx: Pick<MutationCtx, "db">, rows: Re
 
     if (appended > 0) {
         await setWatermark(ctx, to, watermark?._id, seq);
+        // The copied rows expire a window from the copy, as a recorded event does (see `recordMcpEvent`).
+        await noteRetentionWake(ctx, ctx.now + RETENTION_MS);
     }
 
     return appended;

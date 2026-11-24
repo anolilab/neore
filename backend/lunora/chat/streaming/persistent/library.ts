@@ -950,6 +950,24 @@ const vPauseOutcome = v.object({
  * `replyRowIds` and `stepsUsed` are what THIS invocation of the run did; they are added to what the earlier ones did
  * (`pausedRun`), so the resume knows how many steps are left and the run can record one reply when it ends.
  */
+/**
+ * Removes the empty placeholder a failed step-cap wrap-up left (`execute.ts`): the agent marks its row failed when its call is
+ * rejected, and the reply would show that error beside its answer. Only the row the wrap-up named goes, and only while it is still
+ * empty. A row of another reply or run is never named here, so it is never removed.
+ */
+export const removeWrapUpPlaceholder = internalMutation
+    .input({ placeholderId: v.string().max(MAX_LENGTH.id), threadId: v.id("threads") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const placeholder = await ctx.db.messages.findFirst({ where: { _id: args.placeholderId as Id<"messages">, threadId: args.threadId } });
+
+        if (placeholder && isEmptyPlaceholder(placeholder)) {
+            await removeEmptyPending(ctx, args.threadId, placeholder);
+        }
+
+        return null;
+    });
+
 export const pauseRunForRateLimit = internalMutation
     .input({
         /** The row the rejected step continues from: the last row this run saved, else the prompt. */
