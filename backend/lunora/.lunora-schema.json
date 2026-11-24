@@ -10737,6 +10737,34 @@
       "relations": {},
       "shardMode": "shardBy:userId"
     },
+    "mcpEventWatermarks": {
+      "commitOrdered": false,
+      "fields": {
+        "seq": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
     "mcpEvents": {
       "commitOrdered": false,
       "fields": {

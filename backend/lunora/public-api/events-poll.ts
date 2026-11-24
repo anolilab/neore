@@ -59,10 +59,11 @@ export const pollEvents = async (store: EventLogStore, query: PollQuery): Promis
     let from = query.fromSeq;
     let truncated = false;
 
-    // A cursor older than the kept window: resume from the oldest position still held, and say events were skipped.
-    const oldest = await store.oldestSeq();
+    // A cursor older than the kept window: resume from the oldest position still held, and say events were skipped. An empty
+    // log holds nothing, so its oldest position is the one after its end: a cursor behind that has been skipped past.
+    const oldest = (await store.oldestSeq()) ?? (await store.latestSeq()) + 1;
 
-    if (oldest !== undefined && from + 1 < oldest) {
+    if (from + 1 < oldest) {
         from = oldest - 1;
         truncated = true;
     }

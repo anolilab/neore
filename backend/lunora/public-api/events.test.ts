@@ -13,7 +13,7 @@ import {
     RUN_COMPLETED_EVENT,
     RUN_FAILED_EVENT,
 } from "./events-catalog";
-import { recordMcpEvent } from "./events-log";
+import { copyMergedMcpEvents, recordMcpEvent } from "./events-log";
 import { decodeEventCursor, encodeEventCursor } from "./events-cursor";
 import type { EventLogStore, StoredEvent } from "./events-poll";
 import { pollEvents } from "./events-poll";
@@ -174,33 +174,41 @@ describe("events/poll over a log", () => {
 });
 
 describe("the event log's recorder", () => {
-    /** An in-memory `ctx.db` over `mcpEvents`, enough for `findFirst` by index fields and `insert`. */
+    /** An in-memory `ctx.db` over `mcpEvents` and `mcpEventWatermarks`, enough for `findFirst` by index fields, `insert` and `patch`. */
     const memoryCtx = () => {
         const rows: (Record<string, unknown> & { seq: number })[] = [];
+        const watermarks: (Record<string, unknown> & { seq: number })[] = [];
         const matches = (row: Record<string, unknown>, where: Record<string, unknown>) => Object.entries(where).every(([key, value]) => row[key] === value);
+        const findFirst =
+            (list: (Record<string, unknown> & { seq: number })[]) =>
+            async ({ orderBy, where }: { orderBy?: Record<string, "asc" | "desc">[]; where: Record<string, unknown> }) => {
+                const found = list.filter((row) => matches(row, where));
+                const direction = orderBy?.[0]?.["seq"];
+
+                if (direction !== undefined) {
+                    found.sort((a, b) => (direction === "asc" ? a.seq - b.seq : b.seq - a.seq));
+                }
+
+                return found[0];
+            };
         const db = {
-            insert: async (_table: string, document: Record<string, unknown>) => {
-                rows.push({ _id: String(rows.length), ...document } as never);
+            insert: async (table: string, document: Record<string, unknown>) => {
+                const list = table === "mcpEvents" ? rows : watermarks;
+
+                list.push({ _id: String(list.length), ...document } as never);
             },
-            mcpEvents: {
-                findFirst: async ({ orderBy, where }: { orderBy?: Record<string, "asc" | "desc">[]; where: Record<string, unknown> }) => {
-                    const found = rows.filter((row) => matches(row, where));
-                    const direction = orderBy?.[0]?.["seq"];
-
-                    if (direction !== undefined) {
-                        found.sort((a, b) => (direction === "asc" ? a.seq - b.seq : b.seq - a.seq));
-                    }
-
-                    return found[0];
-                },
+            mcpEvents: { findFirst: findFirst(rows) },
+            mcpEventWatermarks: { findFirst: findFirst(watermarks) },
+            patch: async (_table: string, id: string, fields: Record<string, unknown>) => {
+                Object.assign(watermarks.find((row) => row["_id"] === id) ?? {}, fields);
             },
         };
 
-        return { ctx: { db, now: 777 } as never, rows };
+        return { ctx: { db, now: 777 } as never, rows, watermarks };
     };
 
     it("numbers a user's events one past the last and writes an event once per eventId", async () => {
-        const { ctx, rows } = memoryCtx();
+        const { ctx, rows, watermarks } = memoryCtx();
         const input = {
             data: { kind: "approval", requestId: "a1", threadId: "t1" },
             eventId: "approval:a1",
@@ -220,5 +228,69 @@ describe("the event log's recorder", () => {
             ["user-b", 1, "approval:a2", 777],
         ]);
         expect(JSON.parse(rows[0]?.["data"] as string)).toStrictEqual({ kind: "approval", requestId: "a1", threadId: "t1" });
+        expect(watermarks.map((row) => [row["userId"], row["seq"]])).toStrictEqual([
+            ["user-a", 2],
+            ["user-b", 1],
+        ]);
+    });
+
+    it("keeps the sequence when the rows are gone: the next event follows the watermark, not the rows", async () => {
+        const { ctx, rows } = memoryCtx();
+        const input = { data: {}, eventId: "run:s1", name: RUN_COMPLETED_EVENT, timestamp: 5, userId: "user-a" };
+
+        await recordMcpEvent(ctx, input);
+        rows.length = 0;
+
+        expect(await recordMcpEvent(ctx, { ...input, eventId: "run:s2" })).toBe(true);
+        expect(rows.map((row) => row["seq"])).toStrictEqual([2]);
+    });
+
+    it("appends a merged guest's events after the new account's sequence, once per eventId", async () => {
+        const { ctx, rows, watermarks } = memoryCtx();
+
+        await recordMcpEvent(ctx, { data: {}, eventId: "run:own1", name: RUN_COMPLETED_EVENT, timestamp: 1, userId: "user" });
+        await recordMcpEvent(ctx, { data: {}, eventId: "run:own2", name: RUN_COMPLETED_EVENT, timestamp: 2, userId: "user" });
+
+        // The guest's own numbering (1, 2) collides with the new account's; the merge must not keep it.
+        const guest = [
+            { createdAt: 10, data: "{}", eventId: "run:g2", name: RUN_COMPLETED_EVENT, seq: 2, timestamp: 4, userId: "guest" },
+            { createdAt: 9, data: "{}", eventId: "run:g1", name: RUN_COMPLETED_EVENT, seq: 1, timestamp: 3, userId: "guest" },
+        ];
+
+        expect(await copyMergedMcpEvents(ctx, guest, "user")).toBe(2);
+        // A page imported again (a redelivery) writes nothing more.
+        expect(await copyMergedMcpEvents(ctx, guest, "user")).toBe(0);
+
+        expect(rows.filter((row) => row["userId"] === "user").map((row) => [row["eventId"], row["seq"], row["createdAt"]])).toStrictEqual([
+            ["run:own1", 1, 777],
+            ["run:own2", 2, 777],
+            ["run:g1", 3, 9],
+            ["run:g2", 4, 10],
+        ]);
+        expect(watermarks.find((row) => row["userId"] === "user")?.["seq"]).toBe(4);
+    });
+});
+
+describe("events/poll over a log whose rows are all gone", () => {
+    it("reports truncated and resumes at the log's end when the cursor is behind it", async () => {
+        const store: EventLogStore = { after: async () => [], latestSeq: async () => 10, oldestSeq: async () => undefined };
+
+        expect(await pollEvents(store, { fromSeq: 4, maxEvents: 10, name: RUN_COMPLETED_EVENT, now: NOW })).toStrictEqual({
+            events: [],
+            hasMore: false,
+            nextSeq: 10,
+            truncated: true,
+        });
+    });
+
+    it("is not truncated for a cursor already at the log's end", async () => {
+        const store: EventLogStore = { after: async () => [], latestSeq: async () => 10, oldestSeq: async () => undefined };
+
+        expect(await pollEvents(store, { fromSeq: 10, maxEvents: 10, name: RUN_COMPLETED_EVENT, now: NOW })).toStrictEqual({
+            events: [],
+            hasMore: false,
+            nextSeq: 10,
+            truncated: false,
+        });
     });
 });

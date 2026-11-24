@@ -55,10 +55,20 @@ export type DeliveryWork = Infer<typeof vDeliveryWork>;
 
 export const vOutcome = v.object({ category: v.string(), kind: v.string() });
 
-const edgeSeq = async (ctx: Db, userId: string, direction: "asc" | "desc"): Promise<number | undefined> => {
-    const row = await ctx.db.mcpEvents.findFirst({ orderBy: [{ seq: direction }], where: { userId } });
+/**
+ * The position after which an empty or pruned log resumes: the seq of its oldest kept row, or, when it keeps none, the one after
+ * the watermark (the same rule `events/poll` and `events/subscribe` use). The newest seq is the watermark's, never a row's.
+ */
+const oldestPositionOf = async (ctx: Db, userId: string): Promise<number> => {
+    const row = await ctx.db.mcpEvents.findFirst({ orderBy: [{ seq: "asc" }], where: { userId } });
 
-    return row?.seq;
+    if (row) {
+        return row.seq;
+    }
+
+    const watermark = await ctx.db.mcpEventWatermarks.findFirst({ where: { userId } });
+
+    return (watermark?.seq ?? 0) + 1;
 };
 
 /** The cursor position for a subscription: its scan position, held back below its lowest pending delivery. */
@@ -262,9 +272,9 @@ export const dispatchOn = async (ctx: Db, now: number, effects: DispatchEffects)
         }
 
         let { scanSeq } = sub;
-        const oldest = await edgeSeq(ctx, sub.userId, "asc");
+        const oldest = await oldestPositionOf(ctx, sub.userId);
 
-        if (oldest !== undefined && scanSeq + 1 < oldest) {
+        if (scanSeq + 1 < oldest) {
             await insertDelivery(ctx, { eventId: "", keyHash: sub.keyHash, kind: "gap", name: "", seq: oldest - 1, timestamp: 0, userId: sub.userId }, now);
             scanSeq = oldest - 1;
         }

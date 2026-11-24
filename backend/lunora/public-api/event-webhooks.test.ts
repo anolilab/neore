@@ -23,11 +23,25 @@ beforeEach(() => {
 const approve = async (userId = OWNER, host = HOST) =>
     await harness.run(async (ctx: any) => await ctx.db.insert("eventWebhookHosts", { createdAt: NOW, host, userId }));
 
-/** Log rows for the owner, one per seq, timestamped `timestamp`. */
+/**
+ * Log rows for the owner, one per seq, timestamped `timestamp`. The watermark moves to the highest seq seeded, as `recordMcpEvent`
+ * would move it: the latest seq is the watermark's, never a row's.
+ */
 const seed = async (seqs: number[], timestamp = NOW) =>
     await harness.run(async (ctx: any) => {
         for (const seq of seqs) {
             await ctx.db.insert("mcpEvents", { createdAt: NOW, data: "{}", eventId: `evt-${seq}`, name: "run.completed", seq, timestamp, userId: OWNER });
+        }
+
+        const highest = Math.max(0, ...seqs);
+        const watermark = await ctx.db.mcpEventWatermarks.findFirst({ where: { userId: OWNER } });
+
+        if (watermark) {
+            if (highest > watermark.seq) {
+                await ctx.db.patch("mcpEventWatermarks", watermark._id, { seq: highest });
+            }
+        } else {
+            await ctx.db.insert("mcpEventWatermarks", { seq: highest, userId: OWNER });
         }
     });
 

@@ -25,8 +25,9 @@ export interface RecordEventInput {
 /**
  * Appends the event to `userId`'s log and returns `true`, or returns `false` when that event is already there.
  *
- * `seq` is one past the user's highest, read in the same mutation. Writes to a shard are serialized, so no two appends can
- * take the same number. Retention never deletes the highest row (`pruneMcpEvents`), so the sequence never restarts.
+ * `seq` is one past the user's watermark (`mcpEventWatermarks`), which is advanced in the same mutation. Writes to a shard are
+ * serialized, so no two appends can take the same number. The watermark outlives the rows, so retention can delete every
+ * event without the sequence restarting.
  */
 export const recordMcpEvent = async (ctx: Pick<MutationCtx, "db" | "now">, input: RecordEventInput): Promise<boolean> => {
     const existing = await ctx.db.mcpEvents.findFirst({ where: { eventId: input.eventId, userId: input.userId } });
@@ -35,17 +36,67 @@ export const recordMcpEvent = async (ctx: Pick<MutationCtx, "db" | "now">, input
         return false;
     }
 
-    const last = await ctx.db.mcpEvents.findFirst({ orderBy: [{ seq: "desc" }], where: { userId: input.userId } });
+    const watermark = await ctx.db.mcpEventWatermarks.findFirst({ where: { userId: input.userId } });
+    const seq = (watermark?.seq ?? 0) + 1;
 
     await ctx.db.insert("mcpEvents", {
         createdAt: ctx.now,
         data: JSON.stringify(input.data),
         eventId: input.eventId,
         name: input.name,
-        seq: (last?.seq ?? 0) + 1,
+        seq,
         timestamp: input.timestamp,
         userId: input.userId,
     });
+    await setWatermark(ctx, input.userId, watermark?._id, seq);
 
     return true;
+};
+
+const setWatermark = async (ctx: Pick<MutationCtx, "db">, userId: string, rowId: string | undefined, seq: number): Promise<void> => {
+    if (rowId === undefined) {
+        await ctx.db.insert("mcpEventWatermarks", { seq, userId });
+    } else {
+        await ctx.db.patch("mcpEventWatermarks", rowId as never, { seq });
+    }
+};
+
+/**
+ * Appends a merged guest's events to `to`'s log (`lib/account-merge.ts`). A guest's `seq` means nothing in the new account's log,
+ * so each row takes the next number after `to`'s watermark, in guest order. An event `to` already has (a redelivered page) is
+ * skipped, so a page imported twice writes once. Returns the number appended.
+ */
+export const copyMergedMcpEvents = async (ctx: Pick<MutationCtx, "db">, rows: Record<string, unknown>[], to: string): Promise<number> => {
+    const watermark = await ctx.db.mcpEventWatermarks.findFirst({ where: { userId: to } });
+    let seq = watermark?.seq ?? 0;
+    let appended = 0;
+
+    const ordered = rows.toSorted((a, b) => (a["seq"] as number) - (b["seq"] as number));
+
+    for (const row of ordered) {
+        const eventId = row["eventId"] as string;
+
+        if (await ctx.db.mcpEvents.findFirst({ where: { eventId, userId: to } })) {
+            continue;
+        }
+
+        seq += 1;
+        appended += 1;
+
+        await ctx.db.insert("mcpEvents", {
+            createdAt: row["createdAt"] as number,
+            data: row["data"] as string,
+            eventId,
+            name: row["name"] as string,
+            seq,
+            timestamp: row["timestamp"] as number,
+            userId: to,
+        });
+    }
+
+    if (appended > 0) {
+        await setWatermark(ctx, to, watermark?._id, seq);
+    }
+
+    return appended;
 };

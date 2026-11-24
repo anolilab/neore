@@ -647,8 +647,11 @@ const runQueue = async (
         continueFrom = lastMessageId ?? continueFrom;
     }
 
+    // Every way past the speaker loop that is not a pause or a stop lands here, the repeated-call guard's included: the turn
+    // succeeded, so its end is recorded in the Events log by the chunk that closes the stream.
     await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
         final: true,
+        runEnd: "succeeded",
         streamId: turn.streamId as Id<"persistentStreams">,
         text: "",
     });

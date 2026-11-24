@@ -36,6 +36,7 @@ import schema from "../schema";
 import { dropPushDevicesOf } from "../notifications/push-device-writes";
 import { mergeThreadFollowsPage } from "../chat/follows/follow-writes";
 import { copyMergedRunWebhooks } from "../run-webhooks/table-writes";
+import { copyMergedMcpEvents } from "../public-api/events-log";
 
 /** Rows moved per round trip. */
 export const MERGE_PAGE_SIZE = 100;
@@ -214,7 +215,15 @@ export const importShardRows = internalMutation
             };
         }
 
-        if (KEEP_NEW_USERS.has(args.table)) {
+        // A guest's event log is renumbered after the new account's own (its `seq` means nothing there). The guest's watermark is not
+        // copied: the new account's is rebuilt from the events appended.
+        if (args.table === "mcpEvents") {
+            const guestRows = (args.rows as Record<string, unknown>[]).filter((row) => row.userId === args.from);
+
+            return { imported: await copyMergedMcpEvents(ctx, guestRows, args.to) };
+        }
+
+        if (KEEP_NEW_USERS.has(args.table) || args.table === "mcpEventWatermarks") {
             return { imported: 0 };
         }
 
