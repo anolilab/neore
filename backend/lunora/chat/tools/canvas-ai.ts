@@ -12,6 +12,7 @@ import type { Id } from "../../_generated/dataModel";
 import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
 import { toolsLogger } from "../../lib/logger";
+import { type ImageQuotaCode, takeImageQuota } from "./image-quota";
 
 type CanvasAIOperation = "remove_background" | "upscale" | "style_transfer" | "generate_element";
 
@@ -22,6 +23,7 @@ const canvasAITool = createTool<
         prompt?: string;
     },
     {
+        code?: ImageQuotaCode;
         documentId: string;
         error?: string;
         message: string;
@@ -58,6 +60,12 @@ For generate_element, add the result as a FabricImage object in the canvas JSON 
                         message: "generate_element operation requires a prompt",
                         operation,
                     };
+                }
+
+                const quota = await takeImageQuota(context, context.userId, 1);
+
+                if (!quota.ok) {
+                    return { code: quota.code, documentId, error: quota.message, message: quota.message, operation };
                 }
 
                 // Use image generation internal action
@@ -105,6 +113,12 @@ For generate_element, add the result as a FabricImage object in the canvas JSON 
                     message: "Design document not found",
                     operation,
                 };
+            }
+
+            const quota = await takeImageQuota(context, context.userId, 1);
+
+            if (!quota.ok) {
+                return { code: quota.code, documentId, error: quota.message, message: quota.message, operation };
             }
 
             // Use image editing internal action
