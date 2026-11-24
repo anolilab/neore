@@ -5,14 +5,22 @@
  * The sweep leases a bounded set of open links (stamping `stateCheckedAt` in the same transaction, so the next sweep
  * skips them) and schedules one action per link. The action asks the host with the person's token and records the
  * answer only while its lease is still the link's current one, so a late answer never overwrites a newer check.
- * A host read that finds no such pull request records it as closed; any other failure leaves the state as it was.
+ * A failed read leaves the state as it was. A 404 is not taken for a closed pull request: GitHub also answers it for a
+ * private repository the token cannot see, and a closed link is never read again.
  * The sweep does nothing unless auto-archive is on and the person keeps open-pull-request chats.
  */
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
-import { isAutoArchiveDays, isOpenPullRequestForArchive, keepsOpenPullRequestChats } from "../agent/auto-archive-logic";
+import {
+    autoArchiveCutoff,
+    type AutoArchiveCandidate,
+    isAutoArchiveDays,
+    isOpenPullRequestForArchive,
+    keepsOpenPullRequestChats,
+    selectAutoArchiveDue,
+} from "../agent/auto-archive-logic";
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { currentUserShard } from "../lib/shard-context";
 import { DEVELOP_DRIVER } from "./develop-driver";
@@ -27,6 +35,30 @@ export const PR_STATE_MAX_AGE_MS = 10 * 60 * 1000;
 const SCAN_LIMIT = 500;
 /** Links checked per sweep, so one user's host calls stay bounded. */
 const CHECK_LIMIT = 20;
+/** Thread lookups per sweep, as a multiple of `CHECK_LIMIT`: links on chats that are still active are skipped, within that bound. */
+const THREAD_LOOKUP_FACTOR = 4;
+/** Auto-archive's idle rule alone. Its live-stream and pinned-project exclusions are left out, so a chat that is then kept still gets a read. */
+const NO_EXCLUSIONS = { liveThreadIds: new Set<string>(), pinnedProjectIds: new Set<string>() };
+
+const candidateOf = (thread: {
+    _id: string;
+    deleted?: boolean;
+    isTemporary?: boolean;
+    pinnedAt?: number;
+    projectId?: string;
+    status: string;
+    updatedAt?: number;
+}): AutoArchiveCandidate => {
+    return {
+        _id: thread._id,
+        deleted: thread.deleted,
+        isTemporary: thread.isTemporary,
+        pinnedAt: thread.pinnedAt,
+        projectId: thread.projectId,
+        status: thread.status,
+        updatedAt: thread.updatedAt,
+    };
+};
 
 const vState = v.union(v.literal("open"), v.literal("closed"), v.literal("merged"));
 
@@ -47,9 +79,9 @@ export const dispatchLinkedPullRequestChecks = internalMutation
             .unique();
 
         // The state is only read by auto-archive, so with auto-archive off there is nothing to keep fresh.
-        const autoArchiveOn = isAutoArchiveDays(settings?.autoArchiveAfterDays) && settings?.autoArchiveAfterDays !== 0;
+        const days = settings?.autoArchiveAfterDays;
 
-        if (!autoArchiveOn || !keepsOpenPullRequestChats(settings?.keepOpenPullRequestChats)) {
+        if (!isAutoArchiveDays(days) || days === 0 || !keepsOpenPullRequestChats(settings?.keepOpenPullRequestChats)) {
             return { dispatched: 0 };
         }
 
@@ -58,16 +90,32 @@ export const dispatchLinkedPullRequestChecks = internalMutation
             .query("pullRequestThreads")
             .withIndex("by_user_and_repository_number", (q) => q.eq("userId", userId))
             .take(SCAN_LIMIT);
-        const due = links
+        // Never-checked first, then the longest unchecked: a link is not starved by the ones checked before it.
+        const stale = links
             .filter(
                 (link) =>
                     link.threadDeleted !== true &&
                     isOpenPullRequestForArchive(link) &&
                     (link.stateCheckedAt === undefined || now - link.stateCheckedAt >= PR_STATE_MAX_AGE_MS),
             )
-            // Never-checked first, then the longest unchecked: a link is not starved by the ones checked before it.
-            .toSorted((a, b) => (a.stateCheckedAt ?? 0) - (b.stateCheckedAt ?? 0))
-            .slice(0, CHECK_LIMIT);
+            .toSorted((a, b) => (a.stateCheckedAt ?? 0) - (b.stateCheckedAt ?? 0));
+        const cutoff = autoArchiveCutoff(now, days);
+        const due: typeof stale = [];
+
+        // Only a link whose chat auto-archive would consider idle is read: the state of any other chat is never used.
+        const lookups = stale.slice(0, CHECK_LIMIT * THREAD_LOOKUP_FACTOR);
+
+        for (const link of lookups) {
+            if (due.length >= CHECK_LIMIT) {
+                break;
+            }
+
+            const thread = await ctx.db.get("threads", link.threadId);
+
+            if (thread !== null && selectAutoArchiveDue([candidateOf(thread)], cutoff, NO_EXCLUSIONS, 1).length === 1) {
+                due.push(link);
+            }
+        }
 
         for (const link of due) {
             // Stamped first: a sweep that runs again before the read lands skips this link. The stamp is the lease.
@@ -125,9 +173,6 @@ export const checkLinkedPullRequest = internalAction
 
         if (outcome.status === "ok") {
             await ctx.runMutation(internal.source_control.pr_state.recordLinkState, { lease: args.lease, linkId: args.linkId, state: outcome.state });
-        } else if (outcome.status === "not_found") {
-            // The host has no such pull request any more (deleted, or its repository is gone): it is not open, so the chat is not kept for it.
-            await ctx.runMutation(internal.source_control.pr_state.recordLinkState, { lease: args.lease, linkId: args.linkId, state: "closed" });
         }
 
         return null;

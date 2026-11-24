@@ -110,11 +110,13 @@ const threadKeptForOpenPullRequest = async (ctx: MutationCtx, userId: string | u
         return false;
     }
 
-    const links = await ctx.db
+    // One link past the bound, so exactly `PULL_REQUEST_LINK_READ` links reads as complete, not truncated.
+    const read = await ctx.db
         .query("pullRequestThreads")
         .withIndex("by_user_and_threadId", (q) => q.eq("userId", userId).eq("threadId", threadId))
-        .take(PULL_REQUEST_LINK_READ);
-    const truncated = links.length === PULL_REQUEST_LINK_READ;
+        .take(PULL_REQUEST_LINK_READ + 1);
+    const truncated = read.length > PULL_REQUEST_LINK_READ;
+    const links = read.slice(0, PULL_REQUEST_LINK_READ);
 
     if (!truncated && links.every((link) => !isOpenPullRequestForArchive(link))) {
         return false;

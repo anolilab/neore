@@ -259,4 +259,28 @@ describe("archiveIfStillIdle and linked pull requests", () => {
     it("keeps an idle chat whose pull request state the refresh has not read yet", async () => {
         expect(await archiveWithPullRequest({ link: true })).toBe(false);
     });
+
+    it("archives an idle chat whose exactly 100 linked pull requests are all closed", async () => {
+        const archived = await harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Old", updatedAt: 1, userId: OWNER });
+
+            for (let index = 0; index < 100; index += 1) {
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 0,
+                    kind: "opened",
+                    number: index + 1,
+                    repository: "acme/app",
+                    state: "closed",
+                    threadId,
+                    title: "Done",
+                    url: `https://example.test/acme/app/pull/${index + 1}`,
+                    userId: OWNER,
+                });
+            }
+
+            return await ctx.runMutation(archiveIfStillIdle, { cutoff: CUTOFF, threadId });
+        });
+
+        expect(archived).toBe(true);
+    });
 });

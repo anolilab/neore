@@ -31,6 +31,10 @@ afterEach(() => {
 interface LinkSeed {
     state?: "open" | "closed" | "merged";
     stateCheckedAt?: number;
+    /** The chat was active just now, so auto-archive would not consider it idle. */
+    threadActive?: boolean;
+    /** The chat is archived already. */
+    threadArchived?: boolean;
     threadDeleted?: boolean;
 }
 
@@ -49,9 +53,9 @@ const seedAndSweep = (links: LinkSeed[], settings: typeof ON, sweeps = 1) =>
             const threadId = await ctx.db.insert("threads", {
                 mode: "text",
                 model: "gpt-4o",
-                status: "active",
+                status: link.threadArchived === true ? "archived" : "active",
                 title: `Thread ${index}`,
-                updatedAt: 1,
+                updatedAt: link.threadActive === true ? Date.now() : 1,
                 userId: OWNER,
             });
 
@@ -121,6 +125,18 @@ describe("dispatchLinkedPullRequestChecks", () => {
         );
 
         expect(dispatched).toEqual([1]);
+    });
+
+    it("leases nothing for a link whose chat is still active, since auto-archive would not consider it idle", async () => {
+        const { dispatched } = await seedAndSweep([{ threadActive: true }], ON);
+
+        expect(dispatched).toEqual([0]);
+    });
+
+    it("leases nothing for a link whose chat is already archived", async () => {
+        const { dispatched } = await seedAndSweep([{ threadArchived: true }], ON);
+
+        expect(dispatched).toEqual([0]);
     });
 
     it("skips a link whose thread is deleted", async () => {
