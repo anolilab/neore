@@ -95,6 +95,7 @@ type UserPreferencesHookReturn = UserPreferences & {
     setShowTimestamps: (showTimestamps: boolean) => void;
     setSoundEffects: (soundEffects: boolean) => void;
     setSplitViewEnabled: (splitViewEnabled: boolean) => void;
+    setSubAgentOpenPlace: (subAgentOpenPlace: UserPreferences["subAgentOpenPlace"]) => void;
     setTemporaryChatRetentionHours: (hours: number) => void;
     setUserPreferences: (preferences: Partial<UserPreferences>) => void;
     temporaryChatRetentionHours: number;
@@ -292,6 +293,8 @@ export const useUserPreferences = (): UserPreferencesHookReturn => {
             showTimestamps: uiPreferences.showTimestamps,
             soundEffects: uiPreferences.soundEffects,
             splitViewEnabled: uiPreferences.splitViewEnabled === true,
+            // A browser that saved preferences before this key existed has none: it reads as the default.
+            subAgentOpenPlace: uiPreferences.subAgentOpenPlace === "main" ? "main" : "side",
         };
     }, [uiPreferences, userSettings]);
 
@@ -329,6 +332,7 @@ export const useUserPreferences = (): UserPreferencesHookReturn => {
         setShowTimestamps: (showTimestamps: boolean) => setUserPreferencesAction({ showTimestamps }),
         setSoundEffects: (soundEffects: boolean) => setUserPreferencesAction({ soundEffects }),
         setSplitViewEnabled: (splitViewEnabled: boolean) => setUserPreferencesAction({ splitViewEnabled }),
+        setSubAgentOpenPlace: (subAgentOpenPlace: UserPreferences["subAgentOpenPlace"]) => setUserPreferencesAction({ subAgentOpenPlace }),
         setTemporaryChatRetentionHours: (hours: number) => {
             updateUserSettings({ temporaryChatRetentionHours: hours });
         },
@@ -347,6 +351,10 @@ export const useUserPreferences = (): UserPreferencesHookReturn => {
 
             if ("splitViewEnabled" in prefs) {
                 clientSide.splitViewEnabled = prefs.splitViewEnabled;
+            }
+
+            if ("subAgentOpenPlace" in prefs) {
+                clientSide.subAgentOpenPlace = prefs.subAgentOpenPlace;
             }
 
             if ("hidePersonalInfo" in prefs) {

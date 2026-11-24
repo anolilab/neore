@@ -23,6 +23,7 @@ import type { FC } from "react";
 import { useId } from "react";
 
 import { useChatThread } from "@/features/chat/core/context/chat-context";
+import { useOpenChatClick } from "@/features/chat/split/use-open-chat";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
@@ -37,10 +38,12 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
     const crpc = useCRPC();
     const { threadId } = useChatThread();
     const headingId = useId();
+    const openChat = useOpenChatClick();
     const isDenied = part.state === "output-denied";
     const { data: run, isPending } = useQuery(
         crpc.sub_agents.functions.getRunByToolCall.queryOptions(isDenied || !part.toolCallId ? skipToken : { toolCallId: part.toolCallId }),
     );
+    const childThreadId = run?.childThreadId;
 
     const stop = useMutation(
         crpc.sub_agents.functions.cancelRun.mutationOptions({
@@ -126,10 +129,23 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
                 </Button>
             )}
 
-            {run?.childThreadId && (
+            {childThreadId && (
+                // The link keeps its address for the browser's own menu; the click chooses the place (`useOpenChatClick`).
                 <Link
                     className="text-primary-text mt-2 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
-                    params={{ threadId: run.childThreadId }}
+                    onAuxClick={(event) => {
+                        if (event.button !== 1) {
+                            return;
+                        }
+
+                        event.preventDefault();
+                        openChat(childThreadId, event);
+                    }}
+                    onClick={(event) => {
+                        event.preventDefault();
+                        openChat(childThreadId, event);
+                    }}
+                    params={{ threadId: childThreadId }}
                     to="/chat/$threadId"
                 >
                     <ExternalLink aria-hidden="true" className="size-3" />

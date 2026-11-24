@@ -17231,6 +17231,10 @@ msgstr "Hit rate"
 msgid "HLS playback is not supported in this browser."
 msgstr "HLS playback is not supported in this browser."
 
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:32
+msgid "Hold Ctrl, Cmd or the middle mouse button to open it in the other place. The side panel needs Split View, turned on in Account settings."
+msgstr "Hold Ctrl, Cmd or the middle mouse button to open it in the other place. The side panel needs Split View, turned on in Account settings."
+
 #: src/features/settings/components/personalization/memory-item.tsx:208
 msgid "Holds until"
 msgstr "Holds until"
@@ -20470,6 +20474,10 @@ msgstr "Magic Link"
 #: src/features/auth/components/auth/forms/magic-link-form.tsx:76
 msgid "Magic link email sent"
 msgstr "Magic link email sent"
+
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:21
+msgid "Main view"
+msgstr "Main view"
 
 #: src/features/workflow/components/nodes/style-ref-node.tsx:147
 msgid "Maintain original structure"
@@ -31347,6 +31355,10 @@ msgstr "Showing {firstShown} to {lastShown} of {totalRows} rows"
 msgid "Shown to the assistant so it knows when the skill applies."
 msgstr "Shown to the assistant so it knows when the skill applies."
 
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:22
+msgid "Side panel"
+msgstr "Side panel"
+
 #: src/features/chat/aside/aside-panel.tsx:208
 #: src/features/chat/aside/aside-panel.tsx:293
 msgid "Side question"
@@ -39559,6 +39571,10 @@ msgstr "When to delegate"
 #: src/features/projects/components/project-rule-files.tsx:307
 msgid "When to read it"
 msgstr "When to read it"
+
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:29
+msgid "Where a sub-agent or side chat opens"
+msgstr "Where a sub-agent or side chat opens"
 
 #: src/features/tasks/components/task-form-dialog.tsx:586
 msgid "Where each run goes"
