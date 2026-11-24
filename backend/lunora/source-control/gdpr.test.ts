@@ -323,6 +323,25 @@ describe("pull request / thread links in GDPR flows", () => {
         expect(await count(B)).toBe(3);
     });
 
+    it("erases the owner's scan position with their last batch of links", async () => {
+        await link(A, 3);
+        await link(B, 1);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("pullRequestStateScans", { cursor: "scan-a", userId: A });
+            await ctx.db.insert("pullRequestStateScans", { cursor: "scan-b", userId: B });
+        });
+
+        const run = async () => await harness.run(async (ctx: any) => await ctx.runMutation(deleteUserPullRequestThreads as never, { userId: A } as never));
+        const scansOf = async (userId: string): Promise<number> =>
+            await harness.run(
+                async (ctx: any) => (await ctx.db.query("pullRequestStateScans").collect()).filter((row: { userId: string }) => row.userId === userId).length,
+            );
+
+        expect(await run()).toEqual({ hasMore: false });
+        expect(await scansOf(A)).toBe(0);
+        expect(await scansOf(B)).toBe(1);
+    });
+
     it("is wired into both workflows under explicit ids", () => {
         const workflow = (name: string): string => readFileSync(join(import.meta.dirname, "../gdpr/workflows", name), "utf8");
         const exportSource = workflow("export-workflow.ts");

@@ -2567,6 +2567,15 @@ export const schema = defineSchema({
         .index("by_user_and_pull", ["userId", "hostOrigin", "repository", "number"])
         .index("by_threadId", ["threadId"]),
 
+    // Where the housekeeping sweep's state refresh (`source-control/pr-state.ts`) resumes its scan of the owner's
+    // `pullRequestThreads`, one row per person. Null starts from the first link. Erased with the links.
+    pullRequestStateScans: defineTable({
+        cursor: v.union(v.string(), v.null()),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId", ["userId"]),
+
     // Develop mode: the thread a pull request is worked on in, and the pull requests a coding agent opened FROM a
     // thread. `kind` says which: `attached` when the person started work on it ("Work on this PR"), `opened` when a run
     // it belonged to opened it. One row per (user, repository, number, kind) at most; the thread id is the link both

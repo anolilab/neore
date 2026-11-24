@@ -265,5 +265,19 @@ export const deleteUserPullRequestThreads = internalMutation
 
         await Promise.all(links.map((link) => ctx.db.delete("pullRequestThreads", link._id)));
 
-        return { hasMore: links.length >= BATCH };
+        const hasMore = links.length >= BATCH;
+
+        // The scan position goes with the last batch, so no sweep resumes over links that are gone.
+        if (!hasMore) {
+            const scan = await ctx.db
+                .query("pullRequestStateScans")
+                .withIndex("by_userId", (q) => q.eq("userId", userId))
+                .unique();
+
+            if (scan) {
+                await ctx.db.delete("pullRequestStateScans", scan._id);
+            }
+        }
+
+        return { hasMore };
     });

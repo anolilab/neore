@@ -11,8 +11,9 @@
  */
 import { v } from "lunorash/server";
 
+import type { Doc } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
-import { internalAction, internalMutation, internalQuery } from "../_generated/server";
+import { internalAction, internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
 import {
     autoArchiveCutoff,
     type AutoArchiveCandidate,
@@ -29,8 +30,8 @@ import { readFromHost } from "./read-host";
 /** A link's state is re-read once it is this old. */
 export const PR_STATE_MAX_AGE_MS = 10 * 60 * 1000;
 /**
- * Links read per sweep. The candidates are checked oldest-first, so a link past this window is reached as soon as the
- * links ahead of it are fresh; only a user with more links than this waits longer.
+ * Links read per sweep: one page of the person's links. The scan resumes at the page after the last one it finished
+ * (`pullRequestStateScans`), so a user with more links than this is reached a page at a time.
  */
 const SCAN_LIMIT = 500;
 /** Links checked per sweep, so one user's host calls stay bounded. */
@@ -62,6 +63,21 @@ const candidateOf = (thread: {
 
 const vState = v.union(v.literal("open"), v.literal("closed"), v.literal("merged"));
 
+/** Writes the scan position only when it moved, so a page that is still unfinished costs no write. */
+const saveScan = async (ctx: MutationCtx, scan: Doc<"pullRequestStateScans"> | null, userId: string, cursor: string | null): Promise<void> => {
+    if (!scan) {
+        if (cursor !== null) {
+            await ctx.db.insert("pullRequestStateScans", { cursor, userId });
+        }
+
+        return;
+    }
+
+    if (scan.cursor !== cursor) {
+        await ctx.db.patch("pullRequestStateScans", scan._id, { cursor });
+    }
+};
+
 /** Shard sweep: leases the open links whose state is stale, oldest check first, and schedules one host read for each. */
 export const dispatchLinkedPullRequestChecks = internalMutation
     .input({})
@@ -86,12 +102,16 @@ export const dispatchLinkedPullRequestChecks = internalMutation
         }
 
         const { now } = ctx;
-        const links = await ctx.db
+        const scan = await ctx.db
+            .query("pullRequestStateScans")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .unique();
+        const page = await ctx.db
             .query("pullRequestThreads")
             .withIndex("by_user_and_repository_number", (q) => q.eq("userId", userId))
-            .take(SCAN_LIMIT);
+            .paginate({ cursor: scan?.cursor ?? null, numItems: SCAN_LIMIT });
         // Never-checked first, then the longest unchecked: a link is not starved by the ones checked before it.
-        const stale = links
+        const stale = page.page
             .filter(
                 (link) =>
                     link.threadDeleted !== true &&
@@ -101,6 +121,7 @@ export const dispatchLinkedPullRequestChecks = internalMutation
             .toSorted((a, b) => (a.stateCheckedAt ?? 0) - (b.stateCheckedAt ?? 0));
         const cutoff = autoArchiveCutoff(now, days);
         const due: typeof stale = [];
+        let examined = 0;
 
         // Only a link whose chat auto-archive would consider idle is read: the state of any other chat is never used.
         const lookups = stale.slice(0, CHECK_LIMIT * THREAD_LOOKUP_FACTOR);
@@ -110,6 +131,7 @@ export const dispatchLinkedPullRequestChecks = internalMutation
                 break;
             }
 
+            examined += 1;
             const thread = await ctx.db.get("threads", link.threadId);
 
             if (thread !== null && selectAutoArchiveDue([candidateOf(thread)], cutoff, NO_EXCLUSIONS, 1).length === 1) {
@@ -119,6 +141,16 @@ export const dispatchLinkedPullRequestChecks = internalMutation
                 await ctx.db.patch("pullRequestThreads", link._id, { stateCheckedAt: now });
             }
         }
+
+        // A page is finished before the scan moves on. A page with stale links past this sweep's budget is scanned again
+        // next sweep: the links checked now are fresh by then, so the rest come up. Nothing stale is ever skipped.
+        let resumeAt = scan?.cursor ?? null;
+
+        if (examined === stale.length) {
+            resumeAt = page.isDone ? null : page.continueCursor;
+        }
+
+        await saveScan(ctx, scan, userId, resumeAt);
 
         for (const link of due) {
             // Stamped first: a sweep that runs again before the read lands skips this link. The stamp is the lease.

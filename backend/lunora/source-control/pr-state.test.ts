@@ -165,6 +165,16 @@ describe("dispatchLinkedPullRequestChecks", () => {
         expect(dispatched).toEqual([20, 5]);
         expect(stamped.every((checkedAt) => typeof checkedAt === "number")).toBe(true);
     });
+
+    it("reaches an open link past the first page of 500, since the scan resumes on the next page", async () => {
+        const closed = Array.from({ length: 500 }, (): LinkSeed => {
+            return { state: "closed" };
+        });
+        const { dispatched } = await seedAndSweep([...closed, {}], ON, 2);
+
+        // Sweep one reads the 500 closed links, finds nothing stale and moves on; sweep two reads the page holding the open link.
+        expect(dispatched).toEqual([0, 1]);
+    });
 });
 
 describe("recordLinkState", () => {
