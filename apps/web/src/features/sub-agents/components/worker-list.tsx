@@ -80,8 +80,10 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
 
     const { data: userSettings } = useUserSettings();
     const confirmations = userSettings === undefined ? CONFIRM_EVERYTHING : chatActionConfirmations(userSettings);
-    // The worker whose archive waits for confirmation, by worker id; absent when none is pending.
-    const [archiveTarget, setArchiveTarget] = useState<string | undefined>(undefined);
+    // The archive waiting for confirmation, with the lead chat it was asked from. It counts only while that chat is still shown,
+    // so a dialog opened in one chat cannot archive a worker after the person has moved to another.
+    const [archiveTarget, setArchiveTarget] = useState<{ leadThreadId: string | undefined; workerId: string } | undefined>(undefined);
+    const pendingArchive = archiveTarget !== undefined && archiveTarget.leadThreadId === threadId ? archiveTarget.workerId : undefined;
     const archiveWorker = (workerId: string) => {
         updateThread({ status: "archived", threadId: workerId as Id<"threads"> }).catch(() => showError(t`Failed to archive the worker`));
     };
@@ -144,7 +146,7 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
                                 aria-label={t`Archive ${worker.name}`}
                                 onClick={() => {
                                     if (confirmations.archive) {
-                                        setArchiveTarget(worker.workerId);
+                                        setArchiveTarget({ leadThreadId: threadId, workerId: worker.workerId });
 
                                         return;
                                     }
@@ -165,8 +167,8 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
                 confirmLabel={t`Archive`}
                 description={t`Archived chats stay searchable, and you can restore them from the archive.`}
                 onConfirm={() => {
-                    if (archiveTarget !== undefined) {
-                        archiveWorker(archiveTarget);
+                    if (pendingArchive !== undefined) {
+                        archiveWorker(pendingArchive);
                     }
 
                     setArchiveTarget(undefined);
@@ -176,7 +178,7 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
                         setArchiveTarget(undefined);
                     }
                 }}
-                open={archiveTarget !== undefined}
+                open={pendingArchive !== undefined}
                 title={t`Archive this chat?`}
             />
         </section>
