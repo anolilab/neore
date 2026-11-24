@@ -84,14 +84,14 @@
   `repins` step that meets it stops its own merge and keeps that guest, never waits to its cap. That step re-reads its
   route's owner (primary) after the signal check and follows a route re-pointed meanwhile. The import copies re-point only
   `USER_REFERENCE_FIELDS`; content equal to the guest's id stays. The root dispatch clears a shard's due time only while
-  it still holds the value it read; a merge's save (`noteShardDue`'s `rearmPassed`, no other caller) moves a passed one, so it is never cleared, and the tick
-  replaces a passed one with its own (`consumedBefore`). Everything after the lease is taken runs inside the `try` that
+  it still holds the value it read, and puts it back (never throwing) when the tick's send fails; a merge's save
+  (`noteShardDue`'s `rearmPassed` only) moves a passed one so it is not cleared; the tick replaces only the one it read (`consumed`). Everything after the lease is taken runs inside the `try` that
   gives it back. A fenced merge with import or account-move markers left drains its `markers` phase. Every step that
   writes checks the lease generation first (owner-shard pin moves: both accounts' erasure markers). The new account's
   `importing` marker is shared by every merge into it: each merge holds it through its own `guest-merge-importing` claim,
   and only the last live holder ends it; a merge's own cleanup is read from its own claims, never the marker. The merge
-  reads the guest's shard whole only on that shard itself (`onGuestShard`); never on a shard that serves other users too
-  (dev's `SHARD_ROUTING=off`).
+  reads the guest's shard whole only on its own shard (`onGuestShard`); on dev's shared `SHARD_ROUTING=off` it stops at once
+  (`sharedShard`), never fenced done. Every stop (cap, sweep drop, erasure, gone account, shared store) ends its markers, keeps the guest.
 
 - **Secret detection** — `lib/secret-redaction.ts` (`redactSecrets`, `containsSecret`)
   is the one detector for provider keys, JWTs, `Bearer` values, private key blocks,

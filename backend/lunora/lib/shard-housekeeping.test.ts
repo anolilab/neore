@@ -5,6 +5,8 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
 import { RATE_LIMIT_RETENTION_MS, RATE_LIMIT_SWEEP_PAGE, sweepDormantShardRateLimits, sweepExpiredRateLimits } from "./rate-limit-sweep";
 import { createRatelimit, getRateLimitKey } from "./rate-limiter";
+import { internalMutation } from "../_generated/server";
+import { v } from "lunorash/server";
 import { runInShard } from "./shard-context";
 import { MERGE_STALL_MS, recordGuestMerge } from "./account-merge";
 import {
@@ -544,6 +546,40 @@ describe("a stalled guest merge behind more active shards", () => {
         expect(await dispatchWith(dispatchDueShards)).toStrictEqual([]);
     });
 
+    it("leaves a due time a merge's save moves during the tick armed, so the merge it records is checked by the next tick", async () => {
+        // Unrelated work much later (retained rows): the tick's own next time, which must not stand in for the merge's check.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("shardActivity", { lastActiveAt: NOW, nextDueAt: NOW - 60_000, retentionDueAt: NOW + 10 * 60 * 60 * 1000, shardKey: "user" });
+        });
+
+        const original = registry.get("lib_account_merge:resumeStalledGuestMergesOnTick");
+
+        // The tick's merge check has run when the save lands: it saw none of what the save records.
+        registry.set(
+            "lib_account_merge:resumeStalledGuestMergesOnTick",
+            internalMutation
+                .input({})
+                .output(v.any())
+                .mutation(async ({ ctx }) => {
+                    const checked = await ctx.runMutation(original as never, {});
+
+                    await noteShardDue(ctx as never, Date.now() + MERGE_STALL_MS, "user", { rearmPassed: true });
+
+                    return checked;
+                }),
+        );
+
+        try {
+            await runInShard("user", async () => await harness.run(async (ctx: any) => await ctx.runMutation(runShardTick, {})));
+        } finally {
+            registry.set("lib_account_merge:resumeStalledGuestMergesOnTick", original);
+        }
+
+        // Not the passed time the tick read, so not replaced: still due, and the next dispatch sends the tick again.
+        expect(await dueOf("user")).toBe(NOW - 60_000 + 1);
+        expect(await dispatchWith(dispatchDueShards)).toStrictEqual([{ path: "lib_shard_housekeeping:runShardTick", shardKey: "user" }]);
+    });
+
     it("keeps a due time saved while the dispatched tick is being sent, after the dispatch's clear", async () => {
         await harness.run(async (ctx: any) => {
             await ctx.db.insert("shardActivity", { lastActiveAt: NOW, nextDueAt: NOW - 60_000, shardKey: "user" });
@@ -560,6 +596,31 @@ describe("a stalled guest merge behind more active shards", () => {
         });
 
         expect(await dueOf("user")).toBe(NOW + MERGE_STALL_MS);
+    });
+
+    it("puts a cleared due time back when its tick is not sent, and still dispatches the shards after it", async () => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("shardActivity", { lastActiveAt: NOW, nextDueAt: NOW - 120_000, shardKey: "failing" });
+            await ctx.db.insert("shardActivity", { lastActiveAt: NOW, nextDueAt: NOW - 60_000, shardKey: "user" });
+        });
+
+        const result = await harness.run(async (ctx: any) => {
+            ctx.scheduler.runAfter = async (_delay: number, _target: unknown, _args: unknown, options?: { shardKey?: string }) => {
+                if (options?.shardKey === "failing") {
+                    throw new Error("the scheduler is unreachable");
+                }
+
+                return "job";
+            };
+
+            return await ctx.runMutation(dispatchDueShards, {});
+        });
+
+        // The failed send threw nothing, so the restored due time committed: the next dispatch sends that tick again.
+        expect(result).toStrictEqual({ dispatched: 1 });
+        expect(await dueOf("failing")).toBe(NOW - 120_000);
+        expect(await dueOf("user")).toBeUndefined();
+        expect(await dispatchWith(dispatchDueShards)).toStrictEqual([{ path: "lib_shard_housekeeping:runShardTick", shardKey: "failing" }]);
     });
 
     it("stops arming the tick once the shard holds no merge record", async () => {

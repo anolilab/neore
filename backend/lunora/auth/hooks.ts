@@ -188,11 +188,19 @@ export const deleteMergedGuest = internalMutation
         }),
     )
     .mutation(async ({ args, ctx }) => {
+        const guestId = ctx.db.asId("user", args.userId);
+
+        // Before the generation: a merge on a shared store writes none (`noteMergeGeneration`), and must hear why it stops.
+        if (!onGuestShard(guestId)) {
+            authLogger.warn(`[auth] kept guest ${guestId}: its shard serves other users too, so the merge moved none of its rows`);
+
+            return { deleted: false, sharedShard: true };
+        }
+
         if (!(await mergeGenerationCurrent(ctx.db, args.userId, args.generation))) {
             return { deleted: false, fenced: true };
         }
 
-        const guestId = ctx.db.asId("user", args.userId);
         const user = (await ctx.db.user.findFirst({ where: { _id: guestId } })) as {
             _id: Id<"user">;
             isAnonymous?: boolean | null;
@@ -202,12 +210,6 @@ export const deleteMergedGuest = internalMutation
         // still empties the guest's shard, and this step still ends it, so no row and no generation is left behind.
         if (user !== null && user.isAnonymous !== true) {
             return { deleted: false };
-        }
-
-        if (!onGuestShard(guestId)) {
-            authLogger.warn(`[auth] kept guest ${guestId}: its shard serves other users too, so the merge moved none of its rows`);
-
-            return { deleted: false, sharedShard: true };
         }
 
         if (await guestHasFollowRows(ctx.db, guestId)) {

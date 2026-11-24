@@ -174,16 +174,18 @@ export const noteShardActivity = async (ctx: CensusCtx, shardKey: string | undef
  * caller's work is visible, so it is moved by a millisecond, still due, and
  * dispatch sees it changed and leaves it armed for the next one instead of
  * clearing it. Only that caller pays the write it takes;
- * any other keeps a passed time as it is. `consumedBefore`: the shard tick's
- * start; a due time at or before it is one this tick has done the work of
- * (moved or not), so `dueAt` replaces it instead of the passed time staying and
- * waking the shard again for nothing.
+ * any other keeps a passed time as it is. `consumed`: the passed due time the
+ * shard tick read before its work; the tick has done that work (moved by the
+ * dispatch or not), so `dueAt` replaces exactly that value instead of it staying
+ * and waking the shard again for nothing. One moved since (a merge's save
+ * during the tick, which the tick's merge check may have missed) is another
+ * value, so it stays armed and the next dispatch sends the tick again.
  */
 export const noteShardDue = async (
     ctx: CensusCtx,
     dueAt: number,
     shardKey: string | undefined = currentUserShard(),
-    { consumedBefore, rearmPassed = false }: { consumedBefore?: number; rearmPassed?: boolean } = {},
+    { consumed, rearmPassed = false }: { consumed?: number; rearmPassed?: boolean } = {},
 ): Promise<boolean> => {
     if (shardKey === undefined) {
         return true;
@@ -202,7 +204,7 @@ export const noteShardDue = async (
             return;
         }
 
-        if (row.nextDueAt === undefined || dueAt < row.nextDueAt || (consumedBefore !== undefined && row.nextDueAt <= consumedBefore)) {
+        if (row.nextDueAt === undefined || dueAt < row.nextDueAt || (consumed !== undefined && row.nextDueAt === consumed)) {
             await ctx.db.patch("shardActivity", row._id, { nextDueAt: dueAt });
         } else if (rearmPassed && row.nextDueAt <= now) {
             await ctx.db.patch("shardActivity", row._id, { nextDueAt: row.nextDueAt < now ? row.nextDueAt + 1 : row.nextDueAt - 1 });
@@ -427,7 +429,9 @@ export const dispatchDueShards = internalMutation
                 continue;
             }
 
-            if (fresh.nextDueAt === row.nextDueAt) {
+            const cleared = fresh.nextDueAt === row.nextDueAt;
+
+            if (cleared) {
                 // Cleared before the tick is sent, re-armed by the shard tick — so a slow tick is not dispatched twice, and work
                 // noted after this clear arms a due time of its own.
                 await patchRow(ctx.db, "shardActivity", fresh, { nextDueAt: undefined });
@@ -436,10 +440,16 @@ export const dispatchDueShards = internalMutation
             try {
                 await runAfterOnShard(ctx.scheduler, 0, internal.lib.shard_housekeeping.runShardTick, {}, row.shardKey);
             } catch (error) {
-                // Armed again, so the next dispatch sends it.
-                await noteShardDue(ctx, fresh.nextDueAt, row.shardKey);
+                // The send failed: the due time this dispatch cleared is put back, and nothing is thrown, so that write
+                // commits (a throw would roll it back with the clear) and the next dispatch sends the tick again. The
+                // shards after this one are still dispatched.
+                if (cleared) {
+                    await patchRow(ctx.db, "shardActivity", fresh, { nextDueAt: fresh.nextDueAt });
+                }
 
-                throw error;
+                cronsLogger.error(`[housekeeping] the tick of shard ${row.shardKey} was not sent; it stays due:`, error);
+
+                continue;
             }
 
             dispatched += 1;
@@ -542,11 +552,14 @@ export const runShardTick = internalMutation
             try {
                 const census = shardKey === undefined ? undefined : await censusRow(ctx, shardKey, "primary");
 
-                return { at: census?.retentionDueAt, failed: false };
+                return { at: census?.retentionDueAt, due: census?.nextDueAt, failed: false };
             } catch {
-                return { at: undefined, failed: true };
+                return { at: undefined, due: undefined, failed: true };
             }
         })();
+        // A passed due time read here, before the work below: the one this tick serves, so the re-arm replaces it. A read that failed
+        // names none, and a passed time is then left to wake the shard once more.
+        const consumedDue = retention.due !== undefined && retention.due <= ctx.now ? retention.due : undefined;
         const retentionDue = retention.failed || (retention.at !== undefined && retention.at !== NO_RETENTION_DUE && retention.at <= ctx.now);
         // Not yet due: the time is a wake of its own, so the shard is not left with none once this tick's other work is done.
         const retentionLater = !retentionDue && retention.at !== undefined && retention.at !== NO_RETENTION_DUE ? retention.at : undefined;
@@ -637,7 +650,9 @@ export const runShardTick = internalMutation
 
         if (candidates.length > 0) {
             // A passed due time left armed (a save moved it while the dispatch read it) is this tick's to replace.
-            await noteShardDue(ctx, Math.max(Math.min(...candidates), now + MIN_TICK_INTERVAL_MS), undefined, { consumedBefore: now });
+            await noteShardDue(ctx, Math.max(Math.min(...candidates), now + MIN_TICK_INTERVAL_MS), undefined, {
+                ...(consumedDue !== undefined && { consumed: consumedDue }),
+            });
         }
 
         return null;
