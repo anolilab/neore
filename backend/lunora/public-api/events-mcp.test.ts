@@ -119,6 +119,17 @@ describe("events/poll", () => {
         expect(body["result"]).toStrictEqual({ ...pollBody, resultType: "complete" });
     });
 
+    it("sends each event's timestamp as an ISO 8601 string, not epoch milliseconds", async () => {
+        const event = { data: { threadId: "t1" }, eventId: "run:s1", name: "run.completed", timestamp: Date.UTC(2026, 1, 19, 15, 30) };
+        const poll = pollingWith(async () => {
+            return { ...pollBody, events: [event] };
+        });
+
+        const { body } = await serve(modern("events/poll", { _meta: OFFER, cursor: null, name: "run.completed" }, "run.completed"), poll);
+
+        expect(body["result"]["events"]).toStrictEqual([{ ...event, timestamp: "2026-02-19T15:30:00.000Z" }]);
+    });
+
     it("passes the cursor, the bounds and the threadId filter through, with the spec's defaults", async () => {
         const poll = pollingWith(async () => pollBody);
 

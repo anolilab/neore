@@ -459,7 +459,15 @@ export const serveMcp = async (rawBody: string, dependencies: McpDependencies): 
             }
 
             try {
-                return respond({ ...(await events.poll(polled.request)) });
+                const outcome = await events.poll(polled.request);
+
+                // The store keeps epoch milliseconds; the wire carries `timestamp` as ISO 8601, as the spec's event shape does.
+                return respond({
+                    ...outcome,
+                    events: outcome.events.map((event) => {
+                        return { ...event, timestamp: new Date(event.timestamp).toISOString() };
+                    }),
+                });
             } catch (error) {
                 return eventsFailure(id, error);
             }
