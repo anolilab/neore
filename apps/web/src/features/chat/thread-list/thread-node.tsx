@@ -51,6 +51,7 @@ import { DEFAULT_PAGINATION_OPTS } from "@/features/chat/core/constants/query-op
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import type { ThreadLockMode } from "@/features/chat/lock/thread-lock-dialog";
 import { ThreadLockDialog } from "@/features/chat/lock/thread-lock-dialog";
+import type { PaneOpenResult } from "@/features/chat/split/split-layout-store";
 import { openThreadInSplitView, useSplitLayoutStore } from "@/features/chat/split/split-layout-store";
 import { useChatHasDraft } from "@/features/chat/split/use-chat-has-draft";
 import { THREAD_CATEGORY_LABELS } from "@/features/chat/tags/thread-categories";
@@ -287,7 +288,14 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     // On a page with no chat open there is no split view to add a pane to: the chat opens as the page's own, then.
     const handleOpenInSplitView = useCallback(() => {
         const open = async () => {
-            const result = await openThreadInSplitView(node.threadId);
+            let result: PaneOpenResult | undefined;
+
+            try {
+                result = await openThreadInSplitView(node.threadId);
+            } catch {
+                // The saved layout could not be read: the chat opens in the main view below.
+                result = undefined;
+            }
 
             if (result === "full") {
                 showWarning(t`Split view is full. Close a chat first.`);
@@ -296,7 +304,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
             }
 
             // Read at the click, not subscribed to: only this handler needs to know whether a chat is open.
-            if (!CHAT_THREAD_PATH_RE.test(router.state.location.pathname)) {
+            if (result === undefined || !CHAT_THREAD_PATH_RE.test(router.state.location.pathname)) {
                 await router.navigate({ params: { threadId: node.threadId }, search: {}, to: "/chat/$threadId" });
             }
         };

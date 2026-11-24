@@ -17232,6 +17232,10 @@ msgstr "Taux de réussite"
 msgid "HLS playback is not supported in this browser."
 msgstr "La lecture HLS n’est pas prise en charge par ce navigateur."
 
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:32
+msgid "Hold Ctrl, Cmd or the middle mouse button to open it in the other place. The side panel needs Split View, turned on in Account settings."
+msgstr "Maintenez Ctrl, Cmd ou le bouton central de la souris pour l’ouvrir à l’autre emplacement. Le panneau latéral nécessite la vue scindée, à activer dans les paramètres du compte."
+
 #: src/features/settings/components/personalization/memory-item.tsx:208
 msgid "Holds until"
 msgstr "Valable jusqu’au"
@@ -20471,6 +20475,10 @@ msgstr "Lien magique"
 #: src/features/auth/components/auth/forms/magic-link-form.tsx:76
 msgid "Magic link email sent"
 msgstr "E-mail avec lien magique envoyé"
+
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:21
+msgid "Main view"
+msgstr "Vue principale"
 
 #: src/features/workflow/components/nodes/style-ref-node.tsx:147
 msgid "Maintain original structure"
@@ -31348,6 +31356,10 @@ msgstr "Affichage des lignes {firstShown} à {lastShown} sur {totalRows}"
 msgid "Shown to the assistant so it knows when the skill applies."
 msgstr "Montré à l’assistant pour qu’il sache quand la compétence s’applique."
 
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:22
+msgid "Side panel"
+msgstr "Panneau latéral"
+
 #: src/features/chat/aside/aside-panel.tsx:208
 #: src/features/chat/aside/aside-panel.tsx:293
 msgid "Side question"
@@ -39560,6 +39572,10 @@ msgstr "Quand déléguer"
 #: src/features/projects/components/project-rule-files.tsx:307
 msgid "When to read it"
 msgstr "Quand le lire"
+
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:29
+msgid "Where a sub-agent or side chat opens"
+msgstr "Où s’ouvre un sous-agent ou un chat latéral"
 
 #: src/features/tasks/components/task-form-dialog.tsx:586
 msgid "Where each run goes"

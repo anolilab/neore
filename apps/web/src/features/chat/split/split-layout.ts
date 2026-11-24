@@ -15,6 +15,7 @@ export type SplitLayout = {
 
 export type SplitAction =
     | { threadId: string; type: "open" }
+    | { after?: string; threadId: string; type: "openBeside" }
     | { threadId: string; type: "show" }
     | { index: number; type: "focus" }
     | { index: number; type: "close" }
@@ -69,6 +70,35 @@ const open = (layout: SplitLayout, threadId: string): SplitLayout => {
     }
 
     return { ...layout, focus: layout.panes.length, panes: [...layout.panes, threadId], sizes: sizesWithRoom(layout, threadId) };
+};
+
+/**
+ * Adds the chat as a pane right after `after`'s pane (or the focused one, when `after` is not open) and focuses it; a chat already open is
+ * only focused. Refuses past `MAX_PANES`, so a chat opened from a pane sits beside that pane, not at the end of the row.
+ */
+const openBeside = (layout: SplitLayout, threadId: string, after?: string): SplitLayout => {
+    const existing = layout.panes.indexOf(threadId);
+
+    if (existing !== -1) {
+        return existing === layout.focus ? layout : { ...layout, focus: existing };
+    }
+
+    if (layout.panes.length >= MAX_PANES) {
+        return layout;
+    }
+
+    const origin = after === undefined ? -1 : layout.panes.indexOf(after);
+    let at = layout.panes.length === 0 ? 0 : layout.focus + 1;
+
+    if (origin !== -1) {
+        at = origin + 1;
+    }
+
+    return {
+        focus: at,
+        panes: [...layout.panes.slice(0, at), threadId, ...layout.panes.slice(at)],
+        sizes: sizesWithRoom(layout, threadId),
+    };
 };
 
 /** The chat the page is on: focused when open, else it takes the place of the focused pane (or the first pane). */
@@ -160,6 +190,9 @@ export const splitLayoutReducer = (layout: SplitLayout, action: SplitAction): Sp
         }
         case "open": {
             return open(layout, action.threadId);
+        }
+        case "openBeside": {
+            return openBeside(layout, action.threadId, action.after);
         }
         case "prune": {
             return prune(layout, action.isValid);

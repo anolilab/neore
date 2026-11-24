@@ -10,7 +10,7 @@ import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { clearComposerDrafts, peekComposerDraft, peekParkedModelState, saveComposerDraft, saveParkedModelState, setSplitViewMounted } from "./composer-drafts";
 import { leaveSplitView, parkSettingsFor, restoreComposerFor, restoreLiveComposerFor, restoreTextFor, syncFocusedModel, watchPaneFocus } from "./pane-state";
 import { initialSplitLayout, splitLayoutReducer } from "./split-layout";
-import { survivingPaneAfterDelete, useSplitLayoutStore } from "./split-layout-store";
+import { hydrateSplitLayout, survivingPaneAfterDelete, useSplitLayoutStore } from "./split-layout-store";
 
 const fetchMock = vi.hoisted(() => vi.fn());
 
@@ -58,7 +58,9 @@ const upload = (id: string, status: PendingAttachment["status"] = "uploading"): 
 
 const watcher: { stop?: () => void } = {};
 
-beforeEach(() => {
+beforeEach(async () => {
+    // The split view reads the saved layout before anything changes it, as in the app: a change before that read is not saved.
+    await hydrateSplitLayout();
     clearComposerDrafts();
     useChatUIStore.getState().reset();
     useModelStore.setState({

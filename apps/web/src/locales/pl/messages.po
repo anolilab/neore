@@ -17232,6 +17232,10 @@ msgstr "Współczynnik trafień"
 msgid "HLS playback is not supported in this browser."
 msgstr "Odtwarzanie HLS nie jest obsługiwane w tej przeglądarce."
 
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:32
+msgid "Hold Ctrl, Cmd or the middle mouse button to open it in the other place. The side panel needs Split View, turned on in Account settings."
+msgstr "Przytrzymaj Ctrl, Cmd lub środkowy przycisk myszy, aby otworzyć w drugim miejscu. Panel boczny wymaga widoku podzielonego, który włączysz w ustawieniach konta."
+
 #: src/features/settings/components/personalization/memory-item.tsx:208
 msgid "Holds until"
 msgstr "Obowiązuje do"
@@ -20471,6 +20475,10 @@ msgstr "Magiczny link"
 #: src/features/auth/components/auth/forms/magic-link-form.tsx:76
 msgid "Magic link email sent"
 msgstr "Wysłano e-mail z magicznym linkiem"
+
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:21
+msgid "Main view"
+msgstr "Widok główny"
 
 #: src/features/workflow/components/nodes/style-ref-node.tsx:147
 msgid "Maintain original structure"
@@ -31348,6 +31356,10 @@ msgstr "Wyświetlanie wierszy {firstShown}–{lastShown} z {totalRows}"
 msgid "Shown to the assistant so it knows when the skill applies."
 msgstr "Pokazywany asystentowi, aby wiedział, kiedy umiejętność ma zastosowanie."
 
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:22
+msgid "Side panel"
+msgstr "Panel boczny"
+
 #: src/features/chat/aside/aside-panel.tsx:208
 #: src/features/chat/aside/aside-panel.tsx:293
 msgid "Side question"
@@ -39560,6 +39572,10 @@ msgstr "Kiedy delegować"
 #: src/features/projects/components/project-rule-files.tsx:307
 msgid "When to read it"
 msgstr "Kiedy go czytać"
+
+#: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:29
+msgid "Where a sub-agent or side chat opens"
+msgstr "Gdzie otwiera się podagent lub czat boczny"
 
 #: src/features/tasks/components/task-form-dialog.tsx:586
 msgid "Where each run goes"
