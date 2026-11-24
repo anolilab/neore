@@ -897,7 +897,7 @@ msgstr "{activeCount, plural, other {# 件のメッセンジャーが接続さ�
 msgid "{activeCount} of {0} MCP servers active"
 msgstr "{0} 個中 {activeCount} 個の MCP サーバーが有効"
 
-#: src/features/develop/components/thread-pull-requests.tsx:177
+#: src/features/develop/components/thread-pull-requests.tsx:167
 msgid "{address}: {reason}"
 msgstr "{address}: {reason}"
 
@@ -1566,6 +1566,10 @@ msgstr "{server} · {until} まで"
 msgid "{shortened, plural, one {# name was} other {# names were}} shortened to {titleLimit} characters."
 msgstr "{shortened, plural, other {# 件の名前}}を {titleLimit} 文字に短縮しました。"
 
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:134
+msgid "{shown}. {queuedNote}"
+msgstr "{shown}。{queuedNote}"
+
 #: src/features/workflow/hooks/use-workflow-transfer.ts:77
 msgid "{skipped, plural, one {# file could not be imported and was} other {# files could not be imported and were}} left out"
 msgstr "{skipped, plural, other {#個のファイルをインポートできず、除外されました}}"
@@ -1582,6 +1586,10 @@ msgstr "{skippedCount, plural, other {# 件のファイルは追加されませ�
 msgid "{slideCount, plural, one {# slide} other {# slides}}"
 msgstr "{slideCount, plural, other {# 枚のスライド}}"
 
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:133
+msgid "{spoken}. {queuedNote}"
+msgstr "{spoken}。{queuedNote}"
+
 #: src/features/skills/components/star-rating-input.tsx:56
 msgid "{star, plural, one {# star} other {# stars}}"
 msgstr "{star, plural, other {星 # つ}}"
@@ -1590,7 +1598,7 @@ msgstr "{star, plural, other {星 # つ}}"
 msgid "{stateLabel} Stop hands-free voice mode"
 msgstr "{stateLabel} ハンズフリー音声モードを停止"
 
-#: src/features/develop/components/thread-pull-requests.tsx:273
+#: src/features/develop/components/thread-pull-requests.tsx:257
 msgid "{success, plural, one {# pull request linked.} other {# pull requests linked.}}"
 msgstr "{success, plural, other {# 件のプルリクエストをリンクしました。}}"
 
@@ -2052,11 +2060,11 @@ msgstr "目標はタスクをまとめるものです。進捗は完了したタ
 msgid "A group chat. A question from the owner is answered by three agents in turn: a security reviewer, a performance reviewer, and a lead who sums up."
 msgstr "グループチャットです。所有者の質問には、セキュリティレビュアー、パフォーマンスレビュアー、そして要点をまとめるリードの 3 つのエージェントが順番に答えます。"
 
-#: src/features/chat/core/context/chat-context.tsx:732
+#: src/features/chat/core/context/chat-context.tsx:751
 msgid "A guest's message cannot be sent as a goal."
 msgstr "ゲストのメッセージは目標として送信できません。"
 
-#: src/features/chat/core/context/chat-context.tsx:735
+#: src/features/chat/core/context/chat-context.tsx:754
 msgid "A guest's message is sent through a hosted model only. Pick one and send it again."
 msgstr "ゲストのメッセージはホスト型モデルでのみ送信されます。モデルを選んでもう一度送信してください。"
 
@@ -2092,6 +2100,10 @@ msgstr "1 つのログインに指定できるボットは最大 {MAX_TEAMMATES}
 #: src/features/marketing/use-cases/visuals/messaging-visual.tsx:14
 msgid "A message arrives from a chat app, a dot travels down to the agent, and the reply appears in the same chat."
 msgstr "チャットアプリからメッセージが届くと、点がエージェントまで移動し、返信が同じチャットに表示されます。"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:89
+msgid "A message you send here is queued, and it is sent after you resume the reply."
+msgstr "ここで送ったメッセージはキューに入り、返信を再開した後に送信されます。"
 
 #: src/features/chat/host/host-options.tsx:227
 msgid "a mode is changed on the computer, not from here"
@@ -2738,7 +2750,7 @@ msgstr "プロンプトを追加"
 msgid "Add Provider"
 msgstr "プロバイダーを追加"
 
-#: src/features/develop/components/thread-pull-requests.tsx:251
+#: src/features/develop/components/thread-pull-requests.tsx:235
 msgid "Add pull requests that already exist to this thread. Each one is read from the host with your own connection first."
 msgstr "既存のプルリクエストをこのスレッドに追加します。それぞれ、まずご自身の接続でホストから読み取られます。"
 
@@ -3726,7 +3738,7 @@ msgstr "アルファベット順"
 msgid "Already have an account?"
 msgstr "アカウントをお持ちですか？"
 
-#: src/features/develop/components/thread-pull-requests.tsx:111
+#: src/features/develop/components/thread-pull-requests.tsx:101
 msgid "Already linked to this thread."
 msgstr "すでにこのスレッドにリンクされています。"
 
@@ -3773,7 +3785,7 @@ msgstr "アンバー"
 msgid "Amount"
 msgstr "金額"
 
-#: src/features/settings/components/account/account-settings.tsx:110
+#: src/features/settings/components/account/account-settings.tsx:114
 msgid "Amsterdam"
 msgstr "アムステルダム"
 
@@ -4147,7 +4159,7 @@ msgstr "Meta アプリの「App settings > Basic」にある App Secret（X-Hub-
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:316
 #: src/features/projects/components/project-form-dialog.tsx:292
-#: src/features/settings/components/account/account-settings.tsx:181
+#: src/features/settings/components/account/account-settings.tsx:185
 #: src/features/settings/lib/settings-keywords.ts:27
 msgid "Appearance"
 msgstr "外観"
@@ -4708,7 +4720,7 @@ msgstr "試行"
 msgid "Attempts: {0}"
 msgstr "試行回数：{0}"
 
-#: src/features/settings/components/account/account-settings.tsx:121
+#: src/features/settings/components/account/account-settings.tsx:125
 msgid "Auckland"
 msgstr "オークランド"
 
@@ -4843,7 +4855,7 @@ msgstr "自動マージはオンです。{hostLabel} のルールが満たされ
 msgid "Auto-merge is on."
 msgstr "自動マージはオンです。"
 
-#: src/features/settings/components/account/account-settings.tsx:430
+#: src/features/settings/components/account/account-settings.tsx:434
 msgid "Auto-read replies"
 msgstr "返信を自動で読み上げ"
 
@@ -4855,15 +4867,15 @@ msgstr "自動保存"
 msgid "Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so \"Ask\" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only."
 msgstr "自動：確認なしで実行します。確認：承認/拒否を待って一時停止します。オフ：アシスタントはこのツールを認識しません。自動化（トリガー、メッセンジャーボット、ワークフロー）では確認ができないため、「確認」のツールは使用できません。MCP ツールは、サーバーが読み取り専用と指定しない限り、既定で「確認」になります。"
 
-#: src/features/settings/components/account/account-settings.tsx:493
+#: src/features/settings/components/account/account-settings.tsx:497
 msgid "Autocomplete disabled"
 msgstr "オートコンプリートを無効にしました"
 
-#: src/features/settings/components/account/account-settings.tsx:493
+#: src/features/settings/components/account/account-settings.tsx:497
 msgid "Autocomplete enabled"
 msgstr "オートコンプリートを有効にしました"
 
-#: src/features/settings/components/account/account-settings.tsx:482
+#: src/features/settings/components/account/account-settings.tsx:486
 msgid "Autocomplete while typing"
 msgstr "入力中のオートコンプリート"
 
@@ -5213,12 +5225,12 @@ msgstr "返信のたびに、メッセージに最も関連するメモリが、
 msgid "beginner"
 msgstr "初級"
 
-#: src/features/settings/components/account/account-settings.tsx:208
+#: src/features/settings/components/account/account-settings.tsx:212
 #: src/features/settings/lib/settings-keywords.ts:28
 msgid "Behavior"
 msgstr "動作"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:137
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:142
 msgid "Behind {base}"
 msgstr "{base} より遅れています"
 
@@ -5250,7 +5262,7 @@ msgstr "ベンガル語"
 msgid "Bengali (Bangladesh)"
 msgstr "ベンガル語（バングラデシュ）"
 
-#: src/features/settings/components/account/account-settings.tsx:107
+#: src/features/settings/components/account/account-settings.tsx:111
 msgid "Berlin"
 msgstr "ベルリン"
 
@@ -6286,11 +6298,11 @@ msgstr "カタルーニャ語（スペイン）"
 msgid "catalog"
 msgstr "カタログ"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:160
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:165
 msgid "Catch up"
 msgstr "追いつく"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:127
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:132
 msgid "Catch up {pullRequest} with {base}"
 msgstr "{pullRequest} を {base} に追いつかせる"
 
@@ -6313,7 +6325,7 @@ msgstr "{circuitBreakerUntil} まで CB"
 msgid "Center"
 msgstr "中央"
 
-#: src/features/settings/components/account/account-settings.tsx:100
+#: src/features/settings/components/account/account-settings.tsx:104
 msgid "Central Time (US & Canada)"
 msgstr "中部標準時（米国およびカナダ）"
 
@@ -6467,7 +6479,7 @@ msgstr "チャット"
 #: src/features/layout/components/sidebar-shortcut.tsx:79
 #: src/features/layout/components/workspace-switch.tsx:47
 #: src/features/layout/lib/dashboard-page-names.ts:20
-#: src/features/settings/components/account/account-settings.tsx:342
+#: src/features/settings/components/account/account-settings.tsx:346
 #: src/features/settings/components/chat/bots-settings.tsx:515
 #: src/features/settings/lib/settings-keywords.ts:33
 #: src/features/settings/lib/settings-navigation.ts:100
@@ -6568,6 +6580,14 @@ msgstr "チャット"
 msgid "Chats in this project search these collections and cite them."
 msgstr "このプロジェクトのチャットはこれらのコレクションを検索し、引用します。"
 
+#: src/features/settings/components/account/account-settings.tsx:601
+msgid "Chats paused by a usage limit will be snoozed"
+msgstr "利用上限で一時停止した返信のあるチャットをスヌーズします"
+
+#: src/features/settings/components/account/account-settings.tsx:601
+msgid "Chats paused by a usage limit will not be snoozed"
+msgstr "利用上限で一時停止した返信のあるチャットはスヌーズしません"
+
 #: src/features/projects/components/project-rule-files.tsx:323
 msgid "Chats see the name and this line, and read the file when it applies."
 msgstr "チャットには名前とこの行が表示され、該当するときにファイルを読みます。"
@@ -6578,11 +6598,11 @@ msgid "Chats that use its models will stop working until you pick another model.
 msgstr "このプロバイダーのモデルを使うチャットは、別のモデルを選ぶまで動作しなくなります。"
 
 #. placeholder {0}: percentFormat.format(percent / 100)
-#: src/features/settings/components/account/account-settings.tsx:403
+#: src/features/settings/components/account/account-settings.tsx:407
 msgid "Chats will be compacted at {0} of the context window"
 msgstr "チャットはコンテキストウィンドウの{0}で圧縮されます"
 
-#: src/features/settings/components/account/account-settings.tsx:402
+#: src/features/settings/components/account/account-settings.tsx:406
 msgid "Chats will not be compacted automatically"
 msgstr "チャットは自動では圧縮されません"
 
@@ -6767,7 +6787,7 @@ msgstr "既定の動画モデルを選択"
 msgid "Choose how Neore tells you about finished work and things that need you."
 msgstr "完了した作業や対応が必要なことを Neore がどう知らせるかを選びます。"
 
-#: src/features/settings/components/account/account-settings.tsx:214
+#: src/features/settings/components/account/account-settings.tsx:218
 msgid "Choose how to send messages in the chat. Cmd/Ctrl+Enter always sends."
 msgstr "チャットでのメッセージの送信方法を選択します。Cmd/Ctrl+Enter では常に送信されます。"
 
@@ -7044,7 +7064,7 @@ msgstr "「{selector}」をクリック"
 msgid "Click ★ on any model in All models to add it here."
 msgstr "「すべてのモデル」で任意のモデルの ★ をクリックすると、ここに追加されます。"
 
-#: src/features/settings/components/account/account-settings.tsx:229
+#: src/features/settings/components/account/account-settings.tsx:233
 msgid "Click button to send"
 msgstr "ボタンをクリックして送信"
 
@@ -7128,7 +7148,7 @@ msgstr "クローンまたは新規作成…"
 #: src/features/canvas/canvas-panel.tsx:835
 #: src/features/canvas/pdf-preview-panel.tsx:105
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
-#: src/features/develop/components/thread-pull-requests.tsx:296
+#: src/features/develop/components/thread-pull-requests.tsx:280
 #: src/features/evals/components/save-eval-case-action.tsx:95
 #: src/features/prompts/components/prompt-history-dialog.tsx:195
 #: src/features/settings/components/chat/custom-providers-settings.tsx:441
@@ -7660,7 +7680,7 @@ msgstr "コンテキストを圧縮"
 msgid "Compact distilled reasoning model from DeepSeek"
 msgstr "DeepSeek のコンパクトな蒸留推論モデル"
 
-#: src/features/settings/components/account/account-settings.tsx:388
+#: src/features/settings/components/account/account-settings.tsx:392
 msgid "Compact full chats automatically"
 msgstr "上限に達したチャットを自動で圧縮"
 
@@ -7905,7 +7925,7 @@ msgstr "条件分岐"
 msgid "Configure advanced AI agent modules for enhanced task execution"
 msgstr "タスク実行を強化する高度な AI エージェントモジュールを設定"
 
-#: src/features/settings/components/account/account-settings.tsx:342
+#: src/features/settings/components/account/account-settings.tsx:346
 msgid "Configure chat behavior and preferences."
 msgstr "チャットの動作と設定を構成します。"
 
@@ -7913,11 +7933,11 @@ msgstr "チャットの動作と設定を構成します。"
 msgid "Configure default model, reasoning effort, and features for new chats created in this project."
 msgstr "このプロジェクトで作成する新しいチャットの既定のモデル、推論レベル、機能を設定します。"
 
-#: src/features/settings/components/account/account-settings.tsx:208
+#: src/features/settings/components/account/account-settings.tsx:212
 msgid "Configure how the application behaves."
 msgstr "アプリケーションの動作を設定します。"
 
-#: src/features/settings/components/account/account-settings.tsx:236
+#: src/features/settings/components/account/account-settings.tsx:240
 msgid "Configure language preferences and location settings."
 msgstr "言語設定と地域設定を構成します。"
 
@@ -7942,7 +7962,7 @@ msgstr "請求先の連絡先と利用可能な AI モデルを設定します"
 msgid "Configure thresholds and batch limits for anonymous user cleanup"
 msgstr "匿名ユーザーのクリーンアップのしきい値とバッチ上限を設定します"
 
-#: src/features/settings/components/account/account-settings.tsx:634
+#: src/features/settings/components/account/account-settings.tsx:686
 msgid "Configure UI preferences and display options."
 msgstr "UI の設定と表示オプションを構成します。"
 
@@ -8151,7 +8171,7 @@ msgstr "WhatsApp を接続"
 msgid "Connect your {label} account to see what needs your review, what is yours, and what is ready to merge."
 msgstr "{label} アカウントに接続すると、レビューが必要なもの、自分のもの、マージ可能なものを確認できます。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:116
+#: src/features/develop/components/thread-pull-requests.tsx:106
 msgid "Connect your Git host in settings to link a pull request."
 msgstr "プルリクエストをリンクするには、設定で Git ホストに接続してください。"
 
@@ -8441,7 +8461,7 @@ msgstr "続行"
 msgid "Continue in this chat"
 msgstr "このチャットで続ける"
 
-#: src/features/settings/components/account/account-settings.tsx:537
+#: src/features/settings/components/account/account-settings.tsx:541
 msgid "Continue interrupted replies"
 msgstr "中断された返信を続ける"
 
@@ -8494,7 +8514,7 @@ msgstr "AI プロバイダーのデータ取り扱いと保持ポリシーを管
 msgid "Control depth of field with aperture setting"
 msgstr "絞り設定で被写界深度を調整します"
 
-#: src/features/settings/components/account/account-settings.tsx:160
+#: src/features/settings/components/account/account-settings.tsx:164
 msgid "Control how your personal information is displayed in the UI."
 msgstr "UI での個人情報の表示方法を管理します。"
 
@@ -9064,7 +9084,7 @@ msgstr "ワークフローをインポートできませんでした"
 msgid "Could not keep this as yours. Try again."
 msgstr "自分のものとして保持できませんでした。もう一度お試しください。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:193
+#: src/features/develop/components/thread-pull-requests.tsx:183
 msgid "Could not link. Try again."
 msgstr "リンクできませんでした。もう一度お試しください。"
 
@@ -9085,7 +9105,7 @@ msgstr "これ以上プロジェクトを読み込めませんでした。"
 msgid "Could not load statistics for this thread."
 msgstr "このスレッドの統計を読み込めませんでした。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:211
+#: src/features/develop/components/thread-pull-requests.tsx:201
 msgid "Could not load the linked pull requests."
 msgstr "リンクされたプルリクエストを読み込めませんでした。"
 
@@ -9202,7 +9222,7 @@ msgstr "プレビューできません · クリックしてダウンロード"
 msgid "Could not pull {0}: {1}"
 msgstr "{0} を取得できませんでした：{1}"
 
-#: src/features/chat/core/context/chat-context.tsx:679
+#: src/features/chat/core/context/chat-context.tsx:698
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr "生成を開始するためにサーバーに接続できませんでした。接続を確認して、もう一度お試しください。"
 
@@ -9263,7 +9283,7 @@ msgstr "このバージョンを復元できませんでした"
 msgid "Could not resume its own session, so the conversation was handed over"
 msgstr "自身のセッションを再開できなかったため、会話を引き継ぎました"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:145
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:191
 msgid "Could not retry. Please try again."
 msgstr "再試行できませんでした。もう一度お試しください。"
 
@@ -9378,7 +9398,7 @@ msgid "Could not stop the conversation"
 msgstr "会話を停止できませんでした"
 
 #: src/features/chat/thread-list/thread-node.tsx:655
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:150
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:196
 msgid "Could not stop the reply. Please try again."
 msgstr "返信を停止できませんでした。もう一度お試しください。"
 
@@ -10016,7 +10036,7 @@ msgstr "カスタマイズして再生成"
 msgid "Customize keyboard shortcuts for common actions. Click \"Record\" and press your desired key combination."
 msgstr "よく使う操作のキーボードショートカットをカスタマイズします。「記録」をクリックして、使いたいキーの組み合わせを押してください。"
 
-#: src/features/settings/components/account/account-settings.tsx:181
+#: src/features/settings/components/account/account-settings.tsx:185
 msgid "Customize the appearance of the application."
 msgstr "アプリケーションの外観をカスタマイズします。"
 
@@ -10349,7 +10369,7 @@ msgstr "既定"
 msgid "Default agent"
 msgstr "既定のエージェント"
 
-#: src/features/settings/components/account/account-settings.tsx:240
+#: src/features/settings/components/account/account-settings.tsx:244
 #: src/features/settings/lib/settings-keywords.ts:29
 msgid "Default AI Response Language"
 msgstr "AI の既定の応答言語"
@@ -10371,12 +10391,12 @@ msgstr "{name} のデフォルトブランチ"
 msgid "Default branch:"
 msgstr "デフォルトブランチ:"
 
-#: src/features/settings/components/account/account-settings.tsx:265
+#: src/features/settings/components/account/account-settings.tsx:269
 #: src/features/settings/lib/settings-keywords.ts:30
 msgid "Default Dictation Language"
 msgstr "既定の音声入力言語"
 
-#: src/features/settings/components/account/account-settings.tsx:267
+#: src/features/settings/components/account/account-settings.tsx:271
 msgid "Default dictation language for new threads (BCP 47 code)."
 msgstr "新しいスレッドの既定の音声入力言語（BCP 47 コード）。"
 
@@ -10384,11 +10404,11 @@ msgstr "新しいスレッドの既定の音声入力言語（BCP 47 コード�
 msgid "Default for new chats"
 msgstr "新しいチャットの既定"
 
-#: src/features/settings/components/account/account-settings.tsx:242
+#: src/features/settings/components/account/account-settings.tsx:246
 msgid "Default language for AI responses in new threads (BCP 47 code)."
 msgstr "新しいスレッドでの AI の既定の応答言語（BCP 47 コード）。"
 
-#: src/features/settings/components/account/account-settings.tsx:245
+#: src/features/settings/components/account/account-settings.tsx:249
 msgid "Default language updated"
 msgstr "既定の言語を更新しました"
 
@@ -11219,7 +11239,7 @@ msgstr "図のテーマを更新しました"
 msgid "Diamond"
 msgstr "ひし形"
 
-#: src/features/settings/components/account/account-settings.tsx:270
+#: src/features/settings/components/account/account-settings.tsx:274
 msgid "Dictation language updated"
 msgstr "音声入力の言語を更新しました"
 
@@ -11404,7 +11424,7 @@ msgstr "結果にモデル名を表示"
 msgid "Display results"
 msgstr "結果を表示"
 
-#: src/features/settings/components/account/account-settings.tsx:641
+#: src/features/settings/components/account/account-settings.tsx:693
 msgid "Display timestamps on messages."
 msgstr "メッセージにタイムスタンプを表示します。"
 
@@ -11801,7 +11821,7 @@ msgstr "ドライラン（プレビューのみ — 削除は行いません）"
 msgid "Dry run complete"
 msgstr "ドライランが完了しました"
 
-#: src/features/settings/components/account/account-settings.tsx:117
+#: src/features/settings/components/account/account-settings.tsx:121
 msgid "Dubai"
 msgstr "ドバイ"
 
@@ -12001,7 +12021,7 @@ msgstr "Alibaba の今後のモデル機能をいち早く利用"
 msgid "Early adopters who want to experiment with Google's next-generation Flash capabilities"
 msgstr "Google の次世代 Flash の機能を試したいアーリーアダプター"
 
-#: src/features/settings/components/account/account-settings.tsx:99
+#: src/features/settings/components/account/account-settings.tsx:103
 msgid "Eastern Time (US & Canada)"
 msgstr "東部標準時（米国およびカナダ）"
 
@@ -12529,7 +12549,7 @@ msgstr "ディープワークモードを有効にする"
 msgid "Enable Deep Work mode for complex multi-step tasks. The AI will iterate up to 25 times to complete your request."
 msgstr "複雑な多段階タスク向けにディープワークモードを有効にしましょう。AI はリクエストを完了するまで最大 25 回反復します。"
 
-#: src/features/settings/components/account/account-settings.tsx:347
+#: src/features/settings/components/account/account-settings.tsx:351
 #: src/features/settings/lib/settings-keywords.ts:33
 msgid "Enable Follow-up Suggestions"
 msgstr "フォローアップの提案を有効化"
@@ -12804,7 +12824,7 @@ msgstr "組織名を入力"
 msgid "Enter organization slug"
 msgstr "組織のスラッグを入力"
 
-#: src/features/develop/components/thread-pull-requests.tsx:135
+#: src/features/develop/components/thread-pull-requests.tsx:125
 msgid "Enter pull requests as owner/name#123."
 msgstr "プルリクエストは owner/name#123 の形式で入力してください。"
 
@@ -12919,7 +12939,7 @@ msgstr "氏名または表示名を入力"
 msgid "Enter your information to create an account"
 msgstr "アカウントを作成するには情報を入力してください"
 
-#: src/features/settings/components/account/account-settings.tsx:312
+#: src/features/settings/components/account/account-settings.tsx:316
 msgid "Enter your location"
 msgstr "所在地を入力"
 
@@ -14307,8 +14327,8 @@ msgstr "プロバイダーを保存できませんでした"
 msgid "Failed to save rating"
 msgstr "評価を保存できませんでした"
 
-#: src/features/settings/components/account/account-settings.tsx:142
-#: src/features/settings/components/account/account-settings.tsx:150
+#: src/features/settings/components/account/account-settings.tsx:146
+#: src/features/settings/components/account/account-settings.tsx:154
 #: src/features/settings/components/chat/chat-action-confirm-settings.tsx:61
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:40
 #: src/features/settings/components/personalization/personalization-settings.tsx:118
@@ -15436,11 +15456,11 @@ msgstr "スレッドをフォロー"
 msgid "follow up"
 msgstr "フォローアップ"
 
-#: src/features/settings/components/account/account-settings.tsx:358
+#: src/features/settings/components/account/account-settings.tsx:362
 msgid "Follow-up suggestions disabled"
 msgstr "フォローアップの提案を無効にしました"
 
-#: src/features/settings/components/account/account-settings.tsx:358
+#: src/features/settings/components/account/account-settings.tsx:362
 msgid "Follow-up suggestions enabled"
 msgstr "フォローアップの提案を有効にしました"
 
@@ -16953,7 +16973,7 @@ msgstr "ハンズフリーモードをオフにしました"
 msgid "Hands-free mode stopped: {0}"
 msgstr "ハンズフリーモードを停止しました：{0}"
 
-#: src/features/settings/components/account/account-settings.tsx:449
+#: src/features/settings/components/account/account-settings.tsx:453
 msgid "Hands-free voice"
 msgstr "ハンズフリーの音声"
 
@@ -16961,7 +16981,7 @@ msgstr "ハンズフリーの音声"
 msgid "Hands-free voice mode — talk, and replies are read aloud"
 msgstr "ハンズフリー音声モード — 話しかけると返信が読み上げられます"
 
-#: src/features/settings/components/account/account-settings.tsx:460
+#: src/features/settings/components/account/account-settings.tsx:464
 msgid "Hands-free voice updated"
 msgstr "ハンズフリーの音声を更新しました"
 
@@ -17092,7 +17112,7 @@ msgstr "出力を非表示"
 msgid "Hide password"
 msgstr "パスワードを非表示"
 
-#: src/features/settings/components/account/account-settings.tsx:165
+#: src/features/settings/components/account/account-settings.tsx:169
 #: src/features/settings/lib/settings-keywords.ts:26
 msgid "Hide Personal Information"
 msgstr "個人情報を非表示"
@@ -17114,7 +17134,7 @@ msgstr "このサイドクエスチョンを非表示にします。すでに回
 msgid "Hide translation"
 msgstr "翻訳を非表示"
 
-#: src/features/settings/components/account/account-settings.tsx:167
+#: src/features/settings/components/account/account-settings.tsx:171
 msgid "Hides your name and email from the UI."
 msgstr "UI から名前とメールアドレスを非表示にします。"
 
@@ -17347,7 +17367,7 @@ msgid "Honduras"
 msgstr "ホンジュラス"
 
 #: src/features/chat/core/utils/language-utilities.ts:358
-#: src/features/settings/components/account/account-settings.tsx:115
+#: src/features/settings/components/account/account-settings.tsx:119
 msgid "Hong Kong"
 msgstr "香港"
 
@@ -17419,7 +17439,7 @@ msgstr "Neore は ChatGPT と何が違いますか？"
 msgid "How it works"
 msgstr "仕組み"
 
-#: src/features/settings/components/account/account-settings.tsx:583
+#: src/features/settings/components/account/account-settings.tsx:635
 msgid "How long temporary chats are kept before being automatically deleted. Default: 24 hours."
 msgstr "一時チャットが自動削除されるまでの保持期間です。既定：24 時間。"
 
@@ -18433,11 +18453,11 @@ msgstr "中断して再開 — 現在の返信を停止して、これを送信�
 msgid "Interrupt and send"
 msgstr "中断して送信"
 
-#: src/features/settings/components/account/account-settings.tsx:551
+#: src/features/settings/components/account/account-settings.tsx:555
 msgid "Interrupted replies will continue"
 msgstr "中断された返信は続行されます"
 
-#: src/features/settings/components/account/account-settings.tsx:551
+#: src/features/settings/components/account/account-settings.tsx:555
 msgid "Interrupted replies will stop"
 msgstr "中断された返信は停止されます"
 
@@ -19128,7 +19148,7 @@ msgstr "言語"
 msgid "Language"
 msgstr "言語"
 
-#: src/features/settings/components/account/account-settings.tsx:236
+#: src/features/settings/components/account/account-settings.tsx:240
 #: src/features/settings/lib/settings-keywords.ts:29
 #: src/features/settings/lib/settings-keywords.ts:30
 #: src/features/settings/lib/settings-keywords.ts:31
@@ -19527,7 +19547,7 @@ msgstr "左"
 msgid "Left organization successfully"
 msgstr "組織から退出しました"
 
-#: src/features/settings/components/account/account-settings.tsx:200
+#: src/features/settings/components/account/account-settings.tsx:204
 msgid "Left to Right (LTR)"
 msgstr "左から右（LTR）"
 
@@ -19713,7 +19733,7 @@ msgstr "有効な JSON ではない行"
 
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:340
 #: src/features/auth/components/settings/providers/provider-cell.tsx:113
-#: src/features/develop/components/thread-pull-requests.tsx:298
+#: src/features/develop/components/thread-pull-requests.tsx:282
 msgid "Link"
 msgstr "リンク"
 
@@ -19721,7 +19741,7 @@ msgstr "リンク"
 msgid "Link active until {expiresAt}"
 msgstr "{expiresAt} までリンクが有効です"
 
-#: src/features/develop/components/thread-pull-requests.tsx:147
+#: src/features/develop/components/thread-pull-requests.tsx:137
 msgid "Link at most {MAX_PULL_REQUESTS_PER_ATTACH} pull requests at a time."
 msgstr "一度にリンクできるプルリクエストは最大 {MAX_PULL_REQUESTS_PER_ATTACH} 件です。"
 
@@ -19739,11 +19759,11 @@ msgstr "リンクプレビュー"
 msgid "Link previews"
 msgstr "リンクプレビュー"
 
-#: src/features/develop/components/thread-pull-requests.tsx:231
+#: src/features/develop/components/thread-pull-requests.tsx:215
 msgid "Link pull request"
 msgstr "プルリクエストをリンク"
 
-#: src/features/develop/components/thread-pull-requests.tsx:250
+#: src/features/develop/components/thread-pull-requests.tsx:234
 msgid "Link pull requests"
 msgstr "プルリクエストをリンク"
 
@@ -19755,7 +19775,7 @@ msgstr "手動でリンク"
 msgid "Linked pull requests: {linkedPullRequests}"
 msgstr "リンクされたプルリクエスト: {linkedPullRequests}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:112
+#: src/features/develop/components/thread-pull-requests.tsx:102
 msgid "Linked to this thread."
 msgstr "このスレッドにリンクされています。"
 
@@ -19763,8 +19783,8 @@ msgstr "このスレッドにリンクされています。"
 msgid "LinkedIn Post"
 msgstr "LinkedIn 投稿"
 
-#: src/features/develop/components/thread-pull-requests.tsx:279
-#: src/features/develop/components/thread-pull-requests.tsx:298
+#: src/features/develop/components/thread-pull-requests.tsx:263
+#: src/features/develop/components/thread-pull-requests.tsx:282
 msgid "Linking…"
 msgstr "リンク中…"
 
@@ -20119,7 +20139,7 @@ msgstr "ゲストリンクを読み込んでいます…"
 msgid "Loading the guide"
 msgstr "ガイドを読み込み中"
 
-#: src/features/develop/components/thread-pull-requests.tsx:206
+#: src/features/develop/components/thread-pull-requests.tsx:196
 msgid "Loading the linked pull requests…"
 msgstr "リンクされたプルリクエストを読み込み中…"
 
@@ -20214,7 +20234,7 @@ msgstr "読み込んでいます…"
 msgid "local"
 msgstr "ローカル"
 
-#: src/features/chat/core/context/chat-context.tsx:739
+#: src/features/chat/core/context/chat-context.tsx:758
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "ローカルモデルはテキストのみに対応しています。送信するには添付ファイルを削除してください。"
 
@@ -20235,12 +20255,12 @@ msgstr "ロケール"
 msgid "localhost or 127.0.0.1 only. Ollama: {OLLAMA_DEFAULT_BASE_URL} · LM Studio: {LM_STUDIO_DEFAULT_BASE_URL}"
 msgstr "localhost または 127.0.0.1 のみ。Ollama：{OLLAMA_DEFAULT_BASE_URL} · LM Studio：{LM_STUDIO_DEFAULT_BASE_URL}"
 
-#: src/features/settings/components/account/account-settings.tsx:290
+#: src/features/settings/components/account/account-settings.tsx:294
 #: src/features/settings/lib/settings-keywords.ts:31
 msgid "Location"
 msgstr "所在地"
 
-#: src/features/settings/components/account/account-settings.tsx:300
+#: src/features/settings/components/account/account-settings.tsx:304
 msgid "Location updated"
 msgstr "所在地を更新しました"
 
@@ -20341,15 +20361,15 @@ msgstr "ロゴ"
 msgid "logos"
 msgstr "ロゴ"
 
-#: src/features/settings/components/account/account-settings.tsx:105
+#: src/features/settings/components/account/account-settings.tsx:109
 msgid "London"
 msgstr "ロンドン"
 
-#: src/features/settings/components/account/account-settings.tsx:380
+#: src/features/settings/components/account/account-settings.tsx:384
 msgid "Long chats will be summarised"
 msgstr "長いチャットは要約されます"
 
-#: src/features/settings/components/account/account-settings.tsx:380
+#: src/features/settings/components/account/account-settings.tsx:384
 msgid "Long chats will no longer be summarised"
 msgstr "長いチャットは要約されなくなります"
 
@@ -20559,7 +20579,7 @@ msgstr "マクロ"
 msgid "Macro telephoto, tight framing"
 msgstr "マクロ望遠、タイトなフレーミング"
 
-#: src/features/settings/components/account/account-settings.tsx:109
+#: src/features/settings/components/account/account-settings.tsx:113
 msgid "Madrid"
 msgstr "マドリード"
 
@@ -21021,7 +21041,7 @@ msgstr "やや低"
 msgid "Medium-quality video generation with Alibaba's latest Wan improvements for general-purpose use"
 msgstr "Alibaba の最新 Wan の改良による汎用ミディアム品質の動画生成"
 
-#: src/features/settings/components/account/account-settings.tsx:120
+#: src/features/settings/components/account/account-settings.tsx:124
 msgid "Melbourne"
 msgstr "メルボルン"
 
@@ -21272,11 +21292,11 @@ msgstr "{sourceName} からのメッセージ"
 msgid "Messages sent to your bot will create new threads tagged with \"telegram\". The AI will auto-respond on Telegram."
 msgstr "ボットに送信されたメッセージから「telegram」タグ付きの新しいスレッドが作成されます。AI は Telegram で自動的に応答します。"
 
-#: src/features/settings/components/account/account-settings.tsx:573
+#: src/features/settings/components/account/account-settings.tsx:625
 msgid "Messages will interrupt the agent's turn"
 msgstr "メッセージはエージェントの処理を中断します"
 
-#: src/features/settings/components/account/account-settings.tsx:573
+#: src/features/settings/components/account/account-settings.tsx:625
 msgid "Messages will wait for the agent's turn to end"
 msgstr "メッセージはエージェントの処理が終わるまで待機します"
 
@@ -21929,7 +21949,7 @@ msgstr "モーションプロンプト"
 msgid "Motion: {motionPercent}%"
 msgstr "モーション: {motionPercent}%"
 
-#: src/features/settings/components/account/account-settings.tsx:101
+#: src/features/settings/components/account/account-settings.tsx:105
 msgid "Mountain Time (US & Canada)"
 msgstr "山岳部標準時（米国およびカナダ）"
 
@@ -22121,7 +22141,7 @@ msgstr "MiniMax の M2 が信頼性の高いビジョンとテキスト理解を
 msgid "multiple images"
 msgstr "複数の画像"
 
-#: src/features/settings/components/account/account-settings.tsx:118
+#: src/features/settings/components/account/account-settings.tsx:122
 msgid "Mumbai, Kolkata"
 msgstr "ムンバイ、コルカタ"
 
@@ -23752,7 +23772,7 @@ msgstr "リードに配信されませんでした"
 msgid "Not found"
 msgstr "見つかりません"
 
-#: src/features/develop/components/thread-pull-requests.tsx:284
+#: src/features/develop/components/thread-pull-requests.tsx:268
 msgid "Not linked"
 msgstr "リンクされていません"
 
@@ -23970,8 +23990,8 @@ msgstr "職業"
 msgid "off"
 msgstr "オフ"
 
-#: src/features/settings/components/account/account-settings.tsx:414
-#: src/features/settings/components/account/account-settings.tsx:421
+#: src/features/settings/components/account/account-settings.tsx:418
+#: src/features/settings/components/account/account-settings.tsx:425
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:90
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:97
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:277
@@ -23979,11 +23999,11 @@ msgstr "オフ"
 msgid "Off"
 msgstr "オフ"
 
-#: src/features/settings/components/account/account-settings.tsx:391
+#: src/features/settings/components/account/account-settings.tsx:395
 msgid "Off by default. When a chat's context fills this much of the model's window, older messages are condensed for the model before it replies. Your chat itself is never changed. You can also type /compact at any time."
 msgstr "既定では無効です。チャットのコンテキストがモデルのウィンドウのこの割合に達すると、返信の前に古いメッセージがモデル向けに圧縮されます。チャット自体は変更されません。いつでも /compact と入力することもできます。"
 
-#: src/features/settings/components/account/account-settings.tsx:369
+#: src/features/settings/components/account/account-settings.tsx:373
 msgid "Off by default. While a long chat sits idle, condense its older messages into notes so the assistant keeps them in mind. Uses a small amount of credits. Turning it off deletes the summaries already made."
 msgstr "デフォルトではオフです。長いチャットがしばらく使われていない間、古いメッセージをノートに要約して、アシスタントが覚えておけるようにします。少量のクレジットを使用します。オフにすると、作成済みの要約は削除されます。"
 
@@ -23991,7 +24011,7 @@ msgstr "デフォルトではオフです。長いチャットがしばらく使
 msgid "Off until you pick a model."
 msgstr "モデルを選ぶまでオフです。"
 
-#: src/features/settings/components/account/account-settings.tsx:562
+#: src/features/settings/components/account/account-settings.tsx:614
 msgid "Off: a message you send while a coding agent is working waits in the queue and goes after the turn. On: it interrupts the turn and goes next."
 msgstr "オフ：コーディングエージェントの作業中に送ったメッセージはキューで待機し、処理の後に送信されます。オン：処理を中断し、次に送信されます。"
 
@@ -24678,7 +24698,7 @@ msgstr "コンポーザーのモデルピッカーを開く（{0}）"
 
 #. placeholder {0}: link.repository
 #. placeholder {1}: link.number
-#: src/features/develop/components/thread-pull-requests.tsx:50
+#: src/features/develop/components/thread-pull-requests.tsx:40
 msgid "Open the pull request {0}#{1}"
 msgstr "プルリクエスト {0}#{1} を開く"
 
@@ -24714,7 +24734,7 @@ msgstr "このモデルのブラウザーを操作するには、このモデル
 msgid "Open thread"
 msgstr "スレッドを開く"
 
-#: src/features/settings/components/account/account-settings.tsx:676
+#: src/features/settings/components/account/account-settings.tsx:728
 msgid "Open up to three chats side by side. Applies to this browser only."
 msgstr "最大 3 つのチャットを並べて開きます。このブラウザにのみ適用されます。"
 
@@ -24989,7 +25009,7 @@ msgstr "{hostLabel} 上でリバートの{requestNoun}を開きました。"
 msgid "Opened from this thread"
 msgstr "このスレッドから開きました"
 
-#: src/features/settings/components/account/account-settings.tsx:530
+#: src/features/settings/components/account/account-settings.tsx:534
 msgid "Opening a blank chat"
 msgstr "空のチャットを開いています"
 
@@ -25005,7 +25025,7 @@ msgstr "スレッドを開いています…"
 msgid "Opening pull request…"
 msgstr "プルリクエストを作成しています…"
 
-#: src/features/settings/components/account/account-settings.tsx:521
+#: src/features/settings/components/account/account-settings.tsx:525
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "会話なしでアシスタントを開くと、空のチャットではなく最新の会話に移動します。"
 
@@ -25452,7 +25472,7 @@ msgstr "オーナー"
 msgid "owner/name"
 msgstr "owner/name"
 
-#: src/features/settings/components/account/account-settings.tsx:102
+#: src/features/settings/components/account/account-settings.tsx:106
 msgid "Pacific Time (US & Canada)"
 msgstr "太平洋標準時（米国およびカナダ）"
 
@@ -25608,7 +25628,7 @@ msgstr "並列の返信"
 msgid "Parent chat"
 msgstr "親チャット"
 
-#: src/features/settings/components/account/account-settings.tsx:106
+#: src/features/settings/components/account/account-settings.tsx:110
 msgid "Paris"
 msgstr "パリ"
 
@@ -25837,6 +25857,14 @@ msgstr "一時停止"
 msgid "Paused"
 msgstr "一時停止中"
 
+#: src/features/settings/components/account/account-settings.tsx:577
+msgid "Paused replies will resume when the limit resets"
+msgstr "一時停止中の返信は上限がリセットされると再開します"
+
+#: src/features/settings/components/account/account-settings.tsx:577
+msgid "Paused replies will wait for you to resume them"
+msgstr "一時停止中の返信は、あなたが再開するまで待機します"
+
 #: src/features/marketing/components/gateway-landing-page.tsx:724
 msgid "Pay for what <0>you use.</0>"
 msgstr "使った分だけ<0>お支払い。</0>"
@@ -26006,11 +26034,11 @@ msgstr "個人"
 msgid "Personal Account"
 msgstr "個人アカウント"
 
-#: src/features/settings/components/account/account-settings.tsx:174
+#: src/features/settings/components/account/account-settings.tsx:178
 msgid "Personal information is now hidden"
 msgstr "個人情報を非表示にしました"
 
-#: src/features/settings/components/account/account-settings.tsx:174
+#: src/features/settings/components/account/account-settings.tsx:178
 msgid "Personal information is now visible"
 msgstr "個人情報を表示しました"
 
@@ -26262,7 +26290,7 @@ msgstr "プラットフォーム"
 msgid "Play"
 msgstr "再生"
 
-#: src/features/settings/components/account/account-settings.tsx:657
+#: src/features/settings/components/account/account-settings.tsx:709
 msgid "Play a short sound when a reply finishes. Applies to this browser only."
 msgstr "返信が完了したら短い音を鳴らします。このブラウザーのみに適用されます。"
 
@@ -26644,7 +26672,7 @@ msgstr "プリセット"
 msgid "Press ? for keyboard shortcuts"
 msgstr "? キーでキーボードショートカットを表示"
 
-#: src/features/settings/components/account/account-settings.tsx:228
+#: src/features/settings/components/account/account-settings.tsx:232
 msgid "Press Ctrl/Cmd+Enter to send"
 msgstr "送信するには Ctrl/Cmd+Enter を押してください"
 
@@ -26664,7 +26692,7 @@ msgstr "Enter キーまたはスペースキーでエッジを選択します。
 msgid "Press Enter to open the folder. A folder that does not exist is created."
 msgstr "Enter を押すとフォルダーを開きます。存在しないフォルダーは作成されます。"
 
-#: src/features/settings/components/account/account-settings.tsx:226
+#: src/features/settings/components/account/account-settings.tsx:230
 msgid "Press Enter to send"
 msgstr "Enter キーで送信"
 
@@ -26672,7 +26700,7 @@ msgstr "Enter キーで送信"
 msgid "Press Enter to send, Shift+Enter for new line"
 msgstr "Enter で送信、Shift+Enter で改行"
 
-#: src/features/settings/components/account/account-settings.tsx:503
+#: src/features/settings/components/account/account-settings.tsx:507
 msgid "Press Escape to leave typing mode, then edit with h j k l, w b, 0 $, i a I A, o O, x, dd, D and u. Enter still sends. Off by default."
 msgstr "Escape で入力モードを終えると、h j k l、w b、0 $、i a I A、o O、x、dd、D、u で編集できます。Enter は引き続き送信します。既定では無効です。"
 
@@ -26680,7 +26708,7 @@ msgstr "Escape で入力モードを終えると、h j k l、w b、0 $、i a I A
 msgid "Press keys..."
 msgstr "キーを押してください..."
 
-#: src/features/settings/components/account/account-settings.tsx:227
+#: src/features/settings/components/account/account-settings.tsx:231
 msgid "Press Shift+Enter to send"
 msgstr "Shift+Enter キーで送信"
 
@@ -26865,7 +26893,7 @@ msgstr "プライバシー"
 #: src/features/marketing/components/gateway-footer.tsx:145
 #: src/features/marketing/components/landing-footer.tsx:102
 #: src/features/marketing/components/landing-footer.tsx:272
-#: src/features/settings/components/account/account-settings.tsx:160
+#: src/features/settings/components/account/account-settings.tsx:164
 #: src/features/settings/components/chat/model-filter-settings.tsx:363
 #: src/features/settings/lib/settings-keywords.ts:26
 #: src/features/settings/lib/settings-navigation.ts:117
@@ -27448,7 +27476,7 @@ msgid "Pull request settings updated"
 msgstr "プルリクエストの設定を更新しました"
 
 #: src/features/code/components/code-shell.tsx:95
-#: src/features/develop/components/thread-pull-requests.tsx:254
+#: src/features/develop/components/thread-pull-requests.tsx:238
 msgid "Pull requests"
 msgstr "プルリクエスト"
 
@@ -27504,11 +27532,11 @@ msgstr "このブラウザーでのプッシュ通知"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "役割の異なる複数のエージェントを 1 つのスレッドに配置できます。レビューパネルはセキュリティとパフォーマンスの観点から変更を確認でき、ディベートでは統合の前に両方の立場を議論できます。"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:166
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:171
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
 msgstr "このブランチを {base} にリベースし、コンフリクトを解消し、ビルドとテストを確認してプッシュするプロンプトをコンポーザーに入力します。送信はされません。"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:167
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:172
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "このフォークのブランチをローカルのコピーで {base} にリベースし、コンフリクトを解消し、ビルドとテストを確認するプロンプトをコンポーザーに入力します。プッシュはされません。送信はされません。"
 
@@ -27694,7 +27722,7 @@ msgstr "ランダムシード"
 msgid "Range to keep"
 msgstr "残す範囲"
 
-#: src/features/settings/components/account/account-settings.tsx:627
+#: src/features/settings/components/account/account-settings.tsx:679
 msgid "Range: 1 hour to 7 days (168 hours)"
 msgstr "範囲：1 時間〜7 日（168 時間）"
 
@@ -27710,25 +27738,46 @@ msgstr "レート制限を超えました。しばらくしてからもう一度
 msgid "Rate limit reached. You can improve {minutes, plural, one {# more prompt} other {# more prompts}} in {minutes, plural, one {# minute} other {# minutes}}."
 msgstr "レート制限に達しました。{minutes, plural, other {# 分}}後に、あと {minutes, plural, other {# 件}}のプロンプトを改善できます。"
 
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:108
 #: src/features/develop/components/failure-notice.tsx:21
 msgid "Rate limited"
 msgstr "レート制限中"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:91
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:125
 msgid "Rate limited by {provider}, retrying in {countdown}"
 msgstr "{provider} のレート制限中、{countdown} 後に再試行します"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:90
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:124
 msgid "Rate limited by {provider}. Retrying in about {announced}"
 msgstr "{provider} のレート制限中です。約 {announced} 後に再試行します"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:94
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:128
 msgid "Rate limited, retrying in {countdown}"
 msgstr "レート制限中、{countdown} 後に再試行します"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:93
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:112
+msgid "Rate limited, the limit resets in {countdown}"
+msgstr "レート制限中、上限は {countdown} でリセットされます"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:100
+msgid "Rate limited, the limit resets in {countdown}. Waiting for you to resume"
+msgstr "レート制限中、上限は {countdown} でリセットされます。再開はあなたの操作を待っています"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:127
 msgid "Rate limited. Retrying in about {announced}"
 msgstr "レート制限中です。約 {announced} 後に再試行します"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:111
+msgid "Rate limited. The limit resets in about {announced}"
+msgstr "レート制限中。上限は約 {announced} でリセットされます"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:99
+msgid "Rate limited. The limit resets in about {announced}. Waiting for you to resume"
+msgstr "レート制限中。上限は約 {announced} でリセットされます。再開はあなたの操作を待っています"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:96
+msgid "Rate limited. Waiting for you to resume"
+msgstr "レート制限中。再開はあなたの操作を待っています"
 
 #: src/features/marketing/components/gateway-landing-page.tsx:81
 msgid "Rate limiting"
@@ -27786,7 +27835,7 @@ msgstr "読み上げ"
 msgid "Read each item below before you import it. Nothing in the bundle runs until you turn it on: schedules and webhooks are created switched off, group chats are created without starting anything, and skills are imported switched off, so they join no chat until you turn them on in your skill list. A skill adds the tools listed for it, and your own tool permissions still apply."
 msgstr "インポートする前に、以下の各項目をお読みください。バンドル内のものは、オンにするまで何も実行されません。スケジュールと Webhook はオフの状態で作成され、グループチャットは何も開始せずに作成され、スキルはオフの状態でインポートされるため、スキル一覧でオンにするまでどのチャットにも参加しません。スキルは一覧にあるツールを追加し、ご自身のツール権限も引き続き適用されます。"
 
-#: src/features/settings/components/account/account-settings.tsx:432
+#: src/features/settings/components/account/account-settings.tsx:436
 msgid "Read every assistant reply aloud when it finishes, using your browser's voice."
 msgstr "アシスタントの返信が完了するたびに、ブラウザーの音声で読み上げます。"
 
@@ -28080,7 +28129,7 @@ msgstr "再接続"
 msgid "Reconnect {0}"
 msgstr "{0} を再接続"
 
-#: src/features/develop/components/thread-pull-requests.tsx:115
+#: src/features/develop/components/thread-pull-requests.tsx:105
 msgid "Reconnect your Git host in settings to link a pull request."
 msgstr "プルリクエストをリンクするには、設定で Git ホストに再接続してください。"
 
@@ -28834,11 +28883,11 @@ msgstr "スレッドの返信"
 msgid "Replies use the free reply token when the answer is quick, and fall back to a push message (which counts against your LINE quota) when it is not."
 msgstr "すぐに回答できる場合は無料のリプライトークンを使い、そうでない場合はプッシュメッセージ（LINE の送信数上限にカウントされます）で返信します。"
 
-#: src/features/settings/components/account/account-settings.tsx:441
+#: src/features/settings/components/account/account-settings.tsx:445
 msgid "Replies will be read aloud"
 msgstr "返信が読み上げられます"
 
-#: src/features/settings/components/account/account-settings.tsx:441
+#: src/features/settings/components/account/account-settings.tsx:445
 msgid "Replies will no longer be read aloud"
 msgstr "返信は読み上げられなくなります"
 
@@ -28862,7 +28911,7 @@ msgstr "返信"
 msgid "Reply complete"
 msgstr "返信が完了しました"
 
-#: src/features/chat/core/context/chat-context.tsx:643
+#: src/features/chat/core/context/chat-context.tsx:644
 msgid "Reply ready"
 msgstr "返信の準備ができました"
 
@@ -29181,17 +29230,22 @@ msgstr "結果"
 msgid "Result not delivered"
 msgstr "結果は配信されませんでした"
 
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:149
 #: src/features/onboarding/components/setup-checklist.tsx:202
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:233
 msgid "Resume"
 msgstr "再開"
+
+#: src/features/settings/components/account/account-settings.tsx:563
+msgid "Resume after a usage limit"
+msgstr "使用上限後に再開"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:438
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:453
 msgid "Resume import"
 msgstr "インポートを再開"
 
-#: src/features/settings/components/account/account-settings.tsx:518
+#: src/features/settings/components/account/account-settings.tsx:522
 msgid "Resume your latest chat"
 msgstr "最新のチャットを再開"
 
@@ -29199,12 +29253,12 @@ msgstr "最新のチャットを再開"
 msgid "Resumed its own session"
 msgstr "自身のセッションを再開しました"
 
-#: src/features/settings/components/account/account-settings.tsx:530
+#: src/features/settings/components/account/account-settings.tsx:534
 msgid "Resuming your latest chat"
 msgstr "最新のチャットを再開しています"
 
-#: src/features/settings/components/account/account-settings.tsx:595
-#: src/features/settings/components/account/account-settings.tsx:620
+#: src/features/settings/components/account/account-settings.tsx:647
+#: src/features/settings/components/account/account-settings.tsx:672
 msgid "Retention period updated to {hours} hours"
 msgstr "保持期間を {hours} 時間に更新しました"
 
@@ -29263,7 +29317,7 @@ msgstr "エクスポートを再試行"
 msgid "Retry in {retryAfterMinutes}m"
 msgstr "{retryAfterMinutes} 分後に再試行"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:109
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:149
 msgid "Retry now"
 msgstr "今すぐ再試行"
 
@@ -29283,7 +29337,7 @@ msgstr "{attachmentName} のアップロードを再試行"
 msgid "Retry with note"
 msgstr "メモを付けて再試行"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:87
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:121
 msgid "Retrying now"
 msgstr "再試行中"
 
@@ -29460,7 +29514,7 @@ msgstr "右"
 msgid "right to left"
 msgstr "右から左"
 
-#: src/features/settings/components/account/account-settings.tsx:201
+#: src/features/settings/components/account/account-settings.tsx:205
 msgid "Right to Left (RTL)"
 msgstr "右から左（RTL）"
 
@@ -29504,7 +29558,7 @@ msgstr "ルーマニア語"
 msgid "Romanian (Romania)"
 msgstr "ルーマニア語（ルーマニア）"
 
-#: src/features/settings/components/account/account-settings.tsx:108
+#: src/features/settings/components/account/account-settings.tsx:112
 msgid "Rome"
 msgstr "ローマ"
 
@@ -30566,7 +30620,7 @@ msgstr "プレビューするバージョンを選択"
 msgid "Select a version to see changes"
 msgstr "変更を表示するバージョンを選択"
 
-#: src/features/settings/components/account/account-settings.tsx:465
+#: src/features/settings/components/account/account-settings.tsx:469
 msgid "Select a voice"
 msgstr "音声を選択"
 
@@ -30606,7 +30660,7 @@ msgstr "参照として選択"
 msgid "Select by date"
 msgstr "日付で選択"
 
-#: src/features/settings/components/account/account-settings.tsx:275
+#: src/features/settings/components/account/account-settings.tsx:279
 msgid "Select dictation language"
 msgstr "音声入力の言語を選択"
 
@@ -30626,7 +30680,7 @@ msgstr "アップロードするファイルを選択"
 msgid "Select image as reference"
 msgstr "画像を参照として選択"
 
-#: src/features/settings/components/account/account-settings.tsx:250
+#: src/features/settings/components/account/account-settings.tsx:254
 msgid "Select language"
 msgstr "言語を選択"
 
@@ -30836,7 +30890,7 @@ msgstr "回答を送信"
 msgid "Send Backward"
 msgstr "背面へ移動"
 
-#: src/features/settings/components/account/account-settings.tsx:218
+#: src/features/settings/components/account/account-settings.tsx:222
 msgid "Send behavior updated"
 msgstr "送信方法を更新しました"
 
@@ -30844,7 +30898,7 @@ msgstr "送信方法を更新しました"
 msgid "send button"
 msgstr "送信ボタン"
 
-#: src/features/settings/components/account/account-settings.tsx:559
+#: src/features/settings/components/account/account-settings.tsx:611
 msgid "Send during a coding agent's turn"
 msgstr "コーディングエージェントの処理中に送信"
 
@@ -30877,7 +30931,7 @@ msgstr "メッセージを送信"
 msgid "Send message ({sendShortcut})"
 msgstr "メッセージを送信（{sendShortcut}）"
 
-#: src/features/settings/components/account/account-settings.tsx:212
+#: src/features/settings/components/account/account-settings.tsx:216
 #: src/features/settings/lib/settings-keywords.ts:28
 msgid "Send Message Behavior"
 msgstr "メッセージの送信方法"
@@ -31116,7 +31170,7 @@ msgstr "パスワードを設定"
 msgid "Set the focal length in millimeters"
 msgstr "焦点距離をミリメートルで設定します"
 
-#: src/features/settings/components/account/account-settings.tsx:188
+#: src/features/settings/components/account/account-settings.tsx:192
 msgid "Set the text direction for the application. RTL is used for languages like Arabic, Hebrew, and Persian."
 msgstr "アプリケーションのテキストの方向を設定します。RTL はアラビア語、ヘブライ語、ペルシア語などの言語で使われます。"
 
@@ -31178,7 +31232,7 @@ msgstr "複数のスキルが 1 つの会話で回答します。@ でメンシ�
 msgid "Shallow, cinematic separation"
 msgstr "浅い被写界深度、シネマティックな分離"
 
-#: src/features/settings/components/account/account-settings.tsx:114
+#: src/features/settings/components/account/account-settings.tsx:118
 msgid "Shanghai"
 msgstr "上海"
 
@@ -31366,7 +31420,7 @@ msgstr "添付コンテンツを表示"
 msgid "Show follow-up suggestions"
 msgstr "フォローアップの提案を表示"
 
-#: src/features/settings/components/account/account-settings.tsx:349
+#: src/features/settings/components/account/account-settings.tsx:353
 msgid "Show follow-up suggestions after assistant messages."
 msgstr "アシスタントのメッセージの後にフォローアップの提案を表示します。"
 
@@ -31451,7 +31505,7 @@ msgstr "この目標のタスクを表示"
 msgid "Show this help"
 msgstr "このヘルプを表示"
 
-#: src/features/settings/components/account/account-settings.tsx:639
+#: src/features/settings/components/account/account-settings.tsx:691
 msgid "Show Timestamps"
 msgstr "タイムスタンプを表示"
 
@@ -31734,7 +31788,7 @@ msgstr "簡潔にする"
 msgid "since replaced"
 msgstr "置き換え済み"
 
-#: src/features/settings/components/account/account-settings.tsx:116
+#: src/features/settings/components/account/account-settings.tsx:120
 msgid "Singapore"
 msgstr "シンガポール"
 
@@ -32036,6 +32090,10 @@ msgstr "スヌーズ"
 msgid "Snooze 1 hour"
 msgstr "1 時間スヌーズ"
 
+#: src/features/settings/components/account/account-settings.tsx:587
+msgid "Snooze chats until the limit resets"
+msgstr "上限がリセットされるまでチャットをスヌーズ"
+
 #: src/features/chat/thread-list/thread-node.tsx:924
 #: src/features/chat/thread-list/thread-node.tsx:938
 msgid "Snooze thread"
@@ -32192,15 +32250,15 @@ msgstr "2M トークンのコンテキストで SOTA のコスト効率"
 msgid "SOTA with vector art and typography via Replicate"
 msgstr "Replicate 経由のベクターアートとタイポグラフィ対応の SOTA"
 
-#: src/features/settings/components/account/account-settings.tsx:655
+#: src/features/settings/components/account/account-settings.tsx:707
 msgid "Sound Effects"
 msgstr "効果音"
 
-#: src/features/settings/components/account/account-settings.tsx:664
+#: src/features/settings/components/account/account-settings.tsx:716
 msgid "Sound effects disabled"
 msgstr "効果音を無効にしました"
 
-#: src/features/settings/components/account/account-settings.tsx:664
+#: src/features/settings/components/account/account-settings.tsx:716
 msgid "Sound effects enabled"
 msgstr "効果音を有効にしました"
 
@@ -32415,15 +32473,15 @@ msgstr "セルを分割"
 msgid "Split right"
 msgstr "右に分割"
 
-#: src/features/settings/components/account/account-settings.tsx:671
+#: src/features/settings/components/account/account-settings.tsx:723
 msgid "Split View"
 msgstr "分割ビュー"
 
-#: src/features/settings/components/account/account-settings.tsx:684
+#: src/features/settings/components/account/account-settings.tsx:736
 msgid "Split view disabled"
 msgstr "分割ビューを無効にしました"
 
-#: src/features/settings/components/account/account-settings.tsx:684
+#: src/features/settings/components/account/account-settings.tsx:736
 msgid "Split view enabled"
 msgstr "分割ビューを有効にしました"
 
@@ -32886,7 +32944,7 @@ msgstr "まだサーバーに接続中です..."
 msgid "Stock and currency information"
 msgstr "株価と為替の情報"
 
-#: src/features/settings/components/account/account-settings.tsx:111
+#: src/features/settings/components/account/account-settings.tsx:115
 msgid "Stockholm"
 msgstr "ストックホルム"
 
@@ -32898,7 +32956,7 @@ msgstr "株式"
 #: src/features/chat/goal/goal-notes.tsx:85
 #: src/features/chat/group/group-participant-bar.tsx:234
 #: src/features/chat/host/host-composer.tsx:1240
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:113
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:153
 #: src/features/develop/components/watched-repositories.tsx:86
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:367
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:380
@@ -33498,7 +33556,7 @@ msgstr "提案"
 msgid "Suggestions"
 msgstr "提案"
 
-#: src/features/settings/components/account/account-settings.tsx:485
+#: src/features/settings/components/account/account-settings.tsx:489
 msgid "Suggests how to finish your message as grey text; press Right Arrow at the end of the line to accept or Esc to dismiss. Your draft is sent to an AI model to make the suggestion."
 msgstr "メッセージの続きをグレーの文字で提案します。行末で右矢印キーを押すと確定、Esc で破棄します。提案のために下書きが AI モデルに送信されます。"
 
@@ -33506,7 +33564,7 @@ msgstr "メッセージの続きをグレーの文字で提案します。行末
 msgid "Suited for complex tasks: Role / Background / Attention / Skills / Goals / Constraints / Workflow."
 msgstr "複雑なタスクに適しています：Role / Background / Attention / Skills / Goals / Constraints / Workflow。"
 
-#: src/features/settings/components/account/account-settings.tsx:366
+#: src/features/settings/components/account/account-settings.tsx:370
 msgid "Summarise long chats"
 msgstr "長いチャットを要約"
 
@@ -33669,7 +33727,7 @@ msgstr "{label} に切り替え"
 msgid "Switch to {name}?"
 msgstr "{name} に切り替えますか？"
 
-#: src/features/chat/core/context/chat-context.tsx:734
+#: src/features/chat/core/context/chat-context.tsx:753
 msgid "Switch to a text model to send this message."
 msgstr "このメッセージを送信するには、テキストモデルに切り替えてください。"
 
@@ -33703,7 +33761,7 @@ msgstr "チームビューに切り替えました"
 msgid "Switzerland"
 msgstr "スイス"
 
-#: src/features/settings/components/account/account-settings.tsx:119
+#: src/features/settings/components/account/account-settings.tsx:123
 msgid "Sydney"
 msgstr "シドニー"
 
@@ -34145,7 +34203,7 @@ msgstr "一時チャットモード"
 msgid "Temporary chat mode, on for your next chat"
 msgstr "一時チャットモード、次のチャットでオン"
 
-#: src/features/settings/components/account/account-settings.tsx:580
+#: src/features/settings/components/account/account-settings.tsx:632
 msgid "Temporary Chat Retention (hours)"
 msgstr "一時チャットの保持期間（時間）"
 
@@ -34268,16 +34326,16 @@ msgstr "文字色"
 msgid "Text Content"
 msgstr "テキストコンテンツ"
 
-#: src/features/settings/components/account/account-settings.tsx:186
+#: src/features/settings/components/account/account-settings.tsx:190
 #: src/features/settings/lib/settings-keywords.ts:27
 msgid "Text Direction"
 msgstr "テキストの方向"
 
-#: src/features/settings/components/account/account-settings.tsx:192
+#: src/features/settings/components/account/account-settings.tsx:196
 msgid "Text direction set to LTR"
 msgstr "テキストの方向を LTR に設定しました"
 
-#: src/features/settings/components/account/account-settings.tsx:192
+#: src/features/settings/components/account/account-settings.tsx:196
 msgid "Text direction set to RTL"
 msgstr "テキストの方向を RTL に設定しました"
 
@@ -34440,7 +34498,7 @@ msgstr "そのフォルダーは、サーバーのホームフォルダー、ま
 msgid "That folder was not found."
 msgstr "そのフォルダーは見つかりませんでした。"
 
-#: src/features/chat/core/context/chat-context.tsx:730
+#: src/features/chat/core/context/chat-context.tsx:749
 msgid "That guest link has ended."
 msgstr "そのゲストリンクは終了しています。"
 
@@ -34460,7 +34518,7 @@ msgstr "そのリンクを読み取れませんでした。"
 msgid "That message could not be found in this conversation."
 msgstr "そのメッセージはこの会話内に見つかりませんでした。"
 
-#: src/features/chat/core/context/chat-context.tsx:733
+#: src/features/chat/core/context/chat-context.tsx:752
 #: src/features/chat/guest-links/guest-link-panel.tsx:143
 msgid "That message is being sent."
 msgstr "そのメッセージは送信中です。"
@@ -34473,7 +34531,7 @@ msgstr "そのメッセージはもう保留中ではありません。"
 msgid "That message is too long to send from here."
 msgstr "そのメッセージは長すぎて、ここから送信できません。"
 
-#: src/features/chat/core/context/chat-context.tsx:731
+#: src/features/chat/core/context/chat-context.tsx:750
 #: src/features/chat/guest-links/guest-link-panel.tsx:240
 #: src/features/chat/guest-links/guest-link-panel.tsx:316
 msgid "That message was already sent."
@@ -35017,7 +35075,7 @@ msgstr "ホスト"
 msgid "the host did not answer"
 msgstr "ホストが応答しませんでした"
 
-#: src/features/develop/components/thread-pull-requests.tsx:114
+#: src/features/develop/components/thread-pull-requests.tsx:104
 msgid "The host did not answer. Try again."
 msgstr "ホストから応答がありませんでした。もう一度お試しください。"
 
@@ -35029,11 +35087,11 @@ msgstr "ホストから応答がありませんでした。後でもう一度試
 msgid "the host did not change the option"
 msgstr "ホストはそのオプションを変更しませんでした"
 
-#: src/features/develop/components/thread-pull-requests.tsx:117
+#: src/features/develop/components/thread-pull-requests.tsx:107
 msgid "The host has no pull request at that address."
 msgstr "ホストには、そのアドレスにプルリクエストがありません。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:119
+#: src/features/develop/components/thread-pull-requests.tsx:109
 msgid "The host is limiting requests. Try again shortly."
 msgstr "ホストがリクエストを制限しています。しばらくしてからもう一度お試しください。"
 
@@ -35104,6 +35162,14 @@ msgstr "でサインインしました"
 #: src/features/chat/host/host-composer.tsx:959
 msgid "The last turn stopped before it finished."
 msgstr "前回のターンは完了する前に停止しました。"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:114
+msgid "The limit has reset"
+msgstr "上限がリセットされました"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:102
+msgid "The limit has reset. Waiting for you to resume"
+msgstr "上限がリセットされました。再開はあなたの操作を待っています"
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:328
 msgid "The link could not be copied. Select it and copy it yourself."
@@ -35406,7 +35472,7 @@ msgstr "リクエストは {hostLabel} に届く前に拒否されました。�
 msgid "The resource endpoint from Keys and Endpoint — *.openai.azure.com or *.cognitiveservices.azure.com."
 msgstr "「キーとエンドポイント」に表示されるリソースのエンドポイント（*.openai.azure.com または *.cognitiveservices.azure.com）。"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:84
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:118
 msgid "The retry is taking longer than expected"
 msgstr "再試行に予想より時間がかかっています"
 
@@ -35528,7 +35594,7 @@ msgstr "許可された修正ラウンドを経ても、検証役はこの結果
 msgid "The verifier passes the result only if every criterion is met."
 msgstr "すべての基準を満たした場合のみ、検証役は結果を合格にします。"
 
-#: src/features/settings/components/account/account-settings.tsx:452
+#: src/features/settings/components/account/account-settings.tsx:456
 msgid "The voice hands-free mode reads replies in. A skill with its own voice uses that instead. Spoken replies count against a daily allowance; after it, your browser's voice takes over."
 msgstr "ハンズフリーモードが返信を読み上げる音声です。独自の音声を持つスキルはその音声を使います。読み上げは1日の利用枠にカウントされ、上限を超えるとブラウザーの音声に切り替わります。"
 
@@ -36108,7 +36174,7 @@ msgstr "{hostLabel} で、コミット {0} を「{1}」でベースブランチ�
 msgid "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
 msgstr "このメッセージは残せません。短くし、/ で始めたり誰かをメンションしたりしないでください。または後でもう一度お試しください。"
 
-#: src/features/chat/core/context/chat-context.tsx:736
+#: src/features/chat/core/context/chat-context.tsx:755
 msgid "This message cannot be sent in this chat."
 msgstr "このメッセージはこのチャットでは送信できません。"
 
@@ -36220,7 +36286,7 @@ msgstr "このプロンプトはすべてのメッセージで使用されます
 msgid "This prompt will configure:"
 msgstr "このプロンプトで設定される内容："
 
-#: src/features/develop/components/thread-pull-requests.tsx:118
+#: src/features/develop/components/thread-pull-requests.tsx:108
 msgid "This pull request already has as many threads linked as it can keep."
 msgstr "このプルリクエストには、保持できる上限までスレッドがリンクされています。"
 
@@ -36333,7 +36399,7 @@ msgstr "このテキストは非表示の文字だけなので、保存する内
 msgid "This thread"
 msgstr "このスレッド"
 
-#: src/features/develop/components/thread-pull-requests.tsx:120
+#: src/features/develop/components/thread-pull-requests.tsx:110
 msgid "This thread already has as many pull requests linked as it can keep."
 msgstr "このスレッドには、保持できる上限までプルリクエストがリンクされています。"
 
@@ -36599,21 +36665,21 @@ msgstr "タイムアウト"
 msgid "Timeline image"
 msgstr "タイムライン画像"
 
-#: src/features/settings/components/account/account-settings.tsx:648
+#: src/features/settings/components/account/account-settings.tsx:700
 msgid "Timestamps disabled"
 msgstr "タイムスタンプを非表示にしました"
 
-#: src/features/settings/components/account/account-settings.tsx:648
+#: src/features/settings/components/account/account-settings.tsx:700
 msgid "Timestamps enabled"
 msgstr "タイムスタンプを表示しました"
 
-#: src/features/settings/components/account/account-settings.tsx:318
+#: src/features/settings/components/account/account-settings.tsx:322
 #: src/features/settings/components/chat/trigger-settings.tsx:329
 #: src/features/settings/lib/settings-keywords.ts:32
 msgid "Timezone"
 msgstr "タイムゾーン"
 
-#: src/features/settings/components/account/account-settings.tsx:323
+#: src/features/settings/components/account/account-settings.tsx:327
 msgid "Timezone updated"
 msgstr "タイムゾーンを更新しました"
 
@@ -36780,7 +36846,7 @@ msgstr "トークン"
 msgid "Tokens used on your own endpoint are not charged as credits. Daily message limits still apply."
 msgstr "独自のエンドポイントで使用したトークンはクレジットとして課金されません。1 日のメッセージ上限は引き続き適用されます。"
 
-#: src/features/settings/components/account/account-settings.tsx:113
+#: src/features/settings/components/account/account-settings.tsx:117
 msgid "Tokyo"
 msgstr "東京"
 
@@ -36964,7 +37030,7 @@ msgstr "複雑なベンチマークでトップクラスの推論"
 msgid "Top-tier text-to-video quality"
 msgstr "トップクラスのテキストから動画の品質"
 
-#: src/features/settings/components/account/account-settings.tsx:103
+#: src/features/settings/components/account/account-settings.tsx:107
 msgid "Toronto"
 msgstr "トロント"
 
@@ -37238,7 +37304,7 @@ msgstr "検索キーワードを変えてみてください。"
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
-#: src/features/develop/components/thread-pull-requests.tsx:213
+#: src/features/develop/components/thread-pull-requests.tsx:203
 #: src/features/home/components/home-page.tsx:154
 #: src/features/projects/components/computer-rule-file-import.tsx:495
 #: src/features/projects/components/project-repo-picker.tsx:190
@@ -37462,7 +37528,7 @@ msgstr "タイポグラフィ"
 msgid "UAE"
 msgstr "アラブ首長国連邦"
 
-#: src/features/settings/components/account/account-settings.tsx:634
+#: src/features/settings/components/account/account-settings.tsx:686
 msgid "UI Preferences"
 msgstr "UI の設定"
 
@@ -38519,7 +38585,7 @@ msgstr "有効な JSON"
 msgid "Validate data quality and prioritize authoritative sources. Essential for research tasks and fact-checking."
 msgstr "データ品質を検証し、信頼できる情報源を優先します。リサーチやファクトチェックに不可欠です。"
 
-#: src/features/settings/components/account/account-settings.tsx:104
+#: src/features/settings/components/account/account-settings.tsx:108
 msgid "Vancouver"
 msgstr "バンクーバー"
 
@@ -39005,15 +39071,15 @@ msgstr "{0} 個中 {viewedCount} 個のファイルを表示済み"
 msgid "Viewing: {selectedNodeId}"
 msgstr "表示中: {selectedNodeId}"
 
-#: src/features/settings/components/account/account-settings.tsx:511
+#: src/features/settings/components/account/account-settings.tsx:515
 msgid "Vim keys disabled"
 msgstr "Vim キーは無効"
 
-#: src/features/settings/components/account/account-settings.tsx:511
+#: src/features/settings/components/account/account-settings.tsx:515
 msgid "Vim keys enabled"
 msgstr "Vim キーは有効"
 
-#: src/features/settings/components/account/account-settings.tsx:500
+#: src/features/settings/components/account/account-settings.tsx:504
 msgid "Vim keys in the composer"
 msgstr "作成欄の Vim キー"
 
@@ -39350,11 +39416,11 @@ msgstr "監視中のリポジトリ"
 msgid "We could not check that you are signed in. Try again in a moment."
 msgstr "サインインしているかを確認できませんでした。しばらくしてからもう一度お試しください。"
 
-#: src/features/chat/core/context/chat-context.tsx:738
+#: src/features/chat/core/context/chat-context.tsx:757
 msgid "We could not confirm your session in time. The guest's message was not sent; send it again from the Guests tab."
 msgstr "セッションを時間内に確認できませんでした。ゲストのメッセージは送信されていません。［ゲスト］タブからもう一度送信してください。"
 
-#: src/features/chat/core/context/chat-context.tsx:741
+#: src/features/chat/core/context/chat-context.tsx:760
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "時間内にセッションを確認できませんでした。メッセージは入力欄に残っています。もう一度送信してください。"
 
@@ -39705,9 +39771,17 @@ msgstr "条件"
 msgid "When a new fact conflicts with an old one, the old memory is updated, superseded, or the new fact is ignored."
 msgstr "新しい事実が古い事実と矛盾する場合、古いメモリは更新されるか置き換えられるか、または新しい事実が無視されます。"
 
-#: src/features/settings/components/account/account-settings.tsx:540
+#: src/features/settings/components/account/account-settings.tsx:544
 msgid "When a reply is cut off by an update or an outage, it continues from its last finished step, up to 3 times. A reply interrupted while a tool was running is never continued."
 msgstr "更新や障害で返信が途切れた場合、最後に完了したステップから最大 3 回まで続行します。ツールの実行中に中断された返信は続行されません。"
+
+#: src/features/settings/components/account/account-settings.tsx:590
+msgid "When a reply pauses because a usage limit was reached and the provider says when it resets, its chat leaves your active list until then."
+msgstr "利用上限に達して返信が一時停止し、プロバイダーがリセット時刻を示している場合、そのチャットはリセットまでアクティブな一覧から外れます。"
+
+#: src/features/settings/components/account/account-settings.tsx:566
+msgid "When a reply pauses because a usage limit was reached, it resumes by itself once the limit resets. Off: it waits until you resume it."
+msgstr "利用上限に達して返信が一時停止した場合、上限がリセットされると自動的に再開します。オフの場合は、あなたが再開するまで待機します。"
 
 #: src/features/projects/components/project-rule-files.tsx:296
 msgid "When files match"
@@ -40245,7 +40319,7 @@ msgstr "このページは閲覧できますが、編集はできません。"
 msgid "You cannot ask a side question in this chat."
 msgstr "このチャットではサイドクエスチョンはできません。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:113
+#: src/features/develop/components/thread-pull-requests.tsx:103
 msgid "You cannot see that pull request on the host."
 msgstr "そのプルリクエストはホスト上で表示できません。"
 
@@ -40436,7 +40510,7 @@ msgstr "あなたの AI ワークスペースは<0>ここから始まります�
 msgid "Your answer"
 msgstr "あなたの回答"
 
-#: src/features/chat/core/context/chat-context.tsx:643
+#: src/features/chat/core/context/chat-context.tsx:644
 msgid "Your answer in Neore has finished."
 msgstr "Neore での回答が完了しました。"
 
@@ -40614,7 +40688,7 @@ msgstr "最新の変更はまだ保存されていません。"
 msgid "Your local server answered, but refused this site (CORS). Allow this site's origin — for Ollama set OLLAMA_ORIGINS, for LM Studio turn on \"Enable CORS\" — then restart the server."
 msgstr "ローカルサーバーは応答しましたが、このサイトを拒否しました（CORS）。このサイトのオリジンを許可してください。Ollama の場合は OLLAMA_ORIGINS を設定し、LM Studio の場合は「Enable CORS」をオンにしてから、サーバーを再起動してください。"
 
-#: src/features/settings/components/account/account-settings.tsx:292
+#: src/features/settings/components/account/account-settings.tsx:296
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "所在地（例：「アメリカ、ニューヨーク」「ドイツ、ベルリン」）。"
 
@@ -40626,7 +40700,7 @@ msgstr "あなたのメッセージ"
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 msgstr "アップロード中にメッセージが変更されたため、送信されませんでした。送信ボタンを押して送信してください。"
 
-#: src/features/chat/core/context/chat-context.tsx:729
+#: src/features/chat/core/context/chat-context.tsx:748
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "メッセージに不適切なコンテンツが含まれているため、送信できません。"
 
@@ -40795,7 +40869,7 @@ msgstr "自分のタグ"
 msgid "Your Team plans will be cancelled"
 msgstr "Team プランは解約されます"
 
-#: src/features/settings/components/account/account-settings.tsx:320
+#: src/features/settings/components/account/account-settings.tsx:324
 msgid "Your timezone (IANA timezone identifier)."
 msgstr "タイムゾーン（IANA タイムゾーン識別子）。"
 
@@ -40933,7 +41007,7 @@ msgstr "ズールー語"
 msgid "Zulu (South Africa)"
 msgstr "ズールー語（南アフリカ）"
 
-#: src/features/settings/components/account/account-settings.tsx:112
+#: src/features/settings/components/account/account-settings.tsx:116
 msgid "Zurich"
 msgstr "チューリッヒ"
 

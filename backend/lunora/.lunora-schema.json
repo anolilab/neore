@@ -21433,12 +21433,46 @@
             }
           }
         },
+        "pauseAwaitsPerson": {
+          "kind": "literal",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "literal": "true"
+        },
         "pauseCause": {
           "kind": "literal",
           "nullable": false,
           "optional": true,
           "unique": false,
           "literal": "\"interrupted\""
+        },
+        "pauseResetUnreported": {
+          "kind": "literal",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "literal": "true"
+        },
+        "pauseSnooze": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "previousUntil": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "until": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            }
+          }
         },
         "pausedRun": {
           "kind": "object",
@@ -33702,6 +33736,12 @@
             }
           }
         },
+        "resumeAfterUsageLimit": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "resumeInterruptedRuns": {
           "kind": "boolean",
           "nullable": false,
@@ -33743,6 +33783,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "snoozeUntilUsageLimitReset": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         },
         "subAgentRoles": {
           "kind": "object",
