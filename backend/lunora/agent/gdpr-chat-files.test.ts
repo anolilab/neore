@@ -171,10 +171,11 @@ const exportedFor = async (userId: string): Promise<{ files: ExportedFile[]; pag
                     )) as IdsPage,
                 meter,
             ),
-        async (fileIds, bytesLeft) =>
+        async (fileIds, bytesLeft, queriesLeft) =>
             await readChunkMetadata(
                 fileIds,
                 bytesLeft,
+                queriesLeft,
                 async (ids) =>
                     (await harness.run(async (ctx: any) => await ctx.runQuery(chatFileMetadataForExport, { fileIds: ids }))) as {
                         readBytes: number;
@@ -328,6 +329,7 @@ describe("chat files in the GDPR export", () => {
         const chunk = await readChunkMetadata(
             ["a", "b", "c"],
             10,
+            200,
             async () => {
                 return { readBytes: 0, rows: [] };
             },
@@ -343,10 +345,33 @@ describe("chat files in the GDPR export", () => {
         expect(chunk.truncated).toBe(true);
     });
 
+    it("stops the repairs when the query allowance is spent, and says so", async () => {
+        const repaired: string[] = [];
+
+        const chunk = await readChunkMetadata(
+            ["a", "b", "c"],
+            1000,
+            2,
+            async () => {
+                return { readBytes: 0, rows: [] };
+            },
+            async (id) => {
+                repaired.push(id);
+
+                return { readBytes: 0, rows: [{ id }] };
+            },
+        );
+
+        // The read is one query and the allowance is two: one repair, then the rest are left out and flagged.
+        expect(repaired).toEqual(["a"]);
+        expect(chunk.truncated).toBe(true);
+    });
+
     it("does not flag a complete chunk whose last repair overshoots the budget, since nothing is left out", async () => {
         const chunk = await readChunkMetadata(
             ["a"],
             5,
+            200,
             async () => {
                 return { readBytes: 0, rows: [] };
             },

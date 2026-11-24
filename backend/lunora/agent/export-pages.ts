@@ -128,7 +128,11 @@ export const collectAllMessageFileIds = async (
 export const collectAllChatFileMetadata = async <Row>(
     walkGrants: (meter: ChatFileMeter) => Promise<Walked>,
     walkMessages: (meter: ChatFileMeter) => Promise<Walked>,
-    readMetadata: (fileIds: string[], bytesLeft: number) => Promise<{ readBytes: number; rows: Row[]; truncated?: boolean }>,
+    readMetadata: (
+        fileIds: string[],
+        bytesLeft: number,
+        queriesLeft: number,
+    ) => Promise<{ queries?: number; readBytes: number; rows: Row[]; truncated?: boolean }>,
     chunkSize: number = CHAT_FILE_METADATA_CHUNK,
     meter: ChatFileMeter = chatFileMeter(),
 ): Promise<{ rows: Row[]; truncated: boolean }> => {
@@ -144,10 +148,10 @@ export const collectAllChatFileMetadata = async <Row>(
                 return { rows, truncated: true };
             }
 
-            const chunk = await readMetadata(fileIds.slice(start, start + chunkSize), meter.bytesLeft);
+            const chunk = await readMetadata(fileIds.slice(start, start + chunkSize), meter.bytesLeft, metadataQueriesLeft);
 
             meter.bytesLeft -= chunk.readBytes;
-            metadataQueriesLeft -= 1;
+            metadataQueriesLeft -= chunk.queries ?? 1;
             rows.push(...chunk.rows);
 
             // A chunk that stopped its repairs at the budget says so: the rest of the files are not read.
@@ -247,31 +251,36 @@ export const capChatFiles = <Row>(rows: Row[], budget: number = CHAT_FILE_EXPORT
 export const readChunkMetadata = async <Row extends { id: string }>(
     fileIds: string[],
     bytesLeft: number,
+    queriesLeft: number,
     read: (fileIds: string[]) => Promise<{ readBytes: number; rows: Row[] }>,
     repair: (fileId: string) => Promise<{ readBytes: number; rows: Row[] }>,
-): Promise<{ readBytes: number; rows: Row[]; truncated: boolean }> => {
+): Promise<{ queries: number; readBytes: number; rows: Row[]; truncated: boolean }> => {
     const found = await read(fileIds);
     const answered = new Set(found.rows.map((row) => row.id));
     const rows = [...found.rows];
     let { readBytes } = found;
+    // The read is one query; each repair is one more. The repairs share the export's query allowance, so a legacy export cannot issue
+    // one mutation per file without bound.
+    let queries = 1;
 
     for (const fileId of fileIds) {
         if (answered.has(fileId)) {
             continue;
         }
 
-        if (readBytes >= bytesLeft) {
-            return { readBytes, rows, truncated: true };
+        if (readBytes >= bytesLeft || queries >= queriesLeft) {
+            return { queries, readBytes, rows, truncated: true };
         }
 
         const repaired = await repair(fileId);
 
         readBytes += repaired.readBytes;
+        queries += 1;
         rows.push(...repaired.rows);
     }
 
     // Every file was answered: nothing is left out, even when the last repair overshot the budget (the next chunk stops at the budget).
-    return { readBytes, rows, truncated: false };
+    return { queries, readBytes, rows, truncated: false };
 };
 
 /** The UTF-8 bytes of a text, as the file's size limit counts them. */
