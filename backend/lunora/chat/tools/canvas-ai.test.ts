@@ -27,7 +27,7 @@ vi.mock("../../_generated/internal", () => {
         internal: {
             agent: { documents: { getDocumentInternal: "getDocumentInternal", updateDocumentInternal: "updateDocumentInternal" } },
             auth: { functions: { getUserAuthFlagsQuery: "getUserAuthFlagsQuery" } },
-            chat: { functions: { editImage: "editImage", generateImage: "generateImage" } },
+            chat: { daily_charge: { refundDailyCharge: "refundDailyCharge" }, functions: { editImage: "editImage", generateImage: "generateImage" } },
             lib: { rate_limiter_mutations: { applyRateLimit: "applyRateLimit" } },
         },
     };
@@ -57,7 +57,13 @@ const makeContext = (chargeOk = true) => {
             if (reference === "applyRateLimit") {
                 state.log.push("charge");
 
-                return chargeOk ? { ok: true } : { ok: false, retryAfter: 60 };
+                return chargeOk ? { ok: true, windowStart: 7 } : { ok: false, retryAfter: 60 };
+            }
+
+            if (reference === "refundDailyCharge") {
+                state.log.push("refund");
+
+                return null;
             }
 
             state.log.push(`write:${reference}`);
@@ -151,5 +157,14 @@ describe("canvas edits draw on the daily image allowance", () => {
 
         expect(output.error).toBe("Document not found");
         expect(sideEffects()).toStrictEqual([]);
+    });
+
+    it("gives the unit back when the preview is gone by the write, and calls no provider", async () => {
+        state.written = { content: undefined, threadId: "thread-1", userId: "user-1" };
+
+        const output = await tool.execute(makeContext(), { documentId: "doc-1", operation: "upscale" });
+
+        expect(output.error).toBe("No image preview");
+        expect(state.log).toStrictEqual(["read:getDocumentInternal", "charge", "write:updateDocumentInternal", "refund"]);
     });
 });

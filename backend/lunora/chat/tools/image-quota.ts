@@ -13,14 +13,18 @@ import { internal } from "../../_generated/internal";
 import type { ToolCtx as ToolContext } from "../../agent/client";
 import { RATE_LIMIT_CONFIGS } from "../../lib/rate-limiter";
 import { toolsLogger } from "../../lib/logger";
-import { chargeDailyLimit, dailyLimitKeyOf, dailyLimitTierOf, isPlatformAdmin } from "../lib/daily-limit";
+import { chargeDailyLimit, dailyLimitKeyOf, dailyLimitTierOf, isPlatformAdmin, refundDailyLimit } from "../lib/daily-limit";
 
 export const DAILY_IMAGE_LIMIT_REACHED = "DAILY_IMAGE_LIMIT_REACHED";
 export const IMAGE_QUOTA_UNAVAILABLE = "IMAGE_QUOTA_UNAVAILABLE";
 
 export type ImageQuotaCode = typeof DAILY_IMAGE_LIMIT_REACHED | typeof IMAGE_QUOTA_UNAVAILABLE;
 
-export type ImageQuotaResult = { ok: true } | { code: ImageQuotaCode; message: string; ok: false; retryAfter?: number };
+/**
+ * On success, `refund` gives the taken unit back, for an edit that then cannot run (no preview left once the write answers).
+ * It is for a charge of one unit, which is all a single edit takes.
+ */
+export type ImageQuotaResult = { ok: true; refund: () => Promise<void> } | { code: ImageQuotaCode; message: string; ok: false; retryAfter?: number };
 
 const limitReached = (retryAfter?: number): ImageQuotaResult => {
     return {
@@ -58,7 +62,9 @@ export const takeImageQuota = async (context: ToolContext, userId: string, count
         const charge = await chargeDailyLimit(context, user, "Image", count);
 
         if (charge.ok) {
-            return { ok: true };
+            const { windowStart } = charge;
+
+            return { ok: true, refund: async () => await refundDailyLimit(context, user, "Image", { windowStart }) };
         }
 
         return limitReached(charge.retryAfter);

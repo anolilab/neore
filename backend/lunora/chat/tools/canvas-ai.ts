@@ -135,6 +135,9 @@ For generate_element, add the result as a FabricImage object in the canvas JSON 
             });
 
             if (!current.content) {
+                // The preview was cleared between the read and this write: the edit cannot run, so the unit taken for it goes back.
+                await quota.refund();
+
                 return { documentId, error: "No image preview", message: "The design has no image preview to edit", operation };
             }
 
