@@ -6,11 +6,22 @@
  * from now". The answer's `nextSeq` is the last position the poll examined, so a client resumes there even when nothing
  * matched.
  */
-/** Rows read from the store per round trip while a poll scans for matches. */
-const PAGE = 100;
+/**
+ * Rows read from the store per round trip while a poll scans for matches. Small, because a row's payload is not size-capped when
+ * recorded: a page of large rows is held at once.
+ */
+const PAGE = 25;
 
 /** Rows one poll may examine. Past it the poll stops, reports `hasMore`, and the client continues from `nextSeq`. */
 export const POLL_SCAN_LIMIT = 1000;
+
+/**
+ * The bytes of event payloads one poll answers with, so the answer stays well inside the internal call's size limit. A poll cuts
+ * before the event that would pass it and reports `hasMore`; it always gives at least one event, so it cannot stall on a large one.
+ */
+export const POLL_BYTE_BUDGET = 512 * 1024;
+
+const encoder = new TextEncoder();
 
 export interface StoredEvent {
     /** When the log took the event (its insertion or copy time): the clock retention and the age window run on. */
@@ -87,6 +98,7 @@ export const pollEvents = async (store: EventLogStore, query: PollQuery): Promis
     const floor = query.maxAgeMs === undefined ? undefined : query.now - query.maxAgeMs;
     const events: PollOutcome["events"] = [];
     let scanned = 0;
+    let bytes = 0;
     let hasMore = false;
 
     let stopped = false;
@@ -137,6 +149,16 @@ export const pollEvents = async (store: EventLogStore, query: PollQuery): Promis
                     break;
                 }
 
+                const size = encoder.encode(JSON.stringify(event.data)).byteLength;
+
+                if (events.length > 0 && bytes + size > POLL_BYTE_BUDGET) {
+                    // The byte budget is full: the cursor stays before this event, which the next poll answers first.
+                    hasMore = true;
+                    stopped = true;
+                    break;
+                }
+
+                bytes += size;
                 events.push({ data: event.data, eventId: event.eventId, name: event.name, timestamp: event.timestamp });
             }
 
