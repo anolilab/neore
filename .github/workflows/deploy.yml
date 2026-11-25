@@ -182,6 +182,13 @@ jobs:
               shell: "bash"
               run: "pnpm run build:packages"
 
+            # The web app's stories import backend modules that read `lunora/_generated/*`, which is not
+            # committed. Without it the full Storybook build fails on an unresolved import.
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
+
             - name: "Build Storybook"
               shell: "bash"
               run: "pnpm --filter @neore/web run build-storybook"
