@@ -842,6 +842,31 @@ describe("composer prompt queue", () => {
         expect((screen.getByLabelText("Edit queued message 1") as HTMLTextAreaElement).value).toBe("one, typed");
     });
 
+    it("does not send another thread's head when the chat switches while this thread's head is being edited", async () => {
+        chat.error = undefined;
+
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue("thread-1", { attachments: [], text: "one" });
+        setPaused("thread-1", true);
+        enqueue("thread-2", { attachments: [], text: "other thread's head" });
+
+        chat.threadId = "thread-1";
+
+        const { rerender } = render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+
+        chat.threadId = "thread-2";
+        rerender(<ComposerPromptQueue />);
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+    });
+
     it("moves a dropped message to where it lands in the queue", async () => {
         const { enqueue, setPaused } = usePromptQueueStore.getState();
 
