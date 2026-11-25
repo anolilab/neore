@@ -10,11 +10,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "../../_generated/dataModel";
 import { resolveThreadReadAccess } from "../../agent/thread-read-access";
 import { BATCH } from "../../gdpr/batch";
+import { enqueueJob } from "../../lib/job-queue";
 import schema from "../../schema";
 import {
     createDocumentPin,
     createPin,
     deletePin,
+    dropRoutesWithoutPins,
     eraseUserPinsOnThread,
     getThreadPins,
     isPinShapeValid,
@@ -39,6 +41,13 @@ vi.mock("../../lib/crpc-auth-helpers", async (importOriginal) => {
         getSessionUser: sessionFrom,
         getSessionUserForQuery: sessionFrom,
         getSessionUserForQueryLite: sessionFrom,
+    };
+});
+
+vi.mock("../../lib/job-queue", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../../lib/job-queue")>()),
+        enqueueJob: vi.fn(async () => undefined),
     };
 });
 
@@ -572,7 +581,9 @@ describe("a refused pin write takes back the route it wrote", () => {
         expect(routes.page).toHaveLength(1);
     });
 
-    it("removes every duplicate route to the thread, not only the first page of them", async () => {
+    it("removes one batch of duplicate routes in the refused write, and queues a job for the rest", async () => {
+        vi.mocked(enqueueJob).mockClear();
+
         const routes = await harness.run(async (context: any) => {
             for (let index = 0; index < 150; index += 1) {
                 await context.db.insert("sharedPinRoutes", { createdAt: 1, ownerId: OWNER, threadId, userId: "user-collaborator" });
@@ -584,6 +595,24 @@ describe("a refused pin write takes back the route it wrote", () => {
 
             return await context.db.sharedPinRoutes.findMany({ where: { threadId } });
         });
+
+        expect(routes.page).toHaveLength(50);
+        expect(enqueueJob).toHaveBeenCalledTimes(1);
+    });
+
+    it("finishes the rest of the duplicate routes once the job runs, without a pin of the caller's left", async () => {
+        await harness.run(async (context: any) => {
+            for (let index = 0; index < 150; index += 1) {
+                await context.db.insert("sharedPinRoutes", { createdAt: 1, ownerId: OWNER, threadId, userId: "user-collaborator" });
+            }
+        });
+
+        // The job runs the same step again until a batch comes back short.
+        for (let batch = 0; batch < 2; batch += 1) {
+            await harness.run(async (context: any) => await dropRoutesWithoutPins(context, threadId, "user-collaborator"));
+        }
+
+        const routes = await harness.run(async (context: any) => await context.db.sharedPinRoutes.findMany({ where: { threadId } }));
 
         expect(routes.page).toHaveLength(0);
     });
