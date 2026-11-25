@@ -80,13 +80,14 @@ const headIsBeingEdited = (threadId: string): boolean => {
 
 /**
  * The one rule every release path follows for a held send: the edit's close, a reply's end or a chat's switch-in, and a
- * permission-mode save's end. The hold goes now or stays held for Send next:
- * - unpaused: it goes, with its intent;
- * - paused by a chat error and explicit: the pause is lifted and it goes, as Send next does;
+ * permission-mode save's end. It answers whether the hold may go now, and the send itself clears the hold once its message
+ * is sent (a blocked send leaves the hold in place):
+ * - unpaused: it may go, with its intent;
+ * - paused by a chat error and explicit: the pause is lifted and it may go, as Send next does;
  * - anything else (a failed save's pause, a Stop, an automatic send behind an error): it stays held.
  * A queue seen unpaused drops any failed-save mark, which described a pause that has ended.
  */
-const takeReleasableHeldSend = (threadId: string, hasError: boolean): HeldSend | undefined => {
+const releasableHeldSend = (threadId: string, hasError: boolean): HeldSend | undefined => {
     const store = useQueueEditStore.getState();
     // Read live, not from a render: a pause set earlier in the same commit (a reply's error) must count here.
     const paused = usePromptQueueStore.getState().queues[threadId]?.paused === true;
@@ -119,7 +120,7 @@ const takeReleasableHeldSend = (threadId: string, hasError: boolean): HeldSend |
         usePromptQueueStore.getState().setPaused(threadId, false);
     }
 
-    return store.takeHeldSend(threadId);
+    return held;
 };
 
 /**
@@ -836,7 +837,7 @@ const ComposerPromptQueue: FC = () => {
 
         if (ended && threadId && !isStreaming && queue.items.length > 0) {
             // A send held while the save ran goes now, under the shared release rule.
-            const held = takeReleasableHeldSend(threadId, Boolean(error));
+            const held = releasableHeldSend(threadId, Boolean(error));
 
             if (held) {
                 void sendNextPrompt(threadId, { explicit: held.explicit });
@@ -869,7 +870,7 @@ const ComposerPromptQueue: FC = () => {
             return;
         }
 
-        const held = takeReleasableHeldSend(threadId, Boolean(error));
+        const held = releasableHeldSend(threadId, Boolean(error));
 
         if (held) {
             void sendNextPrompt(threadId, { explicit: held.explicit });
@@ -886,7 +887,7 @@ const ComposerPromptQueue: FC = () => {
             return;
         }
 
-        const held = takeReleasableHeldSend(threadId, Boolean(error));
+        const held = releasableHeldSend(threadId, Boolean(error));
 
         if (held) {
             void sendNextPrompt(threadId, { explicit: held.explicit });
@@ -912,7 +913,7 @@ const ComposerPromptQueue: FC = () => {
             return;
         }
 
-        const held = takeReleasableHeldSend(threadId, Boolean(error));
+        const held = releasableHeldSend(threadId, Boolean(error));
 
         if (held) {
             void sendNextPrompt(threadId, { explicit: held.explicit });
