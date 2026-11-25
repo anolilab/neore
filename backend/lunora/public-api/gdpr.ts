@@ -54,14 +54,15 @@ export const collectMcpEventsForExport = internalQuery
             // Measured as the export writes the event: JSON escapes quotes, backslashes and control characters, so their raw
             // bytes understate the size.
             const shaped = { createdAt: row.createdAt, data: row.data, eventId: row.eventId, name: row.name, seq: row.seq, timestamp: row.timestamp };
+            const size = encoder.encode(JSON.stringify(shaped)).byteLength;
 
-            bytes += encoder.encode(JSON.stringify(shaped)).byteLength;
-
-            // Strictly within the budget: an event too large for it is cut too, so the section never exceeds the budget, not even for its newest event.
-            if (bytes > EXPORT_EVENT_BYTES) {
-                break;
+            // An event that does not fit is left out, and the older ones that do fit are still kept: the section never exceeds the
+            // budget, and the gap it leaves is what `truncated` says.
+            if (bytes + size > EXPORT_EVENT_BYTES) {
+                continue;
             }
 
+            bytes += size;
             newest.push(row);
         }
 
