@@ -51,7 +51,11 @@ export const collectMcpEventsForExport = internalQuery
         let bytes = 0;
 
         for (const row of rows.slice(0, MAX_EXPORT_EVENTS)) {
-            bytes += encoder.encode(row.data).byteLength + encoder.encode(row.eventId).byteLength + encoder.encode(row.name).byteLength;
+            // Measured as the export writes the event: JSON escapes quotes, backslashes and control characters, so their raw
+            // bytes understate the size.
+            const shaped = { createdAt: row.createdAt, data: row.data, eventId: row.eventId, name: row.name, seq: row.seq, timestamp: row.timestamp };
+
+            bytes += encoder.encode(JSON.stringify(shaped)).byteLength;
 
             // Strictly within the budget: an event too large for it is cut too, so the section never exceeds the budget, not even for its newest event.
             if (bytes > EXPORT_EVENT_BYTES) {
