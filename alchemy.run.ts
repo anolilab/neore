@@ -76,6 +76,11 @@ const REQUIRED_DEPLOY_ENV = [
     // answers 403 DISPATCH_UNAUTHENTICATED to both, so no scheduled or queued
     // job would ever run on a Worker that deployed green.
     "LUNORA_ADMIN_TOKEN",
+    // Signs the host's calls to the shard registry. Unset, the registry refuses to
+    // register a shard (RELAY_MISCONFIGURED), so every cross-shard fan-out (data
+    // migrations, the account-deletion workflow) misses shards on a Worker that
+    // deployed green.
+    "LUNORA_RELAY_SECRET",
     "R2_ENDPOINT",
     "SITE_URL",
     // Signs `ctx.storage` download URLs (uploads go through the TUS route,
@@ -969,6 +974,7 @@ export default Alchemy.Stack(
                 QUEUE_JOBS: BackendJobs,
                 QUEUE_JOBS_DEAD_LETTERS: BackendJobsDlq,
                 LUNORA_ADMIN_TOKEN: secret(requireEnv("LUNORA_ADMIN_TOKEN")),
+                LUNORA_RELAY_SECRET: secret(requireEnv("LUNORA_RELAY_SECRET")),
                 NODE_ENV: stage === "production" ? "production" : "development",
 
                 // Signing, encryption and the outbound services the backend cannot boot
