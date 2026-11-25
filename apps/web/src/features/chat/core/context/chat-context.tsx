@@ -28,6 +28,7 @@ import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { openLoginPrompt } from "@/features/auth/stores/login-prompt-store";
 import useLocalModelTurn from "@/features/local-models/hooks/use-local-model-turn";
+import useChatRunToasts, { LOCAL_BROWSER_REPLY_RUN, THREAD_REPLY_RUN } from "@/features/notifications/hooks/use-chat-run-toasts";
 import type { UIMessage } from "@/lib/agent";
 import { trackEvent } from "@/lib/analytics";
 import type { AppError } from "@/lib/errors";
@@ -657,6 +658,15 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     const isThreadStreaming =
         Boolean(threadId) &&
         (streamingMessageId !== null || Boolean(activeStreamId) || isRegenerating || (isLocalStreaming && localStreamingThreadId === threadId));
+
+    // In-app toasts for a run that failed, finished, or waits for the person (each gated by its setting). A run is a gateway
+    // stream, a browser-local reply, or a reply still streaming in the thread: an edit or a regenerate shows its reply before
+    // its stream id is known.
+    const localRunId = isLocalStreaming && localStreamingThreadId === threadId ? LOCAL_BROWSER_REPLY_RUN : null;
+    // A local reply in a chat without a thread yet has no thread id to be streaming in, so its marker is taken on its own.
+    const runId = activeStreamId ?? localRunId ?? (isThreadStreaming ? THREAD_REPLY_RUN : null);
+
+    useChatRunToasts({ activeStreamId: runId, error, messages, messagesReady: isMessagesReady, settings: userSettings, threadId });
 
     const { mutateAsync: abortStreamMutation } = useMutation(crpc.chat.functions.abortStreamByMessageId.mutationOptions());
     const { mutateAsync: abortThreadStreamMutation } = useMutation(crpc.chat.functions.abortThreadStream.mutationOptions());

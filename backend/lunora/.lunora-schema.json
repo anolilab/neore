@@ -33533,6 +33533,24 @@
           "optional": true,
           "unique": false
         },
+        "chatFailedToastEnabled": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "chatFinishedToastEnabled": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "chatInputToastEnabled": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "codeFont": {
           "kind": "string",
           "nullable": false,
