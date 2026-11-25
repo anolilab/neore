@@ -535,6 +535,7 @@ for a schema table that is neither policed nor listed:
 | `notifications_daily_brief.dismissDailyBriefOffer` | mutation | authMutation + RL | userSettings | caller-scoped (ctx.user) | ok — new |
 | `notifications_daily_brief.setDailyBriefEnabled` | mutation | authMutation + RL | userSettings, dailyBriefState | caller-scoped (ctx.user) | ok — new |
 | `notifications_task_email.setTaskEmailEnabled` | mutation | authMutation + RL | userSettings | caller-scoped (ctx.user) | ok — new |
+| `notifications_chat_toast_settings.setChatToastEnabled` | mutation | authMutation + RL | userSettings | caller-scoped (ctx.user) | ok — new |
 | `notifications_functions.getNotificationInbox` | query | authQuery | notifications | caller-scoped (ctx.user) | ok — new |
 | `notifications_functions.markAllNotificationsRead` | mutation | authMutation + RL | notifications | caller-scoped (ctx.user) | ok — new |
 | `notifications_functions.markNotificationRead` | mutation | authMutation + RL | notifications | row.userId == caller | ok — new; another user's id is a silent no-op |

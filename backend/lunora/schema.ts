@@ -4269,6 +4269,10 @@ export const schema = defineSchema({
         backupModel: v.optional(v.string()),
         // Appearance: cap long chat code blocks (absent = on). Accepted values: `auth/fields.ts`.
         capLongCodeBlocks: v.optional(v.boolean()),
+        // In-app toasts for chat events (`features/notifications/lib/chat-toasts.ts`). Absent = on.
+        chatFailedToastEnabled: v.optional(v.boolean()),
+        chatFinishedToastEnabled: v.optional(v.boolean()),
+        chatInputToastEnabled: v.optional(v.boolean()),
         codeFont: v.optional(v.string()),
         codeHighlightTheme: v.optional(v.string()),
         codeLineNumbers: v.optional(v.boolean()),

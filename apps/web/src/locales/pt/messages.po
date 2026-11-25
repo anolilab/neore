@@ -37,22 +37,6 @@ msgstr "-- NORMAL --"
 msgid ", unread"
 msgstr ", não lida"
 
-#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:83
-msgid "An admin acting as you cannot change this default."
-msgstr "Um administrador agindo como você não pode alterar este padrão."
-
-#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:66
-msgid "Could not save the default permission mode"
-msgstr "Não foi possível salvar o modo de permissões padrão"
-
-#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:48
-msgid "Default for new chats"
-msgstr "Padrão para novos chats"
-
-#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:50
-msgid "New chats start in this permission mode. A chat that already exists keeps its own mode, and you can still change a chat's mode in its composer."
-msgstr "Os novos chats começam neste modo de permissões. Um chat existente mantém o próprio modo, e o modo de um chat ainda pode ser alterado no compositor."
-
 #: src/features/sub-agents/components/sub-agent-approvals.tsx:63
 msgid "… ({omitted, plural, one {# more character not shown} other {# more characters not shown}}; approving runs the whole call)"
 msgstr "… ({omitted, plural, one {mais # caractere não exibido} other {mais # caracteres não exibidos}}; aprovar executa a chamada inteira)"
@@ -666,7 +650,7 @@ msgstr "{0} com falha"
 
 #. placeholder {0}: modeLabels[mode]
 #. placeholder {1}: tool.name
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:95
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:97
 msgid "{0} for {1}"
 msgstr "{0} para {1}"
 
@@ -1582,13 +1566,17 @@ msgstr "{selectedCount, plural, one {# conversa selecionada} other {# conversas 
 msgid "{selectedCount} of {MAX_PARALLEL} selected"
 msgstr "{selectedCount} de {MAX_PARALLEL} selecionados"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:206
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:208
 msgid "{server} · until {until}"
 msgstr "{server} · até {until}"
 
 #: src/features/projects/components/project-rule-files.tsx:595
 msgid "{shortened, plural, one {# name was} other {# names were}} shortened to {titleLimit} characters."
 msgstr "{shortened, plural, one {# nome foi encurtado} other {# nomes foram encurtados}} para {titleLimit} caracteres."
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:134
+msgid "{shown}. {queuedNote}"
+msgstr ""
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:77
 msgid "{skipped, plural, one {# file could not be imported and was} other {# files could not be imported and were}} left out"
@@ -1605,6 +1593,10 @@ msgstr "{skippedCount, plural, one {# arquivo ficou de fora.} other {# arquivos 
 #: ../../packages/chat-ui/src/chat/presentation-artifact.tsx:51
 msgid "{slideCount, plural, one {# slide} other {# slides}}"
 msgstr "{slideCount, plural, one {# slide} other {# slides}}"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:133
+msgid "{spoken}. {queuedNote}"
+msgstr "{spoken}. {queuedNote}"
 
 #: src/features/skills/components/star-rating-input.tsx:56
 msgid "{star, plural, one {# star} other {# stars}}"
@@ -2019,6 +2011,18 @@ msgstr "há uma alteração aguardando leitura"
 msgid "A chat is waiting for your answer"
 msgstr "Um chat está aguardando sua resposta"
 
+#: src/features/notifications/hooks/use-chat-run-toasts.ts:100
+msgid "A chat needs your input or approval"
+msgstr "Um chat precisa da sua resposta ou aprovação"
+
+#: src/features/notifications/hooks/use-chat-run-toasts.ts:82
+msgid "A chat reply failed"
+msgstr "Uma resposta do chat falhou"
+
+#: src/features/notifications/hooks/use-chat-run-toasts.ts:61
+msgid "A chat reply finished"
+msgstr "Uma resposta do chat terminou"
+
 #: src/features/tasks/components/task-form-dialog.tsx:98
 msgid "A coding agent needs a repository to work on"
 msgstr "Um agente de código precisa de um repositório para trabalhar"
@@ -2076,11 +2080,11 @@ msgstr "Uma meta agrupa tarefas. O progresso dela depende de quantas foram concl
 msgid "A group chat. A question from the owner is answered by three agents in turn: a security reviewer, a performance reviewer, and a lead who sums up."
 msgstr "Um chat em grupo. Uma pergunta do dono é respondida por três agentes em sequência: um revisor de segurança, um revisor de desempenho e um líder que resume."
 
-#: src/features/chat/core/context/chat-context.tsx:725
+#: src/features/chat/core/context/chat-context.tsx:729
 msgid "A guest's message cannot be sent as a goal."
 msgstr "A mensagem de um convidado não pode ser enviada como objetivo."
 
-#: src/features/chat/core/context/chat-context.tsx:728
+#: src/features/chat/core/context/chat-context.tsx:732
 msgid "A guest's message is sent through a hosted model only. Pick one and send it again."
 msgstr "A mensagem de um convidado só é enviada por um modelo hospedado. Escolha um e envie de novo."
 
@@ -2116,6 +2120,10 @@ msgstr "Um login pode indicar no máximo {MAX_TEAMMATES} bots."
 #: src/features/marketing/use-cases/visuals/messaging-visual.tsx:14
 msgid "A message arrives from a chat app, a dot travels down to the agent, and the reply appears in the same chat."
 msgstr "Uma mensagem chega de um app de chat, um ponto desce até o agente, e a resposta aparece no mesmo chat."
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:89
+msgid "A message you send here is queued, and it is sent after you resume the reply."
+msgstr "Uma mensagem que você envia aqui fica na fila e é enviada depois que você retomar a resposta."
 
 #: src/features/chat/host/host-options.tsx:227
 msgid "a mode is changed on the computer, not from here"
@@ -2239,7 +2247,7 @@ msgstr "A conversa de cada execução fica neste projeto. Mover a tarefa para ou
 msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 msgstr "Um sandbox que o bot mantém entre conversas. Pausado quando ocioso, sem cobrança enquanto pausado."
 
-#: src/features/notifications/components/notification-settings.tsx:227
+#: src/features/notifications/components/notification-settings.tsx:248
 msgid "A short summary each morning of what finished, what is running and what needs you. It counts toward your daily usage."
 msgstr "Um breve resumo toda manhã do que terminou, do que está em execução e do que precisa de você. Conta para o seu uso diário."
 
@@ -3721,8 +3729,8 @@ msgstr "Permitir este site ({0})"
 msgid "Allowed AI Models"
 msgstr "Modelos de IA permitidos"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:194
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:195
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:196
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:197
 msgid "Allowed for a limited time"
 msgstr "Permitido por tempo limitado"
 
@@ -3797,14 +3805,17 @@ msgstr "Âmbar"
 msgid "Amount"
 msgstr "Valor"
 
-#: src/features/settings/components/account/account-settings.tsx:110
-#: src/features/settings/components/account/account-settings.tsx:113
+#: src/features/settings/components/account/account-settings.tsx:114
 msgid "Amsterdam"
 msgstr "Amsterdã"
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:245
 msgid "An access key id starts with AKIA and is 20 characters"
 msgstr "Um ID de chave de acesso começa com AKIA e tem 20 caracteres"
+
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:92
+msgid "An admin acting as you cannot change this default."
+msgstr "Um administrador agindo como você não pode alterar este padrão."
 
 #: src/features/settings/connectors/connector-card.tsx:135
 msgid "An administrator needs to register an OAuth app for this connector before it can be used."
@@ -4092,6 +4103,7 @@ msgid "Anyone with the link can view this thread"
 msgstr "Qualquer pessoa com o link pode ver esta conversa"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:49
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:49
 msgid "Anything that is not a plain lookup asks first"
 msgstr "Tudo que não for uma simples consulta pede confirmação antes"
 
@@ -4167,8 +4179,7 @@ msgstr "App Secret em App settings > Basic do seu app da Meta, usado para verifi
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:316
 #: src/features/projects/components/project-form-dialog.tsx:292
-#: src/features/settings/components/account/account-settings.tsx:181
-#: src/features/settings/components/account/account-settings.tsx:184
+#: src/features/settings/components/account/account-settings.tsx:185
 #: src/features/settings/lib/settings-keywords.ts:27
 msgid "Appearance"
 msgstr "Aparência"
@@ -4554,7 +4565,7 @@ msgstr "perguntar"
 
 #: src/features/chat/aside/aside-panel.tsx:306
 #: src/features/chat/sidebar/thread-sidebar.tsx:355
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:61
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:63
 msgid "Ask"
 msgstr "Perguntar"
 
@@ -4729,8 +4740,7 @@ msgstr "Tentativa"
 msgid "Attempts: {0}"
 msgstr "Tentativas: {0}"
 
-#: src/features/settings/components/account/account-settings.tsx:121
-#: src/features/settings/components/account/account-settings.tsx:124
+#: src/features/settings/components/account/account-settings.tsx:125
 msgid "Auckland"
 msgstr "Auckland"
 
@@ -4804,7 +4814,8 @@ msgstr "automático"
 #: src/features/chat/thread/media-gallery-view.tsx:65
 #: src/features/chat/thread/media-gallery-view.tsx:511
 #: src/features/settings/components/chat/bots-settings.tsx:132
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:61
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:41
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:63
 msgid "Auto"
 msgstr "Automático"
 
@@ -4820,6 +4831,10 @@ msgstr "Preços automáticos"
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:72
 msgid "Auto-archive inactive chats"
 msgstr "Arquivar automaticamente conversas inativas"
+
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:110
+msgid "Auto-archive skips a chat while it is linked to a pull request that is still open."
+msgstr ""
 
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:81
 msgid "Auto-archive turned off"
@@ -4860,8 +4875,7 @@ msgstr "A mesclagem automática está ativada: ela mescla assim que as regras de
 msgid "Auto-merge is on."
 msgstr "A mesclagem automática está ativada."
 
-#: src/features/settings/components/account/account-settings.tsx:430
-#: src/features/settings/components/account/account-settings.tsx:433
+#: src/features/settings/components/account/account-settings.tsx:434
 msgid "Auto-read replies"
 msgstr "Ler respostas automaticamente"
 
@@ -4869,28 +4883,19 @@ msgstr "Ler respostas automaticamente"
 msgid "Auto-save"
 msgstr "Salvamento automático"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:361
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:363
 msgid "Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so \"Ask\" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only."
 msgstr "Automático: executa sem perguntar. Perguntar: pausa para você Aprovar / Negar. Desativado: o assistente nunca vê a ferramenta. Automações (gatilhos, bots de mensageiros, fluxos de trabalho) não podem perguntar, então ferramentas em \"Perguntar\" ficam indisponíveis nelas. Ferramentas MCP usam Perguntar por padrão, a menos que o servidor as marque como somente leitura."
 
-#: src/features/settings/components/account/account-settings.tsx:493
+#: src/features/settings/components/account/account-settings.tsx:497
 msgid "Autocomplete disabled"
 msgstr "Preenchimento automático desativado"
 
-#: src/features/settings/components/account/account-settings.tsx:493
+#: src/features/settings/components/account/account-settings.tsx:497
 msgid "Autocomplete enabled"
 msgstr "Preenchimento automático ativado"
 
-#: src/features/settings/components/account/account-settings.tsx:482
-#: src/features/settings/components/account/account-settings.tsx:496
-msgid "Autocomplete disabled"
-msgstr "Preenchimento automático desativado"
-
-#: src/features/settings/components/account/account-settings.tsx:496
-msgid "Autocomplete enabled"
-msgstr "Preenchimento automático ativado"
-
-#: src/features/settings/components/account/account-settings.tsx:485
+#: src/features/settings/components/account/account-settings.tsx:486
 msgid "Autocomplete while typing"
 msgstr "Preenchimento automático ao digitar"
 
@@ -5228,7 +5233,7 @@ msgstr "Console do Bedrock → Chaves de API. Criptografada em repouso e nunca m
 msgid "Before"
 msgstr "Antes"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:246
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:248
 msgid "Before a connected tool set to Ask pauses the chat, a short model check reads the call. It only looks at tools from MCP servers and connectors you have marked as trusted, and only those whose name starts with a read verb such as get, list, search or fetch, and never after the chat has read your knowledge base, memories, project context, a tool result, an attached file, document or web page, or while any skill is enabled. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Everything else still asks you. Off by default."
 msgstr "Antes de uma ferramenta conectada definida como Perguntar pausar o chat, uma rápida verificação do modelo lê a chamada. Ela só analisa ferramentas de servidores MCP e conectores que você marcou como confiáveis, e apenas aquelas cujo nome começa com um verbo de leitura como get, list, search ou fetch, e nunca depois que o chat leu sua base de conhecimento, memórias, contexto do projeto, o resultado de uma ferramenta, um arquivo anexado, documento ou página da web, nem enquanto qualquer habilidade estiver ativada. Se ela julgar a chamada de baixo risco, a chamada é executada e o chat registra que foi aprovada automaticamente, com o motivo. Todo o resto continua pedindo sua confirmação. Desativado por padrão."
 
@@ -5240,8 +5245,7 @@ msgstr "Antes de cada resposta, as memórias mais relevantes para a mensagem sã
 msgid "beginner"
 msgstr "iniciante"
 
-#: src/features/settings/components/account/account-settings.tsx:208
-#: src/features/settings/components/account/account-settings.tsx:211
+#: src/features/settings/components/account/account-settings.tsx:212
 #: src/features/settings/lib/settings-keywords.ts:28
 msgid "Behavior"
 msgstr "Comportamento"
@@ -5274,8 +5278,7 @@ msgstr "Bengali"
 msgid "Bengali (Bangladesh)"
 msgstr "Bengali (Bangladesh)"
 
-#: src/features/settings/components/account/account-settings.tsx:107
-#: src/features/settings/components/account/account-settings.tsx:110
+#: src/features/settings/components/account/account-settings.tsx:111
 msgid "Berlin"
 msgstr "Berlim"
 
@@ -5457,11 +5460,11 @@ msgstr "Provedores bloqueados"
 msgid "Blocked Regions"
 msgstr "Regiões bloqueadas"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:106
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:128
 msgid "Blocked websites for web search"
 msgstr "Sites bloqueados na pesquisa na web"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:127
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:149
 msgid "Blocked websites saved"
 msgstr "Sites bloqueados salvos"
 
@@ -5815,8 +5818,8 @@ msgstr "Editor de canvas integrado"
 msgid "Built-in reasoning before generating"
 msgstr "Raciocínio integrado antes de gerar"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:370
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:371
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:374
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:375
 #: src/features/settings/lib/settings-keywords.ts:102
 msgid "Built-in tools"
 msgstr "Ferramentas integradas"
@@ -6330,8 +6333,7 @@ msgstr "CB até {circuitBreakerUntil}"
 msgid "Center"
 msgstr "Centro"
 
-#: src/features/settings/components/account/account-settings.tsx:100
-#: src/features/settings/components/account/account-settings.tsx:103
+#: src/features/settings/components/account/account-settings.tsx:104
 msgid "Central Time (US & Canada)"
 msgstr "Horário Central (EUA e Canadá)"
 
@@ -6485,8 +6487,7 @@ msgstr "chat"
 #: src/features/layout/components/sidebar-shortcut.tsx:79
 #: src/features/layout/components/workspace-switch.tsx:47
 #: src/features/layout/lib/dashboard-page-names.ts:20
-#: src/features/settings/components/account/account-settings.tsx:342
-#: src/features/settings/components/account/account-settings.tsx:345
+#: src/features/settings/components/account/account-settings.tsx:346
 #: src/features/settings/components/chat/bots-settings.tsx:515
 #: src/features/settings/lib/settings-keywords.ts:33
 #: src/features/settings/lib/settings-navigation.ts:100
@@ -6514,6 +6515,14 @@ msgstr "Chat Completions (/v1/chat/completions) — Ollama, LM Studio, vLLM e a 
 msgid "Chat copied to clipboard as Markdown"
 msgstr "Chat copiado para a área de transferência como Markdown"
 
+#: src/features/notifications/components/notification-settings.tsx:296
+msgid "Chat failed"
+msgstr "Chat com falha"
+
+#: src/features/notifications/components/notification-settings.tsx:279
+msgid "Chat finished"
+msgstr "Chat concluído"
+
 #: src/features/marketing/components/tutorials-page.tsx:98
 msgid "Chat Import"
 msgstr "Importação de chats"
@@ -6538,6 +6547,18 @@ msgstr "Bloqueio do chat: bloqueado"
 #: src/features/settings/lib/settings-keywords.ts:70
 msgid "chat model"
 msgstr "modelo do chat"
+
+#: src/features/notifications/components/notification-settings.tsx:313
+msgid "Chat needs your input or approval"
+msgstr "O chat precisa da sua resposta ou aprovação"
+
+#: src/features/notifications/components/notification-settings.tsx:122
+msgid "Chat notification turned off"
+msgstr "Notificação do chat desativada"
+
+#: src/features/notifications/components/notification-settings.tsx:123
+msgid "Chat notification turned on"
+msgstr "Notificação do chat ativada"
 
 #: src/features/prompts/components/prompt-form-dialog.tsx:377
 msgid "Chat Settings (Optional)"
@@ -6587,11 +6608,11 @@ msgstr "Conversas"
 msgid "Chats in this project search these collections and cite them."
 msgstr "Os chats deste projeto pesquisam essas coleções e as citam."
 
-#: src/features/settings/components/account/account-settings.tsx:598
+#: src/features/settings/components/account/account-settings.tsx:601
 msgid "Chats paused by a usage limit will be snoozed"
 msgstr "As conversas com uma resposta pausada por limite de uso serão adiadas"
 
-#: src/features/settings/components/account/account-settings.tsx:598
+#: src/features/settings/components/account/account-settings.tsx:601
 msgid "Chats paused by a usage limit will not be snoozed"
 msgstr "As conversas com uma resposta pausada por limite de uso não serão adiadas"
 
@@ -6605,18 +6626,21 @@ msgid "Chats that use its models will stop working until you pick another model.
 msgstr "Os chats que usam os modelos dele vão parar de funcionar até você escolher outro modelo."
 
 #. placeholder {0}: percentFormat.format(percent / 100)
-#: src/features/settings/components/account/account-settings.tsx:403
+#: src/features/settings/components/account/account-settings.tsx:407
 msgid "Chats will be compacted at {0} of the context window"
 msgstr "Os chats serão compactados em {0} da janela de contexto"
 
-#: src/features/settings/components/account/account-settings.tsx:402
 #: src/features/settings/components/account/account-settings.tsx:406
-msgid "Chats will be compacted at {0} of the context window"
-msgstr "Os chats serão compactados em {0} da janela de contexto"
-
-#: src/features/settings/components/account/account-settings.tsx:405
 msgid "Chats will not be compacted automatically"
 msgstr "Os chats não serão compactados automaticamente"
+
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:120
+msgid "Chats with an open pull request are kept"
+msgstr ""
+
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:120
+msgid "Chats with an open pull request can be archived"
+msgstr ""
 
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:75
 msgid "Chats with no activity for this long are archived. Archived chats stay searchable."
@@ -6787,12 +6811,11 @@ msgstr "Escolher modelos de texto padrão"
 msgid "Choose default video models"
 msgstr "Escolher modelos de vídeo padrão"
 
-#: src/features/notifications/components/notification-settings.tsx:199
+#: src/features/notifications/components/notification-settings.tsx:220
 msgid "Choose how Neore tells you about finished work and things that need you."
 msgstr "Escolha como o Neore avisa sobre trabalho concluído e o que precisa de você."
 
-#: src/features/settings/components/account/account-settings.tsx:214
-#: src/features/settings/components/account/account-settings.tsx:217
+#: src/features/settings/components/account/account-settings.tsx:218
 msgid "Choose how to send messages in the chat. Cmd/Ctrl+Enter always sends."
 msgstr "Escolha como enviar mensagens no chat. Cmd/Ctrl+Enter sempre envia."
 
@@ -6824,7 +6847,7 @@ msgstr "Escolha o sistema de câmera para a sua cena"
 msgid "Choose the project's folder, or type a path."
 msgstr "Escolha a pasta do projeto ou digite um caminho."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:355
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:357
 msgid "Choose which tools the assistant may use on its own, which need your approval, and which are off."
 msgstr "Escolha quais ferramentas o assistente pode usar sozinho, quais precisam da sua aprovação e quais ficam desativadas."
 
@@ -7069,8 +7092,7 @@ msgstr "Clicar em \"{selector}\""
 msgid "Click ★ on any model in All models to add it here."
 msgstr "Clique em ★ em qualquer modelo em Todos os modelos para adicioná-lo aqui."
 
-#: src/features/settings/components/account/account-settings.tsx:229
-#: src/features/settings/components/account/account-settings.tsx:232
+#: src/features/settings/components/account/account-settings.tsx:233
 msgid "Click button to send"
 msgstr "Clique no botão para enviar"
 
@@ -7686,8 +7708,7 @@ msgstr "Compactar contexto"
 msgid "Compact distilled reasoning model from DeepSeek"
 msgstr "Modelo de raciocínio compacto e destilado da DeepSeek"
 
-#: src/features/settings/components/account/account-settings.tsx:388
-#: src/features/settings/components/account/account-settings.tsx:391
+#: src/features/settings/components/account/account-settings.tsx:392
 msgid "Compact full chats automatically"
 msgstr "Compactar automaticamente chats cheios"
 
@@ -7932,8 +7953,7 @@ msgstr "Ramificação condicional"
 msgid "Configure advanced AI agent modules for enhanced task execution"
 msgstr "Configure módulos avançados do agente de IA para executar tarefas melhor"
 
-#: src/features/settings/components/account/account-settings.tsx:342
-#: src/features/settings/components/account/account-settings.tsx:345
+#: src/features/settings/components/account/account-settings.tsx:346
 msgid "Configure chat behavior and preferences."
 msgstr "Configure o comportamento e as preferências do chat."
 
@@ -7941,16 +7961,11 @@ msgstr "Configure o comportamento e as preferências do chat."
 msgid "Configure default model, reasoning effort, and features for new chats created in this project."
 msgstr "Configure o modelo padrão, o esforço de raciocínio e os recursos para novos chats criados neste projeto."
 
-#: src/features/settings/components/account/account-settings.tsx:208
+#: src/features/settings/components/account/account-settings.tsx:212
 msgid "Configure how the application behaves."
 msgstr "Configure como o aplicativo se comporta."
 
-#: src/features/settings/components/account/account-settings.tsx:236
-#: src/features/settings/components/account/account-settings.tsx:211
-msgid "Configure how the application behaves."
-msgstr "Configure como o aplicativo se comporta."
-
-#: src/features/settings/components/account/account-settings.tsx:239
+#: src/features/settings/components/account/account-settings.tsx:240
 msgid "Configure language preferences and location settings."
 msgstr "Configure as preferências de idioma e as configurações de localização."
 
@@ -7975,8 +7990,7 @@ msgstr "Configure o contato de cobrança e os modelos de IA disponíveis"
 msgid "Configure thresholds and batch limits for anonymous user cleanup"
 msgstr "Configure os limites e os tamanhos de lote para a limpeza de usuários anônimos"
 
-#: src/features/settings/components/account/account-settings.tsx:634
-#: src/features/settings/components/account/account-settings.tsx:680
+#: src/features/settings/components/account/account-settings.tsx:686
 msgid "Configure UI preferences and display options."
 msgstr "Configure as preferências da interface e as opções de exibição."
 
@@ -8244,7 +8258,7 @@ msgstr "Conectado. Você pode fechar esta janela."
 msgid "Connecting {pairingHost}…"
 msgstr "Conectando a {pairingHost}…"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:392
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:396
 msgid "Connecting to your MCP servers..."
 msgstr "Conectando aos seus servidores MCP..."
 
@@ -8475,8 +8489,7 @@ msgstr "Continuar"
 msgid "Continue in this chat"
 msgstr "Continuar neste chat"
 
-#: src/features/settings/components/account/account-settings.tsx:537
-#: src/features/settings/components/account/account-settings.tsx:540
+#: src/features/settings/components/account/account-settings.tsx:541
 msgid "Continue interrupted replies"
 msgstr "Continuar respostas interrompidas"
 
@@ -8529,8 +8542,7 @@ msgstr "Controle as políticas de tratamento e retenção de dados dos provedore
 msgid "Control depth of field with aperture setting"
 msgstr "Controle a profundidade de campo com a abertura"
 
-#: src/features/settings/components/account/account-settings.tsx:160
-#: src/features/settings/components/account/account-settings.tsx:163
+#: src/features/settings/components/account/account-settings.tsx:164
 msgid "Control how your personal information is displayed in the UI."
 msgstr "Controle como suas informações pessoais são exibidas na interface."
 
@@ -8954,7 +8966,7 @@ msgstr "Não foi possível cancelar a execução."
 msgid "Could not change Auto. Please try again."
 msgstr "Não foi possível alterar Auto. Tente novamente."
 
-#: src/features/notifications/components/notification-settings.tsx:169
+#: src/features/notifications/components/notification-settings.tsx:190
 msgid "Could not change push notifications. Try again."
 msgstr "Não foi possível alterar as notificações push. Tente novamente."
 
@@ -9171,7 +9183,7 @@ msgstr "Não foi possível carregar os repositórios deste projeto."
 msgid "Could not load this project's usage."
 msgstr "Não foi possível carregar o uso deste projeto."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:139
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:141
 msgid "Could not load tools: {error}"
 msgstr "Não foi possível carregar as ferramentas: {error}"
 
@@ -9238,7 +9250,7 @@ msgstr "Não foi possível pré-visualizar · Clique para baixar"
 msgid "Could not pull {0}: {1}"
 msgstr "Não foi possível baixar {0}: {1}"
 
-#: src/features/chat/core/context/chat-context.tsx:672
+#: src/features/chat/core/context/chat-context.tsx:676
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr "Não foi possível acessar o servidor para iniciar a geração. Verifique sua conexão e tente novamente."
 
@@ -9299,7 +9311,7 @@ msgstr "Não foi possível restaurar esta versão"
 msgid "Could not resume its own session, so the conversation was handed over"
 msgstr "Não foi possível retomar a própria sessão, então a conversa foi transferida"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:177
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:191
 msgid "Could not retry. Please try again."
 msgstr "Não foi possível tentar novamente. Tente de novo."
 
@@ -9313,11 +9325,19 @@ msgstr "Não foi possível salvar essa escolha. Tente novamente."
 msgid "Could not save the bot's tools. Its tools are unchanged."
 msgstr "Não foi possível salvar as ferramentas do bot. As ferramentas dele não mudaram."
 
-#: src/features/notifications/components/notification-settings.tsx:110
+#: src/features/notifications/components/notification-settings.tsx:121
+msgid "Could not save the chat notification setting."
+msgstr "Não foi possível salvar a configuração de notificação do chat."
+
+#: src/features/notifications/components/notification-settings.tsx:131
 msgid "Could not save the Daily Brief setting."
 msgstr "Não foi possível salvar a configuração do Daily Brief."
 
-#: src/features/notifications/components/notification-settings.tsx:103
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:73
+msgid "Could not save the default permission mode"
+msgstr "Não foi possível salvar o modo de permissões padrão"
+
+#: src/features/notifications/components/notification-settings.tsx:107
 msgid "Could not save the email setting."
 msgstr "Não foi possível salvar a configuração de e-mail."
 
@@ -9410,9 +9430,7 @@ msgid "Could not stop the conversation"
 msgstr "Não foi possível interromper a conversa"
 
 #: src/features/chat/thread-list/thread-node.tsx:655
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:150
-#: src/features/chat/thread-list/thread-node.tsx:644
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:182
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:196
 msgid "Could not stop the reply. Please try again."
 msgstr "Não foi possível interromper a resposta. Tente novamente."
 
@@ -9465,7 +9483,7 @@ msgstr "Contado em semanas inteiras (de segunda a domingo, UTC) depois que cada 
 msgid "country"
 msgstr "país"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:254
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:256
 msgid "Covers only tools from MCP servers and connectors you trust for auto-approval (a switch on each server in your MCP settings and on each connector), left at their default Ask, in chats only you can write to. A trusted server's tool descriptions reach the model and can influence what is approved, so trust only servers you would let act for you. Changing a server's address ends its trust."
 msgstr "Abrange apenas ferramentas de servidores MCP e conectores em que você confia para aprovação automática (uma chave em cada servidor nas suas configurações de MCP e em cada conector), mantidos no padrão Perguntar, em chats em que somente você pode escrever. As descrições das ferramentas de um servidor confiável chegam ao modelo e podem influenciar o que é aprovado, então confie apenas em servidores que você deixaria agir por você. Alterar o endereço de um servidor encerra a confiança."
 
@@ -10007,7 +10025,7 @@ msgid "Custom rate limits"
 msgstr "Limites de taxa personalizados"
 
 #. placeholder {0}: modeLabels[tool.defaultMode]
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:75
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:77
 msgid "Custom setting (default: {0})"
 msgstr "Configuração personalizada (padrão: {0})"
 
@@ -10050,8 +10068,7 @@ msgstr "Personalizar e gerar novamente"
 msgid "Customize keyboard shortcuts for common actions. Click \"Record\" and press your desired key combination."
 msgstr "Personalize os atalhos de teclado para ações comuns. Clique em \"Gravar\" e pressione a combinação de teclas desejada."
 
-#: src/features/settings/components/account/account-settings.tsx:181
-#: src/features/settings/components/account/account-settings.tsx:184
+#: src/features/settings/components/account/account-settings.tsx:185
 msgid "Customize the appearance of the application."
 msgstr "Personalize a aparência do aplicativo."
 
@@ -10100,7 +10117,7 @@ msgid "Czech Republic"
 msgstr "República Tcheca"
 
 #: src/features/home/components/daily-brief-offer.tsx:105
-#: src/features/notifications/components/notification-settings.tsx:224
+#: src/features/notifications/components/notification-settings.tsx:245
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:57
 msgid "Daily Brief"
 msgstr "Daily Brief"
@@ -10114,11 +10131,11 @@ msgstr "O Daily Brief está ativado. Ele chega pela manhã quando há algo para 
 msgid "Daily Brief is on. The next one is planned for {0}; a morning with nothing to report sends none."
 msgstr "O Daily Brief está ativado. O próximo está previsto para {0}; numa manhã sem nada para relatar, nenhum é enviado."
 
-#: src/features/notifications/components/notification-settings.tsx:111
+#: src/features/notifications/components/notification-settings.tsx:132
 msgid "Daily Brief turned off"
 msgstr "Daily Brief desativado"
 
-#: src/features/notifications/components/notification-settings.tsx:112
+#: src/features/notifications/components/notification-settings.tsx:133
 msgid "Daily Brief turned on"
 msgstr "Daily Brief ativado"
 
@@ -10375,7 +10392,7 @@ msgstr "padrão"
 
 #: src/features/appearance/components/appearance-controls.tsx:185
 #: src/features/projects/components/project-repositories.tsx:342
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:75
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:77
 msgid "Default"
 msgstr "Padrão"
 
@@ -10384,8 +10401,7 @@ msgstr "Padrão"
 msgid "Default agent"
 msgstr "Agente padrão"
 
-#: src/features/settings/components/account/account-settings.tsx:240
-#: src/features/settings/components/account/account-settings.tsx:243
+#: src/features/settings/components/account/account-settings.tsx:244
 #: src/features/settings/lib/settings-keywords.ts:29
 msgid "Default AI Response Language"
 msgstr "Idioma padrão das respostas da IA"
@@ -10407,30 +10423,24 @@ msgstr "Branch padrão de {name}"
 msgid "Default branch:"
 msgstr "Branch padrão:"
 
-#: src/features/settings/components/account/account-settings.tsx:265
-#: src/features/settings/components/account/account-settings.tsx:268
+#: src/features/settings/components/account/account-settings.tsx:269
 #: src/features/settings/lib/settings-keywords.ts:30
 msgid "Default Dictation Language"
 msgstr "Idioma padrão de ditado"
 
-#: src/features/settings/components/account/account-settings.tsx:267
+#: src/features/settings/components/account/account-settings.tsx:271
 msgid "Default dictation language for new threads (BCP 47 code)."
 msgstr "Idioma padrão de ditado para novas conversas (código BCP 47)."
 
-#: src/features/settings/components/account/account-settings.tsx:242
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:55
+msgid "Default for new chats"
+msgstr "Padrão para novos chats"
+
+#: src/features/settings/components/account/account-settings.tsx:246
 msgid "Default language for AI responses in new threads (BCP 47 code)."
 msgstr "Idioma padrão das respostas da IA em novas conversas (código BCP 47)."
 
-#: src/features/settings/components/account/account-settings.tsx:245
-#: src/features/settings/components/account/account-settings.tsx:270
-msgid "Default dictation language for new threads (BCP 47 code)."
-msgstr "Idioma padrão de ditado para novas conversas (código BCP 47)."
-
-#: src/features/settings/components/account/account-settings.tsx:245
-msgid "Default language for AI responses in new threads (BCP 47 code)."
-msgstr "Idioma padrão das respostas da IA em novas conversas (código BCP 47)."
-
-#: src/features/settings/components/account/account-settings.tsx:248
+#: src/features/settings/components/account/account-settings.tsx:249
 msgid "Default language updated"
 msgstr "Idioma padrão atualizado"
 
@@ -11143,7 +11153,7 @@ msgstr "Projetar um sistema ou uma alteração que abrange várias partes."
 msgid "Desktop"
 msgstr "Desktop"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:71
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:73
 msgid "destructive"
 msgstr "destrutiva"
 
@@ -11261,8 +11271,7 @@ msgstr "Tema de diagramas atualizado"
 msgid "Diamond"
 msgstr "Losango"
 
-#: src/features/settings/components/account/account-settings.tsx:270
-#: src/features/settings/components/account/account-settings.tsx:273
+#: src/features/settings/components/account/account-settings.tsx:274
 msgid "Dictation language updated"
 msgstr "Idioma de ditado atualizado"
 
@@ -11447,8 +11456,7 @@ msgstr "Exibir os nomes dos modelos nos resultados"
 msgid "Display results"
 msgstr "Exibir resultados"
 
-#: src/features/settings/components/account/account-settings.tsx:641
-#: src/features/settings/components/account/account-settings.tsx:687
+#: src/features/settings/components/account/account-settings.tsx:693
 msgid "Display timestamps on messages."
 msgstr "Exibir data e hora nas mensagens."
 
@@ -11845,8 +11853,7 @@ msgstr "Simulação (só pré-visualização — nada é excluído)"
 msgid "Dry run complete"
 msgstr "Simulação concluída"
 
-#: src/features/settings/components/account/account-settings.tsx:117
-#: src/features/settings/components/account/account-settings.tsx:120
+#: src/features/settings/components/account/account-settings.tsx:121
 msgid "Dubai"
 msgstr "Dubai"
 
@@ -11986,7 +11993,7 @@ msgstr "Cada ação coloca um prompt na caixa de mensagem desta conversa. Leia-o
 msgid "Each case runs once, one after another. Every case counts toward your daily message and task limits, and the run stops when it reaches its cost cap."
 msgstr "Cada caso é executado uma vez, um após o outro. Cada caso conta para seus limites diários de mensagens e tarefas, e a execução para quando atinge o limite de custo."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:258
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:260
 msgid "Each check is one small model call on your account and is rate-limited. If it fails or runs out of time, you are asked as usual."
 msgstr "Cada verificação é uma pequena chamada de modelo na sua conta e tem limite de taxa. Se falhar ou esgotar o tempo, você é consultado como de costume."
 
@@ -12046,8 +12053,7 @@ msgstr "Acesso antecipado aos próximos recursos de modelos da Alibaba"
 msgid "Early adopters who want to experiment with Google's next-generation Flash capabilities"
 msgstr "Early adopters que querem experimentar os recursos Flash de nova geração do Google"
 
-#: src/features/settings/components/account/account-settings.tsx:99
-#: src/features/settings/components/account/account-settings.tsx:102
+#: src/features/settings/components/account/account-settings.tsx:103
 msgid "Eastern Time (US & Canada)"
 msgstr "Horário do Leste (EUA e Canadá)"
 
@@ -12518,7 +12524,7 @@ msgstr "E-mail de verificação enviado"
 msgid "Email Verified:"
 msgstr "E-mail verificado:"
 
-#: src/features/notifications/components/notification-settings.tsx:241
+#: src/features/notifications/components/notification-settings.tsx:262
 msgid "Email when a task finishes"
 msgstr "E-mail quando uma tarefa terminar"
 
@@ -12580,8 +12586,7 @@ msgstr "Ativar o modo Deep Work"
 msgid "Enable Deep Work mode for complex multi-step tasks. The AI will iterate up to 25 times to complete your request."
 msgstr "Ative o modo Deep Work para tarefas complexas em várias etapas. A IA fará até 25 iterações para concluir sua solicitação."
 
-#: src/features/settings/components/account/account-settings.tsx:347
-#: src/features/settings/components/account/account-settings.tsx:350
+#: src/features/settings/components/account/account-settings.tsx:351
 #: src/features/settings/lib/settings-keywords.ts:33
 msgid "Enable Follow-up Suggestions"
 msgstr "Ativar sugestões de continuação"
@@ -12971,8 +12976,7 @@ msgstr "Digite seu nome completo ou nome de exibição"
 msgid "Enter your information to create an account"
 msgstr "Preencha seus dados para criar uma conta"
 
-#: src/features/settings/components/account/account-settings.tsx:312
-#: src/features/settings/components/account/account-settings.tsx:315
+#: src/features/settings/components/account/account-settings.tsx:316
 msgid "Enter your location"
 msgstr "Digite sua localização"
 
@@ -13273,6 +13277,7 @@ msgid "Every Sunday at midnight"
 msgstr "Todo domingo à meia-noite"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:48
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:48
 msgid "Every tool runs without asking, except those that need your answer"
 msgstr "Todas as ferramentas executam sem perguntar, exceto as que precisam da sua resposta"
 
@@ -14302,7 +14307,7 @@ msgstr "Falha ao revogar a sessão"
 msgid "Failed to revoke sessions"
 msgstr "Falha ao revogar as sessões"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:322
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:324
 msgid "Failed to revoke the allow"
 msgstr "Falha ao revogar a permissão"
 
@@ -14359,11 +14364,9 @@ msgstr "Não foi possível salvar o provedor"
 msgid "Failed to save rating"
 msgstr "Falha ao salvar a avaliação"
 
-#: src/features/settings/components/account/account-settings.tsx:142
-#: src/features/settings/components/account/account-settings.tsx:150
+#: src/features/settings/components/account/account-settings.tsx:146
+#: src/features/settings/components/account/account-settings.tsx:154
 #: src/features/settings/components/chat/chat-action-confirm-settings.tsx:61
-#: src/features/settings/components/account/account-settings.tsx:145
-#: src/features/settings/components/account/account-settings.tsx:153
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:40
 #: src/features/settings/components/personalization/personalization-settings.tsx:118
 #: src/features/settings/components/personalization/personalization-settings.tsx:202
@@ -14531,7 +14534,7 @@ msgstr "Não foi possível atualizar o provedor"
 msgid "Failed to update pull request settings"
 msgstr "Não foi possível atualizar as configurações de pull requests"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:47
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:46
 msgid "Failed to update reply tools"
 msgstr "Não foi possível atualizar as ferramentas de resposta"
 
@@ -14551,7 +14554,7 @@ msgstr "Falha ao atualizar as tags"
 msgid "Failed to update the case"
 msgstr "Falha ao atualizar o caso"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:310
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:312
 msgid "Failed to update the quick check"
 msgstr "Falha ao atualizar a verificação rápida"
 
@@ -14563,7 +14566,7 @@ msgstr "Falha ao atualizar os servidores confiáveis"
 msgid "Failed to update thread visibility"
 msgstr "Falha ao atualizar a visibilidade da conversa"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:298
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:300
 msgid "Failed to update tool permission"
 msgstr "Falha ao atualizar a permissão da ferramenta"
 
@@ -15490,16 +15493,11 @@ msgstr "Acompanhar conversa"
 msgid "follow up"
 msgstr "acompanhamento"
 
-#: src/features/settings/components/account/account-settings.tsx:358
+#: src/features/settings/components/account/account-settings.tsx:362
 msgid "Follow-up suggestions disabled"
 msgstr "Sugestões de continuação desativadas"
 
-#: src/features/settings/components/account/account-settings.tsx:358
-#: src/features/settings/components/account/account-settings.tsx:361
-msgid "Follow-up suggestions disabled"
-msgstr "Sugestões de continuação desativadas"
-
-#: src/features/settings/components/account/account-settings.tsx:361
+#: src/features/settings/components/account/account-settings.tsx:362
 msgid "Follow-up suggestions enabled"
 msgstr "Sugestões de continuação ativadas"
 
@@ -15948,6 +15946,7 @@ msgstr "Vídeo em alta definição Full HD 1080p"
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
 #: src/features/chat/thread/composer-permission-mode.tsx:42
 #: src/features/settings/components/chat/bots-settings.tsx:133
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:42
 msgid "Full access"
 msgstr "Acesso total"
 
@@ -16291,7 +16290,7 @@ msgstr "Alemanha"
 msgid "Get a short summary each morning of what finished, what needs you and what is still running. It counts toward your daily usage."
 msgstr "Receba toda manhã um breve resumo do que terminou, do que precisa de você e do que ainda está em andamento. Conta para o seu uso diário."
 
-#: src/features/notifications/components/notification-settings.tsx:193
+#: src/features/notifications/components/notification-settings.tsx:214
 msgid "Get a system notification when a task finishes or something needs your approval, even with the app closed."
 msgstr "Receba uma notificação do sistema quando uma tarefa terminar ou algo precisar da sua aprovação, mesmo com o app fechado."
 
@@ -16299,7 +16298,7 @@ msgstr "Receba uma notificação do sistema quando uma tarefa terminar ou algo p
 msgid "Get Access"
 msgstr "Obter acesso"
 
-#: src/features/notifications/components/notification-settings.tsx:244
+#: src/features/notifications/components/notification-settings.tsx:265
 msgid "Get an email with a link to the result when a task or trigger run finishes with one."
 msgstr "Receba um e-mail com um link para o resultado quando uma tarefa ou execução de gatilho terminar com um."
 
@@ -17011,8 +17010,7 @@ msgstr "Modo mãos-livres desativado"
 msgid "Hands-free mode stopped: {0}"
 msgstr "Modo mãos-livres interrompido: {0}"
 
-#: src/features/settings/components/account/account-settings.tsx:449
-#: src/features/settings/components/account/account-settings.tsx:452
+#: src/features/settings/components/account/account-settings.tsx:453
 msgid "Hands-free voice"
 msgstr "Voz do modo mãos-livres"
 
@@ -17020,8 +17018,7 @@ msgstr "Voz do modo mãos-livres"
 msgid "Hands-free voice mode — talk, and replies are read aloud"
 msgstr "Modo de voz mãos-livres — fale, e as respostas são lidas em voz alta"
 
-#: src/features/settings/components/account/account-settings.tsx:460
-#: src/features/settings/components/account/account-settings.tsx:463
+#: src/features/settings/components/account/account-settings.tsx:464
 msgid "Hands-free voice updated"
 msgstr "Voz do modo mãos-livres atualizada"
 
@@ -17152,8 +17149,7 @@ msgstr "Ocultar saída"
 msgid "Hide password"
 msgstr "Ocultar senha"
 
-#: src/features/settings/components/account/account-settings.tsx:165
-#: src/features/settings/components/account/account-settings.tsx:168
+#: src/features/settings/components/account/account-settings.tsx:169
 #: src/features/settings/lib/settings-keywords.ts:26
 msgid "Hide Personal Information"
 msgstr "Ocultar informações pessoais"
@@ -17175,8 +17171,7 @@ msgstr "Oculte esta pergunta paralela. Ela já está sendo respondida e ainda co
 msgid "Hide translation"
 msgstr "Ocultar tradução"
 
-#: src/features/settings/components/account/account-settings.tsx:167
-#: src/features/settings/components/account/account-settings.tsx:170
+#: src/features/settings/components/account/account-settings.tsx:171
 msgid "Hides your name and email from the UI."
 msgstr "Oculta seu nome e e-mail da interface."
 
@@ -17409,8 +17404,7 @@ msgid "Honduras"
 msgstr "Honduras"
 
 #: src/features/chat/core/utils/language-utilities.ts:358
-#: src/features/settings/components/account/account-settings.tsx:115
-#: src/features/settings/components/account/account-settings.tsx:118
+#: src/features/settings/components/account/account-settings.tsx:119
 msgid "Hong Kong"
 msgstr "Hong Kong"
 
@@ -17482,8 +17476,7 @@ msgstr "Qual é a diferença entre o Neore e o ChatGPT?"
 msgid "How it works"
 msgstr "Como funciona"
 
-#: src/features/settings/components/account/account-settings.tsx:583
-#: src/features/settings/components/account/account-settings.tsx:630
+#: src/features/settings/components/account/account-settings.tsx:635
 msgid "How long temporary chats are kept before being automatically deleted. Default: 24 hours."
 msgstr "Por quanto tempo os chats temporários são mantidos antes de serem excluídos automaticamente. Padrão: 24 horas."
 
@@ -17739,7 +17732,6 @@ msgstr "geração de imagens"
 
 #: src/features/marketing/components/landing-page.tsx:136
 #: src/features/marketing/components/models-page.tsx:486
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:21
 msgid "Image generation"
 msgstr "Geração de imagens"
 
@@ -18497,16 +18489,11 @@ msgstr "Interromper e reiniciar — para a resposta atual e envia isto"
 msgid "Interrupt and send"
 msgstr "Interromper e enviar"
 
-#: src/features/settings/components/account/account-settings.tsx:551
+#: src/features/settings/components/account/account-settings.tsx:555
 msgid "Interrupted replies will continue"
 msgstr "As respostas interrompidas vão continuar"
 
-#: src/features/settings/components/account/account-settings.tsx:551
-#: src/features/settings/components/account/account-settings.tsx:554
-msgid "Interrupted replies will continue"
-msgstr "As respostas interrompidas vão continuar"
-
-#: src/features/settings/components/account/account-settings.tsx:554
+#: src/features/settings/components/account/account-settings.tsx:555
 msgid "Interrupted replies will stop"
 msgstr "As respostas interrompidas vão parar"
 
@@ -18926,6 +18913,10 @@ msgstr "Continuar aceitando o segredo antigo por 24 horas"
 msgid "Keep as mine"
 msgstr "Manter como meu"
 
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:107
+msgid "Keep chats with an open pull request"
+msgstr ""
+
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1071
 msgid "Keep control"
 msgstr "Manter o controle"
@@ -19071,7 +19062,7 @@ msgstr "Módulo de conhecimento"
 msgid "Knowledge retrieval"
 msgstr "Recuperação de conhecimento"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:22
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:21
 msgid "Knowledge search"
 msgstr "Pesquisa no conhecimento"
 
@@ -19193,8 +19184,7 @@ msgstr "idioma"
 msgid "Language"
 msgstr "Linguagem"
 
-#: src/features/settings/components/account/account-settings.tsx:236
-#: src/features/settings/components/account/account-settings.tsx:239
+#: src/features/settings/components/account/account-settings.tsx:240
 #: src/features/settings/lib/settings-keywords.ts:29
 #: src/features/settings/lib/settings-keywords.ts:30
 #: src/features/settings/lib/settings-keywords.ts:31
@@ -19593,8 +19583,7 @@ msgstr "Esquerda"
 msgid "Left organization successfully"
 msgstr "Você saiu da organização"
 
-#: src/features/settings/components/account/account-settings.tsx:200
-#: src/features/settings/components/account/account-settings.tsx:203
+#: src/features/settings/components/account/account-settings.tsx:204
 msgid "Left to Right (LTR)"
 msgstr "Da esquerda para a direita (LTR)"
 
@@ -19619,11 +19608,11 @@ msgstr "Tipo de lente"
 msgid "Less"
 msgstr "Menos"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:243
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:245
 msgid "Let a quick check approve low-risk calls"
 msgstr "Permitir que uma verificação rápida aprove chamadas de baixo risco"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:64
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:63
 msgid "Let replies use tools"
 msgstr "Permitir ferramentas nas respostas"
 
@@ -20256,7 +20245,7 @@ msgstr "Carregando seus servidores, conectores e computadores…"
 #: src/features/settings/components/chat/custom-providers-settings.tsx:343
 #: src/features/settings/components/chat/default-models-settings.tsx:185
 #: src/features/settings/components/chat/native-providers-settings.tsx:396
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:289
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:291
 #: src/features/settings/components/chat/trigger-settings.tsx:974
 #: src/features/settings/components/privacy/data-access.tsx:25
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:229
@@ -20281,7 +20270,7 @@ msgstr "Carregando…"
 msgid "local"
 msgstr "local"
 
-#: src/features/chat/core/context/chat-context.tsx:732
+#: src/features/chat/core/context/chat-context.tsx:736
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "Modelos locais aceitam apenas texto. Remova os anexos para enviar."
 
@@ -20302,14 +20291,12 @@ msgstr "localidade"
 msgid "localhost or 127.0.0.1 only. Ollama: {OLLAMA_DEFAULT_BASE_URL} · LM Studio: {LM_STUDIO_DEFAULT_BASE_URL}"
 msgstr "Somente localhost ou 127.0.0.1. Ollama: {OLLAMA_DEFAULT_BASE_URL} · LM Studio: {LM_STUDIO_DEFAULT_BASE_URL}"
 
-#: src/features/settings/components/account/account-settings.tsx:290
-#: src/features/settings/components/account/account-settings.tsx:293
+#: src/features/settings/components/account/account-settings.tsx:294
 #: src/features/settings/lib/settings-keywords.ts:31
 msgid "Location"
 msgstr "Localização"
 
-#: src/features/settings/components/account/account-settings.tsx:300
-#: src/features/settings/components/account/account-settings.tsx:303
+#: src/features/settings/components/account/account-settings.tsx:304
 msgid "Location updated"
 msgstr "Localização atualizada"
 
@@ -20410,24 +20397,15 @@ msgstr "Logo"
 msgid "logos"
 msgstr "logotipos"
 
-#: src/features/settings/components/account/account-settings.tsx:105
+#: src/features/settings/components/account/account-settings.tsx:109
 msgid "London"
 msgstr "Londres"
 
-#: src/features/settings/components/account/account-settings.tsx:380
+#: src/features/settings/components/account/account-settings.tsx:384
 msgid "Long chats will be summarised"
 msgstr "Chats longos serão resumidos"
 
-#: src/features/settings/components/account/account-settings.tsx:380
-#: src/features/settings/components/account/account-settings.tsx:108
-msgid "London"
-msgstr "Londres"
-
-#: src/features/settings/components/account/account-settings.tsx:383
-msgid "Long chats will be summarised"
-msgstr "Chats longos serão resumidos"
-
-#: src/features/settings/components/account/account-settings.tsx:383
+#: src/features/settings/components/account/account-settings.tsx:384
 msgid "Long chats will no longer be summarised"
 msgstr "Chats longos não serão mais resumidos"
 
@@ -20637,8 +20615,7 @@ msgstr "Macro"
 msgid "Macro telephoto, tight framing"
 msgstr "Macro teleobjetiva, enquadramento fechado"
 
-#: src/features/settings/components/account/account-settings.tsx:109
-#: src/features/settings/components/account/account-settings.tsx:112
+#: src/features/settings/components/account/account-settings.tsx:113
 msgid "Madrid"
 msgstr "Madri"
 
@@ -20983,7 +20960,7 @@ msgstr "MCP"
 msgid "MCP Registry"
 msgstr "MCP Registry"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:398
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:402
 msgid "MCP server"
 msgstr "Servidor MCP"
 
@@ -21024,8 +21001,8 @@ msgstr "Servidores MCP"
 msgid "MCP servers provide additional tools that the AI can use during conversations. Tools from connected servers are automatically available when chatting."
 msgstr "Servidores MCP oferecem ferramentas extras que a IA pode usar durante as conversas. As ferramentas dos servidores conectados ficam disponíveis automaticamente no chat."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:387
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:388
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:391
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:392
 #: src/features/settings/lib/settings-keywords.ts:103
 msgid "MCP tools"
 msgstr "Ferramentas MCP"
@@ -21100,8 +21077,7 @@ msgstr "Médio-baixo"
 msgid "Medium-quality video generation with Alibaba's latest Wan improvements for general-purpose use"
 msgstr "Geração de vídeo de qualidade média com as melhorias mais recentes do Wan da Alibaba para uso geral"
 
-#: src/features/settings/components/account/account-settings.tsx:120
-#: src/features/settings/components/account/account-settings.tsx:123
+#: src/features/settings/components/account/account-settings.tsx:124
 msgid "Melbourne"
 msgstr "Melbourne"
 
@@ -21352,16 +21328,11 @@ msgstr "Mensagens de {sourceName}"
 msgid "Messages sent to your bot will create new threads tagged with \"telegram\". The AI will auto-respond on Telegram."
 msgstr "As mensagens enviadas ao seu bot vão criar novas conversas com a tag \"telegram\". A IA vai responder automaticamente no Telegram."
 
-#: src/features/settings/components/account/account-settings.tsx:573
+#: src/features/settings/components/account/account-settings.tsx:625
 msgid "Messages will interrupt the agent's turn"
 msgstr "As mensagens interrompem a vez do agente"
 
-#: src/features/settings/components/account/account-settings.tsx:573
-#: src/features/settings/components/account/account-settings.tsx:620
-msgid "Messages will interrupt the agent's turn"
-msgstr "As mensagens interrompem a vez do agente"
-
-#: src/features/settings/components/account/account-settings.tsx:620
+#: src/features/settings/components/account/account-settings.tsx:625
 msgid "Messages will wait for the agent's turn to end"
 msgstr "As mensagens esperarão o fim da vez do agente"
 
@@ -22014,8 +21985,7 @@ msgstr "Prompt de movimento"
 msgid "Motion: {motionPercent}%"
 msgstr "Movimento: {motionPercent}%"
 
-#: src/features/settings/components/account/account-settings.tsx:101
-#: src/features/settings/components/account/account-settings.tsx:104
+#: src/features/settings/components/account/account-settings.tsx:105
 msgid "Mountain Time (US & Canada)"
 msgstr "Horário das Montanhas (EUA e Canadá)"
 
@@ -22207,8 +22177,7 @@ msgstr "Tarefas multimodais em que o M2 da MiniMax oferece compreensão confiáv
 msgid "multiple images"
 msgstr "várias imagens"
 
-#: src/features/settings/components/account/account-settings.tsx:118
-#: src/features/settings/components/account/account-settings.tsx:121
+#: src/features/settings/components/account/account-settings.tsx:122
 msgid "Mumbai, Kolkata"
 msgstr "Mumbai, Calcutá"
 
@@ -22628,15 +22597,15 @@ msgstr "nunca"
 msgid "Never"
 msgstr "Nunca"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:256
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:258
 msgid "Never covers a call after the chat has read web pages, attached files, documents or pages, knowledge or other tool results: those can carry hidden instructions."
 msgstr "Nunca abrange uma chamada depois que o chat leu páginas da web, arquivos anexados, documentos ou páginas, conhecimento ou outros resultados de ferramentas: eles podem conter instruções ocultas."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:257
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:259
 msgid "Never covers a call while any skill is enabled or invoked. Skills can come from the marketplace, an organization or an import, and there is no reliable way to tell yours apart, so switch your skills off to use the quick check."
 msgstr "Nunca abrange uma chamada enquanto qualquer habilidade estiver ativada ou invocada. As habilidades podem vir do marketplace, de uma organização ou de uma importação, e não há como distinguir de forma confiável as suas, então desative suas habilidades para usar a verificação rápida."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:255
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:257
 msgid "Never covers a tool you set to Ask yourself, built-in tools, device tools, questions to you, sub-agents or coding agents, or anything that sends, publishes, pays or deletes."
 msgstr "Nunca abrange uma ferramenta que você definiu como Perguntar, ferramentas integradas, ferramentas de dispositivo, perguntas para você, subagentes ou agentes de programação, nem qualquer coisa que envie, publique, pague ou exclua."
 
@@ -22700,6 +22669,10 @@ msgstr "Novo chat"
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:57
 msgid "New chats are deleted automatically after the retention period above. You can make one permanent from its menu."
 msgstr "Chats novos são excluídos automaticamente após o período de retenção acima. Você pode torná-lo permanente pelo menu dele."
+
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:57
+msgid "New chats start in this permission mode. A chat that already exists keeps its own mode, and you can still change a chat's mode in its composer."
+msgstr "Os novos chats começam neste modo de permissões. Um chat existente mantém o próprio modo, e o modo de um chat ainda pode ser alterado no compositor."
 
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:65
 msgid "New chats start permanent"
@@ -23167,7 +23140,7 @@ msgstr "Não há diferenças disponíveis para esta versão"
 msgid "No emoji found"
 msgstr "Nenhum emoji encontrado"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:395
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:399
 msgid "No enabled MCP servers."
 msgstr "Nenhum servidor MCP ativado."
 
@@ -23647,7 +23620,7 @@ msgstr "Ainda não há dados de plano. As informações de plano são registrada
 msgid "No tools shared yet"
 msgstr "Nenhuma ferramenta compartilhada ainda"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:142
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:144
 msgid "No tools."
 msgstr "Nenhuma ferramenta."
 
@@ -23747,6 +23720,7 @@ msgid "none"
 msgstr "nenhum"
 
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:19
+#: src/features/chat/thread/ask-user-questions.tsx:87
 #: src/features/settings/components/chat/default-models-settings.tsx:165
 #: src/features/skills/components/skill-form-dialog.tsx:320
 #: src/features/skills/components/skill-form-dialog.tsx:334
@@ -23804,7 +23778,7 @@ msgstr "Não anexado:"
 msgid "Not changed"
 msgstr "Não alterado"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:72
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:74
 msgid "not configured"
 msgstr "não configurado"
 
@@ -23958,15 +23932,15 @@ msgstr "Fluxos de notificação, canais e preferências de destinatários"
 #: src/features/home/components/home-page.tsx:227
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
-#: src/features/notifications/components/notification-settings.tsx:199
+#: src/features/notifications/components/notification-settings.tsx:220
 msgid "Notifications"
 msgstr "Notificações"
 
-#: src/features/notifications/components/notification-settings.tsx:145
+#: src/features/notifications/components/notification-settings.tsx:166
 msgid "Notifications are blocked for this site in your browser."
 msgstr "As notificações estão bloqueadas para este site no seu navegador."
 
-#: src/features/notifications/components/notification-settings.tsx:186
+#: src/features/notifications/components/notification-settings.tsx:207
 msgid "Notifications are blocked for this site in your browser. Allow them in the site settings to turn this on."
 msgstr "As notificações estão bloqueadas para este site no seu navegador. Permita-as nas configurações do site para ativar isto."
 
@@ -24053,27 +24027,20 @@ msgstr "ocupação"
 msgid "off"
 msgstr "desativado"
 
-#: src/features/settings/components/account/account-settings.tsx:414
-#: src/features/settings/components/account/account-settings.tsx:421
-#: src/features/settings/components/account/account-settings.tsx:417
-#: src/features/settings/components/account/account-settings.tsx:424
+#: src/features/settings/components/account/account-settings.tsx:418
+#: src/features/settings/components/account/account-settings.tsx:425
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:90
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:97
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:277
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:61
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:63
 msgid "Off"
 msgstr "Desativado"
 
-#: src/features/settings/components/account/account-settings.tsx:391
+#: src/features/settings/components/account/account-settings.tsx:395
 msgid "Off by default. When a chat's context fills this much of the model's window, older messages are condensed for the model before it replies. Your chat itself is never changed. You can also type /compact at any time."
 msgstr "Desativado por padrão. Quando o contexto de um chat atingir essa parte da janela do modelo, as mensagens mais antigas são condensadas para o modelo antes da resposta. O chat em si nunca é alterado. Você também pode digitar /compact a qualquer momento."
 
-#: src/features/settings/components/account/account-settings.tsx:369
-#: src/features/settings/components/account/account-settings.tsx:394
-msgid "Off by default. When a chat's context fills this much of the model's window, older messages are condensed for the model before it replies. Your chat itself is never changed. You can also type /compact at any time."
-msgstr "Desativado por padrão. Quando o contexto de um chat atingir essa parte da janela do modelo, as mensagens mais antigas são condensadas para o modelo antes da resposta. O chat em si nunca é alterado. Você também pode digitar /compact a qualquer momento."
-
-#: src/features/settings/components/account/account-settings.tsx:372
+#: src/features/settings/components/account/account-settings.tsx:373
 msgid "Off by default. While a long chat sits idle, condense its older messages into notes so the assistant keeps them in mind. Uses a small amount of credits. Turning it off deletes the summaries already made."
 msgstr "Desativado por padrão. Enquanto um chat longo fica ocioso, condensa as mensagens mais antigas em notas para que o assistente as mantenha em mente. Usa uma pequena quantidade de créditos. Desativar exclui os resumos já feitos."
 
@@ -24081,8 +24048,7 @@ msgstr "Desativado por padrão. Enquanto um chat longo fica ocioso, condensa as 
 msgid "Off until you pick a model."
 msgstr "Desativado até você escolher um modelo."
 
-#: src/features/settings/components/account/account-settings.tsx:562
-#: src/features/settings/components/account/account-settings.tsx:609
+#: src/features/settings/components/account/account-settings.tsx:614
 msgid "Off: a message you send while a coding agent is working waits in the queue and goes after the turn. On: it interrupts the turn and goes next."
 msgstr "Desligado: uma mensagem enviada enquanto um agente de programação trabalha espera na fila e segue depois da vez. Ligado: interrompe a vez e segue em seguida."
 
@@ -24267,7 +24233,7 @@ msgstr "Uma API.<0/><1>Todos os LLMs.</1>"
 msgid "One deployment name per line, exactly as in Azure AI Foundry → Deployments."
 msgstr "Um nome de implantação por linha, exatamente como em Azure AI Foundry → Implantações."
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:109
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:131
 msgid "One domain per line, for example example.com. Results from these sites and their subdomains are never shown, even if the assistant asks for them."
 msgstr "Um domínio por linha, por exemplo example.com. Os resultados desses sites e de seus subdomínios nunca são exibidos, mesmo que o assistente os peça."
 
@@ -24620,7 +24586,7 @@ msgstr "Links de convite abertos"
 msgid "Open it again"
 msgstr "Abrir novamente"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:23
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:22
 msgid "Open links"
 msgstr "Abrir links"
 
@@ -24805,8 +24771,7 @@ msgstr "Abra o chat deste modelo à parte para assumir o controle do navegador d
 msgid "Open thread"
 msgstr "Abrir conversa"
 
-#: src/features/settings/components/account/account-settings.tsx:676
-#: src/features/settings/components/account/account-settings.tsx:722
+#: src/features/settings/components/account/account-settings.tsx:728
 msgid "Open up to three chats side by side. Applies to this browser only."
 msgstr "Abra até três chats lado a lado. Vale apenas para este navegador."
 
@@ -25081,8 +25046,7 @@ msgstr "Uma reversão de {requestNoun} foi aberta em {hostLabel}."
 msgid "Opened from this thread"
 msgstr "Aberto a partir desta conversa"
 
-#: src/features/settings/components/account/account-settings.tsx:530
-#: src/features/settings/components/account/account-settings.tsx:533
+#: src/features/settings/components/account/account-settings.tsx:534
 msgid "Opening a blank chat"
 msgstr "Abrindo um chat em branco"
 
@@ -25098,8 +25062,7 @@ msgstr "Abrindo uma conversa…"
 msgid "Opening pull request…"
 msgstr "Abrindo pull request…"
 
-#: src/features/settings/components/account/account-settings.tsx:521
-#: src/features/settings/components/account/account-settings.tsx:524
+#: src/features/settings/components/account/account-settings.tsx:525
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "Abrir o assistente sem uma conversa leva você à mais recente, em vez de um chat em branco."
 
@@ -25546,8 +25509,7 @@ msgstr "Proprietário"
 msgid "owner/name"
 msgstr "owner/name"
 
-#: src/features/settings/components/account/account-settings.tsx:102
-#: src/features/settings/components/account/account-settings.tsx:105
+#: src/features/settings/components/account/account-settings.tsx:106
 msgid "Pacific Time (US & Canada)"
 msgstr "Horário do Pacífico (EUA e Canadá)"
 
@@ -25703,8 +25665,7 @@ msgstr "Respostas paralelas"
 msgid "Parent chat"
 msgstr "Chat pai"
 
-#: src/features/settings/components/account/account-settings.tsx:106
-#: src/features/settings/components/account/account-settings.tsx:109
+#: src/features/settings/components/account/account-settings.tsx:110
 msgid "Paris"
 msgstr "Paris"
 
@@ -25933,11 +25894,11 @@ msgstr "Pausar"
 msgid "Paused"
 msgstr "Pausado"
 
-#: src/features/settings/components/account/account-settings.tsx:576
+#: src/features/settings/components/account/account-settings.tsx:577
 msgid "Paused replies will resume when the limit resets"
 msgstr "As respostas pausadas serão retomadas quando o limite for redefinido"
 
-#: src/features/settings/components/account/account-settings.tsx:576
+#: src/features/settings/components/account/account-settings.tsx:577
 msgid "Paused replies will wait for you to resume them"
 msgstr "As respostas pausadas esperarão você retomá-las"
 
@@ -26110,16 +26071,11 @@ msgstr "Pessoal"
 msgid "Personal Account"
 msgstr "Conta pessoal"
 
-#: src/features/settings/components/account/account-settings.tsx:174
+#: src/features/settings/components/account/account-settings.tsx:178
 msgid "Personal information is now hidden"
 msgstr "Suas informações pessoais agora estão ocultas"
 
-#: src/features/settings/components/account/account-settings.tsx:174
-#: src/features/settings/components/account/account-settings.tsx:177
-msgid "Personal information is now hidden"
-msgstr "Suas informações pessoais agora estão ocultas"
-
-#: src/features/settings/components/account/account-settings.tsx:177
+#: src/features/settings/components/account/account-settings.tsx:178
 msgid "Personal information is now visible"
 msgstr "Suas informações pessoais agora estão visíveis"
 
@@ -26371,8 +26327,7 @@ msgstr "Plataforma"
 msgid "Play"
 msgstr "Reproduzir"
 
-#: src/features/settings/components/account/account-settings.tsx:657
-#: src/features/settings/components/account/account-settings.tsx:703
+#: src/features/settings/components/account/account-settings.tsx:709
 msgid "Play a short sound when a reply finishes. Applies to this browser only."
 msgstr "Tocar um som curto quando uma resposta terminar. Aplica-se apenas a este navegador."
 
@@ -26754,8 +26709,7 @@ msgstr "Predefinições"
 msgid "Press ? for keyboard shortcuts"
 msgstr "Pressione ? para ver os atalhos de teclado"
 
-#: src/features/settings/components/account/account-settings.tsx:228
-#: src/features/settings/components/account/account-settings.tsx:231
+#: src/features/settings/components/account/account-settings.tsx:232
 msgid "Press Ctrl/Cmd+Enter to send"
 msgstr "Pressione Ctrl/Cmd+Enter para enviar"
 
@@ -26775,8 +26729,7 @@ msgstr "Pressione enter ou espaço para selecionar uma aresta. Depois você pode
 msgid "Press Enter to open the folder. A folder that does not exist is created."
 msgstr "Pressione Enter para abrir a pasta. Uma pasta que não existe é criada."
 
-#: src/features/settings/components/account/account-settings.tsx:226
-#: src/features/settings/components/account/account-settings.tsx:229
+#: src/features/settings/components/account/account-settings.tsx:230
 msgid "Press Enter to send"
 msgstr "Pressione Enter para enviar"
 
@@ -26784,8 +26737,7 @@ msgstr "Pressione Enter para enviar"
 msgid "Press Enter to send, Shift+Enter for new line"
 msgstr "Pressione Enter para enviar, Shift+Enter para nova linha"
 
-#: src/features/settings/components/account/account-settings.tsx:503
-#: src/features/settings/components/account/account-settings.tsx:506
+#: src/features/settings/components/account/account-settings.tsx:507
 msgid "Press Escape to leave typing mode, then edit with h j k l, w b, 0 $, i a I A, o O, x, dd, D and u. Enter still sends. Off by default."
 msgstr "Pressione Escape para sair do modo de digitação e editar com h j k l, w b, 0 $, i a I A, o O, x, dd, D e u. Enter continua enviando. Desativado por padrão."
 
@@ -26793,8 +26745,7 @@ msgstr "Pressione Escape para sair do modo de digitação e editar com h j k l, 
 msgid "Press keys..."
 msgstr "Pressione as teclas..."
 
-#: src/features/settings/components/account/account-settings.tsx:227
-#: src/features/settings/components/account/account-settings.tsx:230
+#: src/features/settings/components/account/account-settings.tsx:231
 msgid "Press Shift+Enter to send"
 msgstr "Pressione Shift+Enter para enviar"
 
@@ -26979,8 +26930,7 @@ msgstr "privacidade"
 #: src/features/marketing/components/gateway-footer.tsx:145
 #: src/features/marketing/components/landing-footer.tsx:102
 #: src/features/marketing/components/landing-footer.tsx:272
-#: src/features/settings/components/account/account-settings.tsx:160
-#: src/features/settings/components/account/account-settings.tsx:163
+#: src/features/settings/components/account/account-settings.tsx:164
 #: src/features/settings/components/chat/model-filter-settings.tsx:363
 #: src/features/settings/lib/settings-keywords.ts:26
 #: src/features/settings/lib/settings-navigation.ts:117
@@ -27595,23 +27545,23 @@ msgstr "Criado especificamente para tarefas complexas de engenharia de software"
 msgid "Purpose-optimized for code generation and debugging"
 msgstr "Otimizado para geração e depuração de código"
 
-#: src/features/notifications/components/notification-settings.tsx:146
+#: src/features/notifications/components/notification-settings.tsx:167
 msgid "Push notifications are not available here."
 msgstr "As notificações push não estão disponíveis aqui."
 
-#: src/features/notifications/components/notification-settings.tsx:181
+#: src/features/notifications/components/notification-settings.tsx:202
 msgid "Push notifications are not configured on this server."
 msgstr "As notificações push não estão configuradas neste servidor."
 
-#: src/features/notifications/components/notification-settings.tsx:166
+#: src/features/notifications/components/notification-settings.tsx:187
 msgid "Push notifications are off for this browser"
 msgstr "As notificações push estão desativadas neste navegador"
 
-#: src/features/notifications/components/notification-settings.tsx:157
+#: src/features/notifications/components/notification-settings.tsx:178
 msgid "Push notifications are on for this browser"
 msgstr "As notificações push estão ativadas neste navegador"
 
-#: src/features/notifications/components/notification-settings.tsx:204
+#: src/features/notifications/components/notification-settings.tsx:225
 msgid "Push notifications on this browser"
 msgstr "Notificações push neste navegador"
 
@@ -27801,8 +27751,7 @@ msgstr "Seed aleatória"
 msgid "Range to keep"
 msgstr "Intervalo a manter"
 
-#: src/features/settings/components/account/account-settings.tsx:627
-#: src/features/settings/components/account/account-settings.tsx:674
+#: src/features/settings/components/account/account-settings.tsx:679
 msgid "Range: 1 hour to 7 days (168 hours)"
 msgstr "Intervalo: de 1 hora a 7 dias (168 horas)"
 
@@ -27818,44 +27767,44 @@ msgstr "Limite de uso excedido. Tente novamente mais tarde."
 msgid "Rate limit reached. You can improve {minutes, plural, one {# more prompt} other {# more prompts}} in {minutes, plural, one {# minute} other {# minutes}}."
 msgstr "Limite de taxa atingido. Você poderá aprimorar {minutes, plural, one {mais # prompt} other {mais # prompts}} em {minutes, plural, one {# minuto} other {# minutos}}."
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:105
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:108
 #: src/features/develop/components/failure-notice.tsx:21
 msgid "Rate limited"
 msgstr "Limite de taxa atingido"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:122
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:125
 msgid "Rate limited by {provider}, retrying in {countdown}"
 msgstr "Limite de taxa atingido em {provider}, tentando novamente em {countdown}"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:121
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:124
 msgid "Rate limited by {provider}. Retrying in about {announced}"
 msgstr "Limite de taxa atingido em {provider}. Tentando novamente em cerca de {announced}"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:125
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:128
 msgid "Rate limited, retrying in {countdown}"
 msgstr "Limite de taxa atingido, tentando novamente em {countdown}"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:109
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:112
 msgid "Rate limited, the limit resets in {countdown}"
 msgstr "Limite de taxa atingido, o limite é redefinido em {countdown}"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:97
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:100
 msgid "Rate limited, the limit resets in {countdown}. Waiting for you to resume"
 msgstr "Limite de taxa atingido, o limite é redefinido em {countdown}. Aguardando você retomar"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:124
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:127
 msgid "Rate limited. Retrying in about {announced}"
 msgstr "Limite de taxa atingido. Tentando novamente em cerca de {announced}"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:108
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:111
 msgid "Rate limited. The limit resets in about {announced}"
 msgstr "Limite de taxa atingido. O limite é redefinido em cerca de {announced}"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:96
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:99
 msgid "Rate limited. The limit resets in about {announced}. Waiting for you to resume"
 msgstr "Limite de taxa atingido. O limite é redefinido em cerca de {announced}. Aguardando você retomar"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:93
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:96
 msgid "Rate limited. Waiting for you to resume"
 msgstr "Limite de taxa atingido. Aguardando você retomar"
 
@@ -27915,8 +27864,7 @@ msgstr "Ler em voz alta"
 msgid "Read each item below before you import it. Nothing in the bundle runs until you turn it on: schedules and webhooks are created switched off, group chats are created without starting anything, and skills are imported switched off, so they join no chat until you turn them on in your skill list. A skill adds the tools listed for it, and your own tool permissions still apply."
 msgstr "Leia cada item abaixo antes de importá-lo. Nada no pacote é executado até você ativar: agendamentos e webhooks são criados desativados, chats em grupo são criados sem iniciar nada, e habilidades são importadas desativadas, então não entram em nenhum chat até você ativá-las na sua lista de habilidades. Uma habilidade adiciona as ferramentas listadas para ela, e suas próprias permissões de ferramentas continuam valendo."
 
-#: src/features/settings/components/account/account-settings.tsx:432
-#: src/features/settings/components/account/account-settings.tsx:435
+#: src/features/settings/components/account/account-settings.tsx:436
 msgid "Read every assistant reply aloud when it finishes, using your browser's voice."
 msgstr "Ler em voz alta cada resposta do assistente ao terminar, usando a voz do navegador."
 
@@ -27941,7 +27889,7 @@ msgstr "Leia o guia"
 msgid "Read the page"
 msgstr "Leia a página"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:70
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:72
 msgid "read-only"
 msgstr "somente leitura"
 
@@ -28952,7 +28900,7 @@ msgstr "Respostas"
 msgid "Replies and spend per day over the last 53 weeks"
 msgstr "Respostas e gastos por dia nas últimas 53 semanas"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:67
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:66
 msgid "Replies can search and more, charged to your account. Tools set to \"Ask\" are skipped — nobody can approve them in a messenger."
 msgstr "As respostas podem pesquisar e mais, cobradas na sua conta. Ferramentas definidas como \"Perguntar\" são ignoradas — ninguém pode aprová-las num mensageiro."
 
@@ -28964,16 +28912,11 @@ msgstr "Respostas em uma conversa"
 msgid "Replies use the free reply token when the answer is quick, and fall back to a push message (which counts against your LINE quota) when it is not."
 msgstr "As respostas usam o reply token gratuito quando a resposta é rápida e, quando não é, recorrem a uma push message (que conta na sua cota do LINE)."
 
-#: src/features/settings/components/account/account-settings.tsx:441
+#: src/features/settings/components/account/account-settings.tsx:445
 msgid "Replies will be read aloud"
 msgstr "As respostas serão lidas em voz alta"
 
-#: src/features/settings/components/account/account-settings.tsx:441
-#: src/features/settings/components/account/account-settings.tsx:444
-msgid "Replies will be read aloud"
-msgstr "As respostas serão lidas em voz alta"
-
-#: src/features/settings/components/account/account-settings.tsx:444
+#: src/features/settings/components/account/account-settings.tsx:445
 msgid "Replies will no longer be read aloud"
 msgstr "As respostas não serão mais lidas em voz alta"
 
@@ -28997,7 +28940,7 @@ msgstr "Responder"
 msgid "Reply complete"
 msgstr "Resposta concluída"
 
-#: src/features/chat/core/context/chat-context.tsx:636
+#: src/features/chat/core/context/chat-context.tsx:640
 msgid "Reply ready"
 msgstr "Resposta pronta"
 
@@ -29151,12 +29094,12 @@ msgstr "Reenviar e-mail de verificação"
 #: src/features/chat/components/cinema-studio/cinema-panel.tsx:88
 #: src/features/settings/components/chat/models-settings.tsx:617
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:269
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:108
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:110
 msgid "Reset"
 msgstr "Redefinir"
 
 #. placeholder {0}: tool.name
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:102
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:104
 msgid "Reset {0} to default"
 msgstr "Redefinir {0} para o padrão"
 
@@ -29316,13 +29259,13 @@ msgstr "Resultado"
 msgid "Result not delivered"
 msgstr "Resultado não entregue"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:140
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:149
 #: src/features/onboarding/components/setup-checklist.tsx:202
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:233
 msgid "Resume"
 msgstr "Retomar"
 
-#: src/features/settings/components/account/account-settings.tsx:562
+#: src/features/settings/components/account/account-settings.tsx:563
 msgid "Resume after a usage limit"
 msgstr "Retomar após um limite de uso"
 
@@ -29331,8 +29274,7 @@ msgstr "Retomar após um limite de uso"
 msgid "Resume import"
 msgstr "Retomar importação"
 
-#: src/features/settings/components/account/account-settings.tsx:518
-#: src/features/settings/components/account/account-settings.tsx:521
+#: src/features/settings/components/account/account-settings.tsx:522
 msgid "Resume your latest chat"
 msgstr "Retomar seu último chat"
 
@@ -29340,18 +29282,12 @@ msgstr "Retomar seu último chat"
 msgid "Resumed its own session"
 msgstr "Retomou a própria sessão"
 
-#: src/features/settings/components/account/account-settings.tsx:530
+#: src/features/settings/components/account/account-settings.tsx:534
 msgid "Resuming your latest chat"
 msgstr "Retomando seu último chat"
 
-#: src/features/settings/components/account/account-settings.tsx:595
-#: src/features/settings/components/account/account-settings.tsx:620
-#: src/features/settings/components/account/account-settings.tsx:533
-msgid "Resuming your latest chat"
-msgstr "Retomando seu último chat"
-
-#: src/features/settings/components/account/account-settings.tsx:642
-#: src/features/settings/components/account/account-settings.tsx:667
+#: src/features/settings/components/account/account-settings.tsx:647
+#: src/features/settings/components/account/account-settings.tsx:672
 msgid "Retention period updated to {hours} hours"
 msgstr "Período de retenção atualizado para {hours} horas"
 
@@ -29410,7 +29346,7 @@ msgstr "Tentar exportar novamente"
 msgid "Retry in {retryAfterMinutes}m"
 msgstr "Tente novamente em {retryAfterMinutes} min"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:140
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:149
 msgid "Retry now"
 msgstr "Tentar agora"
 
@@ -29430,7 +29366,7 @@ msgstr "Tentar o envio de {attachmentName} novamente"
 msgid "Retry with note"
 msgstr "Tentar novamente com observação"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:118
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:121
 msgid "Retrying now"
 msgstr "Tentando agora"
 
@@ -29537,7 +29473,7 @@ msgstr "Observação do revisor"
 #: src/features/auth/components/settings/account/account-cell.tsx:140
 #: src/features/chat/guest-links/use-guest-link-revoke.tsx:105
 #: src/features/pages/components/page-share-dialog.tsx:209
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:215
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:217
 msgid "Revoke"
 msgstr "Revogar"
 
@@ -29553,11 +29489,11 @@ msgstr "Revogar link"
 msgid "Revoke Session"
 msgstr "Revogar sessão"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:209
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:211
 msgid "Revoke the allow for {tool}"
 msgstr "Revogar a permissão para {tool}"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:209
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:211
 msgid "Revoke the allow for {tool} on {server}"
 msgstr "Revogar a permissão para {tool} em {server}"
 
@@ -29607,8 +29543,7 @@ msgstr "Direita"
 msgid "right to left"
 msgstr "da direita para a esquerda"
 
-#: src/features/settings/components/account/account-settings.tsx:201
-#: src/features/settings/components/account/account-settings.tsx:204
+#: src/features/settings/components/account/account-settings.tsx:205
 msgid "Right to Left (RTL)"
 msgstr "Da direita para a esquerda (RTL)"
 
@@ -29652,8 +29587,7 @@ msgstr "Romeno"
 msgid "Romanian (Romania)"
 msgstr "Romeno (Romênia)"
 
-#: src/features/settings/components/account/account-settings.tsx:108
-#: src/features/settings/components/account/account-settings.tsx:111
+#: src/features/settings/components/account/account-settings.tsx:112
 msgid "Rome"
 msgstr "Roma"
 
@@ -30061,7 +29995,7 @@ msgstr "Salvar como caso de avaliação"
 msgid "Save as preset"
 msgstr "Salvar como predefinição"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:133
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:155
 msgid "Save blocked websites"
 msgstr "Salvar sites bloqueados"
 
@@ -30715,8 +30649,7 @@ msgstr "Selecione uma versão para pré-visualizar"
 msgid "Select a version to see changes"
 msgstr "Selecione uma versão para ver as alterações"
 
-#: src/features/settings/components/account/account-settings.tsx:465
-#: src/features/settings/components/account/account-settings.tsx:468
+#: src/features/settings/components/account/account-settings.tsx:469
 msgid "Select a voice"
 msgstr "Selecione uma voz"
 
@@ -30756,8 +30689,7 @@ msgstr "Selecionar como referência"
 msgid "Select by date"
 msgstr "Selecionar por data"
 
-#: src/features/settings/components/account/account-settings.tsx:275
-#: src/features/settings/components/account/account-settings.tsx:278
+#: src/features/settings/components/account/account-settings.tsx:279
 msgid "Select dictation language"
 msgstr "Selecione o idioma de ditado"
 
@@ -30777,8 +30709,7 @@ msgstr "Selecione arquivos para enviar"
 msgid "Select image as reference"
 msgstr "Selecionar imagem como referência"
 
-#: src/features/settings/components/account/account-settings.tsx:250
-#: src/features/settings/components/account/account-settings.tsx:253
+#: src/features/settings/components/account/account-settings.tsx:254
 msgid "Select language"
 msgstr "Selecione o idioma"
 
@@ -30988,8 +30919,7 @@ msgstr "Enviar resposta"
 msgid "Send Backward"
 msgstr "Enviar para trás"
 
-#: src/features/settings/components/account/account-settings.tsx:218
-#: src/features/settings/components/account/account-settings.tsx:221
+#: src/features/settings/components/account/account-settings.tsx:222
 msgid "Send behavior updated"
 msgstr "Comportamento de envio atualizado"
 
@@ -30997,8 +30927,7 @@ msgstr "Comportamento de envio atualizado"
 msgid "send button"
 msgstr "botão de enviar"
 
-#: src/features/settings/components/account/account-settings.tsx:559
-#: src/features/settings/components/account/account-settings.tsx:606
+#: src/features/settings/components/account/account-settings.tsx:611
 msgid "Send during a coding agent's turn"
 msgstr "Enviar durante a vez de um agente de programação"
 
@@ -31031,8 +30960,7 @@ msgstr "Enviar mensagem"
 msgid "Send message ({sendShortcut})"
 msgstr "Enviar mensagem ({sendShortcut})"
 
-#: src/features/settings/components/account/account-settings.tsx:212
-#: src/features/settings/components/account/account-settings.tsx:215
+#: src/features/settings/components/account/account-settings.tsx:216
 #: src/features/settings/lib/settings-keywords.ts:28
 msgid "Send Message Behavior"
 msgstr "Comportamento de envio de mensagens"
@@ -31271,8 +31199,7 @@ msgstr "Definir senha"
 msgid "Set the focal length in millimeters"
 msgstr "Defina a distância focal em milímetros"
 
-#: src/features/settings/components/account/account-settings.tsx:188
-#: src/features/settings/components/account/account-settings.tsx:191
+#: src/features/settings/components/account/account-settings.tsx:192
 msgid "Set the text direction for the application. RTL is used for languages like Arabic, Hebrew, and Persian."
 msgstr "Defina a direção do texto no aplicativo. RTL é usado em idiomas como árabe, hebraico e persa."
 
@@ -31334,8 +31261,7 @@ msgstr "Várias das suas habilidades respondem em uma única conversa. Mencione 
 msgid "Shallow, cinematic separation"
 msgstr "Raso, separação cinematográfica"
 
-#: src/features/settings/components/account/account-settings.tsx:114
-#: src/features/settings/components/account/account-settings.tsx:117
+#: src/features/settings/components/account/account-settings.tsx:118
 msgid "Shanghai"
 msgstr "Xangai"
 
@@ -31502,6 +31428,18 @@ msgstr "Mostrar {name} no seletor de modelos"
 msgid "Show {remainingCount} more"
 msgstr "Mostrar mais {remainingCount}"
 
+#: src/features/notifications/components/notification-settings.tsx:299
+msgid "Show a message in the app when a chat reply fails."
+msgstr "Mostra uma mensagem no app quando uma resposta do chat falha."
+
+#: src/features/notifications/components/notification-settings.tsx:282
+msgid "Show a message in the app when a chat reply finishes."
+msgstr "Mostra uma mensagem no app quando uma resposta do chat termina."
+
+#: src/features/notifications/components/notification-settings.tsx:316
+msgid "Show a message in the app when a chat waits for your answer or your approval."
+msgstr "Mostra uma mensagem no app quando um chat espera sua resposta ou aprovação."
+
 #: src/features/skills/components/bundle-import-dialog.tsx:99
 msgid "Show all"
 msgstr "Mostrar tudo"
@@ -31523,8 +31461,7 @@ msgstr "Mostrar conteúdo anexado"
 msgid "Show follow-up suggestions"
 msgstr "Mostrar sugestões de continuação"
 
-#: src/features/settings/components/account/account-settings.tsx:349
-#: src/features/settings/components/account/account-settings.tsx:352
+#: src/features/settings/components/account/account-settings.tsx:353
 msgid "Show follow-up suggestions after assistant messages."
 msgstr "Mostrar sugestões de continuação depois das mensagens do assistente."
 
@@ -31609,8 +31546,7 @@ msgstr "Mostrar as tarefas desta meta"
 msgid "Show this help"
 msgstr "Mostrar esta ajuda"
 
-#: src/features/settings/components/account/account-settings.tsx:639
-#: src/features/settings/components/account/account-settings.tsx:685
+#: src/features/settings/components/account/account-settings.tsx:691
 msgid "Show Timestamps"
 msgstr "Mostrar data e hora"
 
@@ -31893,8 +31829,7 @@ msgstr "Simplificar"
 msgid "since replaced"
 msgstr "substituída desde então"
 
-#: src/features/settings/components/account/account-settings.tsx:116
-#: src/features/settings/components/account/account-settings.tsx:119
+#: src/features/settings/components/account/account-settings.tsx:120
 msgid "Singapore"
 msgstr "Singapura"
 
@@ -32196,14 +32131,12 @@ msgstr "Adiar"
 msgid "Snooze 1 hour"
 msgstr "Adiar por 1 hora"
 
-#: src/features/chat/thread-list/thread-node.tsx:924
-#: src/features/chat/thread-list/thread-node.tsx:938
-#: src/features/settings/components/account/account-settings.tsx:584
+#: src/features/settings/components/account/account-settings.tsx:587
 msgid "Snooze chats until the limit resets"
 msgstr "Adiar conversas até o limite ser redefinido"
 
-#: src/features/chat/thread-list/thread-node.tsx:913
-#: src/features/chat/thread-list/thread-node.tsx:927
+#: src/features/chat/thread-list/thread-node.tsx:924
+#: src/features/chat/thread-list/thread-node.tsx:938
 msgid "Snooze thread"
 msgstr "Adiar conversa"
 
@@ -32358,24 +32291,15 @@ msgstr "Custo-benefício de ponta com contexto de 2M tokens"
 msgid "SOTA with vector art and typography via Replicate"
 msgstr "SOTA com arte vetorial e tipografia via Replicate"
 
-#: src/features/settings/components/account/account-settings.tsx:655
+#: src/features/settings/components/account/account-settings.tsx:707
 msgid "Sound Effects"
 msgstr "Efeitos sonoros"
 
-#: src/features/settings/components/account/account-settings.tsx:664
+#: src/features/settings/components/account/account-settings.tsx:716
 msgid "Sound effects disabled"
 msgstr "Efeitos sonoros desativados"
 
-#: src/features/settings/components/account/account-settings.tsx:664
-#: src/features/settings/components/account/account-settings.tsx:701
-msgid "Sound Effects"
-msgstr "Efeitos sonoros"
-
-#: src/features/settings/components/account/account-settings.tsx:710
-msgid "Sound effects disabled"
-msgstr "Efeitos sonoros desativados"
-
-#: src/features/settings/components/account/account-settings.tsx:710
+#: src/features/settings/components/account/account-settings.tsx:716
 msgid "Sound effects enabled"
 msgstr "Efeitos sonoros ativados"
 
@@ -32590,24 +32514,15 @@ msgstr "Dividir célula"
 msgid "Split right"
 msgstr "Dividir à direita"
 
-#: src/features/settings/components/account/account-settings.tsx:671
+#: src/features/settings/components/account/account-settings.tsx:723
 msgid "Split View"
 msgstr "Tela dividida"
 
-#: src/features/settings/components/account/account-settings.tsx:684
+#: src/features/settings/components/account/account-settings.tsx:736
 msgid "Split view disabled"
 msgstr "Tela dividida desativada"
 
-#: src/features/settings/components/account/account-settings.tsx:684
-#: src/features/settings/components/account/account-settings.tsx:717
-msgid "Split View"
-msgstr "Tela dividida"
-
-#: src/features/settings/components/account/account-settings.tsx:730
-msgid "Split view disabled"
-msgstr "Tela dividida desativada"
-
-#: src/features/settings/components/account/account-settings.tsx:730
+#: src/features/settings/components/account/account-settings.tsx:736
 msgid "Split view enabled"
 msgstr "Tela dividida ativada"
 
@@ -33070,8 +32985,7 @@ msgstr "Ainda conectando ao servidor..."
 msgid "Stock and currency information"
 msgstr "Informações sobre ações e moedas"
 
-#: src/features/settings/components/account/account-settings.tsx:111
-#: src/features/settings/components/account/account-settings.tsx:114
+#: src/features/settings/components/account/account-settings.tsx:115
 msgid "Stockholm"
 msgstr "Estocolmo"
 
@@ -33083,7 +32997,7 @@ msgstr "Ações"
 #: src/features/chat/goal/goal-notes.tsx:85
 #: src/features/chat/group/group-participant-bar.tsx:234
 #: src/features/chat/host/host-composer.tsx:1240
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:144
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:153
 #: src/features/develop/components/watched-repositories.tsx:86
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:367
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:380
@@ -33683,8 +33597,7 @@ msgstr "sugestões"
 msgid "Suggestions"
 msgstr "Sugestões"
 
-#: src/features/settings/components/account/account-settings.tsx:485
-#: src/features/settings/components/account/account-settings.tsx:488
+#: src/features/settings/components/account/account-settings.tsx:489
 msgid "Suggests how to finish your message as grey text; press Right Arrow at the end of the line to accept or Esc to dismiss. Your draft is sent to an AI model to make the suggestion."
 msgstr "Sugere como terminar sua mensagem em texto cinza; pressione Seta para a direita no fim da linha para aceitar ou Esc para descartar. Seu rascunho é enviado a um modelo de IA para gerar a sugestão."
 
@@ -33692,8 +33605,7 @@ msgstr "Sugere como terminar sua mensagem em texto cinza; pressione Seta para a 
 msgid "Suited for complex tasks: Role / Background / Attention / Skills / Goals / Constraints / Workflow."
 msgstr "Ideal para tarefas complexas: Papel / Contexto / Atenção / Habilidades / Objetivos / Restrições / Fluxo de trabalho."
 
-#: src/features/settings/components/account/account-settings.tsx:366
-#: src/features/settings/components/account/account-settings.tsx:369
+#: src/features/settings/components/account/account-settings.tsx:370
 msgid "Summarise long chats"
 msgstr "Resumir chats longos"
 
@@ -33764,6 +33676,7 @@ msgstr "Compreensão superior de conceitos visuais complexos"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:43
 #: src/features/settings/components/chat/bots-settings.tsx:134
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:43
 msgid "Supervised"
 msgstr "Supervisionado"
 
@@ -33855,7 +33768,7 @@ msgstr "Mudar para {label}"
 msgid "Switch to {name}?"
 msgstr "Trocar para {name}?"
 
-#: src/features/chat/core/context/chat-context.tsx:727
+#: src/features/chat/core/context/chat-context.tsx:731
 msgid "Switch to a text model to send this message."
 msgstr "Mude para um modelo de texto para enviar esta mensagem."
 
@@ -33889,8 +33802,7 @@ msgstr "Visualização da equipe ativada"
 msgid "Switzerland"
 msgstr "Suíça"
 
-#: src/features/settings/components/account/account-settings.tsx:119
-#: src/features/settings/components/account/account-settings.tsx:122
+#: src/features/settings/components/account/account-settings.tsx:123
 msgid "Sydney"
 msgstr "Sydney"
 
@@ -34087,11 +33999,11 @@ msgstr "Detalhes da tarefa, sua revisão e o histórico de execuções."
 msgid "Task done: {title}"
 msgstr "Tarefa concluída: {title}"
 
-#: src/features/notifications/components/notification-settings.tsx:104
+#: src/features/notifications/components/notification-settings.tsx:108
 msgid "Task emails turned off"
 msgstr "E-mails de tarefas desativados"
 
-#: src/features/notifications/components/notification-settings.tsx:105
+#: src/features/notifications/components/notification-settings.tsx:109
 msgid "Task emails turned on"
 msgstr "E-mails de tarefas ativados"
 
@@ -34332,8 +34244,7 @@ msgstr "Modo de chat temporário"
 msgid "Temporary chat mode, on for your next chat"
 msgstr "Modo de chat temporário, ativado para o seu próximo chat"
 
-#: src/features/settings/components/account/account-settings.tsx:580
-#: src/features/settings/components/account/account-settings.tsx:627
+#: src/features/settings/components/account/account-settings.tsx:632
 msgid "Temporary Chat Retention (hours)"
 msgstr "Retenção de chats temporários (horas)"
 
@@ -34456,22 +34367,16 @@ msgstr "Cor do texto"
 msgid "Text Content"
 msgstr "Conteúdo de texto"
 
-#: src/features/settings/components/account/account-settings.tsx:186
-#: src/features/settings/components/account/account-settings.tsx:189
+#: src/features/settings/components/account/account-settings.tsx:190
 #: src/features/settings/lib/settings-keywords.ts:27
 msgid "Text Direction"
 msgstr "Direção do texto"
 
-#: src/features/settings/components/account/account-settings.tsx:192
+#: src/features/settings/components/account/account-settings.tsx:196
 msgid "Text direction set to LTR"
 msgstr "Direção do texto definida como LTR"
 
-#: src/features/settings/components/account/account-settings.tsx:192
-#: src/features/settings/components/account/account-settings.tsx:195
-msgid "Text direction set to LTR"
-msgstr "Direção do texto definida como LTR"
-
-#: src/features/settings/components/account/account-settings.tsx:195
+#: src/features/settings/components/account/account-settings.tsx:196
 msgid "Text direction set to RTL"
 msgstr "Direção do texto definida como RTL"
 
@@ -34634,7 +34539,7 @@ msgstr "Essa pasta é a pasta inicial do servidor ou uma pasta acima dela. Escol
 msgid "That folder was not found."
 msgstr "Essa pasta não foi encontrada."
 
-#: src/features/chat/core/context/chat-context.tsx:723
+#: src/features/chat/core/context/chat-context.tsx:727
 msgid "That guest link has ended."
 msgstr "Esse link de convidado expirou."
 
@@ -34654,7 +34559,7 @@ msgstr "Não foi possível ler esse link."
 msgid "That message could not be found in this conversation."
 msgstr "Não foi possível encontrar essa mensagem nesta conversa."
 
-#: src/features/chat/core/context/chat-context.tsx:726
+#: src/features/chat/core/context/chat-context.tsx:730
 #: src/features/chat/guest-links/guest-link-panel.tsx:143
 msgid "That message is being sent."
 msgstr "Essa mensagem está sendo enviada."
@@ -34667,7 +34572,7 @@ msgstr "Essa mensagem não está mais aguardando."
 msgid "That message is too long to send from here."
 msgstr "Essa mensagem é longa demais para enviar daqui."
 
-#: src/features/chat/core/context/chat-context.tsx:724
+#: src/features/chat/core/context/chat-context.tsx:728
 #: src/features/chat/guest-links/guest-link-panel.tsx:240
 #: src/features/chat/guest-links/guest-link-panel.tsx:316
 msgid "That message was already sent."
@@ -35299,11 +35204,11 @@ msgstr "da última vez"
 msgid "The last turn stopped before it finished."
 msgstr "O último turno parou antes de terminar."
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:111
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:114
 msgid "The limit has reset"
 msgstr "O limite foi redefinido"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:99
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:102
 msgid "The limit has reset. Waiting for you to resume"
 msgstr "O limite foi redefinido. Aguardando você retomar"
 
@@ -35608,7 +35513,7 @@ msgstr "A solicitação foi recusada antes de chegar a {hostLabel}. Nada foi alt
 msgid "The resource endpoint from Keys and Endpoint — *.openai.azure.com or *.cognitiveservices.azure.com."
 msgstr "O ponto de extremidade do recurso, em Chaves e ponto de extremidade — *.openai.azure.com ou *.cognitiveservices.azure.com."
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:115
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:118
 msgid "The retry is taking longer than expected"
 msgstr "A nova tentativa está demorando mais que o esperado"
 
@@ -35730,8 +35635,7 @@ msgstr "O verificador não aprovou este resultado após as rodadas de correção
 msgid "The verifier passes the result only if every criterion is met."
 msgstr "O verificador só aprova o resultado se todos os critérios forem atendidos."
 
-#: src/features/settings/components/account/account-settings.tsx:452
-#: src/features/settings/components/account/account-settings.tsx:455
+#: src/features/settings/components/account/account-settings.tsx:456
 msgid "The voice hands-free mode reads replies in. A skill with its own voice uses that instead. Spoken replies count against a daily allowance; after it, your browser's voice takes over."
 msgstr "A voz com que o modo mãos-livres lê as respostas. Uma habilidade com voz própria usa a sua. As respostas faladas contam para uma cota diária; depois dela, a voz do seu navegador assume."
 
@@ -35807,7 +35711,7 @@ msgstr "Esses provedores nunca serão usados nas suas solicitações."
 msgid "These rule files were changed meanwhile. Discard your changes to see the saved ones, then edit again."
 msgstr "Estes arquivos de regras foram alterados nesse meio-tempo. Descarte suas alterações para ver os salvos e edite novamente."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:196
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:198
 msgid "These tools run without asking until the time shown. Revoke one to be asked again from your next message."
 msgstr "Estas ferramentas são executadas sem perguntar até o horário exibido. Revogue uma para ser consultado novamente a partir da sua próxima mensagem."
 
@@ -35932,7 +35836,7 @@ msgstr "Esta branch está atrás da branch base."
 msgid "This branch was changed meanwhile. Check it and save again."
 msgstr "Este branch foi alterado entretanto. Verifique-o e guarde novamente."
 
-#: src/features/notifications/components/notification-settings.tsx:190
+#: src/features/notifications/components/notification-settings.tsx:211
 msgid "This browser cannot receive push notifications here."
 msgstr "Este navegador não pode receber notificações push aqui."
 
@@ -36311,7 +36215,7 @@ msgstr "Isto mescla o commit {0} na branch base com “{1}” em {hostLabel}. Se
 msgid "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
 msgstr "Não é possível deixar esta mensagem. Seja breve, não a comece com / nem mencione ninguém, ou tente novamente mais tarde."
 
-#: src/features/chat/core/context/chat-context.tsx:729
+#: src/features/chat/core/context/chat-context.tsx:733
 msgid "This message cannot be sent in this chat."
 msgstr "Esta mensagem não pode ser enviada neste chat."
 
@@ -36802,31 +36706,21 @@ msgstr "tempo esgotado"
 msgid "Timeline image"
 msgstr "Imagem de linha do tempo"
 
-#: src/features/settings/components/account/account-settings.tsx:648
+#: src/features/settings/components/account/account-settings.tsx:700
 msgid "Timestamps disabled"
 msgstr "Data e hora desativadas"
 
-#: src/features/settings/components/account/account-settings.tsx:648
+#: src/features/settings/components/account/account-settings.tsx:700
 msgid "Timestamps enabled"
 msgstr "Data e hora ativadas"
 
-#: src/features/settings/components/account/account-settings.tsx:318
-#: src/features/settings/components/account/account-settings.tsx:694
-msgid "Timestamps disabled"
-msgstr "Data e hora desativadas"
-
-#: src/features/settings/components/account/account-settings.tsx:694
-msgid "Timestamps enabled"
-msgstr "Data e hora ativadas"
-
-#: src/features/settings/components/account/account-settings.tsx:321
+#: src/features/settings/components/account/account-settings.tsx:322
 #: src/features/settings/components/chat/trigger-settings.tsx:329
 #: src/features/settings/lib/settings-keywords.ts:32
 msgid "Timezone"
 msgstr "Fuso horário"
 
-#: src/features/settings/components/account/account-settings.tsx:323
-#: src/features/settings/components/account/account-settings.tsx:326
+#: src/features/settings/components/account/account-settings.tsx:327
 msgid "Timezone updated"
 msgstr "Fuso horário atualizado"
 
@@ -36993,8 +36887,7 @@ msgstr "Tokens"
 msgid "Tokens used on your own endpoint are not charged as credits. Daily message limits still apply."
 msgstr "Os tokens usados no seu próprio endpoint não são cobrados em créditos. Os limites diários de mensagens continuam valendo."
 
-#: src/features/settings/components/account/account-settings.tsx:113
-#: src/features/settings/components/account/account-settings.tsx:116
+#: src/features/settings/components/account/account-settings.tsx:117
 msgid "Tokyo"
 msgstr "Tóquio"
 
@@ -37082,7 +36975,7 @@ msgstr "Chamada de ferramentas"
 msgid "Tool output's share of the stored size"
 msgstr "Participação da saída de ferramentas no tamanho armazenado"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:354
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:356
 #: src/features/settings/lib/settings-navigation.ts:96
 msgid "Tool Permissions"
 msgstr "Permissões de ferramentas"
@@ -37114,6 +37007,7 @@ msgid "Tools for {0}"
 msgstr "Ferramentas de {0}"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:47
+#: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:47
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr "As ferramentas executam conforme as próprias configurações; uma verificação rápida pode liberar chamadas de baixo risco"
 
@@ -37177,8 +37071,7 @@ msgstr "Raciocínio de primeira linha em benchmarks complexos"
 msgid "Top-tier text-to-video quality"
 msgstr "Qualidade de texto para vídeo de primeira linha"
 
-#: src/features/settings/components/account/account-settings.tsx:103
-#: src/features/settings/components/account/account-settings.tsx:106
+#: src/features/settings/components/account/account-settings.tsx:107
 msgid "Toronto"
 msgstr "Toronto"
 
@@ -37676,8 +37569,7 @@ msgstr "tipografia"
 msgid "UAE"
 msgstr "Emirados Árabes Unidos"
 
-#: src/features/settings/components/account/account-settings.tsx:634
-#: src/features/settings/components/account/account-settings.tsx:680
+#: src/features/settings/components/account/account-settings.tsx:686
 msgid "UI Preferences"
 msgstr "Preferências da interface"
 
@@ -38019,7 +37911,7 @@ msgstr "até {0}"
 msgid "Until {0}"
 msgstr "Até {0}"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:206
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:208
 msgid "Until {until}"
 msgstr "Até {until}"
 
@@ -38734,8 +38626,7 @@ msgstr "JSON válido"
 msgid "Validate data quality and prioritize authoritative sources. Essential for research tasks and fact-checking."
 msgstr "Valide a qualidade dos dados e priorize fontes confiáveis. Essencial para tarefas de pesquisa e checagem de fatos."
 
-#: src/features/settings/components/account/account-settings.tsx:104
-#: src/features/settings/components/account/account-settings.tsx:107
+#: src/features/settings/components/account/account-settings.tsx:108
 msgid "Vancouver"
 msgstr "Vancouver"
 
@@ -39221,24 +39112,15 @@ msgstr "{viewedCount} de {0} arquivos vistos"
 msgid "Viewing: {selectedNodeId}"
 msgstr "Visualizando: {selectedNodeId}"
 
-#: src/features/settings/components/account/account-settings.tsx:511
+#: src/features/settings/components/account/account-settings.tsx:515
 msgid "Vim keys disabled"
 msgstr "Teclas do Vim desativadas"
 
-#: src/features/settings/components/account/account-settings.tsx:511
+#: src/features/settings/components/account/account-settings.tsx:515
 msgid "Vim keys enabled"
 msgstr "Teclas do Vim ativadas"
 
-#: src/features/settings/components/account/account-settings.tsx:500
-#: src/features/settings/components/account/account-settings.tsx:514
-msgid "Vim keys disabled"
-msgstr "Teclas do Vim desativadas"
-
-#: src/features/settings/components/account/account-settings.tsx:514
-msgid "Vim keys enabled"
-msgstr "Teclas do Vim ativadas"
-
-#: src/features/settings/components/account/account-settings.tsx:503
+#: src/features/settings/components/account/account-settings.tsx:504
 msgid "Vim keys in the composer"
 msgstr "Teclas do Vim no compositor"
 
@@ -39575,11 +39457,11 @@ msgstr "Repositórios monitorados"
 msgid "We could not check that you are signed in. Try again in a moment."
 msgstr "Não foi possível verificar se você está conectado. Tente novamente em instantes."
 
-#: src/features/chat/core/context/chat-context.tsx:731
+#: src/features/chat/core/context/chat-context.tsx:735
 msgid "We could not confirm your session in time. The guest's message was not sent; send it again from the Guests tab."
 msgstr "Não conseguimos confirmar sua sessão a tempo. A mensagem do convidado não foi enviada; envie de novo pela aba Convidados."
 
-#: src/features/chat/core/context/chat-context.tsx:734
+#: src/features/chat/core/context/chat-context.tsx:738
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "Não conseguimos confirmar sua sessão a tempo. Sua mensagem continua no campo de texto. Tente enviá-la novamente."
 
@@ -39620,7 +39502,7 @@ msgstr "Web scraping e extração de dados estruturados"
 msgid "web search"
 msgstr "pesquisa na web"
 
-#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:24
+#: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:23
 msgid "Web search"
 msgstr "Pesquisa na web"
 
@@ -39930,16 +39812,15 @@ msgstr "Quando"
 msgid "When a new fact conflicts with an old one, the old memory is updated, superseded, or the new fact is ignored."
 msgstr "Quando um fato novo entra em conflito com um antigo, a memória antiga é atualizada, substituída, ou o fato novo é ignorado."
 
-#: src/features/settings/components/account/account-settings.tsx:540
-#: src/features/settings/components/account/account-settings.tsx:543
+#: src/features/settings/components/account/account-settings.tsx:544
 msgid "When a reply is cut off by an update or an outage, it continues from its last finished step, up to 3 times. A reply interrupted while a tool was running is never continued."
 msgstr "Quando uma resposta é cortada por uma atualização ou uma interrupção, ela continua a partir do último passo concluído, até 3 vezes. Uma resposta interrompida enquanto uma ferramenta estava em execução nunca é continuada."
 
-#: src/features/settings/components/account/account-settings.tsx:587
+#: src/features/settings/components/account/account-settings.tsx:590
 msgid "When a reply pauses because a usage limit was reached and the provider says when it resets, its chat leaves your active list until then."
 msgstr "Quando uma resposta é pausada porque um limite de uso foi atingido e o provedor informa quando ele é redefinido, a conversa sai da sua lista ativa até lá."
 
-#: src/features/settings/components/account/account-settings.tsx:565
+#: src/features/settings/components/account/account-settings.tsx:566
 msgid "When a reply pauses because a usage limit was reached, it resumes by itself once the limit resets. Off: it waits until you resume it."
 msgstr "Quando uma resposta é pausada porque um limite de uso foi atingido, ela retoma sozinha quando o limite é redefinido. Desativado: ela espera você retomar."
 
@@ -40670,12 +40551,12 @@ msgstr "Seu espaço de trabalho de IA <0>começa aqui.</0>"
 msgid "Your answer"
 msgstr "Sua resposta"
 
-#: src/features/chat/core/context/chat-context.tsx:636
+#: src/features/chat/core/context/chat-context.tsx:640
 msgid "Your answer in Neore has finished."
 msgstr "Sua resposta no Neore foi concluída."
 
 #: src/features/chat/thread/ask-user-prompt.tsx:222
-#: src/features/chat/thread/ask-user-questions.tsx:85
+#: src/features/chat/thread/ask-user-questions.tsx:86
 msgid "Your answer:"
 msgstr "Sua resposta:"
 
@@ -40848,8 +40729,7 @@ msgstr "Suas últimas alterações ainda não foram salvas."
 msgid "Your local server answered, but refused this site (CORS). Allow this site's origin — for Ollama set OLLAMA_ORIGINS, for LM Studio turn on \"Enable CORS\" — then restart the server."
 msgstr "Seu servidor local respondeu, mas recusou este site (CORS). Permita a origem deste site — no Ollama, defina OLLAMA_ORIGINS; no LM Studio, ative \"Enable CORS\" — e reinicie o servidor."
 
-#: src/features/settings/components/account/account-settings.tsx:292
-#: src/features/settings/components/account/account-settings.tsx:295
+#: src/features/settings/components/account/account-settings.tsx:296
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "Sua localização (ex.: \"São Paulo, Brasil\", \"Berlim, Alemanha\")."
 
@@ -40861,7 +40741,7 @@ msgstr "Sua mensagem"
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 msgstr "Sua mensagem mudou durante os uploads, então não foi enviada. Pressione Enviar para enviá-la."
 
-#: src/features/chat/core/context/chat-context.tsx:722
+#: src/features/chat/core/context/chat-context.tsx:726
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Sua mensagem contém conteúdo impróprio e não pode ser enviada."
 
@@ -41030,8 +40910,7 @@ msgstr "Suas tags"
 msgid "Your Team plans will be cancelled"
 msgstr "Seus planos Team serão cancelados"
 
-#: src/features/settings/components/account/account-settings.tsx:320
-#: src/features/settings/components/account/account-settings.tsx:323
+#: src/features/settings/components/account/account-settings.tsx:324
 msgid "Your timezone (IANA timezone identifier)."
 msgstr "Seu fuso horário (identificador de fuso horário IANA)."
 
@@ -41169,85 +41048,10 @@ msgstr "Zulu"
 msgid "Zulu (South Africa)"
 msgstr "Zulu (África do Sul)"
 
-#: src/features/settings/components/account/account-settings.tsx:112
-#: src/features/settings/components/account/account-settings.tsx:115
+#: src/features/settings/components/account/account-settings.tsx:116
 msgid "Zurich"
 msgstr "Zurique"
 
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ pontos"
-
-msgid "Archive"
-msgstr "Arquivar"
-
-msgid "Archive this chat?"
-msgstr "Arquivar este chat?"
-
-msgid "Archived chats stay searchable, and you can restore them from the archive."
-msgstr "Os chats arquivados continuam pesquisáveis, e você pode restaurá-los a partir do arquivo."
-
-msgid "Asks before a chat is archived. Off: archiving happens on the first click."
-msgstr "Pergunta antes de arquivar um chat. Desativado: o arquivamento acontece no primeiro clique."
-
-msgid "Asks before a chat is deleted. Off: deleting happens on the first click."
-msgstr "Pergunta antes de excluir um chat. Desativado: a exclusão acontece no primeiro clique."
-
-msgid "Asks before a pinned chat is unpinned. Off: unpinning happens on the first click."
-msgstr "Pergunta antes de desafixar um chat. Desativado: o desafixar acontece no primeiro clique."
-
-msgid "Confirm before archiving a chat"
-msgstr "Confirmar antes de arquivar um chat"
-
-msgid "Confirm before deleting a chat"
-msgstr "Confirmar antes de excluir um chat"
-
-msgid "Confirm before unpinning a chat"
-msgstr "Confirmar antes de desafixar um chat"
-
-msgid "The chat will no longer be pinned. You can pin it again from the list."
-msgstr "O chat não ficará mais fixado. Você pode fixá-lo novamente na lista."
-
-msgid "Unpin this chat?"
-msgstr "Desafixar este chat?"
-
-msgid "Resume after a usage limit"
-msgstr "Retomar após um limite de uso"
-
-msgid "When a reply pauses because a usage limit was reached, it resumes by itself once the limit resets. Off: it waits until you resume it."
-msgstr "Quando uma resposta é pausada porque um limite de uso foi atingido, ela retoma sozinha quando o limite é redefinido. Desativado: ela espera você retomar."
-
-msgid "Paused replies will resume when the limit resets"
-msgstr "As respostas pausadas serão retomadas quando o limite for redefinido"
-
-msgid "Paused replies will wait for you to resume them"
-msgstr "As respostas pausadas esperarão você retomá-las"
-
-msgid "Snooze chats until the limit resets"
-msgstr "Adiar conversas até o limite ser redefinido"
-
-msgid "When a reply pauses because a usage limit was reached and the provider says when it resets, its chat leaves your active list until then."
-msgstr "Quando uma resposta é pausada porque um limite de uso foi atingido e o provedor informa quando ele é redefinido, a conversa sai da sua lista ativa até lá."
-
-msgid "Chats paused by a usage limit will be snoozed"
-msgstr "As conversas com uma resposta pausada por limite de uso serão adiadas"
-
-msgid "Chats paused by a usage limit will not be snoozed"
-msgstr "As conversas com uma resposta pausada por limite de uso não serão adiadas"
-
-msgid "Rate limited. The limit resets in about {announced}. Waiting for you to resume"
-msgstr "Limite de taxa atingido. O limite é redefinido em cerca de {announced}. Aguardando você retomar"
-
-msgid "Rate limited, the limit resets in {countdown}. Waiting for you to resume"
-msgstr "Limite de taxa atingido, o limite é redefinido em {countdown}. Aguardando você retomar"
-
-msgid "The limit has reset. Waiting for you to resume"
-msgstr "O limite foi redefinido. Aguardando você retomar"
-
-#: src/features/chat/thread/rate-limit-pause-notice.tsx
-msgid "A message you send here is queued, and it is sent after you resume the reply."
-msgstr "Uma mensagem que você envia aqui fica na fila e é enviada depois que você retomar a resposta."
-
-#: src/features/chat/thread/rate-limit-pause-notice.tsx
-msgid "{spoken}. {queuedNote}"
-msgstr "{spoken}. {queuedNote}"

@@ -6,13 +6,14 @@ import { Label } from "@neore/ui/components/label";
 import { Switch } from "@neore/ui/components/switch";
 import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { FC } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useCRPC } from "@/lib/lunora/crpc";
 
+import type { ChatToastEvent } from "../lib/chat-toasts";
 import type { PushSupport } from "../lib/web-push-client";
 import { getCurrentPushSubscription, getPushSupport, subscribeBrowser, unsubscribeBrowser } from "../lib/web-push-client";
 
@@ -33,29 +34,42 @@ type SettingMutation = {
  * so; a saved one confirms with a toast.
  */
 const useOptimisticSetting = (
-    saved: boolean | undefined,
+    saved: boolean | null | undefined,
     mutation: SettingMutation,
     messages: { error: string; off: string; on: string },
+    // What an absent value means: off for an opt-in setting, on for one that defaults on.
+    absent = false,
 ): { checked: boolean; disabled: boolean; onCheckedChange: (checked: boolean) => void } => {
     const [pending, setPending] = useState<boolean | undefined>(undefined);
+    // Each change gets a number: only the newest change may clear the switch when it fails. An older one failing must not
+    // reset a newer change that is still on its way.
+    const latestChange = useRef(0);
+    const current = saved ?? absent;
 
     // Once the saved value catches up with the switch, the local value is no longer needed.
     useEffect(() => {
-        if (pending !== undefined && saved === pending) {
+        if (pending !== undefined && current === pending) {
             setPending(undefined);
         }
-    }, [pending, saved]);
+    }, [pending, current]);
 
     return {
-        checked: pending ?? saved === true,
+        checked: pending ?? current,
         disabled: mutation.isPending,
         onCheckedChange: (checked) => {
+            latestChange.current += 1;
+
+            const change = latestChange.current;
+
             setPending(checked);
             mutation.mutate(
                 { enabled: checked },
                 {
                     onError: () => {
-                        setPending(undefined);
+                        if (latestChange.current === change) {
+                            setPending(undefined);
+                        }
+
                         toast.error(messages.error);
                     },
                     onSuccess: () => toast.success(checked ? messages.on : messages.off),
@@ -104,6 +118,44 @@ const NotificationSettings: FC = () => {
         off: t`Task emails turned off`,
         on: t`Task emails turned on`,
     });
+
+    // The in-app toasts for chat events. Each defaults on: an absent setting keeps the toast.
+    // One mutation observer per switch: a shared one would drop an earlier change's callbacks when a later change starts.
+    // Until the settings load, an absent value is not yet known to mean on: the three switches stay off and disabled.
+    const chatToastsLoaded = userSettings.data !== undefined;
+    const chatToastOptions = crpc.notifications.chat_toast_settings.setChatToastEnabled.mutationOptions();
+    const setChatFinishedToast = useMutation(chatToastOptions);
+    const setChatFailedToast = useMutation(chatToastOptions);
+    const setChatInputToast = useMutation(chatToastOptions);
+    const chatToastMutation = (event: ChatToastEvent, observer: typeof setChatFinishedToast): SettingMutation => {
+        return {
+            isPending: observer.isPending,
+            mutate: (variables, options) => observer.mutate({ enabled: variables.enabled, event }, options),
+        };
+    };
+    const chatToastMessages = {
+        error: t`Could not save the chat notification setting.`,
+        off: t`Chat notification turned off`,
+        on: t`Chat notification turned on`,
+    };
+    const chatFinishedToast = useOptimisticSetting(
+        userSettings.data?.chatFinishedToastEnabled,
+        chatToastMutation("finished", setChatFinishedToast),
+        chatToastMessages,
+        true,
+    );
+    const chatFailedToast = useOptimisticSetting(
+        userSettings.data?.chatFailedToastEnabled,
+        chatToastMutation("failed", setChatFailedToast),
+        chatToastMessages,
+        true,
+    );
+    const chatInputToast = useOptimisticSetting(
+        userSettings.data?.chatInputToastEnabled,
+        chatToastMutation("input", setChatInputToast),
+        chatToastMessages,
+        true,
+    );
 
     const pushAvailable = Boolean(config?.publicKey) && support === "supported";
     const dailyBrief = useOptimisticSetting(userSettings.data?.dailyBriefEnabled, setDailyBrief, {
@@ -250,6 +302,57 @@ const NotificationSettings: FC = () => {
                         disabled={taskEmail.disabled}
                         id="task-email"
                         onCheckedChange={taskEmail.onCheckedChange}
+                    />
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-0.5">
+                        <Label className="text-base font-medium" htmlFor="chat-finished-toast">
+                            {t`Chat finished`}
+                        </Label>
+                        <p className="text-muted-foreground text-sm" id="chat-finished-toast-hint">
+                            {t`Show a message in the app when a chat reply finishes.`}
+                        </p>
+                    </div>
+                    <Switch
+                        aria-describedby="chat-finished-toast-hint"
+                        checked={chatToastsLoaded && chatFinishedToast.checked}
+                        disabled={chatFinishedToast.disabled || !chatToastsLoaded}
+                        id="chat-finished-toast"
+                        onCheckedChange={chatFinishedToast.onCheckedChange}
+                    />
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-0.5">
+                        <Label className="text-base font-medium" htmlFor="chat-failed-toast">
+                            {t`Chat failed`}
+                        </Label>
+                        <p className="text-muted-foreground text-sm" id="chat-failed-toast-hint">
+                            {t`Show a message in the app when a chat reply fails.`}
+                        </p>
+                    </div>
+                    <Switch
+                        aria-describedby="chat-failed-toast-hint"
+                        checked={chatToastsLoaded && chatFailedToast.checked}
+                        disabled={chatFailedToast.disabled || !chatToastsLoaded}
+                        id="chat-failed-toast"
+                        onCheckedChange={chatFailedToast.onCheckedChange}
+                    />
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-0.5">
+                        <Label className="text-base font-medium" htmlFor="chat-input-toast">
+                            {t`Chat needs your input or approval`}
+                        </Label>
+                        <p className="text-muted-foreground text-sm" id="chat-input-toast-hint">
+                            {t`Show a message in the app when a chat waits for your answer or your approval.`}
+                        </p>
+                    </div>
+                    <Switch
+                        aria-describedby="chat-input-toast-hint"
+                        checked={chatToastsLoaded && chatInputToast.checked}
+                        disabled={chatInputToast.disabled || !chatToastsLoaded}
+                        id="chat-input-toast"
+                        onCheckedChange={chatInputToast.onCheckedChange}
                     />
                 </div>
             </CardContent>
