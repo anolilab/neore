@@ -5,7 +5,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { internal } from "../_generated/internal";
-import { recordMergedPullRequest } from "./pr-merged";
+import { enqueueJob } from "../lib/job-queue";
+import { continueMergedRecording, recordMergedPullRequest } from "./pr-merged";
+
+vi.mock("../lib/job-queue", () => {
+    return { enqueueJob: vi.fn(async () => undefined) };
+});
 
 type Call = { args: Record<string, unknown>; ref: unknown };
 
@@ -183,6 +188,48 @@ describe("recordMergedPullRequest", () => {
 
         expect(attempted).toHaveLength(25);
         expect(new Set(attempted).size).toBe(25);
+    });
+
+    it("records at most ten pages in one action, queues the rest from the cursor it stopped at, and the queued job records the rest", async () => {
+        const calls: Call[] = [];
+        // Twelve pages, cursors `c-1` .. `c-11`. A page's cursor names the page after it; the last page is `c-11`.
+        const twelvePages = (args: Record<string, unknown>) => {
+            const index = args.cursor === null ? 0 : Number(String(args.cursor).slice(2));
+
+            return { continueCursor: `c-${String(index + 1)}`, isDone: index === 11, owed: [] };
+        };
+        const runMutation = vi.fn(async (ref: unknown, args: Record<string, unknown>) => {
+            calls.push({ args, ref });
+
+            return ref === internal.source_control.pr_threads.recordPullRequestMergedPage ? twelvePages(args) : null;
+        });
+
+        // The first action queues the rest through the jobs queue; capture what it sends.
+        const queued = vi.mocked(enqueueJob);
+
+        queued.mockClear();
+        await recordMergedPullRequest({ runMutation, scheduler: {} } as never, "user-a", { number: 7, repository: "octo/hello" });
+
+        const pagesFirst = callsTo(calls, internal.source_control.pr_threads.recordPullRequestMergedPage);
+
+        expect(pagesFirst).toHaveLength(10);
+        expect(queued).toHaveBeenCalledTimes(1);
+
+        const [jobRef, jobArgs, jobOptions] = queued.mock.calls[0] ?? [];
+
+        expect(jobRef).toBe(internal.source_control.pr_merged.continueMergedRecordingJob);
+        expect(jobArgs).toMatchObject({ cursor: "c-10", number: 7, repository: "octo/hello", userId: "user-a" });
+        expect(jobOptions).toStrictEqual({ shardKey: "user-a" });
+
+        // The queued job runs the rest of the walk: it records the last two pages and queues nothing more.
+        calls.length = 0;
+        queued.mockClear();
+        await continueMergedRecording({ runMutation, scheduler: {} } as never, { ...(jobArgs as Record<string, unknown>), cursor: "c-10" } as never);
+
+        const pagesRest = callsTo(calls, internal.source_control.pr_threads.recordPullRequestMergedPage).map((call) => call.args.cursor);
+
+        expect(pagesRest).toStrictEqual(["c-10", "c-11"]);
+        expect(queued).not.toHaveBeenCalled();
     });
 
     it("keeps going when one archive fails, and each owed link is archived by its own attempt", async () => {

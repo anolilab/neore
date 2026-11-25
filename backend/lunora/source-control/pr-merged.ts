@@ -5,9 +5,14 @@
  * chat's pull request is read). Never throws: the merge has already happened on the host, and a failed record or archive
  * must not fail the caller.
  */
-import { internal } from "../_generated/internal";
+import { v } from "lunorash/server";
+
 import type { Id } from "../_generated/dataModel";
+import { internal } from "../_generated/internal";
 import type { ActionCtx } from "../_generated/server";
+import { internalAction } from "../_generated/server";
+import { enqueueJob } from "../lib/job-queue";
+import { MAX_LENGTH } from "../lib/validators";
 import { requireAddress } from "./pr-threads";
 
 /** An owed link as a page reports it: its chat, and when an attempt last found the chat busy (0 when never). */
@@ -29,17 +34,128 @@ export interface MergedPullRequestRef {
     repository: string;
 }
 
+/** The merge a recording walks: the pull request, and the host's merge time when the caller has one. */
+export interface MergeRecording {
+    mergedAt?: number;
+    mergedBefore?: number;
+    mergedBeforeIsHostBound?: boolean;
+    number: number;
+    repository: string;
+    userId: string;
+}
+
+type RecordCtx = Pick<ActionCtx, "runMutation" | "scheduler">;
+
+/** The recorded walk of one merge: the owed links it saw, and where it stopped when it did not reach the last page. */
+interface Walk {
+    continueCursor: string | null;
+    done: boolean;
+    owed: Map<string, RecordedLink>;
+}
+
 /**
  * Archive attempts per read. A status read waits for these, so a merge that owes many chats is worked through a bounded
  * batch at a time: what is left stays owed, and the next read takes the next batch.
  */
 const MERGED_ARCHIVES_PER_READ = 25;
 
-/** Walks restarted from the first page per read, when a page's cursor is no longer read. Bounded, so a cursor that keeps failing ends the read. */
+/**
+ * Recording pages one action records. A walk past this continues in a scheduled action from the cursor it stopped at, so no
+ * single action records an unbounded number of pages.
+ */
+const MAX_RECORD_PAGES_PER_ACTION = 10;
+
+/** Walks restarted from the first page per action, when a page's cursor is no longer read. Bounded, so a cursor that keeps failing ends the walk. */
 const MAX_CURSOR_RESTARTS = 3;
 
 /** Whether a page call failed because its cursor is no longer read by the server. */
 const isInvalidCursor = (error: unknown): boolean => typeof error === "object" && error !== null && "code" in error && error.code === "INVALID_CURSOR";
+
+/** The arguments of one page call for this merge. */
+const pageArgsOf = (merge: MergeRecording) => {
+    return {
+        ...(merge.mergedAt !== undefined && { mergedAt: merge.mergedAt }),
+        ...(merge.mergedBefore !== undefined && { mergedBefore: merge.mergedBefore }),
+        ...(merge.mergedBeforeIsHostBound !== undefined && { mergedBeforeIsHostBound: merge.mergedBeforeIsHostBound }),
+        number: merge.number,
+        repository: merge.repository,
+        userId: merge.userId,
+    };
+};
+
+/**
+ * Records the links of one merge page by page, from `start`, for at most `MAX_RECORD_PAGES_PER_ACTION` pages. The owed links are
+ * kept once each, even when a restart sees them again. A cursor the server no longer reads (`INVALID_CURSOR`: a write or a deploy
+ * between pages) restarts the walk from the first page, as the state sweep does.
+ */
+const walkPages = async (ctx: Pick<ActionCtx, "runMutation">, merge: MergeRecording, start: string | null): Promise<Walk> => {
+    const owed = new Map<string, RecordedLink>();
+    let cursor = start;
+    let restarts = 0;
+    let pages = 0;
+
+    while (pages < MAX_RECORD_PAGES_PER_ACTION) {
+        let page: RecordedPage;
+
+        try {
+            page = await ctx.runMutation(internal.source_control.pr_threads.recordPullRequestMergedPage, { ...pageArgsOf(merge), cursor });
+        } catch (error) {
+            if (cursor !== null && restarts < MAX_CURSOR_RESTARTS && isInvalidCursor(error)) {
+                restarts += 1;
+                cursor = null;
+                continue;
+            }
+
+            throw error;
+        }
+
+        pages += 1;
+
+        for (const link of page.owed) {
+            owed.set(link.linkId, link);
+        }
+
+        if (page.isDone) {
+            return { continueCursor: null, done: true, owed };
+        }
+
+        cursor = page.continueCursor;
+    }
+
+    return { continueCursor: cursor, done: false, owed };
+};
+
+/**
+ * Records what this action may, schedules the rest of the walk when it did not reach the last page, and archives the chats of the
+ * owed batch. Every page is recorded before the attempts, so the attempts go to the owed links least recently attempted: a busy link
+ * on an early page cannot take every attempt of the read. What is left stays owed (the next read, the sweep, or the continuation).
+ */
+const recordAndArchive = async (ctx: RecordCtx, merge: MergeRecording, start: string | null): Promise<void> => {
+    const address = { number: merge.number, repository: merge.repository };
+    const walk = await walkPages(ctx, merge, start);
+
+    if (!walk.done && walk.continueCursor !== null) {
+        await queueRest(merge, walk.continueCursor);
+    }
+
+    const owed = [...walk.owed.values()].toSorted((a, b) => a.lastAttemptAt - b.lastAttemptAt);
+
+    for (const link of owed.slice(0, MERGED_ARCHIVES_PER_READ)) {
+        await archiveOwedLink(ctx, link, address);
+    }
+};
+
+/**
+ * Queues the rest of a walk on the jobs queue, on the owner's shard, from the cursor the action stopped at. Long work belongs on the
+ * queue, not the scheduler lane. A failure is logged: the next read records the walk again from its first page, so nothing is lost.
+ */
+const queueRest = async (merge: MergeRecording, cursor: string): Promise<void> => {
+    try {
+        await enqueueJob(internal.source_control.pr_merged.continueMergedRecordingJob, { ...pageArgsOf(merge), cursor }, { shardKey: merge.userId });
+    } catch (error) {
+        console.error("[source-control] could not queue the rest of a merged pull request's recording; the next read records it", error);
+    }
+};
 
 /**
  * Records a merge and archives the chats it owes an archive to. Every caller passes `mergedAt`: the host's merge time, or,
@@ -48,7 +164,7 @@ const isInvalidCursor = (error: unknown): boolean => typeof error === "object" &
  * the next read retries it, and the rest still run.
  */
 export const recordMergedPullRequest = async (
-    ctx: Pick<ActionCtx, "runMutation">,
+    ctx: RecordCtx,
     userId: string,
     ref: MergedPullRequestRef,
     mergedAt?: number,
@@ -58,58 +174,55 @@ export const recordMergedPullRequest = async (
     try {
         // Links are stored under the canonical (lowercase) repository, so the lookup must use it too; an invalid address throws here and is logged.
         const address = requireAddress(ref.repository, ref.number);
-        // The links are recorded one bounded page per call. Every page is recorded before any archive attempt, so the attempts go to
-        // the owed links least recently attempted across all of them: a busy link on an early page cannot take every attempt of
-        // each read and starve the owed links after it. What is left stays owed (the next read or sweep takes it).
-        // A cursor the server no longer reads (`INVALID_CURSOR`: a write or a deploy between pages) restarts the walk from the first
-        // page, as the state sweep does. The owed links the walk sees again are the same ones, so each is kept once.
-        const owedById = new Map<string, RecordedLink>();
-        let cursor: string | null = null;
-        let restarts = 0;
 
-        for (;;) {
-            let page: RecordedPage;
-
-            try {
-                page = await ctx.runMutation(internal.source_control.pr_threads.recordPullRequestMergedPage, {
-                    ...(mergedAt !== undefined && { mergedAt }),
-                    ...(mergedBefore !== undefined && { mergedBefore }),
-                    ...(mergedBeforeIsHostBound !== undefined && { mergedBeforeIsHostBound }),
-                    cursor,
-                    number: address.number,
-                    repository: address.repository,
-                    userId,
-                });
-            } catch (error) {
-                if (cursor !== null && restarts < MAX_CURSOR_RESTARTS && isInvalidCursor(error)) {
-                    restarts += 1;
-                    cursor = null;
-                    continue;
-                }
-
-                throw error;
-            }
-
-            for (const link of page.owed) {
-                owedById.set(link.linkId, link);
-            }
-
-            if (page.isDone) {
-                break;
-            }
-
-            cursor = page.continueCursor;
-        }
-
-        const owed = [...owedById.values()].toSorted((a, b) => a.lastAttemptAt - b.lastAttemptAt);
-
-        for (const link of owed.slice(0, MERGED_ARCHIVES_PER_READ)) {
-            await archiveOwedLink(ctx, link, address);
-        }
+        await recordAndArchive(
+            ctx,
+            {
+                ...(mergedAt !== undefined && { mergedAt }),
+                ...(mergedBefore !== undefined && { mergedBefore }),
+                ...(mergedBeforeIsHostBound !== undefined && { mergedBeforeIsHostBound }),
+                number: address.number,
+                repository: address.repository,
+                userId,
+            },
+            null,
+        );
     } catch (error) {
         console.error("[source-control] could not record the merged pull request", error);
     }
 };
+
+/**
+ * The rest of a merge's recording, from the cursor an earlier action stopped at (`queueRest`). Exported as a plain function so a test
+ * can run the continuation; the job wraps it below.
+ */
+export const continueMergedRecording = async (ctx: RecordCtx, args: MergeRecording & { cursor: string }): Promise<void> => {
+    const { cursor, ...merge } = args;
+
+    try {
+        await recordAndArchive(ctx, merge, cursor);
+    } catch (error) {
+        console.error("[source-control] could not continue a merged pull request's recording", error);
+    }
+};
+
+/** The job that runs `continueMergedRecording`, on the owner's shard through the jobs queue. */
+export const continueMergedRecordingJob = internalAction
+    .input({
+        cursor: v.string().max(MAX_LENGTH.cursor),
+        mergedAt: v.optional(v.number()),
+        mergedBefore: v.optional(v.number()),
+        mergedBeforeIsHostBound: v.optional(v.boolean()),
+        number: v.number(),
+        repository: v.string().max(MAX_LENGTH.short),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.null())
+    .action(async ({ args, ctx }) => {
+        await continueMergedRecording(ctx, args);
+
+        return null;
+    });
 
 /** One owed link's archive attempt. A thrown attempt is logged, and its link is noted so the next read moves past it. */
 const archiveOwedLink = async (
