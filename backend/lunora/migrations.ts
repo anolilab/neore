@@ -407,3 +407,16 @@ export const addProjectRunnerThreadId = defineMigration({
     // `undefined` leaves every row untouched (`MigrationTransform`).
     up: () => undefined,
 });
+
+/**
+ * `user.emailCanonical` gained a unique index, the one `@lunora/auth` relies on to reject a concurrent sign-up that repeats
+ * a folded address. Nothing to fill: a NULL value is refilled from `email` by the auth backfill. Rows that already share a
+ * canonical address are not merged here; `lunora deploy` checks the stored rows against the new schema and names each row
+ * that does not fit. A no-op, so `lunora prepare` records the index in the baseline.
+ */
+export const uniqueUserEmailCanonical = defineMigration({
+    id: "unique-user-email-canonical",
+    table: "user",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});

@@ -4315,8 +4315,8 @@ export const schema = defineSchema({
         userId: v.optional(v.string()),
     })
         .global()
-        // Not unique: existing rows can share a folded address. Making it unique needs a de-duplication migration first.
-        .index("emailCanonical", ["emailCanonical"])
+        // Unique: `@lunora/auth` relies on it to reject a concurrent sign-up that repeats a folded address.
+        .index("emailCanonical", ["emailCanonical"], { unique: true })
         .index("email_name", ["email", "name"])
         .index("name", ["name"])
         .index("role", ["role"])

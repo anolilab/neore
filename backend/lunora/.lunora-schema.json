@@ -21,6 +21,7 @@
     "backfill-message-typed-text",
     "drop-agent-option-fields",
     "session-options-to-session-state",
+    "unique-user-email-canonical",
     "widen-not-typed-steer-collaborator",
     "widen-not-typed-steer-drafts"
   ],
@@ -33445,7 +33446,7 @@
           "fields": [
             "emailCanonical"
           ],
-          "unique": false
+          "unique": true
         },
         "email_name": {
           "fields": [
