@@ -20,8 +20,9 @@ import { pollEvents } from "./events-poll";
 
 const SECRET = "test-secret";
 
-const run = (seq: number, timestamp: number, threadId = "t1", name = RUN_COMPLETED_EVENT): StoredEvent => {
+const run = (seq: number, timestamp: number, threadId = "t1", name = RUN_COMPLETED_EVENT, createdAt = timestamp): StoredEvent => {
     return {
+        createdAt,
         data: { finishedAt: timestamp, outcome: "succeeded", threadId },
         eventId: `run:${seq}`,
         name,
@@ -175,6 +176,16 @@ describe("events/poll over a log", () => {
         expect(outcome.events.map((event) => event.eventId)).toStrictEqual(["run:2"]);
         expect(outcome.truncated).toBe(true);
         expect(outcome.nextSeq).toBe(2);
+    });
+
+    it("keeps an event recorded late for the window from when the log took it, though it happened long before", async () => {
+        // Happened 10 s before `now` (old by its upstream time), but recorded at `now`: the log keeps it, so the poll returns it.
+        const log = logOf([run(1, 1000, "t1", RUN_COMPLETED_EVENT, NOW - 100)]);
+        const outcome = await pollEvents(log, { fromSeq: 0, maxAgeMs: 1000, maxEvents: 50, name: RUN_COMPLETED_EVENT, now: NOW });
+
+        expect(outcome.events.map((event) => event.eventId)).toStrictEqual(["run:1"]);
+        expect(outcome.events[0]?.timestamp).toBe(1000);
+        expect(outcome.truncated).toBe(false);
     });
 
     it("does not report a gap for an old event of another name or thread, which the caller never asked for", async () => {

@@ -24,6 +24,7 @@ const storeOn = (ctx: QueryCtx, userId: string): EventLogStore => {
 
             return page.map((row) => {
                 return {
+                    createdAt: row.createdAt,
                     data: JSON.parse(row.data) as Record<string, unknown>,
                     eventId: row.eventId,
                     name: row.name,
