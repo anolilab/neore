@@ -86,8 +86,10 @@ const headIsBeingEdited = (threadId: string): boolean => {
  * - anything else (a failed save's pause, a Stop, an automatic send behind an error): it stays held.
  * A queue seen unpaused drops any failed-save mark, which described a pause that has ended.
  */
-const takeReleasableHeldSend = (threadId: string, paused: boolean, hasError: boolean): HeldSend | undefined => {
+const takeReleasableHeldSend = (threadId: string, hasError: boolean): HeldSend | undefined => {
     const store = useQueueEditStore.getState();
+    // Read live, not from a render: a pause set earlier in the same commit (a reply's error) must count here.
+    const paused = usePromptQueueStore.getState().queues[threadId]?.paused === true;
 
     if (!paused && store.failedSave[threadId] === true) {
         store.markFailedSave(threadId, false);
@@ -809,7 +811,7 @@ const ComposerPromptQueue: FC = () => {
 
         if (ended && threadId && !isStreaming && queue.items.length > 0) {
             // A send held while the save ran goes now, under the shared release rule.
-            const held = takeReleasableHeldSend(threadId, queue.paused, Boolean(error));
+            const held = takeReleasableHeldSend(threadId, Boolean(error));
 
             if (held) {
                 void sendNextPrompt(threadId, { explicit: held.explicit });
@@ -842,7 +844,7 @@ const ComposerPromptQueue: FC = () => {
             return;
         }
 
-        const held = takeReleasableHeldSend(threadId, queue.paused, Boolean(error));
+        const held = takeReleasableHeldSend(threadId, Boolean(error));
 
         if (held) {
             void sendNextPrompt(threadId, { explicit: held.explicit });
@@ -868,7 +870,7 @@ const ComposerPromptQueue: FC = () => {
             return;
         }
 
-        const held = takeReleasableHeldSend(threadId, queue.paused, Boolean(error));
+        const held = takeReleasableHeldSend(threadId, Boolean(error));
 
         if (held) {
             void sendNextPrompt(threadId, { explicit: held.explicit });

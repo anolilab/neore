@@ -1089,6 +1089,23 @@ describe("composer prompt queue", () => {
         expect(usePromptQueueStore.getState().queues[chat.threadId]?.paused).toBe(true);
     });
 
+    it("a reply that ends in an error sends an explicit held send, reading the queue's live pause", async () => {
+        chat.error = undefined;
+        chat.isStreaming = true;
+
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "held through the error" });
+        useQueueEditStore.getState().holdSend(chat.threadId, true);
+
+        const view = render(<ComposerPromptQueue />);
+
+        // The reply fails and ends: the queue may be paused in the same commit, so the release must not use the render's value.
+        chat.error = new Error("the reply failed");
+        chat.isStreaming = false;
+        view.rerender(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("held through the error", [], { draftFrom: undefined }));
+    });
+
     it("moves a dropped message to where it lands in the queue", async () => {
         const { enqueue, setPaused } = usePromptQueueStore.getState();
 
