@@ -271,6 +271,58 @@ describe("recordMergedPullRequest", () => {
         ).rejects.toThrow("page write failed");
     });
 
+    it("queues the rest from the failed page, and archives the links recorded before it, when a page write fails in the action", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => undefined);
+        const calls: Call[] = [];
+        const runMutation = vi.fn(async (ref: unknown, args: Record<string, unknown>) => {
+            calls.push({ args, ref });
+
+            if (ref === internal.source_control.pr_threads.recordPullRequestMergedPage) {
+                if (args.cursor === "c-1") {
+                    throw new Error("page write failed");
+                }
+
+                return { continueCursor: "c-1", isDone: false, owed: [{ lastAttemptAt: 0, linkId: "link-1", threadId: "thread-1" }] };
+            }
+
+            return null;
+        });
+        const queued = vi.mocked(enqueueJob);
+
+        queued.mockClear();
+        await recordMergedPullRequest({ runMutation, scheduler: {} } as never, "user-a", { number: 7, repository: "octo/hello" });
+
+        expect(queued).toHaveBeenCalledTimes(1);
+        expect(queued.mock.calls[0]?.[1]).toMatchObject({ cursor: "c-1" });
+        expect(callsTo(calls, internal.agent.auto_archive.archiveMergedThread)).toHaveLength(1);
+    });
+
+    it("restarts the walk from the first page when the cursor error carries its code in data, as a wire-decoded error does", async () => {
+        const calls: Call[] = [];
+        const runMutation = vi.fn(async (ref: unknown, args: Record<string, unknown>) => {
+            calls.push({ args, ref });
+
+            if (ref === internal.source_control.pr_threads.recordPullRequestMergedPage) {
+                if (args.cursor === "c-1" && calls.filter((call) => call.args.cursor === "c-1").length === 1) {
+                    throw Object.assign(new Error("cursor expired"), { data: { code: "INVALID_CURSOR" } });
+                }
+
+                return args.cursor === null ? { continueCursor: "c-1", isDone: false, owed: [] } : { continueCursor: null, isDone: true, owed: [] };
+            }
+
+            return null;
+        });
+
+        await recordMergedPullRequest({ runMutation, scheduler: {} } as never, "user-a", { number: 7, repository: "octo/hello" });
+
+        expect(callsTo(calls, internal.source_control.pr_threads.recordPullRequestMergedPage).map((call) => call.args.cursor)).toEqual([
+            null,
+            "c-1",
+            null,
+            "c-1",
+        ]);
+    });
+
     it("keeps going when one archive fails, and each owed link is archived by its own attempt", async () => {
         vi.spyOn(console, "error").mockImplementation(() => undefined);
         const { calls, ctx } = fakeContext(THREAD_A);

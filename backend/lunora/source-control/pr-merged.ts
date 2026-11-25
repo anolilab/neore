@@ -51,6 +51,7 @@ type RecordCtx = Pick<ActionCtx, "runMutation" | "scheduler">;
 interface Walk {
     continueCursor: string | null;
     done: boolean;
+    failure?: unknown;
     owed: Map<string, RecordedLink>;
 }
 
@@ -69,8 +70,12 @@ const MAX_RECORD_PAGES_PER_ACTION = 10;
 /** Walks restarted from the first page per action, when a page's cursor is no longer read. Bounded, so a cursor that keeps failing ends the walk. */
 const MAX_CURSOR_RESTARTS = 3;
 
-/** Whether a page call failed because its cursor is no longer read by the server. */
-const isInvalidCursor = (error: unknown): boolean => typeof error === "object" && error !== null && "code" in error && error.code === "INVALID_CURSOR";
+/** Whether a page call failed because its cursor is no longer read by the server. A wire-decoded error carries the code in `data`. */
+const isInvalidCursor = (error: unknown): boolean => {
+    const { code, data } = (error ?? {}) as { code?: unknown; data?: { code?: unknown } };
+
+    return code === "INVALID_CURSOR" || data?.code === "INVALID_CURSOR";
+};
 
 /** The arguments of one page call for this merge. */
 const pageArgsOf = (merge: MergeRecording) => {
@@ -88,7 +93,8 @@ const pageArgsOf = (merge: MergeRecording) => {
 /**
  * Records the links of one merge page by page, from `start`, for at most `maxPages` pages. The owed links are
  * kept once each, even when a restart sees them again. A cursor the server no longer reads (`INVALID_CURSOR`: a write or a deploy
- * between pages) restarts the walk from the first page, as the state sweep does.
+ * between pages) restarts the walk from the first page, as the state sweep does. Any other failure ends the walk at the cursor that
+ * failed, returned as `failure`: the pages before it stay recorded, and the caller decides what to do with the rest.
  */
 const walkPages = async (ctx: Pick<ActionCtx, "runMutation">, merge: MergeRecording, start: string | null, maxPages: number): Promise<Walk> => {
     const owed = new Map<string, RecordedLink>();
@@ -108,7 +114,7 @@ const walkPages = async (ctx: Pick<ActionCtx, "runMutation">, merge: MergeRecord
                 continue;
             }
 
-            throw error;
+            return { continueCursor: cursor, done: false, failure: error, owed };
         }
 
         pages += 1;
@@ -132,18 +138,31 @@ const walkPages = async (ctx: Pick<ActionCtx, "runMutation">, merge: MergeRecord
  * owed batch. Every page is recorded before the attempts, so the attempts go to the owed links least recently attempted: a busy link
  * on an early page cannot take every attempt of the read. What is left stays owed (the next read, the sweep, or the continuation).
  */
-const recordAndArchive = async (ctx: RecordCtx, merge: MergeRecording, start: string | null): Promise<void> => {
+const recordAndArchive = async (ctx: RecordCtx, merge: MergeRecording, start: string | null, rethrow: boolean): Promise<void> => {
     const address = { number: merge.number, repository: merge.repository };
     const walk = await walkPages(ctx, merge, start, MAX_RECORD_PAGES_PER_ACTION);
 
-    if (!walk.done && walk.continueCursor !== null) {
-        await recordRest(ctx, merge, walk.continueCursor, walk.owed);
+    // A job that failed to record fails, so the queue retries it. An action carries its failure past the attempts, below.
+    if (walk.failure !== undefined && rethrow) {
+        throw walk.failure;
+    }
+
+    let { failure } = walk;
+
+    if (!walk.done) {
+        const rest = await recordRest(ctx, merge, walk.continueCursor, walk.owed);
+
+        failure ??= rest.failure;
     }
 
     const owed = [...walk.owed.values()].toSorted((a, b) => a.lastAttemptAt - b.lastAttemptAt);
 
     for (const link of owed.slice(0, MERGED_ARCHIVES_PER_READ)) {
         await archiveOwedLink(ctx, link, address);
+    }
+
+    if (failure !== undefined) {
+        throw failure;
     }
 };
 
@@ -152,11 +171,16 @@ const recordAndArchive = async (ctx: RecordCtx, merge: MergeRecording, start: st
  * queue, not the scheduler lane. When the queue refuses the send, the rest is recorded in this action instead, so no page is left
  * unrecorded; the cost is this action's time. The owed links it finds join `owed`.
  */
-const recordRest = async (ctx: Pick<ActionCtx, "runMutation">, merge: MergeRecording, cursor: string, owed: Map<string, RecordedLink>): Promise<void> => {
+const recordRest = async (
+    ctx: Pick<ActionCtx, "runMutation">,
+    merge: MergeRecording,
+    cursor: string | null,
+    owed: Map<string, RecordedLink>,
+): Promise<{ failure?: unknown }> => {
     try {
         await enqueueJob(internal.source_control.pr_merged.continueMergedRecordingJob, { ...pageArgsOf(merge), cursor }, { shardKey: merge.userId });
 
-        return;
+        return {};
     } catch (error) {
         console.error("[source-control] could not queue the rest of a merged pull request's recording; recording it in this action", error);
     }
@@ -166,6 +190,9 @@ const recordRest = async (ctx: Pick<ActionCtx, "runMutation">, merge: MergeRecor
     for (const [linkId, link] of rest.owed) {
         owed.set(linkId, link);
     }
+
+    // The failure of that walk is returned, so the caller still archives the owed links the walk found before it.
+    return { failure: rest.failure };
 };
 
 /**
@@ -199,6 +226,7 @@ export const recordMergedPullRequest = async (
                 userId,
             },
             null,
+            false,
         );
     } catch (error) {
         console.error("[source-control] could not record the merged pull request", error);
@@ -209,16 +237,16 @@ export const recordMergedPullRequest = async (
  * The rest of a merge's recording, from the cursor an earlier action stopped at (`recordRest`). Errors propagate: the job that runs it
  * fails, so the queue retries it. Every page is idempotent, so a retry repeats work without changing the result.
  */
-export const continueMergedRecording = async (ctx: RecordCtx, args: MergeRecording & { cursor: string }): Promise<void> => {
+export const continueMergedRecording = async (ctx: RecordCtx, args: MergeRecording & { cursor: string | null }): Promise<void> => {
     const { cursor, ...merge } = args;
 
-    await recordAndArchive(ctx, merge, cursor);
+    await recordAndArchive(ctx, merge, cursor, true);
 };
 
 /** The job that runs `continueMergedRecording`, on the owner's shard through the jobs queue. */
 export const continueMergedRecordingJob = internalAction
     .input({
-        cursor: v.string().max(MAX_LENGTH.cursor),
+        cursor: v.union(v.string().max(MAX_LENGTH.cursor), v.null()),
         mergedAt: v.optional(v.number()),
         mergedBefore: v.optional(v.number()),
         mergedBeforeIsHostBound: v.optional(v.boolean()),
