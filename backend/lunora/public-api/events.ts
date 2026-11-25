@@ -7,7 +7,9 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
+import type { Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
+import { checkUserBanStatus, enforceBanStatus } from "../lib/crpc-auth-helpers";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { pollEvents as pollLog } from "./events-poll";
 import type { EventLogStore } from "./events-poll";
@@ -84,6 +86,12 @@ export const pollEvents = internalQuery
         }),
     )
     .query(async ({ args, ctx }) => {
+        // A banned account reads nothing. Every other public route enforces this in its builder, and the poll reaches the log directly,
+        // so the check is made here, on the same row the builders read.
+        const user = await ctx.db.user.findFirst({ where: { _id: args.userId as Id<"user"> } });
+
+        enforceBanStatus(checkUserBanStatus(user));
+
         const outcome = await pollLog(storeOn(ctx, args.userId), {
             fromSeq: args.fromSeq ?? null,
             // The window never reaches past retention: an event older than it is expired whether or not housekeeping has pruned it yet,
