@@ -2285,6 +2285,42 @@ describe("mergeGuestInto across two real shards", () => {
         }
     });
 
+    it("copies a guest's Events in sequence order across pages, though they were stored out of sequence", async () => {
+        const merge = twoShards();
+
+        try {
+            // Inserted from the highest seq down, so creation order is the reverse of sequence order.
+            await merge.shards.guest.run(async (context: any) => {
+                for (let seq = 250; seq >= 1; seq -= 1) {
+                    await context.db.insert("mcpEvents", {
+                        createdAt: 1,
+                        data: "{}",
+                        eventId: `run:g${String(seq)}`,
+                        name: "run.completed",
+                        seq,
+                        timestamp: 1,
+                        userId: "guest",
+                    });
+                }
+
+                await context.db.insert("mcpEventWatermarks", { seq: 250, userId: "guest" });
+            });
+
+            await mergeToEnd(merge.call, "guest", "user", { budget: MERGE_LEASE_CALLS + MERGE_STOP_CALLS + 4 });
+
+            const eventIds = (await merge.shards.user.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 1000, orderBy: [{ seq: "asc" }], where: { userId: "user" } });
+
+                return page.map((row: { eventId: string }) => row.eventId);
+            })) as string[];
+
+            // The copies take the next numbers in the guest's own sequence order, so their ids read 1 to 250 in order.
+            expect(eventIds).toStrictEqual(Array.from({ length: 250 }, (_, index) => `run:g${String(index + 1)}`));
+        } finally {
+            merge.close();
+        }
+    });
+
     it("brings a row edited on the guest's shard after its copy over with the edit", async () => {
         const merge = twoShards();
 
