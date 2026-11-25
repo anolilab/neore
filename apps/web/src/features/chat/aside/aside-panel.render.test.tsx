@@ -115,6 +115,8 @@ describe("AsidePanel", () => {
         chat.isRunning = false;
         askAside.mockReset();
         addAside.mockReset();
+        // A reveal that corrects the window's scroll must not reach jsdom's unimplemented scrollBy.
+        vi.stubGlobal("scrollBy", vi.fn());
     });
 
     it("is a labelled region and announces the answer in a polite live region", async () => {
@@ -362,7 +364,8 @@ describe("AsidePanel", () => {
     it("brings the current hit into view again when an earlier answer pushes it along the panel", async () => {
         vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
         // jsdom has no layout: place the hit by hand, so that an answer above it can move it without changing its text.
-        let hitTop = 100;
+        // Under the sticky find bar, so the first reveal scrolls it.
+        let hitTop = 20;
         const hitRect = () => {
             return {
                 bottom: hitTop + 20,
@@ -429,7 +432,8 @@ describe("AsidePanel", () => {
     });
 
     it("brings the current hit into view when an image above it loads and pushes it out of sight", async () => {
-        let hitTop = 100;
+        // Under the sticky find bar, so the first reveal scrolls it.
+        let hitTop = 20;
         const scroll = vi.fn();
 
         useAsideStore.setState({ byThread: { "thread-1": [{ answer: "A cat.", id: "a", question: "Why?", status: "answered", token: "tok" }] } });
@@ -476,21 +480,12 @@ describe("AsidePanel", () => {
         useAsideStore.setState({ byThread: { "thread-1": [{ answer: "A cat.", id: "a", question: "Why?", status: "answered", token: "tok" }] } });
         render(<AsidePanel threadId="thread-1" />);
 
-        // With no scroll container of its own, the panel scrolls the page: its viewport is the document element, which jsdom
-        // gives a zero-height box, so stub the box and the scroll.
-        const viewport = document.documentElement;
+        // With no scroll container of its own, the panel is read against the window: a 400 px visible height.
+        vi.stubGlobal("innerHeight", 400);
+        vi.stubGlobal("scrollBy", scrollBy);
 
         Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
         Object.defineProperty(Range.prototype, "getBoundingClientRect", { configurable: true, value: () => rectAt(hitTop) });
-        Object.defineProperties(viewport, {
-            getBoundingClientRect: {
-                configurable: true,
-                value: () => {
-                    return { bottom: 400, top: 0 };
-                },
-            },
-            scrollBy: { configurable: true, value: scrollBy },
-        });
 
         try {
             act(() => {
@@ -505,8 +500,7 @@ describe("AsidePanel", () => {
         } finally {
             Reflect.deleteProperty(Element.prototype, "scrollIntoView");
             Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
-            Reflect.deleteProperty(viewport, "getBoundingClientRect");
-            Reflect.deleteProperty(viewport, "scrollBy");
+            vi.unstubAllGlobals();
             vi.useRealTimers();
         }
     });
