@@ -197,8 +197,12 @@ export const getPullRequestStatus = authAction
 
         ctx.log.event("source_control.get_pull_request_status", { status: outcome.status });
 
-        // Only a host answer moves this chat's links to the back of its read rotation: a failed read stays eligible for the next view.
-        if (outcome.status === "ok" && args.threadId !== undefined) {
+        // A host answer moves this chat's links to the back of its read rotation. So does a failure that repeats (the pull request is
+        // gone, or the token cannot see it): otherwise such a link holds the front of the rotation and starves the others. A temporary
+        // failure (rate limit, host error, reconnect) stays eligible for the next view.
+        const repeatableFailure = outcome.status === "not_found" || outcome.status === "forbidden";
+
+        if ((outcome.status === "ok" || repeatableFailure) && args.threadId !== undefined) {
             await stampStatusRead(ctx, ctx.user.userId, ref, args.threadId, readStartedAt);
         }
 
