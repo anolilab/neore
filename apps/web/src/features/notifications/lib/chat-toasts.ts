@@ -29,21 +29,31 @@ export interface ToastMessage {
     status?: string;
 }
 
+/** The latest assistant reply, or `undefined` when there is none yet. */
+const lastAssistantReply = (messages: ReadonlyArray<ToastMessage>): ToastMessage | undefined => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+        const message = messages[index];
+
+        if (message?.role === "assistant") {
+            return message;
+        }
+    }
+
+    return undefined;
+};
+
 /**
  * Whether the latest assistant reply ended in an error. A server-side failure ends the stream without a client error, so
  * the stream end alone cannot tell it from a finish.
  */
 export const lastReplyFailed = (messages: ReadonlyArray<ToastMessage>): boolean => {
-    for (let index = messages.length - 1; index >= 0; index -= 1) {
-        const message = messages[index];
+    const reply = lastAssistantReply(messages);
 
-        if (message?.role === "assistant") {
-            return message.status === "error" || message.status === "failed";
-        }
-    }
-
-    return false;
+    return reply?.status === "error" || reply?.status === "failed";
 };
+
+/** Whether the latest assistant reply has stopped streaming. The stream can end before its reply is written to the thread. */
+export const replySettled = (messages: ReadonlyArray<ToastMessage>): boolean => lastAssistantReply(messages)?.status !== "streaming";
 
 /**
  * The tool calls in `messages` that wait for the person's answer or approval (`approval-requested`). An `askUser` and a

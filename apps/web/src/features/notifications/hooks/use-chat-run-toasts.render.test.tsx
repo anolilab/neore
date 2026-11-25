@@ -118,6 +118,63 @@ describe("useChatRunToasts: a run's outcome", () => {
     });
 });
 
+describe("useChatRunToasts: settling a run", () => {
+    const streamingReply: Props["messages"] = [{ parts: [], role: "assistant", status: "streaming" }];
+    const erroredReply: Props["messages"] = [{ parts: [], role: "assistant", status: "error" }];
+
+    it("shows the finished toast when only an older turn's approval is still waiting", () => {
+        const stale = waitingOn("stale-call");
+        const { rerender } = setup({ ...idle, messages: stale, settings: {} });
+
+        finishRun(rerender, { ...idle, messages: stale, settings: {} });
+
+        expect(toastSuccess).toHaveBeenCalledTimes(1);
+    });
+
+    it("waits for the reply to settle before deciding the outcome", () => {
+        const { rerender } = setup({ ...idle, settings: {} });
+
+        rerender({ ...idle, activeStreamId: "stream-1", messages: streamingReply, settings: {} });
+        rerender({ ...idle, activeStreamId: null, messages: streamingReply, settings: {} });
+
+        expect(toastSuccess).not.toHaveBeenCalled();
+
+        rerender({ ...idle, activeStreamId: null, messages: erroredReply, settings: {} });
+
+        expect(toastError).toHaveBeenCalledTimes(1);
+        expect(toastSuccess).not.toHaveBeenCalled();
+    });
+
+    it("decides a finished run once the settle window passes, even if the reply stays streaming", () => {
+        vi.useFakeTimers();
+
+        try {
+            const { rerender } = setup({ ...idle, settings: {} });
+
+            rerender({ ...idle, activeStreamId: "stream-1", messages: streamingReply, settings: {} });
+            rerender({ ...idle, activeStreamId: null, messages: streamingReply, settings: {} });
+
+            expect(toastSuccess).not.toHaveBeenCalled();
+
+            vi.advanceTimersByTime(2000);
+
+            expect(toastSuccess).toHaveBeenCalledTimes(1);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("shows one failed toast, not a finished one, when a local reply errors as its stream ends", () => {
+        const { rerender } = setup({ ...idle, settings: {} });
+
+        rerender({ ...idle, activeStreamId: "local-browser-reply", settings: {} });
+        rerender({ ...idle, activeStreamId: null, error: toAppError(new Error("Reply failed")), settings: {} });
+
+        expect(toastError).toHaveBeenCalledTimes(1);
+        expect(toastSuccess).not.toHaveBeenCalled();
+    });
+});
+
 describe("useChatRunToasts: the other toasts still show", () => {
     it("shows the failed and needs-input toasts while the finished toggle is off", () => {
         const { rerender } = setup({ ...idle, settings: { chatFinishedToastEnabled: false } });
