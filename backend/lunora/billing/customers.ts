@@ -13,6 +13,9 @@ import { v } from "lunorash/server";
 
 import { internalMutation } from "../_generated/server";
 
+/** Rows read per reference. Concurrent first checkouts can leave a few; more than this is not a state the store produces. */
+const SEED_ROWS = 50;
+
 /**
  * Point `referenceId`'s Creem customer at `customerId`, unless that would break the store's rules:
  * the reference was erased, or another reference already owns the customer. Returns whether it did.
@@ -31,12 +34,22 @@ export const seedCustomer = internalMutation
             return { seeded: false };
         }
 
-        const existing = await ctx.db.payment_customers.findFirst({ where: { provider: "creem", referenceId } });
+        // Concurrent first checkouts can leave several rows for one reference, and the reader takes the first. Keep the row that
+        // already holds `customerId`, or else the first one, and drop the rest. Only then point the kept row at `customerId`:
+        // never at an id another row holds, which the unique index refuses.
+        const { page: rows } = await ctx.db.payment_customers.findMany({ limit: SEED_ROWS, where: { provider: "creem", referenceId } });
+        const kept = rows.find((row) => row.providerCustomerId === customerId) ?? rows[0];
 
-        if (!existing) {
+        for (const row of rows) {
+            if (row !== kept) {
+                await ctx.db.delete("payment_customers", row._id);
+            }
+        }
+
+        if (!kept) {
             await ctx.db.insert("payment_customers", { createdAt: Date.now(), provider: "creem", providerCustomerId: customerId, referenceId });
-        } else if (existing.providerCustomerId !== customerId) {
-            await ctx.db.patch("payment_customers", existing._id, { providerCustomerId: customerId });
+        } else if (kept.providerCustomerId !== customerId) {
+            await ctx.db.patch("payment_customers", kept._id, { providerCustomerId: customerId });
         }
 
         return { seeded: true };

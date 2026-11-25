@@ -17,7 +17,7 @@ import { internalAction } from "../_generated/server";
 import { CREEM_WEBHOOK_SECRET } from "../env";
 import { logger } from "../lib/logger";
 import { jobSubject } from "./authorize";
-import { deleteAllBillingRows, endLiveSubscriptions } from "./gdpr";
+import { continueErasure, deleteAllBillingRows, endLiveSubscriptions } from "./gdpr";
 import { subscriptionUpdateOf } from "./plans";
 import { planProducts } from "./products";
 
@@ -104,10 +104,13 @@ export const processCreemWebhook = internalAction
         // Creem redelivers it, and the rows are still there to retry against.
         if (subscription && (await ctx.runQuery(internal.billing.gdpr.isErased, { referenceId: subscription.referenceId }))) {
             await endLiveSubscriptions(ctx.payments.scoped(jobSubject(subscription.referenceId)), [subscription]);
-            await deleteAllBillingRows(
+            const complete = await deleteAllBillingRows(
                 async () => await ctx.runMutation(internal.billing.gdpr.deleteBillingRows, { erase: true, referenceId: subscription.referenceId }),
-                subscription.referenceId,
             );
+
+            if (!complete) {
+                await continueErasure(subscription.referenceId, true);
+            }
 
             return { applied, status: response.status };
         }

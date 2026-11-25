@@ -112,19 +112,30 @@ export const deleteBillingRows = internalMutation
         return { hasMore: pages.some((page) => page.length >= BATCH) };
     });
 
-/** Run `deletePage` until it reports no more rows, bounded by {@link MAX_DELETE_PAGES}. Throws when the bound is reached. */
-export const deleteAllBillingRows = async (deletePage: () => Promise<{ hasMore: boolean }>, referenceId: string): Promise<void> => {
+/**
+ * Run `deletePage` until it reports no more rows, for at most {@link MAX_DELETE_PAGES} pages in one run. Returns whether the
+ * rows are all gone: a run that reaches the bound with rows still to go reports `false`, and the caller continues it.
+ */
+export const deleteAllBillingRows = async (deletePage: () => Promise<{ hasMore: boolean }>): Promise<boolean> => {
     for (let page = 0; page < MAX_DELETE_PAGES; page += 1) {
         const { hasMore } = await deletePage();
 
         if (!hasMore) {
-            return;
+            return true;
         }
     }
 
-    billingLogger.error("Billing rows did not finish deleting", { referenceId });
+    return false;
+};
 
-    throw new LunoraError("SERVICE_UNAVAILABLE", `Billing rows for ${referenceId} did not finish deleting in ${MAX_DELETE_PAGES} pages`);
+/**
+ * Continue erasing `referenceId` in a new run of {@link cancelBilling}. A continuation is its own job, so a large
+ * erasure does not consume the retries of the one that started it. Safe to repeat: each run only deletes what is left.
+ */
+export const continueErasure = async (referenceId: string, erase: boolean): Promise<void> => {
+    billingLogger.info("Billing rows remain after one erasure run; continuing", { referenceId });
+
+    await enqueueJob(internal.billing.gdpr.cancelBilling, { erase, referenceId }, { shardKey: ROOT_SHARD_KEY });
 };
 
 /** The facade surface a subject's cancel needs: read the provider, then cancel. */
@@ -165,14 +176,18 @@ export const cancelBilling = internalAction
         const subscriptions = await ctx.payments.store.listSubscriptionsByReference(referenceId);
 
         // A live subscription that cannot be cancelled must fail the step, not let the rows go while it still bills.
-        if (subscriptions.some((subscription) => isCancellable(subscription)) && !CREEM_API_KEY) {
+        if (!CREEM_API_KEY && subscriptions.some((subscription) => isCancellable(subscription))) {
             throw new LunoraError("SERVICE_UNAVAILABLE", "Billing is not configured");
         }
 
         // The facade is scoped to this one reference: the workflow step has no caller, and the facade's own rule would refuse.
         await endLiveSubscriptions(ctx.payments.scoped(jobSubject(referenceId)), subscriptions);
 
-        await deleteAllBillingRows(async () => await ctx.runMutation(internal.billing.gdpr.deleteBillingRows, { erase, referenceId }), referenceId);
+        const complete = await deleteAllBillingRows(async () => await ctx.runMutation(internal.billing.gdpr.deleteBillingRows, { erase, referenceId }));
+
+        if (!complete) {
+            await continueErasure(referenceId, erase);
+        }
 
         return null;
     });
