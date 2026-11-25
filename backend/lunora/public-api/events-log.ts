@@ -53,7 +53,10 @@ const wakeForExpiry = async (ctx: Partial<Pick<MutationCtx, "scheduler">> & Pick
  * serialized, so no two appends can take the same number. The watermark outlives the rows, so retention can delete every
  * event without the sequence restarting.
  */
-export const recordMcpEvent = async (ctx: Pick<MutationCtx, "db" | "now">, input: RecordEventInput): Promise<boolean> => {
+export const recordMcpEvent = async (
+    ctx: Partial<Pick<MutationCtx, "scheduler">> & Pick<MutationCtx, "db" | "now">,
+    input: RecordEventInput,
+): Promise<boolean> => {
     const existing = await ctx.db.mcpEvents.findFirst({ where: { eventId: input.eventId, userId: input.userId } });
 
     if (existing) {
@@ -87,7 +90,7 @@ export const recordMcpEvent = async (ctx: Pick<MutationCtx, "db" | "now">, input
  * the end still reaches a log. Nothing is recorded when neither is known.
  */
 export const recordRunEnd = async (
-    ctx: Pick<MutationCtx, "db" | "now">,
+    ctx: Partial<Pick<MutationCtx, "scheduler">> & Pick<MutationCtx, "db" | "now">,
     input: { outcome: "succeeded" | "failed"; starterId?: string; streamId: string; threadId: string },
 ): Promise<void> => {
     const thread = await ctx.db.get("threads", input.threadId as Id<"threads">);

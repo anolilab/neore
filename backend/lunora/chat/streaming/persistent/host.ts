@@ -184,7 +184,7 @@ const hostRunOutcome = (end: { reason: EndReason; status: "done" | "error" | "ti
  * live to one client and ended to another. Returns false when the stream was already over.
  */
 export const endHostStream = async (
-    ctx: Pick<MutationCtx, "db">,
+    ctx: Partial<Pick<MutationCtx, "scheduler">> & Pick<MutationCtx, "db">,
     stream: Stream,
     end: { reason: EndReason; status: "done" | "error" | "timeout" },
     now: number,
@@ -206,7 +206,11 @@ export const endHostStream = async (
     const outcome = hostRunOutcome(end);
 
     if (outcome !== undefined) {
-        await recordRunEnd({ db: ctx.db, now }, { outcome, starterId: stream.userId, streamId: stream._id, threadId: stream.threadId });
+        // The scheduler goes along, so a failed wake for the event's expiry is retried (`wakeForExpiry`, `public-api/events-log.ts`).
+        await recordRunEnd(
+            { db: ctx.db, now, scheduler: ctx.scheduler },
+            { outcome, starterId: stream.userId, streamId: stream._id, threadId: stream.threadId },
+        );
     }
 
     return true;
