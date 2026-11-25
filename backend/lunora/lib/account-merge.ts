@@ -337,17 +337,21 @@ export const listShardRowsPage = internalQuery
         }
 
         // The Events log is read in sequence order: the copy numbers each guest event after the last one it wrote, so the pages must
-        // come in seq order, not by creation time (a page boundary would otherwise put a later event before an earlier one). Its
-        // rows are small, so no byte cut is needed.
+        // come in seq order, not by creation time (a page boundary would otherwise put a later event before an earlier one). An event's
+        // payload can be large, so the page is cut at the byte budget as the other tables' are, and the next page starts after the last row sent.
         if (args.table === "mcpEvents") {
             // Only the guest's own events: a shared store also holds the other users' logs, which the copy never moves.
-            const result = await ctx.db.mcpEvents.findMany({
-                consistency: "primary",
-                cursor: args.cursor,
-                limit: pageSizeFor(args.table),
-                orderBy: [{ seq: "asc" }],
-                where: { userId: args.from },
-            });
+            const readEvents = async (limit: number) =>
+                await ctx.db.mcpEvents.findMany({
+                    consistency: "primary",
+                    cursor: args.cursor,
+                    limit,
+                    orderBy: [{ seq: "asc" }],
+                    where: { userId: args.from },
+                });
+            const full = await readEvents(pageSizeFor(args.table));
+            const fits = withinClearBytes(full.page as unknown as Record<string, unknown>[]).length;
+            const result = fits < full.page.length ? await readEvents(fits) : full;
 
             return { continueCursor: result.isDone ? null : (result.continueCursor ?? null), isDone: result.isDone, page: result.page };
         }
