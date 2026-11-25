@@ -38,6 +38,8 @@ interface EndedRun {
     startError: AppError | null;
     startWaiting: ReadonlySet<string>;
     threadId: string | undefined;
+    /** A call started waiting during the run, and the run stopped for it: approving it starts a new run, not a finish. */
+    waitedAtEnd: boolean;
 }
 
 /**
@@ -95,7 +97,7 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
 
         // A run that stopped to wait for the person is not finished. Only a call that started waiting during the run counts:
         // one already waiting when the run began is an older turn's, and does not stop this one.
-        if (!runOnly && waitingApprovalIds(current.messages).some((id) => !pending.startWaiting.has(id))) {
+        if (pending.waitedAtEnd || (!runOnly && waitingApprovalIds(current.messages).some((id) => !pending.startWaiting.has(id)))) {
             return;
         }
 
@@ -162,6 +164,7 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
             startError: finished.startError,
             startWaiting: finished.startWaiting,
             threadId,
+            waitedAtEnd: waitingApprovalIds(messages).some((id) => !finished.startWaiting.has(id)),
         };
 
         if (replySettled(messages)) {

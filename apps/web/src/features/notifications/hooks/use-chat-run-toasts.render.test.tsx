@@ -191,6 +191,24 @@ describe("useChatRunToasts: settling a run", () => {
         }
     });
 
+    it("does not announce a finish when an approval pauses the run and a continuation starts", () => {
+        const paused: Props["messages"] = [
+            {
+                id: "m1",
+                parts: [{ state: "approval-requested", toolCallId: "pause-call", type: "tool-shell" }],
+                role: "assistant",
+                status: "streaming",
+            },
+        ];
+        const { rerender } = setup({ ...idle, settings: {} });
+
+        rerender({ ...idle, activeStreamId: "stream-1", messages: streamingReply, settings: {} });
+        rerender({ ...idle, activeStreamId: null, messages: paused, settings: {} });
+        rerender({ ...idle, activeStreamId: "stream-2", messages: paused, settings: {} });
+
+        expect(toastSuccess).not.toHaveBeenCalled();
+    });
+
     it("does not classify a run that ended in another thread", () => {
         vi.useFakeTimers();
 
