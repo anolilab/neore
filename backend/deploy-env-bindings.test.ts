@@ -148,7 +148,7 @@ describe("deploy env bindings", () => {
         expect(deployWorkflow).not.toMatch(GITHUB_TOKEN_FROM_ACTIONS_SECRET);
     });
 
-    it.each(["BACKEND_PUBLIC_ORIGIN", "BETTER_AUTH_SECRET", "ENCRYPTION_KEY", "LUNORA_ADMIN_TOKEN", "STORAGE_SIGNING_SECRET"])(
+    it.each(["BACKEND_PUBLIC_ORIGIN", "BETTER_AUTH_SECRET", "ENCRYPTION_KEY", "LUNORA_ADMIN_TOKEN", "LUNORA_RELAY_SECRET", "STORAGE_SIGNING_SECRET"])(
         "keeps %s in the up-front guard and in the workflow",
         (name) => {
             // Checked before anything is built or created; a blank auth secret deploys

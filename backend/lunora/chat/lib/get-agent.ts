@@ -342,6 +342,12 @@ const getAgent = async (model: AgentModel | string, options: GetAgentOptions): P
     // functions are spread across `api.agent.messages`, `api.agent.threads`, … and
     // the component surface is the whole generated api (see `AgentComponent`).
     return new Agent(api, {
+        // Loaded on first use: the built-ins import every tool module.
+        builtInToolFormatter: async (toolName: string) => {
+            const { builtInToolNamed } = await import("./tool-builder");
+
+            return builtInToolNamed(toolName);
+        },
         instructions: finalInstructions,
         languageModel: chat,
         maxSteps: options?.maxSteps ?? 5,

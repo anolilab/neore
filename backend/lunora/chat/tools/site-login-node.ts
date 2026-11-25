@@ -9,7 +9,7 @@
  * types only while the page is on the login's origin.
  */
 import { browserLogin, type BrowserLoginResponse, createBrowserRendererClient } from "@neore/service-sdk/browser-renderer";
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
@@ -300,7 +300,7 @@ export const fillSavedLogin = internalAction
             }
 
             if (!session) {
-                throw new Error("The browser session could not be opened. Try it again.");
+                throw new LunoraError("SERVICE_UNAVAILABLE", "The browser session could not be opened. Try it again.");
             }
 
             const startedWithProviderSessionId = session.providerSessionId ?? null;
@@ -418,7 +418,7 @@ export const fillSavedLogin = internalAction
                     target: login.site,
                 });
 
-                throw new Error(`Browser renderer returned ${response?.status ?? "no response"}`);
+                throw new LunoraError("SERVICE_UNAVAILABLE", `Browser renderer returned ${response?.status ?? "no response"}`);
             }
 
             // Refused before anything was typed: another call holds the session (409), its lock did not answer or the sign-in

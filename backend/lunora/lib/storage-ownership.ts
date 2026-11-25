@@ -8,18 +8,18 @@
  * when the user can show a claim to it:
  *
  * - a vault `files` row with that key, owned by them; or
- * - a content-addressed chat file (`agent-files/<sha256>`) they hold a
+ * - a chat file (`agent-files/<sha256>/<uuid>`, or the older shared
+ *   `agent-files/<sha256>`; `lib/chat-file-key.ts`) they hold a
  *   `chatFileAccess` grant for — written whenever they store (or re-store)
  *   the bytes, generated media included (`storeFile({ userId })`).
  */
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { insertChatFileAccess } from "../agent/table-writes";
+import { CHAT_FILE_KEY_IN_TEXT, chatFileKeyHash } from "./chat-file-key";
 import { collectStrings } from "./storage-sign";
 
-const CHAT_FILE_KEY = /^agent-files\/([\da-f]{64})$/u;
-
-/** Rows scanned per hash: one per distinct filename the same bytes were stored under. */
+/** Vault rows read per key. */
 const HASH_SCAN_LIMIT = 50;
 
 type Database = Pick<QueryCtx, "db">["db"];
@@ -33,25 +33,30 @@ const ownsVaultKey = async (db: Database, userId: string, key: string): Promise<
     return rows.some((row) => row.userId === userId);
 };
 
-/** The `chatFiles` rows holding content-addressed `key` (one per filename it was stored under). */
-const chatFilesForKey = async (db: Database, key: string) => {
-    const hash = CHAT_FILE_KEY.exec(key)?.[1];
+/**
+ * Every `chatFiles` row naming one of the chat-file `keys`, read by the key itself (`by_storageId`), never through a page of
+ * the hash: identical bytes stored under many names have many rows, and a capped page of them can miss the one naming the
+ * key. A per-upload key is named by one row; an old shared key by one row per filename it was stored under, and no new row
+ * takes one, so the read is bounded by the rows that already exist.
+ */
+const chatFilesNaming = async (db: Database, keys: string[]) => {
+    const chatKeys = keys.filter((key) => chatFileKeyHash(key) !== undefined);
 
-    if (!hash) {
+    if (chatKeys.length === 0) {
         return [];
     }
 
-    // `.global()`: the one content-addressed row set every user's files share.
-    const { page: files } = await db.chatFiles.findMany({ limit: HASH_SCAN_LIMIT, where: { hash } });
+    // `.global()`: every user's rows for these keys.
+    const { page } = await db.chatFiles.findMany({ where: chatKeys.length === 1 ? { storageId: chatKeys[0] } : { storageId: { in: chatKeys } } });
 
-    return files.filter((file) => file.storageId === key);
+    return page.filter((file) => chatKeys.includes(file.storageId));
 };
 
 const hasGrant = async (db: Database, fileId: Id<"chatFiles">, userId: string): Promise<boolean> =>
     (await db.chatFileAccess.findFirst({ where: { fileId, userId } })) !== null;
 
 const ownsChatFileKey = async (db: Database, userId: string, key: string): Promise<boolean> => {
-    const files = await chatFilesForKey(db, key);
+    const files = await chatFilesNaming(db, [key]);
 
     for (const file of files) {
         if (await hasGrant(db, file._id as Id<"chatFiles">, userId)) {
@@ -65,17 +70,10 @@ const ownsChatFileKey = async (db: Database, userId: string, key: string): Promi
 export const ownsStorageKey = async (db: Database, userId: string, key: string): Promise<boolean> =>
     (await ownsChatFileKey(db, userId, key)) || (await ownsVaultKey(db, userId, key));
 
-/** The content-addressed chat-file keys among `keys` that `userId` holds a grant for: two reads. */
+/** The chat-file keys among `keys` that `userId` holds a grant for: two reads. */
 const ownedChatFileKeys = async (db: Database, userId: string, keys: string[]): Promise<Set<string>> => {
     const owned = new Set<string>();
-    const hashes = [...new Set(keys.map((key) => CHAT_FILE_KEY.exec(key)?.[1]).filter((hash): hash is string => hash !== undefined))];
-
-    if (hashes.length === 0) {
-        return owned;
-    }
-
-    const { page: candidates } = await db.chatFiles.findMany({ limit: HASH_SCAN_LIMIT * hashes.length, where: { hash: { in: hashes } } });
-    const files = candidates.filter((file) => keys.includes(file.storageId));
+    const files = await chatFilesNaming(db, keys);
 
     if (files.length === 0) {
         return owned;
@@ -93,9 +91,6 @@ const ownedChatFileKeys = async (db: Database, userId: string, keys: string[]): 
     return owned;
 };
 
-/** A content-addressed chat-file key anywhere in a string: a `storage:` ref, a signed URL, or inside serialized JSON. */
-const CHAT_FILE_KEY_IN_TEXT = /agent-files\/[\da-f]{64}/gu;
-
 /**
  * The ids of the chat files `value` mentions (at any depth, in any string)
  * that `userId` holds a grant for. A tool result carries the media its tool
@@ -106,14 +101,7 @@ const CHAT_FILE_KEY_IN_TEXT = /agent-files\/[\da-f]{64}/gu;
  */
 export const ownedChatFileIdsIn = async (db: Database, userId: string, value: unknown): Promise<Id<"chatFiles">[]> => {
     const keys = [...new Set(collectStrings(value).flatMap((text) => text.match(CHAT_FILE_KEY_IN_TEXT) ?? []))];
-    const hashes = keys.map((key) => CHAT_FILE_KEY.exec(key)?.[1]).filter((hash): hash is string => hash !== undefined);
-
-    if (hashes.length === 0) {
-        return [];
-    }
-
-    const { page: candidates } = await db.chatFiles.findMany({ limit: HASH_SCAN_LIMIT * hashes.length, where: { hash: { in: hashes } } });
-    const files = candidates.filter((file) => keys.includes(file.storageId));
+    const files = await chatFilesNaming(db, keys);
 
     if (files.length === 0) {
         return [];
@@ -162,7 +150,7 @@ export const grantOwnedChatFiles = async (db: MutationCtx["db"], fromUserId: str
     const uniqueKeys = new Set(keys);
 
     for (const key of uniqueKeys) {
-        const files = await chatFilesForKey(db, key);
+        const files = await chatFilesNaming(db, [key]);
         let sourceOwns = false;
 
         for (const file of files) {

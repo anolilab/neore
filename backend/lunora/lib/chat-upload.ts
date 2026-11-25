@@ -165,7 +165,7 @@ export const assertStagedChatJson = async (ctx: Pick<ActionCtx, "storage">, key:
     }
 };
 
-/** A finalized chat file: its row, the content-addressed key it is stored under, the type it was stored with and a signed URL. */
+/** A finalized chat file: its row, the key it is stored under (`lib/chat-file-key.ts`), the type it was stored with and a signed URL. */
 export interface FinalizedChatFile {
     fileId: Id<"chatFiles">;
     mediaType: string;
@@ -174,8 +174,8 @@ export interface FinalizedChatFile {
 }
 
 /**
- * Turn `userId`'s staged `uploadId` into a chat file: stored content-addressed
- * with a grant for `userId`, and queued for text extraction.
+ * Turn `userId`'s staged `uploadId` into a chat file: stored under its own key
+ * (or deduplicated into an existing row for the same bytes) with a grant for `userId`, and queued for text extraction.
  */
 export const finalizeStagedUploadFile = async (ctx: ActionCtx, userId: string, args: { filename: string; uploadId: string }): Promise<FinalizedChatFile> =>
     await takeStagedUpload(ctx, userId, args.uploadId, uploadLimitFor, async ({ bytes, contentType }) => {

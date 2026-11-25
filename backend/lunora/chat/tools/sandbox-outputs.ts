@@ -5,7 +5,7 @@
  * The directory is snapshotted before the run and listed again after it; only
  * files that are new or changed since the snapshot are collected, so a thread's
  * persistent sandbox does not re-deliver last turn's chart on every call. Each
- * collected file is stored content-addressed through `storeFile({ userId,
+ * collected file is stored through `storeFile({ userId,
  * threadId })`, which writes the `chatFiles` row and the caller's (and the
  * thread owner's) `chatFileAccess` grant. The tool result carries only a
  * `storage:<key>` reference: `agent/stored-media.ts` signs it when the message

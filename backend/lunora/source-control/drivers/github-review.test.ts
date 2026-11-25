@@ -143,6 +143,48 @@ describe("review threads", () => {
         };
     };
 
+    it("keeps a comment's page only when it is on the host's own web origin", async () => {
+        const onSite = "https://github.com/acme/app/pull/7#discussion_r1001";
+        const { request } = host(() => {
+            return {
+                data: {
+                    repository: {
+                        pullRequest: {
+                            reviewThreads: {
+                                nodes: [
+                                    threadNode({
+                                        comments: {
+                                            nodes: [
+                                                {
+                                                    author: { login: "reviewer" },
+                                                    body: "a",
+                                                    createdAt: "2026-10-02T10:00:00Z",
+                                                    fullDatabaseId: "1001",
+                                                    url: onSite,
+                                                },
+                                                {
+                                                    author: { login: "reviewer" },
+                                                    body: "b",
+                                                    createdAt: "2026-10-02T10:00:00Z",
+                                                    fullDatabaseId: "1002",
+                                                    url: "https://evil.example/acme/app/pull/7#discussion_r1002",
+                                                },
+                                            ],
+                                        },
+                                    }),
+                                ],
+                                pageInfo: { endCursor: "abc", hasNextPage: false },
+                            },
+                        },
+                    },
+                },
+            };
+        });
+        const page = await githubDriver.listThreads(request, REF, "prev");
+
+        expect(page.items[0]?.comments.map((comment) => comment.url)).toEqual([onSite, undefined]);
+    });
+
     it("lists threads with their comments in host-neutral shape, one page at a time", async () => {
         const { request, sent } = host(() => {
             return {

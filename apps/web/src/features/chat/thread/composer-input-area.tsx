@@ -63,6 +63,7 @@ interface ComposerInputAreaProps {
 
     /** Show compact version */
     compact?: boolean;
+
     /** The chat being typed into; the @ popup does not offer it as a reference */
     currentThreadId?: string;
     /** Custom variables for {{variable}} autocomplete */
@@ -78,6 +79,7 @@ interface ComposerInputAreaProps {
 
     /** Whether the draft has a finished upload; with one, an empty text can still be sent. */
     hasCompletedAttachments?: boolean;
+
     /** Hidden characters taken out of the draft; shown as a notice */
     hiddenRemoved?: number;
     /** Whether a recalled prompt is showing, see `ComposerTiptapEditor` */
@@ -114,6 +116,8 @@ interface ComposerInputAreaProps {
     onPaste?: (event: React.ClipboardEvent) => void;
     /** Ctrl+R prompt search, see `ComposerTiptapEditor` */
     onPromptSearch?: () => boolean;
+    /** The queue button's own action: it queues even where Enter would steer (`onSubmit` is the send). */
+    onQueue?: () => void;
     /** Called when a chat is selected from the @ popup, to attach its text */
     onSelectChat?: (chat: ChatReference) => void;
     /** Called when "Upload new file" is selected from the @ popup */
@@ -155,6 +159,7 @@ const ComposerInputArea = ({
     onAttachDraftAsFile,
     beforeInput,
     canQueueWhileStreaming = false,
+    onQueue,
     compact = false,
     customVariables,
     disabled = false,
@@ -396,7 +401,7 @@ const ComposerInputArea = ({
                                                 compact && "my-1.5 size-[30px]",
                                             )}
                                             disabled={disabled || isUploading || isOverCap}
-                                            onClick={onSubmit}
+                                            onClick={onQueue ?? onSubmit}
                                             type="button"
                                         >
                                             {isUploading ? (

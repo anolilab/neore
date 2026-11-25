@@ -50,9 +50,10 @@ export interface BrowserResult {
     /**
      * The page needs a person (`browser/human-check.ts`): `asked` shows the "Needs you" card in the chat, which offers
      * Take control only while the thread's browser is still `browserId` (the one that showed the check, named by the
-     * action that ran on it) and on `site`.
+     * action that ran on it) and on `site`. `checkId` and `run` (the reply, for the card only, never the model) name the ask
+     * by the thread's unique key for it, which the card reads it by.
      */
-    humanCheck?: { browserId?: string; checkId?: string; site: string; status: "already_asked" | "asked" | "declined" };
+    humanCheck?: { browserId?: string; checkId?: string; run?: string; site: string; status: "already_asked" | "asked" | "declined" };
     /** The accessible name of the element a look read (`visibleOnly`). */
     label?: string;
     labelTruncated?: boolean;
@@ -77,6 +78,22 @@ export interface BrowserResult {
     typedText?: string;
     url?: string;
 }
+
+/** A screenshot reference signed for the run (`agent/stored-media.ts`); an unsigned one is an empty string. */
+const SIGNED_URL = /^https?:\/\//u;
+
+/** `result` without its ask's reply key, which is for the card's read only, never the model. */
+const withoutAskRun = (result: BrowserResult): BrowserResult => {
+    if (result.humanCheck?.run === undefined) {
+        return result;
+    }
+
+    const humanCheck = { ...result.humanCheck };
+
+    delete humanCheck.run;
+
+    return { ...result, humanCheck };
+};
 
 type AnswerContext = Pick<ToolContext, "runMutation" | "runQuery">;
 
@@ -107,7 +124,17 @@ const replaceAlreadyAsked = (result: BrowserResult, site: string, note: string):
 };
 
 /**
- * Names the card a result asks the person on (`checkId`, set only for an ask this call recorded), and tells the agent
+ * The reply a browser call asks the person in, once per site (`browserHumanChecks.run`): `replyKey`, the reply's first
+ * stream, the same through a pause, a resume and an approval's continuation (`resumeApprovedRun` sets it from the run's
+ * snapshot, else its own stream); a group turn's and a headless run's own key. A run that sets none falls back to its
+ * prompt, then to this one call: never the thread, which every later reply in the chat shares, so a later reply's check
+ * on a site asked about before would find that ask and get no card.
+ */
+export const browserRunKey = (context: { promptMessageId?: string; replyKey?: string }, toolCallId: string): string =>
+    context.replyKey ?? context.promptMessageId ?? `call:${toolCallId}`;
+
+/**
+ * Names the card a result asks the person on (`checkId` and its reply `run`, set only for an ask this call recorded), and tells the agent
  * the person's answer on this reply's ask about the site: a decline (the card told them the agent will not use the site
  * again in this reply), also on a page that looks clear, and a done on a check that still shows. A failed read of the
  * answer leaves the result as it is: the action already ran.
@@ -126,6 +153,7 @@ export const withAnswer = async (
 
         if (checkId !== undefined) {
             check.checkId = checkId;
+            check.run = run;
         }
 
         return;
@@ -286,9 +314,7 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                 userId,
                 userTier: context.userTier,
             })) as BrowserResult;
-        // One ask per site per reply (`replyKey`: its first stream, the same through a pause, a resume and an approval's
-        // continuation; a group turn's and a headless run's own key). A run that sets none falls back to its prompt, then the thread.
-        const runKey = context.replyKey ?? (context as { promptMessageId?: string }).promptMessageId ?? threadId;
+        const runKey = browserRunKey(context, options.toolCallId);
 
         if (action === "wait_for_person") {
             // Nobody sees a card in a headless run: there is no answer to wait for.
@@ -481,7 +507,9 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
         );
     },
     title: "Browser",
-    toModelOutput: (_context, { output }) => {
+    toModelOutput: (_context, { output: saved }) => {
+        const output = withoutAskRun(saved);
+
         // For screenshots, return as image content part
         if (output.screenshot && output.screenshotFormat) {
             const { screenshot, screenshotFormat, ...rest } = output;
@@ -499,6 +527,20 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                         text: textPart.value,
                         type: "text" as const,
                     },
+                ],
+            };
+        }
+
+        // A saved result's screenshot moved to storage (`agent/tool-output-media.ts`, the only writer of `screenshotUrl`),
+        // signed for the run only when the row's owner owns it (`agent/stored-media.ts`): the model sees it as an image.
+        const { screenshotUrl, ...unsigned } = output as BrowserResult & { screenshotUrl?: unknown };
+
+        if (typeof screenshotUrl === "string" && SIGNED_URL.test(screenshotUrl)) {
+            return {
+                type: "content" as const,
+                value: [
+                    { type: "image-url" as const, url: screenshotUrl },
+                    { text: toonEncodeOutput(unsigned).value, type: "text" as const },
                 ],
             };
         }

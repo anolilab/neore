@@ -8,6 +8,8 @@ import {
     chatFileMeter,
     chatFileSectionBudget,
     collectAllChatFileMetadata,
+    grantRevisionsExportPageKey,
+    readAllGrantRevisionPages,
     readChunkMetadata,
     collectAllMessageFileIds,
     textBytes,
@@ -731,6 +733,9 @@ export const generateExportFile = internalAction
         // the same in-flight-replay reason as `threadTags`.
         evals: v.optional(v.any()),
         files: v.any(),
+        // How many grant-revision pages the workflow stored under `browserPrefix` (`agent/export-pages.ts`), every one of them,
+        // read here. Optional for the same in-flight-replay reason as `threadTags`: absent is no page.
+        grantRevisionPages: v.optional(v.number()),
         // Memories (superseded history included) and reflection digests
         // (`memory/gdpr.ts`). Optional for the same in-flight-replay reason as `threadTags`.
         memories: v.optional(v.any()),
@@ -861,6 +866,22 @@ export const generateExportFile = internalAction
         // The browser pages, read from their objects, so neither this action's arguments nor its read budget carry them.
         // Held to its share of the file: past it the section is cut and says so, and the rest of the export is written.
         const { browserCut, browserPages, browserPrefix } = args;
+        const grantRevisionPages = args.grantRevisionPages ?? 0;
+
+        // The revisions of the grants the user held, every page the workflow stored under the run's prefix (`agent/export-pages.ts`),
+        // read from their objects: none is cut, and neither this action's arguments nor its read budget carry them.
+        // A count of pages with nowhere to read them from fails the export rather than writing it without them.
+        if (browserPrefix === undefined && grantRevisionPages > 0) {
+            throw new Error("The grant revisions' pages were stored without a prefix to read them from");
+        }
+
+        const grantRevisions =
+            browserPrefix === undefined
+                ? { revisions: [] }
+                : await readAllGrantRevisionPages(
+                      async (page) => await readStoredText(context.storage, grantRevisionsExportPageKey(browserPrefix, page), { maxBytes: MAX_EXPORT_BYTES }),
+                      grantRevisionPages,
+                  );
         const browser =
             browserPrefix === undefined || browserPages === undefined
                 ? { actions: [], extensions: [], humanChecks: [], sessions: [] }
@@ -926,6 +947,7 @@ export const generateExportFile = internalAction
             exportVersion: "1.0",
             feedback: feedback.section,
             files: args.files,
+            grantRevisions,
             knowledgeCollections: activity?.knowledgeCollections ?? [],
             memories: args.memories ?? { digests: [], memories: [] },
             notifications: args.notifications ?? { notifications: [], pushSubscriptions: [] },

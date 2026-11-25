@@ -34,6 +34,7 @@ import { clearMachineFromProjects } from "../projects/machine-location";
 import { runAfterWithRetry } from "../lib/shard-scheduler";
 import { countOpenCalls, isAcpTool, isDeviceOnline, isDeviceOutdated, isTerminalCallStatus, OPEN_CALL_STATUSES } from "./lib/state";
 import { vDeviceCallStatus, vDeviceManifestTool, vDevicePlatform, vDeviceTaintSource } from "./validators";
+import { threadHasLiveGrant } from "../agent/live-grant";
 
 type ThreadRow = Pick<Doc<"threads">, "deleted" | "externalThreadId" | "groupChat" | "isPublic" | "userId">;
 
@@ -54,9 +55,8 @@ export const isDeviceEligibleThread = (thread: ThreadRow | null, userId: string,
 /** The thread when {@link isDeviceEligibleThread} admits it for this user (a grant is looked up here), else null. */
 export const loadEligibleThread = async (ctx: Pick<QueryCtx, "db">, threadId: Doc<"threads">["_id"], userId: string): Promise<Doc<"threads"> | null> => {
     const thread = await ctx.db.get("threads", threadId);
-    const grant = await ctx.db.threadAccess.findFirst({ where: { threadId } });
 
-    return isDeviceEligibleThread(thread, userId, grant !== null) ? thread : null;
+    return isDeviceEligibleThread(thread, userId, await threadHasLiveGrant(ctx, threadId)) ? thread : null;
 };
 
 /**

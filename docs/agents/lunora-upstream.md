@@ -7,12 +7,13 @@ repo-relative. Project-wide rules stay in the root `AGENTS.md`.
 
 **Every defect from the migration audit is fixed or declined** — that batch is
 closed out. Open from us: [#687](https://github.com/anolilab/lunora/issues/687)
-(cloud spend cap prices 35 meters against one observed; non-blocking), and three from the codegen 428 bump
-(2026-11-21): [#1666](https://github.com/anolilab/lunora/issues/1666) (`@lunora/d1` 238 imports a `sql-store` 239
-export while declaring ^237: keep `@lunora/sql-store` 239 in the lockfile),
-[#1667](https://github.com/anolilab/lunora/issues/1667) (`studio` 385+ want `client` ^297, `react` 301 pins 291:
-`studio` held at 384) and [#1668](https://github.com/anolilab/lunora/issues/1668) (`Doc_*` types an optional
-`.global()` column `T | null`, no read returns `null`: reads narrow through `lib/stored-row.ts`).
+(cloud spend cap prices 35 meters against one observed; non-blocking), and
+[#1709](https://github.com/anolilab/lunora/issues/1709) (codegen 443: `where` on an optional column rejects `null`;
+`agent/files.ts` filters with `{ isNull: true }` instead). Closed upstream and no longer held: [#1666](https://github.com/anolilab/lunora/issues/1666),
+[#1667](https://github.com/anolilab/lunora/issues/1667), [#1668](https://github.com/anolilab/lunora/issues/1668),
+[#1702](https://github.com/anolilab/lunora/issues/1702) (`LunoraPayment` drops `adapter`, `scoped()` replaces it),
+[#1703](https://github.com/anolilab/lunora/issues/1703) (advisor false positives, `advisor.accept`),
+[#1705](https://github.com/anolilab/lunora/issues/1705) (live provider status read, in alpha.279).
 Fixed upstream, with a choice here still in force: [#1037](https://github.com/anolilab/lunora/issues/1037)
 (`lunoraTest` now takes `queues` / `notify`; `notifications/push.test.ts` still splices one
 shared facade, since `lunora/notify.ts` makes a fresh memory store per ctx),
@@ -57,6 +58,17 @@ insert into a `.global()` table re-runs the subscriptions that read it, and only
 (`@lunora/do`'s `publishLiveFromAction`: "no cross-shard live fan-out"). A `.global()` shape (`defineShape`) is the one
 built-in that polls D1 (every 2s). Until then a list that other members change is read with refetches, not
 subscriptions: `projects_functions:listProjectRepos` is in `NEVER_LIVE` (`apps/web/src/lib/lunora/crpc.tsx`).
+
+**Not filed yet (owner to decide): a `.global()` `patchIf` cannot be held to a query budget.** In
+`@lunora/sql-store@alpha.239` a conditional patch reads the row (`SELECT … CASE WHEN <where>`), then writes it under the
+version it read; when the write misses and the next read still matches `where`, it goes round again, up to 16 times,
+then throws `occ`. No option caps the rounds and the result (`{ applied, doc }`) does not say how many ran, so a caller
+on the 50-query Free plan cannot stop a page early on contention. A round only repeats after a commit that left `where`
+true: the grant paths (`agent/grant-revision.ts`) condition every write on `revision`, and every writer but a merge's
+own `userId`/`ownerId` move changes it, so a race costs one read more and then misses. `GRANT_PAGE_STATEMENTS` keeps 18
+of the 50 for that. A burst of commits that keep `revision` to one row can still pass the limit; the invocation then
+fails, and the merge job's redelivery continues the page. A `maxAttempts` option or a reported `attempts` count would
+let the page stop early instead.
 
 **Not filed yet (owner to decide): a post-commit schedule handoff fails the committed write's caller.** In the installed
 `@lunora/server`, `ctx.scheduler.runAfter`/`runAt` inside a mutation only buffer the job (`withDeferredSchedules`); the
@@ -122,9 +134,7 @@ bound is listed only after its next write (no data exists yet).
 |                                                       |                                                                  |
 | ----------------------------------------------------- | ---------------------------------------------------------------- |
 | [#687](https://github.com/anolilab/lunora/issues/687) | Cloud prices 35 meters against one observed.                     |
-| [#1666](https://github.com/anolilab/lunora/issues/1666) | `d1` 238 needs `sql-store` 239, declares ^237.                   |
-| [#1667](https://github.com/anolilab/lunora/issues/1667) | `studio` 385+ and `react` 301 need different `client`s.          |
-| [#1668](https://github.com/anolilab/lunora/issues/1668) | Optional `.global()` columns typed `T \| null`, read absent.     |
+| [#1709](https://github.com/anolilab/lunora/issues/1709) | Codegen 443: `where` on an optional column rejects `null`.       |
 | [#360](https://github.com/anolilab/lunora/issues/360) | Pluggable queue drivers; feature request, closed as not planned. |
 
 Check

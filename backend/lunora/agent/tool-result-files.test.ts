@@ -19,7 +19,7 @@ vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await 
 
 const OWNER = "user-owner";
 const DAY_MS = 24 * 60 * 60 * 1000;
-const STORED_CHAT_FILE_REF = /^storage:agent-files\/[\da-f]{64}$/u;
+const STORED_CHAT_FILE_REF = /^storage:agent-files\/[\da-f]{64}\/[\da-f-]{36}$/u;
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -132,6 +132,53 @@ describe("tool-result files", () => {
         await sweepUnusedFiles();
 
         expect(await fileRow(file.fileId)).toBeNull();
+    });
+
+    it("are counted and signed when the same bytes have more rows than one page of their hash", async () => {
+        const { createHash } = await import("node:crypto");
+        const { getOwnedStorageKeys } = await import("./files");
+        const hash = createHash("sha256").update("chart").digest("hex");
+
+        // The same bytes stored earlier under 60 other names: those rows come first in any read of the hash.
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 60; index += 1) {
+                await ctx.db.insert("chatFiles", {
+                    filename: `older-${index}.png`,
+                    hash,
+                    lastTouchedAt: Date.now(),
+                    mediaType: "image/png",
+                    refcount: 0,
+                    storageId: `agent-files/${hash}/00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+                });
+            }
+        });
+
+        const file = await storeOutput();
+
+        expect(file.storageId.startsWith(`agent-files/${hash}/`)).toBe(true);
+
+        await saveToolResult({ files: [{ name: "chart.png", url: `storage:${file.storageId}` }] });
+
+        expect(await fileRow(file.fileId)).toMatchObject({ refcount: 1 });
+        expect(await harness.run(async (ctx: any) => await ctx.runQuery(getOwnedStorageKeys, { keys: [file.storageId], userId: OWNER }))).toStrictEqual([
+            file.storageId,
+        ]);
+    });
+
+    it("count an old shared key through the row the author holds a grant for, among rows of other names", async () => {
+        const { addFile } = await import("./files");
+        const sharedKey = `agent-files/${"c".repeat(64)}`;
+        const addShared = async (filename: string, userId: string) =>
+            (await harness.run(
+                async (ctx: any) => await ctx.runMutation(addFile, { filename, hash: "c".repeat(64), mediaType: "image/png", storageId: sharedKey, userId }),
+            )) as { fileId: string };
+        const foreign = await addShared("theirs.png", "someone-else");
+        const own = await addShared("mine.png", OWNER);
+
+        await saveToolResult({ text: `see storage:${sharedKey}` });
+
+        expect(await fileRow(own.fileId)).toMatchObject({ refcount: 1 });
+        expect(await fileRow(foreign.fileId)).toMatchObject({ refcount: 0 });
     });
 
     it("never count a file the author holds no grant for", async () => {

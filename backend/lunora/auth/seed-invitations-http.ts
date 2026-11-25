@@ -21,60 +21,35 @@
 import type { HttpActionCtx } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
-import { secretsMatch } from "../lib/crypto";
+import type { AdminBearerDependencies } from "./admin-bearer";
+import { NO_STORE, refuseUnlessAdminBearer } from "./admin-bearer";
 import type { SeededInvitation } from "./invitations";
 import { seedAdminInvitationLinks } from "./invitations";
 
 /** The limit this route draws on; see `RATE_LIMIT_CONFIGS`. */
 export const SEED_RATE_LIMIT_KEY = "admin/seedInvitations";
 
-const BEARER_PREFIX = /^Bearer\s+/i;
-
-export interface SeedInvitationsDependencies {
-    /** The configured admin token; empty means the route is disabled. */
-    adminToken: () => string;
-    /** Charges one attempt to `identifier`; `ok: false` means over the limit. */
-    rateLimit: (identifier: string) => Promise<{ ok: boolean; retryAfter?: number }>;
+export interface SeedInvitationsDependencies extends AdminBearerDependencies {
     seed: (options: { reissue: boolean }) => Promise<SeededInvitation[]>;
 }
 
-const noStore = { "cache-control": "no-store" };
-
 /**
  * The route, with its dependencies injected so the auth check and idempotency
- * can be tested without a worker.
- *
- * The rate limit is charged BEFORE the token check and per client IP, so it
- * throttles token guessing, not just successful seeds.
+ * can be tested without a worker. The gate is `refuseUnlessAdminBearer`.
  */
 export const createSeedInvitationsHandler =
     (dependencies: SeedInvitationsDependencies) =>
     async (request: Request): Promise<Response> => {
-        const limit = await dependencies.rateLimit(request.headers.get("cf-connecting-ip") ?? "unknown");
+        const refusal = await refuseUnlessAdminBearer(request, dependencies);
 
-        if (!limit.ok) {
-            const retryAfterSeconds = Math.ceil((limit.retryAfter ?? 60_000) / 1000);
-
-            return Response.json({ error: "Too many requests" }, { headers: { ...noStore, "retry-after": String(retryAfterSeconds) }, status: 429 });
-        }
-
-        const expected = dependencies.adminToken();
-
-        if (!expected) {
-            return Response.json({ error: "LUNORA_ADMIN_TOKEN is not configured" }, { headers: noStore, status: 503 });
-        }
-
-        const header = request.headers.get("authorization") ?? "";
-        const presented = BEARER_PREFIX.test(header) ? header.replace(BEARER_PREFIX, "").trim() : "";
-
-        if (!presented || !(await secretsMatch(presented, expected))) {
-            return Response.json({ error: "Unauthorized" }, { headers: { ...noStore, "www-authenticate": "Bearer" }, status: 401 });
+        if (refusal !== undefined) {
+            return refusal;
         }
 
         const reissueParameter = new URL(request.url).searchParams.get("reissue");
         const invitations = await dependencies.seed({ reissue: reissueParameter === "1" || reissueParameter === "true" });
 
-        return Response.json({ invitations }, { headers: noStore, status: 200 });
+        return Response.json({ invitations }, { headers: NO_STORE, status: 200 });
     };
 
 export const seedInvitationsHttpAction = async (context: HttpActionCtx, request: Request): Promise<Response> =>

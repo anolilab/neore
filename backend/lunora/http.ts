@@ -270,6 +270,12 @@ app.post("/gateway/notifications", httpAction(lazy(async () => await import("./c
 // Operator bootstrap for invite-only sign-up; bearer `LUNORA_ADMIN_TOKEN`.
 app.post("/admin/seed-invitations", httpAction(lazy(async () => await import("./auth/seed-invitations-http"), "seedInvitationsHttpAction")));
 
+// Fills `user.emailCanonical` one batch per call, until `done`; the deploy calls it. Bearer `LUNORA_ADMIN_TOKEN`.
+app.post(
+    "/admin/backfill-email-canonical",
+    httpAction(lazy(async () => await import("./auth/email-canonical-backfill-http"), "emailCanonicalBackfillHttpAction")),
+);
+
 // The e2e suite's invitations. 404 anywhere but a local development stack
 // holding `E2E_SEED_TOKEN` — see `auth/e2e-seed-http.ts`.
 app.post("/e2e/invitations", httpAction(lazy(async () => await import("./auth/e2e-seed-http"), "e2eSeedInvitationHttpAction")));
@@ -334,7 +340,7 @@ app.get("/api/health", async (c) =>
 /**
  * Worker-signed download URLs — `<PUBLIC_ORIGIN>/<key>?exp&method&bucket&sig`,
  * minted by `ctx.storage.getSignedUrl`. Keys contain slashes
- * (`agent-files/<hash>`), so this is a catch-all, and therefore registered
+ * (`agent-files/<hash>/<uuid>`), so this is a catch-all, and therefore registered
  * LAST: every real route above wins. An unsigned request falls through to the
  * 404 below. See `lib/signed-storage.ts`.
  */

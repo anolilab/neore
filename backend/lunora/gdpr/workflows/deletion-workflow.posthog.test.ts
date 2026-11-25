@@ -14,6 +14,7 @@ interface Call {
 }
 
 const DEDUP_ID_PATTERN = /^post-hog-retry:req-1:.+/;
+const OWNER_SWEEP_STEP = /^erase-pins-on-owner-shards(?:-again)?-\d+$/;
 
 /** Runs the real handler against a context whose steps record calls; the PostHog step returns `postHog`, or throws it when it is an Error. */
 const runWorkflow = async (
@@ -75,7 +76,7 @@ const runWorkflow = async (
         }
 
         // The owner sweeps report one page each, with no owner shards fenced and no further page.
-        if (/^erase-pins-on-owner-shards(-again)?-\d+$/.test(current)) {
+        if (OWNER_SWEEP_STEP.test(current)) {
             return { cursor: null, hasMore: false, owners: [] };
         }
 

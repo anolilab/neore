@@ -25,6 +25,7 @@ import { onUserShard } from "../../lib/workflow-shard";
 import { stepDedupId } from "./dedup-id";
 import type { BrowserExportCursor } from "../../browser/gdpr";
 import { browserExportPageKey, browserExportPrefix, storeAllBrowserPages } from "../../browser/export-pages";
+import { GrantRevisionsExportError, grantRevisionsExportPageKey, storeAllGrantRevisionPages } from "../../agent/export-pages";
 import { collectAllGuides, collectAllPullRequestThreads, collectAllReviewDrafts } from "../../source-control/export-pages";
 import { clearUsagePieces, collectUsageExport, UsageExportError, type UsageExportIo, type UsagePageSummary, usageObjectKey } from "../usage-export-steps";
 
@@ -42,6 +43,10 @@ export const exportFailureMessage = (error: unknown): string => {
 
     if (error instanceof UsageExportError && error.reason === "too-large") {
         return "Your usage history is too large to export in one file; contact support";
+    }
+
+    if (error instanceof GrantRevisionsExportError) {
+        return "Your sharing history is too large to export in one file; contact support";
     }
 
     return error instanceof LunoraError && error.code === "PAYLOAD_TOO_LARGE"
@@ -384,6 +389,23 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                 )) as { bytes?: number; next?: BrowserExportCursor };
             });
 
+            // The revisions of the grants the user held (`agent/gdpr.ts`): a page per step, each read in its own query and stored under
+            // the run's prefix, as the browser pages are, so no single read budget can cut the section. Every page is stored before
+            // the file is written; past `GRANT_REVISIONS_EXPORT_PAGES` the walk throws and the export fails, never completing short.
+            const grantRevisionPages = await storeAllGrantRevisionPages(async (cursor, page) => {
+                const name = `collect-grant-revisions-${String(page)}`;
+
+                return (await context.step.do(
+                    name,
+                    async () =>
+                        await context.run(
+                            internal.agent.gdpr.storeGrantRevisionsExportPage,
+                            { ...(cursor !== undefined && { cursor }), key: grantRevisionsExportPageKey(browserPrefix, page), runKey: scope, userId },
+                            { dedupId: stepDedupId(scope, name) },
+                        ),
+                )) as { next?: string };
+            });
+
             await progress({ currentStep: "collecting_usage", progress: 70 });
             const collected = await collectUsageExport(usageIo);
 
@@ -422,6 +444,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                             devices,
                             evals,
                             files,
+                            grantRevisionPages,
                             memories,
                             notifications,
                             pages,

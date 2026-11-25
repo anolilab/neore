@@ -104,7 +104,7 @@ export const executeBrowserAction = internalAction
                 }
 
                 if (!sessionDocument) {
-                    throw new Error("The browser session could not be opened. Try it again.");
+                    throw new LunoraError("SERVICE_UNAVAILABLE", "The browser session could not be opened. Try it again.");
                 }
 
                 // What the row named when this action started: its result is written only if no other action moved it on.
@@ -181,7 +181,7 @@ export const executeBrowserAction = internalAction
                 const budget = rendererCallBudget(held.until, Date.now());
 
                 if (budget === 0) {
-                    throw new Error("The action started too late and was not sent. Try it again.");
+                    throw new LunoraError("CONFLICT", "The action started too late and was not sent. Try it again.");
                 }
 
                 callSignal = AbortSignal.timeout(budget);

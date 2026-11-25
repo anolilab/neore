@@ -31,7 +31,7 @@ import { requireOwnedThread, resolveThreadReadAccess } from "../agent/thread-rea
 import { getVectorIdInfo, type VectorTableId, type VectorTableName } from "../agent/vector/tables";
 import { parentKeyOf } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
-import { storedRow } from "../lib/stored-row";
+import { findLiveGrant } from "../agent/live-grant";
 
 /**
  * Whether the user turned memory on. OPT-IN: absent means off. Memory extraction reads every
@@ -202,7 +202,7 @@ export const listUserMemories = authQuery
 /** Whether `userId` holds an unexpired grant to another person's thread (`threadAccess`, global, so readable from any shard). */
 const holdsThreadGrant = async (context: Pick<QueryCtx, "db">, threadId: string, userId: string): Promise<boolean> => {
     // Primary: a replica that lags a revocation would still show the grant.
-    const grant = storedRow(await context.db.threadAccess.findFirst({ consistency: "primary", where: { threadId: threadId as Id<"threads">, userId } }));
+    const grant = await findLiveGrant(context, threadId as Id<"threads">, userId, { primary: true });
 
     return grant !== null && (grant.expiresAt === undefined || grant.expiresAt >= Date.now());
 };
@@ -1069,7 +1069,7 @@ export const saveImportedMemoryBatch = internalMutation
         const finished = (list: (ImportOutcome | undefined)[]): ImportOutcome[] =>
             list.map((outcome) => {
                 if (!outcome) {
-                    throw new Error("[memory/import] A fact was left without an outcome");
+                    throw new LunoraError("INTERNAL", "[memory/import] A fact was left without an outcome");
                 }
 
                 return outcome;

@@ -4,7 +4,7 @@
  *
  * Inbound: each attachment is downloaded with the owner's bot token
  * (`lib/platform-media.ts`, host-pinned and size-capped in `lib/media.ts`),
- * typed by the allowlist, and stored content-addressed through `storeFile` —
+ * typed by the allowlist, and stored through `storeFile` (deduplicated by hash) —
  * which writes the `chatFiles` row and the owner's `chatFileAccess` grant. The
  * user message then carries every stored file in `fileIds`, and as parts only
  * what a model reads directly (images, PDFs). Voice notes and audio are

@@ -11,7 +11,6 @@ import type { PeriodicJob } from "./lib/cron-schedule";
 import { dueJobs } from "./lib/cron-schedule";
 import { HISTORY_PAGE } from "./lib/document-history";
 import { cronsLogger } from "./lib/logger";
-import { scheduleObjectDeletion } from "./lib/storage-cleanup";
 
 export const crons = cronJobs();
 
@@ -43,13 +42,15 @@ export const deleteUnusedFiles = internalMutation
             cronsLogger.debug(`Deleting ${toDelete.length} files...`);
         }
 
-        await scheduleObjectDeletion(
-            context,
-            toDelete.map((f) => f.storageId as string),
-        );
+        // The objects go after the rows, through the deletes `deleteFiles` records and schedules.
         await context.runMutation(internal.agent.files.deleteFiles, {
             fileIds: toDelete.map((f) => f._id),
         });
+
+        if (arguments_.cursor === undefined) {
+            // Its own invocation: object deletes that did not finish, and uploads no row took, are deleted again (`retryObjectDeletes`).
+            await context.scheduler.runAfter(0, internal.agent.files.retryObjectDeletes, {});
+        }
 
         if (!files.isDone) {
             cronsLogger.debug(`Deleted ${toDelete.length} files but not done yet, continuing...`);

@@ -602,7 +602,7 @@ export const schema = defineSchema({
     }).global(),
 
     /**
-     * Who may attach a `chatFiles` row. The rows are content-addressed and
+     * Who may attach a `chatFiles` row. The rows are deduplicated by hash and
      * SHARED — two users uploading the same bytes get the same row — so the
      * file itself cannot carry an owner. A grant is written whenever a user
      * stores (or re-stores) the bytes; `agent_files.getFileForUser` is the
@@ -635,7 +635,35 @@ export const schema = defineSchema({
         .global()
         .index("by_fileId", ["fileId"]),
 
+    /**
+     * A chat-file storage object no row names (any more, or yet), to be deleted: written when a delete takes a file's last row
+     * (`agent/files.ts#discardFileRow`), and before a store uploads to its own new key (`useExistingFile`'s `uploadKey`), which
+     * the row that store writes takes back (`addFile`). It goes once the object delete returned (`deleteStoredObjects`); the sweep
+     * deletes again every record past `deleteAfter` (`retryObjectDeletes`), so a failed delete or a store that died never leaves
+     * bytes behind.
+     */
+    chatFileObjectDeletes: defineTable({
+        /** The sweep takes the record up after this; a store's claim sets it beyond any sweep. */
+        deleteAfter: v.number(),
+        /**
+         * `store`: an upload under way, which only its own store's row may take back (`addFile`). `delete`: the object is to go; a
+         * sweep's claim of a due `store` record makes it one, so a store that comes back late finds it gone.
+         */
+        kind: v.union(v.literal("store"), v.literal("delete")),
+        storageId: v.string(),
+    })
+        // `.global()`, like `chatFiles`: the stores and deletes it records run on any user's shard.
+        .global()
+        .index("by_storageId", ["storageId"])
+        .index("by_deleteAfter", ["deleteAfter"]),
+
     chatFiles: defineTable({
+        /**
+         * Set by the conditional write that decides a delete (a save rollback, the unused-file sweep), before the row's grants,
+         * metadata and row go. A reuse and a new reference are conditional on it being unset, so each lands before the decision
+         * (and the delete skips the row) or finds it marked and stores its own row.
+         */
+        discardingAt: v.optional(v.number()),
         extractedText: v.optional(v.string()),
         extractionError: v.optional(v.string()),
         extractionStatus: v.optional(
@@ -648,15 +676,24 @@ export const schema = defineSchema({
         nsfwScores: v.optional(v.object({ drawing: v.number(), hentai: v.number(), neutral: v.number(), porn: v.number(), sexy: v.number() })),
         nsfwStatus: v.optional(v.union(v.literal("pending"), v.literal("checking"), v.literal("safe"), v.literal("blocked"), v.literal("failed"))),
         refcount: v.number(),
+        /**
+         * Set when a store found this row and handed it out again (`useExistingFile`, a racing `addFile`). That store's message
+         * counts the row only when it saves, so until then `refcount` cannot show it: a save rollback (`discardUnsavedFiles`)
+         * takes back only a row no other store reused.
+         */
+        reusedAt: v.optional(v.number()),
         storageId: v.string(),
         unreferencedSince: v.optional(v.number()),
     })
-        // `.global()`: content-addressed (`agent-files/<sha256>`), so identical
-        // bytes stored by two users share ONE R2 object. Its refcount must see
-        // every user's references — per-shard copies would each reap the object
-        // the other still uses.
+        // `.global()`: deduplicated by hash, so identical bytes stored by two
+        // users share ONE row and its object (`agent-files/<sha256>/<uuid>`,
+        // `lib/chat-file-key.ts`). Its refcount must see every user's
+        // references — per-shard copies would each reap the object the other
+        // still uses.
         .global()
         .index("hash_filename", ["hash", "filename"])
+        // The rows naming one storage object (`lib/storage-ownership.ts`, `agent/files.ts`): a hash can have any number of rows.
+        .index("by_storageId", ["storageId"])
         .index("refcount", ["refcount"]),
 
     /**
@@ -3417,6 +3454,8 @@ export const schema = defineSchema({
         /** The thread's owner — the shard the thread lives on, and the key `authorizeShard` admits the grantee to. */
         ownerId: v.optional(v.string()),
         permission: v.union(v.literal("read"), v.literal("write"), v.literal("admin")),
+        /** Advanced by every write to the grant (`agent/grant-revision.ts`); absent on a grant from before revisions (0). */
+        revision: v.optional(v.number()),
         threadId: v.id("threads"),
         userId: v.string(),
     })
@@ -3424,11 +3463,32 @@ export const schema = defineSchema({
         .global()
         .index("by_thread_and_user", ["threadId", "userId"])
         .index("by_user_and_owner", ["userId", "ownerId"])
+        // The grants on a user's chats: a guest merge's last check and the owner's erasure, without a table scan.
+        .index("by_owner", ["ownerId"])
         .relations((r) => {
             return {
                 thread: r.one("threads", { field: "threadId" }),
             };
         }),
+    /**
+     * The last revision of a thread grant (`agent/grant-revision.ts`), one row per thread and grantee. It outlives the
+     * grant row, so a grant written after a removal continues past the removal's revision and a denial names it. Erased
+     * when the chat is deleted for good (`revokeThreadGrantsJob` with `purge`) and with either user's account.
+     */
+    threadAccessRevisions: defineTable({
+        /** The thread's owner, so the owner's account deletion erases the row. */
+        ownerId: v.optional(v.string()),
+        revision: v.number(),
+        threadId: v.id("threads"),
+        /** The grantee. */
+        userId: v.string(),
+    })
+        .global()
+        // Unique: two writers that both find no row cannot both make one (`advanceGrantRevision`).
+        .index("by_thread_and_user", ["threadId", "userId"], { unique: true })
+        .index("by_user_and_owner", ["userId", "ownerId"])
+        .index("by_owner", ["ownerId"]),
+
     /**
      * A rolling summary of the older rows of ONE path of a thread, made while it
      * sits idle (`agent/thread-summaries.ts`) and fed to the agent ahead of the
@@ -3645,6 +3705,20 @@ export const schema = defineSchema({
                 thread: r.one("threads", { field: "threadId" }),
             };
         }),
+
+    /**
+     * A chat deleted for good (`agent/grant-revision.ts#markThreadPurged`): written by its grant purge before the purge
+     * reads a grant or a revision, and read by every write that makes one (a new grant, a new count) after its own write,
+     * which then takes it back. So a write the purge's reads miss (an invite accept already past its invite read) finds
+     * the mark. Holds no user; dropped a day after the purge finishes (`dropThreadPurgeMark`), when no such write is left.
+     */
+    threadPurgeMarks: defineTable({
+        purgedAt: v.number(),
+        threadId: v.id("threads"),
+    })
+        .global()
+        // Unique: a purge redelivered or run twice (a delete and the account's erasure) writes one mark.
+        .index("by_thread", ["threadId"], { unique: true }),
 
     threadRelationships: defineTable({
         branchPoint: v.optional(v.number()),
@@ -4231,6 +4305,8 @@ export const schema = defineSchema({
         /** The Creem subscription that set `baseTier`; a cancel of any other one leaves it alone. */
         creemSubscriptionId: v.optional(v.string()),
         email: v.string(),
+        /** `@lunora/auth`'s case- and Unicode-folded copy of `email`, added to the user table by its plugin. */
+        emailCanonical: v.optional(v.string()),
         emailVerified: v.boolean(),
         image: v.optional(v.string()),
         isAnonymous: v.optional(v.boolean()),
@@ -4241,6 +4317,8 @@ export const schema = defineSchema({
         userId: v.optional(v.string()),
     })
         .global()
+        // Unique: `@lunora/auth` relies on it to reject a concurrent sign-up that repeats a folded address.
+        .index("emailCanonical", ["emailCanonical"], { unique: true })
         .index("email_name", ["email", "name"])
         .index("name", ["name"])
         .index("role", ["role"])
@@ -4330,6 +4408,8 @@ export const schema = defineSchema({
         disableExternalLinkWarning: v.optional(v.boolean()),
         enableFollowupSuggestions: v.optional(v.boolean()),
         favoriteModels: v.optional(v.array(v.string())),
+        // A message sent while a reply streams joins that reply at its next step, instead of queueing behind it. Absent = queue.
+        followUpSteer: v.optional(v.boolean()),
         hidePersonalInfo: v.optional(v.boolean()),
         // A message sent during a coding agent's turn interrupts that turn and goes next, instead of queueing behind it. Absent = queue.
         hostFollowUpSteer: v.optional(v.boolean()),

@@ -7,30 +7,21 @@ import type { Id } from "../../_generated/dataModel";
 import { assert } from "../../lib/error-helpers";
 import type { Signer } from "../../lib/storage-sign";
 import { signedReadUrl } from "../../lib/storage-read";
+import { newChatFileKey } from "../../lib/chat-file-key";
 import { toStorageRef } from "../../lib/storage-ref";
+import { deleteStoredObjects } from "./object-deletes";
 import type { Message } from "../validators";
 import type { ActionCtx as ActionContext, MutationCtx as MutationContext, QueryCtx as QueryContext } from "./types";
 import { FETCH_TIMEOUT_LONG_MS, fetchWithDeadline } from "../../lib/fetch-timeout";
+import { bytesToBase64 } from "../../lib/crypto";
 
 export const MAX_FILE_SIZE = 1024 * 64;
-
-/**
- * Storage keys are content-addressed.
- *
- * Storage ids used to be minted opaquely per upload; Lunora's storage is
- * key-addressed, so the key has to be chosen here. Deriving it from the content
- * hash makes deduplication a property of the key rather than something
- * `useExistingFile` has to enforce — storing the same bytes twice is idempotent.
- *
- * The `storageId` columns keep their name and now hold this key.
- */
-const storageKeyFor = (hash: string): string => `agent-files/${hash}`;
 
 type File = {
     fileId: string;
     filename: string | undefined;
     hash: string;
-    /** An R2 key since the Lunora port — see {@link storageKeyFor}. */
+    /** An R2 key since the Lunora port — see `lib/chat-file-key.ts`. */
     storageId: string;
     url: string;
 };
@@ -93,6 +84,8 @@ export const storeFile = async (
         userId?: string;
     } = {},
 ): Promise<{
+    /** This call wrote the row (and its object); `false` when the bytes were already stored. */
+    created: boolean;
     file: File;
     filePart: FilePart;
     imagePart: ImagePart | undefined;
@@ -119,9 +112,13 @@ export const storeFile = async (
         throw new Error(`Hash mismatch: ${hash} != ${sha256}`);
     }
 
+    // The bytes get a key of their own (`lib/chat-file-key.ts`), so no delete of another row's object can take them. It is
+    // recorded before the upload when no row is reused, so a store that dies before its row leaves the sweep a record to delete by.
+    const newStorageId = newChatFileKey(hash);
     const reused = await ctx.runMutation(internal.agent.files.useExistingFile, {
         filename,
         hash,
+        uploadKey: newStorageId,
         ...(userId && { userId }),
     });
 
@@ -134,6 +131,7 @@ export const storeFile = async (
 
         return {
             ...getParts(toStorageRef(reused.storageId), blob.type, filename),
+            created: false,
             file: {
                 fileId: reused.fileId,
                 filename,
@@ -144,10 +142,8 @@ export const storeFile = async (
         };
     }
 
-    const newStorageId = storageKeyFor(hash);
-
     await ctx.storage.store(newStorageId, buffer, { allowedContentTypes, contentType: blob.type, maxSize });
-    const { fileId, storageId } = await ctx.runMutation(internal.agent.files.addFile, {
+    const { created, discardedUpload, fileId, storageId } = await ctx.runMutation(internal.agent.files.addFile, {
         filename,
         hash,
         mediaType: blob.type,
@@ -155,17 +151,20 @@ export const storeFile = async (
         ...(userId && { userId }),
     });
 
+    // A racing store's row was reused: this upload is not needed, and its delete is recorded (the sweep retries a failed one).
+    if (discardedUpload) {
+        await deleteStoredObjects(ctx, [discardedUpload]);
+    }
+
     if (threadId) {
         await ctx.runMutation(internal.agent.files.grantThreadOwnerAccess, { fileId, threadId });
     }
 
     const url = await signedReadUrl(ctx.storage, storageId);
 
-    // A fresh storage id per store meant a race could leave an orphan
-    // to clean up. Content-addressed keys make that impossible: a racing store
-    // writes the same key with the same bytes.
     return {
         ...getParts(toStorageRef(storageId), blob.type, filename),
+        created,
         file: {
             fileId,
             filename,
@@ -250,12 +249,20 @@ const getParts = (location: string, mediaType: string, filename: string | undefi
     return { filePart, imagePart };
 };
 
-/**
- * Check if a URL points to localhost.
- */
-const LOCALHOST_HOSTNAMES = new Set(["0.0.0.0", "127.0.0.1", "::1", "localhost"]);
+const LOCALHOST_HOSTNAMES = new Set(["0.0.0.0", "::1", "localhost"]);
 
-const isLocalhostUrl = (url: URL): boolean => LOCALHOST_HOSTNAMES.has(url.hostname);
+/** IPv4 loopback, `127.0.0.0/8`, as `URL` writes it (`127.1` reads as `127.0.0.1`). */
+const IPV4_LOOPBACK = /^127(?:\.\d{1,3}){3}$/u;
+
+/**
+ * Whether a URL points to localhost. `URL.hostname` keeps an IPv6 address in brackets (`http://[::1]:8788` has the
+ * hostname `[::1]`), so they are dropped before the address is compared.
+ */
+const isLocalhostUrl = (url: URL): boolean => {
+    const host = url.hostname.startsWith("[") && url.hostname.endsWith("]") ? url.hostname.slice(1, -1) : url.hostname;
+
+    return LOCALHOST_HOSTNAMES.has(host) || IPV4_LOOPBACK.test(host);
+};
 
 /** Whether `origin` (e.g. `PUBLIC_ORIGIN`) is a loopback address — local dev. */
 export const isLocalOrigin = (origin: string | undefined): boolean => {
@@ -281,6 +288,13 @@ export const isLocalOrigin = (origin: string | undefined): boolean => {
  * services).
  */
 const downloadFile = async (url: URL): Promise<ArrayBuffer> => {
+    const { data } = await downloadTyped(url);
+
+    return data;
+};
+
+/** Downloads like {@link downloadFile}, with the media type the server answered (absent when it named none). */
+const downloadTyped = async (url: URL): Promise<{ data: ArrayBuffer; mediaType?: string }> => {
     if (url.protocol !== "http:" && url.protocol !== "https:") {
         throw new Error(`Refusing to download non-HTTP URL: ${url.protocol}`);
     }
@@ -297,7 +311,9 @@ const downloadFile = async (url: URL): Promise<ArrayBuffer> => {
         throw new Error(`Failed to fetch ${url}: ${response.statusText}`);
     }
 
-    return await response.arrayBuffer();
+    const mediaType = response.headers.get("content-type")?.split(";", 1)[0]?.trim();
+
+    return { data: await response.arrayBuffer(), ...(mediaType && { mediaType }) };
 };
 
 /**
@@ -341,5 +357,73 @@ export const inlineMessagesFiles = async <T extends ModelMessage | Message>(mess
             }
 
             return { ...message, content: processedContent as AssistantContent };
+        }),
+    );
+
+/** What the model reads in place of a screenshot that could not be loaded. */
+export const SCREENSHOT_UNAVAILABLE_NOTE = "[A screenshot was taken here but could not be loaded.]";
+
+/**
+ * Inlines tool results as {@link inlineMessagesFiles} inlines files: an `image-url` part of a tool's `content` output that points to localhost (a
+ * saved screenshot signed in local dev, which a browser tool's `toModelOutput` hands the model as a URL) becomes `image-data`
+ * with its bytes, and one that cannot be loaded a short note. Only for a run's own messages in local dev; every other part, and
+ * every URL that is not localhost, stays.
+ */
+export const inlineToolResultImages = async (messages: ModelMessage[]): Promise<ModelMessage[]> =>
+    await Promise.all(
+        messages.map(async (message): Promise<ModelMessage> => {
+            if (message.role !== "tool") {
+                return message;
+            }
+
+            const content = await Promise.all(
+                message.content.map(async (part) => {
+                    if (part.type !== "tool-result" || part.output.type !== "content") {
+                        return part;
+                    }
+
+                    const value = await Promise.all(
+                        part.output.value.map(async (item) => {
+                            if (item.type !== "image-url") {
+                                return item;
+                            }
+
+                            let url: URL;
+
+                            try {
+                                url = new URL(item.url);
+                            } catch {
+                                return item;
+                            }
+
+                            if (!isLocalhostUrl(url)) {
+                                return item;
+                            }
+
+                            try {
+                                const { data, mediaType } = await downloadTyped(url);
+
+                                return {
+                                    data: bytesToBase64(new Uint8Array(data)),
+                                    mediaType: mediaType?.startsWith("image/") === true ? mediaType : "image/png",
+                                    type: "image-data" as const,
+                                };
+                            } catch (error) {
+                                // One unreadable screenshot (an expired signature, storage down) must not stop the reply: the model is told instead.
+                                console.warn("[inlineToolResultImages] screenshot_unavailable", {
+                                    error: error instanceof Error ? error.message : String(error),
+                                    toolCallId: part.toolCallId,
+                                });
+
+                                return { text: SCREENSHOT_UNAVAILABLE_NOTE, type: "text" as const };
+                            }
+                        }),
+                    );
+
+                    return { ...part, output: { ...part.output, value } };
+                }),
+            );
+
+            return { ...message, content };
         }),
     );
