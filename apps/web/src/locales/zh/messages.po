@@ -122,7 +122,7 @@ msgstr "（{0}/{MAX_PARTICIPANTS}，至少 {MIN_PARTICIPANTS} 个）"
 msgid "({jobFailed} failed)"
 msgstr "（{jobFailed} 个失败）"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:414
+#: src/features/chat/thread/composer-prompt-queue.tsx:519
 msgid "(attachments only)"
 msgstr "（仅附件）"
 
@@ -974,7 +974,7 @@ msgstr "{count, plural, other {已选择 # 条消息}}"
 msgid "{count, plural, one {# of {maxReferenceImages} reference attached} other {# of {maxReferenceImages} references attached}}"
 msgstr "{count, plural, other {已附加 #/{maxReferenceImages} 张参考图}}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:755
+#: src/features/chat/thread/composer-prompt-queue.tsx:1149
 msgid "{count, plural, one {# steering — the reply reads it at its next step} other {# steering — the reply reads them at its next step}}"
 msgstr "{count, plural, other {# 条引导——回复会在下一步读取}}"
 
@@ -994,15 +994,19 @@ msgstr "{count, plural, other {使用了 # 个来源}}"
 msgid "{count} characters now."
 msgstr "当前 {count} 个字符。"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:752
+#: src/features/chat/thread/composer-prompt-queue.tsx:1146
 msgid "{count} queued"
 msgstr "{count} 条排队中"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:752
+#: src/features/chat/thread/composer-prompt-queue.tsx:1146
 msgid "{count} queued — sends when the current reply finishes"
 msgstr "{count} 条排队中——当前回复完成后发送"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:760
+#: src/features/chat/thread/composer-prompt-queue.tsx:1156
+msgid "{count} queued — sends when the edit closes"
+msgstr "{count} 条排队中 — 编辑结束后发送"
+
+#: src/features/chat/thread/composer-prompt-queue.tsx:1161
 msgid "{count} queued — waiting for the permission mode to save"
 msgstr "{count} 项已排队，等待保存权限模式"
 
@@ -1040,7 +1044,7 @@ msgstr "已完成 {done}/{total} 项任务"
 msgid "{done} of {total} tasks done. In progress: {inProgress}"
 msgstr "已完成 {done}/{total} 项任务。进行中：{inProgress}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:455
+#: src/features/chat/thread/composer-prompt-queue.tsx:622
 msgid "{droppedCount, plural, one {# attachment removed on reload} other {# attachments removed on reload}}"
 msgstr "{droppedCount, plural, other {重新加载时移除了 # 个附件}}"
 
@@ -4094,7 +4098,7 @@ msgstr "任何拥有链接的人都可以阅读此页面。评论永远不会显
 msgid "Anyone with the link can view this thread"
 msgstr "任何拥有链接的人都可以查看此对话"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:49
+#: src/features/chat/thread/composer-permission-mode.tsx:50
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:49
 msgid "Anything that is not a plain lookup asks first"
 msgstr "凡非单纯查询的操作均需先询问"
@@ -4719,7 +4723,7 @@ msgstr "附件 {0} 超过 {MAX_FEEDBACK_IMAGE_MB} MB 且无法压缩。请移除
 msgid "Attachment only"
 msgstr "仅附件"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:449
+#: src/features/chat/thread/composer-prompt-queue.tsx:616
 msgid "Attachments:"
 msgstr "附件："
 
@@ -4801,7 +4805,7 @@ msgstr "自动"
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
 #: src/features/chat/thread/composer-model-selector.tsx:122
-#: src/features/chat/thread/composer-permission-mode.tsx:41
+#: src/features/chat/thread/composer-permission-mode.tsx:42
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:65
 #: src/features/chat/thread/media-gallery-view.tsx:511
@@ -5242,7 +5246,7 @@ msgstr "入门"
 msgid "Behavior"
 msgstr "行为"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:232
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:256
 msgid "Behind {base}"
 msgstr "落后于 {base}"
 
@@ -6088,6 +6092,7 @@ msgstr "加拿大"
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:178
 #: src/features/chat/thread-list/snooze-until-dialog.tsx:111
 #: src/features/chat/thread/composer-draw-dialog.tsx:384
+#: src/features/chat/thread/composer-prompt-queue.tsx:651
 #: src/features/chat/thread/edit-composer.tsx:162
 #: src/features/chat/thread/fork-branch-dialog.tsx:91
 #: src/features/chat/thread/generation-model-menu.tsx:163
@@ -6310,11 +6315,11 @@ msgstr "加泰罗尼亚语（西班牙）"
 msgid "catalog"
 msgstr "目录"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:255
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:279
 msgid "Catch up"
 msgstr "追上"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:222
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:246
 msgid "Catch up {pullRequest} with {base}"
 msgstr "让 {pullRequest} 追上 {base}"
 
@@ -8958,7 +8963,7 @@ msgstr "无法附加该聊天"
 msgid "could not be saved"
 msgstr "无法保存"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:379
+#: src/features/chat/thread/composer-prompt-queue.tsx:469
 msgid "Could not cancel the message. It is still queued."
 msgstr "无法取消该消息。它仍在队列中。"
 
@@ -8983,7 +8988,7 @@ msgstr "无法更改机器人的权限模式。"
 msgid "Could not change the model. Please try again."
 msgstr "无法更改模型。请重试。"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:202
+#: src/features/chat/thread/composer-permission-mode.tsx:205
 msgid "Could not change the permission mode. Please try again."
 msgstr "无法更改权限模式，请重试。"
 
@@ -12237,6 +12242,11 @@ msgstr "编辑排队的消息"
 msgid "Edit queued message {0}"
 msgstr "编辑排队的消息 {0}"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:581
+#: src/features/chat/thread/composer-prompt-queue.tsx:657
+msgid "Edit queued message {position}"
+msgstr "编辑排队中的消息 {position}"
+
 #: src/features/skills/components/skill-form-dialog.tsx:174
 msgid "Edit skill"
 msgstr "编辑技能"
@@ -13275,7 +13285,7 @@ msgstr "每个请求都必须签名。请发送 <0>X-Neore-Timestamp</0>（当�
 msgid "Every Sunday at midnight"
 msgstr "每周日午夜"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:48
+#: src/features/chat/thread/composer-permission-mode.tsx:49
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:48
 msgid "Every tool runs without asking, except those that need your answer"
 msgstr "除需要你作答的工具外，所有工具均无需询问即可运行"
@@ -15943,7 +15953,7 @@ msgid "Full 1080p high-definition video output"
 msgstr "完整 1080p 高清视频输出"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
-#: src/features/chat/thread/composer-permission-mode.tsx:42
+#: src/features/chat/thread/composer-permission-mode.tsx:43
 #: src/features/settings/components/chat/bots-settings.tsx:133
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:42
 msgid "Full access"
@@ -22030,11 +22040,11 @@ msgstr "向下移动一页"
 msgid "Move out one level"
 msgstr "上移一级"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:469
+#: src/features/chat/thread/composer-prompt-queue.tsx:677
 msgid "Move queued message {position} down"
 msgstr "下移队列中的消息 {position}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:459
+#: src/features/chat/thread/composer-prompt-queue.tsx:667
 msgid "Move queued message {position} up"
 msgstr "上移队列中的消息 {position}"
 
@@ -22101,8 +22111,8 @@ msgid "Moved selected node {0}. New position, x: {x}, y: {y}"
 msgstr "已移动所选节点{0}。新位置，x：{x}，y：{y}"
 
 #. placeholder {0}: to + 1
-#: src/features/chat/thread/composer-prompt-queue.tsx:702
-#: src/features/chat/thread/composer-prompt-queue.tsx:729
+#: src/features/chat/thread/composer-prompt-queue.tsx:1093
+#: src/features/chat/thread/composer-prompt-queue.tsx:1120
 msgid "Moved to position {0}"
 msgstr "已移动到第 {0} 位"
 
@@ -26020,7 +26030,7 @@ msgstr "永久删除你的账号及所有相关数据"
 msgid "Permission Level"
 msgstr "权限级别"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:89
+#: src/features/chat/thread/composer-permission-mode.tsx:90
 #: src/features/settings/components/chat/bots-settings.tsx:415
 msgid "Permission mode"
 msgstr "权限模式"
@@ -26031,8 +26041,8 @@ msgid "Permission mode for {0}"
 msgstr "{0} 的权限模式"
 
 #. placeholder {0}: labels[mode]
-#: src/features/chat/thread/composer-permission-mode.tsx:63
-#: src/features/chat/thread/composer-permission-mode.tsx:81
+#: src/features/chat/thread/composer-permission-mode.tsx:64
+#: src/features/chat/thread/composer-permission-mode.tsx:82
 msgid "Permission mode: {0}"
 msgstr "权限模式：{0}"
 
@@ -27568,11 +27578,11 @@ msgstr "此浏览器上的推送通知"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "将多个各具角色的智能体放在同一对话中。审查小组可从安全和性能角度检查更改，辩论则可在综合前论证双方观点。"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:261
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:285
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, and check the build and tests. It pushes only when a signed-in gh confirms the pull request is still open on that base. Nothing is sent."
 msgstr "在输入框中填入一条提示，将此分支变基到 {base}、解决冲突并检查构建和测试。只有在已登录的 gh 确认该拉取请求仍在此基础分支上打开时才会推送。不会发送任何内容。"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:262
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:286
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "在输入框中填入一条提示，在本地副本中将此复刻的分支变基到 {base}、解决冲突并检查构建和测试。不会推送。不会发送任何内容。"
 
@@ -27616,7 +27626,7 @@ msgid "Queued"
 msgstr "排队中"
 
 #: src/features/chat/host/host-composer.tsx:374
-#: src/features/chat/thread/composer-prompt-queue.tsx:774
+#: src/features/chat/thread/composer-prompt-queue.tsx:1175
 msgid "Queued messages"
 msgstr "排队中的消息"
 
@@ -28753,7 +28763,7 @@ msgstr "要移除提供商吗？"
 msgid "Remove queued message {0}"
 msgstr "移除排队的消息 {0}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:479
+#: src/features/chat/thread/composer-prompt-queue.tsx:687
 msgid "Remove queued message {position}"
 msgstr "移除排队消息 {position}"
 
@@ -29967,6 +29977,7 @@ msgstr "沙特阿拉伯"
 #: src/features/chat/pins/pin-item.tsx:304
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:181
+#: src/features/chat/thread/composer-prompt-queue.tsx:640
 #: src/features/chat/thread/edit-composer.tsx:166
 #: src/features/chat/thread/request-secret-prompt.tsx:490
 #: src/features/develop/components/draft-comment-card.tsx:43
@@ -30977,7 +30988,7 @@ msgid "Send messages to the AI bot via Telegram. Conversations appear as threads
 msgstr "通过 Telegram 向 AI 机器人发送消息。对话会显示在你的聊天列表中。"
 
 #: src/features/chat/host/host-composer.tsx:1035
-#: src/features/chat/thread/composer-prompt-queue.tsx:793
+#: src/features/chat/thread/composer-prompt-queue.tsx:1207
 msgid "Send next"
 msgstr "发送下一条"
 
@@ -32955,7 +32966,7 @@ msgstr "引导——当前回复会在下一步读取此内容"
 msgid "Steer the reply"
 msgstr "引导回复"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:440
+#: src/features/chat/thread/composer-prompt-queue.tsx:575
 msgid "Steering:"
 msgstr "引导："
 
@@ -33681,7 +33692,7 @@ msgstr "出众的多文件代码生成与重构"
 msgid "Superior understanding of complex visual concepts"
 msgstr "对复杂视觉概念的理解出众"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:43
+#: src/features/chat/thread/composer-permission-mode.tsx:44
 #: src/features/settings/components/chat/bots-settings.tsx:134
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:43
 msgid "Supervised"
@@ -35941,7 +35952,7 @@ msgstr "此集合由你组织中的成员共享给你。你可以将其附加到
 msgid "This command name is reserved"
 msgstr "此命令名称已被保留"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:198
+#: src/features/chat/thread/composer-permission-mode.tsx:201
 msgid "This comparison's mode applies to every column. Change it on the comparison."
 msgstr "此对比的模式适用于所有列。请在对比中更改。"
 
@@ -37013,7 +37024,7 @@ msgstr "工具"
 msgid "Tools for {0}"
 msgstr "{0} 的工具"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:47
+#: src/features/chat/thread/composer-permission-mode.tsx:48
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:47
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr "工具按各自的设置运行；快速检查可放行低风险调用"
@@ -37536,6 +37547,10 @@ msgstr "在“{selector}”中输入"
 #: src/features/chat/lock/thread-lock-dialog.tsx:193
 msgid "Type it again"
 msgstr "再输入一次"
+
+#: src/features/chat/thread/composer-prompt-queue.tsx:629
+msgid "Type some visible text to save this message."
+msgstr "请输入可见文字以保存此消息。"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-search.tsx:221
 msgid "Type to search"
@@ -40318,7 +40333,7 @@ msgstr "你已离线。请重新连接后重试。"
 
 #: src/features/chat/thread/composer-input.tsx:1195
 #: src/features/chat/thread/composer-input.tsx:1320
-#: src/features/chat/thread/composer-prompt-queue.tsx:112
+#: src/features/chat/thread/composer-prompt-queue.tsx:181
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "你已离线。你的消息会保留在这里；恢复在线后再发送。"
 

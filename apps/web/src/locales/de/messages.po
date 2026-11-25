@@ -122,7 +122,7 @@ msgstr "({0} von {MAX_PARTICIPANTS}, mindestens {MIN_PARTICIPANTS})"
 msgid "({jobFailed} failed)"
 msgstr "({jobFailed} fehlgeschlagen)"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:414
+#: src/features/chat/thread/composer-prompt-queue.tsx:519
 msgid "(attachments only)"
 msgstr "(nur Anhänge)"
 
@@ -974,7 +974,7 @@ msgstr "{count, plural, one {# Nachricht ausgewählt} other {# Nachrichten ausge
 msgid "{count, plural, one {# of {maxReferenceImages} reference attached} other {# of {maxReferenceImages} references attached}}"
 msgstr "{count, plural, one {# von {maxReferenceImages} Referenz angehängt} other {# von {maxReferenceImages} Referenzen angehängt}}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:755
+#: src/features/chat/thread/composer-prompt-queue.tsx:1149
 msgid "{count, plural, one {# steering — the reply reads it at its next step} other {# steering — the reply reads them at its next step}}"
 msgstr "{count, plural, one {# Steuerhinweis – die Antwort liest ihn bei ihrem nächsten Schritt} other {# Steuerhinweise – die Antwort liest sie bei ihrem nächsten Schritt}}"
 
@@ -994,15 +994,19 @@ msgstr "{count, plural, one {# Quelle verwendet} other {# Quellen verwendet}}"
 msgid "{count} characters now."
 msgstr "Jetzt {count} Zeichen."
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:752
+#: src/features/chat/thread/composer-prompt-queue.tsx:1146
 msgid "{count} queued"
 msgstr "{count} in der Warteschlange"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:752
+#: src/features/chat/thread/composer-prompt-queue.tsx:1146
 msgid "{count} queued — sends when the current reply finishes"
 msgstr "{count} in der Warteschlange – wird gesendet, wenn die aktuelle Antwort fertig ist"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:760
+#: src/features/chat/thread/composer-prompt-queue.tsx:1156
+msgid "{count} queued — sends when the edit closes"
+msgstr "{count} in der Warteschlange – wird gesendet, wenn die Bearbeitung endet"
+
+#: src/features/chat/thread/composer-prompt-queue.tsx:1161
 msgid "{count} queued — waiting for the permission mode to save"
 msgstr "{count} in der Warteschlange – wartet auf das Speichern des Berechtigungsmodus"
 
@@ -1040,7 +1044,7 @@ msgstr "{done} von {total} Aufgaben erledigt"
 msgid "{done} of {total} tasks done. In progress: {inProgress}"
 msgstr "{done} von {total} Aufgaben erledigt. In Arbeit: {inProgress}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:455
+#: src/features/chat/thread/composer-prompt-queue.tsx:622
 msgid "{droppedCount, plural, one {# attachment removed on reload} other {# attachments removed on reload}}"
 msgstr "{droppedCount, plural, one {# Anhang beim Neuladen entfernt} other {# Anhänge beim Neuladen entfernt}}"
 
@@ -4094,7 +4098,7 @@ msgstr "Jeder mit dem Link kann diese Seite lesen. Kommentare werden nie angezei
 msgid "Anyone with the link can view this thread"
 msgstr "Jeder mit dem Link kann diesen Thread ansehen"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:49
+#: src/features/chat/thread/composer-permission-mode.tsx:50
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:49
 msgid "Anything that is not a plain lookup asks first"
 msgstr "Alles, was kein reines Nachschlagen ist, fragt zuerst nach"
@@ -4719,7 +4723,7 @@ msgstr "Anhang {0} ist größer als {MAX_FEEDBACK_IMAGE_MB} MB und konnte nicht 
 msgid "Attachment only"
 msgstr "Nur Anhang"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:449
+#: src/features/chat/thread/composer-prompt-queue.tsx:616
 msgid "Attachments:"
 msgstr "Anhänge:"
 
@@ -4801,7 +4805,7 @@ msgstr "auto"
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
 #: src/features/chat/thread/composer-model-selector.tsx:122
-#: src/features/chat/thread/composer-permission-mode.tsx:41
+#: src/features/chat/thread/composer-permission-mode.tsx:42
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:65
 #: src/features/chat/thread/media-gallery-view.tsx:511
@@ -5242,7 +5246,7 @@ msgstr "Einsteiger"
 msgid "Behavior"
 msgstr "Verhalten"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:232
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:256
 msgid "Behind {base}"
 msgstr "Hinter {base}"
 
@@ -6088,6 +6092,7 @@ msgstr "Kanada"
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:178
 #: src/features/chat/thread-list/snooze-until-dialog.tsx:111
 #: src/features/chat/thread/composer-draw-dialog.tsx:384
+#: src/features/chat/thread/composer-prompt-queue.tsx:651
 #: src/features/chat/thread/edit-composer.tsx:162
 #: src/features/chat/thread/fork-branch-dialog.tsx:91
 #: src/features/chat/thread/generation-model-menu.tsx:163
@@ -6310,11 +6315,11 @@ msgstr "Katalanisch (Spanien)"
 msgid "catalog"
 msgstr "Katalog"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:255
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:279
 msgid "Catch up"
 msgstr "Aufholen"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:222
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:246
 msgid "Catch up {pullRequest} with {base}"
 msgstr "{pullRequest} auf {base} aufholen"
 
@@ -8958,7 +8963,7 @@ msgstr "Der Chat konnte nicht angehängt werden"
 msgid "could not be saved"
 msgstr "konnte nicht gespeichert werden"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:379
+#: src/features/chat/thread/composer-prompt-queue.tsx:469
 msgid "Could not cancel the message. It is still queued."
 msgstr "Die Nachricht konnte nicht abgebrochen werden. Sie ist weiterhin in der Warteschlange."
 
@@ -8983,7 +8988,7 @@ msgstr "Der Berechtigungsmodus des Bots konnte nicht geändert werden."
 msgid "Could not change the model. Please try again."
 msgstr "Das Modell konnte nicht geändert werden. Bitte versuche es erneut."
 
-#: src/features/chat/thread/composer-permission-mode.tsx:202
+#: src/features/chat/thread/composer-permission-mode.tsx:205
 msgid "Could not change the permission mode. Please try again."
 msgstr "Der Berechtigungsmodus konnte nicht geändert werden. Bitte versuche es erneut."
 
@@ -12237,6 +12242,11 @@ msgstr "Wartende Nachricht bearbeiten"
 msgid "Edit queued message {0}"
 msgstr "Wartende Nachricht {0} bearbeiten"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:581
+#: src/features/chat/thread/composer-prompt-queue.tsx:657
+msgid "Edit queued message {position}"
+msgstr "Wartende Nachricht {position} bearbeiten"
+
 #: src/features/skills/components/skill-form-dialog.tsx:174
 msgid "Edit skill"
 msgstr "Skill bearbeiten"
@@ -13275,7 +13285,7 @@ msgstr "Jede Anfrage muss signiert sein. Sende <0>X-Neore-Timestamp</0> (die akt
 msgid "Every Sunday at midnight"
 msgstr "Jeden Sonntag um Mitternacht"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:48
+#: src/features/chat/thread/composer-permission-mode.tsx:49
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:48
 msgid "Every tool runs without asking, except those that need your answer"
 msgstr "Jedes Tool läuft ohne Nachfrage, außer denen, die deine Antwort brauchen"
@@ -15943,7 +15953,7 @@ msgid "Full 1080p high-definition video output"
 msgstr "Videoausgabe in vollem 1080p-HD"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
-#: src/features/chat/thread/composer-permission-mode.tsx:42
+#: src/features/chat/thread/composer-permission-mode.tsx:43
 #: src/features/settings/components/chat/bots-settings.tsx:133
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:42
 msgid "Full access"
@@ -22030,11 +22040,11 @@ msgstr "Eine Seite nach unten"
 msgid "Move out one level"
 msgstr "Eine Ebene nach oben verschieben"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:469
+#: src/features/chat/thread/composer-prompt-queue.tsx:677
 msgid "Move queued message {position} down"
 msgstr "Eingereihte Nachricht {position} nach unten"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:459
+#: src/features/chat/thread/composer-prompt-queue.tsx:667
 msgid "Move queued message {position} up"
 msgstr "Eingereihte Nachricht {position} nach oben"
 
@@ -22101,8 +22111,8 @@ msgid "Moved selected node {0}. New position, x: {x}, y: {y}"
 msgstr "Ausgewählten Knoten {0} verschoben. Neue Position, x: {x}, y: {y}"
 
 #. placeholder {0}: to + 1
-#: src/features/chat/thread/composer-prompt-queue.tsx:702
-#: src/features/chat/thread/composer-prompt-queue.tsx:729
+#: src/features/chat/thread/composer-prompt-queue.tsx:1093
+#: src/features/chat/thread/composer-prompt-queue.tsx:1120
 msgid "Moved to position {0}"
 msgstr "Auf Position {0} verschoben"
 
@@ -26020,7 +26030,7 @@ msgstr "Dein Konto und alle damit verbundenen Daten dauerhaft löschen"
 msgid "Permission Level"
 msgstr "Berechtigungsstufe"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:89
+#: src/features/chat/thread/composer-permission-mode.tsx:90
 #: src/features/settings/components/chat/bots-settings.tsx:415
 msgid "Permission mode"
 msgstr "Berechtigungsmodus"
@@ -26031,8 +26041,8 @@ msgid "Permission mode for {0}"
 msgstr "Berechtigungsmodus für {0}"
 
 #. placeholder {0}: labels[mode]
-#: src/features/chat/thread/composer-permission-mode.tsx:63
-#: src/features/chat/thread/composer-permission-mode.tsx:81
+#: src/features/chat/thread/composer-permission-mode.tsx:64
+#: src/features/chat/thread/composer-permission-mode.tsx:82
 msgid "Permission mode: {0}"
 msgstr "Berechtigungsmodus: {0}"
 
@@ -27568,11 +27578,11 @@ msgstr "Push-Benachrichtigungen in diesem Browser"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "Bringe mehrere Agenten mit eigenen Rollen in einen Thread. Ein Review-Panel kann eine Änderung aus Sicherheits- und Performance-Sicht prüfen, und eine Debatte kann vor einer Synthese beide Seiten abwägen."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:261
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:285
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, and check the build and tests. It pushes only when a signed-in gh confirms the pull request is still open on that base. Nothing is sent."
 msgstr "Fügt einen Prompt in das Eingabefeld ein, der diesen Branch auf {base} rebased, Konflikte löst sowie Build und Tests prüft. Gepusht wird nur, wenn ein angemeldetes gh bestätigt, dass der Pull Request noch auf dieser Basis offen ist. Es wird nichts gesendet."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:262
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:286
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "Fügt einen Prompt in das Eingabefeld ein, der den Branch dieses Forks in einer lokalen Kopie auf {base} rebased, Konflikte löst und Build und Tests prüft. Er wird nicht gepusht. Es wird nichts gesendet."
 
@@ -27616,7 +27626,7 @@ msgid "Queued"
 msgstr "In Warteschlange"
 
 #: src/features/chat/host/host-composer.tsx:374
-#: src/features/chat/thread/composer-prompt-queue.tsx:774
+#: src/features/chat/thread/composer-prompt-queue.tsx:1175
 msgid "Queued messages"
 msgstr "Nachrichten in der Warteschlange"
 
@@ -28753,7 +28763,7 @@ msgstr "Anbieter entfernen?"
 msgid "Remove queued message {0}"
 msgstr "Wartende Nachricht {0} entfernen"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:479
+#: src/features/chat/thread/composer-prompt-queue.tsx:687
 msgid "Remove queued message {position}"
 msgstr "Eingereihte Nachricht {position} entfernen"
 
@@ -29967,6 +29977,7 @@ msgstr "Saudi-Arabien"
 #: src/features/chat/pins/pin-item.tsx:304
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:181
+#: src/features/chat/thread/composer-prompt-queue.tsx:640
 #: src/features/chat/thread/edit-composer.tsx:166
 #: src/features/chat/thread/request-secret-prompt.tsx:490
 #: src/features/develop/components/draft-comment-card.tsx:43
@@ -30977,7 +30988,7 @@ msgid "Send messages to the AI bot via Telegram. Conversations appear as threads
 msgstr "Sende über Telegram Nachrichten an den KI-Bot. Unterhaltungen erscheinen als Threads in deiner Chat-Liste."
 
 #: src/features/chat/host/host-composer.tsx:1035
-#: src/features/chat/thread/composer-prompt-queue.tsx:793
+#: src/features/chat/thread/composer-prompt-queue.tsx:1207
 msgid "Send next"
 msgstr "Als Nächstes senden"
 
@@ -32955,7 +32966,7 @@ msgstr "Steuern – die aktuelle Antwort liest dies bei ihrem nächsten Schritt"
 msgid "Steer the reply"
 msgstr "Die Antwort steuern"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:440
+#: src/features/chat/thread/composer-prompt-queue.tsx:575
 msgid "Steering:"
 msgstr "Steuerhinweise:"
 
@@ -33681,7 +33692,7 @@ msgstr "Hervorragende Codegenerierung und Refactoring über mehrere Dateien"
 msgid "Superior understanding of complex visual concepts"
 msgstr "Hervorragendes Verständnis komplexer visueller Konzepte"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:43
+#: src/features/chat/thread/composer-permission-mode.tsx:44
 #: src/features/settings/components/chat/bots-settings.tsx:134
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:43
 msgid "Supervised"
@@ -35941,7 +35952,7 @@ msgstr "Diese Sammlung wurde von einem Mitglied deiner Organisation mit dir gete
 msgid "This command name is reserved"
 msgstr "Dieser Befehlsname ist reserviert"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:198
+#: src/features/chat/thread/composer-permission-mode.tsx:201
 msgid "This comparison's mode applies to every column. Change it on the comparison."
 msgstr "Der Modus dieses Vergleichs gilt für jede Spalte. Ändere ihn im Vergleich."
 
@@ -37013,7 +37024,7 @@ msgstr "Tools"
 msgid "Tools for {0}"
 msgstr "Tools für {0}"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:47
+#: src/features/chat/thread/composer-permission-mode.tsx:48
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:47
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr "Tools laufen nach ihren eigenen Einstellungen; ein Schnellcheck kann risikoarme Aufrufe freigeben"
@@ -37536,6 +37547,10 @@ msgstr "In „{selector}“ tippen"
 #: src/features/chat/lock/thread-lock-dialog.tsx:193
 msgid "Type it again"
 msgstr "Gib es erneut ein"
+
+#: src/features/chat/thread/composer-prompt-queue.tsx:629
+msgid "Type some visible text to save this message."
+msgstr "Gib sichtbaren Text ein, um diese Nachricht zu speichern."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-search.tsx:221
 msgid "Type to search"
@@ -40318,7 +40333,7 @@ msgstr "Du bist offline. Stelle die Verbindung wieder her und versuche es erneut
 
 #: src/features/chat/thread/composer-input.tsx:1195
 #: src/features/chat/thread/composer-input.tsx:1320
-#: src/features/chat/thread/composer-prompt-queue.tsx:112
+#: src/features/chat/thread/composer-prompt-queue.tsx:181
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "Du bist offline. Deine Nachricht bleibt hier; sende sie, sobald du wieder online bist."
 

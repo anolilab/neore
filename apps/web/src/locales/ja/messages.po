@@ -122,7 +122,7 @@ msgstr "（{0} / {MAX_PARTICIPANTS}、最低 {MIN_PARTICIPANTS}）"
 msgid "({jobFailed} failed)"
 msgstr "（{jobFailed} 件失敗）"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:414
+#: src/features/chat/thread/composer-prompt-queue.tsx:519
 msgid "(attachments only)"
 msgstr "（添付ファイルのみ）"
 
@@ -974,7 +974,7 @@ msgstr "{count, plural, other {#件のメッセージを選択中}}"
 msgid "{count, plural, one {# of {maxReferenceImages} reference attached} other {# of {maxReferenceImages} references attached}}"
 msgstr "{count, plural, other {参照画像 # / {maxReferenceImages} 枚を添付済み}}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:755
+#: src/features/chat/thread/composer-prompt-queue.tsx:1149
 msgid "{count, plural, one {# steering — the reply reads it at its next step} other {# steering — the reply reads them at its next step}}"
 msgstr "{count, plural, other {# 件のステアリング: 返信は次のステップで読み取ります}}"
 
@@ -994,15 +994,19 @@ msgstr "{count, plural, other {# 件のソースを使用}}"
 msgid "{count} characters now."
 msgstr "現在 {count} 文字です。"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:752
+#: src/features/chat/thread/composer-prompt-queue.tsx:1146
 msgid "{count} queued"
 msgstr "{count} 件待機中"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:752
+#: src/features/chat/thread/composer-prompt-queue.tsx:1146
 msgid "{count} queued — sends when the current reply finishes"
 msgstr "{count} 件待機中 — 現在の返信が終わると送信されます"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:760
+#: src/features/chat/thread/composer-prompt-queue.tsx:1156
+msgid "{count} queued — sends when the edit closes"
+msgstr "{count} 件待機中 — 編集が終わると送信されます"
+
+#: src/features/chat/thread/composer-prompt-queue.tsx:1161
 msgid "{count} queued — waiting for the permission mode to save"
 msgstr "{count} 件がキューに入っています — 権限モードの保存待ち"
 
@@ -1040,7 +1044,7 @@ msgstr "{total} 件中 {done} 件のタスクが完了"
 msgid "{done} of {total} tasks done. In progress: {inProgress}"
 msgstr "{total} 件中 {done} 件のタスクが完了。実行中: {inProgress}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:455
+#: src/features/chat/thread/composer-prompt-queue.tsx:622
 msgid "{droppedCount, plural, one {# attachment removed on reload} other {# attachments removed on reload}}"
 msgstr "{droppedCount, plural, other {再読み込み時に # 個の添付ファイルが削除されました}}"
 
@@ -4094,7 +4098,7 @@ msgstr "リンクを知っている人は誰でもこのページを閲覧でき
 msgid "Anyone with the link can view this thread"
 msgstr "リンクを知っている人は誰でもこのスレッドを閲覧できます"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:49
+#: src/features/chat/thread/composer-permission-mode.tsx:50
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:49
 msgid "Anything that is not a plain lookup asks first"
 msgstr "単純な参照以外はすべて、先に確認が求められます"
@@ -4719,7 +4723,7 @@ msgstr "添付ファイル {0} は {MAX_FEEDBACK_IMAGE_MB} MB を超えており
 msgid "Attachment only"
 msgstr "添付のみ"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:449
+#: src/features/chat/thread/composer-prompt-queue.tsx:616
 msgid "Attachments:"
 msgstr "添付ファイル："
 
@@ -4801,7 +4805,7 @@ msgstr "自動"
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
 #: src/features/chat/thread/composer-model-selector.tsx:122
-#: src/features/chat/thread/composer-permission-mode.tsx:41
+#: src/features/chat/thread/composer-permission-mode.tsx:42
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:65
 #: src/features/chat/thread/media-gallery-view.tsx:511
@@ -5242,7 +5246,7 @@ msgstr "初級"
 msgid "Behavior"
 msgstr "動作"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:232
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:256
 msgid "Behind {base}"
 msgstr "{base} より遅れています"
 
@@ -6088,6 +6092,7 @@ msgstr "カナダ"
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:178
 #: src/features/chat/thread-list/snooze-until-dialog.tsx:111
 #: src/features/chat/thread/composer-draw-dialog.tsx:384
+#: src/features/chat/thread/composer-prompt-queue.tsx:651
 #: src/features/chat/thread/edit-composer.tsx:162
 #: src/features/chat/thread/fork-branch-dialog.tsx:91
 #: src/features/chat/thread/generation-model-menu.tsx:163
@@ -6310,11 +6315,11 @@ msgstr "カタルーニャ語（スペイン）"
 msgid "catalog"
 msgstr "カタログ"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:255
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:279
 msgid "Catch up"
 msgstr "追いつく"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:222
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:246
 msgid "Catch up {pullRequest} with {base}"
 msgstr "{pullRequest} を {base} に追いつかせる"
 
@@ -8958,7 +8963,7 @@ msgstr "チャットを添付できませんでした"
 msgid "could not be saved"
 msgstr "保存できませんでした"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:379
+#: src/features/chat/thread/composer-prompt-queue.tsx:469
 msgid "Could not cancel the message. It is still queued."
 msgstr "メッセージをキャンセルできませんでした。まだキューに入っています。"
 
@@ -8983,7 +8988,7 @@ msgstr "ボットの権限モードを変更できませんでした。"
 msgid "Could not change the model. Please try again."
 msgstr "モデルを変更できませんでした。もう一度お試しください。"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:202
+#: src/features/chat/thread/composer-permission-mode.tsx:205
 msgid "Could not change the permission mode. Please try again."
 msgstr "権限モードを変更できませんでした。もう一度お試しください。"
 
@@ -12237,6 +12242,11 @@ msgstr "キューのメッセージを編集"
 msgid "Edit queued message {0}"
 msgstr "キューのメッセージ {0} を編集"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:581
+#: src/features/chat/thread/composer-prompt-queue.tsx:657
+msgid "Edit queued message {position}"
+msgstr "待機中のメッセージ {position} を編集"
+
 #: src/features/skills/components/skill-form-dialog.tsx:174
 msgid "Edit skill"
 msgstr "スキルを編集"
@@ -13275,7 +13285,7 @@ msgstr "すべてのリクエストに署名が必要です。<0>X-Neore-Timesta
 msgid "Every Sunday at midnight"
 msgstr "毎週日曜日の午前 0 時"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:48
+#: src/features/chat/thread/composer-permission-mode.tsx:49
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:48
 msgid "Every tool runs without asking, except those that need your answer"
 msgstr "回答が必要なものを除き、すべてのツールは確認せずに実行されます"
@@ -15943,7 +15953,7 @@ msgid "Full 1080p high-definition video output"
 msgstr "フル 1080p の高精細動画出力"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
-#: src/features/chat/thread/composer-permission-mode.tsx:42
+#: src/features/chat/thread/composer-permission-mode.tsx:43
 #: src/features/settings/components/chat/bots-settings.tsx:133
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:42
 msgid "Full access"
@@ -22030,11 +22040,11 @@ msgstr "1 ページ下へ移動"
 msgid "Move out one level"
 msgstr "1 階層上へ移動"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:469
+#: src/features/chat/thread/composer-prompt-queue.tsx:677
 msgid "Move queued message {position} down"
 msgstr "キュー内のメッセージ {position} を下へ"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:459
+#: src/features/chat/thread/composer-prompt-queue.tsx:667
 msgid "Move queued message {position} up"
 msgstr "キュー内のメッセージ {position} を上へ"
 
@@ -22101,8 +22111,8 @@ msgid "Moved selected node {0}. New position, x: {x}, y: {y}"
 msgstr "選択したノード {0} を移動しました。新しい位置、x: {x}、y: {y}"
 
 #. placeholder {0}: to + 1
-#: src/features/chat/thread/composer-prompt-queue.tsx:702
-#: src/features/chat/thread/composer-prompt-queue.tsx:729
+#: src/features/chat/thread/composer-prompt-queue.tsx:1093
+#: src/features/chat/thread/composer-prompt-queue.tsx:1120
 msgid "Moved to position {0}"
 msgstr "{0} 番目に移動しました"
 
@@ -26020,7 +26030,7 @@ msgstr "アカウントと関連するすべてのデータを完全に削除し
 msgid "Permission Level"
 msgstr "権限レベル"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:89
+#: src/features/chat/thread/composer-permission-mode.tsx:90
 #: src/features/settings/components/chat/bots-settings.tsx:415
 msgid "Permission mode"
 msgstr "権限モード"
@@ -26031,8 +26041,8 @@ msgid "Permission mode for {0}"
 msgstr "{0} の権限モード"
 
 #. placeholder {0}: labels[mode]
-#: src/features/chat/thread/composer-permission-mode.tsx:63
-#: src/features/chat/thread/composer-permission-mode.tsx:81
+#: src/features/chat/thread/composer-permission-mode.tsx:64
+#: src/features/chat/thread/composer-permission-mode.tsx:82
 msgid "Permission mode: {0}"
 msgstr "権限モード: {0}"
 
@@ -27568,11 +27578,11 @@ msgstr "このブラウザーでのプッシュ通知"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "役割の異なる複数のエージェントを 1 つのスレッドに配置できます。レビューパネルはセキュリティとパフォーマンスの観点から変更を確認でき、ディベートでは統合の前に両方の立場を議論できます。"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:261
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:285
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, and check the build and tests. It pushes only when a signed-in gh confirms the pull request is still open on that base. Nothing is sent."
 msgstr "このブランチを {base} にリベースし、コンフリクトを解消し、ビルドとテストを確認するプロンプトをコンポーザーに入力します。プッシュするのは、サインイン済みの gh でプルリクエストがそのベースのまま開いていると確認できた場合だけです。送信はされません。"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:262
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:286
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "このフォークのブランチをローカルのコピーで {base} にリベースし、コンフリクトを解消し、ビルドとテストを確認するプロンプトをコンポーザーに入力します。プッシュはされません。送信はされません。"
 
@@ -27616,7 +27626,7 @@ msgid "Queued"
 msgstr "待機中"
 
 #: src/features/chat/host/host-composer.tsx:374
-#: src/features/chat/thread/composer-prompt-queue.tsx:774
+#: src/features/chat/thread/composer-prompt-queue.tsx:1175
 msgid "Queued messages"
 msgstr "待機中のメッセージ"
 
@@ -28753,7 +28763,7 @@ msgstr "プロバイダーを削除しますか？"
 msgid "Remove queued message {0}"
 msgstr "キューのメッセージ {0} を削除"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:479
+#: src/features/chat/thread/composer-prompt-queue.tsx:687
 msgid "Remove queued message {position}"
 msgstr "待機中のメッセージ {position} を削除"
 
@@ -29967,6 +29977,7 @@ msgstr "サウジアラビア"
 #: src/features/chat/pins/pin-item.tsx:304
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:181
+#: src/features/chat/thread/composer-prompt-queue.tsx:640
 #: src/features/chat/thread/edit-composer.tsx:166
 #: src/features/chat/thread/request-secret-prompt.tsx:490
 #: src/features/develop/components/draft-comment-card.tsx:43
@@ -30977,7 +30988,7 @@ msgid "Send messages to the AI bot via Telegram. Conversations appear as threads
 msgstr "Telegram 経由で AI ボットにメッセージを送信できます。会話はチャット一覧にスレッドとして表示されます。"
 
 #: src/features/chat/host/host-composer.tsx:1035
-#: src/features/chat/thread/composer-prompt-queue.tsx:793
+#: src/features/chat/thread/composer-prompt-queue.tsx:1207
 msgid "Send next"
 msgstr "次を送信"
 
@@ -32955,7 +32966,7 @@ msgstr "ステアリング: 現在の返信は次のステップでこれを読�
 msgid "Steer the reply"
 msgstr "返信をステアリング"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:440
+#: src/features/chat/thread/composer-prompt-queue.tsx:575
 msgid "Steering:"
 msgstr "ステアリング:"
 
@@ -33681,7 +33692,7 @@ msgstr "複数ファイルにまたがる優れたコード生成とリファク
 msgid "Superior understanding of complex visual concepts"
 msgstr "複雑な視覚的コンセプトへの優れた理解"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:43
+#: src/features/chat/thread/composer-permission-mode.tsx:44
 #: src/features/settings/components/chat/bots-settings.tsx:134
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:43
 msgid "Supervised"
@@ -35941,7 +35952,7 @@ msgstr "このコレクションは組織のメンバーから共有されてい
 msgid "This command name is reserved"
 msgstr "このコマンド名は予約されています"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:198
+#: src/features/chat/thread/composer-permission-mode.tsx:201
 msgid "This comparison's mode applies to every column. Change it on the comparison."
 msgstr "この比較のモードはすべての列に適用されます。比較画面で変更してください。"
 
@@ -37013,7 +37024,7 @@ msgstr "ツール"
 msgid "Tools for {0}"
 msgstr "{0} のツール"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:47
+#: src/features/chat/thread/composer-permission-mode.tsx:48
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:47
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr "ツールはそれぞれの設定で実行され、簡易チェックで低リスクの呼び出しを許可できます"
@@ -37536,6 +37547,10 @@ msgstr "「{selector}」に入力"
 #: src/features/chat/lock/thread-lock-dialog.tsx:193
 msgid "Type it again"
 msgstr "もう一度入力"
+
+#: src/features/chat/thread/composer-prompt-queue.tsx:629
+msgid "Type some visible text to save this message."
+msgstr "このメッセージを保存するには、表示される文字を入力してください。"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-search.tsx:221
 msgid "Type to search"
@@ -40318,7 +40333,7 @@ msgstr "オフラインです。再接続してからもう一度お試しくだ
 
 #: src/features/chat/thread/composer-input.tsx:1195
 #: src/features/chat/thread/composer-input.tsx:1320
-#: src/features/chat/thread/composer-prompt-queue.tsx:112
+#: src/features/chat/thread/composer-prompt-queue.tsx:181
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "オフラインです。メッセージはここに残ります。オンラインに戻ったら送信してください。"
 
