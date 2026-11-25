@@ -14,6 +14,13 @@ const ASIDE_SKIPPED_PARENTS = "script, style, textarea, input, button";
 /** How long after a navigation the scroll has had to settle before the occurrence is brought into view. */
 const REVEAL_DELAY_MS = 150;
 
+/** The band at the top of the scroll container that the sticky find bar covers. */
+const STICKY_BAR_CLEARANCE_PX = 56;
+
+/** Whether a hit sits outside the part of the panel the reader can see, the sticky bar's band included. */
+export const isOutsideViewport = (rect: Pick<DOMRect, "bottom" | "top">, bounds: Pick<DOMRect, "bottom" | "top">): boolean =>
+    rect.top < bounds.top + STICKY_BAR_CLEARANCE_PX || rect.bottom > bounds.bottom;
+
 /**
  * Every occurrence of `query` in the panel as it is rendered, in panel order (question, then answer, entry by entry).
  * Counting the rendered text rather than the Markdown source keeps the count, the highlights and the navigation in
@@ -78,8 +85,14 @@ const useAsideFindHighlights = (
         observer.observe(host, { characterData: true, childList: true, subtree: true });
 
         // The occurrence can sit in an answer that is still rendering, so the scroll waits for the layout to settle.
+        // Scrolls only when the hit is out of sight: a keystroke or a step to a visible hit leaves the panel where it is.
         const reveal = setTimeout(() => {
-            apply()?.startContainer.parentElement?.scrollIntoView({ block: "center" });
+            const target = apply()?.startContainer.parentElement;
+            const viewport = host.closest(".overflow-y-auto") ?? document.documentElement;
+
+            if (target && isOutsideViewport(target.getBoundingClientRect(), viewport.getBoundingClientRect())) {
+                target.scrollIntoView({ block: "center" });
+            }
         }, REVEAL_DELAY_MS);
 
         return () => {

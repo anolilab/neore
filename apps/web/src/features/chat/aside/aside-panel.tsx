@@ -293,7 +293,7 @@ const AsidePanel: FC<{ threadId?: string }> = ({ threadId }) => {
 
     return (
         // Focus lands on this section when a click hits its text, so the Find shortcut knows the panel has it (`aside-find-target.ts`).
-        <section aria-labelledby={headingId} className="space-y-3 py-4 pr-2 pl-1 outline-none" data-aside-find-host="" tabIndex={-1}>
+        <section aria-labelledby={headingId} className="space-y-3 py-4 pr-2 pl-1" data-aside-find-host="" tabIndex={-1}>
             <h2 className="text-foreground text-base font-semibold" id={headingId}>{t`Side question`}</h2>
             <AsideFindBar key={threadId} />
             <p className="text-muted-foreground text-xs">{t`Ask something without interrupting the reply. The question and the answer stay here unless you add them to the thread.`}</p>

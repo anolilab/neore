@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { collectAsideRanges } from "./use-aside-find-highlights";
+import { collectAsideRanges, isOutsideViewport } from "./use-aside-find-highlights";
 
 afterEach(() => {
     document.body.replaceChildren();
@@ -12,6 +12,23 @@ afterEach(() => {
 const panel = (rows: string): string => `<section data-aside-find-host="">${rows}</section>`;
 const row = (id: string, question: string, answer = ""): string =>
     `<li data-aside-entry-id="${id}"><p data-find-text="">${question}</p>${answer ? `<div data-find-text="">${answer}</div>` : ""}</li>`;
+
+describe("isOutsideViewport", () => {
+    const bounds = { bottom: 500, top: 100 };
+
+    it("is false for a hit well inside the panel", () => {
+        expect(isOutsideViewport({ bottom: 300, top: 280 }, bounds)).toBe(false);
+    });
+
+    it("is true for a hit above the panel, or in the band the sticky find bar covers", () => {
+        expect(isOutsideViewport({ bottom: 90, top: 70 }, bounds)).toBe(true);
+        expect(isOutsideViewport({ bottom: 130, top: 110 }, bounds)).toBe(true);
+    });
+
+    it("is true for a hit below the panel's visible bottom", () => {
+        expect(isOutsideViewport({ bottom: 540, top: 520 }, bounds)).toBe(true);
+    });
+});
 
 describe("collectAsideRanges", () => {
     it("counts every occurrence in panel order, question before answer, entry by entry", () => {
