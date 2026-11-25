@@ -24,7 +24,8 @@ const PRUNE_BATCH = 200;
 
 /**
  * Whether an event belongs to a chat a poll leaves out: a locked one, or one in the trash. The thread list omits both, and their events
- * carry the same thread id, so their metadata is kept from the key the same way. A trashed chat's events return when it is restored.
+ * carry the same thread id, so their metadata is kept from the key the same way. Trashing a chat deletes its events (`softDeleteThread`),
+ * so the trash check covers only the ones recorded while it is in the trash or not yet removed by that cleanup.
  * Each thread is read once per poll.
  */
 const hiddenByThread = (ctx: QueryCtx) => {
@@ -201,7 +202,7 @@ export const retryEventWake = internalMutation
 /**
  * The rest of a trashed chat's events, one batch per call (`softDeleteThread` in `agent/threads.ts` runs the first batch in the trash
  * write and schedules this for any left). Each call runs in its own transaction and schedules the next while events remain. It stops
- * as soon as the chat is no longer in the trash: a restored chat's events, recorded since, are not this batch's to remove.
+ * once the chat is no longer in the trash, which restore allows only after `drainTrashedThreadEvents` has removed every event.
  */
 export const deleteTrashedThreadEvents = internalMutation
     .input({ threadId: v.string(), userId: v.string() })
@@ -221,16 +222,11 @@ export const deleteTrashedThreadEvents = internalMutation
     });
 
 /**
- * A restored chat's events recorded before it was trashed, one batch per call. Restore schedules it (`restoreThread` in
- * `agent/threads.ts`), so the trash's leftover batches cannot bring those events back. Events recorded since the trash are kept.
+ * One batch of a trashed chat's events, run before its restore (`undoDeleteThread` in `chat/functions.ts`). The restore runs after it in
+ * its own transaction, and refuses while events remain, so a restored chat never shows events the trash meant to remove. Returns `true`
+ * once none are left.
  */
-export const deleteEventsBeforeTrash = internalMutation
-    .input({ before: v.number(), threadId: v.string(), userId: v.string() })
-    .output(v.null())
-    .mutation(async ({ args, ctx }) => {
-        if (!(await deleteMcpEventsOfThread(ctx, args.userId, args.threadId, args.before))) {
-            await runAfterOnShard(ctx.scheduler, 0, internal.public_api.events.deleteEventsBeforeTrash, args, args.userId);
-        }
-
-        return null;
-    });
+export const drainTrashedThreadEvents = internalMutation
+    .input({ threadId: v.string(), userId: v.string() })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => await deleteMcpEventsOfThread(ctx, args.userId, args.threadId));
