@@ -10,6 +10,11 @@ import { isChatToastOn, lastReplyFailed, replySettled, waitingApprovalIds, waiti
 /** How long a finished run waits for its reply to settle before its outcome is decided anyway. */
 const SETTLE_MS = 2000;
 
+/** The run marker of a browser-local reply, which has no gateway stream. */
+export const LOCAL_BROWSER_REPLY_RUN = "local-browser-reply";
+/** The run marker of a reply still streaming in the thread, before its gateway stream id is known (an edit or a regenerate). */
+export const THREAD_REPLY_RUN = "thread-reply";
+
 interface ChatRunToastsInput {
     /** The thread's live run (a gateway stream, or the local marker for a browser-local reply), `null` between runs. */
     activeStreamId: string | null;
@@ -136,6 +141,13 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
     // A run starts and ends with its stream id. The outcome waits until the reply has settled (or the window passes).
     useEffect(() => {
         if (activeStreamId) {
+            // The real stream id of a reply already in progress is the same run, not a new one.
+            if (run.current?.streamId === THREAD_REPLY_RUN && activeStreamId !== THREAD_REPLY_RUN) {
+                run.current = { ...run.current, streamId: activeStreamId };
+
+                return;
+            }
+
             if (run.current?.streamId !== activeStreamId) {
                 // A finished run still settling is decided now, from its own state: the reply and errors in the thread now belong to the new run.
                 settle(true);

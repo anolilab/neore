@@ -11,7 +11,7 @@ import { toAppError } from "@/features/chat/core/context/chat-action-shared";
 import type { AppError } from "@/lib/errors";
 
 import type { ChatToastSettings, ToastMessage } from "../lib/chat-toasts";
-import useChatRunToasts from "./use-chat-run-toasts";
+import useChatRunToasts, { THREAD_REPLY_RUN } from "./use-chat-run-toasts";
 
 const toastSuccess = vi.hoisted(() => vi.fn());
 const toastWarning = vi.hoisted(() => vi.fn());
@@ -207,6 +207,19 @@ describe("useChatRunToasts: settling a run", () => {
         rerender({ ...idle, activeStreamId: "stream-2", messages: paused, settings: {} });
 
         expect(toastSuccess).not.toHaveBeenCalled();
+    });
+
+    it("counts an edited reply that streams before its stream id is known as one run", () => {
+        const { rerender } = setup({ ...idle, settings: {} });
+
+        rerender({ ...idle, activeStreamId: THREAD_REPLY_RUN, messages: streamingReply, settings: {} });
+        rerender({ ...idle, activeStreamId: "stream-9", messages: streamingReply, settings: {} });
+
+        expect(toastSuccess).not.toHaveBeenCalled();
+
+        rerender({ ...idle, activeStreamId: null, messages: [{ parts: [], role: "assistant" }], settings: {} });
+
+        expect(toastSuccess).toHaveBeenCalledTimes(1);
     });
 
     it("does not classify a run that ended in another thread", () => {
