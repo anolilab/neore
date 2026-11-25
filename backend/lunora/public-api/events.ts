@@ -23,11 +23,12 @@ import { internal } from "../_generated/internal";
 const PRUNE_BATCH = 200;
 
 /**
- * Whether an event belongs to a locked thread, which a poll leaves out. The thread list omits a locked chat, and its events carry the
- * same thread id, so their metadata is kept from the key the same way. Each thread is read once per poll.
+ * Whether an event belongs to a chat a poll leaves out: a locked one, or one in the trash. The thread list omits both, and their events
+ * carry the same thread id, so their metadata is kept from the key the same way. A trashed chat's events return when it is restored.
+ * Each thread is read once per poll.
  */
-const hiddenByLock = (ctx: QueryCtx) => {
-    const locked = new Map<string, boolean>();
+const hiddenByThread = (ctx: QueryCtx) => {
+    const hidden = new Map<string, boolean>();
 
     return async (event: { data: Record<string, unknown> }): Promise<boolean> => {
         const { threadId } = event.data;
@@ -36,7 +37,7 @@ const hiddenByLock = (ctx: QueryCtx) => {
             return false;
         }
 
-        const known = locked.get(threadId);
+        const known = hidden.get(threadId);
 
         if (known !== undefined) {
             return known;
@@ -44,11 +45,11 @@ const hiddenByLock = (ctx: QueryCtx) => {
 
         // From the primary: a replica that lags a lock would show the locked thread's events as unlocked.
         const thread = await ctx.db.threads.findFirst({ consistency: "primary", where: { _id: threadId as Id<"threads"> } });
-        const isLocked = thread !== null && isThreadLocked(thread);
+        const isHidden = thread !== null && (isThreadLocked(thread) || thread.deleted === true);
 
-        locked.set(threadId, isLocked);
+        hidden.set(threadId, isHidden);
 
-        return isLocked;
+        return isHidden;
     };
 };
 
@@ -125,7 +126,7 @@ export const pollEvents = internalQuery
 
         const outcome = await pollLog(storeOn(ctx, args.userId), {
             fromSeq: args.fromSeq ?? null,
-            hidden: hiddenByLock(ctx),
+            hidden: hiddenByThread(ctx),
             // The window never reaches past retention: an event older than it is expired whether or not housekeeping has pruned it yet,
             // so a dormant shard's backlog is never read back to a returning user.
             maxAgeMs: args.maxAgeMs === undefined ? RETENTION_MS : Math.min(args.maxAgeMs, RETENTION_MS),
