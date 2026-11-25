@@ -34,6 +34,8 @@ export interface EventLogStore {
 
 export interface PollQuery {
     fromSeq: number | null;
+    /** Whether an event is kept from the caller: the shard's locked threads' events are (their metadata is not for a poll). Skipped, not a gap. */
+    hidden?: (event: StoredEvent) => Promise<boolean>;
     maxAgeMs?: number;
     maxEvents: number;
     name: string;
@@ -115,6 +117,12 @@ export const pollEvents = async (store: EventLogStore, query: PollQuery): Promis
                     truncated = true;
                 }
 
+                from = event.seq;
+                continue;
+            }
+
+            // A hidden event is passed over as the window's old events are, and it is no gap: the caller was never meant to see it.
+            if (query.hidden !== undefined && (await query.hidden(event))) {
                 from = event.seq;
                 continue;
             }
