@@ -6,7 +6,7 @@ import { Label } from "@neore/ui/components/label";
 import { Switch } from "@neore/ui/components/switch";
 import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { FC } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
@@ -41,6 +41,9 @@ const useOptimisticSetting = (
     absent = false,
 ): { checked: boolean; disabled: boolean; onCheckedChange: (checked: boolean) => void } => {
     const [pending, setPending] = useState<boolean | undefined>(undefined);
+    // Each change gets a number: only the newest change may clear the switch when it fails. An older one failing must not
+    // reset a newer change that is still on its way.
+    const latestChange = useRef(0);
     const current = saved ?? absent;
 
     // Once the saved value catches up with the switch, the local value is no longer needed.
@@ -54,12 +57,19 @@ const useOptimisticSetting = (
         checked: pending ?? current,
         disabled: mutation.isPending,
         onCheckedChange: (checked) => {
+            latestChange.current += 1;
+
+            const change = latestChange.current;
+
             setPending(checked);
             mutation.mutate(
                 { enabled: checked },
                 {
                     onError: () => {
-                        setPending(undefined);
+                        if (latestChange.current === change) {
+                            setPending(undefined);
+                        }
+
                         toast.error(messages.error);
                     },
                     onSuccess: () => toast.success(checked ? messages.on : messages.off),
