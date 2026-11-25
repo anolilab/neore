@@ -7,8 +7,9 @@
  * matched.
  */
 /**
- * Rows read from the store per round trip while a poll scans for matches. Small, because a row's payload is not size-capped when
- * recorded: a page of large rows is held at once.
+ * Rows read from the store per round trip while a poll scans for matches. Whole rows are read, and a stored payload is at most
+ * `MAX_EVENT_PAYLOAD_BYTES` (`events-log.ts`, 16 KiB), so a page holds at most 25 such rows at once, about 400 KiB. Smaller pages
+ * would only add round trips.
  */
 const PAGE = 25;
 
@@ -125,9 +126,9 @@ export const pollEvents = async (store: EventLogStore, query: PollQuery): Promis
                 break;
             }
 
-            // The bytes a poll reads are bounded as well: a payload is not size-capped when recorded, so a scan of large rows stops
-            // within the transaction's read budget, and the client continues from the last row read (`nextSeq`). A poll always reads
-            // at least one row, so a single large row cannot stall it.
+            // The bytes a poll reads are bounded too. A stored payload is at most `MAX_EVENT_PAYLOAD_BYTES`, but `POLL_SCAN_LIMIT` rows
+            // of that size would be 16 MiB, past the transaction's read budget, so a scan stops at `POLL_READ_BUDGET` and the client
+            // continues from `nextSeq`. A poll always reads at least one row, so a single large row cannot stall it.
             const rowBytes = encoder.encode(JSON.stringify(event.data)).byteLength;
 
             if (readBytes > 0 && readBytes + rowBytes > POLL_READ_BUDGET) {
