@@ -138,11 +138,15 @@ describe(catchUpPrompt, () => {
 
         it("rebases with --no-update-refs, and finishes or aborts a conflicted rebase", () => {
             // Step 8 goes back to step 5 when the base moves: that one rebase command serves the repeat too.
-            expect(commandsMatching(commands, "git rebase ").map(({ command, step }: Command) => [step, command])).toEqual([
+            expect(commandsMatching(commands, "git rebase ").map(({ command, step }: Command) => [step, command.split(" && ", 1)[0]])).toEqual([
                 [5, "git rebase --no-update-refs refs/worktree/neore/pull-42-a1b2c3d4-base"],
+                [6, "git rebase --continue"],
                 [6, "git rebase --continue"],
                 [6, "git rebase --abort"],
             ]);
+            // A rebase that stops with nothing to resolve is aborted too, and the abort counts only back on the start commit.
+            expect(stepsOf(prompt).get(6)).toContain("fails while that lists no file (a hook failed, or git stopped for another reason), abort");
+            expect(stepsOf(prompt).get(6)).toContain("Unless it prints `ready`, the checkout may still be mid-rebase: run nothing else in it");
         });
 
         it("stops before any rebase when the pull request's head has merge commits, and suggests merging the base", () => {
@@ -214,7 +218,9 @@ describe(catchUpPrompt, () => {
         expect(commands[switchTo + 2]?.command).toBe(
             '[ "$(git symbolic-ref -q HEAD)" = "refs/heads/feat/x" ] && [ "$(git rev-parse --verify -q HEAD)" = "$(git rev-parse --verify -q refs/worktree/neore/pull-42-a1b2c3d4-head)" ] && echo ready',
         );
-        expect(firstIndex(commands, "git rebase ")).toBe(switchTo + 3);
+        // Step 5 records the commit HEAD starts on, which an abort must come back to, then rebases.
+        expect(commands[switchTo + 3]).toEqual({ command: "git rev-parse HEAD", step: 5 });
+        expect(firstIndex(commands, "git rebase ")).toBe(switchTo + 4);
     });
 
     it("for a head in the base repository, pushes only its branch, after step 7 and the base re-check, on the commit step 4 recorded", () => {

@@ -234,6 +234,84 @@ describe("catchUpPrompt's fetch and switch, run against a scratch origin", () =>
         });
     });
 
+    describe.each([
+        ["a head in the base repository", true, "feat/x"],
+        ["a fork", false, "pr-42-a1b2c3d4"],
+    ])("step 6's abort, for %s", (_name: string, inBase: boolean, branch: string) => {
+        const prompt = catchUpPrompt({ ...PULL, headInBaseRepository: inBase, number: 42 });
+        const started = (): string => commandOf(prompt, "test -d ");
+        const conflicted = (): string => commandOf(prompt, "git diff --name-only --diff-filter=U");
+        const abort = (start: string): string =>
+            commandOf(prompt, "git rebase --abort && ")
+                .replaceAll("<start commit from step 5>", () => start)
+                .replaceAll("<name>", () => branch);
+
+        /**
+         * A linked worktree (whose `.git` is a file) on `branch` with a change to `file.txt` that conflicts with the base,
+         * mid-rebase onto it after the conflict was resolved and staged; `start` is the commit HEAD held before step 5.
+         */
+        const resolvedConflict = (name: string): { start: string; work: string } => {
+            const seed = join(root, `${name}-seed`);
+
+            git(root, "init", "--quiet", "-b", "main", seed);
+            writeFileSync(join(seed, "file.txt"), "base\n");
+            git(seed, "add", "file.txt");
+            git(seed, "commit", "--quiet", "-m", "base");
+            git(seed, "switch", "--quiet", "-c", branch);
+            writeFileSync(join(seed, "file.txt"), "change\n");
+            git(seed, "commit", "--quiet", "-am", "change");
+            git(seed, "switch", "--quiet", "main");
+            writeFileSync(join(seed, "file.txt"), "landed\n");
+            git(seed, "commit", "--quiet", "-am", "landed on main");
+            git(seed, "update-ref", "refs/pull/42/head", branch);
+            git(seed, "update-ref", "refs/heads/feat/x", branch);
+
+            const work = join(root, name);
+
+            git(seed, "worktree", "add", "--quiet", "--detach", work);
+            git(work, "update-ref", `${REF_PREFIX}-base`, "main");
+            git(work, "switch", "--quiet", branch);
+
+            const start = git(work, "rev-parse", "HEAD");
+
+            expect(sh(work, `${commandOf(prompt, "git rebase --no-update-refs ")} >/dev/null 2>&1`).status).not.toBe(0);
+            expect(sh(work, started()).status).toBe(0);
+            expect(sh(work, conflicted()).output).toBe("file.txt\n");
+
+            writeFileSync(join(work, "file.txt"), "landed\nchange\n");
+            git(work, "add", "file.txt");
+
+            return { start, work };
+        };
+
+        // The rebase runs `prepare-commit-msg` when it commits the resolved files; `pre-commit` it skips.
+        it("aborts a rebase whose continue a hook failed, back on the start commit", () => {
+            const { start, work } = resolvedConflict(`abort-hook-${branch.replaceAll("/", "-")}`);
+            const hook = join(git(work, "rev-parse", "--git-common-dir"), "hooks", "prepare-commit-msg");
+
+            writeFileSync(hook, "#!/bin/sh\nexit 1\n");
+            chmodSync(hook, 0o755);
+
+            // The continue fails with the rebase in progress and nothing left to resolve: neither the conflict loop nor "no
+            // rebase started" applies.
+            expect(sh(work, "GIT_EDITOR=true git rebase --continue >/dev/null 2>&1").status).not.toBe(0);
+            expect(sh(work, started()).status).toBe(0);
+            expect(sh(work, conflicted()).output).toBe("");
+
+            expect(sh(work, `${abort(start)} 2>/dev/null`)).toStrictEqual({ output: "ready\n", status: 0 });
+            expect(sh(work, started()).status).not.toBe(0);
+            expect(git(work, "symbolic-ref", "HEAD")).toBe(`refs/heads/${branch}`);
+            expect(git(work, "rev-parse", "HEAD")).toBe(start);
+        });
+
+        it("prints no ready when HEAD is not the start commit after the abort", () => {
+            const { work } = resolvedConflict(`abort-elsewhere-${branch.replaceAll("/", "-")}`);
+            const elsewhere = git(work, "rev-parse", "main");
+
+            expect(sh(work, `${abort(elsewhere)} 2>/dev/null`).output).toBe("");
+        });
+    });
+
     describe("step 7's set-aside, for a head in the base repository", () => {
         const prompt = catchUpPrompt({ ...PULL, headInBaseRepository: true, number: 42 });
         const setAside = (name: string, lease: string): string =>

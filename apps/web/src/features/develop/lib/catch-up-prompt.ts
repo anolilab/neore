@@ -83,7 +83,8 @@ interface CatchUpPromptInput {
  * paired device or server): a delegated cloud coding-agent run never pushes (`buildAgentPrompt`, and its run script drops the
  * credential before the agent starts), so the prompt says not to hand the steps to one. A branch with merge commits is not rebased
  * at all (a rebase drops them, and any conflict resolution made in one): the prompt stops and suggests merging the base. A
- * rebase that stops on a conflict is continued or aborted, never left half done, and nothing is pushed unless the build and the tests pass and every fix is
+ * rebase that stops on a conflict is continued or aborted, one that stops for any other reason (a failing hook) is aborted, and
+ * an abort counts only once HEAD is back on the commit it started from: a rebase is never left half done, and nothing is pushed unless the build and the tests pass and every fix is
  * committed. Callers pass plain names only ({@link isPlainBranchName}, {@link isPlainRepo}, and a `run` of letters and digits).
  */
 export const catchUpPrompt = ({ baseBranch, headBranch, headInBaseRepository, host, number, repository, run }: CatchUpPromptInput): string => {
@@ -123,12 +124,24 @@ export const catchUpPrompt = ({ baseBranch, headBranch, headInBaseRepository, ho
     // `onFailedChecks` says where the rebased commits go when step 7 stops; `onAbortedRepeat`, when a repeat rebase from step 8
     // is aborted and leaves the first one checked out.
     // A rebase can fail without starting (a `pre-rebase` hook, a ref it cannot read): then no rebase is in progress, nothing was
-    // rebased, and step 7 must not check and report the unchanged commits as rebased.
-    const finish = (onFailedChecks: string, onAbortedRepeat?: string): string[] => [
-        `5. Run \`git rebase --no-update-refs ${base}\`. If it fails and \`test -d "$(git rev-parse --git-path rebase-merge)" || test -d "$(git rev-parse --git-path rebase-apply)"\` fails too, no rebase started: say git's error, ${onAbortedRepeat === undefined ? "" : `${onAbortedRepeat}, `}${stopAfterFetch}. Go on to step 7 only once the rebase has completed.`,
-        `6. When the rebase stops on a conflict, resolve it so the result keeps the intent of both sides: this branch's change and what landed on the base. Stage the resolved files with \`git add\` and run \`git rebase --continue\`, and repeat for each later conflict until the rebase completes. If a conflict cannot be resolved, run \`git rebase --abort\`, ${onAbortedRepeat === undefined ? "" : `${onAbortedRepeat}, `}${stopAfterFetch}.`,
-        `7. Check that the build and the tests still pass. Fix what the rebase broke and commit each fix on this branch. If the build or the tests still fail, do not push: ${onFailedChecks}, ${stopAfterFetch}.`,
-    ];
+    // rebased, and step 7 must not check and report the unchanged commits as rebased. It can also stop with a rebase in progress
+    // and nothing left to resolve (a hook failing during `--continue`): that one is aborted, never left half done. `--git-path`
+    // finds the rebase state in a linked worktree too, whose `.git` is a file.
+    // `branch` is the branch the rebase runs on, written as the prompt names it.
+    const finish = (branch: string, onFailedChecks: string, onAbortedRepeat?: string): string[] => {
+        const startCommit = "<start commit from step 5>";
+        const rebaseState = (name: string): string => `"$(git rev-parse --git-path ${name})"`;
+        const inRebase = `test -d ${rebaseState("rebase-merge")} || test -d ${rebaseState("rebase-apply")}`;
+        // The abort counts only once no rebase is in progress and HEAD is the branch again, on the commit it held before step 5.
+        const abort = `git rebase --abort && ! test -d ${rebaseState("rebase-merge")} && ! test -d ${rebaseState("rebase-apply")} && ${onBranchAt(branch, startCommit)}`;
+        const afterAbort = `${onAbortedRepeat === undefined ? "" : `${onAbortedRepeat}, `}${stopAfterFetch}`;
+
+        return [
+            `5. Record the commit \`git rev-parse HEAD\` prints as the start commit. Run \`git rebase --no-update-refs ${base}\`. If it fails and \`${inRebase}\` fails too, no rebase started: say git's error, ${afterAbort}. If it fails with a rebase in progress, go to step 6. Go on to step 7 only once the rebase has completed.`,
+            `6. While \`git diff --name-only --diff-filter=U\` lists files, the rebase stopped on a conflict: resolve it so the result keeps the intent of both sides: this branch's change and what landed on the base. Stage the resolved files with \`git add\` and run \`git rebase --continue\`, and repeat for each later conflict until the rebase completes. If a conflict cannot be resolved, or the rebase or \`git rebase --continue\` fails while that lists no file (a hook failed, or git stopped for another reason), abort: run \`${abort}\` as one command, with the commit you recorded in step 5 in place of ${startCommit}${branch === "<name>" ? " and the branch you chose in step 4 in place of <name>" : ""}. Unless it prints \`ready\`, the checkout may still be mid-rebase: run nothing else in it, tell the person to look at \`git status\` there, ${stopAfterFetch}. Otherwise say git's error (never a URL), ${afterAbort}.`,
+            `7. Check that the build and the tests still pass. Fix what the rebase broke and commit each fix on this branch. If the build or the tests still fail, do not push: ${onFailedChecks}, ${stopAfterFetch}.`,
+        ];
+    };
     // Last, and also on any stop from step 3 on: the refs are this run's alone, and nothing reads them once the run is over.
     const cleanUp = (refs: string[]): string =>
         `9. Whether the steps finished or you stopped at step 3 or any step after it, delete the refs this run fetched (a failed fetch may have left some out): ${refs.map((ref) => `\`git update-ref -d ${ref}\``).join(", ")}.`;
@@ -148,7 +161,7 @@ export const catchUpPrompt = ({ baseBranch, headBranch, headInBaseRepository, ho
             // Branches are shared by every linked worktree: one checked out in another already exists here too. The rebase runs on
             // whatever is checked out, so it waits until HEAD is shown to be the new branch on the pull request's head.
             `4. ${checkMerges} Otherwise ${chooseBranch(local)} Then run \`git switch -c <name> ${pullRef} && ${onBranchAt("<name>", pullRef)}\` with the name you chose in place of <name>. Unless it prints \`ready\`, do not rebase: ${stopAfterFetch}.`,
-            ...finish("leave the rebased commits in place"),
+            ...finish("<name>", "leave the rebased commits in place"),
             `8. Leave the rebased commits on the branch you chose in step 4 and say so, naming that branch, for the person to bring to the fork. Do not push to any branch or remote. Unless ${cleanAfterChecks}, also list what it shows and tell the person to commit what belongs to the change on that branch and remove the rest.`,
             cleanUp([base, pullRef]),
         ].join("\n");
@@ -194,7 +207,7 @@ export const catchUpPrompt = ({ baseBranch, headBranch, headInBaseRepository, ho
             ` Then record the commit \`git rev-parse ${base}\` prints and say it: the rebase is built on that base, and step 8 checks the base still holds it.`,
         ),
         `4. If \`git rev-parse ${head}\` differs from \`git rev-parse ${pullRef}\`, ${stopAfterFetch}: origin's ${headBranch} is not this pull request's head right now. ${checkMerges} Otherwise record the commit \`git rev-parse ${pullRef}\` printed and say it: step 8 leases on that commit. ${checkOtherWorktree} Otherwise, if \`git show-ref --verify --quiet refs/heads/${headBranch}\` succeeds, run \`git switch --no-guess ${headBranch} && git merge --ff-only ${head}\`; if not, run \`git switch -c ${headBranch} ${head}\`. Then run \`${onBranchAt(headBranch, pullRef)}\`. Unless it prints \`ready\`, the switch failed or the local branch has commits origin does not; do not rebase: ${stopAfterFetch}.`,
-        ...finish(setAside, "and if you came back here from step 8, set the rebase aside as step 7 says"),
+        ...finish(headBranch, setAside, "and if you came back here from step 8, set the rebase aside as step 7 says"),
         // The base can move during the rebase and the checks: a push onto the base fetched in step 3 would leave the branch behind again.
         // A checkout left dirty by the checks is not pushed, and the rebase is set aside: left on the pull request's branch, the
         // next Catch up's step 4 would stop on a branch origin does not have. The set-aside's switch carries the changes along.
