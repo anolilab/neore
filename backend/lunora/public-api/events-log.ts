@@ -68,8 +68,8 @@ export const EVENT_WAKE_MAX_ATTEMPTS = 10;
 
 /**
  * Wakes `userId`'s shard for an event's expiry. The census write is best-effort, so a run's write never fails on it. A write that
- * failed is retried by a job scheduled here, in the same transaction as the event: the event and its retry commit together, so a
- * shard is never left holding an expiring event with no wake for it.
+ * failed is retried by a job scheduled here, in the same transaction as the event, so the event and its retry commit together. If
+ * the retry cannot be scheduled either, it is logged and the event still commits without one.
  */
 const wakeForExpiry = async (ctx: LogWriteCtx, userId: string, dueAt: number): Promise<void> => {
     if (await noteRetentionWake(ctx, dueAt)) {
@@ -106,7 +106,7 @@ export const recordMcpEvent = async (ctx: LogWriteCtx, input: RecordEventInput):
 
     await ctx.db.insert("mcpEvents", {
         createdAt: ctx.now,
-        data: boundedPayload(JSON.stringify(input.data), threadOf(input.data)),
+        data: boundedPayload(JSON.stringify(input.data), threadId),
         eventId: input.eventId,
         name: input.name,
         seq,
@@ -125,13 +125,8 @@ export const recordMcpEvent = async (ctx: LogWriteCtx, input: RecordEventInput):
  * Records how a reply's run ended, for the thread's owner. Keyed by the stream, so one reply has one end event however often
  * the end is written: the final chunk, a live stream set to error, and a timed-out stream all go through here.
  *
- * A thread with no owner (its owner's account was removed) falls back to the run's starter, as the tool approval path does, so
- * the end still reaches a log. Nothing is recorded when neither is known.
  */
-export const recordRunEnd = async (
-    ctx: LogWriteCtx,
-    input: { outcome: "succeeded" | "failed"; starterId?: string; streamId: string; threadId: string },
-): Promise<void> => {
+export const recordRunEnd = async (ctx: LogWriteCtx, input: { outcome: "succeeded" | "failed"; streamId: string; threadId: string }): Promise<void> => {
     const thread = await ctx.db.get("threads", input.threadId as Id<"threads">);
 
     // A thread row that is gone was deleted: its run's log is not reachable from this shard, so nothing is recorded here.
@@ -215,7 +210,7 @@ export const copyMergedMcpEvents = async (ctx: LogWriteCtx, rows: Record<string,
 
         await ctx.db.insert("mcpEvents", {
             createdAt: ctx.now,
-            data: boundedPayload(row["data"] as string, storedThreadOf(row["data"] as string)),
+            data: boundedPayload(row["data"] as string, threadId),
             eventId,
             name: row["name"] as string,
             seq,

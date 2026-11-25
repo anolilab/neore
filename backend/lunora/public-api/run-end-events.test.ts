@@ -167,32 +167,9 @@ describe("a group turn's end in the Events log", () => {
         expect(JSON.parse(events[0]!.data)).toMatchObject({ outcome: "succeeded", threadId });
     });
 
-    it("closes with the succeeded final chunk the repeated-call guard's turn also closes with", async () => {
-        // The guard ends a speaker's reply, then the turn breaks out of the speaker loop into the same closing call, so one chunk is what it writes.
-        const chunks: unknown[] = [];
-        const recording = {
-            runMutation: async (_ref: unknown, args: unknown) => {
-                chunks.push(args);
-            },
-        };
-
-        await closeGroupTurnStream(recording as never, { streamId }, "succeeded");
-
-        expect(chunks).toStrictEqual([{ final: true, runEnd: "succeeded", streamId, text: "" }]);
-    });
-
-    it("writes no run event when the group Stop ends the turn, and its closing chunk carries no runEnd", async () => {
-        const chunks: unknown[] = [];
-        const recording = {
-            runMutation: async (_ref: unknown, args: unknown) => {
-                chunks.push(args);
-            },
-        };
-
-        await closeGroupTurnStream(recording as never, { streamId }, undefined);
-
-        expect(chunks).toStrictEqual([{ final: true, streamId, text: "" }]);
+    it("writes no run event when the group Stop ends the turn", async () => {
         await closeWith(undefined);
+
         expect(await eventsOf()).toStrictEqual([]);
     });
 

@@ -363,7 +363,7 @@ export const inspectRun = internalMutation
             await endPausedRun(ctx, { ...stream, pausedRun }, { holdThread: finishedGoals.length > 0 });
 
             // The saved answer is the reply's end, so the Events log records it as a finished run, as the run's own end would.
-            await recordRunEnd(ctx, { outcome: "succeeded", starterId: stream.userId, streamId: stream._id, threadId: stream.threadId });
+            await recordRunEnd(ctx, { outcome: "succeeded", streamId: stream._id, threadId: stream.threadId });
 
             if (ownGoal) {
                 await enqueueJob(internal.chat.goals.execute.reviewGoalRound, { goalId: ownGoal._id, round: ownGoal.round + 1 });

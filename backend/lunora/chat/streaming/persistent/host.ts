@@ -207,10 +207,7 @@ export const endHostStream = async (
 
     if (outcome !== undefined) {
         // The scheduler goes along, so a failed wake for the event's expiry is retried (`wakeForExpiry`, `public-api/events-log.ts`).
-        await recordRunEnd(
-            { db: ctx.db, now, scheduler: ctx.scheduler },
-            { outcome, starterId: stream.userId, streamId: stream._id, threadId: stream.threadId },
-        );
+        await recordRunEnd({ db: ctx.db, now, scheduler: ctx.scheduler }, { outcome, streamId: stream._id, threadId: stream.threadId });
     }
 
     return true;

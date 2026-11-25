@@ -58,7 +58,7 @@ export interface PollRequest {
     threadId?: string;
 }
 
-export interface PollEvent {
+interface PollEvent {
     data: Record<string, unknown>;
     eventId: string;
     name: string;
@@ -78,7 +78,7 @@ export interface PollResponse {
  * The Events extension's poll, run by the router as the key's owner on the owner's shard. It throws `PublicApiError`:
  * `invalid_request` for a cursor this key was not given, `insufficient_scope` for a key without `threads:read`.
  */
-export interface EventsDependencies {
+interface EventsDependencies {
     poll: (request: PollRequest) => Promise<PollResponse>;
 }
 

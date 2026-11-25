@@ -830,7 +830,7 @@ export const recordPendingToolApprovals = internalMutation
                 for (const [index, approvalId] of [...uniqueIds].entries()) {
                     await recordMcpEvent(ctx, {
                         data: { kind: kindOf(approvalId), requestId: approvalId, threadId },
-                        eventId: `${APPROVAL_REQUESTED_EVENT}:${recordedIds[index] ?? approvalId}`,
+                        eventId: `${APPROVAL_REQUESTED_EVENT}:${recordedIds[index]!}`,
                         name: APPROVAL_REQUESTED_EVENT,
                         timestamp: createdAt,
                         userId: ownerId,
