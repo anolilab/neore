@@ -1022,6 +1022,10 @@ msgstr "{count} in der Warteschlange – wird gesendet, wenn die aktuelle Antwor
 msgid "{count} queued — waiting for the permission mode to save"
 msgstr "{count} in der Warteschlange – wartet auf das Speichern des Berechtigungsmodus"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:978
+msgid "{count} queued — sends when the edit closes"
+msgstr "{count} in der Warteschlange – wird gesendet, wenn die Bearbeitung endet"
+
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:102
 msgid "{date}: {replies}, {cost}"
 msgstr "{date}: {replies}, {cost}"

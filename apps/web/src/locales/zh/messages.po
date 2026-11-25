@@ -1022,6 +1022,10 @@ msgstr "{count} 条排队中——当前回复完成后发送"
 msgid "{count} queued — waiting for the permission mode to save"
 msgstr "{count} 项已排队，等待保存权限模式"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:978
+msgid "{count} queued — sends when the edit closes"
+msgstr "{count} 条排队中 — 编辑结束后发送"
+
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:102
 msgid "{date}: {replies}, {cost}"
 msgstr "{date}：{replies}，{cost}"

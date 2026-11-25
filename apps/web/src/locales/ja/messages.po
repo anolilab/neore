@@ -1022,6 +1022,10 @@ msgstr "{count} 件待機中 — 現在の返信が終わると送信されま�
 msgid "{count} queued — waiting for the permission mode to save"
 msgstr "{count} 件がキューに入っています — 権限モードの保存待ち"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:978
+msgid "{count} queued — sends when the edit closes"
+msgstr "{count} 件待機中 — 編集が終わると送信されます"
+
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:102
 msgid "{date}: {replies}, {cost}"
 msgstr "{date}：{replies}、{cost}"

@@ -44,6 +44,7 @@ import {
     PROMPT_QUEUE_STORAGE_KEY_PREFIX as STORAGE_KEY_PREFIX,
     registerPromptQueueReset,
 } from "./prompt-queue-session";
+import { useQueueEditStore } from "./queue-edit-store";
 
 export { allowPromptQueueRestore, clearPromptQueues } from "./prompt-queue-session";
 
@@ -144,6 +145,8 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
     registerPromptQueueReset(() => {
         // The ended session's held sends go too: a later queue under the same thread id must not inherit its request.
         set({ offlineHolds: {}, queues: {} });
+        // An editor left open by the ended session goes with its queue, or the next message in that thread could not be edited.
+        useQueueEditStore.getState().clear();
     });
 
     const update = (threadId: string, next: (queue: ThreadQueue) => ThreadQueue) => {

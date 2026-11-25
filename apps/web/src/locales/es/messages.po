@@ -1022,6 +1022,10 @@ msgstr "{count} en cola: se envía cuando termine la respuesta actual"
 msgid "{count} queued — waiting for the permission mode to save"
 msgstr "{count} en cola — esperando a que se guarde el modo de permisos"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:978
+msgid "{count} queued — sends when the edit closes"
+msgstr "{count} en cola: se envía al cerrar la edición"
+
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:102
 msgid "{date}: {replies}, {cost}"
 msgstr "{date}: {replies}, {cost}"

@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-store";
-import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
+import { clearPromptQueues, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import { useQueueEditStore } from "@/features/chat/core/stores/queue-edit-store";
 import { EMPTY_PROMPT_QUEUE, serializePromptQueue } from "@/features/chat/core/utils/prompt-queue";
 import { clearSendStarting, isSendStarting, markSendStarting } from "@/features/chat/core/utils/send-in-flight";
@@ -865,6 +865,42 @@ describe("composer prompt queue", () => {
 
         chat.threadId = "thread-2";
         rerender(<ComposerPromptQueue />);
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("drops an open editor with the queues when the session ends, so the thread's next message can be edited", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        setPaused(chat.threadId, true);
+
+        const { rerender } = render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+
+        clearPromptQueues();
+
+        enqueue(chat.threadId, { attachments: [], text: "fresh" });
+        setPaused(chat.threadId, true);
+        rerender(<ComposerPromptQueue />);
+
+        expect((screen.getByLabelText("Edit queued message 1") as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it("sends nothing when an edit of a paused head is cancelled", async () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
         await act(async () => {
             await Promise.resolve();

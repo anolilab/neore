@@ -1022,6 +1022,10 @@ msgstr "W kolejce: {count} — wyśle się, gdy bieżąca odpowiedź się zakoń
 msgid "{count} queued — waiting for the permission mode to save"
 msgstr "{count} w kolejce — czeka na zapisanie trybu uprawnień"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:978
+msgid "{count} queued — sends when the edit closes"
+msgstr "{count} w kolejce — wyślą się po zakończeniu edycji"
+
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:102
 msgid "{date}: {replies}, {cost}"
 msgstr "{date}: {replies}, {cost}"

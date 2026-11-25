@@ -283,6 +283,14 @@ const useQueueActions = () => {
                     // A reply that started meanwhile owns the thread: a message sent from the
                     // composer is `isSubmitting` before its stream exists, so that counts too.
                     canSend: () => {
+                        // The head's text is open in its chip: the send is held with its intent, and the edit's close sends it
+                        // with its own text (the close effect takes the held send; nothing else sends it under the editor).
+                        if (headIsBeingEdited(threadId)) {
+                            useQueueEditStore.getState().holdSend(threadId, explicit);
+
+                            return false;
+                        }
+
                         const latest = latestRef.current;
 
                         return (
@@ -293,8 +301,6 @@ const useQueueActions = () => {
                             !usePromptQueueStore.getState().queues[threadId]?.paused &&
                             // The withdrawal's await can outlast the network: then the prompt stays and is held for it.
                             !latest.offline &&
-                            // The head's text is open in its chip: the send waits for the edit to close, with its text.
-                            !headIsBeingEdited(threadId) &&
                             // Read from the cache, not the rendered flag: a save that began after the last render is not in that flag yet,
                             // and this check runs after the withdrawal's await, so it could send under the old mode.
                             queryClient.isMutating({ exact: true, mutationKey: permissionModeSaveKey(threadId) }) === 0 &&
@@ -745,17 +751,24 @@ const ComposerPromptQueue: FC = () => {
         }
     }, [error, isStreaming, modeSaving, queue.items.length, queue.paused, sendNextPrompt, threadId]);
 
-    // The head's send held while its text was open goes once the edit closes, unless the queue is busy, failed or paused.
+    // A send the queue held while the head's text was open goes once the edit closes, with its own intent. Only a held send
+    // is retried: an edit that closes with nothing held changes nothing, and the queue's other rules still apply to the send.
     useEffect(() => {
         const previous = wasHeadEditing.current;
         const closed = previous.threadId === threadId && previous.editing && !headEditing;
 
         wasHeadEditing.current = { editing: headEditing, threadId };
 
-        if (closed && threadId && !isStreaming && !error && !queue.paused && queue.items.length > 0) {
-            void sendNextPrompt(threadId);
+        if (!closed || !threadId) {
+            return;
         }
-    }, [error, headEditing, isStreaming, queue.items.length, queue.paused, sendNextPrompt, threadId]);
+
+        const held = useQueueEditStore.getState().takeHeldSend(threadId);
+
+        if (held && !isStreaming && !queue.paused && queue.items.length > 0) {
+            void sendNextPrompt(threadId, { explicit: held.explicit });
+        }
+    }, [headEditing, isStreaming, queue.items.length, queue.paused, sendNextPrompt, threadId]);
 
     const handleRemove = useCallback(
         (id: string) => {
@@ -958,6 +971,11 @@ const ComposerPromptQueue: FC = () => {
 
     if (steerCount === count && isStreaming) {
         statusText = <Plural one="# steering — the reply reads it at its next step" other="# steering — the reply reads them at its next step" value={count} />;
+    }
+
+    // "Send next" is disabled while the head's text is open: say why, and that the send follows the edit.
+    if (headEditing) {
+        statusText = t`${count} queued — sends when the edit closes`;
     }
 
     // "Send next" is disabled while the permission mode saves: say why, and that the queue moves on once it has.
