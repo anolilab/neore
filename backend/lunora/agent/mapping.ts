@@ -45,7 +45,7 @@ import { MAX_FILE_SIZE, storeFile } from "./client/files";
 import type { ActionCtx as ActionContext, RunnerCtx as RunnerContext } from "./client/types";
 import type { MutationCtx as MutationContext } from "./client/types";
 import { extractText, getModelName, getProviderName, type ModelOrMetadata } from "./shared";
-import { offloadToolOutputMedia, stepInlineBudget, type StoreToolMedia } from "./tool-output-media";
+import { BROWSER_TOOL, offloadToolOutputMedia, stepInlineBudget, type StoreToolMedia } from "./tool-output-media";
 import type { vAssistantContent, vToolApprovalRequest, vToolApprovalResponse, vToolContent } from "./validators";
 import {
     type Message,
@@ -148,7 +148,40 @@ export const docsToModelMessages = (messages: MessageDoc[]): ModelMessage[] =>
         .map((m) => m.message)
         .filter((m) => !!m)
         .filter((m) => m.content.length > 0)
-        .map((item) => toModelMessage(item));
+        .map((item) => withoutHumanCheckRun(toModelMessage(item)));
+
+/**
+ * A saved browser result keeps its human check's reply key (`humanCheck.run`) for the card's read; no model is shown it.
+ * Its own step gets the tool's `toModelOutput`, which drops it; a saved row reaches a later model call through here.
+ */
+export const withoutHumanCheckRun = (message: ModelMessage): ModelMessage => {
+    if (message.role !== "tool") {
+        return message;
+    }
+
+    let changed = false;
+    const content = message.content.map((part) => {
+        if (part.type !== "tool-result" || part.toolName !== BROWSER_TOOL || part.output.type !== "json") {
+            return part;
+        }
+
+        const value = part.output.value as { humanCheck?: Record<string, JSONValue> } | null;
+
+        if (!value || typeof value !== "object" || !value.humanCheck || typeof value.humanCheck !== "object" || !("run" in value.humanCheck)) {
+            return part;
+        }
+
+        const humanCheck = { ...value.humanCheck };
+
+        delete humanCheck.run;
+
+        changed = true;
+
+        return { ...part, output: { type: "json" as const, value: { ...value, humanCheck } as JSONValue } };
+    });
+
+    return changed ? { ...message, content } : message;
+};
 
 export const serializeUsage = (usage: LanguageModelUsage): Usage => {
     // inputTokenDetails may exist in newer AI SDK versions (5.1+)
@@ -318,10 +351,19 @@ export interface ToolMediaOwner {
     userId: string;
 }
 
+/**
+ * Serialize a step's content parts for saving, moving their media to storage.
+ * @param context The action context the media is stored through.
+ * @param content The step's content parts.
+ * @param owner Whose run it is; without one, tool-result media stays inline.
+ * @param createdFileIds Collects the files this call wrote (not reused ones), as each store lands, so a caller whose save
+ * then fails can take them back (`agent/client/tool-approval.ts`) — also when a later part's store throws.
+ */
 export const serializeStepContent = async (
     context: ActionContext,
     content: StepResult<ToolSet>["content"],
     owner?: ToolMediaOwner,
+    createdFileIds?: string[],
 ): Promise<{ messageFileIds?: string[]; partContent: SerializedContent }> => {
     const fileIds: string[] = [];
     // Tool media is stored once per distinct blob in the step, and one blob at a time: the parts serialize at once,
@@ -334,7 +376,11 @@ export const serializeStepContent = async (
 
         if (!pending) {
             pending = storing.then(async () => {
-                const { file } = await storeFile(context, new Blob([convertBase64ToUint8Array(base64)], { type: mediaType }), owner);
+                const { created, file } = await storeFile(context, new Blob([convertBase64ToUint8Array(base64)], { type: mediaType }), owner);
+
+                if (created) {
+                    createdFileIds?.push(file.fileId);
+                }
 
                 return { fileId: file.fileId, storageId: file.storageId };
             });
@@ -368,7 +414,11 @@ export const serializeStepContent = async (
                     const mediaType = getMediaType(part.file)!;
 
                     if (data.byteLength > MAX_FILE_SIZE) {
-                        const { file } = await storeFile(context, new Blob([data], { type: mediaType }));
+                        const { created, file } = await storeFile(context, new Blob([data], { type: mediaType }));
+
+                        if (created) {
+                            createdFileIds?.push(file.fileId);
+                        }
 
                         // Persist the reference, not a URL that expires (`agent/stored-media.ts`).
                         data = toStorageRef(file.storageId);

@@ -1,15 +1,11 @@
-import type { JSONValue } from "@ai-sdk/provider";
-import { getErrorMessage } from "@ai-sdk/provider";
 import type {
     CustomPart,
     FilePart,
     ImagePart,
     ReasoningFilePart,
     ReasoningPart,
-    Tool,
     ToolApprovalRequest,
     ToolCallPart,
-    ToolResultOutput,
     ToolResultPart,
 } from "@ai-sdk/provider-utils";
 import type { ModelMessage, TextPart, UIDataTypes, UIMessagePart, UITools } from "ai";
@@ -17,40 +13,6 @@ import type { ModelMessage, TextPart, UIDataTypes, UIMessagePart, UITools } from
 import type { TypedTextOptions } from "../chat/lib/attached-text";
 import { typedTextOf } from "../chat/lib/attached-text";
 import type { Message, MessageContentParts } from "./validators";
-
-/**
- * Helper function to create a tool model output for approval responses.
- * @see ai `src/prompt/create-tool-model-output.ts`
- */
-export const createToolModelOutput = async ({
-    errorMode,
-    input,
-    output,
-    tool,
-    toolCallId,
-}: {
-    errorMode: "none" | "text" | "json";
-    input: unknown;
-    output: unknown;
-    tool: Tool | undefined;
-    toolCallId: string;
-}): Promise<ToolResultOutput> => {
-    if (errorMode === "text") {
-        return { type: "error-text", value: getErrorMessage(output) };
-    }
-
-    if (errorMode === "json") {
-        return { type: "error-json", value: toJSONValue(output) };
-    }
-
-    if (tool?.toModelOutput) {
-        return await tool.toModelOutput({ input, output, toolCallId });
-    }
-
-    return typeof output === "string" ? { type: "text", value: output } : { type: "json", value: toJSONValue(output) };
-};
-
-const toJSONValue = (value: unknown): JSONValue => (value === undefined ? null : (value as JSONValue));
 
 export const DEFAULT_RECENT_MESSAGES = 100;
 

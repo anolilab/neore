@@ -17,6 +17,8 @@
  * bucket, so no row needs it.
  */
 
+import { chatFileKeyHash } from "./chat-file-key";
+
 export const STORAGE_REF_PREFIX = "storage:";
 
 export const toStorageRef = (key: string): string => `${STORAGE_REF_PREFIX}${key}`;
@@ -24,10 +26,10 @@ export const toStorageRef = (key: string): string => `${STORAGE_REF_PREFIX}${key
 export const isStorageRef = (value: unknown): value is string =>
     typeof value === "string" && value.startsWith(STORAGE_REF_PREFIX) && value.length > STORAGE_REF_PREFIX.length;
 
-/** Keys storage itself mints: content-addressed chat files and `randomUUID()` uploads. */
-const MINTED_KEY = /^(?:agent-files\/[\da-f]{64}|[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12})$/u;
+/** Keys storage itself mints: `randomUUID()` uploads (chat files are `lib/chat-file-key.ts`). */
+const MINTED_KEY = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/u;
 
-const isMintedKeyShape = (key: string): boolean => MINTED_KEY.test(key);
+const isMintedKeyShape = (key: string): boolean => MINTED_KEY.test(key) || chatFileKeyHash(key) !== undefined;
 
 /** Keys are opaque, but never empty, never absolute, never traversing. */
 const isPlausibleKey = (key: string): boolean => key.length > 0 && key.length <= 512 && !key.startsWith("/") && !key.split("/").includes("..");

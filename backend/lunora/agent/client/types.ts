@@ -14,6 +14,7 @@ import type {
     LanguageModelUsage,
     streamText,
     StreamTextResult,
+    Tool,
     ToolSet,
 } from "ai";
 
@@ -85,7 +86,17 @@ export type AgentPrompt = {
     system?: string;
 };
 
+/** A tool as far as formatting a saved result of it goes. */
+export type HistoryFormatter = Pick<Tool, "toModelOutput">;
+
 export type Config = {
+    /**
+     * The tool whose `toModelOutput` formats a saved result of `toolName` that the run does not offer (a call with no
+     * tools, a tool switched off since): the agent factory hands the built-ins (`chat/lib/get-agent.ts`). Without it
+     * such a result reaches the model as saved.
+     */
+    builtInToolFormatter?: (toolName: string) => Promise<HistoryFormatter | undefined>;
+
     /**
      * The default settings to use for the LLM calls.
      * This can be overridden at each generate/stream callsite on a per-field

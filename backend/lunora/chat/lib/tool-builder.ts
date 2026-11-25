@@ -3,9 +3,11 @@
  * Creates and configures tools for chat streaming context
  */
 import { isToolCallUnsupportedModel, staticUnsupportedModels } from "@neore/ai/models";
-import type { LanguageModel, ToolSet } from "ai";
+import type { LanguageModel, Tool, ToolSet } from "ai";
 
 import { toolsLogger } from "../../lib/logger";
+import { INSTRUCTION_READ_TOOL } from "../../projects/rule-files";
+import { instructionReadTool } from "../tools/instruction-read";
 import {
     academicSearchTool,
     askUserTool,
@@ -457,6 +459,19 @@ const ALL_TOOLS: Record<ToolName, unknown> = {
     [ToolName.WolframAlpha]: wolframAlphaTool,
     [ToolName.XSearch]: xSearchTool,
     [ToolName.YoutubeSearch]: youtubeSearchTool,
+};
+
+/**
+ * The built-in tool named `name`, whether or not a run offers it: its `toModelOutput` formats a saved result of it for a
+ * later model call (`agent/client/tool-approval.ts#withApprovedToolModelOutputs`), which a call offering no tools, or a
+ * tool switched off since, must format all the same. `undefined` for any other name (MCP, device, connector tools).
+ */
+export const builtInToolNamed = (name: string): Tool | undefined => {
+    if (name === INSTRUCTION_READ_TOOL) {
+        return instructionReadTool([]) as Tool;
+    }
+
+    return Object.hasOwn(ALL_TOOLS, name) ? (ALL_TOOLS[name as ToolName] as Tool) : undefined;
 };
 
 /**

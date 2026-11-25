@@ -8,6 +8,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import type { Id } from "../_generated/dataModel";
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { createThreadAccess, deleteThreadAccess, updateThreadAccess } from "../agent/sharing";
 import { applyLimit } from "../lib/rate-limiter-mutations";
 import { internalMutation, internalQuery } from "../lib/crpc";
 import schema from "../schema";
@@ -25,6 +26,13 @@ const STRANGER = "user-stranger";
 const WRITER = "user-writer";
 /** The frozen clock every test reads, in the code and in the assertions alike. */
 const NOW = Date.UTC(2026, 10, 20, 12);
+/** No browser the reader may watch, and a caller who does not read the chat: the server's clock and nothing else. */
+const NO_BROWSER = { kind: "none", now: expect.any(Number) };
+const DENIED = { kind: "denied", now: expect.any(Number) };
+/** A denial to someone who is not the owner and had a grant: it names their grant's last revision. */
+const DENIED_AT = (revision: number) => {
+    return { ...DENIED, revision };
+};
 /** The provider session ids the tests use: a browser name a client sees must hold neither. */
 const PROVIDER_SESSION_ID = /s-[12]/u;
 /** What a lease's holder looks like on the row: a SHA-256 HMAC in hex. */
@@ -78,19 +86,36 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
 
 // A read replica that still holds a grant the primary no longer has: every grant read that does not ask for the
 // primary gets `replica.grant` while it is set, the way a lagging replica answers after an admin removed a reader.
+// `afterPrimary` runs once after the next primary grant read, as a write that commits right after it.
 const { replica } = vi.hoisted(() => {
-    return { replica: {} as { grant?: Record<string, unknown> } };
+    return { replica: {} as { afterPrimary?: () => Promise<void>; grant?: Record<string, unknown> } };
 });
 
 vi.mock("../agent/thread-read-access", async (importOriginal) => {
     const original = await importOriginal<typeof import("../agent/thread-read-access")>();
     const lagging = (context: any): any => {
-        const findFirst = async (query: { consistency?: string }) =>
-            query.consistency !== "primary" && replica.grant !== undefined ? replica.grant : await context.db.threadAccess.findFirst(query);
+        // The access read takes the grant's live copy from a page of them (`agent/live-grant.ts`).
+        const findMany = async (query: { consistency?: string }) => {
+            if (query.consistency !== "primary" && replica.grant !== undefined) {
+                return { continueCursor: null, isDone: true, page: replica.grant === null ? [] : [replica.grant] };
+            }
+
+            const result = await context.db.threadAccess.findMany(query);
+            const after = query.consistency === "primary" ? replica.afterPrimary : undefined;
+
+            if (after !== undefined) {
+                delete replica.afterPrimary;
+                await after();
+            }
+
+            return result;
+        };
         const db = new Proxy(context.db, {
             get: (target, key) =>
                 key === "threadAccess"
-                    ? new Proxy(target.threadAccess, { get: (table, name) => (name === "findFirst" ? findFirst : table[name]) })
+                    ? new Proxy(target.threadAccess, {
+                          get: (table, name) => (name === "findMany" ? findMany : table[name]),
+                      })
                     : target[key],
         });
 
@@ -259,6 +284,7 @@ afterEach(() => {
     releaseLimit.keys.length = 0;
     releaseLimit.limited = false;
     delete replica.grant;
+    delete replica.afterPrimary;
     impersonation.by = undefined;
     actionStart.hook = undefined;
     rendererStart.hook = undefined;
@@ -288,7 +314,7 @@ describe("a running browser", () => {
     it("gives a caller who cannot read the thread no status and no URL, and never asks the provider", async () => {
         await addSession();
 
-        await expect(statusFor(STRANGER)).resolves.toBeNull();
+        await expect(statusFor(STRANGER)).resolves.toStrictEqual(DENIED);
         await expect(open(STRANGER)).rejects.toMatchObject({ code: "NOT_FOUND" });
         expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -297,17 +323,17 @@ describe("a running browser", () => {
         await addSession();
         await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { lockedAt: 1 }));
 
-        await expect(statusFor(OWNER)).resolves.toBeNull();
+        await expect(statusFor(OWNER)).resolves.toStrictEqual(DENIED);
         await expect(open(OWNER)).rejects.toMatchObject({ code: "NOT_FOUND" });
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    it("gives nothing for a trashed thread, to its owner or a reader", async () => {
+    it("gives nothing for a trashed thread, to its owner or a reader: its status says they do not read it", async () => {
         await addSession();
         await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { deleted: true }));
 
-        await expect(statusFor(OWNER)).resolves.toBeNull();
-        await expect(statusFor(READER)).resolves.toBeNull();
+        await expect(statusFor(OWNER)).resolves.toStrictEqual(DENIED);
+        await expect(statusFor(READER)).resolves.toStrictEqual(DENIED_AT(0));
         await expect(open(READER)).resolves.toEqual({ status: "ended" });
         expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -322,6 +348,7 @@ describe("a running browser", () => {
             canControl: true,
             currentUrl: "https://example.com/login",
             idleUntil: heldUntil,
+            kind: "running",
             // The server's clock, so a client tells a lease's end without a clock of its own.
             now: NOW,
         });
@@ -341,12 +368,91 @@ describe("a running browser", () => {
         await expect(statusFor(READER)).resolves.toMatchObject({ accessUntil: expiresAt });
         // The owner's access does not end.
         await expect(statusFor(OWNER)).resolves.not.toHaveProperty("accessUntil");
+        // With no browser running the answer still says when the grant ends: which answer a card holds as newest never
+        // hides the grant's end.
+        await harness.run(async (ctx: any) => {
+            const session = await ctx.db.query("browserSessions").first();
+
+            await ctx.db.patch("browserSessions", session._id, { completedAt: NOW, status: "completed" });
+        });
+        await expect(statusFor(READER)).resolves.toStrictEqual({ ...NO_BROWSER, accessUntil: expiresAt, revision: 0 });
+        await expect(statusFor(OWNER)).resolves.toStrictEqual(NO_BROWSER);
 
         vi.setSystemTime(expiresAt + 1);
 
-        await expect(statusFor(READER)).resolves.toBeNull();
+        // An end the clock reached writes nothing: a grant from before revisions has none to name.
+        await expect(statusFor(READER)).resolves.toStrictEqual(DENIED);
         await expect(open(READER)).rejects.toMatchObject({ code: "NOT_FOUND" });
         expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("names the grant's revision on a reader's answers: a removal's denial a higher one than a replica that still holds the grant", async () => {
+        await addSession();
+        await harness.run(async (ctx: any) => {
+            const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: READER } });
+
+            await ctx.runMutation(updateThreadAccess, { accessId: grant._id, expiresAt: NOW + 60_000 });
+        });
+        await expect(statusFor(READER)).resolves.toMatchObject({ kind: "running", revision: 1 });
+        await expect(statusFor(OWNER)).resolves.not.toHaveProperty("revision");
+
+        await harness.run(async (ctx: any) => {
+            const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: READER } });
+
+            replica.grant = grant;
+            await ctx.runMutation(deleteThreadAccess, { accessId: grant._id });
+        });
+
+        // The replica's read still shows the page, on a later clock, but with the grant's older revision.
+        vi.setSystemTime(NOW + 1000);
+        await expect(statusFor(READER)).resolves.toMatchObject({ currentUrl: "https://example.com/login", kind: "running", now: NOW + 1000, revision: 1 });
+
+        delete replica.grant;
+        // Advanced before and after the delete: past any revision a change racing the removal put on the row.
+        await expect(statusFor(READER)).resolves.toStrictEqual(DENIED_AT(3));
+
+        // A grant given again continues past the removal.
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(createThreadAccess, { grantedBy: OWNER, ownerId: OWNER, permission: "read", threadId, userId: READER }),
+        );
+        await expect(statusFor(READER)).resolves.toMatchObject({ kind: "running", revision: 4 });
+    });
+
+    it("decides a reader's denial on the primary: a re-grant a replica has not seen yet reads as the grant it is", async () => {
+        await addSession();
+        await harness.run(async (ctx: any) => {
+            const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: READER } });
+
+            await ctx.runMutation(deleteThreadAccess, { accessId: grant._id });
+            await ctx.runMutation(createThreadAccess, { grantedBy: OWNER, ownerId: OWNER, permission: "read", threadId, userId: READER });
+        });
+
+        // A replica that saw the removal but not the grant given again: its denial would name the new grant's revision.
+        replica.grant = null as never;
+        await expect(statusFor(READER)).resolves.toMatchObject({ currentUrl: "https://example.com/login", kind: "running", revision: 3 });
+    });
+
+    it("names a denial a revision read after the primary denial: a re-grant and its removal right after it do not leave it older", async () => {
+        await addSession();
+        await harness.run(async (ctx: any) => {
+            const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: READER } });
+
+            await ctx.runMutation(deleteThreadAccess, { accessId: grant._id });
+        });
+        await expect(statusFor(READER)).resolves.toStrictEqual(DENIED_AT(2));
+
+        // The replica already denies; a re-grant and its removal commit right after the primary read denied too.
+        replica.afterPrimary = async () =>
+            await harness.run(async (ctx: any) => {
+                await ctx.runMutation(createThreadAccess, { grantedBy: OWNER, ownerId: OWNER, permission: "read", threadId, userId: READER });
+
+                const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: READER } });
+
+                await ctx.runMutation(deleteThreadAccess, { accessId: grant._id });
+            });
+
+        // The re-grant took 3, its removal 4 and 5: the denial names 5, not the 2 a count read before the grant would.
+        await expect(statusFor(READER)).resolves.toStrictEqual(DENIED_AT(5));
     });
 
     it("mints no view for a reader an admin removed, while a replica still holds their grant", async () => {
@@ -517,7 +623,7 @@ describe("a browser that ended", () => {
     it("gives no status and no URL once its row is closed", async () => {
         await addSession({ completedAt: NOW, status: "completed" });
 
-        await expect(statusFor(OWNER)).resolves.toBeNull();
+        await expect(statusFor(OWNER)).resolves.toStrictEqual(NO_BROWSER);
         await expect(open(OWNER)).resolves.toEqual({ status: "ended" });
         expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -525,7 +631,7 @@ describe("a browser that ended", () => {
     it("gives no status and no URL once it sat idle past the provider's reap", async () => {
         await addSession({ lastActivityAt: NOW - BROWSER_IDLE_REAP_MS - 1000 });
 
-        await expect(statusFor(OWNER)).resolves.toBeNull();
+        await expect(statusFor(OWNER)).resolves.toStrictEqual(NO_BROWSER);
         await expect(open(OWNER)).resolves.toEqual({ status: "ended" });
         expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -570,7 +676,7 @@ describe("a browser that ended", () => {
     ])("gives nothing for %s", async (_name, fields) => {
         await addSession(fields);
 
-        await expect(statusFor(OWNER)).resolves.toBeNull();
+        await expect(statusFor(OWNER)).resolves.toStrictEqual(NO_BROWSER);
         await expect(open(OWNER)).resolves.toEqual({ status: "ended" });
         expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -1581,7 +1687,7 @@ describe("opening a page while in control", () => {
         expect(after.providerSessionId).toBe("cf-browser-rendering");
         // The agent's next action hears that the person's browser was closed, not that they went idle.
         expect(after.control).toMatchObject({ ended: "browser_closed", until: NOW });
-        await expect(statusFor(OWNER)).resolves.toBeNull();
+        await expect(statusFor(OWNER)).resolves.toStrictEqual(NO_BROWSER);
     });
 
     it("ends the page's hold when its audit row could not be written, so a hand back mid-load still ends", async () => {

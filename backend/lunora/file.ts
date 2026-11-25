@@ -7,7 +7,7 @@
  *    `lib/chat-upload-staging.ts`) and refuses a declared type off the
  *    allowlist or a declared size over its kind's limit.
  * 2. {@link finalizeChatUpload} reads what actually arrived, checks its real
- *    size, type and leading bytes, and stores it content-addressed through
+ *    size, type and leading bytes, and stores it under its own key through
  *    `storeFile` (dedupe into `chatFiles`, a `chatFileAccess` grant for the
  *    caller), then deletes the staging object. It returns the `chatFiles` id
  *    that `/chat/start`'s `fileIds` and extraction already take.

@@ -272,7 +272,7 @@ describe(isMpegFrameHeader, () => {
 });
 
 describe(finalizeStagedReferenceMedia, () => {
-    it("stores a small clip content-addressed with a grant, and deletes the staging object", async () => {
+    it("stores a small clip under its own key with a grant, and deletes the staging object", async () => {
         const ctx = actionContext();
         const bytes = mp4(64);
         const key = stage(ALICE, bytes, "video/mp4");
@@ -281,8 +281,13 @@ describe(finalizeStagedReferenceMedia, () => {
 
         expect(result.fileId).toBeTypeOf("string");
         expect(result.url).toContain("sig=read");
-        expect(objects.get(`agent-files/${hash}`)?.bytes).toStrictEqual(bytes);
-        expect(objects.get(`agent-files/${hash}`)?.contentType).toBe("video/mp4");
+        const storedKeys = [...objects.keys()].filter((name) => name.startsWith("agent-files/"));
+        const stored = objects.get(storedKeys[0] ?? "");
+
+        // The upload's own key: the hash, then a fresh id.
+        expect(storedKeys).toStrictEqual([expect.stringMatching(new RegExp(String.raw`^agent-files/${hash}/[\da-f-]{36}$`, "u"))]);
+        expect(stored?.bytes).toStrictEqual(bytes);
+        expect(stored?.contentType).toBe("video/mp4");
         expect(objects.has(key)).toBe(false);
     });
 

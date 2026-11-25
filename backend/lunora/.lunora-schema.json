@@ -5227,6 +5227,62 @@
       "relations": {},
       "shardMode": "global:d1"
     },
+    "chatFileObjectDeletes": {
+      "commitOrdered": false,
+      "fields": {
+        "deleteAfter": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "kind": {
+          "kind": "union",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"delete\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"store\""
+            }
+          ]
+        },
+        "storageId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_deleteAfter": {
+          "fields": [
+            "deleteAfter"
+          ],
+          "unique": false
+        },
+        "by_storageId": {
+          "fields": [
+            "storageId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
+    },
     "chatFileThreads": {
       "commitOrdered": false,
       "fields": {
@@ -5285,6 +5341,12 @@
     "chatFiles": {
       "commitOrdered": false,
       "fields": {
+        "discardingAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "extractedText": {
           "kind": "string",
           "nullable": false,
@@ -5451,6 +5513,12 @@
           "optional": false,
           "unique": false
         },
+        "reusedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "storageId": {
           "kind": "string",
           "nullable": false,
@@ -5465,6 +5533,12 @@
         }
       },
       "indexes": {
+        "by_storageId": {
+          "fields": [
+            "storageId"
+          ],
+          "unique": false
+        },
         "hash_filename": {
           "fields": [
             "hash",
@@ -28584,6 +28658,12 @@
             }
           ]
         },
+        "revision": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "threadId": {
           "kind": "id",
           "nullable": false,
@@ -28599,6 +28679,12 @@
         }
       },
       "indexes": {
+        "by_owner": {
+          "fields": [
+            "ownerId"
+          ],
+          "unique": false
+        },
         "by_thread_and_user": {
           "fields": [
             "threadId",
@@ -28622,6 +28708,61 @@
           "table": "threads"
         }
       },
+      "shardMode": "global:d1"
+    },
+    "threadAccessRevisions": {
+      "commitOrdered": false,
+      "fields": {
+        "ownerId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "revision": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "threadId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "threads"
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_owner": {
+          "fields": [
+            "ownerId"
+          ],
+          "unique": false
+        },
+        "by_thread_and_user": {
+          "fields": [
+            "threadId",
+            "userId"
+          ],
+          "unique": true
+        },
+        "by_user_and_owner": {
+          "fields": [
+            "userId",
+            "ownerId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
       "shardMode": "global:d1"
     },
     "threadContextSummaries": {
@@ -29809,6 +29950,35 @@
         }
       },
       "shardMode": "shardBy:userId"
+    },
+    "threadPurgeMarks": {
+      "commitOrdered": false,
+      "fields": {
+        "purgedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "threadId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "threads"
+        }
+      },
+      "indexes": {
+        "by_thread": {
+          "fields": [
+            "threadId"
+          ],
+          "unique": true
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
     },
     "threadRelationships": {
       "commitOrdered": false,
