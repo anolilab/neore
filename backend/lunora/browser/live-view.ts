@@ -823,7 +823,6 @@ const returnLease = async (
  */
 export const handBack = authMutation
     .input({ claim: v.string().max(MAX_LENGTH.short), reason: v.union(v.literal("handed_back"), v.literal("left")), threadId: v.id("threads") })
-    .use(rateLimit("browser/handBack"))
     .output(v.boolean())
     .mutation(async ({ args: { claim, reason, threadId }, ctx }) => {
         const db = systemDb(ctx);

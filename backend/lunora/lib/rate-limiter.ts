@@ -114,11 +114,9 @@ export const RATE_LIMIT_CONFIGS = {
 
     "browser/action:premium": Ratelimit.fixedWindow(200, HOUR),
     "browser/action:public": Ratelimit.fixedWindow(5, HOUR),
+    // Keeping and steering the browser a person took control of (`browser/live-view.ts`).
     "browser/control:free": Ratelimit.fixedWindow(240, HOUR),
     "browser/control:premium": Ratelimit.fixedWindow(600, HOUR),
-    // Keeping, handing back and steering the browser a person took control of (`browser/live-view.ts`).
-    "browser/handBack:free": Ratelimit.fixedWindow(60, MINUTE),
-    "browser/handBack:premium": Ratelimit.fixedWindow(60, MINUTE),
     // Each call mints a live view URL at the provider (`browser/live-view.ts`).
     "browser/liveView:free": Ratelimit.fixedWindow(30, HOUR),
     "browser/liveView:premium": Ratelimit.fixedWindow(120, HOUR),
@@ -975,7 +973,8 @@ export const rateLimitGuard = async (
         // loosely is what let `rateLimit("skills/create")` reach production
         // naming a limit that was never in the table.
         rateLimitKey: RateLimitName;
-        user: Pick<SessionUser, "userId" | "plan"> | null;
+        // `isAdmin` lets `getUserTier` give an admin without a plan the premium tier.
+        user: (Partial<Pick<SessionUser, "isAdmin">> & Pick<SessionUser, "userId" | "plan">) | null;
     } & (ActionContext | MutationContext),
 ): Promise<void> => {
     const count = Math.max(1, Math.trunc(context.count ?? 1));
