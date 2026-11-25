@@ -753,7 +753,7 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
                 const organizationId = organizationOfMemberChange(context.path, returned);
 
                 if (deletedOrganizationId) {
-                    await queueOrganizationBillingCancel(deletedOrganizationId);
+                    await queueOrganizationBillingCancel(deletedOrganizationId, true);
                     await queueOrganizationPolicyErase(deletedOrganizationId);
                     await queueOrganizationRepoErase(deletedOrganizationId);
                 } else if (organizationId) {

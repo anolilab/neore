@@ -190,8 +190,16 @@ export const openCustomerPortal = authAction
         const id = kind === "user" ? ctx.user.userId : billingOrganizationOf(ctx.user);
         const { creemCustomerId, creemPurchaserId } = await ctx.runQuery(internal.billing.checkout.getBillingSubject, { id, kind });
 
-        // The gate: only the purchaser opens the portal, and only once a customer was recorded for the subject.
-        portalCustomerFor(ctx.user.userId, { creemCustomerId, creemPurchaserId });
+        // The gate: only the purchaser opens the portal, on the customer recorded for the subject.
+        const customerId = portalCustomerFor(ctx.user.userId, { creemCustomerId, creemPurchaserId });
+
+        // The facade opens the portal on the store's customer for the reference, so that must be this one: write it first.
+        // The write refuses a customer another reference owns; then the purchaser manages the subscription in-app.
+        const { seeded } = await ctx.runMutation(internal.billing.customers.seedCustomer, { customerId, referenceId: id });
+
+        if (!seeded) {
+            throw new LunoraError("FORBIDDEN", "This customer is shared with another subscription; manage it in-app");
+        }
 
         const session = await ctx.payments.scoped(jobSubject(id)).createPortalSession(id, billingPageUrl());
 

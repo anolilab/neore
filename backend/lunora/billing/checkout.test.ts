@@ -99,12 +99,20 @@ const scoped = vi.fn((_authorize: (referenceId: string) => boolean) => {
     return { createCheckout: createCheckoutSession, createPortalSession };
 });
 
+// Whether the store accepts the portal customer write (`billing/customers.ts`): false when another reference owns it.
+const seeding = vi.hoisted(() => {
+    return { allowed: true };
+});
+
 const context = (userId: string) => {
     return {
         auth: { getIdentity: async () => null, userId },
         db: {},
         log: { event: vi.fn() },
         payments: { createCheckout: createCheckoutSession, scoped },
+        runMutation: vi.fn(async () => {
+            return { seeded: seeding.allowed };
+        }),
         runQuery: vi.fn(async (_reference: unknown, { id, kind }: { id: string; kind: string }) => subjects.get(`${kind}:${id}`) ?? subject({ exists: false })),
     };
 };
@@ -122,6 +130,7 @@ beforeEach(() => {
     createCheckoutSession.mockClear();
     createPortalSession.mockClear();
     scoped.mockClear();
+    seeding.allowed = true;
     env.CREEM_API_KEY = "creem_key";
     env.CREEM_YEARLY_CHECKOUT = "";
     env.CREEM_PRODUCT_TEAM_YEARLY = "";
@@ -316,6 +325,15 @@ describe("openCustomerPortal", () => {
 
         expect(authorize(OWNER)).toBe(true);
         expect(authorize(OTHER_OWNER)).toBe(false);
+    });
+
+    it("refuses a portal whose customer another reference already owns, and opens nothing", async () => {
+        subjects.set(`user:${OWNER}`, subject({ baseTier: "pro", creemCustomerId: "cus_shared", creemPurchaserId: OWNER }));
+        seeding.allowed = false;
+
+        await expect(portal(OWNER, { subject: "user" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+        expect(createPortalSession).not.toHaveBeenCalled();
     });
 
     it("opens a Team portal for the owner who subscribed", async () => {

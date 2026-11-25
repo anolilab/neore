@@ -16,10 +16,15 @@ import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
 import { CREEM_WEBHOOK_SECRET } from "../env";
 import { logger } from "../lib/logger";
+import { jobSubject } from "./authorize";
+import { deleteAllBillingRows, endLiveSubscriptions } from "./gdpr";
 import { subscriptionUpdateOf } from "./plans";
 import { planProducts } from "./products";
 
 const billingLogger = logger.scope("billing");
+
+/** States that grant the subject its plan, so the customer recorded for them is the one that pays. */
+const ENTITLING_STATES: ReadonlySet<string> = new Set(["active", "past_due", "trialing"]);
 
 /** `customer` / `subscription` arrive as an id or as the expanded object. */
 const idOf = (value: unknown): string | undefined => {
@@ -94,10 +99,15 @@ export const processCreemWebhook = internalAction
             return { applied, status: response.status };
         }
 
-        // The facade has just stored a row for this event. An erased reference keeps none: a late `canceled` would
-        // otherwise recreate a subscription row that names the deleted account.
+        // The facade has just stored rows for this event. For an erased reference the subscription may still bill, so it is
+        // ended at Creem first, and the rows go only after that is confirmed. A failed cancel throws: the event is refused,
+        // Creem redelivers it, and the rows are still there to retry against.
         if (subscription && (await ctx.runQuery(internal.billing.gdpr.isErased, { referenceId: subscription.referenceId }))) {
-            await ctx.runMutation(internal.billing.gdpr.dropErasedSubscription, { subscriptionId: event.subscriptionId });
+            await endLiveSubscriptions(ctx.payments.scoped(jobSubject(subscription.referenceId)), [subscription]);
+            await deleteAllBillingRows(
+                async () => await ctx.runMutation(internal.billing.gdpr.deleteBillingRows, { erase: true, referenceId: subscription.referenceId }),
+                subscription.referenceId,
+            );
 
             return { applied, status: response.status };
         }
@@ -107,15 +117,10 @@ export const processCreemWebhook = internalAction
         if (update && subscription) {
             await ctx.runMutation(internal.auth.billing.applyCreemSubscription, update);
 
-            // The portal opens on the store's customer for this subject. Checkout writes one only when Creem could bind
-            // the buyer's email to it, so seed it from the paid subscription when it is missing.
-            if (event.customerId !== undefined && (await ctx.payments.store.getCustomerByReference("creem", subscription.referenceId)) === undefined) {
-                await ctx.payments.store.upsertCustomer({
-                    createdAt: Date.now(),
-                    id: event.customerId,
-                    provider: "creem",
-                    referenceId: subscription.referenceId,
-                });
+            // The portal opens on the customer recorded for the subject. Seed it from the paid subscription: the mutation
+            // refuses a customer another reference owns, and refuses an erased reference.
+            if (event.customerId !== undefined && ENTITLING_STATES.has(subscription.state)) {
+                await ctx.runMutation(internal.billing.customers.seedCustomer, { customerId: event.customerId, referenceId: subscription.referenceId });
             }
         } else {
             billingLogger.warn("Creem subscription event grants nothing here", { priceId: subscription?.priceId, subscriptionId: event.subscriptionId });

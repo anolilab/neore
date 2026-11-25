@@ -160,7 +160,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             async () =>
                 await workflowContext.run(
                     internal.billing.gdpr.cancelBilling,
-                    { referenceId: args.userId },
+                    { erase: true, referenceId: args.userId },
                     { dedupId: stepDedupId(scope, "cancel-user-billing"), shardKey: ROOT_SHARD_KEY },
                 ),
         );
