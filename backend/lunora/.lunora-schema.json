@@ -33379,6 +33379,12 @@
           "optional": false,
           "unique": false
         },
+        "emailCanonical": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "emailVerified": {
           "kind": "boolean",
           "nullable": false,
@@ -33432,6 +33438,12 @@
         "by_isAnonymous": {
           "fields": [
             "isAnonymous"
+          ],
+          "unique": false
+        },
+        "emailCanonical": {
+          "fields": [
+            "emailCanonical"
           ],
           "unique": false
         },
