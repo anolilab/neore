@@ -29,6 +29,7 @@ import { memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, use
 
 import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useInviteOnly from "@/features/auth/hooks/use-invite-only";
+import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { isCompactCommand } from "@/features/chat/compaction/compaction-logic";
 import useCompactThread from "@/features/chat/compaction/use-compact-thread";
 import ReferenceStrip from "@/features/chat/components/reference-picker/reference-strip";
@@ -1173,6 +1174,8 @@ const ComposerInput = ({
     const { mutateAsync: steerRun } = useMutation(crpc.chat.steering.steerRun.mutationOptions());
     const followUp = followUpControl(useRunnerCapabilities());
     const canSteer = isThreadComposer && !isComparisonValid && Boolean(sseStreamState) && attachments.length === 0 && attachedReferences.length === 0;
+    // The person's default for a send during a reply: on, a text-only send joins the reply as a steer. Absent means queue.
+    const followUpSteerDefault = useUserSettings().data?.followUpSteer === true;
 
     const handleSteer = useCallback(() => {
         const streamId = sseStreamState;
@@ -1361,6 +1364,23 @@ const ComposerInput = ({
             return false;
         }
 
+        // The person's default (`followUpSteer`): a text-only send during a reply joins it as a steer, as the Steer button does. A
+        // send that cannot steer now (offline, too long, or no steer capability) queues as before.
+        if (
+            intent === "queue" &&
+            followUpSteerDefault &&
+            canSteer &&
+            followUp === "steer" &&
+            !disabled &&
+            !isOffline &&
+            draftText.trim() !== "" &&
+            draftText.length <= MAX_PROMPT_CHARS
+        ) {
+            handleSteer();
+
+            return true;
+        }
+
         // A turn is still running: queue instead of sending. The queue sends it
         // when the stream finishes (see ComposerPromptQueue). A composer without a queue waits.
         if (intent === "queue" || intent === "wait") {
@@ -1453,6 +1473,10 @@ const ComposerInput = ({
 
         return true;
     }, [
+        canSteer,
+        followUp,
+        followUpSteerDefault,
+        handleSteer,
         isOffline,
         t,
         disabled,

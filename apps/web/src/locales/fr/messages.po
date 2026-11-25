@@ -21349,6 +21349,22 @@ msgstr "Les messages interrompent le tour de l'agent"
 msgid "Messages will wait for the agent's turn to end"
 msgstr "Les messages attendront la fin du tour de l'agent"
 
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Send while a reply is writing"
+msgstr "Envoyer pendant qu'une réponse s'écrit"
+
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Off: a message you send while a reply is streaming waits in the queue and goes after it. On: it joins the reply at its next step."
+msgstr "Désactivé : un message envoyé pendant que la réponse s'écrit attend dans la file et part après. Activé : il rejoint la réponse à sa prochaine étape."
+
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Messages will join the reply as it writes"
+msgstr "Les messages rejoindront la réponse pendant qu'elle s'écrit"
+
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Messages will wait for the reply to finish"
+msgstr "Les messages attendront la fin de la réponse"
+
 #: src/features/marketing/use-cases/use-case-data.ts:72
 msgid "Messaging apps"
 msgstr "Applications de messagerie"
