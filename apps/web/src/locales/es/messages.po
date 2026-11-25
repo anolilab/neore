@@ -1080,6 +1080,10 @@ msgstr "{extraRowCount, plural, one {+# fila más} other {+# filas más}}"
 msgid "{failed} document(s) could not be added."
 msgstr "No se pudieron añadir {failed} documento(s)."
 
+#: src/features/knowledge/hooks/use-knowledge-import.ts
+msgid "{tooLarge} document(s) are too large to import: each must be under {REQUEST_BATCH_KB} KB once encoded."
+msgstr "{tooLarge} documento(s) son demasiado grandes para importar: cada uno debe pesar menos de {REQUEST_BATCH_KB} KB una vez codificado."
+
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:211
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:288
 #: src/features/auth/components/settings/account/update-field-card.tsx:73

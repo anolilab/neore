@@ -10,7 +10,12 @@
 
 export const MAX_DOCUMENTS_PER_BATCH = 25;
 export const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
-export const MAX_BATCH_CHARS = 8 * 1024 * 1024;
+
+/**
+ * What one batch may take in its request body. Lunora refuses a request body over 1 MiB, and a batch is one request, so the budget
+ * leaves room for the request's other fields. A document is measured as its JSON, the bytes the body carries.
+ */
+export const MAX_REQUEST_BATCH_BYTES = 768 * 1024;
 /** A folder or export is capped so one pick cannot queue thousands of ingestions. */
 export const MAX_DOCUMENTS_PER_IMPORT = 500;
 
@@ -133,26 +138,41 @@ export const encodeDocument = async (candidate: DocumentCandidate): Promise<Enco
     };
 };
 
-/** Groups documents into calls under both the count and the size cap, in order. */
-export const toBatches = <T extends { content: string }>(documents: ReadonlyArray<T>): T[][] => {
+/** The bytes a value takes once sent as JSON in a request body. */
+const jsonBytes = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).byteLength;
+
+/**
+ * Groups documents into calls under the count cap and the request byte budget, in order. A document that is over the budget
+ * on its own fits no call, so it is returned in `oversize` for the caller to report instead of sending.
+ */
+export const toBatches = <T>(documents: ReadonlyArray<T>): { batches: T[][]; oversize: T[] } => {
     const batches: T[][] = [];
+    const oversize: T[] = [];
     let current: T[] = [];
-    let chars = 0;
+    let bytes = 0;
 
     for (const document of documents) {
-        if (current.length > 0 && (current.length >= MAX_DOCUMENTS_PER_BATCH || chars + document.content.length > MAX_BATCH_CHARS)) {
+        const size = jsonBytes(document);
+
+        if (size > MAX_REQUEST_BATCH_BYTES) {
+            oversize.push(document);
+
+            continue;
+        }
+
+        if (current.length > 0 && (current.length >= MAX_DOCUMENTS_PER_BATCH || bytes + size > MAX_REQUEST_BATCH_BYTES)) {
             batches.push(current);
             current = [];
-            chars = 0;
+            bytes = 0;
         }
 
         current.push(document);
-        chars += document.content.length;
+        bytes += size;
     }
 
     if (current.length > 0) {
         batches.push(current);
     }
 
-    return batches;
+    return { batches, oversize };
 };

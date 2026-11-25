@@ -8,7 +8,7 @@ import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
 import type { DocumentCandidate, EncodedDocument } from "@/features/knowledge/lib/documents";
-import { encodeDocument, MAX_DOCUMENTS_PER_IMPORT, toBatches } from "@/features/knowledge/lib/documents";
+import { encodeDocument, MAX_DOCUMENTS_PER_IMPORT, MAX_REQUEST_BATCH_BYTES, toBatches } from "@/features/knowledge/lib/documents";
 import { classifyImportBatchError, knowledgeErrorKind } from "@/features/knowledge/lib/import-batch-error";
 import { listArchiveEntries, notionDocuments } from "@/features/knowledge/lib/notion-export";
 import { useCRPC, useLunoraActionOptions } from "@/lib/lunora/crpc";
@@ -21,6 +21,9 @@ export type CollectionId = Id<"knowledgeCollections">;
 
 /** How often one rate-limited batch is sent again before it counts as failed. */
 const MAX_BATCH_RETRIES = 3;
+
+/** The request budget in KB, for the message that names it. */
+const REQUEST_BATCH_KB = MAX_REQUEST_BATCH_BYTES / 1024;
 
 const wait = async (ms: number): Promise<void> => {
     await new Promise<void>((resolve) => {
@@ -95,6 +98,7 @@ const useKnowledgeImport = (onChange: () => void) => {
             const limited = candidates.slice(0, MAX_DOCUMENTS_PER_IMPORT);
             let added = 0;
             let failed = 0;
+            let tooLarge = 0;
             let quotaReached = false;
 
             setProgress({ done: 0, total: limited.length });
@@ -118,7 +122,11 @@ const useKnowledgeImport = (onChange: () => void) => {
 
                     failed += slice.length - encoded.length;
 
-                    for (const batch of toBatches(encoded)) {
+                    const { batches, oversize } = toBatches(encoded);
+
+                    tooLarge += oversize.length;
+
+                    for (const batch of batches) {
                         const result = await sendBatch(async () => await addDocuments({ collectionId, documents: batch }));
 
                         if (result.ok) {
@@ -137,7 +145,7 @@ const useKnowledgeImport = (onChange: () => void) => {
 
                     // The quota is full: every later batch would fail the same way.
                     if (quotaReached) {
-                        failed = limited.length - added;
+                        failed = limited.length - added - tooLarge;
                         break;
                     }
                 }
@@ -150,6 +158,10 @@ const useKnowledgeImport = (onChange: () => void) => {
                 toast.error(t`Your knowledge base is full. ${failed} document(s) were not added.`);
             } else if (failed > 0) {
                 toast.error(t`${failed} document(s) could not be added.`);
+            }
+
+            if (tooLarge > 0) {
+                toast.error(t`${tooLarge} document(s) are too large to import: each must be under ${REQUEST_BATCH_KB} KB once encoded.`);
             }
 
             if (candidates.length > limited.length) {
