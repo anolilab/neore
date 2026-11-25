@@ -152,6 +152,8 @@ export const dispatchLinkedPullRequestChecks = internalMutation
 
         // Only a link whose chat auto-archive would consider idle, or whose chat owes a merge that can archive it, is read.
         const lookups = stale.slice(0, CHECK_LIMIT * THREAD_LOOKUP_FACTOR);
+        // Several stale links can share a chat: its merge answer is read once per sweep, and only when idle archiving does not already due it.
+        const owesMerge = new Map<string, boolean>();
 
         for (const link of lookups) {
             if (due.length >= CHECK_LIMIT) {
@@ -160,7 +162,15 @@ export const dispatchLinkedPullRequestChecks = internalMutation
 
             const thread = await ctx.db.get("threads", link.threadId);
             const idleDue = thread !== null && cutoff !== undefined && selectAutoArchiveDue([candidateOf(thread)], cutoff, NO_EXCLUSIONS, 1).length === 1;
-            const mergeOwed = thread !== null && mergedOn && (await ownsMergeTo(ctx, userId, link.threadId));
+            let mergeOwed = false;
+
+            if (!idleDue && thread !== null && mergedOn) {
+                const key = String(link.threadId);
+                const known = owesMerge.get(key);
+
+                mergeOwed = known ?? (await ownsMergeTo(ctx, userId, link.threadId));
+                owesMerge.set(key, mergeOwed);
+            }
 
             if (idleDue || mergeOwed) {
                 due.push(link);
