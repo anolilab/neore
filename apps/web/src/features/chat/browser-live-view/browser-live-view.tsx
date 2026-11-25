@@ -11,13 +11,21 @@ import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import { Input } from "@neore/ui/components/input";
-import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
+import { hashKey, skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Globe, Loader2 } from "lucide-react";
 import type { ChangeEvent, FC, FormEvent } from "react";
 import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 
 import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import { onBrowserControlRequest } from "@/features/chat/browser-live-view/control-request";
+import {
+    atGrantRevision,
+    freshRead,
+    readPastRecovery,
+    useGrantRevision,
+    useNewestRead,
+    useReadOnRecovery,
+} from "@/features/chat/browser-live-view/newest-read";
 import { usePassed, useStatusSkew } from "@/features/chat/browser-live-view/status-clock";
 import env from "@/lib/env";
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
@@ -196,7 +204,9 @@ const settle = async <T,>(request: Promise<T>): Promise<Settled<T>> => {
     }
 };
 
-type StatusRead = { canControl: boolean; control?: { byClaim?: boolean; byYou: boolean; until: number }; now: number } | null;
+type StatusRead =
+    | { canControl: boolean; control?: { byClaim?: boolean; byYou: boolean; until: number }; kind: "running"; now: number }
+    | { kind: "denied" | "none"; now: number };
 
 /**
  * A person's lease as the status names it, on the server's clock; `byYou`: the caller holds it (from any of their tabs).
@@ -579,9 +589,9 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
         }
 
         const read = outcome.value;
-        const named = read?.control;
+        const named = read.kind === "running" ? read.control : undefined;
 
-        if (read?.canControl !== true || named?.byClaim !== true || named.until <= read.now) {
+        if (read.kind !== "running" || !read.canControl || named?.byClaim !== true || named.until <= read.now) {
             endLease();
 
             return;
@@ -1167,24 +1177,63 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     );
 };
 
+/** A status answer that says the caller does not read the chat: it wins a tie on the server's clock (`useNewestRead`). */
+const isDenial = (answer: { kind: string }): boolean => answer.kind === "denied";
+
 const BrowserLiveView: FC<{ threadId: Id<"threads"> | undefined }> = ({ threadId }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
+    const queryClient = useQueryClient();
     const headingId = useId();
-    const status = useQuery(crpc.browser.live_view.getThreadBrowser.queryOptions(threadId ? { threadId } : skipToken));
-    const browser = status.data;
+    const statusArgs = threadId ? { threadId } : skipToken;
+    const statusOptions = crpc.browser.live_view.getThreadBrowser.queryOptions(statusArgs);
+    const status = useQuery(statusOptions);
+    // A grantee's status is also read past the subscription (on focus, and when the grant ends): a renewed grant pushes
+    // nothing, and the "Needs you" card, which reads it so, must not offer Take control while this card is gone.
+    // Every answer to a grantee names their grant's revision; one with no end names an end-less grant, whose removal a
+    // lagging copy can still answer past.
+    const grantee = status.data !== undefined && (status.data.kind === "denied" || status.data.accessUntil !== undefined || status.data.revision !== undefined);
+    const statusAgainOptions = freshRead(crpc.browser.live_view.getThreadBrowser.queryOptions(statusArgs, { live: false }), grantee);
+    const statusAgain = useQuery(statusAgainOptions);
+    // An answer that saw an older grant than one already seen (a replica's read after a removal) is no answer.
+    const revision = useGrantRevision(statusOptions.queryKey, [status.data, statusAgain.data]);
+    // Held by the status's key: a chat switch (a new `threadId`) starts with nothing the last chat's reads left.
+    // On an equal server time a denial stands, whichever read arrived last: access is never decided by arrival order.
+    const newest = useNewestRead(atGrantRevision(status, revision), atGrantRevision(statusAgain, revision), statusOptions.queryKey, isDenial);
+    // An answer of no browser still carries the server's clock.
+    const browser = newest.data?.kind === "running" ? newest.data : undefined;
     // The answer's deadlines are on the server's clock: each is moved onto this device's clock (`useStatusSkew`).
-    const skew = useStatusSkew(browser?.now, status.dataUpdatedAt);
+    const skew = useStatusSkew(newest.data?.now, newest.at);
     const local = (at: number | undefined): number | undefined => (at === undefined ? undefined : at - skew);
     // The card's own lease keeps the browser alive past an `idleUntil` whose push has not come yet.
     const [hold, setHold] = useState<number | undefined>(undefined);
     const idle = usePassed(browser ? Math.max(local(browser.idleUntil) ?? 0, hold ?? 0) : undefined);
     // A grantee's grant ended: nothing re-runs the live query when only the clock moves, so the card goes at once and the
-    // status is asked again; the server answers nothing after the grant's end.
-    const accessEnded = usePassed(local(browser?.accessUntil));
-    const refetchStatus = useEffectEvent((): void => {
+    // status is asked again; the server answers nothing after the grant's end. Read from either answer a reader gets (an
+    // answer of no browser names the end too), so an end that passed while no browser ran is held all the same.
+    const readable = newest.data?.kind === "denied" ? undefined : newest.data;
+    const accessEnded = usePassed(local(readable?.accessUntil));
+    // The latest grant end the card saw pass, on the server's clock, kept once it hides: a read sampled before that end
+    // (sent before it, arriving after) would move the deadline by its later arrival and show the chat again. Only an
+    // answer sampled strictly after it, a renewal's, shows the card again. Held by the status's key, like `newest`.
+    const statusKey = hashKey(statusOptions.queryKey);
+    const [passedEnd, setPassedEnd] = useState<{ end: number; key: string } | undefined>(undefined);
+    const endPassed = passedEnd?.key === statusKey ? passedEnd.end : undefined;
+
+    if (accessEnded && readable?.accessUntil !== undefined && (endPassed === undefined || readable.accessUntil > endPassed)) {
+        setPassedEnd({ end: readable.accessUntil, key: statusKey });
+    }
+
+    const sampledBeforeEnd = endPassed !== undefined && newest.data !== undefined && newest.data.now <= endPassed;
+    const readStatusAgain = (): void => {
         status.refetch().catch(() => undefined);
-    });
+
+        // A live query's refetch may answer its last push again, which clears no failure (`useNewestRead`).
+        if (grantee || newest.failed) {
+            statusAgain.refetch().catch(() => undefined);
+        }
+    };
+    const refetchStatus = useEffectEvent(readStatusAgain);
 
     useEffect(() => {
         if (accessEnded) {
@@ -1192,11 +1241,24 @@ const BrowserLiveView: FC<{ threadId: Id<"threads"> | undefined }> = ({ threadId
         }
     }, [accessEnded]);
 
+    // The subscription came back while the failure holds: one read past it, joined with the "Needs you" cards' own (the
+    // same key), so a newer answer shows the card again without Try again.
+    useReadOnRecovery(status, statusOptions.queryKey, newest.failed && threadId !== undefined, () => {
+        readPastRecovery(queryClient, statusAgainOptions.queryKey, statusAgain);
+    });
+
     // The status could not be read: a running browser must not look like no browser, so the card says so and can ask again.
     // This holds after an earlier answer too: the cached browser may be one the person can no longer see, so its page and
     // any open view go (the frame unmounts, ending the connection). `isError` follows the query client's retry policy: a
-    // network failure is retried with backoff before the card changes, an error the backend answered with is not.
-    if (threadId !== undefined && status.isError) {
+    // network failure is retried with backoff before the card changes, an error the backend answered with is not. A
+    // failure of the subscription counts until a newer answer comes, as on the "Needs you" card (`useNewestRead`). One of
+    // the read past it alone does not take an open view down: the subscription is what carries a removal or a lock, and it
+    // answered since, while the read past it (on focus, or a "Needs you" card's) is there for a renewal, and runs again on
+    // the next focus.
+    // A failure in the answer's own millisecond counts too (`useNewestRead`): the card fails closed.
+    const liveFailed = newest.data === undefined || (status.errorUpdatedAt > 0 && status.errorUpdatedAt >= newest.at);
+
+    if (threadId !== undefined && newest.failed && liveFailed) {
         return (
             <section aria-labelledby={headingId} className="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-900/50">
                 <div className="flex items-center gap-2">
@@ -1209,10 +1271,8 @@ const BrowserLiveView: FC<{ threadId: Id<"threads"> | undefined }> = ({ threadId
                     </div>
                     <Button
                         className={TOUCH_TARGET}
-                        disabled={status.isFetching}
-                        onClick={() => {
-                            status.refetch().catch(() => undefined);
-                        }}
+                        disabled={status.isFetching || statusAgain.isFetching}
+                        onClick={readStatusAgain}
                         size="sm"
                         type="button"
                         variant="outline"
@@ -1224,7 +1284,7 @@ const BrowserLiveView: FC<{ threadId: Id<"threads"> | undefined }> = ({ threadId
         );
     }
 
-    if (threadId === undefined || browser === undefined || browser === null || idle || accessEnded) {
+    if (threadId === undefined || browser === undefined || idle || accessEnded || sampledBeforeEnd) {
         return null;
     }
 

@@ -14,6 +14,7 @@ import { stream } from "../lib/streams";
 import { deleteFollowRowsOfThread } from "../chat/follows/functions";
 import { eraseThreadPinsAndRoutesBatch } from "../chat/gdpr";
 import { deleteMessage } from "./messages";
+import { revokeThreadGrants } from "./sharing";
 import { deleteStreamsPageForThreadId } from "./streams";
 import { vPaginationResult } from "./validators";
 // Note: it only searches for users with threads
@@ -233,6 +234,9 @@ async function deletePageForUserId(context: MutationContext, args: DeleteAllArgs
 
     if (threadDrained && !pinsBatch.hasMore) {
         await context.db.delete("threads", threadInProgress);
+        // Grants and revisions written after the cascade erased this chat's (an invite accepted in between) go with it.
+        // The cascade deleted its invites first; only an acceptance already past its invite check can land after this.
+        await revokeThreadGrants(context, threadInProgress!, { purge: true });
         threadInProgress = null;
         messagesCursor = null;
         isStreamsInProgress = false;

@@ -49,6 +49,7 @@ import {
     eraseChatFileAccessForUser,
     eraseChatFileThreadsForUser,
     eraseStreamingMessagesForUser,
+    eraseGrantRevisionsForUser,
     eraseThreadSummariesForUser,
     eraseWorkflowExecutionsForProject,
     eraseWorkflowExecutionsForUser,
@@ -317,6 +318,12 @@ export const deleteUserThreadSummaries = internalMutation
     .input({ userId: v.string() })
     .output(vBatchResult)
     .mutation(async ({ args: { userId }, ctx: context }): Promise<BatchResult> => await eraseThreadSummariesForUser(context, userId));
+
+/** The revisions of grants the user held or gave, which outlive the grants (`agent/gdpr.ts`). */
+export const deleteUserGrantRevisions = internalMutation
+    .input({ userId: v.string() })
+    .output(vBatchResult)
+    .mutation(async ({ args: { userId }, ctx: context }): Promise<BatchResult> => await eraseGrantRevisionsForUser(context, userId));
 
 /** Streaming-message rows outlive their thread when a stream is abandoned (`agent/gdpr.ts`). */
 export const deleteUserStreamingMessages = internalMutation

@@ -355,3 +355,104 @@ vectors written after its index; a failed upsert is logged, not retried (`lunora
 - **Don't read `ctx.db.query(t).withIndex` on a `.global()` table** — use the
   `ctx.db.<table>` facade.
 - **Don't add a second cron expression** — periodic work goes in `PERIODIC_JOBS`.
+
+## AGENT MODULE (`agent/`)
+
+The rules are in `backend/lunora/agent/AGENTS.md`; the reasoning behind the longer ones is here.
+
+### Grant revisions
+
+- The count outlives the `threadAccess` row: a denial names the removal's revision, and a new grant continues past it,
+  so a client can order a denial against a later re-grant.
+- `getThreadBrowser`/`getHumanCheck` put the revision on every answer to a non-owner. The web cards drop answers below
+  the highest revision seen (a lagging replica's read) and re-read an ask that was dropped.
+- Claim and grant write are separate statements (D1 has no transaction across them): a change goes through `writeGrant`,
+  conditional on the revision read; a new grant and a removal call `settleGrant` after their write, and a removal counts
+  under the grantee the row names at that point. A denial reads the primary.
+- A removal stamps the row with its revision's tombstone (negated, as a merge marks a copy) before the delete: a change
+  that read the row earlier misses, one that reads it after answers the grant gone, so none lands in between and is
+  erased while it reported a write. A stamped row grants nothing (`agent/live-grant.ts`: every access reader skips it),
+  so a removal that stops between the stamp and the delete never leaves the grantee in; a re-grant writes a new row and
+  deletes the stamped one, a later removal finishes it, and a merge never keeps one. Revision reads take the absolute value.
+- Nothing keys `(threadId, userId)` unique on `threadAccess` (a merge from before `mergeGrantsPage` left copies, and
+  concurrent accepts of one invite each insert one), so `settleGrant` reads the copies in pages until one comes back
+  short, never trusting one page as all of them. Past `SETTLE_COPIES_MAX` it moves those and refuses (`CONFLICT`); the
+  next settle reads the raised count and moves the rest.
+- A guest merge marks the guest (`merged-guest` route) with its `merging` marker at every run's start (`beginMergeRun`),
+  before any step reads the guest's rows; the grant steps run in `reassignGlobalRows` after its lease and erasure checks.
+  `mergeGrantsPage` keeps one grant per chat: every write is
+  conditional; a copy to delete is first marked with its negated revision, which no write takes; the kept row is read
+  again before each delete; a chat with many copies is merged over several calls. Then the counts merge (a guest count
+  is marked with its tombstone before its delete, and a claim that reads it goes to the merged account), and the mark is
+  dropped after the guest (`deleteMergedGuest`, whose `grantsRemain` sends the run back to the `global` step), or with the
+  `merging` marker by any stop that keeps the guest (`endGuestMerging`), whose grants then work as any account's.
+- While the mark stands, a grant or count under the marked guest is refused or folded, and an invite of a marked owner
+  waits. An accept the mark overtook takes its grant write back (`undoInviteGrant`), only at the revision it wrote, so
+  it never removes a newer write. Its follow default goes the same way (`withdrawThreadFollowDefault`): a conditional
+  stamp on the state and `updatedAt` written, then the delete. Every follow write is conditional on the `updatedAt` it
+  read and leaves a later one (`setThreadFollowState`), and treats a stamped row as gone, so a choice made since stays.
+  An invite to an accountless grantee or owner is refused (`requireAccounts`).
+- A status read's denial of a grantee is decided again on the primary (a replica that has not seen a re-grant reads
+  as the grant it is), and the count is read after that denial: the revision it names is then at least as new as the
+  denial, so a re-grant and its removal landing between the two reads leave no grant answer the card keeps over it.
+  The other order failed open; this one can only fail closed (a re-grant and a renewal landing between the reads label
+  the denial past the re-grant's push, until a later read).
+- A chat deleted for good is marked (`threadPurgeMarks`, `markThreadPurged`) before its purge reads a grant or a count.
+  A new grant (`insertThreadAccess`) and a new count (`advanceGrantRevision`'s insert) read the mark from the primary
+  AFTER their own write and take that write back when it is there. A write that misses the mark landed before it, so the
+  purge's later reads find it; one that finds it was possibly missed and removes itself. An accept that read the invite
+  before the delete can therefore leave nothing behind. The chat row cannot be checked instead: it lives on the owner's
+  shard, the accept runs on the invitee's, and no transaction spans `.global()` writes. A change or removal of an
+  existing grant needs no check: a patch of a purged row misses, and only an insert makes a row again. The mark names no
+  user and is dropped a day after the purge finishes (`dropThreadPurgeMark`), past any write still in flight; one a
+  lost job leaves is harmless.
+- The rows stop growing with their chats and people: a chat deleted for good purges its counts (`revokeThreadGrantsPage`
+  with `purge`), account erasure drains the user's held and given ones (`eraseGrantRevisionsForUser`). The export holds
+  only the ones the user held (chat and revision); the counts on the user's own chats name other people and stay out.
+  The export stores them a page per workflow step (`storeGrantRevisionsExportPage`, under the run's browser prefix, so
+  the run's cleanup, the sweep and erasure take them) and the file action reads every page back; no step result or
+  dispatch body carries them, and none is cut: past `GRANT_REVISIONS_EXPORT_PAGES` the export fails.
+- Batched grant paths size each call to `GRANT_PAGE_STATEMENTS` (50 D1 statements); why 18 of the Free plan's 50 queries
+  stay spare is in `lunora-upstream.md` (a `.global()` `patchIf` retries up to 16 rounds).
+
+### Save rollback of stored files
+
+- An approved tool result stores its media before its row saves; when the save fails, `discardUnsavedFiles` takes the
+  files back. `chatFiles` rows are shared by hash, and a store that reuses one (`useExistingFile`, a racing `addFile`)
+  does not count it: its message does, once it saves. So `refcount === 0` cannot tell "nobody wants it" from "another
+  reply holds it until its save". Every reuse stamps `reusedAt`; the rollback deletes a row only when it is still as its
+  store left it (`refcount` 0, no `reusedAt`).
+- Lunora runs a mutation's `.global()` statements without a transaction, so that check is ONE conditional write: the
+  delete marks the row (`patchIf` setting `discardingAt`, where `refcount`/`reusedAt` still match and no mark is set),
+  then records the object, removes grants, export view (`deleteFileRowWithMetadata`) and row. A reuse (`claimForReuse`)
+  and a new reference (`changeRefcount`) are `patchIf` on no mark too: one lands before the mark (the row stays, every
+  grant with it) or finds it marked (a reuse stores its own row, a reference fails as "not found"). `findChatFile` skips
+  marked rows. The sweep's `deleteFiles` goes through the same `discardFileRow`, conditional on `lastTouchedAt` and
+  `refcount` 0.
+- Every upload writes its OWN key, `agent-files/<sha256>/<uuid>` (`lib/chat-file-key.ts`); dedup is by row, never by
+  key. A key is named only by the row its upload created and the stores that reused that row through the conditional
+  reuse, so a rollback or sweep that marked the row deletes the object with no race: a store of the same bytes writes a
+  key of its own, and a slow delete cannot reach it. Do not reintroduce content-addressed keys or holds.
+- Every object delete is a `chatFileObjectDeletes` record, written in the deciding mutation right after the mark and
+  ended once `ctx.storage.delete` returned (`deleteStoredObjects`). The hourly sweep claims records past `deleteAfter`
+  (`retryObjectDeletes`, a page at a time), so a failed delete or a dead action never strands bytes.
+- A store records its key as `kind: "store"` (`useExistingFile`'s `uploadKey`, due after `STORE_INTENT_MS`) BEFORE it
+  uploads. `addFile` takes that record back with a conditional write as it writes the row; a key with no live `store`
+  record is refused, so a row never names a key the sweep may delete. A store that lost to a racing store's row turns
+  its record into a delete (`discardedUpload`) and deletes its own upload, never the row's.
+- Rows stored before name the old shared `agent-files/<sha256>`. Those stay valid; their object goes only with the
+  last row naming it (`isStorageKeyNamed`: every page of the hash from the primary; past the page cap the object is
+  kept). No new row names an old key, so once none does, none will. Readers parse both forms (`chatFileKeyHash`).
+
+### Archived flag on thread vectors
+
+- Vectorize metadata on `embeddings-1024` only (metadata index in `alchemy.run.ts`). Lunora's vector sync writes it
+  after commit, so keeping the flag current is a row patch on the thread's vector rows.
+- The threads update trigger moves it on any change into or out of `archived`; a failed schedule fails the write, and
+  the job retries forever, as nothing else re-queues it.
+- The backfill runs once per shard, from the housekeeping sweep and from a meaning search (an idle shard is not swept).
+  Its place is on an `idempotencyClaims` row that never expires, with the chain's lease inside; only the step whose
+  chain, kind and cursor equal the place runs, and nothing runs once account deletion is underway.
+- Writers read the thread's current status, patch only its own vectors of the same owner, and skip a thread gone or
+  being deleted. Vectorize indexes a property only for vectors written after its index; a failed upsert is logged, not
+  retried (`lunora-upstream.md`).

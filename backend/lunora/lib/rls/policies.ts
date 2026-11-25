@@ -383,6 +383,15 @@ const RULES: Record<string, TableRules> = {
         },
         update: (scope, row) => threadLevelAtLeast(scope, row.threadId, "admin"),
     },
+    // A grantee's own grant revisions; written only by the internal grant mutations.
+    threadAccessRevisions: {
+        delete: () => false,
+        insert: () => false,
+        read: (_scope, userId) => {
+            return { userId };
+        },
+        update: () => false,
+    },
     // A condensed copy of the thread's content: readable by whoever reads the thread. Written only by internal functions.
     threadContextSummaries: threadScoped({ hasUserId: true }),
     // No `userId`: the pending tokens are the owner's and admin grantees' alone.
@@ -437,6 +446,7 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     changelogCache: "public changelog cache",
     chatFileMetadata:
         "the export view of a shared `chatFiles` row (name, type, hash, stored-at), written and erased with that row; read only by the GDPR export, which reads it for files the user holds a grant for or names in a message",
+    chatFileObjectDeletes: "a chat-file storage object no row names, to be deleted; no user column, written and read only by the file store and its deletes",
     chatFiles: "content-addressed and SHARED (same bytes, one row) — no owner; access is the `chatFileAccess` grant",
     chatFileThreads:
         "derived index of which of the owner's chats hold a chat file; read only as a yes/no by the lock gate, never returned, written by `changeMessageFiles` and the chat-file backfill (`agent/file-link-backfill.ts`), and deleted directly by `deleteChatFileLinksForThread` (permanent thread delete) and `eraseChatFileThreadsForUser` (account erasure)",
@@ -492,6 +502,8 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     teamMember: "better-auth team membership; org-scoped",
     teamSettings: "org-scoped settings, checked by org role",
     threadKnowledge: "link rows with no owner column; every access follows a thread access check",
+    threadPurgeMarks:
+        "a chat deleted for good, with no user column: written by its grant purge and read through the primary by the internal grant writers (`agent/grant-revision.ts#markThreadPurged`); no client reads it",
     triggerExecutions: "no owner column; every access follows the parent trigger's owner check",
     usageOrganizationCohortSlots:
         "global booking slots per organization; written by the contributor booking and read by the organization usage view, both through systemDb",

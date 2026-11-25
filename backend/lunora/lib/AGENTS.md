@@ -55,7 +55,7 @@
   procedures take the staged object by `uploadId` alone, rebuild its key from
   the caller's identity and check the REAL bytes (`takeStagedUpload`: size cap,
   allowlist, leading bytes, then the staging object is deleted) —
-  `file.finalizeChatUpload` dedupes into `agent-files/<sha256>`,
+  `file.finalizeChatUpload` dedupes by hash into `chatFiles` (each new upload its own `agent-files/<sha256>/<uuid>`),
   `vault_functions.saveVaultFile` moves it to a server-minted key (5 MB cap),
   `chat_import_functions.startImportJob` hands the staging key to the import
   workflow, which deletes it when done. The route schedules a reap of each

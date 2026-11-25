@@ -32,6 +32,7 @@
  *    to a table after its clear sends the merge back to clear it), as the anonymous plugin does when a
  *    conversion completes in the guest's own browser. A cross-browser
  *    conversion (`auth/guest-conversion.ts`) would otherwise leave it alive.
+ *    Its merge mark goes in the same step, after the guest.
  *
  * An import never overwrites the new account's own edit: every row it writes
  * leaves an import marker (the digest of what it wrote), and a row on the new
@@ -94,10 +95,12 @@ import { noteRetentionDueAt, noteShardActivity, noteShardDue } from "./shard-hou
 import { currentShard } from "./shard-context";
 import schema from "../schema";
 import { dropPushDevicesOf } from "../notifications/push-device-writes";
+import { GRANT_PAGE_STATEMENTS, mergeGrantRevisionsPage, mergeGrantsPage, reassignOwnedRevisionsPage } from "../agent/grant-revision";
 import { mergeThreadFollowsPage } from "../chat/follows/follow-writes";
 import { firstPinRouteOf, moveSharedPinRoute, pinRouteOwnerOf } from "../chat/pins/pin-route-writes";
 import { ORGANIZATION_RECORD_LATE_MS } from "../usage/activity-logic";
 import { patchRow } from "./patch";
+import { deleteShardRoute, setShardRoute } from "./shard-routes";
 import { SEARCH_INTERNAL_FIELDS } from "../agent/thread-search-plan";
 import { countUserTurns } from "../agent/thread-search-triggers";
 import { copyMergedRunWebhooks } from "../run-webhooks/table-writes";
@@ -217,7 +220,11 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     sharedPinRoutes: ["ownerId"],
     skillRatings: ["userId"],
     skills: ["userId"],
-    threadAccess: ["userId", "ownerId", "grantedBy"],
+    // `userId` is moved by `mergeGrantsPage` before the loop below: a grant takes a revision past the merged count.
+    threadAccess: ["ownerId", "grantedBy"],
+    // Moved by the grant steps before the loop below, each a page sized to the invocation's D1 queries: `userId` by
+    // `mergeGrantRevisionsPage` (a unique key), `ownerId` by `reassignOwnedRevisionsPage`.
+    threadAccessRevisions: [],
     threadInvites: ["ownerId", "invitedBy", "acceptedBy"],
     // The organizations a guest's projects were filed under: the list follows the guest's ledger rows (which move with their shard).
     usageOrganizationContributors: ["userId"],
@@ -848,6 +855,27 @@ export const dropMergeGeneration = async (db: MutationCtx["db"], from: string): 
 };
 
 /**
+ * Marks guest `from` as merging into `to` (a `merged-guest` route) with its `merging` marker, at each run's start and
+ * before any step reads the guest's rows: a grant or a grant revision written under the guest afterwards finds the mark
+ * and is refused or folded into `to` (`agent/grant-revision.ts`), so none is left on the guest after the merge's last read.
+ */
+export const markGuestMerging = async (ctx: Pick<MutationCtx, "db">, from: string, to: string, now: number): Promise<void> => {
+    await beginAccountMove(ctx, from, "merging", now);
+    // From the primary: a mark renewed by the next run must find the first, or it would add a second route.
+    await setShardRoute(ctx, "merged-guest", from, to, { primary: true });
+};
+
+/**
+ * Ends guest `from`'s `merging` marker and its `merged-guest` mark together: a merge that stops keeps its guest, whose
+ * grants then behave as any account's again. A finished merge's mark already went with the guest
+ * (`auth/hooks.ts#deleteMergedGuest`); a later run that goes on marks the guest again.
+ */
+const endGuestMerging = async (ctx: Pick<MutationCtx, "db">, from: string): Promise<void> => {
+    await endAccountMove(ctx, from, "merging");
+    await deleteShardRoute(ctx, "merged-guest", from);
+};
+
+/**
  * A merge that stops for good with no run holding its lease: into an account that is gone (erased, so every claim tagged
  * with it went too), or one the stalled-merge sweep drops (an erasure, the run cap). This merge's markers end, so the
  * guest's pin writes are refused no longer, and its progress record and lease go, so nothing tagged with an erased account
@@ -860,7 +888,7 @@ const endStoppedMerge = async (ctx: Pick<MutationCtx, "db">, from: string, to: s
         await endImporting(ctx, from, to, now);
     }
 
-    await endAccountMove(ctx, from, "merging");
+    await endGuestMerging(ctx, from);
     await dropMergeProgress(ctx.db, from);
 
     const lease = await storedClaim(ctx.db, MERGE_LEASE_SCOPE, from);
@@ -1304,6 +1332,9 @@ export const resumeStalledGuestMergesOnTick = internalMutation
         return nextCheckAt === undefined ? {} : { nextCheckAt };
     });
 
+/** D1 reads {@link stoppedForErasure} takes when no erasure has begun: each account's erasing marker. */
+const ERASURE_CHECK_STATEMENTS = 2;
+
 /**
  * The erasure fence of every step that hands the guest's data to the new account (the copy's and the clear's imports, the
  * contributor hand-over, the `global` and follows re-points, a pin route's move), and of the take-backs of copies whose
@@ -1320,7 +1351,7 @@ const stoppedForErasure = async (ctx: Pick<MutationCtx, "db">, from: string, to:
     }
 
     await endImporting(ctx, from, to, now);
-    await endAccountMove(ctx, from, "merging");
+    await endGuestMerging(ctx, from);
     await dropMergeProgress(ctx.db, from);
 
     return true;
@@ -1575,7 +1606,7 @@ export const dropImportMarkersPage = internalMutation
             }
 
             await endImporting(ctx, args.from, args.to, now);
-            await endAccountMove(ctx, args.from, "merging");
+            await endGuestMerging(ctx, args.from);
         }
 
         return { fenced: false, hasMore };
@@ -1953,6 +1984,40 @@ export const reassignGlobalRows = internalMutation
                 findMany: (options: { consistency: "primary"; limit: number; where: Record<string, string> }) => Promise<{ page: Record<string, unknown>[] }>;
             }
         >;
+        // The guest's grant revisions first: the new account may hold a count for the same thread, which a re-point would
+        // collide with. Each grant step below is sized to its own share of an invocation's D1 queries
+        // (`GRANT_PAGE_STATEMENTS`, less the erasure check's reads above), and a call that did grant work stops there: the
+        // next call goes on.
+        const grantShare = GRANT_PAGE_STATEMENTS - ERASURE_CHECK_STATEMENTS;
+        const revisions = await mergeGrantRevisionsPage(ctx, args.from, args.to, { budget: grantShare });
+
+        if (!revisions.done || revisions.moved > 0) {
+            return { done: false, reassigned: revisions.moved };
+        }
+
+        // Then the guest's grants, each chat's copies made one at a revision past that count, every write conditional on
+        // the revision read (`mergeGrantsPage` counts its own statements).
+        const grants = await mergeGrantsPage(ctx, args.from, args.to, grantShare);
+
+        if (!grants.done || grants.statements > 1) {
+            return { done: false, reassigned: grants.statements };
+        }
+
+        // Then the guest's revisions again: a change or removal of a guest's grant that raced the moves claimed under the
+        // guest, after the first pass. Merged into the new account's count, advanced past it, and its grant settled past that.
+        const late = await mergeGrantRevisionsPage(ctx, args.from, args.to, { budget: grantShare, past: true });
+
+        if (!late.done || late.moved > 0) {
+            return { done: false, reassigned: late.moved };
+        }
+
+        // Then the counts on chats the guest owns, a page within what is left of the grant share: three page reads above.
+        const owned = await reassignOwnedRevisionsPage(ctx, args.from, args.to, grantShare - 3);
+
+        if (!owned.done || owned.moved > 0) {
+            return { done: false, reassigned: owned.moved };
+        }
+
         let reassigned = 0;
 
         const settleContributors = args.guestDrained !== false;
@@ -2097,7 +2162,7 @@ export const stopMergeKeepingGuest = internalMutation
         }
 
         await endImporting(ctx, args.from, args.to, now);
-        await endAccountMove(ctx, args.from, "merging");
+        await endGuestMerging(ctx, args.from);
         await dropMergeProgress(ctx.db, args.from);
 
         if (args.dropLease === true) {
@@ -2184,12 +2249,12 @@ export const beginMergeRun = internalMutation
             };
         }
 
-        await beginAccountMove(ctx, args.from, "merging", now);
+        await markGuestMerging(ctx, args.from, args.to, now);
         await beginImporting(ctx, args.from, args.to, now);
 
         if ((await isErasing(ctx, args.to)) || (await isErasing(ctx, args.from))) {
             await endImporting(ctx, args.from, args.to, now);
-            await endAccountMove(ctx, args.from, "merging");
+            await endGuestMerging(ctx, args.from);
             // The merge ends here: nothing is left for the stalled-merge sweep to restart.
             await dropMergeProgress(ctx.db, args.from);
 
@@ -2588,6 +2653,7 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
             deleted: boolean;
             fenced?: boolean;
             followsRemain?: boolean;
+            grantsRemain?: boolean;
             pinsRemain?: boolean;
             rowsRemain?: string;
             sharedShard?: boolean;
@@ -2610,6 +2676,10 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
             enter(state, "follows");
         } else if (result.pinsRemain === true) {
             enter(state, "pins");
+        } else if (result.grantsRemain === true) {
+            // A grant or a count under the guest that its `global` step has not seen (a write that failed before it could
+            // undo itself): that step moves it, then the guest step runs again.
+            enter(state, "global");
         } else if (result.rowsRemain === undefined) {
             enter(state, "markers");
         } else {

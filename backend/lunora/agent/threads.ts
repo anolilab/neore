@@ -509,8 +509,8 @@ export const deleteAllForThreadIdAsync = internalMutation
             }
 
             await deleteThreadSummaries(ctx, args.threadId);
-            // A chat deleted for good without passing the trash keeps no grant either.
-            await revokeThreadGrants(ctx, args.threadId);
+            // A chat deleted for good without passing the trash keeps no grant either, nor any grant's revision.
+            await revokeThreadGrants(ctx, args.threadId, { purge: true });
         } else {
             await ctx.scheduler.runAfter(0, internal.agent.threads.deleteAllForThreadIdAsync, {
                 cursor: messagesResult.cursor,

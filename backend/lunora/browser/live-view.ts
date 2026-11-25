@@ -23,6 +23,7 @@ import { getRateLimitKey, getUserTier } from "../lib/rate-limiter";
 import { systemDb } from "../lib/rls/scope";
 import { isServiceBound, serviceFetch } from "../lib/services";
 import { validateDomain } from "../chat/tools/utilities";
+import { lastGrantRevision } from "../agent/grant-revision";
 import { activeThreadSession } from "./functions";
 import { claimIdOf, releaseTokenFor } from "./release-token";
 import { patchRow } from "../lib/patch";
@@ -41,6 +42,10 @@ import {
     watchableSessionId,
 } from "./live-view-logic";
 
+/**
+ * `revision`, on a grantee's answer that reads the chat: the revision of their grant this read saw
+ * (`agent/grant-revision.ts`). Absent for the owner.
+ */
 type ReaderBrowser =
     | {
           accessUntil?: number;
@@ -53,6 +58,7 @@ type ReaderBrowser =
           idleUntil: number;
           kind: "watchable";
           providerSessionId: string;
+          revision?: number;
           session: Doc<"browserSessions">;
           /**
            * The shard the session row is on: the one serving this read (the thread owner's). Never the row's `userId`, which names whoever opened
@@ -60,8 +66,13 @@ type ReaderBrowser =
            */
           shardKey: string;
       }
-    | { kind: "denied" }
-    | { kind: "none" };
+    /** `owner`: the caller owns the chat (a locked one), so the denial names no grant. */
+    | { kind: "denied"; owner?: true }
+    /**
+     * `accessUntil`: as on a watchable browser, so a grantee's every readable answer says when the grant ends. `trashed`:
+     * the chat is in the bin, which the status answers as `denied` (the ask's card hides on it like on a lock).
+     */
+    | { accessUntil?: number; kind: "none"; revision?: number; trashed?: true };
 
 /**
  * Who holds a lease, as `browserSessions.control.by` stores it: a keyed hash of the session and the person, never their
@@ -129,12 +140,17 @@ const readerBrowser = async (
     const access = await resolveThreadReadAccess(ctx, threadId, userId, undefined, options);
 
     if (access?.kind !== "full") {
-        return { kind: "denied" };
+        return access?.thread.userId === userId ? { kind: "denied", owner: true } : { kind: "denied" };
     }
+
+    const grant = {
+        ...(access.expiresAt !== undefined && { accessUntil: access.expiresAt }),
+        ...(access.revision !== undefined && { revision: access.revision }),
+    };
 
     // A trashed chat shows its browser to no one, like every other read of a trashed thread.
     if (access.thread.deleted === true) {
-        return { kind: "none" };
+        return { ...grant, kind: "none", trashed: true };
     }
 
     // The same row the agent's next action uses (`getActiveSession`), so the view is of the browser the agent drives.
@@ -142,11 +158,11 @@ const readerBrowser = async (
     const providerSessionId = watchableSessionId(session, now);
 
     if (session === null || providerSessionId === undefined) {
-        return { kind: "none" };
+        return { ...grant, kind: "none" };
     }
 
     return {
-        ...(access.expiresAt !== undefined && { accessUntil: access.expiresAt }),
+        ...grant,
         browserId: await browserIdOf(session._id, providerSessionId),
         canControl: meetsThreadPermission(access.permission, "write"),
         ...(controlStateOf(session, now) === "person" &&
@@ -160,21 +176,63 @@ const readerBrowser = async (
     };
 };
 
+/**
+ * The status read's browser and the grant revision its answer names. The read is on the replica; a denial of a grantee
+ * is decided again on the primary (a re-grant a replica has not seen yet reads as the grant it is), and the count is
+ * read after that denial, so the revision it names is at least as new as the denial: a re-grant and its removal that
+ * commit between the two reads leave no grant answer the card would keep over it. A denial names the caller's last
+ * revision (a removal advanced it); the owner's names none (they hold no grant).
+ */
+const statusBrowser = async (
+    ctx: QueryCtx & { user: { userId: string } },
+    threadId: Id<"threads">,
+    now: number,
+): Promise<{ browser: ReaderBrowser; revision?: number }> => {
+    const { userId } = ctx.user;
+    const replica = await readerBrowser(ctx, threadId, userId, now);
+
+    if (replica.kind !== "denied") {
+        return replica.revision === undefined ? { browser: replica } : { browser: replica, revision: replica.revision };
+    }
+
+    if (replica.owner === true) {
+        return { browser: replica };
+    }
+
+    const browser = await readerBrowser(ctx, threadId, userId, now, { primary: true });
+    let revision = browser.kind === "denied" ? await lastGrantRevision(ctx, threadId, userId) : browser.revision;
+
+    if (browser.kind === "denied" && browser.owner === true) {
+        revision = undefined;
+    }
+
+    return revision === undefined ? { browser } : { browser, revision };
+};
+
 /** The public names of the claims that name `lease`: its own, and the one a renewal still being minted replaces. */
 const leaseClaimIds = async (lease: { claim: string; renewing?: string }): Promise<string[]> =>
     await Promise.all([lease.claim, ...(lease.renewing === undefined ? [] : [lease.renewing])].map(async (claim: string) => await claimIdOf(claim)));
 
 /**
- * The thread's running cloud browser, or `null`. A grantee's read goes through the thread decision, then past row-level
- * security. `accessUntil` is when a grantee's grant ends: a live query is re-run only by a write to what it read, not
- * by the clock, so the client stops showing the status then and asks again, and every answer after it is `null`.
+ * The thread's running cloud browser (`kind: "running"`); `none`: no browser running that the reader may watch;
+ * `denied`: the caller does not read the chat now (a non-reader, a locked or trashed chat, a grant that ended). The
+ * last two carry nothing of the thread or its browser, only the server's clock `now`, which every answer carries so a
+ * client orders a one-shot read against a live push. A grantee's read goes through the thread decision, then past
+ * row-level security. `accessUntil` (on `running` and `none`, so on every answer a grantee reads the chat by) is when a
+ * grantee's grant ends: a live query is re-run only by a write to what it read, not by the clock, so the client stops
+ * showing the status then and asks again, and every answer after it is `denied`. Which answer is newest never decides
+ * whether the grant's end is known. `revision`, on every answer to a grantee: the revision of their grant the read saw,
+ * on a denial their grant's last one, none when they never had one (`agent/grant-revision.ts`). A removal advances it and pushes a denial, a renewal
+ * advances it and pushes nothing, so a client drops any answer older than the highest revision it has seen: a one-shot
+ * read from a replica that still holds a removed grant answers on a later clock, but with the older revision.
  */
 export const getThreadBrowser = authQuery
     /** `claim`: a view's own claim. The answer then says whether the lease is that view's, not only the caller's. */
     .input({ claim: v.optional(v.string()), threadId: v.id("threads") })
     .output(
         v.union(
-            v.null(),
+            v.object({ kind: v.literal("denied"), now: v.number(), revision: v.optional(v.number()) }),
+            v.object({ accessUntil: v.optional(v.number()), kind: v.literal("none"), now: v.number(), revision: v.optional(v.number()) }),
             v.object({
                 accessUntil: v.optional(v.number()),
                 browserId: v.string(),
@@ -191,19 +249,29 @@ export const getThreadBrowser = authQuery
                 ),
                 currentUrl: v.optional(v.string()),
                 idleUntil: v.number(),
+                kind: v.literal("running"),
                 /**
                  * The server's clock at this answer. A lease that runs out writes nothing, so no new answer comes when it
                  * ends: the client compares `control.until` with this clock, not its own, and needs no second read.
                  */
                 now: v.number(),
+                revision: v.optional(v.number()),
             }),
         ),
     )
     .query(async ({ args: { claim, threadId }, ctx }) => {
-        const browser = await readerBrowser(ctx, threadId, ctx.user.userId, ctx.now);
+        const { browser, revision: answered } = await statusBrowser(ctx, threadId, ctx.now);
+        const revision = answered === undefined ? {} : { revision: answered };
 
-        if (browser.kind !== "watchable") {
-            return null;
+        // A trashed chat is read by no one, the person who trashed it included: the "Needs you" card hides its site and
+        // page on it whether or not its own ask still reads (a settled ask's card no longer subscribes to the ask).
+
+        if (browser.kind === "denied" || (browser.kind === "none" && browser.trashed === true)) {
+            return { ...revision, kind: "denied" as const, now: ctx.now };
+        }
+
+        if (browser.kind === "none") {
+            return { ...(browser.accessUntil !== undefined && { accessUntil: browser.accessUntil }), ...revision, kind: "none" as const, now: ctx.now };
         }
 
         const { control } = browser;
@@ -223,7 +291,9 @@ export const getThreadBrowser = authQuery
             }),
             currentUrl: browser.currentUrl,
             idleUntil: browser.idleUntil,
+            kind: "running" as const,
             now: ctx.now,
+            ...revision,
         };
     });
 
@@ -253,7 +323,7 @@ export const getReaderBrowser = internalQuery
         const browser = await readerBrowser(ctx, threadId, userId, Math.max(ctx.now, at ?? 0), { primary: true });
 
         if (browser.kind !== "watchable") {
-            return browser;
+            return { kind: browser.kind };
         }
 
         return {

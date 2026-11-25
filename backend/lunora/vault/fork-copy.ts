@@ -1,7 +1,7 @@
 /**
  * Vault images in a forked workflow: the forker gets their OWN copy.
  *
- * A chat file (`agent-files/<sha256>`) is content-addressed and shared, so a
+ * A chat file (`agent-files/<sha256>/<uuid>`) is deduplicated by hash and shared, so a
  * fork grants it (`grantOwnedChatFiles`). A vault `files` row has exactly one
  * owner and no grant table, so the other two options were a new read-grant
  * mechanism for vault keys or a copy. A copy wins:

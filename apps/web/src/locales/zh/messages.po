@@ -61,19 +61,19 @@ msgstr "“{0}” 将在其依赖项完成后开始"
 msgid "\"{badLogin}\" is not a valid login. A login starts with a letter or digit, has at most {0} characters, and uses only letters, digits, and single hyphens or underscores."
 msgstr "“{badLogin}”不是有效的登录名。登录名须以字母或数字开头，最多 {0} 个字符，且只能包含字母、数字以及单个连字符或下划线。"
 
-#: src/features/chat/thread/composer-input.tsx:720
+#: src/features/chat/thread/composer-input.tsx:721
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "无法附加“{fileName}”：不支持此文件类型。"
 
-#: src/features/chat/thread/composer-input.tsx:713
+#: src/features/chat/thread/composer-input.tsx:714
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "无法附加“{fileName}”：文件内容与其文件类型不符。"
 
-#: src/features/chat/thread/composer-input.tsx:1241
+#: src/features/chat/thread/composer-input.tsx:1244
 msgid "\"{fileName}\" could not be uploaded, so the message was not sent."
 msgstr "\"{fileName}\" 无法上传，因此消息未发送。"
 
-#: src/features/chat/thread/composer-input.tsx:715
+#: src/features/chat/thread/composer-input.tsx:716
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "无法上传“{fileName}”。请检查你的网络连接，然后重试。"
 
@@ -81,11 +81,11 @@ msgstr "无法上传“{fileName}”。请检查你的网络连接，然后重�
 #~ msgid "\"{fileName}\" could not be uploaded. Remove it to send."
 #~ msgstr "\"{fileName}\" 无法上传。请移除后再发送。"
 
-#: src/features/chat/thread/composer-input.tsx:718
+#: src/features/chat/thread/composer-input.tsx:719
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "“{fileName}”太大了。文档最大为 {maxMegabytes} MB。"
 
-#: src/features/chat/thread/composer-input.tsx:719
+#: src/features/chat/thread/composer-input.tsx:720
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "“{fileName}”太大了。此类文件最大为 {maxMegabytes} MB。"
 
@@ -897,7 +897,7 @@ msgstr "{activeCount, plural, other {你已连接 # 个即时通讯平台}}"
 msgid "{activeCount} of {0} MCP servers active"
 msgstr "{activeCount}/{0} 个 MCP 服务器已启用"
 
-#: src/features/develop/components/thread-pull-requests.tsx:167
+#: src/features/develop/components/thread-pull-requests.tsx:289
 msgid "{address}: {reason}"
 msgstr "{address}：{reason}"
 
@@ -1018,8 +1018,8 @@ msgstr "{date}：{replies}，{cost}"
 msgid "{date}: no replies"
 msgstr "{date}：无回复"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:90
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:97
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:93
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:100
 msgid "{days} days"
 msgstr "{days} 天"
 
@@ -1072,13 +1072,9 @@ msgstr "{editorNames} 正在编辑此页面。如果你们修改了同一个版�
 msgid "{extraRowCount, plural, one {+# more row} other {+# more rows}}"
 msgstr "{extraRowCount, plural, other {+另外 # 行}}"
 
-#: src/features/knowledge/hooks/use-knowledge-import.ts:152
+#: src/features/knowledge/hooks/use-knowledge-import.ts:168
 msgid "{failed} document(s) could not be added."
 msgstr "有 {failed} 个文档无法添加。"
-
-#: src/features/knowledge/hooks/use-knowledge-import.ts
-msgid "Skipped {tooLarge} document(s) over {REQUEST_DOCUMENT_KB} KB once encoded."
-msgstr "已跳过 {tooLarge} 份文档：编码后超过 {REQUEST_DOCUMENT_KB} KB。"
 
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:211
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:288
@@ -1137,7 +1133,7 @@ msgstr "{handoff} 积分"
 msgid "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
 msgstr "{hiddenColumns, plural, other {另有 # 列未显示。}}"
 
-#: src/features/chat/thread/composer-input-area.tsx:200
+#: src/features/chat/thread/composer-input-area.tsx:205
 msgid "{hiddenRemoved, plural, one {# invisible character was removed from your message.} other {# invisible characters were removed from your message.}}"
 msgstr "{hiddenRemoved, plural, other {已从你的消息中移除 # 个不可见字符。}}"
 
@@ -1606,7 +1602,7 @@ msgstr "{star, plural, other {# 星}}"
 msgid "{stateLabel} Stop hands-free voice mode"
 msgstr "{stateLabel} 停止免提语音模式"
 
-#: src/features/develop/components/thread-pull-requests.tsx:257
+#: src/features/develop/components/thread-pull-requests.tsx:373
 msgid "{success, plural, one {# pull request linked.} other {# pull requests linked.}}"
 msgstr "{success, plural, other {已关联 # 个拉取请求。}}"
 
@@ -2632,10 +2628,10 @@ msgstr "至少添加一个模型——使用“获取模型”或手动输入 ID
 msgid "Add at least one model id"
 msgstr "请至少添加一个模型 ID"
 
-#: src/features/chat/thread/composer-input-area.tsx:245
-#: src/features/chat/thread/composer-input-area.tsx:279
-#: src/features/chat/thread/composer-input-area.tsx:286
-#: src/features/chat/thread/composer-input-area.tsx:300
+#: src/features/chat/thread/composer-input-area.tsx:250
+#: src/features/chat/thread/composer-input-area.tsx:284
+#: src/features/chat/thread/composer-input-area.tsx:291
+#: src/features/chat/thread/composer-input-area.tsx:305
 #: src/features/chat/thread/edit-composer.tsx:132
 msgid "Add attachment"
 msgstr "添加附件"
@@ -2770,7 +2766,7 @@ msgstr "添加提示词"
 msgid "Add Provider"
 msgstr "添加提供商"
 
-#: src/features/develop/components/thread-pull-requests.tsx:235
+#: src/features/develop/components/thread-pull-requests.tsx:351
 msgid "Add pull requests that already exist to this thread. Each one is read from the host with your own connection first."
 msgstr "将已有的拉取请求添加到此对话。每个请求会先通过你自己的连接从托管方读取。"
 
@@ -2903,11 +2899,11 @@ msgstr "已将“{0}”添加到知识库"
 msgid "added {0}"
 msgstr "添加于 {0}"
 
-#: src/features/knowledge/hooks/use-knowledge-import.ts:180
+#: src/features/knowledge/hooks/use-knowledge-import.ts:200
 msgid "Added {added} document(s); skipped {skippedCount} unsupported or oversized file(s)."
 msgstr "已添加 {added} 个文档；跳过了 {skippedCount} 个不支持或过大的文件。"
 
-#: src/features/knowledge/hooks/use-knowledge-import.ts:181
+#: src/features/knowledge/hooks/use-knowledge-import.ts:201
 msgid "Added {added} document(s)."
 msgstr "已添加 {added} 个文档。"
 
@@ -3758,7 +3754,7 @@ msgstr "按字母顺序"
 msgid "Already have an account?"
 msgstr "已有账号？"
 
-#: src/features/develop/components/thread-pull-requests.tsx:101
+#: src/features/develop/components/thread-pull-requests.tsx:223
 msgid "Already linked to this thread."
 msgstr "已关联到此对话。"
 
@@ -3805,7 +3801,7 @@ msgstr "琥珀色"
 msgid "Amount"
 msgstr "金额"
 
-#: src/features/settings/components/account/account-settings.tsx:114
+#: src/features/settings/components/account/account-settings.tsx:115
 msgid "Amsterdam"
 msgstr "阿姆斯特丹"
 
@@ -4179,7 +4175,7 @@ msgstr "Meta 应用“应用设置 > 基本”中的 App Secret，用于验证 X
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:316
 #: src/features/projects/components/project-form-dialog.tsx:292
-#: src/features/settings/components/account/account-settings.tsx:185
+#: src/features/settings/components/account/account-settings.tsx:186
 #: src/features/settings/lib/settings-keywords.ts:27
 msgid "Appearance"
 msgstr "外观"
@@ -4377,6 +4373,10 @@ msgstr "归档"
 #: src/features/sub-agents/components/worker-list.tsx:154
 msgid "Archive {0}"
 msgstr "归档 {0}"
+
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:113
+msgid "Archive a chat when its linked pull request is merged. Archived chats stay searchable."
+msgstr "当关联的拉取请求（PR）合并后归档该聊天。已归档的聊天仍可搜索。"
 
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:73
 msgid "Archive open thread"
@@ -4740,7 +4740,7 @@ msgstr "尝试"
 msgid "Attempts: {0}"
 msgstr "尝试次数：{0}"
 
-#: src/features/settings/components/account/account-settings.tsx:125
+#: src/features/settings/components/account/account-settings.tsx:126
 msgid "Auckland"
 msgstr "奥克兰"
 
@@ -4828,31 +4828,19 @@ msgstr "自动媒体补充"
 msgid "Auto pricing"
 msgstr "自动定价"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:107
-msgid "Auto-archive merged chats"
-msgstr "自动归档已合并的聊天"
-
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:111
-msgid "Archive a chat when its linked pull request is merged. Archived chats stay searchable."
-msgstr "当关联的拉取请求（PR）合并后归档该聊天。已归档的聊天仍可搜索。"
-
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:118
-msgid "Merged chats will be archived"
-msgstr "已合并的聊天将被归档"
-
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:118
-msgid "Merged chats stay as they are"
-msgstr "已合并的聊天保持不变"
-
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:72
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:75
 msgid "Auto-archive inactive chats"
 msgstr "自动归档不活跃的聊天"
 
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:110
+msgid "Auto-archive merged chats"
+msgstr "自动归档已合并的聊天"
+
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:151
 msgid "Auto-archive skips a chat while it is linked to a pull request that is still open."
 msgstr "只要聊天关联的拉取请求仍处于打开状态，自动归档就会跳过该聊天。"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:81
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:84
 msgid "Auto-archive turned off"
 msgstr "已关闭自动归档"
 
@@ -4891,7 +4879,7 @@ msgstr "自动合并已开启：{hostLabel} 的规则满足后即合并。"
 msgid "Auto-merge is on."
 msgstr "自动合并已开启。"
 
-#: src/features/settings/components/account/account-settings.tsx:434
+#: src/features/settings/components/account/account-settings.tsx:435
 msgid "Auto-read replies"
 msgstr "自动朗读回复"
 
@@ -4903,15 +4891,15 @@ msgstr "自动保存"
 msgid "Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so \"Ask\" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only."
 msgstr "自动：无需询问直接运行。询问：暂停等待你批准/拒绝。关闭：助手完全看不到该工具。自动化（触发器、消息机器人、工作流）无法询问，因此“询问”类工具在那里不可用。MCP 工具默认为“询问”，除非服务器将其标记为只读。"
 
-#: src/features/settings/components/account/account-settings.tsx:497
+#: src/features/settings/components/account/account-settings.tsx:498
 msgid "Autocomplete disabled"
 msgstr "自动补全已停用"
 
-#: src/features/settings/components/account/account-settings.tsx:497
+#: src/features/settings/components/account/account-settings.tsx:498
 msgid "Autocomplete enabled"
 msgstr "自动补全已启用"
 
-#: src/features/settings/components/account/account-settings.tsx:486
+#: src/features/settings/components/account/account-settings.tsx:487
 msgid "Autocomplete while typing"
 msgstr "输入时自动补全"
 
@@ -5261,7 +5249,7 @@ msgstr "每次回复前，与该消息最相关的记忆会被加入提示词，
 msgid "beginner"
 msgstr "入门"
 
-#: src/features/settings/components/account/account-settings.tsx:212
+#: src/features/settings/components/account/account-settings.tsx:213
 #: src/features/settings/lib/settings-keywords.ts:28
 msgid "Behavior"
 msgstr "行为"
@@ -5298,7 +5286,7 @@ msgstr "孟加拉语"
 msgid "Bengali (Bangladesh)"
 msgstr "孟加拉语（孟加拉国）"
 
-#: src/features/settings/components/account/account-settings.tsx:111
+#: src/features/settings/components/account/account-settings.tsx:112
 msgid "Berlin"
 msgstr "柏林"
 
@@ -5480,11 +5468,11 @@ msgstr "已屏蔽的提供商"
 msgid "Blocked Regions"
 msgstr "已屏蔽的地区"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:128
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:169
 msgid "Blocked websites for web search"
 msgstr "网页搜索屏蔽的网站"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:149
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:190
 msgid "Blocked websites saved"
 msgstr "已保存屏蔽的网站"
 
@@ -5712,8 +5700,8 @@ msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "浏览、复刻并改编社区分享的工作流"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:824
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1028
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1205
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1038
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1267
 msgid "Browser"
 msgstr "浏览器"
 
@@ -6291,7 +6279,7 @@ msgstr "说明文字"
 msgid "Caption text"
 msgstr "说明文字"
 
-#: src/features/chat/thread/composer-input-area.tsx:274
+#: src/features/chat/thread/composer-input-area.tsx:279
 msgid "Capture screen"
 msgstr "截取屏幕"
 
@@ -6362,7 +6350,7 @@ msgstr "熔断至 {circuitBreakerUntil}"
 msgid "Center"
 msgstr "居中"
 
-#: src/features/settings/components/account/account-settings.tsx:104
+#: src/features/settings/components/account/account-settings.tsx:105
 msgid "Central Time (US & Canada)"
 msgstr "中部时间（美国和加拿大）"
 
@@ -6510,13 +6498,13 @@ msgid "chat"
 msgstr "聊天"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:29
-#: src/features/chat/split/chat-split-view.tsx:115
+#: src/features/chat/split/chat-split-view.tsx:116
 #: src/features/chat/thread/composer-search-mode.tsx:48
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:66
 #: src/features/layout/components/sidebar-shortcut.tsx:79
 #: src/features/layout/components/workspace-switch.tsx:47
 #: src/features/layout/lib/dashboard-page-names.ts:20
-#: src/features/settings/components/account/account-settings.tsx:346
+#: src/features/settings/components/account/account-settings.tsx:347
 #: src/features/settings/components/chat/bots-settings.tsx:515
 #: src/features/settings/lib/settings-keywords.ts:33
 #: src/features/settings/lib/settings-navigation.ts:100
@@ -6637,11 +6625,11 @@ msgstr "聊天"
 msgid "Chats in this project search these collections and cite them."
 msgstr "此项目中的聊天会搜索并引用这些集合。"
 
-#: src/features/settings/components/account/account-settings.tsx:601
+#: src/features/settings/components/account/account-settings.tsx:602
 msgid "Chats paused by a usage limit will be snoozed"
 msgstr "因用量上限而暂停回复的对话将被暂时搁置"
 
-#: src/features/settings/components/account/account-settings.tsx:601
+#: src/features/settings/components/account/account-settings.tsx:602
 msgid "Chats paused by a usage limit will not be snoozed"
 msgstr "因用量上限而暂停回复的对话不会被暂时搁置"
 
@@ -6655,23 +6643,23 @@ msgid "Chats that use its models will stop working until you pick another model.
 msgstr "使用其模型的聊天将无法工作，直到你选择其他模型。"
 
 #. placeholder {0}: percentFormat.format(percent / 100)
-#: src/features/settings/components/account/account-settings.tsx:407
+#: src/features/settings/components/account/account-settings.tsx:408
 msgid "Chats will be compacted at {0} of the context window"
 msgstr "聊天将在上下文窗口的 {0} 时压缩"
 
-#: src/features/settings/components/account/account-settings.tsx:406
+#: src/features/settings/components/account/account-settings.tsx:407
 msgid "Chats will not be compacted automatically"
 msgstr "聊天不会自动压缩"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:120
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:161
 msgid "Chats with an open pull request are kept"
 msgstr "有打开的拉取请求的聊天会被保留"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:120
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:161
 msgid "Chats with an open pull request can be archived"
 msgstr "有打开的拉取请求的聊天可以被归档"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:75
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:78
 msgid "Chats with no activity for this long are archived. Archived chats stay searchable."
 msgstr "超过这段时间没有活动的聊天会被归档。已归档的聊天仍可搜索。"
 
@@ -6844,7 +6832,7 @@ msgstr "选择默认视频模型"
 msgid "Choose how Neore tells you about finished work and things that need you."
 msgstr "选择 Neore 如何通知你已完成的工作和需要你处理的事项。"
 
-#: src/features/settings/components/account/account-settings.tsx:218
+#: src/features/settings/components/account/account-settings.tsx:219
 msgid "Choose how to send messages in the chat. Cmd/Ctrl+Enter always sends."
 msgstr "选择在聊天中发送消息的方式。Cmd/Ctrl+Enter 始终可发送。"
 
@@ -7121,7 +7109,7 @@ msgstr "点击“{selector}”"
 msgid "Click ★ on any model in All models to add it here."
 msgstr "在“所有模型”中点击任意模型上的 ★ 即可添加到这里。"
 
-#: src/features/settings/components/account/account-settings.tsx:233
+#: src/features/settings/components/account/account-settings.tsx:234
 msgid "Click button to send"
 msgstr "点击按钮发送"
 
@@ -7150,7 +7138,7 @@ msgstr "点击任意消息上的图钉图标即可保存到这里。"
 msgid "Click the star on any model in All models to add it here."
 msgstr "在“所有模型”中点击任意模型的星标即可将其添加到这里。"
 
-#: src/features/chat/thread/composer-input.tsx:329
+#: src/features/chat/thread/composer-input.tsx:330
 msgid "Click to edit"
 msgstr "点击编辑"
 
@@ -7205,7 +7193,7 @@ msgstr "克隆或新建…"
 #: src/features/canvas/canvas-panel.tsx:835
 #: src/features/canvas/pdf-preview-panel.tsx:105
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
-#: src/features/develop/components/thread-pull-requests.tsx:280
+#: src/features/develop/components/thread-pull-requests.tsx:396
 #: src/features/evals/components/save-eval-case-action.tsx:95
 #: src/features/prompts/components/prompt-history-dialog.tsx:195
 #: src/features/settings/components/chat/custom-providers-settings.tsx:441
@@ -7251,7 +7239,7 @@ msgstr "关闭节点搜索"
 msgid "Close pane"
 msgstr "关闭窗格"
 
-#: src/features/chat/split/chat-split-view.tsx:198
+#: src/features/chat/split/chat-split-view.tsx:199
 msgid "Close pane: {title}"
 msgstr "关闭窗格：{title}"
 
@@ -7737,7 +7725,7 @@ msgstr "压缩上下文"
 msgid "Compact distilled reasoning model from DeepSeek"
 msgstr "DeepSeek 的紧凑蒸馏推理模型"
 
-#: src/features/settings/components/account/account-settings.tsx:392
+#: src/features/settings/components/account/account-settings.tsx:393
 msgid "Compact full chats automatically"
 msgstr "自动压缩已满的聊天"
 
@@ -7982,7 +7970,7 @@ msgstr "条件分支"
 msgid "Configure advanced AI agent modules for enhanced task execution"
 msgstr "配置高级 AI 智能体模块，增强任务执行能力"
 
-#: src/features/settings/components/account/account-settings.tsx:346
+#: src/features/settings/components/account/account-settings.tsx:347
 msgid "Configure chat behavior and preferences."
 msgstr "配置聊天行为和偏好。"
 
@@ -7990,11 +7978,11 @@ msgstr "配置聊天行为和偏好。"
 msgid "Configure default model, reasoning effort, and features for new chats created in this project."
 msgstr "为此项目中新建的聊天配置默认模型、推理强度和功能。"
 
-#: src/features/settings/components/account/account-settings.tsx:212
+#: src/features/settings/components/account/account-settings.tsx:213
 msgid "Configure how the application behaves."
 msgstr "配置应用的行为方式。"
 
-#: src/features/settings/components/account/account-settings.tsx:240
+#: src/features/settings/components/account/account-settings.tsx:241
 msgid "Configure language preferences and location settings."
 msgstr "配置语言偏好和位置设置。"
 
@@ -8019,7 +8007,7 @@ msgstr "配置账单联系人和可用的 AI 模型"
 msgid "Configure thresholds and batch limits for anonymous user cleanup"
 msgstr "配置匿名用户清理的阈值和批次限制"
 
-#: src/features/settings/components/account/account-settings.tsx:686
+#: src/features/settings/components/account/account-settings.tsx:709
 msgid "Configure UI preferences and display options."
 msgstr "配置界面偏好和显示选项。"
 
@@ -8228,7 +8216,7 @@ msgstr "连接 WhatsApp"
 msgid "Connect your {label} account to see what needs your review, what is yours, and what is ready to merge."
 msgstr "连接你的 {label} 账号，即可查看需要你审查的内容、属于你的内容以及可合并的内容。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:106
+#: src/features/develop/components/thread-pull-requests.tsx:228
 msgid "Connect your Git host in settings to link a pull request."
 msgstr "请在设置中连接 Git 托管服务，以关联拉取请求。"
 
@@ -8518,7 +8506,7 @@ msgstr "继续"
 msgid "Continue in this chat"
 msgstr "在此聊天中继续"
 
-#: src/features/settings/components/account/account-settings.tsx:541
+#: src/features/settings/components/account/account-settings.tsx:542
 msgid "Continue interrupted replies"
 msgstr "继续被中断的回复"
 
@@ -8571,15 +8559,15 @@ msgstr "控制 AI 提供商的数据处理和保留策略。隐私设置目前�
 msgid "Control depth of field with aperture setting"
 msgstr "通过光圈设置控制景深"
 
-#: src/features/settings/components/account/account-settings.tsx:164
+#: src/features/settings/components/account/account-settings.tsx:165
 msgid "Control how your personal information is displayed in the UI."
 msgstr "控制个人信息在界面中的显示方式。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:497
+#: src/features/chat/browser-live-view/browser-live-view.tsx:507
 msgid "Control of the browser is back with the agent: the server did not confirm in time that you still have it."
 msgstr "浏览器的控制权已交还给智能体：服务器未能及时确认你仍拥有控制权。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:498
+#: src/features/chat/browser-live-view/browser-live-view.tsx:508
 msgid "Control of the browser is back with the agent."
 msgstr "浏览器的控制权已交还给智能体。"
 
@@ -8644,8 +8632,8 @@ msgstr "此列表未显示的文件上的对话和待提交评论"
 msgid "Conversations on lines this diff no longer shows"
 msgstr "此差异不再显示的行上的对话"
 
-#: src/features/chat/thread/composer-input.tsx:904
-#: src/features/chat/thread/composer-input.tsx:1901
+#: src/features/chat/thread/composer-input.tsx:905
+#: src/features/chat/thread/composer-input.tsx:1940
 msgid "Conversion failed"
 msgstr "转换失败"
 
@@ -8975,7 +8963,7 @@ msgstr "无法附加 {0}。其他文件已附加；请重试这些文件。"
 msgid "Could not attach {0}. Try those again."
 msgstr "无法附加 {0}。请重试。"
 
-#: src/features/chat/thread/composer-input.tsx:1931
+#: src/features/chat/thread/composer-input.tsx:1970
 msgid "Could not attach the chat"
 msgstr "无法附加该聊天"
 
@@ -9084,7 +9072,7 @@ msgstr "无法复制到剪贴板"
 msgid "Could not copy; select the text instead"
 msgstr "无法复制，请手动选择文本"
 
-#: src/features/knowledge/hooks/use-knowledge-import.ts:233
+#: src/features/knowledge/hooks/use-knowledge-import.ts:253
 msgid "Could not create a collection for this import. Try again."
 msgstr "无法为此次导入创建集合。请重试。"
 
@@ -9141,7 +9129,7 @@ msgstr "无法导入工作流"
 msgid "Could not keep this as yours. Try again."
 msgstr "无法保留为你的内容。请重试。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:183
+#: src/features/develop/components/thread-pull-requests.tsx:305
 msgid "Could not link. Try again."
 msgstr "无法关联。请重试。"
 
@@ -9162,7 +9150,7 @@ msgstr "无法加载更多项目。"
 msgid "Could not load statistics for this thread."
 msgstr "无法加载此对话的统计数据。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:201
+#: src/features/develop/components/thread-pull-requests.tsx:323
 msgid "Could not load the linked pull requests."
 msgstr "无法加载已关联的拉取请求。"
 
@@ -9194,7 +9182,7 @@ msgstr "无法加载此{requestNoun}的对话。"
 msgid "Could not load this"
 msgstr "无法加载此内容"
 
-#: src/features/chat/split/chat-split-view.tsx:206
+#: src/features/chat/split/chat-split-view.tsx:207
 #: src/features/chat/thread/thread.tsx:367
 msgid "Could not load this chat's details."
 msgstr "无法加载此聊天的详情。"
@@ -9287,11 +9275,11 @@ msgstr "无法连接服务器以开始生成。请检查网络连接后重试。
 msgid "Could not reach the server. Try again."
 msgstr "无法连接服务器。请重试。"
 
-#: src/features/chat/thread/composer-input.tsx:1934
+#: src/features/chat/thread/composer-input.tsx:1973
 msgid "Could not read that chat"
 msgstr "无法读取该聊天"
 
-#: src/features/chat/thread/composer-input.tsx:1935
+#: src/features/chat/thread/composer-input.tsx:1974
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "无法读取该聊天。如果已锁定，请先解锁。"
 
@@ -9299,7 +9287,7 @@ msgstr "无法读取该聊天。如果已锁定，请先解锁。"
 msgid "Could not read the pasted list"
 msgstr "无法读取粘贴的列表"
 
-#: src/features/develop/components/pull-request-fixes.tsx:205
+#: src/features/develop/components/pull-request-fixes.tsx:208
 msgid "Could not read what blocks {name}. Try again"
 msgstr "无法读取阻碍 {name} 的问题。重试"
 
@@ -10097,7 +10085,7 @@ msgstr "自定义并重新生成"
 msgid "Customize keyboard shortcuts for common actions. Click \"Record\" and press your desired key combination."
 msgstr "为常用操作自定义键盘快捷键。点击“录制”并按下你想要的组合键。"
 
-#: src/features/settings/components/account/account-settings.tsx:185
+#: src/features/settings/components/account/account-settings.tsx:186
 msgid "Customize the appearance of the application."
 msgstr "自定义应用的外观。"
 
@@ -10311,6 +10299,7 @@ msgstr "辩论 {0} 轮。"
 msgid "Debug an error or review my code..."
 msgstr "调试错误或审查我的代码..."
 
+#: src/features/chat/browser-live-view/browser-human-check.tsx:553
 #: src/features/chat/host/host-composer.tsx:177
 #: src/features/chat/thread/request-secret-prompt.tsx:494
 msgid "Decline"
@@ -10430,7 +10419,7 @@ msgstr "默认"
 msgid "Default agent"
 msgstr "默认智能体"
 
-#: src/features/settings/components/account/account-settings.tsx:244
+#: src/features/settings/components/account/account-settings.tsx:245
 #: src/features/settings/lib/settings-keywords.ts:29
 msgid "Default AI Response Language"
 msgstr "默认 AI 回复语言"
@@ -10452,12 +10441,12 @@ msgstr "{name} 的默认分支"
 msgid "Default branch:"
 msgstr "默认分支："
 
-#: src/features/settings/components/account/account-settings.tsx:269
+#: src/features/settings/components/account/account-settings.tsx:270
 #: src/features/settings/lib/settings-keywords.ts:30
 msgid "Default Dictation Language"
 msgstr "默认听写语言"
 
-#: src/features/settings/components/account/account-settings.tsx:271
+#: src/features/settings/components/account/account-settings.tsx:272
 msgid "Default dictation language for new threads (BCP 47 code)."
 msgstr "新对话的默认听写语言（BCP 47 代码）。"
 
@@ -10465,11 +10454,11 @@ msgstr "新对话的默认听写语言（BCP 47 代码）。"
 msgid "Default for new chats"
 msgstr "新聊天的默认设置"
 
-#: src/features/settings/components/account/account-settings.tsx:246
+#: src/features/settings/components/account/account-settings.tsx:247
 msgid "Default language for AI responses in new threads (BCP 47 code)."
 msgstr "新对话中 AI 回复的默认语言（BCP 47 代码）。"
 
-#: src/features/settings/components/account/account-settings.tsx:249
+#: src/features/settings/components/account/account-settings.tsx:250
 msgid "Default language updated"
 msgstr "默认语言已更新"
 
@@ -11300,7 +11289,7 @@ msgstr "图表主题已更新"
 msgid "Diamond"
 msgstr "菱形"
 
-#: src/features/settings/components/account/account-settings.tsx:274
+#: src/features/settings/components/account/account-settings.tsx:275
 msgid "Dictation language updated"
 msgstr "听写语言已更新"
 
@@ -11485,7 +11474,7 @@ msgstr "在结果上显示模型名称"
 msgid "Display results"
 msgstr "显示结果"
 
-#: src/features/settings/components/account/account-settings.tsx:693
+#: src/features/settings/components/account/account-settings.tsx:716
 msgid "Display timestamps on messages."
 msgstr "在消息上显示时间戳。"
 
@@ -11822,7 +11811,7 @@ msgstr "将文件拖到此处"
 msgid "Draw an image"
 msgstr "绘制图像"
 
-#: src/features/chat/thread/composer-input-area.tsx:268
+#: src/features/chat/thread/composer-input-area.tsx:273
 msgid "Draw image"
 msgstr "绘制图像"
 
@@ -11844,7 +11833,7 @@ msgstr "拖放文件或点击上传"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:2130
+#: src/features/chat/thread/composer-input.tsx:2170
 msgid "Drop files here"
 msgstr "将文件拖放到此处"
 
@@ -11882,7 +11871,7 @@ msgstr "试运行（仅预览——不删除）"
 msgid "Dry run complete"
 msgstr "试运行完成"
 
-#: src/features/settings/components/account/account-settings.tsx:121
+#: src/features/settings/components/account/account-settings.tsx:122
 msgid "Dubai"
 msgstr "迪拜"
 
@@ -12082,7 +12071,7 @@ msgstr "抢先体验阿里巴巴即将推出的模型能力"
 msgid "Early adopters who want to experiment with Google's next-generation Flash capabilities"
 msgstr "希望尝试 Google 下一代 Flash 能力的早期用户"
 
-#: src/features/settings/components/account/account-settings.tsx:103
+#: src/features/settings/components/account/account-settings.tsx:104
 msgid "Eastern Time (US & Canada)"
 msgstr "东部时间（美国和加拿大）"
 
@@ -12166,8 +12155,8 @@ msgstr "编辑集合"
 msgid "Edit comment"
 msgstr "编辑评论"
 
-#: src/features/chat/thread/composer-input.tsx:336
-#: src/features/chat/thread/composer-input.tsx:348
+#: src/features/chat/thread/composer-input.tsx:337
+#: src/features/chat/thread/composer-input.tsx:349
 msgid "Edit content"
 msgstr "编辑内容"
 
@@ -12615,7 +12604,7 @@ msgstr "开启深度工作模式"
 msgid "Enable Deep Work mode for complex multi-step tasks. The AI will iterate up to 25 times to complete your request."
 msgstr "为复杂的多步骤任务开启深度工作模式。AI 会最多迭代 25 次来完成你的请求。"
 
-#: src/features/settings/components/account/account-settings.tsx:351
+#: src/features/settings/components/account/account-settings.tsx:352
 #: src/features/settings/lib/settings-keywords.ts:33
 msgid "Enable Follow-up Suggestions"
 msgstr "启用后续建议"
@@ -12890,7 +12879,7 @@ msgstr "输入组织名称"
 msgid "Enter organization slug"
 msgstr "输入组织 slug"
 
-#: src/features/develop/components/thread-pull-requests.tsx:125
+#: src/features/develop/components/thread-pull-requests.tsx:247
 msgid "Enter pull requests as owner/name#123."
 msgstr "请按 owner/name#123 的格式输入拉取请求。"
 
@@ -13005,7 +12994,7 @@ msgstr "输入你的全名或显示名称"
 msgid "Enter your information to create an account"
 msgstr "输入你的信息以创建账号"
 
-#: src/features/settings/components/account/account-settings.tsx:316
+#: src/features/settings/components/account/account-settings.tsx:317
 msgid "Enter your location"
 msgstr "输入你的位置"
 
@@ -13902,7 +13891,7 @@ msgid "Failed to attach collection"
 msgstr "附加集合失败"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1704
+#: src/features/chat/thread/composer-input.tsx:1743
 msgid "Failed to attach file"
 msgstr "附加文件失败"
 
@@ -14312,7 +14301,7 @@ msgstr "请求导出失败"
 msgid "Failed to reset to defaults"
 msgstr "恢复默认设置失败"
 
-#: src/features/chat/thread/composer-input.tsx:1736
+#: src/features/chat/thread/composer-input.tsx:1775
 msgid "Failed to restore attachment"
 msgstr "恢复附件失败"
 
@@ -14393,10 +14382,11 @@ msgstr "无法保存提供商"
 msgid "Failed to save rating"
 msgstr "保存评分失败"
 
-#: src/features/settings/components/account/account-settings.tsx:146
-#: src/features/settings/components/account/account-settings.tsx:154
+#: src/features/settings/components/account/account-settings.tsx:147
+#: src/features/settings/components/account/account-settings.tsx:155
 #: src/features/settings/components/chat/chat-action-confirm-settings.tsx:61
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:40
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:43
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:139
 #: src/features/settings/components/personalization/personalization-settings.tsx:118
 #: src/features/settings/components/personalization/personalization-settings.tsx:202
 msgid "Failed to save settings"
@@ -15489,7 +15479,7 @@ msgstr "焦距"
 msgid "Focal Length"
 msgstr "焦距"
 
-#: src/features/chat/split/chat-split-view.tsx:193
+#: src/features/chat/split/chat-split-view.tsx:194
 msgid "Focus chat: {title}"
 msgstr "聚焦聊天：{title}"
 
@@ -15522,11 +15512,11 @@ msgstr "关注对话"
 msgid "follow up"
 msgstr "跟进"
 
-#: src/features/settings/components/account/account-settings.tsx:362
+#: src/features/settings/components/account/account-settings.tsx:363
 msgid "Follow-up suggestions disabled"
 msgstr "已关闭后续建议"
 
-#: src/features/settings/components/account/account-settings.tsx:362
+#: src/features/settings/components/account/account-settings.tsx:363
 msgid "Follow-up suggestions enabled"
 msgstr "已开启后续建议"
 
@@ -16422,7 +16412,7 @@ msgstr "授予他人访问此页面的权限，或发布一个只读链接。"
 msgid "Global analyst research, market analysis, and investment data"
 msgstr "全球分析师研究、市场分析和投资数据"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1128
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1138
 msgid "Go"
 msgstr "前往"
 
@@ -17006,7 +16996,7 @@ msgstr "高"
 msgid "Hand (pan)"
 msgstr "抓手（平移）"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1051
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1061
 msgid "Hand back"
 msgstr "交还"
 
@@ -17039,7 +17029,7 @@ msgstr "免提模式已关闭"
 msgid "Hands-free mode stopped: {0}"
 msgstr "免提模式已停止：{0}"
 
-#: src/features/settings/components/account/account-settings.tsx:453
+#: src/features/settings/components/account/account-settings.tsx:454
 msgid "Hands-free voice"
 msgstr "免提模式语音"
 
@@ -17047,7 +17037,7 @@ msgstr "免提模式语音"
 msgid "Hands-free voice mode — talk, and replies are read aloud"
 msgstr "免提语音模式 — 直接说话，回复会被朗读出来"
 
-#: src/features/settings/components/account/account-settings.tsx:464
+#: src/features/settings/components/account/account-settings.tsx:465
 msgid "Hands-free voice updated"
 msgstr "免提模式语音已更新"
 
@@ -17165,7 +17155,7 @@ msgstr "隐藏列"
 msgid "Hide follow-up suggestions"
 msgstr "隐藏后续建议"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1046
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1056
 msgid "Hide live view"
 msgstr "隐藏实时画面"
 
@@ -17178,7 +17168,7 @@ msgstr "隐藏输出"
 msgid "Hide password"
 msgstr "隐藏密码"
 
-#: src/features/settings/components/account/account-settings.tsx:169
+#: src/features/settings/components/account/account-settings.tsx:170
 #: src/features/settings/lib/settings-keywords.ts:26
 msgid "Hide Personal Information"
 msgstr "隐藏个人信息"
@@ -17200,7 +17190,7 @@ msgstr "隐藏此旁支问题。它已在回答中，仍计为一条消息。"
 msgid "Hide translation"
 msgstr "隐藏翻译"
 
-#: src/features/settings/components/account/account-settings.tsx:171
+#: src/features/settings/components/account/account-settings.tsx:172
 msgid "Hides your name and email from the UI."
 msgstr "在界面中隐藏你的姓名和邮箱。"
 
@@ -17433,7 +17423,7 @@ msgid "Honduras"
 msgstr "洪都拉斯"
 
 #: src/features/chat/core/utils/language-utilities.ts:358
-#: src/features/settings/components/account/account-settings.tsx:119
+#: src/features/settings/components/account/account-settings.tsx:120
 msgid "Hong Kong"
 msgstr "香港"
 
@@ -17505,7 +17495,7 @@ msgstr "Neore 与 ChatGPT 有何不同？"
 msgid "How it works"
 msgstr "工作原理"
 
-#: src/features/settings/components/account/account-settings.tsx:635
+#: src/features/settings/components/account/account-settings.tsx:658
 msgid "How long temporary chats are kept before being automatically deleted. Default: 24 hours."
 msgstr "临时聊天在自动删除前保留的时长。默认：24 小时。"
 
@@ -18037,11 +18027,11 @@ msgstr "重要："
 msgid "Imported {0} cases"
 msgstr "已导入 {0} 个用例"
 
-#: src/features/knowledge/hooks/use-knowledge-import.ts:242
+#: src/features/knowledge/hooks/use-knowledge-import.ts:262
 msgid "Imported {added} Notion page(s); skipped {skipped} attachment(s)."
 msgstr "已导入 {added} 个 Notion 页面；跳过了 {skipped} 个附件。"
 
-#: src/features/knowledge/hooks/use-knowledge-import.ts:242
+#: src/features/knowledge/hooks/use-knowledge-import.ts:262
 msgid "Imported {added} Notion page(s)."
 msgstr "已导入 {added} 个 Notion 页面。"
 
@@ -18216,7 +18206,7 @@ msgstr "在 WeChat 公众号后台（mp.weixin.qq.com）中打开“设置与开
 msgid "In this project"
 msgstr "在此项目中"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:81
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:84
 msgid "Inactive chats will be archived after {days} days"
 msgstr "不活跃的聊天将在 {days} 天后归档"
 
@@ -18505,11 +18495,11 @@ msgstr "强度"
 msgid "Interface, user experience and visual design."
 msgstr "界面、用户体验和视觉设计。"
 
-#: src/features/chat/thread/composer-input-area.tsx:365
+#: src/features/chat/thread/composer-input-area.tsx:370
 msgid "Interrupt and restart"
 msgstr "中断并重新开始"
 
-#: src/features/chat/thread/composer-input-area.tsx:381
+#: src/features/chat/thread/composer-input-area.tsx:386
 msgid "Interrupt and restart — stops the current reply and sends this"
 msgstr "中断并重新开始——停止当前回复并发送此内容"
 
@@ -18518,11 +18508,11 @@ msgstr "中断并重新开始——停止当前回复并发送此内容"
 msgid "Interrupt and send"
 msgstr "中断并发送"
 
-#: src/features/settings/components/account/account-settings.tsx:555
+#: src/features/settings/components/account/account-settings.tsx:556
 msgid "Interrupted replies will continue"
 msgstr "被中断的回复将继续"
 
-#: src/features/settings/components/account/account-settings.tsx:555
+#: src/features/settings/components/account/account-settings.tsx:556
 msgid "Interrupted replies will stop"
 msgstr "被中断的回复将停止"
 
@@ -18942,11 +18932,11 @@ msgstr "继续接受旧密钥 24 小时"
 msgid "Keep as mine"
 msgstr "保留为我的"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:107
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:148
 msgid "Keep chats with an open pull request"
 msgstr "保留有打开的拉取请求的聊天"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1071
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1081
 msgid "Keep control"
 msgstr "保持控制"
 
@@ -19213,7 +19203,7 @@ msgstr "语言"
 msgid "Language"
 msgstr "语言"
 
-#: src/features/settings/components/account/account-settings.tsx:240
+#: src/features/settings/components/account/account-settings.tsx:241
 #: src/features/settings/lib/settings-keywords.ts:29
 #: src/features/settings/lib/settings-keywords.ts:30
 #: src/features/settings/lib/settings-keywords.ts:31
@@ -19612,7 +19602,7 @@ msgstr "左"
 msgid "Left organization successfully"
 msgstr "已离开组织"
 
-#: src/features/settings/components/account/account-settings.tsx:204
+#: src/features/settings/components/account/account-settings.tsx:205
 msgid "Left to Right (LTR)"
 msgstr "从左到右（LTR）"
 
@@ -19798,7 +19788,7 @@ msgstr "不是有效 JSON 的行"
 
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:340
 #: src/features/auth/components/settings/providers/provider-cell.tsx:113
-#: src/features/develop/components/thread-pull-requests.tsx:282
+#: src/features/develop/components/thread-pull-requests.tsx:398
 msgid "Link"
 msgstr "关联"
 
@@ -19806,7 +19796,7 @@ msgstr "关联"
 msgid "Link active until {expiresAt}"
 msgstr "链接有效期至 {expiresAt}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:137
+#: src/features/develop/components/thread-pull-requests.tsx:259
 msgid "Link at most {MAX_PULL_REQUESTS_PER_ATTACH} pull requests at a time."
 msgstr "一次最多关联 {MAX_PULL_REQUESTS_PER_ATTACH} 个拉取请求。"
 
@@ -19824,11 +19814,11 @@ msgstr "链接预览"
 msgid "Link previews"
 msgstr "链接预览"
 
-#: src/features/develop/components/thread-pull-requests.tsx:215
+#: src/features/develop/components/thread-pull-requests.tsx:331
 msgid "Link pull request"
 msgstr "关联拉取请求"
 
-#: src/features/develop/components/thread-pull-requests.tsx:234
+#: src/features/develop/components/thread-pull-requests.tsx:350
 msgid "Link pull requests"
 msgstr "关联拉取请求"
 
@@ -19840,7 +19830,7 @@ msgstr "手动关联"
 msgid "Linked pull requests: {linkedPullRequests}"
 msgstr "已关联的拉取请求：{linkedPullRequests}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:102
+#: src/features/develop/components/thread-pull-requests.tsx:224
 msgid "Linked to this thread."
 msgstr "已关联到此对话。"
 
@@ -19848,8 +19838,8 @@ msgstr "已关联到此对话。"
 msgid "LinkedIn Post"
 msgstr "LinkedIn 帖子"
 
-#: src/features/develop/components/thread-pull-requests.tsx:263
-#: src/features/develop/components/thread-pull-requests.tsx:282
+#: src/features/develop/components/thread-pull-requests.tsx:379
+#: src/features/develop/components/thread-pull-requests.tsx:398
 msgid "Linking…"
 msgstr "正在关联…"
 
@@ -19922,11 +19912,11 @@ msgstr "实时预览——组件流式输出完成后渲染"
 msgid "Live preview — updating as the artifact streams"
 msgstr "实时预览——随工件流式输出实时更新"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1162
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1172
 msgid "Live view of the agent's browser (read-only)"
 msgstr "智能体浏览器的实时画面（只读）"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1162
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1172
 msgid "Live view of the agent's browser (you have control)"
 msgstr "智能体浏览器的实时画面（由你控制）"
 
@@ -20204,7 +20194,7 @@ msgstr "正在加载访客链接…"
 msgid "Loading the guide"
 msgstr "正在加载指南"
 
-#: src/features/develop/components/thread-pull-requests.tsx:196
+#: src/features/develop/components/thread-pull-requests.tsx:318
 msgid "Loading the linked pull requests…"
 msgstr "正在加载已关联的拉取请求…"
 
@@ -20215,6 +20205,10 @@ msgstr "正在加载已关联的拉取请求…"
 #: src/features/sub-agents/components/sub-agent-approvals.tsx:48
 msgid "Loading the sub-agent's requests…"
 msgstr "正在加载子代理的请求…"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:456
+msgid "Loading this check…"
+msgstr "正在加载此验证…"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:59
 msgid "Loading threads"
@@ -20267,7 +20261,7 @@ msgstr "正在加载你的服务器、连接器和电脑…"
 #: src/components/default-loading.tsx:8
 #: src/features/canvas/canvas-panel.tsx:747
 #: src/features/changelog/components/changelog-panel.tsx:109
-#: src/features/chat/split/chat-split-view.tsx:212
+#: src/features/chat/split/chat-split-view.tsx:213
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:874
 #: src/features/settings/components/chat/agent-settings.tsx:90
 #: src/features/settings/components/chat/api-keys-settings.tsx:462
@@ -20320,12 +20314,12 @@ msgstr "区域设置"
 msgid "localhost or 127.0.0.1 only. Ollama: {OLLAMA_DEFAULT_BASE_URL} · LM Studio: {LM_STUDIO_DEFAULT_BASE_URL}"
 msgstr "仅限 localhost 或 127.0.0.1。Ollama：{OLLAMA_DEFAULT_BASE_URL} · LM Studio：{LM_STUDIO_DEFAULT_BASE_URL}"
 
-#: src/features/settings/components/account/account-settings.tsx:294
+#: src/features/settings/components/account/account-settings.tsx:295
 #: src/features/settings/lib/settings-keywords.ts:31
 msgid "Location"
 msgstr "位置"
 
-#: src/features/settings/components/account/account-settings.tsx:304
+#: src/features/settings/components/account/account-settings.tsx:305
 msgid "Location updated"
 msgstr "位置已更新"
 
@@ -20426,15 +20420,15 @@ msgstr "徽标"
 msgid "logos"
 msgstr "标志"
 
-#: src/features/settings/components/account/account-settings.tsx:109
+#: src/features/settings/components/account/account-settings.tsx:110
 msgid "London"
 msgstr "伦敦"
 
-#: src/features/settings/components/account/account-settings.tsx:384
+#: src/features/settings/components/account/account-settings.tsx:385
 msgid "Long chats will be summarised"
 msgstr "长聊天将被总结"
 
-#: src/features/settings/components/account/account-settings.tsx:384
+#: src/features/settings/components/account/account-settings.tsx:385
 msgid "Long chats will no longer be summarised"
 msgstr "长聊天将不再被总结"
 
@@ -20476,7 +20470,7 @@ msgstr "检测到长文本"
 msgid "Long text generation in images"
 msgstr "图像中的长文本生成"
 
-#: src/features/chat/thread/composer-input.tsx:980
+#: src/features/chat/thread/composer-input.tsx:981
 msgid "Long text was attached as a file."
 msgstr "长文本已作为文件附加。"
 
@@ -20644,7 +20638,7 @@ msgstr "微距"
 msgid "Macro telephoto, tight framing"
 msgstr "微距长焦，紧凑构图"
 
-#: src/features/settings/components/account/account-settings.tsx:113
+#: src/features/settings/components/account/account-settings.tsx:114
 msgid "Madrid"
 msgstr "马德里"
 
@@ -20843,6 +20837,10 @@ msgstr "全部标为已读"
 #: src/features/prompts/components/prompt-form-dialog.tsx:324
 msgid "Mark as favorite"
 msgstr "标记为收藏"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:541
+msgid "Mark done"
+msgstr "标记为完成"
 
 #: src/features/workflow/components/nodes/object-editor-node.tsx:142
 msgid "Mark the area to edit in white"
@@ -21106,7 +21104,7 @@ msgstr "中低"
 msgid "Medium-quality video generation with Alibaba's latest Wan improvements for general-purpose use"
 msgstr "借助阿里巴巴最新 Wan 改进的中等质量通用视频生成"
 
-#: src/features/settings/components/account/account-settings.tsx:124
+#: src/features/settings/components/account/account-settings.tsx:125
 msgid "Melbourne"
 msgstr "墨尔本"
 
@@ -21279,6 +21277,14 @@ msgstr "就绪后合并？"
 msgid "Merged"
 msgstr "已合并"
 
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:133
+msgid "Merged chats stay as they are"
+msgstr "已合并的聊天保持不变"
+
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:133
+msgid "Merged chats will be archived"
+msgstr "已合并的聊天将被归档"
+
 #: src/features/develop/components/merge-panel.tsx:99
 msgid "Merged on {hostLabel}."
 msgstr "已在 {hostLabel} 上合并。"
@@ -21357,27 +21363,19 @@ msgstr "来自 {sourceName} 的消息"
 msgid "Messages sent to your bot will create new threads tagged with \"telegram\". The AI will auto-respond on Telegram."
 msgstr "发送给你的机器人的消息会创建带有“telegram”标签的新对话。AI 会在 Telegram 上自动回复。"
 
-#: src/features/settings/components/account/account-settings.tsx:625
+#: src/features/settings/components/account/account-settings.tsx:626
 msgid "Messages will interrupt the agent's turn"
 msgstr "消息会中断代理的当前轮次"
 
-#: src/features/settings/components/account/account-settings.tsx:625
-msgid "Messages will wait for the agent's turn to end"
-msgstr "消息会等待代理的当前轮次结束"
-
-#: src/features/settings/components/account/account-settings.tsx
-msgid "Send while a reply is writing"
-msgstr "在回复生成时发送"
-
-#: src/features/settings/components/account/account-settings.tsx
-msgid "Off: a message you send while a reply is streaming waits in the queue and goes after it. On: it joins the reply at its next step."
-msgstr "关闭：在回复流式输出时发送的消息会排队，回复结束后再发送。开启：在回复的下一步加入该回复。"
-
-#: src/features/settings/components/account/account-settings.tsx
+#: src/features/settings/components/account/account-settings.tsx:648
 msgid "Messages will join the reply as it writes"
 msgstr "消息会在回复生成时加入回复"
 
-#: src/features/settings/components/account/account-settings.tsx
+#: src/features/settings/components/account/account-settings.tsx:626
+msgid "Messages will wait for the agent's turn to end"
+msgstr "消息会等待代理的当前轮次结束"
+
+#: src/features/settings/components/account/account-settings.tsx:648
 msgid "Messages will wait for the reply to finish"
 msgstr "消息将等待回复结束"
 
@@ -22030,7 +22028,7 @@ msgstr "运动提示词"
 msgid "Motion: {motionPercent}%"
 msgstr "运动：{motionPercent}%"
 
-#: src/features/settings/components/account/account-settings.tsx:105
+#: src/features/settings/components/account/account-settings.tsx:106
 msgid "Mountain Time (US & Canada)"
 msgstr "山地时间（美国和加拿大）"
 
@@ -22222,7 +22220,7 @@ msgstr "MiniMax M2 可提供可靠视觉与文本理解的多模态任务"
 msgid "multiple images"
 msgstr "多张图片"
 
-#: src/features/settings/components/account/account-settings.tsx:122
+#: src/features/settings/components/account/account-settings.tsx:123
 msgid "Mumbai, Kolkata"
 msgstr "孟买、加尔各答"
 
@@ -22479,7 +22477,7 @@ msgstr "需要我审查"
 msgid "Needs review"
 msgstr "待审核"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:130
+#: src/features/chat/browser-live-view/browser-human-check.tsx:496
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:550
 #: src/features/home/components/home-page.tsx:165
 msgid "Needs you"
@@ -22711,7 +22709,7 @@ msgstr "新聊天"
 msgid "New Chat"
 msgstr "新聊天"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:57
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:60
 msgid "New chats are deleted automatically after the retention period above. You can make one permanent from its menu."
 msgstr "新聊天会在上述保留期限后自动删除。你可以从其菜单中将某个聊天设为永久保留。"
 
@@ -22719,11 +22717,11 @@ msgstr "新聊天会在上述保留期限后自动删除。你可以从其菜单
 msgid "New chats start in this permission mode. A chat that already exists keeps its own mode, and you can still change a chat's mode in its composer."
 msgstr "新聊天将以此权限模式开始。已有的聊天保留其自身的模式，你仍可在输入框中更改某个聊天的模式。"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:65
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:68
 msgid "New chats start permanent"
 msgstr "新聊天默认永久保留"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:65
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:68
 msgid "New chats start temporary"
 msgstr "新聊天默认为临时"
 
@@ -23270,7 +23268,7 @@ msgstr "还没有图片"
 msgid "No indexed files available. Files are still being processed."
 msgstr "没有已索引的文件。文件仍在处理中。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1068
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1078
 msgid "No input for a while: control goes back to the agent in under a minute."
 msgstr "已有一段时间没有输入：控制权将在一分钟内交还给智能体。"
 
@@ -23399,7 +23397,7 @@ msgstr "尚无输出。运行工作流以查看结果。"
 msgid "No pages found"
 msgstr "未找到页面"
 
-#: src/features/knowledge/hooks/use-knowledge-import.ts:213
+#: src/features/knowledge/hooks/use-knowledge-import.ts:233
 msgid "No pages found. Export from Notion as \"Markdown & CSV\" or \"HTML\"."
 msgstr "未找到页面。请从 Notion 以“Markdown & CSV”或“HTML”格式导出。"
 
@@ -23415,7 +23413,11 @@ msgstr "还没有配对的电脑。"
 msgid "No pending invitations"
 msgstr "没有待处理的邀请"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:169
+#: src/features/chat/browser-live-view/browser-human-check.tsx:598
+msgid "No picture of the page could be taken."
+msgstr "无法截取页面图像。"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:597
 msgid "No picture of the page could be taken. Take control to see it in the live view."
 msgstr "无法截取页面图像。接管控制即可在实时视图中查看。"
 
@@ -23854,7 +23856,7 @@ msgstr "未送达主导者"
 msgid "Not found"
 msgstr "未找到"
 
-#: src/features/develop/components/thread-pull-requests.tsx:268
+#: src/features/develop/components/thread-pull-requests.tsx:384
 msgid "Not linked"
 msgstr "未关联"
 
@@ -24001,7 +24003,7 @@ msgstr "通知并阻止"
 msgid "Notify only"
 msgstr "仅通知"
 
-#: src/features/knowledge/hooks/use-knowledge-import.ts:221
+#: src/features/knowledge/hooks/use-knowledge-import.ts:241
 msgid "Notion export"
 msgstr "Notion 导出"
 
@@ -24072,20 +24074,20 @@ msgstr "职业"
 msgid "off"
 msgstr "关"
 
-#: src/features/settings/components/account/account-settings.tsx:418
-#: src/features/settings/components/account/account-settings.tsx:425
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:90
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:97
+#: src/features/settings/components/account/account-settings.tsx:419
+#: src/features/settings/components/account/account-settings.tsx:426
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:93
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:100
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:277
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:63
 msgid "Off"
 msgstr "关闭"
 
-#: src/features/settings/components/account/account-settings.tsx:395
+#: src/features/settings/components/account/account-settings.tsx:396
 msgid "Off by default. When a chat's context fills this much of the model's window, older messages are condensed for the model before it replies. Your chat itself is never changed. You can also type /compact at any time."
 msgstr "默认关闭。当聊天上下文达到模型窗口的这一比例时，较早的消息会在回复前为模型精简。聊天本身从不改动。你也可以随时输入 /compact。"
 
-#: src/features/settings/components/account/account-settings.tsx:373
+#: src/features/settings/components/account/account-settings.tsx:374
 msgid "Off by default. While a long chat sits idle, condense its older messages into notes so the assistant keeps them in mind. Uses a small amount of credits. Turning it off deletes the summaries already made."
 msgstr "默认关闭。长聊天闲置时，会将较早的消息浓缩为笔记，让助手始终记得。会消耗少量积分。关闭后会删除已生成的摘要。"
 
@@ -24093,9 +24095,13 @@ msgstr "默认关闭。长聊天闲置时，会将较早的消息浓缩为笔记
 msgid "Off until you pick a model."
 msgstr "在你选择模型之前保持关闭。"
 
-#: src/features/settings/components/account/account-settings.tsx:614
+#: src/features/settings/components/account/account-settings.tsx:615
 msgid "Off: a message you send while a coding agent is working waits in the queue and goes after the turn. On: it interrupts the turn and goes next."
 msgstr "关闭：编程代理工作时发送的消息会在队列中等待，并在本轮结束后发送。开启：中断当前轮次，并接着发送该消息。"
+
+#: src/features/settings/components/account/account-settings.tsx:637
+msgid "Off: a message you send while a reply is streaming waits in the queue and goes after it. On: it joins the reply at its next step."
+msgstr "关闭：在回复流式输出时发送的消息会排队，回复结束后再发送。开启：在回复的下一步加入该回复。"
 
 #: src/features/devices/components/device-scope.tsx:126
 msgid "Offered only in chats that belong to the projects above. It applies from the next message."
@@ -24250,6 +24256,10 @@ msgstr "新手引导向导"
 msgid "Once a night, for users active that day, a reflection pass merges duplicates and promotes repeated facts."
 msgstr "每晚一次，针对当天活跃的用户，反思流程会合并重复内容并提升反复出现的事实。"
 
+#: src/features/chat/browser-live-view/browser-human-check.tsx:480
+msgid "Once the check is cleared, mark it done. Or decline if you will not."
+msgstr "完成验证后，请将其标记为完成。如果你不打算处理，也可以拒绝。"
+
 #: src/features/appearance/components/appearance-controls.tsx:175
 msgid "One"
 msgstr "One"
@@ -24278,7 +24288,7 @@ msgstr "一个 API。<0/><1>所有 LLM。</1>"
 msgid "One deployment name per line, exactly as in Azure AI Foundry → Deployments."
 msgstr "每行一个部署名称，与 Azure AI Foundry → 部署中的名称完全一致。"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:131
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:172
 msgid "One domain per line, for example example.com. Results from these sites and their subdomains are never shown, even if the assistant asks for them."
 msgstr "每行一个域名，例如 example.com。即使助手要求，也不会显示来自这些网站及其子域名的结果。"
 
@@ -24405,7 +24415,7 @@ msgstr "仅当每个筛选条件都与 JSON 正文匹配时才运行。请使用
 msgid "Only same-type models can be compared. Clear selection to switch types."
 msgstr "只能对比同类型的模型。清除选择以切换类型。"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:114
+#: src/features/chat/browser-live-view/browser-human-check.tsx:437
 msgid "Only someone who can write in this chat can take control of the browser."
 msgstr "只有可以在此聊天中发言的人才能接管浏览器。"
 
@@ -24428,7 +24438,7 @@ msgstr "只搜索最相关的结果，因此较早或较新的提示词可能不
 msgid "Only the first {0} projects are listed here."
 msgstr "此处仅列出前 {0} 个项目。"
 
-#: src/features/knowledge/hooks/use-knowledge-import.ts:156
+#: src/features/knowledge/hooks/use-knowledge-import.ts:176
 msgid "Only the first {MAX_DOCUMENTS_PER_IMPORT} documents were imported."
 msgstr "仅导入了前 {MAX_DOCUMENTS_PER_IMPORT} 个文档。"
 
@@ -24780,7 +24790,7 @@ msgstr "在输入框中打开模型选择器（{0}）"
 
 #. placeholder {0}: link.repository
 #. placeholder {1}: link.number
-#: src/features/develop/components/thread-pull-requests.tsx:40
+#: src/features/develop/components/thread-pull-requests.tsx:78
 msgid "Open the pull request {0}#{1}"
 msgstr "打开拉取请求 {0}#{1}"
 
@@ -24808,7 +24818,7 @@ msgstr "打开子代理的对话"
 msgid "Open the thread list search and focus it ({0})"
 msgstr "打开对话列表搜索并聚焦（{0}）"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:117
+#: src/features/chat/browser-live-view/browser-human-check.tsx:440
 msgid "Open this model's chat on its own to take control of its browser."
 msgstr "请单独打开此模型的聊天，以接管它的浏览器。"
 
@@ -24816,7 +24826,7 @@ msgstr "请单独打开此模型的聊天，以接管它的浏览器。"
 msgid "Open thread"
 msgstr "打开对话"
 
-#: src/features/settings/components/account/account-settings.tsx:728
+#: src/features/settings/components/account/account-settings.tsx:751
 msgid "Open up to three chats side by side. Applies to this browser only."
 msgstr "最多可并排打开三个聊天。仅适用于此浏览器。"
 
@@ -25091,7 +25101,7 @@ msgstr "已在 {hostLabel} 上打开撤销{requestNoun}。"
 msgid "Opened from this thread"
 msgstr "从此对话打开"
 
-#: src/features/settings/components/account/account-settings.tsx:534
+#: src/features/settings/components/account/account-settings.tsx:535
 msgid "Opening a blank chat"
 msgstr "正在打开空白对话"
 
@@ -25107,15 +25117,15 @@ msgstr "正在打开对话…"
 msgid "Opening pull request…"
 msgstr "正在创建拉取请求…"
 
-#: src/features/settings/components/account/account-settings.tsx:525
+#: src/features/settings/components/account/account-settings.tsx:526
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "在没有对话的情况下打开助手，会带你到最近的对话，而不是空白对话。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1079
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1089
 msgid "Opening the live view…"
 msgstr "正在打开实时画面…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1134
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1144
 msgid "Opening the page. This can take up to a minute."
 msgstr "正在打开页面，最多可能需要一分钟。"
 
@@ -25554,7 +25564,7 @@ msgstr "所有者"
 msgid "owner/name"
 msgstr "owner/name"
 
-#: src/features/settings/components/account/account-settings.tsx:106
+#: src/features/settings/components/account/account-settings.tsx:107
 msgid "Pacific Time (US & Canada)"
 msgstr "太平洋时间（美国和加拿大）"
 
@@ -25567,11 +25577,11 @@ msgstr "页面"
 msgid "Page {currentPage} of {totalPages}"
 msgstr "第 {currentPage} 页，共 {totalPages} 页"
 
-#: src/features/knowledge/hooks/use-knowledge-import.ts:255
+#: src/features/knowledge/hooks/use-knowledge-import.ts:275
 msgid "Page added. It is being fetched and indexed."
 msgstr "已添加网页，正在获取并建立索引。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1113
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1123
 #: src/features/settings/components/chat/event-trigger-fields.tsx:217
 msgid "Page address"
 msgstr "页面地址"
@@ -25710,7 +25720,7 @@ msgstr "并行回复"
 msgid "Parent chat"
 msgstr "父级聊天"
 
-#: src/features/settings/components/account/account-settings.tsx:110
+#: src/features/settings/components/account/account-settings.tsx:111
 msgid "Paris"
 msgstr "巴黎"
 
@@ -25939,11 +25949,11 @@ msgstr "暂停"
 msgid "Paused"
 msgstr "已暂停"
 
-#: src/features/settings/components/account/account-settings.tsx:577
+#: src/features/settings/components/account/account-settings.tsx:578
 msgid "Paused replies will resume when the limit resets"
 msgstr "暂停的回复将在上限重置后继续"
 
-#: src/features/settings/components/account/account-settings.tsx:577
+#: src/features/settings/components/account/account-settings.tsx:578
 msgid "Paused replies will wait for you to resume them"
 msgstr "暂停的回复将等待你手动继续"
 
@@ -26116,11 +26126,11 @@ msgstr "个人"
 msgid "Personal Account"
 msgstr "个人账号"
 
-#: src/features/settings/components/account/account-settings.tsx:178
+#: src/features/settings/components/account/account-settings.tsx:179
 msgid "Personal information is now hidden"
 msgstr "个人信息已隐藏"
 
-#: src/features/settings/components/account/account-settings.tsx:178
+#: src/features/settings/components/account/account-settings.tsx:179
 msgid "Personal information is now visible"
 msgstr "个人信息已显示"
 
@@ -26372,7 +26382,7 @@ msgstr "平台"
 msgid "Play"
 msgstr "播放"
 
-#: src/features/settings/components/account/account-settings.tsx:709
+#: src/features/settings/components/account/account-settings.tsx:732
 msgid "Play a short sound when a reply finishes. Applies to this browser only."
 msgstr "回复完成时播放短提示音。仅适用于此浏览器。"
 
@@ -26754,7 +26764,7 @@ msgstr "预设"
 msgid "Press ? for keyboard shortcuts"
 msgstr "按 ? 查看键盘快捷键"
 
-#: src/features/settings/components/account/account-settings.tsx:232
+#: src/features/settings/components/account/account-settings.tsx:233
 msgid "Press Ctrl/Cmd+Enter to send"
 msgstr "按 Ctrl/Cmd+Enter 发送"
 
@@ -26774,7 +26784,7 @@ msgstr "按回车键或空格键选择连线。然后可按 Delete 键删除，�
 msgid "Press Enter to open the folder. A folder that does not exist is created."
 msgstr "按回车键打开文件夹。不存在的文件夹将被创建。"
 
-#: src/features/settings/components/account/account-settings.tsx:230
+#: src/features/settings/components/account/account-settings.tsx:231
 msgid "Press Enter to send"
 msgstr "按 Enter 发送"
 
@@ -26782,7 +26792,7 @@ msgstr "按 Enter 发送"
 msgid "Press Enter to send, Shift+Enter for new line"
 msgstr "按 Enter 发送，Shift+Enter 换行"
 
-#: src/features/settings/components/account/account-settings.tsx:507
+#: src/features/settings/components/account/account-settings.tsx:508
 msgid "Press Escape to leave typing mode, then edit with h j k l, w b, 0 $, i a I A, o O, x, dd, D and u. Enter still sends. Off by default."
 msgstr "按 Esc 退出输入模式，然后用 h j k l、w b、0 $、i a I A、o O、x、dd、D 和 u 编辑。Enter 仍然发送。默认关闭。"
 
@@ -26790,7 +26800,7 @@ msgstr "按 Esc 退出输入模式，然后用 h j k l、w b、0 $、i a I A、o
 msgid "Press keys..."
 msgstr "请按键..."
 
-#: src/features/settings/components/account/account-settings.tsx:231
+#: src/features/settings/components/account/account-settings.tsx:232
 msgid "Press Shift+Enter to send"
 msgstr "按 Shift+Enter 发送"
 
@@ -26975,7 +26985,7 @@ msgstr "隐私"
 #: src/features/marketing/components/gateway-footer.tsx:145
 #: src/features/marketing/components/landing-footer.tsx:102
 #: src/features/marketing/components/landing-footer.tsx:272
-#: src/features/settings/components/account/account-settings.tsx:164
+#: src/features/settings/components/account/account-settings.tsx:165
 #: src/features/settings/components/chat/model-filter-settings.tsx:363
 #: src/features/settings/lib/settings-keywords.ts:26
 #: src/features/settings/lib/settings-navigation.ts:117
@@ -27558,7 +27568,7 @@ msgid "Pull request settings updated"
 msgstr "拉取请求设置已更新"
 
 #: src/features/code/components/code-shell.tsx:95
-#: src/features/develop/components/thread-pull-requests.tsx:238
+#: src/features/develop/components/thread-pull-requests.tsx:354
 msgid "Pull requests"
 msgstr "拉取请求"
 
@@ -27643,11 +27653,11 @@ msgstr "问题"
 msgid "Queue"
 msgstr "队列"
 
-#: src/features/chat/thread/composer-input-area.tsx:392
+#: src/features/chat/thread/composer-input-area.tsx:397
 msgid "Queue message"
 msgstr "排队消息"
 
-#: src/features/chat/thread/composer-input-area.tsx:411
+#: src/features/chat/thread/composer-input-area.tsx:416
 msgid "Queue message — sends when the current reply finishes"
 msgstr "排队消息——当前回复完成后发送"
 
@@ -27804,7 +27814,7 @@ msgstr "随机种子"
 msgid "Range to keep"
 msgstr "保留范围"
 
-#: src/features/settings/components/account/account-settings.tsx:679
+#: src/features/settings/components/account/account-settings.tsx:702
 msgid "Range: 1 hour to 7 days (168 hours)"
 msgstr "范围：1 小时到 7 天（168 小时）"
 
@@ -27917,7 +27927,7 @@ msgstr "朗读"
 msgid "Read each item below before you import it. Nothing in the bundle runs until you turn it on: schedules and webhooks are created switched off, group chats are created without starting anything, and skills are imported switched off, so they join no chat until you turn them on in your skill list. A skill adds the tools listed for it, and your own tool permissions still apply."
 msgstr "导入前请阅读下方每一项。在你开启之前，捆绑包中的任何内容都不会运行：计划任务和 webhook 创建后处于关闭状态，群聊创建后不会启动任何内容，技能导入后处于关闭状态，因此在你于技能列表中开启之前，它们不会加入任何聊天。技能会添加为其列出的工具，你自己的工具权限仍然适用。"
 
-#: src/features/settings/components/account/account-settings.tsx:436
+#: src/features/settings/components/account/account-settings.tsx:437
 msgid "Read every assistant reply aloud when it finishes, using your browser's voice."
 msgstr "每条助手回复完成后，使用浏览器的声音朗读出来。"
 
@@ -27954,7 +27964,7 @@ msgstr "只读预览——复刻后可编辑"
 msgid "Read-only shared conversation"
 msgstr "只读共享对话"
 
-#: src/features/chat/thread/composer-input.tsx:293
+#: src/features/chat/thread/composer-input.tsx:294
 msgid "Reading \"{attachmentName}\"…"
 msgstr "正在读取“{attachmentName}”…"
 
@@ -28211,7 +28221,7 @@ msgstr "重新连接"
 msgid "Reconnect {0}"
 msgstr "重新连接 {0}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:105
+#: src/features/develop/components/thread-pull-requests.tsx:227
 msgid "Reconnect your Git host in settings to link a pull request."
 msgstr "请在设置中重新连接 Git 托管服务，以关联拉取请求。"
 
@@ -28601,10 +28611,10 @@ msgstr "记住我"
 #: src/features/chat/host/host-composer.tsx:1078
 #: src/features/chat/sharing/thread-share-button.tsx:300
 #: src/features/chat/sharing/thread-share-button.tsx:372
-#: src/features/chat/thread/composer-input.tsx:355
-#: src/features/chat/thread/composer-input.tsx:367
-#: src/features/chat/thread/composer-input.tsx:421
-#: src/features/chat/thread/composer-input.tsx:430
+#: src/features/chat/thread/composer-input.tsx:356
+#: src/features/chat/thread/composer-input.tsx:368
+#: src/features/chat/thread/composer-input.tsx:422
+#: src/features/chat/thread/composer-input.tsx:431
 #: src/features/devices/components/devices-settings.tsx:396
 #: src/features/devices/components/devices-settings.tsx:402
 #: src/features/projects/components/project-form-dialog.tsx:323
@@ -28965,11 +28975,11 @@ msgstr "对话中的回复"
 msgid "Replies use the free reply token when the answer is quick, and fall back to a push message (which counts against your LINE quota) when it is not."
 msgstr "回答较快时使用免费的回复令牌，否则改用推送消息（会计入你的 LINE 配额）。"
 
-#: src/features/settings/components/account/account-settings.tsx:445
+#: src/features/settings/components/account/account-settings.tsx:446
 msgid "Replies will be read aloud"
 msgstr "回复将被朗读"
 
-#: src/features/settings/components/account/account-settings.tsx:445
+#: src/features/settings/components/account/account-settings.tsx:446
 msgid "Replies will no longer be read aloud"
 msgstr "回复将不再被朗读"
 
@@ -29207,7 +29217,7 @@ msgstr "重置缩放（当前 {zoomPercent}%）"
 msgid "Resize {label} column"
 msgstr "调整 {label} 列宽"
 
-#: src/features/chat/split/chat-split-view.tsx:460
+#: src/features/chat/split/chat-split-view.tsx:464
 msgid "Resize chats {index} and {next}"
 msgstr "调整聊天 {index} 和 {next} 的大小"
 
@@ -29318,7 +29328,7 @@ msgstr "结果未送达"
 msgid "Resume"
 msgstr "恢复"
 
-#: src/features/settings/components/account/account-settings.tsx:563
+#: src/features/settings/components/account/account-settings.tsx:564
 msgid "Resume after a usage limit"
 msgstr "达到用量上限后继续"
 
@@ -29327,7 +29337,7 @@ msgstr "达到用量上限后继续"
 msgid "Resume import"
 msgstr "继续导入"
 
-#: src/features/settings/components/account/account-settings.tsx:522
+#: src/features/settings/components/account/account-settings.tsx:523
 msgid "Resume your latest chat"
 msgstr "继续最近的对话"
 
@@ -29335,12 +29345,12 @@ msgstr "继续最近的对话"
 msgid "Resumed its own session"
 msgstr "已恢复其自身会话"
 
-#: src/features/settings/components/account/account-settings.tsx:534
+#: src/features/settings/components/account/account-settings.tsx:535
 msgid "Resuming your latest chat"
 msgstr "正在继续最近的对话"
 
-#: src/features/settings/components/account/account-settings.tsx:647
-#: src/features/settings/components/account/account-settings.tsx:672
+#: src/features/settings/components/account/account-settings.tsx:670
+#: src/features/settings/components/account/account-settings.tsx:695
 msgid "Retention period updated to {hours} hours"
 msgstr "保留时长已更新为 {hours} 小时"
 
@@ -29407,11 +29417,11 @@ msgstr "立即重试"
 msgid "Retry the device check"
 msgstr "重新检查设备"
 
-#: src/features/chat/thread/composer-input.tsx:444
+#: src/features/chat/thread/composer-input.tsx:445
 msgid "Retry upload"
 msgstr "重试上传"
 
-#: src/features/chat/thread/composer-input.tsx:439
+#: src/features/chat/thread/composer-input.tsx:440
 msgid "Retry upload of {attachmentName}"
 msgstr "重试上传 {attachmentName}"
 
@@ -29596,7 +29606,7 @@ msgstr "右"
 msgid "right to left"
 msgstr "从右到左"
 
-#: src/features/settings/components/account/account-settings.tsx:205
+#: src/features/settings/components/account/account-settings.tsx:206
 msgid "Right to Left (RTL)"
 msgstr "从右到左（RTL）"
 
@@ -29640,7 +29650,7 @@ msgstr "罗马尼亚语"
 msgid "Romanian (Romania)"
 msgstr "罗马尼亚语（罗马尼亚）"
 
-#: src/features/settings/components/account/account-settings.tsx:112
+#: src/features/settings/components/account/account-settings.tsx:113
 msgid "Rome"
 msgstr "罗马"
 
@@ -30049,7 +30059,7 @@ msgstr "保存为评测用例"
 msgid "Save as preset"
 msgstr "保存为预设"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:155
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:196
 msgid "Save blocked websites"
 msgstr "保存屏蔽的网站"
 
@@ -30183,6 +30193,10 @@ msgstr "已保存到“{0}”"
 msgid "Saving tools…"
 msgstr "正在保存工具…"
 
+#: src/features/chat/browser-live-view/browser-human-check.tsx:462
+msgid "Saving your answer…"
+msgstr "正在保存你的回答…"
+
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/projects/components/project-form-dialog.tsx:491
@@ -30277,7 +30291,7 @@ msgstr "得分"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "根据预期答案或评分标准为每个答案打 0–100% 的分。每个用例会额外调用一次小模型。"
 
-#: src/features/chat/thread/composer-input.tsx:1663
+#: src/features/chat/thread/composer-input.tsx:1702
 msgid "Screen capture failed. Please try again."
 msgstr "屏幕截取失败。请重试。"
 
@@ -30703,7 +30717,7 @@ msgstr "选择要预览的版本"
 msgid "Select a version to see changes"
 msgstr "选择一个版本查看更改"
 
-#: src/features/settings/components/account/account-settings.tsx:469
+#: src/features/settings/components/account/account-settings.tsx:470
 msgid "Select a voice"
 msgstr "选择语音"
 
@@ -30743,7 +30757,7 @@ msgstr "选为参考"
 msgid "Select by date"
 msgstr "按日期选择"
 
-#: src/features/settings/components/account/account-settings.tsx:279
+#: src/features/settings/components/account/account-settings.tsx:280
 msgid "Select dictation language"
 msgstr "选择听写语言"
 
@@ -30763,7 +30777,7 @@ msgstr "选择要上传的文件"
 msgid "Select image as reference"
 msgstr "选择图像作为参考"
 
-#: src/features/settings/components/account/account-settings.tsx:254
+#: src/features/settings/components/account/account-settings.tsx:255
 msgid "Select language"
 msgstr "选择语言"
 
@@ -30973,7 +30987,7 @@ msgstr "发送回答"
 msgid "Send Backward"
 msgstr "下移一层"
 
-#: src/features/settings/components/account/account-settings.tsx:222
+#: src/features/settings/components/account/account-settings.tsx:223
 msgid "Send behavior updated"
 msgstr "发送方式已更新"
 
@@ -30981,7 +30995,7 @@ msgstr "发送方式已更新"
 msgid "send button"
 msgstr "发送按钮"
 
-#: src/features/settings/components/account/account-settings.tsx:611
+#: src/features/settings/components/account/account-settings.tsx:612
 msgid "Send during a coding agent's turn"
 msgstr "在编程代理的轮次中发送"
 
@@ -31004,17 +31018,17 @@ msgid "Send Magic Link"
 msgstr "发送魔法链接"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:169
-#: src/features/chat/thread/composer-input-area.tsx:195
-#: src/features/chat/thread/composer-input-area.tsx:446
+#: src/features/chat/thread/composer-input-area.tsx:200
+#: src/features/chat/thread/composer-input-area.tsx:451
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:105
 msgid "Send message"
 msgstr "发送消息"
 
-#: src/features/chat/thread/composer-input-area.tsx:195
+#: src/features/chat/thread/composer-input-area.tsx:200
 msgid "Send message ({sendShortcut})"
 msgstr "发送消息（{sendShortcut}）"
 
-#: src/features/settings/components/account/account-settings.tsx:216
+#: src/features/settings/components/account/account-settings.tsx:217
 #: src/features/settings/lib/settings-keywords.ts:28
 msgid "Send Message Behavior"
 msgstr "消息发送方式"
@@ -31065,17 +31079,21 @@ msgstr "发送验证码"
 msgid "Send Verification Code"
 msgstr "发送验证码"
 
-#: src/features/chat/thread/composer-input-area.tsx:217
+#: src/features/chat/thread/composer-input-area.tsx:222
 msgid "Send when uploads finish"
 msgstr "上传完成后发送"
+
+#: src/features/settings/components/account/account-settings.tsx:634
+msgid "Send while a reply is writing"
+msgstr "在回复生成时发送"
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:416
 msgid "Send: {snippet}"
 msgstr "发送：{snippet}"
 
-#: src/features/chat/thread/composer-input-area.tsx:217
-#: src/features/chat/thread/composer-input-area.tsx:219
-#: src/features/chat/thread/composer-input-area.tsx:476
+#: src/features/chat/thread/composer-input-area.tsx:222
+#: src/features/chat/thread/composer-input-area.tsx:224
+#: src/features/chat/thread/composer-input-area.tsx:481
 msgid "Sending once uploads finish…"
 msgstr "上传完成后发送…"
 
@@ -31253,7 +31271,7 @@ msgstr "设置密码"
 msgid "Set the focal length in millimeters"
 msgstr "设置焦距（毫米）"
 
-#: src/features/settings/components/account/account-settings.tsx:192
+#: src/features/settings/components/account/account-settings.tsx:193
 msgid "Set the text direction for the application. RTL is used for languages like Arabic, Hebrew, and Persian."
 msgstr "设置应用的文字方向。RTL 用于阿拉伯语、希伯来语和波斯语等语言。"
 
@@ -31315,7 +31333,7 @@ msgstr "你的多个技能在同一个对话中回答。用 @ 提及其中一个
 msgid "Shallow, cinematic separation"
 msgstr "浅景深，电影感分离"
 
-#: src/features/settings/components/account/account-settings.tsx:118
+#: src/features/settings/components/account/account-settings.tsx:119
 msgid "Shanghai"
 msgstr "上海"
 
@@ -31515,7 +31533,7 @@ msgstr "显示附加内容"
 msgid "Show follow-up suggestions"
 msgstr "显示后续建议"
 
-#: src/features/settings/components/account/account-settings.tsx:353
+#: src/features/settings/components/account/account-settings.tsx:354
 msgid "Show follow-up suggestions after assistant messages."
 msgstr "在助手消息后显示后续建议。"
 
@@ -31600,7 +31618,7 @@ msgstr "显示此目标的任务"
 msgid "Show this help"
 msgstr "显示此帮助"
 
-#: src/features/settings/components/account/account-settings.tsx:691
+#: src/features/settings/components/account/account-settings.tsx:714
 msgid "Show Timestamps"
 msgstr "显示时间戳"
 
@@ -31883,7 +31901,7 @@ msgstr "简化"
 msgid "since replaced"
 msgstr "已被替换"
 
-#: src/features/settings/components/account/account-settings.tsx:120
+#: src/features/settings/components/account/account-settings.tsx:121
 msgid "Singapore"
 msgstr "新加坡"
 
@@ -32029,6 +32047,10 @@ msgstr "跳过导览"
 #: src/features/settings/components/chat/trigger-settings.tsx:182
 msgid "Skipped"
 msgstr "已跳过"
+
+#: src/features/knowledge/hooks/use-knowledge-import.ts:172
+msgid "Skipped {tooLarge} document(s) over {REQUEST_DOCUMENT_KB} KB once encoded."
+msgstr "已跳过 {tooLarge} 份文档：编码后超过 {REQUEST_DOCUMENT_KB} KB。"
 
 #. placeholder {0}: state.skipped.join(", ")
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:362
@@ -32185,7 +32207,7 @@ msgstr "暂时搁置"
 msgid "Snooze 1 hour"
 msgstr "暂时搁置 1 小时"
 
-#: src/features/settings/components/account/account-settings.tsx:587
+#: src/features/settings/components/account/account-settings.tsx:588
 msgid "Snooze chats until the limit resets"
 msgstr "在上限重置前暂时搁置对话"
 
@@ -32271,9 +32293,9 @@ msgstr "此次运行中的部分图像无法保存。"
 msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "部分步骤缺少价格数据；总额为最低值。"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:112
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1032
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1091
+#: src/features/chat/browser-live-view/browser-human-check.tsx:435
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1042
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1101
 msgid "Someone else has control of this browser."
 msgstr "其他人正在控制此浏览器。"
 
@@ -32345,15 +32367,15 @@ msgstr "SOTA 级性价比，支持 2M token 上下文"
 msgid "SOTA with vector art and typography via Replicate"
 msgstr "通过 Replicate 提供的支持矢量图和排版的 SOTA"
 
-#: src/features/settings/components/account/account-settings.tsx:707
+#: src/features/settings/components/account/account-settings.tsx:730
 msgid "Sound Effects"
 msgstr "音效"
 
-#: src/features/settings/components/account/account-settings.tsx:716
+#: src/features/settings/components/account/account-settings.tsx:739
 msgid "Sound effects disabled"
 msgstr "已关闭音效"
 
-#: src/features/settings/components/account/account-settings.tsx:716
+#: src/features/settings/components/account/account-settings.tsx:739
 msgid "Sound effects enabled"
 msgstr "已开启音效"
 
@@ -32568,15 +32590,15 @@ msgstr "拆分单元格"
 msgid "Split right"
 msgstr "向右拆分"
 
-#: src/features/settings/components/account/account-settings.tsx:723
+#: src/features/settings/components/account/account-settings.tsx:746
 msgid "Split View"
 msgstr "分屏视图"
 
-#: src/features/settings/components/account/account-settings.tsx:736
+#: src/features/settings/components/account/account-settings.tsx:759
 msgid "Split view disabled"
 msgstr "已停用分屏视图"
 
-#: src/features/settings/components/account/account-settings.tsx:736
+#: src/features/settings/components/account/account-settings.tsx:759
 msgid "Split view enabled"
 msgstr "已启用分屏视图"
 
@@ -32834,7 +32856,7 @@ msgstr "开始模拟登录"
 msgid "Start LM Studio's server with CORS"
 msgstr "启动启用了 CORS 的 LM Studio 服务器"
 
-#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:54
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:57
 msgid "Start new chats as temporary"
 msgstr "新聊天默认为临时"
 
@@ -32994,11 +33016,11 @@ msgstr "状态"
 msgid "Status Page"
 msgstr "状态页"
 
-#: src/features/chat/thread/composer-input-area.tsx:382
+#: src/features/chat/thread/composer-input-area.tsx:387
 msgid "Steer — the current reply reads this at its next step"
 msgstr "引导——当前回复会在下一步读取此内容"
 
-#: src/features/chat/thread/composer-input-area.tsx:365
+#: src/features/chat/thread/composer-input-area.tsx:370
 msgid "Steer the reply"
 msgstr "引导回复"
 
@@ -33039,7 +33061,7 @@ msgstr "仍在连接服务器..."
 msgid "Stock and currency information"
 msgstr "股票和汇率信息"
 
-#: src/features/settings/components/account/account-settings.tsx:115
+#: src/features/settings/components/account/account-settings.tsx:116
 msgid "Stockholm"
 msgstr "斯德哥尔摩"
 
@@ -33079,8 +33101,8 @@ msgstr "停止浏览器会话"
 
 #: src/features/chat/thread-list/thread-node.tsx:644
 #: src/features/chat/thread-list/thread-node.tsx:666
-#: src/features/chat/thread/composer-input-area.tsx:419
-#: src/features/chat/thread/composer-input-area.tsx:432
+#: src/features/chat/thread/composer-input-area.tsx:424
+#: src/features/chat/thread/composer-input-area.tsx:437
 msgid "Stop generating"
 msgstr "停止生成"
 
@@ -33651,7 +33673,7 @@ msgstr "建议"
 msgid "Suggestions"
 msgstr "建议"
 
-#: src/features/settings/components/account/account-settings.tsx:489
+#: src/features/settings/components/account/account-settings.tsx:490
 msgid "Suggests how to finish your message as grey text; press Right Arrow at the end of the line to accept or Esc to dismiss. Your draft is sent to an AI model to make the suggestion."
 msgstr "以灰色文字建议如何补全消息；在行尾按右方向键接受，按 Esc 忽略。你的草稿会发送给 AI 模型以生成建议。"
 
@@ -33659,7 +33681,7 @@ msgstr "以灰色文字建议如何补全消息；在行尾按右方向键接受
 msgid "Suited for complex tasks: Role / Background / Attention / Skills / Goals / Constraints / Workflow."
 msgstr "适合复杂任务：Role / Background / Attention / Skills / Goals / Constraints / Workflow。"
 
-#: src/features/settings/components/account/account-settings.tsx:370
+#: src/features/settings/components/account/account-settings.tsx:371
 msgid "Summarise long chats"
 msgstr "总结长聊天"
 
@@ -33856,7 +33878,7 @@ msgstr "已切换到团队视图"
 msgid "Switzerland"
 msgstr "瑞士"
 
-#: src/features/settings/components/account/account-settings.tsx:123
+#: src/features/settings/components/account/account-settings.tsx:124
 msgid "Sydney"
 msgstr "悉尼"
 
@@ -33979,12 +34001,16 @@ msgstr "台湾"
 msgid "Take an input image, remove the background, then apply style transfer"
 msgstr "输入一张图像，移除背景，然后应用风格迁移"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:163
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1056
+#: src/features/chat/browser-live-view/browser-human-check.tsx:588
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1066
 msgid "Take control"
 msgstr "接管控制"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:136
+#: src/features/chat/browser-live-view/browser-human-check.tsx:477
+msgid "Take control, clear it and hand the browser back, then mark it done. Or decline if you will not."
+msgstr "接管控制，完成验证并交还浏览器，然后将其标记为完成。如果你不打算处理，也可以拒绝。"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:478
 msgid "Take control, clear it, then hand the browser back."
 msgstr "接管控制，完成验证，然后把浏览器交还。"
 
@@ -33992,7 +34018,7 @@ msgstr "接管控制，完成验证，然后把浏览器交还。"
 msgid "Take turns"
 msgstr "轮流发言"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:346
+#: src/features/chat/browser-live-view/browser-live-view.tsx:356
 msgid "Taking control is not available while impersonating."
 msgstr "模拟登录期间无法接管控制。"
 
@@ -34298,7 +34324,7 @@ msgstr "临时聊天模式"
 msgid "Temporary chat mode, on for your next chat"
 msgstr "临时聊天模式，已为你的下一个聊天开启"
 
-#: src/features/settings/components/account/account-settings.tsx:632
+#: src/features/settings/components/account/account-settings.tsx:655
 msgid "Temporary Chat Retention (hours)"
 msgstr "临时聊天保留时长（小时）"
 
@@ -34421,20 +34447,20 @@ msgstr "文字颜色"
 msgid "Text Content"
 msgstr "文本内容"
 
-#: src/features/settings/components/account/account-settings.tsx:190
+#: src/features/settings/components/account/account-settings.tsx:191
 #: src/features/settings/lib/settings-keywords.ts:27
 msgid "Text Direction"
 msgstr "文字方向"
 
-#: src/features/settings/components/account/account-settings.tsx:196
+#: src/features/settings/components/account/account-settings.tsx:197
 msgid "Text direction set to LTR"
 msgstr "文字方向已设为 LTR"
 
-#: src/features/settings/components/account/account-settings.tsx:196
+#: src/features/settings/components/account/account-settings.tsx:197
 msgid "Text direction set to RTL"
 msgstr "文字方向已设为 RTL"
 
-#: src/features/chat/thread/composer-input.tsx:329
+#: src/features/chat/thread/composer-input.tsx:330
 msgid "Text document"
 msgstr "文本文档"
 
@@ -34633,12 +34659,12 @@ msgid "That message was already sent."
 msgstr "该消息已发送。"
 
 #. placeholder {0}: result.error
-#: src/features/chat/browser-live-view/browser-live-view.tsx:932
+#: src/features/chat/browser-live-view/browser-live-view.tsx:942
 msgid "That page could not be opened: {0}"
 msgstr "无法打开该页面：{0}"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:646
-#: src/features/chat/browser-live-view/browser-live-view.tsx:952
+#: src/features/chat/browser-live-view/browser-live-view.tsx:656
+#: src/features/chat/browser-live-view/browser-live-view.tsx:962
 msgid "That page could not be opened."
 msgstr "无法打开该页面。"
 
@@ -34747,7 +34773,7 @@ msgstr "智能体未提供该选项"
 msgid "The agent finished without giving a guide. Write it again."
 msgstr "智能体已结束，但未给出指南。请重新撰写。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1090
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1100
 msgid "The agent is finishing a browser action, which can take over a minute. Try again shortly."
 msgstr "智能体正在完成一项浏览器操作，可能需要一分钟以上。请稍后再试。"
 
@@ -34759,7 +34785,7 @@ msgstr "智能体仍在打开会话。请稍后重试。"
 msgid "The agent is still working on the last message."
 msgstr "智能体仍在处理上一条消息。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1029
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1039
 msgid "The agent is using a browser"
 msgstr "智能体正在使用浏览器"
 
@@ -34783,19 +34809,19 @@ msgstr "智能体未更改任何文件。"
 msgid "The agent on your computer is reading the change…"
 msgstr "你电脑上的智能体正在读取此变更…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:926
+#: src/features/chat/browser-live-view/browser-live-view.tsx:936
 msgid "The agent's browser closed while the page loaded."
 msgstr "页面加载期间，智能体的浏览器已关闭。"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:134
+#: src/features/chat/browser-live-view/browser-human-check.tsx:500
 msgid "The agent's browser reached a page on {site} only a person can clear. The agent waits and will not try to get around it."
 msgstr "代理的浏览器在 {site} 上遇到了只有真人才能通过的页面。代理会等待，不会尝试绕过它。"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:133
+#: src/features/chat/browser-live-view/browser-human-check.tsx:499
 msgid "The agent's browser reached a page only a person can clear. The agent waits and will not try to get around it."
 msgstr "代理的浏览器遇到了只有真人才能通过的页面。代理会等待，不会尝试绕过它。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:808
+#: src/features/chat/browser-live-view/browser-live-view.tsx:818
 msgid "The agent's browser was replaced, and control went back to the agent. You can take control again."
 msgstr "智能体的浏览器已被替换，控制权已交还给智能体。你可以再次接管控制。"
 
@@ -34865,7 +34891,7 @@ msgstr "机器人为此聊天设置模型。"
 msgid "The bot's tools were saved"
 msgstr "已保存机器人的工具"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:108
+#: src/features/chat/browser-live-view/browser-human-check.tsx:431
 msgid "The browser cannot be taken over right now. Ask the agent to look at the page again if it is still needed."
 msgstr "目前无法接管此浏览器。如果仍需要该页面，请让代理重新查看页面。"
 
@@ -34873,17 +34899,21 @@ msgstr "目前无法接管此浏览器。如果仍需要该页面，请让代理
 msgid "The browser cannot read this video to capture a frame"
 msgstr "浏览器无法读取此视频，因此无法截取帧"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:901
+#: src/features/chat/browser-live-view/browser-live-view.tsx:911
 msgid "The browser could not be handed back. The agent gets it back on its own after two minutes without input."
 msgstr "无法交还浏览器。两分钟内没有输入后，它会自动回到智能体手中。"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:101
+#: src/features/chat/browser-live-view/browser-human-check.tsx:422
 msgid "The browser has closed, so this check can no longer be cleared here. Once the agent's reply has finished, ask it to try again: it opens a new browser and asks you again if the check still shows."
 msgstr "浏览器已关闭，因此无法在此处完成这项验证。请在代理的回复结束后让它重试：它会打开一个新浏览器，如果验证仍然出现，会再次询问你。"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:105
+#: src/features/chat/browser-live-view/browser-human-check.tsx:428
 msgid "The browser has since moved on from {site}, so this check is no longer open."
 msgstr "浏览器已离开 {site}，因此此验证已不再进行。"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:427
+msgid "The browser has since moved on from {site}. Mark the check done if you cleared it, or decline it."
+msgstr "浏览器已离开 {site}。如果你已完成验证，请将其标记为完成，否则请拒绝。"
 
 #: src/features/skills/components/skill-builder-dialog.tsx:108
 msgid "The builder could not answer. Try again."
@@ -34921,7 +34951,7 @@ msgstr "更改被拒绝"
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "聊天智能体使用其工具处理任务，并可选择遵循某个技能。"
 
-#: src/features/chat/thread/composer-input.tsx:1080
+#: src/features/chat/thread/composer-input.tsx:1081
 msgid "The chat changed before the paste was ready, so it was not inserted."
 msgstr "粘贴内容准备好之前聊天已切换，因此未插入。"
 
@@ -34961,8 +34991,8 @@ msgstr "命令行未登录。你可以关闭此标签页。"
 msgid "The comparison could not be loaded."
 msgstr "无法加载对比结果。"
 
-#: src/features/chat/thread/composer-input.tsx:1088
-#: src/features/chat/thread/composer-input.tsx:1110
+#: src/features/chat/thread/composer-input.tsx:1089
+#: src/features/chat/thread/composer-input.tsx:1111
 msgid "The composer was locked before the paste was ready, so it was not inserted."
 msgstr "粘贴准备好之前输入框已被锁定，因此未插入。"
 
@@ -35113,7 +35143,7 @@ msgstr "每轮对话的最终文本都会像其他聊天一样保存到你的聊
 msgid "The first two other participants debate, for and against, in list order."
 msgstr "按列表顺序，其他参与者中的前两位分别持正方和反方进行辩论。"
 
-#: src/features/knowledge/hooks/use-knowledge-import.ts:167
+#: src/features/knowledge/hooks/use-knowledge-import.ts:187
 msgid "The folder has no supported documents."
 msgstr "该文件夹中没有受支持的文档。"
 
@@ -35170,7 +35200,7 @@ msgstr "托管方"
 msgid "the host did not answer"
 msgstr "主机未作答"
 
-#: src/features/develop/components/thread-pull-requests.tsx:104
+#: src/features/develop/components/thread-pull-requests.tsx:226
 msgid "The host did not answer. Try again."
 msgstr "托管方没有响应。请重试。"
 
@@ -35182,11 +35212,11 @@ msgstr "托管方没有响应。稍后将重试。"
 msgid "the host did not change the option"
 msgstr "主机未更改该选项"
 
-#: src/features/develop/components/thread-pull-requests.tsx:107
+#: src/features/develop/components/thread-pull-requests.tsx:229
 msgid "The host has no pull request at that address."
 msgstr "托管方在该地址没有拉取请求。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:109
+#: src/features/develop/components/thread-pull-requests.tsx:231
 msgid "The host is limiting requests. Try again shortly."
 msgstr "托管方正在限制请求。请稍后重试。"
 
@@ -35278,11 +35308,11 @@ msgstr "链接可能有误，或者所有者已将该对话设为私有或删除
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "链接可能有误，或者所有者已取消发布或删除该页面。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1099
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1109
 msgid "The live view could not be opened."
 msgstr "无法打开实时画面。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1084
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1094
 msgid "The live view is not available right now."
 msgstr "实时画面暂时不可用。"
 
@@ -35364,7 +35394,7 @@ msgstr "链接中的模型不可用。聊天将保留其原有模型。"
 msgid "The model picker now lists {0} models from {1}"
 msgstr "模型选择器现已列出 {1} 的 {0} 个模型"
 
-#: src/features/chat/thread/composer-input.tsx:1598
+#: src/features/chat/thread/composer-input.tsx:1637
 msgid "The model selection changed while the uploads ran, so the message was not sent. Press send to send it."
 msgstr "上传期间模型选择已更改，因此消息未发送。请按发送按钮发送。"
 
@@ -35437,7 +35467,7 @@ msgstr "页面现在显示的是另一个版本。请从你的版本中复制想
 msgid "The page with the login form. Leave empty to start at the site's front page."
 msgstr "包含登录表单的页面。留空则从网站首页开始。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1139
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1149
 msgid "The page you opened is still loading."
 msgstr "你打开的页面仍在加载。"
 
@@ -35445,7 +35475,7 @@ msgstr "你打开的页面仍在加载。"
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "该页面、所有子页面、评论及版本历史都将被删除。此操作无法撤销。"
 
-#: src/features/chat/thread/composer-input.tsx:1136
+#: src/features/chat/thread/composer-input.tsx:1137
 msgid "The pasted text could not be attached and was not inserted."
 msgstr "粘贴的文本无法附加，也未被插入。"
 
@@ -35669,11 +35699,11 @@ msgstr "两次输入的口令不一致。"
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "面向现代 AI 应用的统一 LLM 网关。"
 
-#: src/features/chat/thread/composer-input.tsx:714
+#: src/features/chat/thread/composer-input.tsx:715
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "“{fileName}”的上传已过期。请重新附加该文件。"
 
-#: src/features/chat/thread/composer-input.tsx:1611
+#: src/features/chat/thread/composer-input.tsx:1650
 msgid "The uploads finished, but the message was not sent. Press send to send it."
 msgstr "上传已完成，但消息未发送。请按发送按钮发送。"
 
@@ -35689,7 +35719,7 @@ msgstr "在允许的修复轮次之后，验证器仍未通过此结果。你可
 msgid "The verifier passes the result only if every criterion is met."
 msgstr "只有满足所有标准，验证器才会通过结果。"
 
-#: src/features/settings/components/account/account-settings.tsx:456
+#: src/features/settings/components/account/account-settings.tsx:457
 msgid "The voice hands-free mode reads replies in. A skill with its own voice uses that instead. Spoken replies count against a daily allowance; after it, your browser's voice takes over."
 msgstr "免提模式朗读回复时使用的语音。带有自有语音的技能会改用其语音。朗读的回复计入每日额度，用完后由浏览器的语音接替。"
 
@@ -35955,9 +35985,29 @@ msgstr "此聊天已锁定。请解锁后再发送。"
 msgid "This chat is too long to compact."
 msgstr "此聊天过长，无法压缩。"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:103
+#: src/features/chat/browser-live-view/browser-human-check.tsx:448
+msgid "This check can no longer be read here."
+msgstr "此验证已无法在此读取。"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:468
+msgid "This check cannot be answered in this chat."
+msgstr "无法在此聊天中回复此验证。"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:409
+msgid "This check is no longer open. Ask the agent to try again if it is still needed."
+msgstr "此验证已不再开放。如果仍有需要，请让智能体再试一次。"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:405
+msgid "This check was declined. The agent will not use this site again in this reply."
+msgstr "此验证已被拒绝。在本次回复中，智能体不会再使用此网站。"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:424
 msgid "This check was for an earlier browser, which the agent no longer uses."
 msgstr "此验证针对的是代理已不再使用的先前浏览器。"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:408
+msgid "This check was marked done. The agent looks at the page again before it goes on."
+msgstr "此验证已被标记为完成。智能体会在继续之前再次查看页面。"
 
 #: src/features/auth/components/device-approval.tsx:83
 msgid "This code can't be approved here."
@@ -36121,7 +36171,7 @@ msgstr "无法上传此文件。请检查其类型和大小，然后重试。"
 msgid "This file is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "此文件较大（约 {0} 个 token），将占用模型上下文窗口的很大一部分。"
 
-#: src/features/knowledge/hooks/use-knowledge-import.ts:207
+#: src/features/knowledge/hooks/use-knowledge-import.ts:227
 msgid "This file is not a readable ZIP archive."
 msgstr "此文件不是可读取的 ZIP 压缩包。"
 
@@ -36381,7 +36431,7 @@ msgstr "此提示词将用于每条消息。每条消息都独立处理，不带
 msgid "This prompt will configure:"
 msgstr "此提示词将配置："
 
-#: src/features/develop/components/thread-pull-requests.tsx:108
+#: src/features/develop/components/thread-pull-requests.tsx:230
 msgid "This pull request already has as many threads linked as it can keep."
 msgstr "此拉取请求已关联了所能保留的最多对话数。"
 
@@ -36494,7 +36544,7 @@ msgstr "此文本仅包含隐藏字符，因此没有可保存的内容。"
 msgid "This thread"
 msgstr "此对话"
 
-#: src/features/develop/components/thread-pull-requests.tsx:110
+#: src/features/develop/components/thread-pull-requests.tsx:232
 msgid "This thread already has as many pull requests linked as it can keep."
 msgstr "此对话已关联了所能保留的最多拉取请求数。"
 
@@ -36510,7 +36560,7 @@ msgstr "此对话已被删除"
 msgid "This thread's system prompt changed while you were editing."
 msgstr "你在编辑时，此线程的系统提示词已更改。"
 
-#: src/features/knowledge/hooks/use-knowledge-import.ts:262
+#: src/features/knowledge/hooks/use-knowledge-import.ts:282
 msgid "This URL cannot be added."
 msgstr "无法添加此 URL。"
 
@@ -36760,21 +36810,21 @@ msgstr "已超时"
 msgid "Timeline image"
 msgstr "时间轴图片"
 
-#: src/features/settings/components/account/account-settings.tsx:700
+#: src/features/settings/components/account/account-settings.tsx:723
 msgid "Timestamps disabled"
 msgstr "已关闭时间戳"
 
-#: src/features/settings/components/account/account-settings.tsx:700
+#: src/features/settings/components/account/account-settings.tsx:723
 msgid "Timestamps enabled"
 msgstr "已开启时间戳"
 
-#: src/features/settings/components/account/account-settings.tsx:322
+#: src/features/settings/components/account/account-settings.tsx:323
 #: src/features/settings/components/chat/trigger-settings.tsx:329
 #: src/features/settings/lib/settings-keywords.ts:32
 msgid "Timezone"
 msgstr "时区"
 
-#: src/features/settings/components/account/account-settings.tsx:327
+#: src/features/settings/components/account/account-settings.tsx:328
 msgid "Timezone updated"
 msgstr "时区已更新"
 
@@ -36941,7 +36991,7 @@ msgstr "Token"
 msgid "Tokens used on your own endpoint are not charged as credits. Daily message limits still apply."
 msgstr "使用你自己的端点消耗的 token 不计入积分，但每日消息限额仍然适用。"
 
-#: src/features/settings/components/account/account-settings.tsx:117
+#: src/features/settings/components/account/account-settings.tsx:118
 msgid "Tokyo"
 msgstr "东京"
 
@@ -36975,7 +37025,7 @@ msgstr "尝试次数过多。请稍等几秒后重试。"
 msgid "too many files"
 msgstr "文件过多"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1098
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1108
 msgid "Too many live views were opened. Try again later."
 msgstr "打开的实时画面过多，请稍后再试。"
 
@@ -37125,7 +37175,7 @@ msgstr "在复杂基准测试中推理顶级"
 msgid "Top-tier text-to-video quality"
 msgstr "顶级文生视频质量"
 
-#: src/features/settings/components/account/account-settings.tsx:107
+#: src/features/settings/components/account/account-settings.tsx:108
 msgid "Toronto"
 msgstr "多伦多"
 
@@ -37393,13 +37443,13 @@ msgstr "尝试调整搜索词。"
 #: src/features/admin/components/admin-shard-footprint-row.tsx:52
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/browser-live-view/browser-human-check.tsx:153
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1103
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1220
+#: src/features/chat/browser-live-view/browser-human-check.tsx:578
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1113
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1280
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
-#: src/features/develop/components/thread-pull-requests.tsx:203
+#: src/features/develop/components/thread-pull-requests.tsx:325
 #: src/features/home/components/home-page.tsx:154
 #: src/features/projects/components/computer-rule-file-import.tsx:495
 #: src/features/projects/components/project-repo-picker.tsx:190
@@ -37602,7 +37652,7 @@ msgid "Type your answer…"
 msgstr "输入你的回答…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:250
-#: src/features/chat/thread/composer-input.tsx:2120
+#: src/features/chat/thread/composer-input.tsx:2160
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:231
 msgid "Type your message..."
 msgstr "输入你的消息..."
@@ -37627,7 +37677,7 @@ msgstr "文字排版"
 msgid "UAE"
 msgstr "阿联酋"
 
-#: src/features/settings/components/account/account-settings.tsx:686
+#: src/features/settings/components/account/account-settings.tsx:709
 msgid "UI Preferences"
 msgstr "界面偏好"
 
@@ -37772,7 +37822,7 @@ msgstr "下划线"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:68
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:95
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:982
+#: src/features/chat/thread/composer-input.tsx:983
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "撤销"
@@ -37943,7 +37993,7 @@ msgstr "未读"
 msgid "Unsaved changes"
 msgstr "未保存的更改"
 
-#: src/features/chat/split/chat-split-view.tsx:186
+#: src/features/chat/split/chat-split-view.tsx:187
 msgid "Unsent draft"
 msgstr "未发送的草稿"
 
@@ -38030,7 +38080,7 @@ msgstr "任意库或框架的最新文档"
 msgid "Update Duration"
 msgstr "更新时长"
 
-#: src/features/chat/thread/composer-input.tsx:1970
+#: src/features/chat/thread/composer-input.tsx:2009
 msgid "Update failed"
 msgstr "更新失败"
 
@@ -38228,18 +38278,18 @@ msgstr "上传 CSV、运行 Python 分析并导出图表——无需配置 Jupyt
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "将文档上传到知识库并分组为集合。AI 会从中搜索相关上下文，并引用所用的段落。"
 
-#: src/features/chat/thread/composer-input.tsx:436
-#: src/features/chat/thread/composer-input.tsx:759
-#: src/features/chat/thread/composer-input.tsx:1876
+#: src/features/chat/thread/composer-input.tsx:437
+#: src/features/chat/thread/composer-input.tsx:760
+#: src/features/chat/thread/composer-input.tsx:1915
 msgid "Upload failed"
 msgstr "上传失败"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1869
+#: src/features/chat/thread/composer-input.tsx:1908
 msgid "Upload failed: {0}"
 msgstr "上传失败：{0}"
 
-#: src/features/chat/thread/composer-input-area.tsx:263
+#: src/features/chat/thread/composer-input-area.tsx:268
 msgid "Upload file"
 msgstr "上传文件"
 
@@ -38285,7 +38335,7 @@ msgstr "已上传"
 msgid "Uploaded {fileName}"
 msgstr "已上传 {fileName}"
 
-#: src/features/chat/thread/composer-input.tsx:373
+#: src/features/chat/thread/composer-input.tsx:374
 msgid "Uploading {attachmentName}"
 msgstr "正在上传 {attachmentName}"
 
@@ -38684,7 +38734,7 @@ msgstr "有效的 JSON"
 msgid "Validate data quality and prioritize authoritative sources. Essential for research tasks and fact-checking."
 msgstr "验证数据质量并优先采用权威来源。对研究任务和事实核查至关重要。"
 
-#: src/features/settings/components/account/account-settings.tsx:108
+#: src/features/settings/components/account/account-settings.tsx:109
 msgid "Vancouver"
 msgstr "温哥华"
 
@@ -39170,15 +39220,15 @@ msgstr "已查看 {viewedCount}/{0} 个文件"
 msgid "Viewing: {selectedNodeId}"
 msgstr "正在查看：{selectedNodeId}"
 
-#: src/features/settings/components/account/account-settings.tsx:515
+#: src/features/settings/components/account/account-settings.tsx:516
 msgid "Vim keys disabled"
 msgstr "Vim 按键已关闭"
 
-#: src/features/settings/components/account/account-settings.tsx:515
+#: src/features/settings/components/account/account-settings.tsx:516
 msgid "Vim keys enabled"
 msgstr "Vim 按键已开启"
 
-#: src/features/settings/components/account/account-settings.tsx:504
+#: src/features/settings/components/account/account-settings.tsx:505
 msgid "Vim keys in the composer"
 msgstr "输入框中的 Vim 按键"
 
@@ -39452,8 +39502,8 @@ msgstr "正在等待所有者回答"
 msgid "Waiting for the owner to approve"
 msgstr "正在等待所有者批准"
 
-#: src/features/chat/thread/composer-input-area.tsx:219
-#: src/features/chat/thread/composer-input-area.tsx:392
+#: src/features/chat/thread/composer-input-area.tsx:224
+#: src/features/chat/thread/composer-input-area.tsx:397
 msgid "Waiting for uploads to complete…"
 msgstr "正在等待上传完成…"
 
@@ -39498,7 +39548,7 @@ msgstr "想从这里继续吗？"
 msgid "Watch"
 msgstr "监视"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1046
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1056
 msgid "Watch live"
 msgstr "观看实时画面"
 
@@ -39783,11 +39833,11 @@ msgstr "指南应该关注什么？"
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "过去 30 天内智能体请求你的设备执行的操作。"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:173
+#: src/features/chat/browser-live-view/browser-human-check.tsx:602
 msgid "What the agent's browser sees"
 msgstr "代理的浏览器看到的内容"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:173
+#: src/features/chat/browser-live-view/browser-human-check.tsx:602
 msgid "What the agent's browser sees on {site}"
 msgstr "代理的浏览器在 {site} 上看到的内容"
 
@@ -39870,15 +39920,15 @@ msgstr "何时"
 msgid "When a new fact conflicts with an old one, the old memory is updated, superseded, or the new fact is ignored."
 msgstr "当新事实与旧事实冲突时，旧记忆会被更新、取代，或忽略新事实。"
 
-#: src/features/settings/components/account/account-settings.tsx:544
+#: src/features/settings/components/account/account-settings.tsx:545
 msgid "When a reply is cut off by an update or an outage, it continues from its last finished step, up to 3 times. A reply interrupted while a tool was running is never continued."
 msgstr "当回复因更新或故障而中断时，它会从上一个已完成的步骤继续，最多 3 次。在工具运行期间被中断的回复永远不会继续。"
 
-#: src/features/settings/components/account/account-settings.tsx:590
+#: src/features/settings/components/account/account-settings.tsx:591
 msgid "When a reply pauses because a usage limit was reached and the provider says when it resets, its chat leaves your active list until then."
 msgstr "回复因达到用量上限而暂停，且服务商给出了重置时间时，对话会在此之前从你的活动列表中暂时搁置。"
 
-#: src/features/settings/components/account/account-settings.tsx:566
+#: src/features/settings/components/account/account-settings.tsx:567
 msgid "When a reply pauses because a usage limit was reached, it resumes by itself once the limit resets. Off: it waits until you resume it."
 msgstr "回复因达到用量上限而暂停时，上限重置后会自动继续。关闭时，需要你手动继续。"
 
@@ -39939,13 +39989,18 @@ msgstr "让想法<0/><1>化为行动。</1>"
 msgid "Where you stay in control"
 msgstr "你始终掌控"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1207
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1269
 msgid "Whether the agent is using a browser could not be checked."
 msgstr "无法检查智能体是否正在使用浏览器。"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:96
+#: src/features/chat/browser-live-view/browser-human-check.tsx:417
 msgid "Whether the browser is still open could not be checked."
 msgstr "无法确认浏览器是否仍处于打开状态。"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:454
+#: src/features/chat/browser-live-view/browser-human-check.tsx:466
+msgid "Whether this check is still open could not be checked."
+msgstr "无法确认此验证是否仍然开放。"
 
 #: src/features/marketing/components/landing-page.tsx:258
 msgid "Which AI models are included?"
@@ -40333,7 +40388,7 @@ msgstr "你即将从文件库中删除“{fileName}”。此操作无法撤销�
 msgid "You are about to impersonate {userName}. You will see the application as they do and can perform actions on their behalf."
 msgstr "你即将模拟登录 {userName}。你将看到对方看到的应用界面，并可以代表对方执行操作。"
 
-#: src/features/knowledge/hooks/use-knowledge-import.ts:264
+#: src/features/knowledge/hooks/use-knowledge-import.ts:284
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:148
 msgid "You are adding documents too quickly. Wait a moment and try again."
 msgstr "你添加文档的速度过快。请稍候再试。"
@@ -40367,8 +40422,8 @@ msgstr "你已离线。网络恢复后，Neore 将重新连接。"
 msgid "You are offline. Reconnect and try again."
 msgstr "你已离线。请重新连接后重试。"
 
-#: src/features/chat/thread/composer-input.tsx:1195
-#: src/features/chat/thread/composer-input.tsx:1320
+#: src/features/chat/thread/composer-input.tsx:1198
+#: src/features/chat/thread/composer-input.tsx:1325
 #: src/features/chat/thread/composer-prompt-queue.tsx:181
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "你已离线。你的消息会保留在这里；恢复在线后再发送。"
@@ -40418,7 +40473,7 @@ msgstr "你可以查看此页面，但不能编辑。"
 msgid "You cannot ask a side question in this chat."
 msgstr "你不能在此聊天中提出旁支问题。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:103
+#: src/features/develop/components/thread-pull-requests.tsx:225
 msgid "You cannot see that pull request on the host."
 msgstr "你在托管方上看不到该拉取请求。"
 
@@ -40430,16 +40485,20 @@ msgstr "你可选择计划、运行位置和项目。该项目必须是你有写
 msgid "You chose these integrations in the agent builder. Each one opens for you to review before anything connects."
 msgstr "这些是你在智能体构建器中选择的集成。每一个都会先打开供你审阅，然后才会建立连接。"
 
+#: src/features/chat/browser-live-view/browser-human-check.tsx:404
+msgid "You declined this check. The agent will not use this site again in this reply."
+msgstr "你已拒绝此验证。在本次回复中，智能体不会再使用此网站。"
+
 #: src/features/marketing/use-cases/use-case-data.ts:39
 msgid "You get a notification when a run finishes, needs your review or fails. A finished run links to its chat, and a run that needs review links to the tasks board."
 msgstr "运行完成、需要你审阅或失败时，你会收到通知。已完成的运行会链接到其聊天，需要审阅的运行会链接到任务看板。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:531
-#: src/features/chat/browser-live-view/browser-live-view.tsx:880
+#: src/features/chat/browser-live-view/browser-live-view.tsx:541
+#: src/features/chat/browser-live-view/browser-live-view.tsx:890
 msgid "You handed the browser back to the agent."
 msgstr "你已将浏览器交还给智能体。"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:110
+#: src/features/chat/browser-live-view/browser-human-check.tsx:433
 msgid "You have control. Clear the check in the live view, then hand the browser back."
 msgstr "你已接管控制。请在实时视图中完成验证，然后把浏览器交还。"
 
@@ -40497,7 +40556,11 @@ msgstr "你今天的消息额度已用完。请稍后再试。"
 msgid "You have used today's translations. Try again later."
 msgstr "今天的翻译次数已用完。请稍后再试。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:346
+#: src/features/chat/browser-live-view/browser-human-check.tsx:407
+msgid "You marked this check done. The agent looks at the page again before it goes on."
+msgstr "你已将此验证标记为完成。智能体会在继续之前再次查看页面。"
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:356
 msgid "You may not take control of this browser."
 msgstr "你无法控制此浏览器。"
 
@@ -40505,10 +40568,10 @@ msgstr "你无法控制此浏览器。"
 msgid "You need to sign in to access this page."
 msgstr "你需要登录才能访问此页面。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:536
-#: src/features/chat/browser-live-view/browser-live-view.tsx:699
-#: src/features/chat/browser-live-view/browser-live-view.tsx:880
-#: src/features/chat/browser-live-view/browser-live-view.tsx:928
+#: src/features/chat/browser-live-view/browser-live-view.tsx:546
+#: src/features/chat/browser-live-view/browser-live-view.tsx:709
+#: src/features/chat/browser-live-view/browser-live-view.tsx:890
+#: src/features/chat/browser-live-view/browser-live-view.tsx:938
 msgid "You no longer have control of the browser."
 msgstr "你已不再控制此浏览器。"
 
@@ -40593,6 +40656,10 @@ msgstr "你的 {label} 登录已过期。请重新连接以继续读取。"
 msgid "Your {label} sign-in has expired. Connect it again."
 msgstr "你的 {label} 登录已过期。请重新连接。"
 
+#: src/features/chat/browser-live-view/browser-human-check.tsx:446
+msgid "Your access to this chat has ended."
+msgstr "你对此聊天的访问权限已结束。"
+
 #: src/features/auth/components/device-approval.tsx:79
 msgid "Your account already has the maximum number of API keys, so the command line was not signed in. Revoke one in Settings, then run `neore login --device` again."
 msgstr "你的账户已达 API 密钥数量上限，因此命令行未登录。请在设置中撤销一个，然后再次运行 `neore login --device`。"
@@ -40608,6 +40675,10 @@ msgstr "你的 AI 工作区<0>从这里开始。</0>"
 #: src/features/chat/thread/ask-user-prompt.tsx:261
 msgid "Your answer"
 msgstr "你的回答"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:464
+msgid "Your answer could not be saved. Try again."
+msgstr "无法保存你的回答。请重试。"
 
 #: src/features/chat/core/context/chat-context.tsx:645
 msgid "Your answer in Neore has finished."
@@ -40663,7 +40734,7 @@ msgstr "你的聊天和 {0}"
 msgid "Your chats and the bots you chose"
 msgstr "你的聊天和你选择的机器人"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1148
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1158
 msgid "Your clicks, typing and scrolling in the view go to the browser. The agent waits until you hand it back."
 msgstr "你在画面中的点击、输入和滚动都会发送到浏览器。在你交还之前，智能体会等待。"
 
@@ -40757,20 +40828,20 @@ msgid "Your GitHub sign-in has expired. Connect GitHub again in Settings → Con
 msgstr "你的 GitHub 登录已过期。请在“设置 → 连接器”中重新连接 GitHub。"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:824
+#: src/features/chat/thread/composer-input.tsx:825
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "你的输入较大（约 {0} 个 token），将占用模型上下文窗口的很大一部分。"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:817
+#: src/features/chat/thread/composer-input.tsx:818
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "你的输入过大（约 {0} 个 token），超出了模型的上下文窗口。请缩短消息或移除附件后再提交。"
 
-#: src/features/knowledge/hooks/use-knowledge-import.ts:150
+#: src/features/knowledge/hooks/use-knowledge-import.ts:166
 msgid "Your knowledge base is full. {failed} document(s) were not added."
 msgstr "你的知识库已满。有 {failed} 个文档未添加。"
 
-#: src/features/knowledge/hooks/use-knowledge-import.ts:263
+#: src/features/knowledge/hooks/use-knowledge-import.ts:283
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:144
 msgid "Your knowledge base is full. Remove files to add more."
 msgstr "你的知识库已满。请删除一些文件后再添加。"
@@ -40787,7 +40858,7 @@ msgstr "你最新的更改尚未保存。"
 msgid "Your local server answered, but refused this site (CORS). Allow this site's origin — for Ollama set OLLAMA_ORIGINS, for LM Studio turn on \"Enable CORS\" — then restart the server."
 msgstr "你的本地服务器有响应，但拒绝了此网站（CORS）。请允许此网站的来源——Ollama 设置 OLLAMA_ORIGINS，LM Studio 开启“Enable CORS”——然后重启服务器。"
 
-#: src/features/settings/components/account/account-settings.tsx:296
+#: src/features/settings/components/account/account-settings.tsx:297
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "你的位置（例如“New York, USA”“Berlin, Germany”）。"
 
@@ -40795,7 +40866,7 @@ msgstr "你的位置（例如“New York, USA”“Berlin, Germany”）。"
 msgid "Your message"
 msgstr "你的消息"
 
-#: src/features/chat/thread/composer-input.tsx:1583
+#: src/features/chat/thread/composer-input.tsx:1622
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 msgstr "上传期间消息已更改，因此未发送。请按发送按钮发送。"
 
@@ -40968,7 +41039,7 @@ msgstr "你的标签"
 msgid "Your Team plans will be cancelled"
 msgstr "你的 Team 套餐将被取消"
 
-#: src/features/settings/components/account/account-settings.tsx:324
+#: src/features/settings/components/account/account-settings.tsx:325
 msgid "Your timezone (IANA timezone identifier)."
 msgstr "你的时区（IANA 时区标识符）。"
 
@@ -41106,7 +41177,7 @@ msgstr "祖鲁语"
 msgid "Zulu (South Africa)"
 msgstr "祖鲁语（南非）"
 
-#: src/features/settings/components/account/account-settings.tsx:116
+#: src/features/settings/components/account/account-settings.tsx:117
 msgid "Zurich"
 msgstr "苏黎世"
 

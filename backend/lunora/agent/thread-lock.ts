@@ -27,6 +27,7 @@ import { followupDispatchInFlight } from "./followup-suggestions";
 import { clearRecordedTitleAnswers, titleDispatchInFlight } from "./thread-title";
 import { passcodeHashOf, readPasscodeRow, type PasscodeRow, unlockSecret } from "./thread-passcode";
 import { requireOwnedThreadIgnoringLock } from "./thread-read-access";
+import { threadHasLiveGrant } from "./live-grant";
 
 const vPasscode = v.string().max(PASSCODE_MAX_LENGTH);
 
@@ -141,9 +142,7 @@ export const enableThreadLock = authMutation
             throw new LunoraError("BAD_REQUEST", "Stop sharing this chat before you lock it.");
         }
 
-        const grant = await context.db.threadAccess.findFirst({ where: { threadId } });
-
-        if (grant) {
+        if (await threadHasLiveGrant(context, threadId)) {
             throw new LunoraError("BAD_REQUEST", "Remove shared access before you lock this chat.");
         }
 

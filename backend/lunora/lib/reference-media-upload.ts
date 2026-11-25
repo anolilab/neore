@@ -7,12 +7,12 @@
  * because a 50 MB video cannot take that path. `storeFile` buffers the whole
  * object and `ctx.storage.store` caps a stream at 16 MiB, so the bytes are
  * read in ranges: one pass hashes them through a counting stream, and the
- * content-addressed object is then written as an R2 multipart upload, one
- * range per part. Memory stays at one part, however large the file.
+ * object is then written as an R2 multipart upload, one range per part.
+ * Memory stays at one part, however large the file.
  *
- * Shares what matters with the chat path: the content key is
- * `agent-files/<sha256>`, identical bytes dedupe through
- * `agent.files.useExistingFile` / `addFile`, and the caller gets a
+ * Shares what matters with the chat path: the key is the upload's own
+ * `agent-files/<sha256>/<uuid>` (`lib/chat-file-key.ts`), identical bytes
+ * dedupe through `agent.files.useExistingFile` / `addFile`, and the caller gets a
  * `chatFileAccess` grant. The file's `refcount` counts a saved workflow that
  * names it (`workflow/images.ts` counts a file node's `fileId` only for
  * video or audio: this purpose is the only way a workflow gets one, so a
@@ -30,6 +30,8 @@ import { LunoraError } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import type { ActionCtx } from "../_generated/server";
+import { deleteStoredObjects } from "../agent/client/object-deletes";
+import { newChatFileKey } from "./chat-file-key";
 import { CHAT_UPLOAD_CONTENT_MISMATCH, CHAT_UPLOAD_EXPIRED, CHAT_UPLOAD_TOO_LARGE, CHAT_UPLOAD_UNSUPPORTED_TYPE } from "./chat-upload-codes";
 import { isUploadId, stagedPurposeIs, stagingKeyFor } from "./chat-upload-staging";
 import { normalizeContentType } from "./chat-upload";
@@ -232,10 +234,10 @@ const digestOf = async (ctx: Pick<ActionCtx, "storage">, key: string, size: numb
 /**
  * Write `size` bytes from the staging object to `storageKey` as one multipart
  * upload, a range per part, while a second digest checks them against `hash`.
- * The upload is only completed when the bytes match, so the content-addressed
- * key never holds bytes that differ from its name; otherwise it is aborted.
+ * The upload is only completed when the bytes match, so the key never holds
+ * bytes that differ from the hash it names; otherwise it is aborted.
  */
-const storeContentAddressed = async (
+const storeVerified = async (
     ctx: ActionCtx,
     stagingKey: string,
     storageKey: string,
@@ -275,7 +277,7 @@ const storeContentAddressed = async (
 /**
  * Turn `userId`'s staged `uploadId` into a reference-media chat file: checked
  * against {@link referenceMediaLimitFor} and its own type's leading bytes,
- * stored content-addressed with a grant for `userId`. The staging object is
+ * stored under its own key with a grant for `userId`. The staging object is
  * deleted whatever the outcome.
  */
 export const finalizeStagedReferenceMedia = async (
@@ -327,23 +329,28 @@ export const finalizeStagedReferenceMedia = async (
         }
 
         const hash = await digestOf(ctx, key, metadata.size, maxBytes);
-        const reused = await ctx.runMutation(internal.agent.files.useExistingFile, { filename: args.filename, hash, userId });
+        // Recorded before the copy when no row is reused, as `storeFile` does: a copy whose row never lands is deleted by the sweep.
+        const storageKey = newChatFileKey(hash);
+        const reused = await ctx.runMutation(internal.agent.files.useExistingFile, { filename: args.filename, hash, uploadKey: storageKey, userId });
 
         if (reused) {
             return { fileId: reused.fileId as Id<"chatFiles">, url: await signedReadUrl(ctx.storage, reused.storageId) };
         }
 
-        const storageKey = `agent-files/${hash}`;
+        await storeVerified(ctx, key, storageKey, { contentType, hash, size: metadata.size });
 
-        await storeContentAddressed(ctx, key, storageKey, { contentType, hash, size: metadata.size });
-
-        const { fileId, storageId } = await ctx.runMutation(internal.agent.files.addFile, {
+        const { discardedUpload, fileId, storageId } = await ctx.runMutation(internal.agent.files.addFile, {
             filename: args.filename,
             hash,
             mediaType: contentType,
             storageId: storageKey,
             userId,
         });
+
+        // A racing store's row was reused: this copy is not needed.
+        if (discardedUpload) {
+            await deleteStoredObjects(ctx, [discardedUpload]);
+        }
 
         return { fileId: fileId as Id<"chatFiles">, url: await signedReadUrl(ctx.storage, storageId) };
     } finally {

@@ -411,6 +411,16 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 ),
         );
 
+        await drain(
+            "delete-user-grant-revisions",
+            async (round) =>
+                await context.run(
+                    steps.deleteUserGrantRevisions,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-grant-revisions", round) },
+                ),
+        );
+
         await context.run(internal.gdpr.functions.updateRequestProgress, {
             currentStep: "deleting_memories",
             progress: 40,
