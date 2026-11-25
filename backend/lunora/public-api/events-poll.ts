@@ -111,9 +111,10 @@ export const pollEvents = async (store: EventLogStore, query: PollQuery): Promis
             // The window is on `createdAt`, the same clock retention deletes by: an event recorded late (its upstream time long past) is
             // still kept for a window from when the log took it, so a poll must not skip it as old.
             if (floor !== undefined && event.createdAt < floor) {
-                // Older than the window the caller asked for. A gap only when it is an event the caller asked for: another name or
-                // thread in that window was never the caller's to receive.
-                if (matches(event, query)) {
+                // Older than the window the caller asked for. A gap only when it is an event the caller asked for and may see: another
+                // name or thread in that window was never the caller's to receive, and a hidden (locked-thread) event must not reveal
+                // itself by flagging a gap.
+                if (matches(event, query) && (query.hidden === undefined || !(await query.hidden(event)))) {
                     truncated = true;
                 }
 
@@ -122,7 +123,8 @@ export const pollEvents = async (store: EventLogStore, query: PollQuery): Promis
             }
 
             // A hidden event is passed over as the window's old events are, and it is no gap: the caller was never meant to see it.
-            if (query.hidden !== undefined && (await query.hidden(event))) {
+            // Only a row the caller asked for is looked up: another name or thread is passed over without a lookup.
+            if (matches(event, query) && query.hidden !== undefined && (await query.hidden(event))) {
                 from = event.seq;
                 continue;
             }
