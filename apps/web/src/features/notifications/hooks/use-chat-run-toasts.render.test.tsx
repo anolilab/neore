@@ -174,6 +174,26 @@ describe("useChatRunToasts: settling a run", () => {
         }
     });
 
+    it("keeps a settling run's outcome when a new run starts in the same thread", () => {
+        vi.useFakeTimers();
+
+        try {
+            const { rerender } = setup({ ...idle, settings: {} });
+
+            rerender({ ...idle, activeStreamId: "stream-1", messages: streamingReply, settings: {} });
+            rerender({ ...idle, activeStreamId: null, messages: streamingReply, settings: {} });
+            rerender({ ...idle, activeStreamId: "stream-2", messages: streamingReply, settings: {} });
+
+            expect(toastSuccess).not.toHaveBeenCalled();
+
+            vi.advanceTimersByTime(2000);
+
+            expect(toastSuccess).toHaveBeenCalledTimes(1);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("does not classify a run that ended in another thread", () => {
         vi.useFakeTimers();
 

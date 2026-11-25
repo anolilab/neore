@@ -134,8 +134,7 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
     useEffect(() => {
         if (activeStreamId) {
             if (run.current?.streamId !== activeStreamId) {
-                // A new run supersedes a finished one that is still settling: decide that one now.
-                settle();
+                // A finished run still settling keeps its own decision (its reply, or the settle window): a new run must not take it.
                 run.current = {
                     failed: false,
                     startError: error,
