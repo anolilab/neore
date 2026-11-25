@@ -32,6 +32,7 @@ import { closestCenter, DndContext, PointerSensor, useSensor, useSensors } from 
 import { rectSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Plural, useLingui } from "@lingui/react/macro";
+import { MAX_PROMPT_CHARS } from "@neore/ai/constants";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import cn from "@neore/ui/utils/cn";
@@ -55,14 +56,26 @@ import { useChatActions, useChatError, useChatIsStreaming, useChatThread } from 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-store";
 import { allowPromptQueueRestore, selectThreadQueue, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
+import { selectThreadEdit, useQueueEditStore } from "@/features/chat/core/stores/queue-edit-store";
 import type { QueuedSteer, SteerWithdrawal } from "@/features/chat/core/utils/prompt-queue";
-import { decideAutoSend, deliveredSteerItems, takeNextToSend } from "@/features/chat/core/utils/prompt-queue";
+import { cleanPromptText, decideAutoSend, deliveredSteerItems, takeNextToSend } from "@/features/chat/core/utils/prompt-queue";
 import { isSendStarting, subscribeSendStarting } from "@/features/chat/core/utils/send-in-flight";
 import { useConnectionView } from "@/features/connection/hooks/use-connection";
 import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 import { showError, showInfo } from "@/lib/toast";
 
 import { permissionModeSaveKey, usePermissionModeSaving } from "./composer-permission-mode";
+
+/**
+ * Whether the thread's head is being edited in its chip. The drain holds its send then: the send would take the old
+ * text and discard the unsaved correction. The hold ends with the edit (Save or Cancel), and the queue goes on.
+ */
+const headIsBeingEdited = (threadId: string): boolean => {
+    const head = usePromptQueueStore.getState().queues[threadId]?.items[0];
+    const edit = useQueueEditStore.getState().editing[threadId];
+
+    return head !== undefined && edit?.id === head.id;
+};
 
 /**
  * `sendMessage` clears the composer synchronously (before its first await) —
@@ -280,6 +293,8 @@ const useQueueActions = () => {
                             !usePromptQueueStore.getState().queues[threadId]?.paused &&
                             // The withdrawal's await can outlast the network: then the prompt stays and is held for it.
                             !latest.offline &&
+                            // The head's text is open in its chip: the send waits for the edit to close, with its text.
+                            !headIsBeingEdited(threadId) &&
                             // Read from the cache, not the rendered flag: a save that began after the last render is not in that flag yet,
                             // and this check runs after the withdrawal's await, so it could send under the old mode.
                             queryClient.isMutating({ exact: true, mutationKey: permissionModeSaveKey(threadId) }) === 0 &&
@@ -409,18 +424,24 @@ const QueueChip: FC<{
     blockedDown: boolean;
     blockedUp: boolean;
     count: number;
+    /** The draft of this chip's open editor; undefined while the message is not being edited. Kept by the queue's edit store. */
+    editDraft: string | undefined;
     onEdit: (id: string, text: string) => void;
+    onEditDraft: (id: string, draft: string) => void;
+    onEditStart: (id: string, text: string) => void;
+    onEditStop: (id: string) => void;
     onMove: (id: string, step: -1 | 1) => void;
     onRemove: (id: string) => void;
     position: number;
     prompt: QueuedChatPrompt;
-}> = ({ blockedDown, blockedUp, count, onEdit, onMove, onRemove, position, prompt }) => {
+}> = ({ blockedDown, blockedUp, count, editDraft, onEdit, onEditDraft, onEditStart, onEditStop, onMove, onRemove, position, prompt }) => {
     const { t } = useLingui();
     const pending = Boolean(prompt.steer?.pending);
     // A steered message keeps its place in the order the reply reads it, so it cannot be dragged, moved or edited.
     const fixed = Boolean(prompt.steer);
-    const [editing, setEditing] = useState(false);
-    const [draft, setDraft] = useState("");
+    const editing = editDraft !== undefined;
+    const draft = editDraft ?? "";
+    const blank = cleanPromptText(draft) === "";
     const { isDragging, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({
         disabled: fixed || editing,
         id: prompt.id,
@@ -441,17 +462,17 @@ const QueueChip: FC<{
     }, [editing]);
 
     const startEdit = (): void => {
-        setDraft(prompt.text);
-        setEditing(true);
+        onEditStart(prompt.id, prompt.text);
     };
 
     const saveEdit = (): void => {
-        // An empty text is no message: the store keeps the old text, so the chip simply closes.
-        if (draft.trim() !== "") {
+        // The stop comes first: a saved change hands the message a new id, and focus follows the id the message has then.
+        onEditStop(prompt.id);
+
+        // Text that is only hidden characters is no message: the store keeps the old text, so the chip simply closes.
+        if (!blank) {
             onEdit(prompt.id, draft);
         }
-
-        setEditing(false);
     };
 
     return (
@@ -484,13 +505,15 @@ const QueueChip: FC<{
                 <textarea
                     aria-label={t`Edit queued message ${position}`}
                     className="bg-background min-w-0 flex-1 resize-y rounded-md border px-1.5 py-1 text-xs"
+                    // The composer's own cap: a longer text would be refused by the gateway after its chip had left the queue.
+                    maxLength={MAX_PROMPT_CHARS}
                     onChange={(event) => {
-                        setDraft(event.target.value);
+                        onEditDraft(prompt.id, event.target.value);
                     }}
                     onKeyDown={(event) => {
                         if (event.key === "Escape") {
                             event.preventDefault();
-                            setEditing(false);
+                            onEditStop(prompt.id);
                         } else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
                             event.preventDefault();
                             saveEdit();
@@ -519,10 +542,18 @@ const QueueChip: FC<{
             )}
             {editing ? (
                 <>
-                    <Button className="h-6 px-2 text-xs" disabled={draft.trim() === ""} onClick={saveEdit} size="sm" type="button">
+                    <Button className="h-6 px-2 text-xs" disabled={blank} onClick={saveEdit} size="sm" type="button">
                         {t`Save`}
                     </Button>
-                    <Button className="h-6 px-2 text-xs" onClick={() => setEditing(false)} size="sm" type="button" variant="ghost">
+                    <Button
+                        className="h-6 px-2 text-xs"
+                        onClick={() => {
+                            onEditStop(prompt.id);
+                        }}
+                        size="sm"
+                        type="button"
+                        variant="ghost"
+                    >
                         {t`Cancel`}
                     </Button>
                 </>
@@ -579,6 +610,10 @@ const ComposerPromptQueue: FC = () => {
     const { isStreaming } = useChatIsStreaming();
     const { error } = useChatError();
     const queue = usePromptQueueStore(selectThreadQueue(threadId));
+    const edit = useQueueEditStore(selectThreadEdit(threadId));
+    // The head's text is open in its chip: the queue holds its send until the edit closes (see `headIsBeingEdited`).
+    const headEditing = edit !== undefined && queue.items[0]?.id === edit.id;
+    const wasHeadEditing = useRef(headEditing);
     const { removePrompt, sendNextPrompt } = useQueueActions();
     const modeSaving = usePermissionModeSaving(threadId);
     const wasModeSaving = useRef(modeSaving);
@@ -706,6 +741,17 @@ const ComposerPromptQueue: FC = () => {
         }
     }, [error, isStreaming, modeSaving, queue.items.length, queue.paused, sendNextPrompt, threadId]);
 
+    // The head's send held while its text was open goes once the edit closes, unless the queue is busy, failed or paused.
+    useEffect(() => {
+        const closed = wasHeadEditing.current && !headEditing;
+
+        wasHeadEditing.current = headEditing;
+
+        if (closed && threadId && !isStreaming && !error && !queue.paused && queue.items.length > 0) {
+            void sendNextPrompt(threadId);
+        }
+    }, [error, headEditing, isStreaming, queue.items.length, queue.paused, sendNextPrompt, threadId]);
+
     const handleRemove = useCallback(
         (id: string) => {
             if (threadId) {
@@ -715,10 +761,70 @@ const ComposerPromptQueue: FC = () => {
         [removePrompt, threadId],
     );
 
-    const handleEdit = useCallback(
+    // The chip whose editor just closed: its Edit button takes focus once the queue has rendered, since the editor's own
+    // control is gone by then. A saved change names the message's new id.
+    const editFocus = useRef<string | undefined>(undefined);
+
+    useEffect(() => {
+        const target = editFocus.current;
+
+        if (target === undefined) {
+            return;
+        }
+
+        editFocus.current = undefined;
+
+        const chip = [...document.querySelectorAll<HTMLElement>("[data-queue-chip-id]")].find((element) => element.dataset.queueChipId === target);
+
+        chip?.querySelector<HTMLButtonElement>("[data-edit]")?.focus();
+    });
+
+    const handleEditStart = useCallback(
         (id: string, text: string) => {
             if (threadId) {
-                usePromptQueueStore.getState().edit(threadId, id, text);
+                useQueueEditStore.getState().start(threadId, id, text);
+            }
+        },
+        [threadId],
+    );
+
+    const handleEditDraft = useCallback(
+        (id: string, draft: string) => {
+            if (threadId) {
+                useQueueEditStore.getState().setDraft(threadId, id, draft);
+            }
+        },
+        [threadId],
+    );
+
+    const handleEditStop = useCallback(
+        (id: string) => {
+            if (!threadId || useQueueEditStore.getState().editing[threadId]?.id !== id) {
+                return;
+            }
+
+            editFocus.current = id;
+            useQueueEditStore.getState().stop(threadId, id);
+        },
+        [threadId],
+    );
+
+    const handleEdit = useCallback(
+        (id: string, text: string) => {
+            if (!threadId) {
+                return;
+            }
+
+            const store = usePromptQueueStore.getState();
+            const index = (store.queues[threadId]?.items ?? []).findIndex((item) => item.id === id);
+
+            store.edit(threadId, id, text);
+
+            // A changed text is a new item in the same place, with a new id: focus follows it there.
+            const after = usePromptQueueStore.getState().queues[threadId]?.items[index];
+
+            if (after !== undefined) {
+                editFocus.current = after.id;
             }
         },
         [threadId],
@@ -871,8 +977,12 @@ const ComposerPromptQueue: FC = () => {
                                 blockedDown={queue.items[index + 1]?.steer !== undefined}
                                 blockedUp={index > 0 && queue.items[index - 1]?.steer !== undefined}
                                 count={count}
+                                editDraft={edit?.id === prompt.id ? edit.draft : undefined}
                                 key={prompt.id}
                                 onEdit={handleEdit}
+                                onEditDraft={handleEditDraft}
+                                onEditStart={handleEditStart}
+                                onEditStop={handleEditStop}
                                 onMove={handleMove}
                                 onRemove={handleRemove}
                                 position={index + 1}
@@ -883,7 +993,14 @@ const ComposerPromptQueue: FC = () => {
                 </SortableContext>
             </DndContext>
             {!isStreaming && (
-                <Button className="h-6 gap-1 px-2 text-xs" disabled={modeSaving} onClick={handleSendNext} size="sm" type="button" variant="outline">
+                <Button
+                    className="h-6 gap-1 px-2 text-xs"
+                    disabled={modeSaving || headEditing}
+                    onClick={handleSendNext}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                >
                     <SendIcon aria-hidden="true" className="size-3" />
                     {t`Send next`}
                 </Button>

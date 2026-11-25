@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-store";
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
+import { useQueueEditStore } from "@/features/chat/core/stores/queue-edit-store";
 import { EMPTY_PROMPT_QUEUE, serializePromptQueue } from "@/features/chat/core/utils/prompt-queue";
 import { clearSendStarting, isSendStarting, markSendStarting } from "@/features/chat/core/utils/send-in-flight";
 
@@ -151,6 +152,7 @@ describe("composer prompt queue", () => {
         withdrawSteer.mockReset();
         toast.showInfo.mockReset();
         usePromptQueueStore.setState({ offlineHolds: {}, queues: {} });
+        useQueueEditStore.setState({ editing: {} });
 
         // A test that failed midway can leave a send marked as starting in the thread.
         while (isSendStarting(chat.threadId)) {
@@ -742,6 +744,81 @@ describe("composer prompt queue", () => {
         fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
         expect(texts()).toEqual(["one", "two, edited", "three"]);
+    });
+
+    it("returns focus to the message's Edit button when its editor closes, on Escape and after a save", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        for (const text of ["one", "two"]) {
+            enqueue(chat.threadId, { attachments: [], text });
+        }
+
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        fireEvent.keyDown(screen.getByLabelText("Edit queued message 1"), { key: "Escape" });
+
+        // Focus placement (document.activeElement) is what this test asserts.
+        // eslint-disable-next-line testing-library/no-node-access
+        expect(document.activeElement).toBe(screen.getByLabelText("Edit queued message 1"));
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 2"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 2"), { target: { value: "two, changed" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        // eslint-disable-next-line testing-library/no-node-access
+        expect(document.activeElement).toBe(screen.getByLabelText("Edit queued message 2"));
+    });
+
+    it("refuses to save a draft that is only hidden characters, and keeps the old text", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "kept" });
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 1"), { target: { value: "​" } });
+
+        expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("holds the head's send while its text is open, and sends the edited text once the edit closes", async () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 1"), { target: { value: "one, fixed" } });
+
+        expect((screen.getByRole("button", { name: "Send next" }) as HTMLButtonElement).disabled).toBe(true);
+
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.items.map((item) => item.text)).toEqual(["one, fixed"]);
+
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+        await vi.waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("one, fixed", [], { draftFrom: undefined }));
+    });
+
+    it("keeps an unsaved draft when its chip remounts", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "draft me" });
+        setPaused(chat.threadId, true);
+
+        const { unmount } = render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 1"), { target: { value: "typed, not saved" } });
+        unmount();
+
+        render(<ComposerPromptQueue />);
+
+        expect((screen.getByLabelText("Edit queued message 1") as HTMLTextAreaElement).value).toBe("typed, not saved");
     });
 
     it("moves a dropped message to where it lands in the queue", async () => {
