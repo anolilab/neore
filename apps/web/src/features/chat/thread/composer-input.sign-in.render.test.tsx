@@ -40,6 +40,8 @@ const harness = vi.hoisted(() => {
         sendMessage: vi.fn(async () => undefined),
         /** The input row's editor; none by default, as a composer before the editor loads. */
         editor: null as ComposerTiptapEditorRef | null,
+        /** The person's `followUpSteer` default: a text-only send during a reply steers into it. */
+        followUpSteer: false,
         showError: vi.fn(),
         showInfo: vi.fn(),
         sseStreamState: null as string | null,
@@ -121,7 +123,7 @@ vi.mock("@/features/chat/core/context/chat-context", () => {
 vi.mock("@/features/auth/hooks/use-user-settings", () => {
     return {
         useUserSettings: () => {
-            return { data: null };
+            return { data: harness.followUpSteer ? { followUpSteer: true } : null };
         },
     };
 });
@@ -182,12 +184,14 @@ vi.mock("./composer-tiptap/use-composer-autocomplete", () => {
 
 const InputArea = ({
     onPaste,
+    onQueue,
     onSteer,
     onSubmit,
     ref,
     value,
 }: {
     onPaste?: (event: unknown) => void;
+    onQueue?: () => void;
     onSteer?: () => void;
     onSubmit: () => void;
     ref?: Ref<ComposerInputAreaRef>;
@@ -205,6 +209,11 @@ const InputArea = ({
             <button onClick={onSubmit} type="button">
                 Send message
             </button>
+            {onQueue && (
+                <button onClick={onQueue} type="button">
+                    Queue message
+                </button>
+            )}
             {onSteer && (
                 <button onClick={onSteer} type="button">
                     Steer
@@ -476,6 +485,96 @@ describe("ComposerInput while the connection is down", () => {
 
         expect(harness.sendMessage).not.toHaveBeenCalled();
         expect(usePromptQueueStore.getState().queues["thread-1"]?.items.map((item: QueuedChatPrompt) => item.text)).toStrictEqual(["a follow-up"]);
+    });
+});
+
+describe("ComposerInput follow-up steer default", () => {
+    beforeEach(() => {
+        harness.mustSignIn = false;
+        harness.isStreaming = true;
+        harness.sseStreamState = "stream-1";
+        harness.threadId = "thread-1";
+        harness.runner = { groups: { turns: { followUp: { kind: "steer" } } } };
+        usePromptQueueStore.setState({ offlineHolds: {}, queues: {} });
+        useChatUIStore.getState().setComposerText("a follow-up");
+    });
+
+    afterEach(() => {
+        harness.followUpSteer = false;
+        harness.isStreaming = false;
+        harness.runner = null;
+        harness.sseStreamState = null;
+        harness.threadId = undefined;
+        useChatUIStore.getState().clearComposer();
+        vi.clearAllMocks();
+    });
+
+    it("steers a text-only follow-up into the reply when the person's default is on", () => {
+        harness.followUpSteer = true;
+
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+
+        const items = usePromptQueueStore.getState().queues["thread-1"]?.items ?? [];
+
+        expect(items).toHaveLength(1);
+        expect(items[0]).toMatchObject({ steer: { pending: true, streamId: "stream-1" }, text: "a follow-up" });
+    });
+
+    it("queues the follow-up as before when the person's default is off", () => {
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+
+        const items = usePromptQueueStore.getState().queues["thread-1"]?.items ?? [];
+
+        expect(items).toHaveLength(1);
+        expect(items[0]?.steer).toBeUndefined();
+        expect(items[0]?.text).toBe("a follow-up");
+    });
+
+    it("keeps the queue button a queue even when the person's default is on", () => {
+        harness.followUpSteer = true;
+
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Queue message" }));
+
+        const items = usePromptQueueStore.getState().queues["thread-1"]?.items ?? [];
+
+        expect(items).toHaveLength(1);
+        expect(items[0]?.steer).toBeUndefined();
+        expect(items[0]?.text).toBe("a follow-up");
+    });
+
+    it("queues a follow-up that carries a reference, so the reference is not dropped by a steer", () => {
+        harness.followUpSteer = true;
+        useChatUIStore.setState({ attachedReferences: [{ id: "ref-1" }] as never });
+
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        const items = usePromptQueueStore.getState().queues["thread-1"]?.items ?? [];
+
+        expect(items).toHaveLength(1);
+        expect(items[0]?.steer).toBeUndefined();
+        expect(items[0]?.references).toHaveLength(1);
+        useChatUIStore.setState({ attachedReferences: [] });
+    });
+
+    it("queues a guest's follow-up under invite-only, even when the default is on", () => {
+        harness.followUpSteer = true;
+        harness.mustSignIn = true;
+
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        const items = usePromptQueueStore.getState().queues["thread-1"]?.items ?? [];
+
+        expect(items).toHaveLength(1);
+        expect(items[0]?.steer).toBeUndefined();
     });
 });
 

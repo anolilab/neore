@@ -33770,6 +33770,12 @@
             "unique": false
           }
         },
+        "followUpSteer": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "hidePersonalInfo": {
           "kind": "boolean",
           "nullable": false,

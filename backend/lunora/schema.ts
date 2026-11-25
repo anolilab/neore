@@ -4328,6 +4328,8 @@ export const schema = defineSchema({
         disableExternalLinkWarning: v.optional(v.boolean()),
         enableFollowupSuggestions: v.optional(v.boolean()),
         favoriteModels: v.optional(v.array(v.string())),
+        // A message sent while a reply streams joins that reply at its next step, instead of queueing behind it. Absent = queue.
+        followUpSteer: v.optional(v.boolean()),
         hidePersonalInfo: v.optional(v.boolean()),
         // A message sent during a coding agent's turn interrupts that turn and goes next, instead of queueing behind it. Absent = queue.
         hostFollowUpSteer: v.optional(v.boolean()),

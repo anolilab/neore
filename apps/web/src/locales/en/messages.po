@@ -21364,6 +21364,22 @@ msgstr "Messages will interrupt the agent's turn"
 msgid "Messages will wait for the agent's turn to end"
 msgstr "Messages will wait for the agent's turn to end"
 
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Send while a reply is writing"
+msgstr "Send while a reply is writing"
+
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Off: a message you send while a reply is streaming waits in the queue and goes after it. On: it joins the reply at its next step."
+msgstr "Off: a message you send while a reply is streaming waits in the queue and goes after it. On: it joins the reply at its next step."
+
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Messages will join the reply as it writes"
+msgstr "Messages will join the reply as it writes"
+
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Messages will wait for the reply to finish"
+msgstr "Messages will wait for the reply to finish"
+
 #: src/features/marketing/use-cases/use-case-data.ts:72
 msgid "Messaging apps"
 msgstr "Messaging apps"

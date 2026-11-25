@@ -78,6 +78,8 @@ export const userSettingsFieldsWithoutUserId = {
     disableExternalLinkWarning: v.optional(v.boolean()),
     enableFollowupSuggestions: v.optional(v.boolean()), // Enable/disable follow-up suggestions after assistant messages
     favoriteModels: v.optional(v.array(v.string().max(MAX_LENGTH.short))),
+    // A message sent while a reply streams joins that reply at its next step, instead of queueing behind it. Absent means queue.
+    followUpSteer: v.optional(v.boolean()),
     hidePersonalInfo: v.optional(v.boolean()),
     hostFollowUpSteer: v.optional(v.boolean()), // A message sent during a coding agent's turn interrupts it and goes next. Absent means queue.
     id: v.optional(v.string().max(MAX_LENGTH.id)),

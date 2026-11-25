@@ -21365,6 +21365,22 @@ msgstr "メッセージはエージェントの処理を中断します"
 msgid "Messages will wait for the agent's turn to end"
 msgstr "メッセージはエージェントの処理が終わるまで待機します"
 
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Send while a reply is writing"
+msgstr "返信の作成中に送信"
+
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Off: a message you send while a reply is streaming waits in the queue and goes after it. On: it joins the reply at its next step."
+msgstr "オフ: 返信のストリーミング中に送ったメッセージはキューで待ち、後で送られます。オン: 次のステップで返信に加わります。"
+
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Messages will join the reply as it writes"
+msgstr "メッセージは返信の作成中に返信に加わります"
+
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Messages will wait for the reply to finish"
+msgstr "メッセージは返信が終わるまで待ちます"
+
 #: src/features/marketing/use-cases/use-case-data.ts:72
 msgid "Messaging apps"
 msgstr "メッセージングアプリ"

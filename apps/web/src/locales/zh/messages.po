@@ -21365,6 +21365,22 @@ msgstr "消息会中断代理的当前轮次"
 msgid "Messages will wait for the agent's turn to end"
 msgstr "消息会等待代理的当前轮次结束"
 
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Send while a reply is writing"
+msgstr "在回复生成时发送"
+
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Off: a message you send while a reply is streaming waits in the queue and goes after it. On: it joins the reply at its next step."
+msgstr "关闭：在回复流式输出时发送的消息会排队，回复结束后再发送。开启：在回复的下一步加入该回复。"
+
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Messages will join the reply as it writes"
+msgstr "消息会在回复生成时加入回复"
+
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Messages will wait for the reply to finish"
+msgstr "消息将等待回复结束"
+
 #: src/features/marketing/use-cases/use-case-data.ts:72
 msgid "Messaging apps"
 msgstr "消息应用"

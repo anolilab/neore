@@ -21365,6 +21365,22 @@ msgstr "Wiadomości przerywają turę agenta"
 msgid "Messages will wait for the agent's turn to end"
 msgstr "Wiadomości poczekają, aż tura agenta się zakończy"
 
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Send while a reply is writing"
+msgstr "Wysyłaj podczas pisania odpowiedzi"
+
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Off: a message you send while a reply is streaming waits in the queue and goes after it. On: it joins the reply at its next step."
+msgstr "Wyłączone: wiadomość wysłana podczas strumieniowania odpowiedzi czeka w kolejce i idzie po niej. Włączone: dołącza do odpowiedzi w jej następnym kroku."
+
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Messages will join the reply as it writes"
+msgstr "Wiadomości dołączą do odpowiedzi podczas jej pisania"
+
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Messages will wait for the reply to finish"
+msgstr "Wiadomości poczekają na zakończenie odpowiedzi"
+
 #: src/features/marketing/use-cases/use-case-data.ts:72
 msgid "Messaging apps"
 msgstr "Aplikacje do wiadomości"

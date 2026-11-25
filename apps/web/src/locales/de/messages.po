@@ -21365,6 +21365,22 @@ msgstr "Nachrichten unterbrechen den Durchlauf des Agenten"
 msgid "Messages will wait for the agent's turn to end"
 msgstr "Nachrichten warten, bis der Durchlauf des Agenten endet"
 
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Send while a reply is writing"
+msgstr "Während einer Antwort senden"
+
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Off: a message you send while a reply is streaming waits in the queue and goes after it. On: it joins the reply at its next step."
+msgstr "Aus: Eine Nachricht, die du während einer Antwort sendest, wartet in der Warteschlange und kommt danach. An: Sie fließt beim nächsten Schritt in die Antwort ein."
+
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Messages will join the reply as it writes"
+msgstr "Nachrichten fließen ein, während die Antwort entsteht"
+
+#: src/features/settings/components/account/account-settings.tsx
+msgid "Messages will wait for the reply to finish"
+msgstr "Nachrichten warten, bis die Antwort fertig ist"
+
 #: src/features/marketing/use-cases/use-case-data.ts:72
 msgid "Messaging apps"
 msgstr "Messaging-Apps"
