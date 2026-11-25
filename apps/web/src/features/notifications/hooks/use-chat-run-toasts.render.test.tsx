@@ -32,13 +32,14 @@ interface Props {
     activeStreamId: string | null;
     error: AppError | null;
     messages: ReadonlyArray<ToastMessage>;
+    messagesReady: boolean;
     settings: ChatToastSettings | null | undefined;
     threadId: string | undefined;
 }
 
 // A thread with its first message in it: a call can only start waiting after that.
 const userMessage: Props["messages"] = [{ parts: [{ text: "hello", type: "text" }] }];
-const idle: Props = { activeStreamId: null, error: null, messages: userMessage, settings: {}, threadId: "thread-1" };
+const idle: Props = { activeStreamId: null, error: null, messages: userMessage, messagesReady: true, settings: {}, threadId: "thread-1" };
 const streaming = (props: Props): Props => {
     return { ...props, activeStreamId: "stream-1" };
 };
@@ -229,10 +230,18 @@ describe("useChatRunToasts: the other toasts still show", () => {
         expect(toastError).toHaveBeenCalledTimes(1);
     });
 
-    it("does not announce a call that is waiting when a thread loads after an empty snapshot", () => {
-        const { rerender } = setup({ ...idle, messages: [], settings: {} });
+    it("does not announce a call that is waiting when a thread finishes loading", () => {
+        const { rerender } = setup({ ...idle, messages: [], messagesReady: false, settings: {} });
 
-        rerender({ ...idle, messages: waitingOn("call-open"), settings: {} });
+        rerender({ ...idle, messages: waitingOn("call-open"), messagesReady: true, settings: {} });
+
+        expect(toastWarning).not.toHaveBeenCalled();
+    });
+
+    it("does not announce older calls that arrive with the rest of a partial history", () => {
+        const { rerender } = setup({ ...idle, messages: userMessage, messagesReady: false, settings: {} });
+
+        rerender({ ...idle, messages: waitingOn("old-call"), messagesReady: true, settings: {} });
 
         expect(toastWarning).not.toHaveBeenCalled();
     });

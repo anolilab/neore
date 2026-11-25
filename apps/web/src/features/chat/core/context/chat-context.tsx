@@ -619,7 +619,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     // A browser-local reply has no gateway stream; its own streaming flag marks the run for the toasts.
     const localRunId = isLocalStreaming && localStreamingThreadId === threadId ? "local-browser-reply" : null;
 
-    useChatRunToasts({ activeStreamId: activeStreamId ?? localRunId, error, messages, settings: userSettings, threadId });
+    useChatRunToasts({ activeStreamId: activeStreamId ?? localRunId, error, messages, messagesReady: isMessagesReady, settings: userSettings, threadId });
 
     // Track stream completion when activeStreamId transitions from non-null to null
     const { t } = useLingui();

@@ -17,6 +17,8 @@ interface ChatRunToastsInput {
     error: AppError | null;
     /** The thread's messages: a tool call that waits for the person, and the reply's own status. */
     messages: ReadonlyArray<ToastMessage>;
+    /** Whether the thread's messages have fully loaded. Until then a snapshot is partial and cannot be the baseline. */
+    messagesReady: boolean;
     settings: ChatToastSettings | null | undefined;
     threadId: string | undefined;
 }
@@ -44,13 +46,13 @@ interface EndedRun {
  *
  * Every toast fires on a transition, never on the first snapshot, so opening a thread does not re-announce it.
  */
-const useChatRunToasts = ({ activeStreamId, error, messages, settings, threadId }: ChatRunToastsInput): void => {
+const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, settings, threadId }: ChatRunToastsInput): void => {
     const { t } = useLingui();
     const run = useRef<RunState | undefined>(undefined);
     const ended = useRef<EndedRun | undefined>(undefined);
     const settleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const lastError = useRef<AppError | null>(null);
-    const approvals = useRef<{ count: number; ids: ReadonlySet<string>; threadId: string | undefined } | undefined>(undefined);
+    const approvals = useRef<{ ids: ReadonlySet<string>; threadId: string | undefined } | undefined>(undefined);
     // The newest inputs, for the settle timer, which fires outside any render.
     const latest = useRef({ error, messages, settings, t, threadId });
 
@@ -182,15 +184,20 @@ const useChatRunToasts = ({ activeStreamId, error, messages, settings, threadId 
         [],
     );
 
-    // A tool call that starts waiting for the person. The baseline is the thread's first populated snapshot: a thread that
-    // opens already waiting shows its card on screen, so it is not announced. A call that arrives after that is.
+    // A tool call that starts waiting for the person. The baseline is the thread's first fully loaded snapshot: a thread that
+    // opens already waiting shows its card on screen, so it is not announced. A partial load is not a baseline, so the older
+    // calls that arrive with the rest of the history are not announced either. A call that arrives after the baseline is.
     useEffect(() => {
+        if (!messagesReady) {
+            return;
+        }
+
         const ids = new Set(waitingApprovalIds(messages));
         const previous = approvals.current;
 
-        approvals.current = { count: messages.length, ids, threadId };
+        approvals.current = { ids, threadId };
 
-        if (!previous || previous.threadId !== threadId || previous.count === 0) {
+        if (!previous || previous.threadId !== threadId) {
             return;
         }
 
@@ -199,7 +206,7 @@ const useChatRunToasts = ({ activeStreamId, error, messages, settings, threadId 
         if (arrived && isChatToastOn(settings, "input")) {
             toast.warning(t`A chat needs your input or approval`);
         }
-    }, [messages, settings, t, threadId]);
+    }, [messages, messagesReady, settings, t, threadId]);
 };
 
 export default useChatRunToasts;
