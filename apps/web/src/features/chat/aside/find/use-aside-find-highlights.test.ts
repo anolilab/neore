@@ -52,6 +52,12 @@ describe("collectAsideRanges", () => {
         expect(collectAsideRanges(host, "**bold**")).toHaveLength(1);
     });
 
+    it("does not count a match that spans rendered elements, so nothing counted is out of reach", () => {
+        document.body.innerHTML = panel(row("a", "Q", `foo <strong>bar</strong>`));
+
+        expect(collectAsideRanges(document.querySelector("section") as Element, "foo bar")).toEqual([]);
+    });
+
     it("returns nothing for a blank query", () => {
         document.body.innerHTML = panel(row("a", "cat"));
 
