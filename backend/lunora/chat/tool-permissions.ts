@@ -945,6 +945,9 @@ export const recordApprovalPreference = async (ctx: PreferenceCtx, decision: Too
     }
 };
 
+/** The longest approval id an answer accepts. A longer request is recorded as no event: a poll could not carry its id, so it is not kept. */
+export const MAX_APPROVAL_ID_LENGTH = 256;
+
 /**
  * Answer a pending tool-approval request and resume the agent run.
  *
@@ -958,9 +961,6 @@ export const recordApprovalPreference = async (ctx: PreferenceCtx, decision: Too
  * What executes is the tool call stored under `approvalId`, never anything the
  * client names.
  */
-/** The longest approval id an answer accepts. A longer request is recorded as no event: a poll could not carry its id, so it is not kept. */
-export const MAX_APPROVAL_ID_LENGTH = 256;
-
 export const respondToToolApproval = authMutation
     .use(rateLimit("chat/stream"))
     .input({

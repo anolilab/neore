@@ -18,7 +18,7 @@ vi.mock("../_generated/internal", async (importOriginal) => {
 registerModule(registry, "public_api_events", { pruneMcpEvents, pruneMcpEventsBacklog });
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** Rows one tick prunes: a single batch of 200, in its own transaction; the rest is a tick of its own. */
+/** Rows one tick prunes: a single batch of 200, in its own transaction; the rest is the backlog job's, one batch per call. */
 const TICK_ROWS = 200;
 
 describe("a tick facing an Events backlog larger than its rounds", () => {
