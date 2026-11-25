@@ -13,7 +13,7 @@ export const MIGRATIONS_MODULE = "backend/lunora/migrations.ts";
 
 /** How often one migration runs while it stays `in_progress`, and the pause between those runs. */
 export const MIGRATION_ATTEMPTS = 4;
-export const MIGRATION_PAUSE_MS = 15_000;
+const MIGRATION_PAUSE_MS = 15_000;
 
 const literalText = (node: ts.Node | undefined): string | undefined =>
     node !== undefined && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) ? node.text : undefined;
@@ -115,29 +115,25 @@ export interface CliRun {
 }
 
 export interface RunMigrationsOptions {
-    attempts?: number;
     error: (line: string) => void;
     log: (line: string) => void;
-    pauseMs?: number;
     /** Production prints no CLI error detail: it names the URL. */
     production: boolean;
-    run: (id: string) => CliRun | Promise<CliRun>;
+    run: (id: string) => CliRun;
     sleep: (ms: number) => Promise<unknown>;
 }
 
 /**
- * Runs each migration in order. One that stays `in_progress` is retried after a pause, up to `attempts` runs; `failed`,
+ * Runs each migration in order. One that stays `in_progress` is retried after a pause, up to `MIGRATION_ATTEMPTS` runs; `failed`,
  * unreadable output, or running out of attempts stops the job before the next id. Returns the process exit code.
  */
 export const runDataMigrations = async (ids: readonly string[], options: RunMigrationsOptions): Promise<number> => {
-    const { attempts = MIGRATION_ATTEMPTS, pauseMs = MIGRATION_PAUSE_MS } = options;
-
     for (const id of ids) {
         let line = "";
         let ok = false;
 
-        for (let attempt = 1; attempt <= attempts && !ok; attempt += 1) {
-            const run = await options.run(id);
+        for (let attempt = 1; attempt <= MIGRATION_ATTEMPTS && !ok; attempt += 1) {
+            const run = options.run(id);
             const summary = summarizeMigrationRun(run.stdout ?? "", run.status ?? 1);
 
             line = formatMigrationRun(id, summary);
@@ -149,8 +145,8 @@ export const runDataMigrations = async (ids: readonly string[], options: RunMigr
 
             if (summary.exitCode === 0 && summary.status === "completed") {
                 ok = true;
-            } else if (summary.status === "in_progress" && attempt < attempts) {
-                await options.sleep(pauseMs);
+            } else if (summary.status === "in_progress" && attempt < MIGRATION_ATTEMPTS) {
+                await options.sleep(MIGRATION_PAUSE_MS);
             } else {
                 if (!options.production && summary.error !== undefined) {
                     options.log(`  ${summary.error}`);
