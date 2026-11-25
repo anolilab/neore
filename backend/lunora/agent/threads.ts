@@ -38,6 +38,7 @@ import { systemDb } from "../lib/rls/scope";
 import { readPasscodeRow } from "./thread-passcode";
 import { clearAwaitingInput, patchThread } from "./table-writes";
 import { deleteMcpEventsOfThread } from "../public-api/events-log";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import { deletePullRequestLinksOfThread, setLinksThreadDeleted } from "../source-control/pr-thread-links";
 import { deleteThreadSummaries } from "./thread-summaries";
 import { SEARCH_INTERNAL_FIELDS } from "./thread-search-plan";
@@ -839,6 +840,19 @@ export const softDeleteThread = internalMutation
             deletedAt: ctx.now,
             updatedAt: ctx.now,
         });
+
+        // The chat's run and approval events go with it, as its delete removes them: a poll that passed a hidden event has moved its
+        // cursor on, so a restored chat could never get it back. One batch here; the rest by a scheduled batch (`deleteTrashedThreadEvents`).
+        if (oldThread.userId !== undefined && !(await deleteMcpEventsOfThread(ctx, oldThread.userId, args.threadId))) {
+            await runAfterOnShard(
+                ctx.scheduler,
+                0,
+                internal.public_api.events.deleteTrashedThreadEvents,
+                { threadId: args.threadId, userId: oldThread.userId },
+                oldThread.userId,
+            );
+        }
+
         await setLinksThreadDeleted(ctx, oldThread.userId, args.threadId, true);
         // A coding agent's turn does not outlive the thread it writes into, nor does a goal.
         await endHostThread(ctx, oldThread, ctx.now);
