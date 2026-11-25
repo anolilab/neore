@@ -319,6 +319,9 @@ const runMergedArchive = async (ctx: MutationCtx, args: MergedArchiveArgs): Prom
 
     if (outcome === "archived") {
         ctx.log.event("chat.auto_archive", { archived: 1, reason: "merged_pull_request" });
+    } else {
+        // A kept chat is visible too: busy (a run, a request waiting on the owner, an open link) or declined (a guard or the setting).
+        ctx.log.event("chat.merged_archive_kept", { outcome });
     }
 
     if (outcome === "busy") {

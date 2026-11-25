@@ -208,7 +208,10 @@ const PullRequestFixes = ({
                 label={t`Could not read what blocks ${name}. Try again`}
                 onFocusLost={reportLost}
                 onRetry={() => {
-                    void status.refetch();
+                    // A link outside this view's read selection never reads the host, even from its own chip.
+                    if (readStatus) {
+                        void status.refetch();
+                    }
                 }}
                 reading={status.isFetching}
             />
@@ -232,7 +235,9 @@ const PullRequestFixes = ({
             name={name}
             onFocusLost={reportLost}
             onOpen={() => {
-                void status.refetch();
+                if (readStatus) {
+                    void status.refetch();
+                }
             }}
             problems={data}
             refreshing={status.isFetching}

@@ -111,18 +111,26 @@ export const noteMergeAttemptRow = async (ctx: Pick<MutationCtx, "db">, linkId: 
     }
 };
 
+/** Links of one chat read when its archive settles the owed merges: one transaction, so a bound. */
+const OWED_SETTLE_ROW_LIMIT = 500;
+
 /**
  * Settles every owed merge link of the chat, whichever pull request it names. Every archive of the chat calls this (`markThreadArchived`),
  * so reopening an archived chat cannot archive it again for a merge it already covered. Read over the chat's own links.
  */
 export const settleOwedMergesOf = async (ctx: Pick<MutationCtx, "db">, userId: string, threadId: Id<"threads">, at: number): Promise<void> => {
-    await someLinkOfThread(ctx, userId, threadId, async (row) => {
+    // Bounded: an archive is one transaction. A merge past this many links is still refused on a reopen when the host bounded it
+    // (`agent/auto-archive.ts`, the reopen guard), so the bound does not let it archive the chat again.
+    const rows = await ctx.db
+        .query("pullRequestThreads")
+        .withIndex("by_user_and_threadId", (q) => q.eq("userId", userId).eq("threadId", threadId))
+        .take(OWED_SETTLE_ROW_LIMIT);
+
+    for (const row of rows) {
         if (row.mergedAt !== undefined && row.mergeSettledAt === undefined) {
             await settleMergedLinkRow(ctx, row._id, at);
         }
-
-        return false;
-    });
+    }
 };
 
 /**

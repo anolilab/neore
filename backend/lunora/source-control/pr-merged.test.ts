@@ -20,11 +20,15 @@ const fakeContext = (failArchiveOf?: string) => {
     const runMutation = vi.fn(async (ref: unknown, args: Record<string, unknown>) => {
         calls.push({ args, ref });
 
-        if (ref === internal.source_control.pr_threads.recordPullRequestMerged) {
-            return [
-                { linkId: LINK_A, threadId: THREAD_A },
-                { linkId: LINK_B, threadId: THREAD_B },
-            ];
+        if (ref === internal.source_control.pr_threads.recordPullRequestMergedPage) {
+            return {
+                continueCursor: null,
+                isDone: true,
+                owed: [
+                    { linkId: LINK_A, threadId: THREAD_A },
+                    { linkId: LINK_B, threadId: THREAD_B },
+                ],
+            };
         }
 
         if (ref === internal.agent.auto_archive.archiveMergedThread && args.threadId === failArchiveOf) {
@@ -49,7 +53,7 @@ describe("recordMergedPullRequest", () => {
 
         await recordMergedPullRequest(ctx, "user-a", { number: 7, repository: "Octo/Hello" });
 
-        const [record] = callsTo(calls, internal.source_control.pr_threads.recordPullRequestMerged);
+        const [record] = callsTo(calls, internal.source_control.pr_threads.recordPullRequestMergedPage);
 
         expect(record?.args).toMatchObject({ number: 7, repository: "octo/hello", userId: "user-a" });
 
@@ -63,13 +67,13 @@ describe("recordMergedPullRequest", () => {
 
         await recordMergedPullRequest(given.ctx, "user-a", { number: 7, repository: "octo/hello" }, 1000);
 
-        expect(callsTo(given.calls, internal.source_control.pr_threads.recordPullRequestMerged)[0]?.args).toMatchObject({ mergedAt: 1000 });
+        expect(callsTo(given.calls, internal.source_control.pr_threads.recordPullRequestMergedPage)[0]?.args).toMatchObject({ mergedAt: 1000 });
 
         const now = fakeContext();
 
         await recordMergedPullRequest(now.ctx, "user-a", { number: 7, repository: "octo/hello" });
 
-        expect(callsTo(now.calls, internal.source_control.pr_threads.recordPullRequestMerged)[0]?.args).not.toHaveProperty("mergedAt");
+        expect(callsTo(now.calls, internal.source_control.pr_threads.recordPullRequestMergedPage)[0]?.args).not.toHaveProperty("mergedAt");
     });
 
     it("logs an invalid address and does nothing, without throwing", async () => {
@@ -80,6 +84,33 @@ describe("recordMergedPullRequest", () => {
 
         expect(calls).toHaveLength(0);
         expect(error).toHaveBeenCalled();
+    });
+
+    it("walks every page of a pull request's links, and caps the archive attempts across the whole read", async () => {
+        const calls: Call[] = [];
+        const owedOf = (prefix: string, count: number) =>
+            Array.from({ length: count }, (_, index) => {
+                return { linkId: `${prefix}-${String(index)}`, threadId: `${prefix}-thread-${String(index)}` };
+            });
+        const pages = [
+            { continueCursor: "page-2", isDone: false, owed: owedOf("a", 20) },
+            { continueCursor: null, isDone: true, owed: owedOf("b", 20) },
+        ];
+        const runMutation = vi.fn(async (ref: unknown, args: Record<string, unknown>) => {
+            calls.push({ args, ref });
+
+            if (ref === internal.source_control.pr_threads.recordPullRequestMergedPage) {
+                return pages[args.cursor === "page-2" ? 1 : 0];
+            }
+
+            return null;
+        });
+
+        await recordMergedPullRequest({ runMutation } as never, "user-a", { number: 7, repository: "octo/hello" });
+
+        // Both pages are recorded, the second with the first page's cursor; 40 owed links but only 25 archive attempts in this read.
+        expect(callsTo(calls, internal.source_control.pr_threads.recordPullRequestMergedPage).map((call) => call.args.cursor)).toStrictEqual([null, "page-2"]);
+        expect(callsTo(calls, internal.agent.auto_archive.archiveMergedThread)).toHaveLength(25);
     });
 
     it("keeps going when one archive fails, and each owed link is archived by its own attempt", async () => {

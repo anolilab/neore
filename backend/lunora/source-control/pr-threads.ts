@@ -416,83 +416,167 @@ export const mergedArchiveOn = internalQuery
         return settings?.autoArchiveMergedChats === true && settings.autoArchiveMergedChatsSince !== undefined;
     });
 
+/** A link that still owes an archive attempt for a merge. */
+interface OwedLink {
+    lastAttemptAt: number;
+    linkId: Id<"pullRequestThreads">;
+    threadId: Id<"threads">;
+}
+
+/** Links marked per recording page: each page is one bounded mutation, so a pull request's whole link history is never one transaction. */
+const RECORD_PAGE_LINKS = 100;
+
+const mergeArgsFields = {
+    /** The merge's lower-bound time: the setting's opt-in is compared with it. */
+    mergedAt: v.optional(v.number()),
+    /** The merge's upper-bound time: a link created at or after it was not part of the merge. Absent: `mergedAt` plus a second. */
+    mergedBefore: v.optional(v.number()),
+    /** False when `mergedBefore` is not the host's bound (the host gave no merge time): it orders the links, but it is not stored. */
+    mergedBeforeIsHostBound: v.optional(v.boolean()),
+    number: v.number(),
+    repository: v.string().max(MAX_LENGTH.short),
+    userId: v.string().max(MAX_LENGTH.id),
+};
+
+/** The merge's times and the owner's setting, read once per recording mutation. */
+interface MergeMark {
+    mergedAt: number;
+    mergedBefore: number;
+    settingOn: boolean;
+    since: number | undefined;
+    storeBound: boolean;
+}
+
+const mergeMarkOf = async (
+    ctx: MutationCtx,
+    args: { mergedAt?: number; mergedBefore?: number; mergedBeforeIsHostBound?: boolean; userId: string },
+): Promise<MergeMark> => {
+    const mergedAt = args.mergedAt ?? ctx.now;
+    const mergedBefore = args.mergedBefore ?? mergedAt + MERGE_TIME_PRECISION_MS;
+    const settings = await ctx.db
+        .query("userSettings")
+        .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+        .unique();
+    const since = settings?.autoArchiveMergedChatsSince;
+
+    return {
+        mergedAt,
+        mergedBefore,
+        // A merge owes an archive only when the setting is on and the merge came after the owner turned it on.
+        settingOn: settings?.autoArchiveMergedChats === true && since !== undefined,
+        since,
+        // The bound is stored only when the host gave the merge time: a bound made from the request time says nothing about when the
+        // merge happened, so the reopen guard must not decline on it.
+        storeBound: args.mergedBeforeIsHostBound !== false,
+    };
+};
+
 /**
- * Records that a pull request was seen merged, on each link made before the merge. Internal: called by the merge action
- * and the status read, both with the merge time (the host's, or the time before the merge request), so a link made after
- * the merge is neither marked nor returned. Returns the links still owed an archive attempt for this merge: ones just
- * marked, and ones marked by an earlier read whose attempt never settled.
+ * Marks one link as merged, once, and settles it when no archive is owed. Returns the link when it still owes an archive attempt.
+ */
+const markLinkMerged = async (ctx: MutationCtx, link: Doc<"pullRequestThreads">, merge: MergeMark): Promise<OwedLink | undefined> => {
+    if (link.mergedAt === undefined) {
+        if (link.createdAt >= merge.mergedBefore) {
+            // Made after the merge, so it owes no archive; the host's merge still holds for its pull request, so its state says merged
+            // and it does not keep another chat open (`pr-state.ts`).
+            if (link.state !== "merged") {
+                await ctx.db.patch("pullRequestThreads", link._id, { state: "merged" });
+            }
+
+            return undefined;
+        }
+
+        await ctx.db.patch("pullRequestThreads", link._id, {
+            mergedAt: merge.mergedAt,
+            state: "merged",
+            ...(merge.storeBound && { mergedBefore: merge.mergedBefore }),
+        });
+    } else {
+        // A link marked earlier keeps its merge time. A relink may have reset its state to open, but the host's merge still holds.
+        if (link.state !== "merged") {
+            await ctx.db.patch("pullRequestThreads", link._id, { state: "merged" });
+        }
+
+        if (link.mergeSettledAt !== undefined) {
+            return undefined;
+        }
+    }
+
+    // Judged on the link's own merge time, once stored: a later read with a less precise time cannot retract a merge that already
+    // proved it came after the opt-in. With the setting off (or the merge before the opt-in), the link settles here.
+    const eligibleAt = link.mergedAt ?? merge.mergedAt;
+
+    if (!merge.settingOn || merge.since === undefined || eligibleAt < merge.since) {
+        await settleMergedLinkRow(ctx, link._id, ctx.now);
+
+        return undefined;
+    }
+
+    return { lastAttemptAt: link.mergeAttemptedAt ?? 0, linkId: link._id, threadId: link.threadId };
+};
+
+/**
+ * Records that a pull request was seen merged, one bounded page of its links per call. Internal: the merge action and the status
+ * read call it page by page, passing the cursor back, and archive the chats each page owes (see `source-control/pr-merged.ts`).
+ * A page's owed links are least recently attempted first; across pages the caller keeps its own order.
+ */
+export const recordPullRequestMergedPage = internalMutation
+    .input({
+        ...mergeArgsFields,
+        cursor: v.optional(v.union(v.string(), v.null())),
+    })
+    .output(
+        v.object({
+            continueCursor: v.union(v.string(), v.null()),
+            isDone: v.boolean(),
+            owed: v.array(v.object({ linkId: v.id("pullRequestThreads"), threadId: v.id("threads") })),
+        }),
+    )
+    .mutation(async ({ args, ctx }) => {
+        const merge = await mergeMarkOf(ctx, args);
+        const page = await ctx.db
+            .query("pullRequestThreads")
+            .withIndex("by_user_and_repository_number", (q) => q.eq("userId", args.userId).eq("repository", args.repository).eq("number", args.number))
+            .paginate({ cursor: args.cursor ?? null, numItems: RECORD_PAGE_LINKS });
+        const owed: OwedLink[] = [];
+
+        for (const link of page.page) {
+            const entry = await markLinkMerged(ctx, link, merge);
+
+            if (entry !== undefined) {
+                owed.push(entry);
+            }
+        }
+
+        owed.sort((a, b) => a.lastAttemptAt - b.lastAttemptAt);
+
+        return {
+            continueCursor: page.continueCursor,
+            isDone: page.isDone,
+            owed: owed.map((link) => {
+                return { linkId: link.linkId, threadId: link.threadId };
+            }),
+        };
+    });
+
+/**
+ * Records that a pull request was seen merged, on every link of it, in one mutation. Kept for callers and tests that hold a whole
+ * pull request; production paths use `recordPullRequestMergedPage`, one bounded page at a time.
  */
 export const recordPullRequestMerged = internalMutation
-    .input({
-        /** The merge's lower-bound time: the setting's opt-in is compared with it. */
-        mergedAt: v.optional(v.number()),
-        /** The merge's upper-bound time: a link created at or after it was not part of the merge. Absent: `mergedAt` plus a second. */
-        mergedBefore: v.optional(v.number()),
-        /** False when `mergedBefore` is not the host's bound (the host gave no merge time): it orders the links, but it is not stored. */
-        mergedBeforeIsHostBound: v.optional(v.boolean()),
-        number: v.number(),
-        repository: v.string().max(MAX_LENGTH.short),
-        userId: v.string().max(MAX_LENGTH.id),
-    })
+    .input(mergeArgsFields)
     .output(v.array(v.object({ linkId: v.id("pullRequestThreads"), threadId: v.id("threads") })))
     .mutation(async ({ args, ctx }) => {
-        const mergedAt = args.mergedAt ?? ctx.now;
-        const mergedBefore = args.mergedBefore ?? mergedAt + MERGE_TIME_PRECISION_MS;
-        const owed: { lastAttemptAt: number; linkId: Id<"pullRequestThreads">; threadId: Id<"threads"> }[] = [];
+        const merge = await mergeMarkOf(ctx, args);
         const links = await pullRequestLinksOf(ctx, args.userId, args.repository, args.number);
-        const settings = await ctx.db
-            .query("userSettings")
-            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
-            .unique();
-        const since = settings?.autoArchiveMergedChatsSince;
-        const settingOn = settings?.autoArchiveMergedChats === true && since !== undefined;
+        const owed: OwedLink[] = [];
 
         for (const link of links) {
-            if (link.mergedAt === undefined) {
-                if (link.createdAt >= mergedBefore) {
-                    // Made after the merge, so it owes no archive; the host's merge still holds for its pull request, so its state
-                    // says merged and it does not keep another chat open (`pr-state.ts`).
-                    if (link.state !== "merged") {
-                        await ctx.db.patch("pullRequestThreads", link._id, { state: "merged" });
-                    }
+            const entry = await markLinkMerged(ctx, link, merge);
 
-                    continue;
-                }
-
-                // The host's merge time when the read had it, else now: the export shows when the merge happened, not when it was seen.
-                // The host said merged: the link's state says so too, so the open-pull-request rule (`pr-state.ts`) no longer keeps its chat.
-                // The bound is stored only when the host gave the merge time: a bound made from the request time says nothing about when
-                // the merge happened, so the reopen guard must not decline on it.
-                const storeBound = args.mergedBeforeIsHostBound !== false;
-
-                await ctx.db.patch("pullRequestThreads", link._id, {
-                    mergedAt,
-                    state: "merged",
-                    ...(storeBound && { mergedBefore }),
-                });
-            } else {
-                // A link marked earlier keeps its merge time. A relink may have reset its state to open, but the host's merge still
-                // holds, so the state is restored before the link is skipped or judged.
-                if (link.state !== "merged") {
-                    await ctx.db.patch("pullRequestThreads", link._id, { state: "merged" });
-                }
-
-                if (link.mergeSettledAt !== undefined) {
-                    continue;
-                }
+            if (entry !== undefined) {
+                owed.push(entry);
             }
-
-            // Judged on the link's own merge time, once stored: a later read with a less precise time cannot retract a merge that
-            // already proved it came after the opt-in. With the setting off (or the merge before the opt-in), the link settles here,
-            // so a later opt-in cannot archive a chat for a merge that came before it.
-            const eligibleAt = link.mergedAt ?? mergedAt;
-
-            if (!settingOn || since === undefined || eligibleAt < since) {
-                await settleMergedLinkRow(ctx, link._id, ctx.now);
-                continue;
-            }
-
-            owed.push({ lastAttemptAt: link.mergeAttemptedAt ?? 0, linkId: link._id, threadId: link.threadId });
         }
 
         // Least recently attempted first: a read's bounded batch reaches every owed chat, not just the first busy ones.

@@ -10,7 +10,7 @@ import { internal } from "../_generated/internal";
 import schema from "../schema";
 import { recordMergedPullRequest } from "../source-control/pr-merged";
 import { recordLinkState } from "../source-control/pr-state";
-import { noteMergeAttempt, recordPullRequestMerged } from "../source-control/pr-threads";
+import { noteMergeAttempt, recordPullRequestMerged, recordPullRequestMergedPage } from "../source-control/pr-threads";
 import { archiveClosedLinkChat, archiveMergedThread } from "./auto-archive";
 import { archiveThread } from "./threads";
 
@@ -22,6 +22,7 @@ const REGISTERED = new Map<unknown, unknown>([
     [internal.agent.auto_archive.archiveMergedThread, archiveMergedThread],
     [internal.source_control.pr_threads.noteMergeAttempt, noteMergeAttempt],
     [internal.source_control.pr_threads.recordPullRequestMerged, recordPullRequestMerged],
+    [internal.source_control.pr_threads.recordPullRequestMergedPage, recordPullRequestMergedPage],
 ]);
 
 type Harness = ReturnType<typeof lunoraTest>;

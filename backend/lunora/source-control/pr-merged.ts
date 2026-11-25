@@ -10,6 +10,13 @@ import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 import { requireAddress } from "./pr-threads";
 
+/** One page of recorded links: the owed ones, and where the next page starts. */
+interface RecordedPage {
+    continueCursor: string | null;
+    isDone: boolean;
+    owed: { linkId: Id<"pullRequestThreads">; threadId: Id<"threads"> }[];
+}
+
 export interface MergedPullRequestRef {
     number: number;
     repository: string;
@@ -38,31 +45,59 @@ export const recordMergedPullRequest = async (
     try {
         // Links are stored under the canonical (lowercase) repository, so the lookup must use it too; an invalid address throws here and is logged.
         const address = requireAddress(ref.repository, ref.number);
-        const owed = await ctx.runMutation(internal.source_control.pr_threads.recordPullRequestMerged, {
-            ...(mergedAt !== undefined && { mergedAt }),
-            ...(mergedBefore !== undefined && { mergedBefore }),
-            ...(mergedBeforeIsHostBound !== undefined && { mergedBeforeIsHostBound }),
-            number: address.number,
-            repository: address.repository,
-            userId,
-        });
+        // The links are recorded one bounded page per call; the archive attempts are capped for the whole read, and what is left stays
+        // owed (the next read or sweep takes it).
+        let cursor: string | null = null;
+        let attempts = 0;
 
-        for (const link of owed.slice(0, MERGED_ARCHIVES_PER_READ)) {
-            try {
-                // The attempt settles its link in the same transaction when its answer is final; a busy one stays owed.
-                await ctx.runMutation(internal.agent.auto_archive.archiveMergedThread, {
-                    linkId: link.linkId,
-                    number: address.number,
-                    repository: address.repository,
-                    threadId: link.threadId,
-                });
-            } catch (error) {
-                console.error("[source-control] could not archive a chat for a merged pull request; the next read retries it", error);
-                await noteFailedAttempt(ctx, link.linkId);
+        for (;;) {
+            const page: RecordedPage = await ctx.runMutation(internal.source_control.pr_threads.recordPullRequestMergedPage, {
+                ...(mergedAt !== undefined && { mergedAt }),
+                ...(mergedBefore !== undefined && { mergedBefore }),
+                ...(mergedBeforeIsHostBound !== undefined && { mergedBeforeIsHostBound }),
+                cursor,
+                number: address.number,
+                repository: address.repository,
+                userId,
+            });
+
+            for (const link of page.owed) {
+                if (attempts >= MERGED_ARCHIVES_PER_READ) {
+                    break;
+                }
+
+                attempts += 1;
+                await archiveOwedLink(ctx, link, address);
             }
+
+            if (page.isDone) {
+                break;
+            }
+
+            cursor = page.continueCursor;
         }
     } catch (error) {
         console.error("[source-control] could not record the merged pull request", error);
+    }
+};
+
+/** One owed link's archive attempt. A thrown attempt is logged, and its link is noted so the next read moves past it. */
+const archiveOwedLink = async (
+    ctx: Pick<ActionCtx, "runMutation">,
+    link: { linkId: Id<"pullRequestThreads">; threadId: Id<"threads"> },
+    address: { number: number; repository: string },
+): Promise<void> => {
+    try {
+        // The attempt settles its link in the same transaction when its answer is final; a busy one stays owed.
+        await ctx.runMutation(internal.agent.auto_archive.archiveMergedThread, {
+            linkId: link.linkId,
+            number: address.number,
+            repository: address.repository,
+            threadId: link.threadId,
+        });
+    } catch (error) {
+        console.error("[source-control] could not archive a chat for a merged pull request; the next read retries it", error);
+        await noteFailedAttempt(ctx, link.linkId);
     }
 };
 
