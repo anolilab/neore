@@ -382,7 +382,8 @@ export const schema = defineSchema({
         erasedAt: v.number(),
         referenceId: v.string(),
     })
-        .global()
+        // Not `.global()`: the tombstone lives on the root shard with the payment rows it guards, so one mutation
+        // writes both or neither.
         .index("by_referenceId", ["referenceId"]),
 
     /**

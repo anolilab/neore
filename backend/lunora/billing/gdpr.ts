@@ -170,9 +170,11 @@ export const endLiveSubscriptions = async (
  * `erase` is set when the reference is being deleted, and records its tombstone.
  */
 export const cancelBilling = internalAction
-    .input({ erase: v.boolean(), referenceId: v.string() })
+    // `erase` is optional because jobs queued before it existed carry only the reference. Those were never tombstoned,
+    // so a missing flag means no tombstone: they still cancel and delete.
+    .input({ erase: v.optional(v.boolean()), referenceId: v.string() })
     .output(v.null())
-    .action(async ({ args: { erase, referenceId }, ctx }) => {
+    .action(async ({ args: { erase = false, referenceId }, ctx }) => {
         const subscriptions = await ctx.payments.store.listSubscriptionsByReference(referenceId);
 
         // A live subscription that cannot be cancelled must fail the step, not let the rows go while it still bills.

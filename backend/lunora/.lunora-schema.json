@@ -4171,7 +4171,7 @@
       },
       "memory": false,
       "relations": {},
-      "shardMode": "global:d1"
+      "shardMode": "root"
     },
     "botOwners": {
       "commitOrdered": false,
