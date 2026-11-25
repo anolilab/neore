@@ -876,7 +876,7 @@ export const restoreThread = internalMutation
 
         // A chat's events go with the trash, but the trash's leftover batches may not have run. A restored chat must not show them, so
         // restore refuses while any remain: `undoDeleteThread` drains them first, in its own transaction. Events recorded since are kept.
-        if (oldThread.userId !== undefined && (await hasMcpEventsOfThread(ctx, oldThread.userId, args.threadId))) {
+        if (oldThread.deleted === true && oldThread.userId !== undefined && (await hasMcpEventsOfThread(ctx, oldThread.userId, args.threadId))) {
             throw new LunoraError("CONFLICT", "This chat's activity is still being cleared from the trash. Try restoring it again in a moment.");
         }
 

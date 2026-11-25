@@ -229,4 +229,13 @@ export const deleteTrashedThreadEvents = internalMutation
 export const drainTrashedThreadEvents = internalMutation
     .input({ threadId: v.string(), userId: v.string() })
     .output(v.boolean())
-    .mutation(async ({ args, ctx }) => await deleteMcpEventsOfThread(ctx, args.userId, args.threadId));
+    .mutation(async ({ args, ctx }) => {
+        const thread = await ctx.db.threads.findFirst({ consistency: "primary", where: { _id: args.threadId as Id<"threads"> } });
+
+        // Only a trashed chat drains: a chat that is live (already restored, or restored by a concurrent undo) keeps the events it has.
+        if (thread === null || thread.deleted !== true) {
+            return true;
+        }
+
+        return await deleteMcpEventsOfThread(ctx, args.userId, args.threadId);
+    });
