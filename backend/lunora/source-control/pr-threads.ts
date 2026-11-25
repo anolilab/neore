@@ -23,7 +23,7 @@ import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import { GITHUB_WEB_ORIGIN, splitGithubRepo } from "./drivers/github";
 import { rereadRelinkedLink, scheduleArchiveAfterClose } from "./pr-state";
-import { MERGE_TIME_PRECISION_MS, noteMergeAttemptRow, pullRequestLinksOf, settleMergedLinkRow, someLinkOfThread } from "./pr-thread-links";
+import { MERGE_TIME_PRECISION_MS, noteMergeAttemptRow, pullRequestLinksOf, setThreadMergeOwed, settleMergedLinkRow, someLinkOfThread } from "./pr-thread-links";
 
 /** Threads kept per pull request: a list, not a history. The newest are the ones anyone is working in. */
 export const MAX_THREADS_PER_PULL_REQUEST = 50;
@@ -511,6 +511,9 @@ const markLinkMerged = async (ctx: MutationCtx, link: Doc<"pullRequestThreads">,
 
         return undefined;
     }
+
+    // The chat now owes an archive attempt: flagged before the link is returned, so the sweep reads this chat's links for it.
+    await setThreadMergeOwed(ctx, link.threadId, true);
 
     return { lastAttemptAt: link.mergeAttemptedAt ?? 0, linkId: link._id, threadId: link.threadId };
 };

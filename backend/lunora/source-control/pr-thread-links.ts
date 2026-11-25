@@ -120,16 +120,38 @@ const OWED_SETTLE_ROW_LIMIT = 500;
  */
 export const settleOwedMergesOf = async (ctx: Pick<MutationCtx, "db">, userId: string, threadId: Id<"threads">, at: number): Promise<void> => {
     // Bounded: an archive is one transaction. A merge past this many links is still refused on a reopen when the host bounded it
-    // (`agent/auto-archive.ts`, the reopen guard), so the bound does not let it archive the chat again.
+    // (`agent/auto-archive.ts`, the reopen guard), so the bound does not let it archive the chat again. One row past the bound
+    // tells whether the read was whole.
     const rows = await ctx.db
         .query("pullRequestThreads")
         .withIndex("by_user_and_threadId", (q) => q.eq("userId", userId).eq("threadId", threadId))
-        .take(OWED_SETTLE_ROW_LIMIT);
+        .take(OWED_SETTLE_ROW_LIMIT + 1);
 
-    for (const row of rows) {
+    for (const row of rows.slice(0, OWED_SETTLE_ROW_LIMIT)) {
         if (row.mergedAt !== undefined && row.mergeSettledAt === undefined) {
             await settleMergedLinkRow(ctx, row._id, at);
         }
+    }
+
+    // Cleared only when every link was read: a chat past the bound may still owe a merge, so the sweep keeps reading it.
+    if (rows.length <= OWED_SETTLE_ROW_LIMIT) {
+        await setThreadMergeOwed(ctx, threadId, false);
+    }
+};
+
+/** Flags a chat as owing a merge archive, or clears the flag. A chat that is gone is left alone. */
+export const setThreadMergeOwed = async (ctx: Pick<MutationCtx, "db">, threadId: Id<"threads">, owed: boolean): Promise<void> => {
+    const thread = await ctx.db.get("threads", threadId);
+
+    if (thread === null) {
+        return;
+    }
+
+    // Written only on a change, so a settled chat with no flag costs no write.
+    if (owed && thread.mergeOwed !== true) {
+        await ctx.db.patch("threads", threadId, { mergeOwed: true });
+    } else if (!owed && thread.mergeOwed === true) {
+        await ctx.db.patch("threads", threadId, { mergeOwed: false });
     }
 };
 

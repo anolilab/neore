@@ -996,6 +996,38 @@ describe("archiveMergedThread", () => {
         expect(await statusOf(threadId)).toBe("archived");
     });
 
+    it("flags a busy chat as owing a merge, and clears the flag once its archive settles", async () => {
+        const threadId = await setUp({ autoArchiveMergedChats: true });
+        const streamId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    messageId: "m-1",
+                    status: "streaming",
+                    streamingConfig: { contentType: "text", model: "gpt-4o" },
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+        const mergeOwed = () =>
+            harness.run(async (ctx: any) => {
+                const thread = await ctx.db.get("threads", threadId);
+
+                return thread?.mergeOwed;
+            });
+
+        await seeMerge();
+        expect(await mergeOwed()).toBe(true);
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("persistentStreams", streamId, { status: "done" });
+        });
+        await seeMerge();
+
+        expect(await statusOf(threadId)).toBe("archived");
+        expect(await mergeOwed()).toBe(false);
+    });
+
     it("declines a chat pinned during a run at merge time, so unpinning it once the run is over archives nothing", async () => {
         const threadId = await setUp({ autoArchiveMergedChats: true, pinned: true });
 

@@ -30636,6 +30636,12 @@
           "optional": true,
           "unique": false
         },
+        "mergeOwed": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "messengerConnectionId": {
           "kind": "id",
           "nullable": false,

@@ -25,6 +25,7 @@ import {
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { currentUserShard } from "../lib/shard-context";
 import { DEVELOP_DRIVER } from "./develop-driver";
+import { setThreadMergeOwed } from "./pr-thread-links";
 import { readFromHost } from "./read-host";
 
 /** A link's state is re-read once it is this old. */
@@ -176,7 +177,8 @@ export const dispatchLinkedPullRequestChecks = internalMutation
             const idleDue = thread !== null && cutoff !== undefined && selectAutoArchiveDue([candidateOf(thread)], cutoff, NO_EXCLUSIONS, 1).length === 1;
             let mergeOwed = false;
 
-            if (!idleDue && thread !== null && mergedOn) {
+            // Only a chat flagged as owing a merge is read for one: the flag is set with every owed link (`pr-threads.ts`).
+            if (!idleDue && thread !== null && mergedOn && thread.mergeOwed === true) {
                 const key = String(link.threadId);
                 const known = owesMerge.get(key);
 
@@ -225,7 +227,14 @@ const ownsMergeTo = async (ctx: MutationCtx, userId: string, threadId: Id<"threa
         return true;
     }
 
-    return rows.some((row) => row.mergedAt !== undefined && row.mergeSettledAt === undefined);
+    const owed = rows.some((row) => row.mergedAt !== undefined && row.mergeSettledAt === undefined);
+
+    // The whole chat was read and nothing is owed: a flag left by an owed merge that settled another way is cleared here.
+    if (!owed) {
+        await setThreadMergeOwed(ctx, threadId, false);
+    }
+
+    return owed;
 };
 
 /**
