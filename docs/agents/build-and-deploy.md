@@ -123,6 +123,14 @@ Write`; without them the deploy fails, hence the switch.
   can still be dead: the first staging deploys passed with every backend request failing. A failure
   outside production also replays the RPC while tailing the Worker's logs; production's logs are never
   printed (the run log of this repository is public). `backend/deploy-smoke.test.ts` pins it.
+- **After the smoke test, `deploy.yml` runs the backend's data migrations** (`defineMigration` in
+  `backend/lunora/migrations.ts`), every declared one in declaration order, through
+  `scripts/run-data-migrations.ts` (`lunora migrate up <id> --prod --yes`, which takes one id). A new
+  backfill needs no workflow edit: declare it after any migration it depends on, in that file (the
+  runner reads no other), with a literal string `id`: one it cannot read fails the step. `up` is idempotent and resumable: a shard that completed a migration
+  answers at once, so a deploy only pays one fan-out per migration. The admin token reaches the CLI only as `LUNORA_ADMIN_TOKEN` in the step's environment;
+  the log shows ids and counts only, and production no error detail. A failed or unfinished
+  migration fails the job. `backend/deploy-migrations.test.ts` pins it.
 - **A Worker that passes the size cap can still fail Cloudflare's startup check** ("Script startup
   exceeded CPU time limit", error 10021): the module-level code of the whole bundle may take 1 s of
   CPU, and it is checked at upload, so it first shows on a deploy. `cd backend && pnpm exec wrangler

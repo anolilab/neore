@@ -437,13 +437,16 @@ const GatewayCacheKv = Cloudflare.KV.Namespace("llm-gateway-cache", { title: sta
 // @neore/backend codegen`). Table DDL needs no step: the runtime applies root and
 // `.shardBy()` tables from the schema, and `.global()` tables are created on first
 // access. The schema-drift gate runs in `pnpm build` (`lunora build`), before this
-// deploy. Only a data backfill (`defineMigration`) needs a `lunora migrate up <id> --prod --yes
-// --url <worker>` run after the deploy, one per backfill id. The agent-options backfills in
-// `backend/lunora/migrations.ts` are two: `drop-agent-option-fields`, then
+// deploy. A data backfill (`defineMigration`) is a `lunora migrate up <id>` call against the
+// new Worker, which this deploy does not make: `deploy.yml` runs every migration declared in
+// `backend/lunora/migrations.ts` right after its smoke test, in declaration order
+// (`scripts/run-data-migrations.ts`), so a new one needs no workflow edit. Order matters for
+// the agent-options backfills: `drop-agent-option-fields`, then
 // `session-options-to-session-state`. Without those runs, stored sessions keep the removed
-// `agentOptions` fields and stored chunks keep the removed `session_options` event. The
-// prompt-search backfill is one: `backfill-message-typed-text`. Without that run, the
-// composer's prompt search (Ctrl+R) finds only prompts sent after the deploy.
+// `agentOptions` fields and stored chunks keep the removed `session_options` event. Without
+// `backfill-message-typed-text`, the composer's prompt search (Ctrl+R) finds only prompts
+// sent after the deploy. A deploy outside that workflow runs them by hand:
+// `LUNORA_ADMIN_TOKEN=… lunora migrate up <id> --prod --yes --url <worker>`.
 const BackendDatabase = Cloudflare.D1.Database("neore-backend-db", { jurisdiction: dataJurisdiction, name: named("neore-backend") });
 
 const BackendFiles = Cloudflare.R2.Bucket("neore-backend-files", {
