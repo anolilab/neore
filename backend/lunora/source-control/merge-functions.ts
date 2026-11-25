@@ -130,9 +130,6 @@ export const mergePullRequest = authAction
         // An unconfirmed answer (the host may have merged, but its reply could not be read) is recorded only when a host read
         // confirms the merge: the read returns a merge time only for a merged pull request.
         const ref = { number: args.number, repository: args.repository };
-        // Taken once the write has answered: the merge happened before this moment, so it bounds the merge from above when the host's
-        // time cannot be read.
-        const completedAt = Date.now();
         const hostAt = outcome.status === "ok" || outcome.status === "unconfirmed" ? await hostMergedAt(token, ref) : undefined;
 
         if (outcome.status === "ok" || (outcome.status === "unconfirmed" && hostAt !== undefined)) {
@@ -142,7 +139,10 @@ export const mergePullRequest = authAction
             // old merge) keeps its historical time, so it is judged as it was. The upper bound is the end of the host's second.
             const historical = hostAt !== undefined && hostAt + MERGE_TIME_PRECISION_MS <= requestedAt ? hostAt : undefined;
             const mergedAt = historical ?? Math.max(hostAt ?? 0, requestedAt);
-            const mergedBefore = hostAt === undefined ? completedAt : hostAt + MERGE_TIME_PRECISION_MS;
+            // Without the host's time the merge may have come at any point from the request onward, so a link made after the request is
+            // not counted as predating it. That leaves a link made in that window unarchived now; the next status read of the pull request
+            // records the merge with the host's time and then counts it.
+            const mergedBefore = hostAt === undefined ? requestedAt : hostAt + MERGE_TIME_PRECISION_MS;
 
             await recordMergedPullRequest(ctx, ctx.user.userId, ref, mergedAt, mergedBefore);
         }
