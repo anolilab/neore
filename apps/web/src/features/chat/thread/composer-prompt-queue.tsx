@@ -570,6 +570,11 @@ const QueueChip: FC<{
                         onEditDraft(prompt.id, event.target.value);
                     }}
                     onKeyDown={(event) => {
+                        // Keys that finish an IME composition (Escape, Enter) belong to the input method, not the editor.
+                        if (event.nativeEvent.isComposing) {
+                            return;
+                        }
+
                         if (event.key === "Escape") {
                             event.preventDefault();
                             onEditStop(prompt.id);
@@ -580,6 +585,8 @@ const QueueChip: FC<{
                     }}
                     ref={textareaRef}
                     rows={2}
+                    // The native shell turns spellcheck off by default; an edited message is prose, so it keeps it.
+                    spellCheck
                     value={draft}
                 />
             ) : (
@@ -682,6 +689,8 @@ const ComposerPromptQueue: FC = () => {
     const { error } = useChatError();
     const queue = usePromptQueueStore(selectThreadQueue(threadId));
     const edit = useQueueEditStore(selectThreadEdit(threadId));
+    // A send held for this thread: only then does the status promise a send on the edit's close.
+    const heldSend = useQueueEditStore((state) => (threadId === undefined ? undefined : state.held[threadId]));
     // The head's text is open in its chip: the queue holds its send until the edit closes (see `headIsBeingEdited`).
     const editOpen = edit !== undefined;
     const headEditing = editOpen && queue.items[0]?.id === edit.id;
@@ -1099,7 +1108,7 @@ const ComposerPromptQueue: FC = () => {
 
     // "Send next" is disabled while the head's text is open: say why, and that the send follows the edit. A paused queue
     // sends nothing on a close, so it makes no such promise.
-    if (headEditing && !queue.paused && !isStreaming) {
+    if (headEditing && !queue.paused && !isStreaming && heldSend !== undefined) {
         statusText = t`${count} queued — sends when the edit closes`;
     }
 
