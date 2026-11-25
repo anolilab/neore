@@ -10,7 +10,10 @@ import { internalMutation, internalQuery } from "../_generated/server";
 
 const BATCH = 200;
 
-/** Rows the export reads per page. A page's payloads are held at once, and nothing caps a payload's size, so the page is kept small. */
+/**
+ * Rows the export reads per page. Whole rows are read, and a stored payload is at most `MAX_EVENT_PAYLOAD_BYTES` (`events-log.ts`,
+ * 16 KiB), so a page holds at most 25 such rows at once, about 400 KiB.
+ */
 const EXPORT_PAGE = 25;
 
 /**
@@ -44,7 +47,8 @@ export const collectMcpEventsForExport = internalQuery
     )
     .query(async ({ args: { userId }, ctx }) => {
         // Newest first, a page at a time. Each row is measured against the byte budget as it is read, so the rows held at once are
-        // one page and the kept ones, never the whole history: an event's payload can be large, and nothing caps it when recorded.
+        // one page and the kept ones, never the whole history. A stored payload is at most `MAX_EVENT_PAYLOAD_BYTES`
+        // (`events-log.ts`), and the byte budget (`EXPORT_EVENT_BYTES`) is what bounds the section.
         const encoder = new TextEncoder();
         const newest: Doc<"mcpEvents">[] = [];
         let bytes = 0;
