@@ -184,12 +184,14 @@ vi.mock("./composer-tiptap/use-composer-autocomplete", () => {
 
 const InputArea = ({
     onPaste,
+    onQueue,
     onSteer,
     onSubmit,
     ref,
     value,
 }: {
     onPaste?: (event: unknown) => void;
+    onQueue?: () => void;
     onSteer?: () => void;
     onSubmit: () => void;
     ref?: Ref<ComposerInputAreaRef>;
@@ -207,6 +209,11 @@ const InputArea = ({
             <button onClick={onSubmit} type="button">
                 Send message
             </button>
+            {onQueue && (
+                <button onClick={onQueue} type="button">
+                    Queue message
+                </button>
+            )}
             {onSteer && (
                 <button onClick={onSteer} type="button">
                     Steer
@@ -527,6 +534,47 @@ describe("ComposerInput follow-up steer default", () => {
         expect(items).toHaveLength(1);
         expect(items[0]?.steer).toBeUndefined();
         expect(items[0]?.text).toBe("a follow-up");
+    });
+
+    it("keeps the queue button a queue even when the person's default is on", () => {
+        harness.followUpSteer = true;
+
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Queue message" }));
+
+        const items = usePromptQueueStore.getState().queues["thread-1"]?.items ?? [];
+
+        expect(items).toHaveLength(1);
+        expect(items[0]?.steer).toBeUndefined();
+        expect(items[0]?.text).toBe("a follow-up");
+    });
+
+    it("queues a follow-up that carries a reference, so the reference is not dropped by a steer", () => {
+        harness.followUpSteer = true;
+        useChatUIStore.setState({ attachedReferences: [{ id: "ref-1" }] as never });
+
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        const items = usePromptQueueStore.getState().queues["thread-1"]?.items ?? [];
+
+        expect(items).toHaveLength(1);
+        expect(items[0]?.steer).toBeUndefined();
+        expect(items[0]?.references).toHaveLength(1);
+        useChatUIStore.setState({ attachedReferences: [] });
+    });
+
+    it("queues a guest's follow-up under invite-only, even when the default is on", () => {
+        harness.followUpSteer = true;
+        harness.mustSignIn = true;
+
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        const items = usePromptQueueStore.getState().queues["thread-1"]?.items ?? [];
+
+        expect(items).toHaveLength(1);
+        expect(items[0]?.steer).toBeUndefined();
     });
 });
 
