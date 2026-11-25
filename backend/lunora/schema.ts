@@ -2659,7 +2659,7 @@ export const schema = defineSchema({
         kind: v.union(v.literal("attached"), v.literal("linked"), v.literal("opened")),
         // The last archive attempt for this merge that found the chat busy. The next read tries the least recently attempted links first.
         mergeAttemptedAt: v.optional(v.number()),
-        // Set once the pull request is seen merged (`source-control/pr-threads.ts#recordPullRequestMerged`). Written once: a merge is terminal.
+        // Set once the pull request is seen merged (`source-control/pr-merged.ts#recordMergedPullRequest`). Written once: a merge is terminal.
         mergedAt: v.optional(v.number()),
         // The exclusive upper bound of the merge's time, as the recorder was given it. Unset: the merge is bounded by `mergedAt` plus a second.
         mergedBefore: v.optional(v.number()),

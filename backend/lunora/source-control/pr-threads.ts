@@ -563,31 +563,3 @@ export const recordPullRequestMergedPage = internalMutation
             }),
         };
     });
-
-/**
- * Records that a pull request was seen merged, on every link of it, in one mutation. Kept for callers and tests that hold a whole
- * pull request; production paths use `recordPullRequestMergedPage`, one bounded page at a time.
- */
-export const recordPullRequestMerged = internalMutation
-    .input(mergeArgsFields)
-    .output(v.array(v.object({ linkId: v.id("pullRequestThreads"), threadId: v.id("threads") })))
-    .mutation(async ({ args, ctx }) => {
-        const merge = await mergeMarkOf(ctx, args);
-        const links = await pullRequestLinksOf(ctx, args.userId, args.repository, args.number);
-        const owed: OwedLink[] = [];
-
-        for (const link of links) {
-            const entry = await markLinkMerged(ctx, link, merge);
-
-            if (entry !== undefined) {
-                owed.push(entry);
-            }
-        }
-
-        // Least recently attempted first: a read's bounded batch reaches every owed chat, not just the first busy ones.
-        owed.sort((a, b) => a.lastAttemptAt - b.lastAttemptAt);
-
-        return owed.map((link) => {
-            return { linkId: link.linkId, threadId: link.threadId };
-        });
-    });

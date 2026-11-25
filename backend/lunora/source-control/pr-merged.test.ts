@@ -143,6 +143,48 @@ describe("recordMergedPullRequest", () => {
         expect(attempted).toHaveLength(25);
     });
 
+    it("restarts the walk from the first page when a cursor is no longer read, and attempts each owed link once", async () => {
+        const calls: Call[] = [];
+        let invalidated = false;
+        const owedOf = (prefix: string, count: number) =>
+            Array.from({ length: count }, (_, index) => {
+                return { lastAttemptAt: 0, linkId: `${prefix}-${String(index)}`, threadId: `${prefix}-thread-${String(index)}` };
+            });
+        const runMutation = vi.fn(async (ref: unknown, args: Record<string, unknown>) => {
+            calls.push({ args, ref });
+
+            if (ref === internal.source_control.pr_threads.recordPullRequestMergedPage) {
+                // The second page's cursor is rejected once, as after a write between pages.
+                if (args.cursor === "page-2" && !invalidated) {
+                    invalidated = true;
+                    throw Object.assign(new Error("cursor"), { code: "INVALID_CURSOR" });
+                }
+
+                return args.cursor === "page-2"
+                    ? { continueCursor: null, isDone: true, owed: owedOf("b", 20) }
+                    : { continueCursor: "page-2", isDone: false, owed: owedOf("a", 20) };
+            }
+
+            return null;
+        });
+
+        await recordMergedPullRequest({ runMutation } as never, "user-a", { number: 7, repository: "octo/hello" });
+
+        // The walk restarted from the first page and read the second page again.
+        expect(callsTo(calls, internal.source_control.pr_threads.recordPullRequestMergedPage).map((call) => call.args.cursor)).toStrictEqual([
+            null,
+            "page-2",
+            null,
+            "page-2",
+        ]);
+
+        // The first page's owed links were seen twice: each is attempted once, and the read still caps at 25 attempts.
+        const attempted = callsTo(calls, internal.agent.auto_archive.archiveMergedThread).map((call) => call.args.linkId);
+
+        expect(attempted).toHaveLength(25);
+        expect(new Set(attempted).size).toBe(25);
+    });
+
     it("keeps going when one archive fails, and each owed link is archived by its own attempt", async () => {
         vi.spyOn(console, "error").mockImplementation(() => undefined);
         const { calls, ctx } = fakeContext(THREAD_A);

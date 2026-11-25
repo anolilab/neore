@@ -10,7 +10,7 @@ import { internal } from "../_generated/internal";
 import schema from "../schema";
 import { recordMergedPullRequest } from "../source-control/pr-merged";
 import { recordLinkState } from "../source-control/pr-state";
-import { noteMergeAttempt, recordPullRequestMerged, recordPullRequestMergedPage } from "../source-control/pr-threads";
+import { noteMergeAttempt, recordPullRequestMergedPage } from "../source-control/pr-threads";
 import { archiveClosedLinkChat, archiveMergedThread } from "./auto-archive";
 import { archiveThread } from "./threads";
 
@@ -21,9 +21,36 @@ import { archiveThread } from "./threads";
 const REGISTERED = new Map<unknown, unknown>([
     [internal.agent.auto_archive.archiveMergedThread, archiveMergedThread],
     [internal.source_control.pr_threads.noteMergeAttempt, noteMergeAttempt],
-    [internal.source_control.pr_threads.recordPullRequestMerged, recordPullRequestMerged],
     [internal.source_control.pr_threads.recordPullRequestMergedPage, recordPullRequestMergedPage],
 ]);
+
+/**
+ * Records a merge on every link of the pull request, one page at a time, as `recordMergedPullRequest` walks them. Returns the owed
+ * links the walk collected.
+ */
+const recordAllPages = async (ctx: any, args: Record<string, unknown>): Promise<any[]> => {
+    const owed: any[] = [];
+    let cursor: string | null = null;
+
+    for (;;) {
+        const page: { continueCursor: string | null; isDone: boolean; owed: { linkId: string; threadId: string }[] } = await ctx.runMutation(
+            recordPullRequestMergedPage,
+            { ...args, cursor },
+        );
+
+        owed.push(
+            ...page.owed.map(({ linkId, threadId }) => {
+                return { linkId, threadId };
+            }),
+        );
+
+        if (page.isDone) {
+            return owed;
+        }
+
+        cursor = page.continueCursor;
+    }
+};
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -212,9 +239,7 @@ describe("archiveMergedThread", () => {
                 }),
         );
 
-        const owed = await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { number: NUMBER, repository: REPOSITORY, userId: OWNER }),
-        );
+        const owed = await harness.run(async (ctx: any) => await recordAllPages(ctx, { number: NUMBER, repository: REPOSITORY, userId: OWNER }));
         const [first, other] = [owed.find((row: { linkId: string }) => row.linkId !== second), owed.find((row: { linkId: string }) => row.linkId === second)];
 
         expect(owed).toHaveLength(2);
@@ -276,9 +301,7 @@ describe("archiveMergedThread", () => {
             });
         });
 
-        const owed = await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { number: NUMBER, repository: REPOSITORY, userId: OWNER }),
-        );
+        const owed = await harness.run(async (ctx: any) => await recordAllPages(ctx, { number: NUMBER, repository: REPOSITORY, userId: OWNER }));
         const first = owed.find((row: { linkId: string }) => row.linkId !== second);
 
         expect(owed).toHaveLength(2);
@@ -347,7 +370,7 @@ describe("archiveMergedThread", () => {
         // The host gave no merge time: the merge is recorded with the request's time and no stored bound.
         await harness.run(
             async (ctx: any) =>
-                await ctx.runMutation(recordPullRequestMerged, {
+                await recordAllPages(ctx, {
                     mergedAt,
                     mergedBefore: mergedAt + 1000,
                     mergedBeforeIsHostBound: false,
@@ -409,9 +432,7 @@ describe("archiveMergedThread", () => {
         });
 
         expect(
-            await harness.run(
-                async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { mergedAt: 1000, number: NUMBER, repository: REPOSITORY, userId: OWNER }),
-            ),
+            await harness.run(async (ctx: any) => await recordAllPages(ctx, { mergedAt: 1000, number: NUMBER, repository: REPOSITORY, userId: OWNER })),
         ).toHaveLength(0);
 
         // The owner turns the setting on before any later read of the merged pull request.
@@ -425,9 +446,7 @@ describe("archiveMergedThread", () => {
         });
 
         expect(
-            await harness.run(
-                async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { mergedAt: 1000, number: NUMBER, repository: REPOSITORY, userId: OWNER }),
-            ),
+            await harness.run(async (ctx: any) => await recordAllPages(ctx, { mergedAt: 1000, number: NUMBER, repository: REPOSITORY, userId: OWNER })),
         ).toHaveLength(0);
 
         const archived = await harness.run(async (ctx: any) => {
@@ -470,9 +489,7 @@ describe("archiveMergedThread", () => {
                     userId: OWNER,
                 }),
         );
-        const owed = await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { number: NUMBER, repository: REPOSITORY, userId: OWNER }),
-        );
+        const owed = await harness.run(async (ctx: any) => await recordAllPages(ctx, { number: NUMBER, repository: REPOSITORY, userId: OWNER }));
         const first = owed.find((row: { linkId: string }) => row.linkId !== second);
 
         expect(
@@ -587,9 +604,7 @@ describe("archiveMergedThread", () => {
         });
 
         // The second request merges after the opt-in and is recorded; the first merge predates the opt-in.
-        await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { mergedAt: 6000, number: 8, repository: REPOSITORY, userId: OWNER }),
-        );
+        await harness.run(async (ctx: any) => await recordAllPages(ctx, { mergedAt: 6000, number: 8, repository: REPOSITORY, userId: OWNER }));
 
         expect(
             await harness.run(
@@ -623,7 +638,7 @@ describe("archiveMergedThread", () => {
         );
 
         const owed = await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { mergedAt: 1000, number: NUMBER, repository: REPOSITORY, userId: OWNER }),
+            async (ctx: any) => await recordAllPages(ctx, { mergedAt: 1000, number: NUMBER, repository: REPOSITORY, userId: OWNER }),
         );
 
         expect(owed.map((row: { linkId: string }) => row.linkId)).toEqual([linkId]);
@@ -652,7 +667,7 @@ describe("archiveMergedThread", () => {
         );
 
         const owed = await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { mergedAt: 1000, number: NUMBER, repository: REPOSITORY, userId: OWNER }),
+            async (ctx: any) => await recordAllPages(ctx, { mergedAt: 1000, number: NUMBER, repository: REPOSITORY, userId: OWNER }),
         );
 
         expect(owed.map((row: { linkId: string }) => row.linkId)).toEqual([linkId]);
@@ -704,10 +719,10 @@ describe("archiveMergedThread", () => {
         );
 
         const owedFirst = await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { mergedAt: 1000, number: NUMBER, repository: REPOSITORY, userId: OWNER }),
+            async (ctx: any) => await recordAllPages(ctx, { mergedAt: 1000, number: NUMBER, repository: REPOSITORY, userId: OWNER }),
         );
         const owedSecond = await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { mergedAt: 1000, number: 8, repository: REPOSITORY, userId: OWNER }),
+            async (ctx: any) => await recordAllPages(ctx, { mergedAt: 1000, number: 8, repository: REPOSITORY, userId: OWNER }),
         );
 
         expect(owedSecond.map((row: { linkId: string }) => row.linkId)).toEqual([otherLink]);
@@ -787,8 +802,7 @@ describe("archiveMergedThread", () => {
             return row?.archivedAt;
         });
         const owedSecond = await harness.run(
-            async (ctx: any) =>
-                await ctx.runMutation(recordPullRequestMerged, { mergedAt: archivedAt + 1000, number: 8, repository: REPOSITORY, userId: OWNER }),
+            async (ctx: any) => await recordAllPages(ctx, { mergedAt: archivedAt + 1000, number: 8, repository: REPOSITORY, userId: OWNER }),
         );
 
         expect(owedSecond.map((row: { linkId: string }) => row.linkId)).toEqual([secondLink]);
@@ -985,7 +999,7 @@ describe("archiveMergedThread", () => {
         // does not cover it: the merge may have come after it.
         await harness.run(
             async (ctx: any) =>
-                await ctx.runMutation(recordPullRequestMerged, {
+                await recordAllPages(ctx, {
                     mergedAt: archivedAt - 500,
                     mergedBefore: archivedAt - 500,
                     mergedBeforeIsHostBound: false,
@@ -1042,16 +1056,12 @@ describe("archiveMergedThread", () => {
     it("keeps an attempt owed until it settles, so a failed archive is retried", async () => {
         const threadId = await setUp({ autoArchiveMergedChats: true });
 
-        const owed = await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { number: NUMBER, repository: REPOSITORY, userId: OWNER }),
-        );
+        const owed = await harness.run(async (ctx: any) => await recordAllPages(ctx, { number: NUMBER, repository: REPOSITORY, userId: OWNER }));
 
         expect(owed).toHaveLength(1);
 
         // The archive never ran (or failed), so nothing settled: the next read owes the same link again.
-        const again = await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { number: NUMBER, repository: REPOSITORY, userId: OWNER }),
-        );
+        const again = await harness.run(async (ctx: any) => await recordAllPages(ctx, { number: NUMBER, repository: REPOSITORY, userId: OWNER }));
 
         expect(again).toStrictEqual(owed);
         expect(await statusOf(threadId)).toBe("active");
@@ -1318,9 +1328,7 @@ describe("archiveMergedThread", () => {
 
         await seeMerge();
 
-        const owedAfter = await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { number: NUMBER, repository: REPOSITORY, userId: OWNER }),
-        );
+        const owedAfter = await harness.run(async (ctx: any) => await recordAllPages(ctx, { number: NUMBER, repository: REPOSITORY, userId: OWNER }));
 
         expect(owedAfter).toStrictEqual([]);
     });

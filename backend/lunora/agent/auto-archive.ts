@@ -370,7 +370,7 @@ const archiveOwedMergesOf = async (ctx: MutationCtx, userId: string, threadId: I
 
 /**
  * Archives a chat linked to a pull request that has just merged, when the owner turned on `autoArchiveMergedChats`.
- * Called by `source-control` for each link the merge owes (`recordPullRequestMerged`), so a chat the person reopens later
+ * Called by `source-control` for each link the merge owes (`recordMergedPullRequest`), so a chat the person reopens later
  * is not archived again. The same guards as the idle archive keep the thread, re-read here. The answer says what to do
  * with the owed link: `archived` and `declined` are final, and settle the link in this transaction; `busy` (a run, a
  * request waiting on the owner, or a live guest link) is not, so the next read tries again.

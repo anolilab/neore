@@ -35,6 +35,12 @@ export interface MergedPullRequestRef {
  */
 const MERGED_ARCHIVES_PER_READ = 25;
 
+/** Walks restarted from the first page per read, when a page's cursor is no longer read. Bounded, so a cursor that keeps failing ends the read. */
+const MAX_CURSOR_RESTARTS = 3;
+
+/** Whether a page call failed because its cursor is no longer read by the server. */
+const isInvalidCursor = (error: unknown): boolean => typeof error === "object" && error !== null && "code" in error && error.code === "INVALID_CURSOR";
+
 /**
  * Records a merge and archives the chats it owes an archive to. Every caller passes `mergedAt`: the host's merge time, or,
  * when the merge action's follow-up read cannot get it, the time before the merge was requested. `ctx.now` is only the
@@ -55,21 +61,38 @@ export const recordMergedPullRequest = async (
         // The links are recorded one bounded page per call. Every page is recorded before any archive attempt, so the attempts go to
         // the owed links least recently attempted across all of them: a busy link on an early page cannot take every attempt of
         // each read and starve the owed links after it. What is left stays owed (the next read or sweep takes it).
-        const owed: RecordedLink[] = [];
+        // A cursor the server no longer reads (`INVALID_CURSOR`: a write or a deploy between pages) restarts the walk from the first
+        // page, as the state sweep does. The owed links the walk sees again are the same ones, so each is kept once.
+        const owedById = new Map<string, RecordedLink>();
         let cursor: string | null = null;
+        let restarts = 0;
 
         for (;;) {
-            const page: RecordedPage = await ctx.runMutation(internal.source_control.pr_threads.recordPullRequestMergedPage, {
-                ...(mergedAt !== undefined && { mergedAt }),
-                ...(mergedBefore !== undefined && { mergedBefore }),
-                ...(mergedBeforeIsHostBound !== undefined && { mergedBeforeIsHostBound }),
-                cursor,
-                number: address.number,
-                repository: address.repository,
-                userId,
-            });
+            let page: RecordedPage;
 
-            owed.push(...page.owed);
+            try {
+                page = await ctx.runMutation(internal.source_control.pr_threads.recordPullRequestMergedPage, {
+                    ...(mergedAt !== undefined && { mergedAt }),
+                    ...(mergedBefore !== undefined && { mergedBefore }),
+                    ...(mergedBeforeIsHostBound !== undefined && { mergedBeforeIsHostBound }),
+                    cursor,
+                    number: address.number,
+                    repository: address.repository,
+                    userId,
+                });
+            } catch (error) {
+                if (cursor !== null && restarts < MAX_CURSOR_RESTARTS && isInvalidCursor(error)) {
+                    restarts += 1;
+                    cursor = null;
+                    continue;
+                }
+
+                throw error;
+            }
+
+            for (const link of page.owed) {
+                owedById.set(link.linkId, link);
+            }
 
             if (page.isDone) {
                 break;
@@ -78,7 +101,7 @@ export const recordMergedPullRequest = async (
             cursor = page.continueCursor;
         }
 
-        owed.sort((a, b) => a.lastAttemptAt - b.lastAttemptAt);
+        const owed = [...owedById.values()].toSorted((a, b) => a.lastAttemptAt - b.lastAttemptAt);
 
         for (const link of owed.slice(0, MERGED_ARCHIVES_PER_READ)) {
             await archiveOwedLink(ctx, link, address);
