@@ -78,6 +78,23 @@ const deferred = () => {
 
 const HIDE_NAME = /^Hide this side question/;
 
+/** The rectangle a selected hit reports in jsdom, which lays out nothing, with its top at `top`. */
+const rectAt = (top: number) => {
+    return {
+        bottom: top + 20,
+        height: 20,
+        left: 0,
+        right: 0,
+        toJSON: () => {
+            return {};
+        },
+        top,
+        width: 0,
+        x: 0,
+        y: top,
+    };
+};
+
 const ask = (question: string) => {
     fireEvent.change(screen.getByLabelText("Your side question"), { target: { value: question } });
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
@@ -254,7 +271,7 @@ describe("AsidePanel", () => {
         fireEvent.keyDown(input, { isComposing: true, key: "Enter" });
         expect(screen.getByText("1 of 2")).toBeTruthy();
 
-        // The same keystroke outside composition still steps, so the check above is not passing for want of a step.
+        // Shift+Enter still steps, so the no-step above is not just a dead handler.
         fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
         expect(screen.getByText("2 of 2")).toBeTruthy();
     });
@@ -398,6 +415,41 @@ describe("AsidePanel", () => {
                     }),
             );
             expect(scroll).not.toHaveBeenCalled();
+        } finally {
+            Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+            Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
+        }
+    });
+
+    it("brings the current hit into view when an image above it loads and pushes it out of sight", async () => {
+        let hitTop = 100;
+        const scroll = vi.fn();
+
+        useAsideStore.setState({ byThread: { "thread-1": [{ answer: "A cat.", id: "a", question: "Why?", status: "answered", token: "tok" }] } });
+        render(<AsidePanel threadId="thread-1" />);
+
+        // An image in the panel. Its load changes no node, only the layout above the hit.
+        const image = document.createElement("img");
+        const region = screen.getByRole("region", { name: "Side question" });
+
+        region.insertBefore(image, screen.getByRole("heading", { name: "Side question" }));
+
+        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
+        Object.defineProperty(Range.prototype, "getBoundingClientRect", { configurable: true, value: () => rectAt(hitTop) });
+
+        try {
+            act(() => {
+                globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+            });
+            fireEvent.change(screen.getByRole("textbox", { name: "Find in side questions" }), { target: { value: "cat" } });
+            await waitFor(() => expect(scroll).toHaveBeenCalled());
+            scroll.mockClear();
+
+            hitTop = 900;
+            act(() => {
+                image.dispatchEvent(new Event("load"));
+            });
+            await waitFor(() => expect(scroll).toHaveBeenCalled());
         } finally {
             Reflect.deleteProperty(Element.prototype, "scrollIntoView");
             Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");

@@ -150,7 +150,9 @@ const useAsideFindHighlights = (
         apply();
         scheduleReveal();
 
-        const observer = new MutationObserver(() => {
+        // A new answer can bring the current hit into existence, or push it along the panel (its text unchanged):
+        // either way that hit is revealed too.
+        const recheck = () => {
             cancelAnimationFrame(frame);
             frame = requestAnimationFrame(() => {
                 const before = applied;
@@ -158,18 +160,21 @@ const useAsideFindHighlights = (
 
                 apply();
 
-                // A new answer can bring the current hit into existence, or push it along the panel (its text unchanged):
-                // either way that hit is revealed too.
                 if (beforeOffset !== appliedOffset || !isSameHit(before, applied)) {
                     scheduleReveal();
                 }
             });
-        });
+        };
+
+        const observer = new MutationObserver(recheck);
 
         observer.observe(host, { characterData: true, childList: true, subtree: true });
+        // An image that loads changes the layout above a hit without touching the DOM. Load does not bubble, hence capture.
+        host.addEventListener("load", recheck, { capture: true });
 
         return () => {
             observer.disconnect();
+            host.removeEventListener("load", recheck, { capture: true });
             cancelAnimationFrame(frame);
             clearTimeout(revealTimer);
             clearHighlights(ASIDE_HIGHLIGHTS);
