@@ -930,7 +930,7 @@ describe("composer prompt queue", () => {
         expect(chat.sendMessage).not.toHaveBeenCalled();
     });
 
-    it("runs a send asked for while a call holds the flag once, when that call sent nothing", async () => {
+    it("busy send retry: a send requested during a busy send runs once, when the busy send sent nothing", async () => {
         chat.error = undefined;
 
         let finish: (value: { outcome: "withdrawn" }) => void = () => {};
@@ -964,7 +964,7 @@ describe("composer prompt queue", () => {
         expect(chat.sendMessage).toHaveBeenCalledWith("steered", [], { draftFrom: undefined });
     });
 
-    it("drops a send asked for while a call holds the flag when that call sends, so nothing goes twice", async () => {
+    it("busy send retry: a send requested during a busy send is dropped when the busy send sends, so nothing goes twice", async () => {
         chat.error = undefined;
 
         let finish: (value: { outcome: "withdrawn" }) => void = () => {};
