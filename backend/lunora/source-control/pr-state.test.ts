@@ -394,6 +394,61 @@ describe("dispatchLinkedPullRequestChecks owed merges", () => {
         expect(dispatched).toEqual([0]);
         expect(flag).toEqual([false]);
     });
+
+    it("scans a chat past one page of links across sweeps, saving its place, and keeps the chat flagged until the scan ends", async () => {
+        const { dispatched, flag, scan } = await harness.run(async (ctx: any) => {
+            await ctx.db.insert("userSettings", {
+                autoArchiveAfterDays: 30,
+                autoArchiveMergedChats: true,
+                autoArchiveMergedChatsSince: 0,
+                keepOpenPullRequestChats: true,
+                userId: OWNER,
+            });
+            const threadId = await ctx.db.insert("threads", {
+                mergeOwed: true,
+                mode: "text",
+                model: "gpt-4o",
+                status: "active",
+                title: "Huge",
+                updatedAt: Date.now(),
+                userId: OWNER,
+            });
+
+            for (let index = 0; index < 600; index += 1) {
+                await ctx.db.insert("pullRequestThreads", {
+                    ...NOW_LINK,
+                    kind: "linked",
+                    mergedAt: 1000,
+                    mergeSettledAt: 2000,
+                    number: 4000 + index,
+                    repository: "octo/other",
+                    state: "merged",
+                    threadId,
+                    userId: OWNER,
+                });
+            }
+
+            await ctx.db.insert("pullRequestThreads", {
+                ...NOW_LINK,
+                kind: "attached",
+                number: 2,
+                repository: "acme/app",
+                state: "open",
+                threadId,
+                userId: OWNER,
+            });
+            const result = await runInShard(OWNER, () => ctx.runMutation(dispatchLinkedPullRequestChecks, {}));
+            const thread = await ctx.db.get("threads", threadId);
+
+            return { dispatched: [result.dispatched], flag: [thread?.mergeOwed], scan: [thread?.mergeOwedScan] };
+        });
+
+        // One page of 500 is not the whole chat: the scan is saved, the chat stays flagged, and its open link is read this sweep.
+        expect(dispatched).toEqual([1]);
+        expect(flag).toEqual([true]);
+        expect(scan[0]).toBeTypeOf("string");
+        expect(scan[0]).not.toBe("");
+    });
 });
 
 describe("dispatchLinkedPullRequestChecks paging", () => {

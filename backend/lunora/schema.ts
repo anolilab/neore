@@ -3813,9 +3813,12 @@ export const schema = defineSchema({
         // Set while the thread has a passcode (locked). Content is refused
         // without a proof; `lib/thread-lock.ts`. The hash lives in `threadPasscodes`.
         lockedAt: v.optional(v.number()),
-        // Set while a merge owes this chat an archive (`source-control/pr-thread-links.ts#markThreadMergeOwed`), cleared once its owed
+        // Set while a merge owes this chat an archive (`source-control/pr-thread-links.ts#setThreadMergeOwed`), cleared once its owed
         // links settle. The sweep reads a chat's links for an owed merge only while this is set, so a chat with none is never read.
         mergeOwed: v.optional(v.boolean()),
+        // Where the sweep's scan for an owed merge stands in this chat's links, saved between sweeps for a chat too large to scan in
+        // one mutation. Empty: the scan starts from the first link. Any new owed merge empties it, so a scan cannot pass that link.
+        mergeOwedScan: v.optional(v.string()),
         messengerConnectionId: v.optional(v.id("messengerConnections")),
         mode: v.optional(v.string()),
         model: v.optional(v.string()),

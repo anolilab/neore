@@ -139,7 +139,10 @@ export const settleOwedMergesOf = async (ctx: Pick<MutationCtx, "db">, userId: s
     }
 };
 
-/** Flags a chat as owing a merge archive, or clears the flag. A chat that is gone is left alone. */
+/**
+ * Flags a chat as owing a merge archive, or clears the flag. Either change empties the chat's owed-merge scan (`mergeOwedScan`): a
+ * newly owed merge must be found by the next scan, and a cleared chat has nothing left to scan. A chat that is gone is left alone.
+ */
 export const setThreadMergeOwed = async (ctx: Pick<MutationCtx, "db">, threadId: Id<"threads">, owed: boolean): Promise<void> => {
     const thread = await ctx.db.get("threads", threadId);
 
@@ -147,11 +150,13 @@ export const setThreadMergeOwed = async (ctx: Pick<MutationCtx, "db">, threadId:
         return;
     }
 
+    const scanning = (thread.mergeOwedScan ?? "") !== "";
+
     // Written only on a change, so a settled chat with no flag costs no write.
-    if (owed && thread.mergeOwed !== true) {
-        await ctx.db.patch("threads", threadId, { mergeOwed: true });
-    } else if (!owed && thread.mergeOwed === true) {
-        await ctx.db.patch("threads", threadId, { mergeOwed: false });
+    if (owed && (thread.mergeOwed !== true || scanning)) {
+        await ctx.db.patch("threads", threadId, { mergeOwed: true, mergeOwedScan: "" });
+    } else if (!owed && (thread.mergeOwed === true || scanning)) {
+        await ctx.db.patch("threads", threadId, { mergeOwed: false, mergeOwedScan: "" });
     }
 };
 

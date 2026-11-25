@@ -25,7 +25,7 @@ import {
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { currentUserShard } from "../lib/shard-context";
 import { DEVELOP_DRIVER } from "./develop-driver";
-import { setThreadMergeOwed, someLinkOfThread } from "./pr-thread-links";
+import { setThreadMergeOwed } from "./pr-thread-links";
 import { readFromHost } from "./read-host";
 
 /** A link's state is re-read once it is this old. */
@@ -39,6 +39,8 @@ const SCAN_LIMIT = 500;
 const CHECK_LIMIT = 20;
 /** Thread lookups per sweep, as a multiple of `CHECK_LIMIT`: links on chats that are still active are skipped, within that bound. */
 const THREAD_LOOKUP_FACTOR = 4;
+/** Links one sweep reads of a chat when it looks for an owed merge. A larger chat is scanned across sweeps, one page each. */
+const OWED_SCAN_ROWS = 500;
 /** Auto-archive's idle rule alone. Its live-stream and pinned-project exclusions are left out, so a chat that is then kept still gets a read. */
 const NO_EXCLUSIONS = { liveThreadIds: new Set<string>(), pinnedProjectIds: new Set<string>() };
 
@@ -189,7 +191,7 @@ export const dispatchLinkedPullRequestChecks = internalMutation
                 const key = String(link.threadId);
                 const known = owesMerge.get(key);
 
-                mergeOwed = known ?? (await ownsMergeTo(ctx, userId, link.threadId));
+                mergeOwed = known ?? (await ownsMergeTo(ctx, userId, thread));
                 owesMerge.set(key, mergeOwed);
             }
 
@@ -219,19 +221,46 @@ export const dispatchLinkedPullRequestChecks = internalMutation
         return { dispatched: due.length + scheduled };
     });
 
-/**
- * Whether the chat owes a merge: one recorded for it and not yet settled. Every link is walked, a page at a time, until an owed one
- * is found. A chat that owes nothing is flagged clear here, so the sweep stops reading it: a flag left by an owed merge that
- * settled past the archive's bounded read clears on the first sweep that finds nothing owed.
- */
-const ownsMergeTo = async (ctx: MutationCtx, userId: string, threadId: Id<"threads">): Promise<boolean> => {
-    const owed = await someLinkOfThread(ctx, userId, threadId, (row) => row.mergedAt !== undefined && row.mergeSettledAt === undefined);
+/** One bounded page of the chat's links from `cursor`. A cursor the server no longer reads restarts the scan from the first link. */
+const owedScanPageAt = async (ctx: MutationCtx, userId: string, threadId: Id<"threads">, cursor: string | null) => {
+    const links = () => ctx.db.query("pullRequestThreads").withIndex("by_user_and_threadId", (q) => q.eq("userId", userId).eq("threadId", threadId));
 
-    if (!owed) {
-        await setThreadMergeOwed(ctx, threadId, false);
+    try {
+        return await links().paginate({ cursor, numItems: OWED_SCAN_ROWS });
+    } catch (error) {
+        if (cursor === null || !(error instanceof LunoraError) || error.code !== "INVALID_CURSOR") {
+            throw error;
+        }
+
+        return await links().paginate({ cursor: null, numItems: OWED_SCAN_ROWS });
+    }
+};
+
+/**
+ * Whether the chat owes a merge: one recorded for it and not yet settled. The chat's links are scanned one bounded page per sweep, and
+ * the scan resumes from its saved place on the next sweep, so a large chat never reads past one page in one mutation. A scan that
+ * reaches the end with nothing owed clears the flag, so the sweep stops reading the chat. Until then the chat counts as owing, and
+ * its links are read for a merge as before.
+ */
+const ownsMergeTo = async (ctx: MutationCtx, userId: string, thread: Doc<"threads">): Promise<boolean> => {
+    const page = await owedScanPageAt(ctx, userId, thread._id, thread.mergeOwedScan || null);
+
+    if (page.page.some((row) => row.mergedAt !== undefined && row.mergeSettledAt === undefined)) {
+        await setThreadMergeOwed(ctx, thread._id, true);
+
+        return true;
     }
 
-    return owed;
+    if (page.isDone) {
+        await setThreadMergeOwed(ctx, thread._id, false);
+
+        return false;
+    }
+
+    // Saved for the next sweep. A new owed merge empties it (`setThreadMergeOwed`), so the scan never passes a link it has not seen.
+    await ctx.db.patch("threads", thread._id, { mergeOwedScan: page.continueCursor ?? "" });
+
+    return true;
 };
 
 /**

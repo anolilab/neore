@@ -30648,6 +30648,12 @@
           "optional": true,
           "unique": false
         },
+        "mergeOwedScan": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "messengerConnectionId": {
           "kind": "id",
           "nullable": false,
