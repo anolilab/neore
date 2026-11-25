@@ -459,7 +459,7 @@ export const recordPullRequestMerged = internalMutation
 
                 // The host's merge time when the read had it, else now: the export shows when the merge happened, not when it was seen.
                 // The host said merged: the link's state says so too, so the open-pull-request rule (`pr-state.ts`) no longer keeps its chat.
-                await ctx.db.patch("pullRequestThreads", link._id, { mergedAt, state: "merged" });
+                await ctx.db.patch("pullRequestThreads", link._id, { mergedAt, mergedBefore, state: "merged" });
             } else {
                 // A link marked earlier keeps its merge time. A relink may have reset its state to open, but the host's merge still
                 // holds, so the state is restored before the link is skipped or judged.

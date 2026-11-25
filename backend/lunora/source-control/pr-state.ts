@@ -68,6 +68,11 @@ const candidateOf = (thread: {
  * (`stateCheckedAt` 0), so the next sweep reads the host again and the chat is kept until that answer comes.
  */
 export const rereadRelinkedLink = async (ctx: MutationCtx, link: Doc<"pullRequestThreads">): Promise<void> => {
+    // A recorded merge is final: a relink keeps it merged (the open state would block archiving for a merge already known).
+    if (link.mergedAt !== undefined) {
+        return;
+    }
+
     if (link.state === "closed" || link.state === "merged") {
         await ctx.db.patch("pullRequestThreads", link._id, { state: "open", stateCheckedAt: 0 });
     }

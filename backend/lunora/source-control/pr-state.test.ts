@@ -216,7 +216,7 @@ describe("dispatchLinkedPullRequestChecks owed merges", () => {
     });
 
     it("still retries an owed merge with keep-open off, while leaving open links unread", async () => {
-        const { dispatched } = await harness.run(async (ctx: any) => {
+        const { dispatched, mergedStateCheckedAt } = await harness.run(async (ctx: any) => {
             await ctx.db.insert("userSettings", {
                 autoArchiveAfterDays: 30,
                 autoArchiveMergedChats: true,
@@ -233,7 +233,7 @@ describe("dispatchLinkedPullRequestChecks owed merges", () => {
                 userId: OWNER,
             });
 
-            await ctx.db.insert("pullRequestThreads", {
+            const mergedLink = await ctx.db.insert("pullRequestThreads", {
                 ...NOW_LINK,
                 kind: "attached",
                 mergedAt: 1000,
@@ -243,6 +243,7 @@ describe("dispatchLinkedPullRequestChecks owed merges", () => {
                 threadId,
                 userId: OWNER,
             });
+
             await ctx.db.insert("pullRequestThreads", {
                 ...NOW_LINK,
                 kind: "attached",
@@ -253,12 +254,14 @@ describe("dispatchLinkedPullRequestChecks owed merges", () => {
                 userId: OWNER,
             });
             const result = await runInShard(OWNER, () => ctx.runMutation(dispatchLinkedPullRequestChecks, {}));
+            const row = await ctx.db.get("pullRequestThreads", mergedLink);
 
-            return { dispatched: [result.dispatched] };
+            return { dispatched: [result.dispatched], mergedStateCheckedAt: [row?.stateCheckedAt] };
         });
 
-        // Only the owed merge is read; the open link is not, since keep-open is off.
+        // Only the owed merge is read; the open link is not, since keep-open is off. The merged link itself was checked.
         expect(dispatched).toEqual([1]);
+        expect(mergedStateCheckedAt[0]).toBeTypeOf("number");
     });
 });
 

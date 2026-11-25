@@ -691,9 +691,15 @@ describe("archiveMergedThread", () => {
                 userId: OWNER,
             });
         });
+        // The second merge is after the archive written above: its time is taken from the stored archive time, not the wall clock.
+        const archivedAt = await harness.run(async (ctx: any) => {
+            const row = await ctx.db.get("threads", threadId);
+
+            return row?.archivedAt;
+        });
         const owedSecond = await harness.run(
             async (ctx: any) =>
-                await ctx.runMutation(recordPullRequestMerged, { mergedAt: Date.now() + 1000, number: 8, repository: REPOSITORY, userId: OWNER }),
+                await ctx.runMutation(recordPullRequestMerged, { mergedAt: archivedAt + 1000, number: 8, repository: REPOSITORY, userId: OWNER }),
         );
 
         expect(owedSecond.map((row: { linkId: string }) => row.linkId)).toEqual([secondLink]);
@@ -785,6 +791,15 @@ describe("archiveMergedThread", () => {
 
         expect(await harness.run(async (ctx: any) => await ctx.runMutation(archiveClosedLinkChat, { threadId }))).toBe(true);
         expect(await statusOf(threadId)).toBe("archived");
+
+        // The idle archive settled the owed merge itself.
+        const settled = await harness.run(async (ctx: any) => {
+            const row = await ctx.db.get("pullRequestThreads", linkId);
+
+            return row?.mergeSettledAt;
+        });
+
+        expect(settled).toBeTypeOf("number");
 
         // The owner reopens the chat; the merge that the idle archive already covered must not archive it again.
         await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { status: "active" }));

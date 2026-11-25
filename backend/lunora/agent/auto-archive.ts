@@ -211,6 +211,11 @@ export const archiveClosedLinkChat = internalMutation
             return false;
         }
 
+        // Only with merged-chat archiving on is there an owed merge to archive for: the scan is skipped otherwise.
+        if (settings?.autoArchiveMergedChats !== true || settings.autoArchiveMergedChatsSince === undefined) {
+            return false;
+        }
+
         // The merged archive logs its own event (`merged_pull_request`), so this one is not logged again as a closed request.
         return await archiveOwedMergesOf(ctx, thread.userId, args.threadId);
     });
@@ -263,7 +268,7 @@ const attemptMergedArchive = async (ctx: MutationCtx, args: MergedArchiveArgs): 
 
     // A merge that certainly predates the chat's last archive was covered by it: a reopened chat is not archived again for it. The
     // merge time is known only to the second, so a merge in the archive's second is not treated as covered.
-    if (thread.archivedAt !== undefined && link.mergedAt + MERGE_TIME_PRECISION_MS <= thread.archivedAt) {
+    if (thread.archivedAt !== undefined && (link.mergedBefore ?? link.mergedAt + MERGE_TIME_PRECISION_MS) <= thread.archivedAt) {
         return "link-declined";
     }
 

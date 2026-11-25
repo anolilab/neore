@@ -24489,6 +24489,12 @@
           "optional": true,
           "unique": false
         },
+        "mergedBefore": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "number": {
           "kind": "number",
           "nullable": false,

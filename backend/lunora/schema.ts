@@ -2614,6 +2614,8 @@ export const schema = defineSchema({
         mergeAttemptedAt: v.optional(v.number()),
         // Set once the pull request is seen merged (`source-control/pr-threads.ts#recordPullRequestMerged`). Written once: a merge is terminal.
         mergedAt: v.optional(v.number()),
+        // The exclusive upper bound of the merge's time, as the recorder was given it. Unset: the merge is bounded by `mergedAt` plus a second.
+        mergedBefore: v.optional(v.number()),
         // Set once this merge's archive attempt for the link finished: archived, or declined by a guard or the setting. Until then a read retries it.
         mergeSettledAt: v.optional(v.number()),
         number: v.number(),

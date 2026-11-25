@@ -156,7 +156,8 @@ export const mergePullRequest = authAction
             // opt-in inside the same second still archives). A pull request that had merged clearly before this request (a retry of an
             // old merge) keeps its historical time, so it is judged as it was. The upper bound is the end of the host's second.
             const historical = hostAt !== undefined && hostAt + MERGE_TIME_PRECISION_MS <= requestedAt ? hostAt : undefined;
-            const mergedAt = historical ?? Math.max(hostAt ?? 0, requestedAt);
+            // An unconfirmed answer is ordered by the host's second alone: the merge may have come before this request.
+            const mergedAt = outcome.status === "unconfirmed" ? hostAt : (historical ?? Math.max(hostAt ?? 0, requestedAt));
             // Without the host's time the merge may have come at any point from the request onward, so a link made after the request is
             // not counted as predating it. That leaves a link made in that window unarchived now; the next status read of the pull request
             // records the merge with the host's time and then counts it.
