@@ -161,6 +161,38 @@ describe("an unsupported poll's read allowance", () => {
     });
 });
 
+describe("an Events list's read allowance", () => {
+    it("is drawn once when the list is answered", async () => {
+        const charge = vi.fn(async () => undefined);
+        const request = modern("events/list", { _meta: OFFER });
+
+        await serveMcp(request.body, {
+            ...dependenciesWith(
+                request,
+                pollingWith(async () => pollBody),
+            ),
+            chargeProtocolCall: charge,
+        });
+
+        expect(charge).toHaveBeenCalledTimes(1);
+    });
+
+    it("is drawn once when the list is refused as unsupported", async () => {
+        const charge = vi.fn(async () => undefined);
+        const request = modern("events/list", {});
+
+        await serveMcp(request.body, {
+            ...dependenciesWith(
+                request,
+                pollingWith(async () => pollBody),
+            ),
+            chargeProtocolCall: charge,
+        });
+
+        expect(charge).toHaveBeenCalledTimes(1);
+    });
+});
+
 describe("events/poll", () => {
     it("starts from now with a null cursor and returns the complete result", async () => {
         const poll = pollingWith(async () => pollBody);

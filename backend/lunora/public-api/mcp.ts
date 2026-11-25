@@ -424,9 +424,9 @@ export const serveMcp = async (rawBody: string, dependencies: McpDependencies): 
         return era.refusal;
     }
 
-    // A tool call is charged by its route, and an `events/poll` by the router once its scope check passes: a poll the key may not
-    // make is refused without drawing on its read allowance.
-    if (message.method !== "tools/call" && message.method !== "events/poll") {
+    // A tool call is charged by its route. Each Events method is charged in its own branch below, exactly once, so none is charged
+    // here as well: an `events/poll` the key may not make draws nothing, and the others are charged where they are answered or refused.
+    if (message.method !== "tools/call" && !message.method.startsWith("events/")) {
         await dependencies.chargeProtocolCall();
     }
 
@@ -453,6 +453,8 @@ export const serveMcp = async (rawBody: string, dependencies: McpDependencies): 
         }
 
         if (method === "events/list") {
+            await dependencies.chargeProtocolCall();
+
             return respond({ events: describeEvents() });
         }
 
@@ -481,7 +483,9 @@ export const serveMcp = async (rawBody: string, dependencies: McpDependencies): 
             }
         }
 
-        // The rest of the extension (push, webhook) is a later part.
+        // The rest of the extension (push, webhook) is a later part. Refused here, so charged here.
+        await dependencies.chargeProtocolCall();
+
         return rpcError(id, METHOD_NOT_FOUND, `Method not found: ${method}`, { status: 404 });
     }
 
