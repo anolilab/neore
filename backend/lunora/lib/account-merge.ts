@@ -1438,25 +1438,30 @@ export const importShardRows = internalMutation
             const imported = await copyMergedMcpEvents(ctx, fresh, args.to);
 
             for (const row of fresh) {
-                const key = markerKey(args.from, args.table, row._id as string);
-
                 await ctx.db.insert("idempotencyClaims", {
                     claimedAt: now,
                     expiresAt: IMPORT_MARKER_EXPIRES_AT,
-                    key,
+                    key: markerKey(args.from, args.table, row._id as string),
                     scope: IMPORT_MARKER_SCOPE,
                     userId: args.to,
                 });
+            }
 
-                // The clear's own record, as the generic import writes it: the copy is on the new shard before the guest's row goes.
-                if (args.clearing === true && (await storedClaim(ctx.db, MERGE_CLEARED_SCOPE, key)) === null) {
-                    await ctx.db.insert("idempotencyClaims", {
-                        claimedAt: now,
-                        expiresAt: IMPORT_MARKER_EXPIRES_AT,
-                        key,
-                        scope: MERGE_CLEARED_SCOPE,
-                        userId: args.to,
-                    });
+            // The clear's own record for every row of its page, copied now or earlier, as the generic import writes it: the copy is on
+            // the new shard before the guest's row goes.
+            if (args.clearing === true) {
+                for (const row of guestRows) {
+                    const key = markerKey(args.from, args.table, row._id as string);
+
+                    if ((await storedClaim(ctx.db, MERGE_CLEARED_SCOPE, key)) === null) {
+                        await ctx.db.insert("idempotencyClaims", {
+                            claimedAt: now,
+                            expiresAt: IMPORT_MARKER_EXPIRES_AT,
+                            key,
+                            scope: MERGE_CLEARED_SCOPE,
+                            userId: args.to,
+                        });
+                    }
                 }
             }
 
