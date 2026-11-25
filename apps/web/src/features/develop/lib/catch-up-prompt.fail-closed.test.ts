@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -324,6 +324,38 @@ describe("catchUpPrompt's fetch and switch, run against a scratch origin", () =>
 
             expect(output.filter(Boolean).join("")).not.toContain(origin);
             expect(sh(work, headCheck(lease))).toStrictEqual({ output: "changed\n", status: 0 });
+        });
+    });
+
+    describe("step 8's signed-in check, for a head in the base repository", () => {
+        const signedIn = commandOf(catchUpPrompt({ ...PULL, headInBaseRepository: true, number: 42 }), "gh auth status ");
+
+        /** The check with only a stand-in `gh` that exits with `status` on the path, or no `gh` at all. */
+        const withGh = (name: string, status?: number): { output: string; status: number | null } => {
+            const bin = join(root, name);
+
+            mkdirSync(bin);
+
+            if (status !== undefined) {
+                writeFileSync(join(bin, "gh"), `#!/bin/sh\necho account-details\nexit ${String(status)}\n`);
+                chmodSync(join(bin, "gh"), 0o755);
+            }
+
+            const result = spawnSync("/bin/sh", ["-c", signedIn], { cwd: root, encoding: "utf8", env: { ...GIT_ENV, PATH: bin } });
+
+            return { output: result.stdout, status: result.status };
+        };
+
+        it("prints none when the CLI is missing", () => {
+            expect(withGh("gh-missing")).toStrictEqual({ output: "none\n", status: 0 });
+        });
+
+        it("prints none when the CLI is not signed in", () => {
+            expect(withGh("gh-signed-out", 1)).toStrictEqual({ output: "none\n", status: 0 });
+        });
+
+        it("prints only signed-in when the CLI is signed in", () => {
+            expect(withGh("gh-signed-in", 0)).toStrictEqual({ output: "signed-in\n", status: 0 });
         });
     });
 });

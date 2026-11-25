@@ -258,7 +258,7 @@ const CatchUpControl = ({
                 />
                 <TooltipContent side="bottom">
                     {sameRepo
-                        ? t`Puts a prompt in the composer to rebase this branch on ${base}, resolve conflicts, check the build and tests, and push. Nothing is sent.`
+                        ? t`Puts a prompt in the composer to rebase this branch on ${base}, resolve conflicts, and check the build and tests. It pushes only when a signed-in gh confirms the pull request is still open on that base. Nothing is sent.`
                         : t`Puts a prompt in the composer to rebase this fork's branch on ${base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent.`}
                 </TooltipContent>
             </Tooltip>

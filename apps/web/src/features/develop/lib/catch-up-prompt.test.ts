@@ -235,7 +235,7 @@ describe(catchUpPrompt, () => {
         expect(SAME_REPO).toContain(`in place of ${expected}`);
     });
 
-    it("for a head in the base repository, re-reads the pull request's head ref, and its state and base through a signed-in CLI, right before the push", () => {
+    it("for a head in the base repository, re-reads the pull request's head ref, and its state and base through a signed-in CLI, right before the push, and without one does not push", () => {
         const step = stepsOf(SAME_REPO).get(8) ?? "";
         const inBackticks = step.split("`").filter((_part: string, index: number) => index % 2 === 1);
         const headCheck = inBackticks.find((part: string) => part.startsWith("if git fetch --quiet origin +refs/pull/42/head:")) ?? "";
@@ -254,8 +254,15 @@ describe(catchUpPrompt, () => {
         );
         expect(order.every((index: number) => index > 0)).toBe(true);
         expect(order).toEqual(order.toSorted((left: number, right: number) => left - right));
-        // Without a signed-in CLI the run goes on, on the head check alone, and says what it could not check.
-        expect(step).toContain("If it prints `none`, say in one line that the pull request's state and base could not be re-checked");
+        // Fail closed: anything but `signed-in` (a missing CLI prints `none` too) stops before the push and sets the rebase aside.
+        const signedInAt = step.indexOf(`\`${signedIn}\``);
+        const noCli = step.slice(signedInAt, step.indexOf(`\`${view}\``));
+
+        expect(noCli).toContain("Unless it prints `signed-in`, do not push");
+        expect(noCli).toContain("set the rebase aside as step 7 says");
+        expect(noCli).toContain("do step 9, then stop");
+        expect(noCli).not.toContain("git push");
+        expect(step).not.toContain("go on");
         expect(FORK).not.toContain("gh ");
         expect(FORK).not.toContain("echo same");
     });
@@ -277,9 +284,9 @@ describe(catchUpPrompt, () => {
         expect(steps.get(7)).toContain("If it fails at any point, do not move feat/x in any other way: leave the rebase where it is");
         expect(steps.get(7)).toContain("start with pr-42-a1b2c3d4,");
         expect(commands.filter(({ command }: Command) => command.includes("git update-ref refs/heads/"))).toHaveLength(1);
-        // A failed re-fetch, a rewritten base, the base moving twice, a moved pull request head, a closed or retargeted pull
-        // request and a refused push all set the rebase aside the same way.
-        expect(steps.get(8)?.match(SET_ASIDE_AS_STEP_SEVEN)).toHaveLength(6);
+        // A failed re-fetch, a rewritten base, the base moving twice, a moved pull request head, no signed-in CLI, a closed or
+        // retargeted pull request and a refused push all set the rebase aside the same way.
+        expect(steps.get(8)?.match(SET_ASIDE_AS_STEP_SEVEN)).toHaveLength(7);
         expect(steps.get(6)).toContain("as step 7 says");
         expect(SAME_REPO).not.toContain("leave the rebased commits in place");
         expect(SAME_REPO).not.toMatch(FORCED_BRANCH_MOVE);
