@@ -722,11 +722,11 @@ export const generateExportFile = internalAction
         // the same in-flight-replay reason as `threadTags`.
         evals: v.optional(v.any()),
         files: v.any(),
-        // The owner's Events log: their run and approval events (`public-api/gdpr.ts`). Optional for the same reason.
-        mcpEvents: v.optional(v.any()),
         // How many grant-revision pages the workflow stored under `browserPrefix` (`agent/export-pages.ts`), every one of them,
         // read here. Optional for the same in-flight-replay reason as `threadTags`: absent is no page.
         grantRevisionPages: v.optional(v.number()),
+        // The owner's Events log: their run and approval events (`public-api/gdpr.ts`). Optional for the same reason.
+        mcpEvents: v.optional(v.any()),
         // Memories (superseded history included) and reflection digests
         // (`memory/gdpr.ts`). Optional for the same in-flight-replay reason as `threadTags`.
         memories: v.optional(v.any()),
