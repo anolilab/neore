@@ -73,7 +73,8 @@ interface PromptQueueStore {
     offlineHolds: Record<string, { explicit: boolean }>;
     queues: Record<string, ThreadQueue>;
     remove: (threadId: string, id: string) => void;
-    setPaused: (threadId: string, paused: boolean) => void;
+    /** `byError`: the pause is a reply's error (the only pause an explicit held send may lift); any other pause clears that mark. */
+    setPaused: (threadId: string, paused: boolean, byError?: boolean) => void;
     /** `steerRun` answered: keeps the steer (`accepted`) or makes it an ordinary queued message (`refused`). */
     settleSteer: (threadId: string, steerId: string, outcome: "accepted" | "refused") => void;
     /** Marks whether a send was made under a queued message's id whose answer may have been lost. */
@@ -218,7 +219,10 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
         offlineHolds: {},
         queues: {},
         remove: (threadId, id) => update(threadId, (queue) => removeQueuedPrompt(queue, id)),
-        setPaused: (threadId, paused) => update(threadId, (queue) => (queue.paused === paused ? queue : { ...queue, paused })),
+        setPaused: (threadId, paused, byError = false) => {
+            update(threadId, (queue) => (queue.paused === paused ? queue : { ...queue, paused }));
+            useQueueEditStore.getState().markErrorPause(threadId, paused && byError);
+        },
         setTried: (threadId, id, tried) =>
             update(threadId, (queue) => {
                 const target = queue.items.find((item) => item.id === id);

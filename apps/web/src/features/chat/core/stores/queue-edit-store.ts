@@ -19,14 +19,18 @@ export interface HeldSend {
 }
 
 interface QueueEditStore {
-    /** Drops every open edit, held send and failed-save mark: the session that had them has ended. */
+    /** Drops every open edit, held send, failed-save mark and error-pause mark: the session that had them has ended. */
     clear: () => void;
     editing: Record<string, QueueEdit | undefined>;
+    /** The thread's queue is paused by a reply's error (set through `setPaused`'s `byError`). */
+    errorPaused: Record<string, boolean | undefined>;
     /** A permission-mode save failed for the thread and paused its queue: an explicit held send must not resume that pause. */
     failedSave: Record<string, boolean | undefined>;
     held: Record<string, HeldSend | undefined>;
     /** Records that a send was refused for the open head edit. Repeated holds keep the explicit intent of any of them. */
     holdSend: (threadId: string, explicit: boolean) => void;
+    /** Marks (or clears) that the thread's queue is paused by a reply's error, the only pause an explicit held send may lift. */
+    markErrorPause: (threadId: string, on: boolean) => void;
     /** Marks (or clears) a failed permission-mode save for the thread. */
     markFailedSave: (threadId: string, failed: boolean) => void;
     /** Keeps the draft of the open edit of `id`. */
@@ -42,10 +46,16 @@ interface QueueEditStore {
 export const useQueueEditStore = create<QueueEditStore>()((set, get) => {
     return {
         editing: {},
+        errorPaused: {},
         failedSave: {},
         held: {},
         clear: () => {
-            set({ editing: {}, failedSave: {}, held: {} });
+            set({ editing: {}, errorPaused: {}, failedSave: {}, held: {} });
+        },
+        markErrorPause: (threadId, on) => {
+            set((state) => {
+                return { errorPaused: { ...state.errorPaused, [threadId]: on } };
+            });
         },
         markFailedSave: (threadId, failed) => {
             set((state) => {

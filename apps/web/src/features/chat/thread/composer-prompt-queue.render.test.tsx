@@ -1106,6 +1106,28 @@ describe("composer prompt queue", () => {
         await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("held through the error", [], { draftFrom: undefined }));
     });
 
+    it("an explicit held send does not lift a manual Stop's pause, even with a chat error set", async () => {
+        chat.error = new Error("the reply failed");
+
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        // A manual Stop pauses without the error's mark.
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        useQueueEditStore.getState().holdSend(chat.threadId, true);
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.paused).toBe(true);
+    });
+
     it("moves a dropped message to where it lands in the queue", async () => {
         const { enqueue, setPaused } = usePromptQueueStore.getState();
 

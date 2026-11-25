@@ -102,7 +102,8 @@ const takeReleasableHeldSend = (threadId: string, hasError: boolean): HeldSend |
     }
 
     if (paused) {
-        const liftable = held.explicit && hasError && store.failedSave[threadId] !== true;
+        // Only a reply's error pause lifts, and never a failed save's: a Stop, a rate limit or a refused send keeps the hold.
+        const liftable = held.explicit && hasError && store.errorPaused[threadId] === true && store.failedSave[threadId] !== true;
 
         if (!liftable) {
             return undefined;
@@ -770,7 +771,8 @@ const ComposerPromptQueue: FC = () => {
         });
 
         if (decision === "pause") {
-            setPaused(threadId, true);
+            // A reply that ended in an error: the one pause an explicit held send may lift (a Stop or a rate limit is not).
+            setPaused(threadId, true, true);
         } else if (decision === "send") {
             void sendNextPrompt(threadId);
         }
