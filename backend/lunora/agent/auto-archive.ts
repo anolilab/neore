@@ -316,6 +316,10 @@ const runMergedArchive = async (ctx: MutationCtx, args: MergedArchiveArgs): Prom
 
     const outcome = await attemptMergedArchive(ctx, args);
 
+    if (outcome === "archived") {
+        ctx.log.event("chat.auto_archive", { archived: 1, reason: "merged_pull_request" });
+    }
+
     if (outcome === "busy") {
         await noteMergeAttemptRow(ctx, args.linkId, ctx.now);
     } else {

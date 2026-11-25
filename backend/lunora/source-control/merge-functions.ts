@@ -14,6 +14,7 @@
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
+import type { ActionCtx } from "../_generated/server";
 
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { authAction, rateLimit } from "../lib/crpc";
@@ -92,6 +93,17 @@ export const rerunCheck = authAction
         return outcome;
     });
 
+/** Whether the owner's merged-chat archiving is on. A failed lookup answers true (the host's time is then read), and is logged. */
+const mergedArchiveOnOrUnknown = async (ctx: Pick<ActionCtx, "runQuery">, userId: string): Promise<boolean> => {
+    try {
+        return await ctx.runQuery(internal.source_control.pr_threads.mergedArchiveOn, { userId });
+    } catch (error) {
+        console.error("[source-control] could not read the merged-archive setting for a merge", error);
+
+        return true;
+    }
+};
+
 /** The host's merge time of a pull request that has merged, read once after the merge. Absent when the read fails. */
 const hostMergedAt = async (token: Parameters<typeof readFromHost>[1], ref: { number: number; repository: string }): Promise<number | undefined> => {
     try {
@@ -134,7 +146,8 @@ export const mergePullRequest = authAction
         const ref = { number: args.number, repository: args.repository };
         // The host's time is read only when it can change the outcome: an unconfirmed answer needs it to confirm the merge, and a
         // merge that can archive needs it to order against the opt-in. Otherwise the merge is recorded at the request time.
-        const archiveOn = outcome.status === "ok" ? await ctx.runQuery(internal.source_control.pr_threads.mergedArchiveOn, { userId: ctx.user.userId }) : false;
+        // A failed settings lookup must not fail a merge the host already made: it reads the host's time, the conservative path.
+        const archiveOn = outcome.status === "ok" ? await mergedArchiveOnOrUnknown(ctx, ctx.user.userId) : false;
         const hostAt = outcome.status === "unconfirmed" || (outcome.status === "ok" && archiveOn) ? await hostMergedAt(token, ref) : undefined;
 
         if (outcome.status === "ok" || (outcome.status === "unconfirmed" && hostAt !== undefined)) {
