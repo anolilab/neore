@@ -7,7 +7,7 @@ import { LunoraError } from "lunorash/server";
 import type { Doc } from "../../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import { encryptKey } from "../../lib/encryption";
-import { notifyQuietly } from "../../notifications/notify";
+import { notify } from "../../notifications/notify";
 import { setShardRoute } from "../../lib/shard-routes";
 import { DEVICE_LIMIT_CODE, MAX_DEVICES_PER_USER } from "./constants";
 import { generateDeviceSecret } from "./signing";
@@ -52,7 +52,8 @@ export const insertDevice = async (ctx: Pick<MutationCtx, "db" | "now">, device:
  * Writes the owner's alert for a device that was just paired, once. `alertPending` is set when the row is created and
  * cleared here, in the same transaction as the alert, so a repeat call or the housekeeping sweep finds nothing left to do.
  * The registration never calls this: the callers that do run after the secret is returned, so a failure to hand the alert
- * off cannot cost the caller the device. Goes through `notifyQuietly`.
+ * off cannot cost the caller the device. It uses `notify`, not `notifyQuietly`: a failed alert write must roll the cleared flag
+ * back with it, or nothing would ever retry the alert.
  */
 export const announceNewDevice = async (ctx: MutationCtx, device: Doc<"devices">): Promise<void> => {
     if (device.alertPending !== true) {
@@ -60,7 +61,7 @@ export const announceNewDevice = async (ctx: MutationCtx, device: Doc<"devices">
     }
 
     await ctx.db.patch("devices", device._id, { alertPending: false });
-    await notifyQuietly(ctx, {
+    await notify(ctx, {
         dedupeKey: `device-paired:${device._id as string}`,
         link: "/dashboard/settings/chat/devices",
         title: device.name,
