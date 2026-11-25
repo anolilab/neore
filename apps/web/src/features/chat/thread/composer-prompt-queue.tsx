@@ -566,7 +566,7 @@ const QueueChip: FC<{
                     )}
                     <Button
                         aria-describedby={blank ? blankHintId : undefined}
-                        className="h-6 px-2 text-xs"
+                        className="h-6 px-2 text-xs pointer-coarse:min-h-11"
                         disabled={blank}
                         onClick={saveEdit}
                         size="sm"
@@ -575,7 +575,7 @@ const QueueChip: FC<{
                         {t`Save`}
                     </Button>
                     <Button
-                        className="h-6 px-2 text-xs"
+                        className="h-6 px-2 text-xs pointer-coarse:min-h-11"
                         onClick={() => {
                             onEditStop(prompt.id);
                         }}
@@ -590,7 +590,7 @@ const QueueChip: FC<{
                 <>
                     <button
                         aria-label={t`Edit queued message ${position}`}
-                        className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground flex size-6 items-center justify-center rounded-full disabled:opacity-40"
+                        className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground flex size-6 items-center justify-center rounded-full disabled:opacity-40 pointer-coarse:size-11"
                         data-edit=""
                         disabled={fixed || editLocked}
                         onClick={startEdit}
@@ -600,7 +600,7 @@ const QueueChip: FC<{
                     </button>
                     <button
                         aria-label={t`Move queued message ${position} up`}
-                        className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground flex size-6 items-center justify-center rounded-full disabled:opacity-40"
+                        className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground flex size-6 items-center justify-center rounded-full disabled:opacity-40 pointer-coarse:size-11"
                         data-move-up=""
                         disabled={fixed || position === 1 || blockedUp}
                         onClick={() => onMove(prompt.id, -1)}
@@ -610,7 +610,7 @@ const QueueChip: FC<{
                     </button>
                     <button
                         aria-label={t`Move queued message ${position} down`}
-                        className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground flex size-6 items-center justify-center rounded-full disabled:opacity-40"
+                        className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground flex size-6 items-center justify-center rounded-full disabled:opacity-40 pointer-coarse:size-11"
                         data-move-down=""
                         disabled={fixed || position === count || blockedDown}
                         onClick={() => onMove(prompt.id, 1)}
@@ -620,7 +620,7 @@ const QueueChip: FC<{
                     </button>
                     <button
                         aria-label={t`Remove queued message ${position}`}
-                        className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground rounded-full p-0.5"
+                        className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground rounded-full p-0.5 pointer-coarse:size-11"
                         disabled={pending}
                         onClick={() => onRemove(prompt.id)}
                         type="button"
@@ -641,9 +641,10 @@ const ComposerPromptQueue: FC = () => {
     const queue = usePromptQueueStore(selectThreadQueue(threadId));
     const edit = useQueueEditStore(selectThreadEdit(threadId));
     // The head's text is open in its chip: the queue holds its send until the edit closes (see `headIsBeingEdited`).
-    const headEditing = edit !== undefined && queue.items[0]?.id === edit.id;
+    const editOpen = edit !== undefined;
+    const headEditing = editOpen && queue.items[0]?.id === edit.id;
     // Kept with its thread: a switch of chats must not read the previous thread's edit as this one's close.
-    const wasHeadEditing = useRef<{ editing: boolean; threadId: string | undefined }>({ editing: headEditing, threadId });
+    const wasHeadEditing = useRef<{ editing: boolean; threadId: string | undefined }>({ editing: edit !== undefined, threadId });
     const { removePrompt, sendNextPrompt } = useQueueActions();
     const modeSaving = usePermissionModeSaving(threadId);
     const wasModeSaving = useRef(modeSaving);
@@ -775,9 +776,10 @@ const ComposerPromptQueue: FC = () => {
     // is retried: an edit that closes with nothing held changes nothing, and the queue's other rules still apply to the send.
     useEffect(() => {
         const previous = wasHeadEditing.current;
-        const closed = previous.threadId === threadId && previous.editing && !headEditing;
+        // Closed is the edit record ending, not the edited message leaving the head: a chip moved ahead of it does not close it.
+        const closed = previous.threadId === threadId && previous.editing && !editOpen;
 
-        wasHeadEditing.current = { editing: headEditing, threadId };
+        wasHeadEditing.current = { editing: editOpen, threadId };
 
         // While a reply streams, the held send waits for that reply's end (the effect below takes it there).
         if (!closed || !threadId || isStreaming) {
@@ -786,10 +788,19 @@ const ComposerPromptQueue: FC = () => {
 
         const held = useQueueEditStore.getState().takeHeldSend(threadId);
 
-        if (held && !queue.paused && queue.items.length > 0) {
-            void sendNextPrompt(threadId, { explicit: held.explicit });
+        if (!held || queue.items.length === 0) {
+            return;
         }
-    }, [headEditing, isStreaming, queue.items.length, queue.paused, sendNextPrompt, threadId]);
+
+        // An explicit send (Send next) goes even after an error, resuming the queue as its own button does.
+        if (held.explicit) {
+            usePromptQueueStore.getState().setPaused(threadId, false);
+        } else if (queue.paused) {
+            return;
+        }
+
+        void sendNextPrompt(threadId, { explicit: held.explicit });
+    }, [editOpen, isStreaming, queue.items.length, queue.paused, sendNextPrompt, threadId]);
 
     // A send held while the edit closed during a reply goes when that reply ends. An explicit one (Send next) goes even after
     // an error, resuming the queue as its own button does; an automatic one waits for the usual rules.
@@ -1030,7 +1041,7 @@ const ComposerPromptQueue: FC = () => {
 
     // "Send next" is disabled while the head's text is open: say why, and that the send follows the edit. A paused queue
     // sends nothing on a close, so it makes no such promise.
-    if (headEditing && !queue.paused) {
+    if (headEditing && !queue.paused && !isStreaming) {
         statusText = t`${count} queued — sends when the edit closes`;
     }
 

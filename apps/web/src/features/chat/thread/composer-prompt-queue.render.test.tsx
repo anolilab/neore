@@ -1012,6 +1012,30 @@ describe("composer prompt queue", () => {
         await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("held for two", [], { draftFrom: undefined }));
     });
 
+    it("moving another message ahead of an open head edit does not release the edit's held send", async () => {
+        chat.error = undefined;
+
+        const { enqueue } = usePromptQueueStore.getState();
+
+        // Queued before the chip mounts: idle and unpaused, nothing has arrived since the mount.
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        enqueue(chat.threadId, { attachments: [], text: "two" });
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        useQueueEditStore.getState().holdSend(chat.threadId, false);
+
+        // "two" moves ahead of the edited head: the head changes, but the edit is still open.
+        fireEvent.click(screen.getByLabelText("Move queued message 2 up"));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+        expect(screen.getByLabelText("Edit queued message 2")).toBeTruthy();
+    });
+
     it("moves a dropped message to where it lands in the queue", async () => {
         const { enqueue, setPaused } = usePromptQueueStore.getState();
 
