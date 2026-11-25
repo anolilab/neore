@@ -12,14 +12,17 @@
  * resumes from each shard's cursor, so it is retried after a pause. `failed`, or output that cannot be read, stops the
  * job at once.
  *
- * First it fills `user.emailCanonical` through D1 (`POST /admin/backfill-email-canonical`, one batch per call, until it is
- * done): `user` is a `.global()` table, which `lunora migrate up` does not reach. The backfill and the shard migrations are
+ * First it fills `user.emailCanonical` through D1 (`POST /admin/backfill-email-canonical`): a check of every account, page
+ * by page, that no address is shared by two, then the fill, one batch per call, then a check again until it is done. The
+ * cursors and the check's digests travel only in the request and response bodies, never in the log. `user` is a
+ * `.global()` table, which `lunora migrate up` does not reach. The backfill and the shard migrations are
  * independent, so each runs whether or not the other fails; the job fails if either does. A migration declared on a
  * `.global()` table fails the step before anything runs.
  *
  * Run: pnpm exec tsx scripts/run-data-migrations.ts
  */
 import { spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -53,9 +56,10 @@ try {
 }
 
 const backfilled = await runEmailCanonicalBackfill({
-    call: async () => {
+    call: async (request) => {
         const response = await fetch(new URL("/admin/backfill-email-canonical", backendUrl), {
-            headers: { authorization: `Bearer ${process.env.LUNORA_ADMIN_TOKEN ?? ""}` },
+            body: JSON.stringify(request),
+            headers: { authorization: `Bearer ${process.env.LUNORA_ADMIN_TOKEN ?? ""}`, "content-type": "application/json" },
             method: "POST",
             signal: AbortSignal.timeout(BACKFILL_CALL_TIMEOUT_MS),
         });
@@ -69,6 +73,7 @@ const backfilled = await runEmailCanonicalBackfill({
     },
     error: console.error,
     log: console.log,
+    salt: () => randomBytes(16).toString("hex"),
     sleep,
 });
 

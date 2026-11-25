@@ -9,9 +9,12 @@ import { describe, expect, it } from "vitest";
 
 import ts from "typescript";
 
-import type { BackfillCall, CliRun } from "../scripts/data-migrations";
+import type { BackfillCall, BackfillRequest, CliRun } from "../scripts/data-migrations";
 import {
     declaredMigrationIds,
+    EMAIL_CANONICAL_ROUND_PAUSE_MS,
+    EMAIL_CANONICAL_ROUNDS,
+    EMAIL_CANONICAL_STALLS,
     formatMigrationRun,
     globalTablesOf,
     MIGRATION_ATTEMPTS,
@@ -29,6 +32,8 @@ const smokeAt = workflow.indexOf('- name: "Smoke test the deployment"');
 const start = workflow.indexOf(`- name: "Run the backend's data migrations"`);
 const step = workflow.slice(start);
 const runner = readFileSync(join(REPO_ROOT, "scripts/run-data-migrations.ts"), "utf8");
+/** The refusal of a definition whose `id` or `table` the runner cannot read. */
+const UNREADABLE_DEFINITION = /needs a (`table`|literal string `id`)/u;
 const baseline = readFileSync(join(REPO_ROOT, SCHEMA_BASELINE), "utf8");
 
 /** The tables `schema.ts` declares with `.global()` in their `defineTable` chain, read from the source. */
@@ -108,8 +113,8 @@ describe("the post-deploy data migrations", () => {
     it("read every literal id, wherever it sits in the declaration, and refuse one that is not literal", () => {
         const source = [
             'export const a = defineMigration({ table: "t", options: { batch: { size: 10 } }, id: "after-nested" });',
-            "export const b = defineMigration({ id: 'single-quoted', up: () => ({}) });",
-            "export const c = defineMigration({ up: () => { return {}; }, id: `template-literal` });",
+            "export const b = defineMigration({ id: 'single-quoted', table: 't', up: () => ({}) });",
+            'export const c = defineMigration({ up: () => { return {}; }, id: `template-literal`, table: "t" });',
         ].join("\n");
 
         expect(declaredMigrationIds(source)).toStrictEqual(["after-nested", "single-quoted", "template-literal"]);
@@ -139,6 +144,32 @@ describe("the post-deploy data migrations", () => {
         expect(() => declaredMigrationIds(source, new Set(["user"]))).toThrow(
             `${MIGRATIONS_MODULE}:2: migration "fill-user" targets the .global() table "user"`,
         );
+    });
+
+    it("refuse a .global() table passed through a constant, and any table the runner cannot read", () => {
+        const global = new Set(["user"]);
+        const declare = (definition: string, prelude = ""): string => `${prelude}\nexport const m = defineMigration(${definition});`;
+
+        expect(() => declaredMigrationIds(declare('{ id: "fill", table: USER }', 'const USER = "user";'), global)).toThrow(
+            'migration "fill" targets the .global() table "user"',
+        );
+        expect(() => declaredMigrationIds(declare('{ id: "fill", table }', 'const table = "user" as const;'), global)).toThrow(
+            'targets the .global() table "user"',
+        );
+        expect(declaredMigrationIds(declare('{ id: "fine", table: MESSAGES }', 'const MESSAGES = "messages";'), global)).toStrictEqual(["fine"]);
+
+        for (const [definition, prelude] of [
+            ['{ id: "fill", table: TABLES.user }', 'const TABLES = { user: "user" };'],
+            ['{ id: "fill", table: pick() }', ""],
+            ['{ id: "fill", table: "us" + "er" }', ""],
+            ['{ id: "fill", table: "messages", ...override }', 'const override = { table: "user" };'],
+            ['{ id: "fill", ["table"]: name }', 'let name = "user";'],
+            ['{ id: "fill", table }', 'let table = "user";'],
+            ['{ id: "fill" }', ""],
+            ["definition", 'const definition = { id: "fill", table: "user" };'],
+        ]) {
+            expect(() => declaredMigrationIds(declare(definition!, prelude), global), definition).toThrow(UNREADABLE_DEFINITION);
+        }
     });
 
     it("are all declared in the one module the runner reads", () => {
@@ -316,16 +347,16 @@ describe("the data migration runner", () => {
     });
 });
 
-/** Runs the backfill loop against `answers` in turn, recording calls, pauses and printed lines. */
+/** Runs the backfill loop against `answers` in turn, recording requests, pauses and printed lines. */
 const backfillWith = async (answers: (BackfillCall | Error)[], maxCalls?: number) => {
     const pauses: number[] = [];
     const printed: string[] = [];
-    let calls = 0;
+    const requests: BackfillRequest[] = [];
     const exitCode = await runEmailCanonicalBackfill({
-        call: async () => {
-            calls += 1;
+        call: async (request) => {
+            requests.push(request);
 
-            const answer = answers.shift() ?? { body: { conflicts: 0, filled: 0, remaining: 0, status: "done" }, status: 200 };
+            const answer = answers.shift() ?? { body: { status: "done" }, status: 200 };
 
             if (answer instanceof Error) {
                 throw answer;
@@ -340,71 +371,136 @@ const backfillWith = async (answers: (BackfillCall | Error)[], maxCalls?: number
             printed.push(line);
         },
         maxCalls,
+        salt: () => "run-salt",
         sleep: async (ms) => {
             pauses.push(ms);
         },
     });
 
-    return { calls, exitCode, output: printed.join("\n"), pauses };
+    return { calls: requests.length, exitCode, output: printed.join("\n"), pauses, requests };
 };
 
-const progress = (filled: number, remaining: number): BackfillCall => {
-    return { body: { conflicts: 0, filled, remaining, status: "progress" }, status: 200 };
+const checking = (cursor: string, digests: string[], checkedAt = 100): BackfillCall => {
+    return { body: { checkedAt, cursor, digests, scanned: digests.length, status: "checking", unfilled: digests.length }, status: 200 };
 };
+
+const checked = (digests: string[], checkedAt = 100): BackfillCall => {
+    return { body: { checkedAt, digests, scanned: digests.length, status: "checked", unfilled: digests.length }, status: 200 };
+};
+
+const progress = (filled: number, cursor?: string, skipped = 0): BackfillCall => {
+    return { body: { conflicts: 0, filled, skipped, status: "progress", ...(cursor !== undefined && { cursor }) }, status: 200 };
+};
+
+const filledAll = (filled: number, skipped = 0): BackfillCall => {
+    return { body: { conflicts: 0, filled, skipped, status: "filled" }, status: 200 };
+};
+
+const done: BackfillCall = { body: { status: "done" }, status: 200 };
 
 describe("the user.emailCanonical backfill in the deploy", () => {
     it("runs in the post-deploy step, through D1, before the shard migrations, and both decide the exit code", () => {
         expect(runner).toContain('"/admin/backfill-email-canonical"');
         expect(runner).toContain("signal: AbortSignal.timeout(");
+        expect(runner).toContain("body: JSON.stringify(request)");
         expect(runner.indexOf("runEmailCanonicalBackfill(")).toBeLessThan(runner.indexOf("runDataMigrations(ids"));
         expect(runner).toContain("process.exitCode = backfilled === 0 && migrated === 0 ? 0 : 1;");
         expect(runner).toContain("authorization: `Bearer ${process.env.LUNORA_ADMIN_TOKEN");
     });
 
-    it("calls until done and prints counts only", async () => {
-        const { calls, exitCode, output } = await backfillWith([
-            progress(8, 9),
-            progress(8, 1),
-            { body: { conflicts: 0, filled: 1, remaining: 0, status: "done" }, status: 200 },
+    it("checks every page, then fills from cursor to cursor, then checks again, and prints counts only", async () => {
+        const { calls, exitCode, output, requests } = await backfillWith([
+            checking("c1", ["d1", "d2"], 100),
+            checked(["d3"], 900),
+            progress(8, "f1"),
+            filledAll(1),
+            done,
         ]);
 
-        expect(calls).toBe(3);
+        expect(calls).toBe(5);
         expect(exitCode).toBe(0);
-        expect(output).toBe("backfill-email-canonical: done, filled 17 over 3 call(s)");
+        expect(requests).toStrictEqual([
+            { phase: "check", salt: "run-salt" },
+            { cursor: "c1", phase: "check", salt: "run-salt" },
+            { checkedAt: 100, phase: "fill" },
+            { checkedAt: 100, cursor: "f1", phase: "fill" },
+            { phase: "check", salt: "run-salt" },
+        ]);
+        expect(output).toBe(
+            ["backfill-email-canonical: checked 3 account(s), no address shared", "backfill-email-canonical: done, filled 9 over 5 call(s)"].join("\n"),
+        );
+    });
+
+    it("refuses an address two check pages share before any fill, and prints no digest", async () => {
+        const { exitCode, output, requests } = await backfillWith([checking("c1", ["same", "d2"]), checked(["same"])]);
+
+        expect(exitCode).toBe(1);
+        expect(requests.every((request) => request.phase === "check")).toBe(true);
+        expect(output).toContain("::error::backfill-email-canonical: 1 address(es) belong to more than one account");
+        expect(output).not.toContain("same");
     });
 
     it("waits out a 429, then goes on", async () => {
-        const { calls, exitCode, pauses } = await backfillWith([{ body: undefined, retryAfterSeconds: 42, status: 429 }, progress(2, 0)]);
+        const { calls, exitCode, pauses } = await backfillWith([{ body: undefined, retryAfterSeconds: 42, status: 429 }, done]);
 
         expect(pauses).toStrictEqual([42_000]);
-        expect(calls).toBe(3);
+        expect(calls).toBe(2);
         expect(exitCode).toBe(0);
     });
 
     it("fails on a conflict, naming the count and what to do", async () => {
-        const { calls, exitCode, output } = await backfillWith([
-            progress(8, 3),
-            { body: { conflicts: 2, filled: 0, remaining: 3, status: "conflict" }, status: 409 },
+        const { exitCode, output } = await backfillWith([
+            checked(["d1"]),
+            progress(8, "f1"),
+            { body: { conflicts: 2, filled: 0, skipped: 0, status: "conflict" }, status: 409 },
         ]);
 
-        expect(calls).toBe(2);
         expect(exitCode).toBe(1);
         expect(output).toContain("::error::backfill-email-canonical: 2 address(es) belong to more than one account");
-        expect(output).toContain("filled 8 over 2 call(s)");
+        expect(output).toContain("filled 8 over 3 call(s)");
     });
 
-    it("fails on a call that makes no progress, on any other status, on a request error, and after its call cap", async () => {
-        const stuck = await backfillWith([progress(0, 4)]);
+    it("retries a fill answer that moved nothing, and goes on once one does", async () => {
+        const { exitCode, output } = await backfillWith([checked(["d1"]), progress(0), progress(0), progress(3, "f1"), progress(0, "f1"), filledAll(1), done]);
+
+        expect(exitCode).toBe(0);
+        expect(output).toContain("done, filled 4 over 7 call(s)");
+    });
+
+    it(`fails after ${String(EMAIL_CANONICAL_STALLS)} answers in a row that move nothing`, async () => {
+        const stuck = await backfillWith([checked(["d1"]), progress(0, "f1"), progress(0, "f1"), progress(0, "f1"), progress(0, "f1")]);
+        const stuckCheck = await backfillWith([checking("c1", []), checking("c1", []), checking("c1", []), checking("c1", [])]);
+
+        expect(stuck.exitCode).toBe(1);
+        expect(stuck.output).toContain(`made no progress over ${String(EMAIL_CANONICAL_STALLS)} call(s)`);
+        expect(stuck.calls).toBe(1 + 1 + EMAIL_CANONICAL_STALLS);
+        expect(stuckCheck.output).toContain("made no progress");
+    });
+
+    it("checks again after a fill that left changed rows behind, pausing past the settle window, and gives up after its rounds", async () => {
+        const again = await backfillWith([checked(["d1", "d2"]), filledAll(1, 1), checked(["d2"], 500), filledAll(1), done]);
+
+        expect(again.exitCode).toBe(0);
+        expect(again.pauses).toStrictEqual([EMAIL_CANONICAL_ROUND_PAUSE_MS]);
+        expect(again.requests[3]).toStrictEqual({ checkedAt: 500, phase: "fill" });
+
+        const rounds = Array.from({ length: EMAIL_CANONICAL_ROUNDS + 1 }, () => [checked(["d1"]), filledAll(0, 1)]).flat();
+        const restless = await backfillWith(rounds);
+
+        expect(restless.exitCode).toBe(1);
+        expect(restless.output).toContain(`accounts still unfilled after ${String(EMAIL_CANONICAL_ROUNDS)} rounds`);
+    });
+
+    it("fails on any other status, on a request error, and after its call cap", async () => {
         const refused = await backfillWith([{ body: { error: "Unauthorized" }, status: 401 }]);
         const unreachable = await backfillWith([new TypeError("fetch failed https://backend.example.invalid")]);
 
-        expect(stuck.output).toContain("made no progress");
         expect(refused.output).toContain("answered HTTP 401");
         expect(unreachable.output).toBe("::error::backfill-email-canonical: the request failed (TypeError) (filled 0 over 1 call(s))");
 
-        const capped = await backfillWith([progress(1, 5), progress(1, 4), progress(1, 3)], 2);
+        const capped = await backfillWith([checked(["d1"]), progress(1, "a"), progress(1, "b"), progress(1, "c")], 3);
 
         expect(capped.exitCode).toBe(1);
-        expect(capped.output).toContain("not done after 2 calls");
+        expect(capped.output).toContain("not done after 3 calls");
     });
 });

@@ -21,37 +21,114 @@ const MIGRATION_PAUSE_MS = 15_000;
 const literalText = (node: ts.Node | undefined): string | undefined =>
     node !== undefined && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) ? node.text : undefined;
 
-/** The literal string value of the `name` property of `call`'s first argument. */
-const definitionProperty = (call: ts.CallExpression, name: string): string | undefined => {
-    const [definition] = call.arguments;
-    const property =
-        definition !== undefined && ts.isObjectLiteralExpression(definition)
-            ? definition.properties.find(
-                  (member) => member.name !== undefined && (ts.isIdentifier(member.name) || ts.isStringLiteral(member.name)) && member.name.text === name,
-              )
-            : undefined;
+/** `node` without the `as`, `satisfies` and parentheses around it. */
+const unwrapped = (node: ts.Expression): ts.Expression =>
+    ts.isAsExpression(node) || ts.isSatisfiesExpression(node) || ts.isParenthesizedExpression(node) ? unwrapped(node.expression) : node;
 
-    return property !== undefined && ts.isPropertyAssignment(property) ? literalText(property.initializer) : undefined;
+/** The module's top-level `const NAME = "literal"` declarations, which a `table` may name. */
+const constStrings = (file: ts.SourceFile): Map<string, string> => {
+    const found = new Map<string, string>();
+
+    for (const statement of file.statements) {
+        if (ts.isVariableStatement(statement) && (statement.declarationList.flags & ts.NodeFlags.Const) !== 0) {
+            for (const declaration of statement.declarationList.declarations) {
+                const value = declaration.initializer === undefined ? undefined : literalText(unwrapped(declaration.initializer));
+
+                if (ts.isIdentifier(declaration.name) && value !== undefined) {
+                    found.set(declaration.name.text, value);
+                }
+            }
+        }
+    }
+
+    return found;
 };
 
-const migrationId = (call: ts.CallExpression, file: ts.SourceFile, globalTables: ReadonlySet<string>): string => {
-    const id = definitionProperty(call, "id");
+/** A literal string, or a top-level string constant named by `node`. */
+const resolvedText = (node: ts.Expression, constants: ReadonlyMap<string, string>): string | undefined => {
+    const bare = unwrapped(node);
+
+    return literalText(bare) ?? (ts.isIdentifier(bare) ? constants.get(bare.text) : undefined);
+};
+
+/** What a definition says about one property: not there, a string the runner can read, or something it cannot. */
+type PropertyValue = { kind: "absent" } | { kind: "string"; value: string } | { kind: "unresolved" };
+
+const UNRESOLVED: PropertyValue = { kind: "unresolved" };
+
+/**
+ * The value of the `name` property of `call`'s first argument. `literalOnly` refuses a constant. A spread, a computed key
+ * the runner cannot read, or a definition that is not an object literal could hide the property: unresolved.
+ */
+const definitionProperty = (call: ts.CallExpression, name: string, constants: ReadonlyMap<string, string>, literalOnly: boolean): PropertyValue => {
+    const [definition] = call.arguments;
+    const read = (node: ts.Expression): PropertyValue => {
+        const value = literalOnly ? literalText(node) : resolvedText(node, constants);
+
+        return value === undefined ? UNRESOLVED : { kind: "string", value };
+    };
+
+    if (definition === undefined || !ts.isObjectLiteralExpression(unwrapped(definition))) {
+        return UNRESOLVED;
+    }
+
+    let found: PropertyValue = { kind: "absent" };
+
+    for (const member of (unwrapped(definition) as ts.ObjectLiteralExpression).properties) {
+        if (ts.isSpreadAssignment(member)) {
+            return UNRESOLVED;
+        }
+
+        const key =
+            member.name === undefined
+                ? undefined
+                : ts.isComputedPropertyName(member.name)
+                  ? resolvedText(member.name.expression, constants)
+                  : ts.isIdentifier(member.name) || ts.isStringLiteral(member.name) || ts.isNoSubstitutionTemplateLiteral(member.name)
+                    ? member.name.text
+                    : undefined;
+
+        if (key === undefined) {
+            return UNRESOLVED;
+        }
+
+        if (key === name) {
+            found = ts.isPropertyAssignment(member)
+                ? read(member.initializer)
+                : ts.isShorthandPropertyAssignment(member) && !literalOnly && constants.has(key)
+                  ? { kind: "string", value: constants.get(key) ?? "" }
+                  : UNRESOLVED;
+        }
+    }
+
+    return found;
+};
+
+const migrationId = (call: ts.CallExpression, file: ts.SourceFile, globalTables: ReadonlySet<string>, constants: ReadonlyMap<string, string>): string => {
+    const id = definitionProperty(call, "id", constants, true);
     const { line } = file.getLineAndCharacterOfPosition(call.getStart(file));
     const at = `${MIGRATIONS_MODULE}:${String(line + 1)}`;
 
-    if (id === undefined) {
+    if (id.kind !== "string") {
         throw new Error(`${at}: defineMigration needs a literal string \`id\` so the deploy can run it`);
     }
 
-    const table = definitionProperty(call, "table");
+    const table = definitionProperty(call, "table", constants, false);
 
-    if (table !== undefined && globalTables.has(table)) {
+    // Fail closed: a table the runner cannot read could be a `.global()` one.
+    if (table.kind !== "string") {
         throw new Error(
-            `${at}: migration "${id}" targets the .global() table "${table}", which defineMigration never reaches (it runs in the shard Durable Objects, not D1); backfill it through D1 instead`,
+            `${at}: migration "${id.value}" needs a \`table\` that is a literal string or a top-level string constant of this module, so the deploy can tell it is not a .global() table`,
         );
     }
 
-    return id;
+    if (globalTables.has(table.value)) {
+        throw new Error(
+            `${at}: migration "${id.value}" targets the .global() table "${table.value}", which defineMigration never reaches (it runs in the shard Durable Objects, not D1); backfill it through D1 instead`,
+        );
+    }
+
+    return id.value;
 };
 
 /** The tables `baseline` (the committed `.lunora-schema.json`) records as `.global()`, on any backend. */
@@ -67,16 +144,17 @@ export const globalTablesOf = (baseline: string): Set<string> => {
 
 /**
  * Every migration id declared in `source`, in declaration order. Throws when a `defineMigration` call's `id` is not a
- * literal string (a partial list would skip that migration on deploy), and when one targets a table in `globalTables`: a
- * shard migration does not reach a `.global()` table's rows, and its run fails on the root shard, stopping every
- * migration after it.
+ * literal string (a partial list would skip that migration on deploy), when its `table` is not a string the runner can read,
+ * and when one targets a table in `globalTables`: a shard migration does not reach a `.global()` table's rows, and its
+ * run fails on the root shard, stopping every migration after it.
  */
 export const declaredMigrationIds = (source: string, globalTables: ReadonlySet<string> = new Set()): string[] => {
     const file = ts.createSourceFile(MIGRATIONS_MODULE, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const constants = constStrings(file);
     const ids: string[] = [];
     const visit = (node: ts.Node): void => {
         if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "defineMigration") {
-            ids.push(migrationId(node, file, globalTables));
+            ids.push(migrationId(node, file, globalTables, constants));
         }
 
         ts.forEachChild(node, visit);
@@ -235,11 +313,26 @@ export const runDataMigrations = async (ids: readonly string[], options: RunMigr
 /** The backfill of `user.emailCanonical`, which the deploy runs through D1 (`backend/lunora/auth/email-canonical-backfill.ts`). */
 export const EMAIL_CANONICAL_BACKFILL = "backfill-email-canonical";
 
-/** Calls one run of the backfill may make; each fills one batch. */
-export const EMAIL_CANONICAL_MAX_CALLS = 2000;
+/** Calls one run of the backfill may make, over every phase and round. */
+export const EMAIL_CANONICAL_MAX_CALLS = 4000;
+
+/** Check-then-fill rounds one run makes: a round after the first checks again what an earlier one left. */
+export const EMAIL_CANONICAL_ROUNDS = 3;
+
+/**
+ * Answers in a row that move nothing (no row filled, the cursor where it was) before the run gives up. One such answer is a
+ * harmless race: every row of the batch changed under it, and the next call reads it again.
+ */
+export const EMAIL_CANONICAL_STALLS = 3;
+
+/** The pause before a round that follows one which left rows behind: past the backfill's settle window, so they count again. */
+export const EMAIL_CANONICAL_ROUND_PAUSE_MS = 61_000;
 
 /** The longest `retry-after` the runner waits out; a longer one fails the step. */
 const MAX_RETRY_AFTER_MS = 15 * 60 * 1000;
+
+/** What one call asks for: a check page (with the run's salt) or a fill batch (with the check's start). */
+export type BackfillRequest = { checkedAt: number; cursor?: string; phase: "fill" } | { cursor?: string; phase: "check"; salt: string };
 
 /** One call of `POST /admin/backfill-email-canonical`: its HTTP status, its JSON body (or `undefined`) and `retry-after`. */
 export interface BackfillCall {
@@ -249,88 +342,215 @@ export interface BackfillCall {
 }
 
 export interface RunBackfillOptions {
-    call: () => Promise<BackfillCall>;
+    call: (request: BackfillRequest) => Promise<BackfillCall>;
     error: (line: string) => void;
     log: (line: string) => void;
     maxCalls?: number;
+    /** A fresh random salt for one check; the digests a check answers mean nothing without it. */
+    salt: () => string;
     sleep: (ms: number) => Promise<unknown>;
 }
 
-const backfillBody = (body: unknown): { conflicts: number; filled: number; remaining: number; status: string } => {
+interface BackfillAnswer {
+    checkedAt: number | undefined;
+    conflicts: number;
+    cursor: string | undefined;
+    digests: string[];
+    filled: number;
+    skipped: number;
+    status: string;
+}
+
+const backfillAnswer = (body: unknown): BackfillAnswer => {
     const record = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
 
     return {
+        checkedAt: typeof record.checkedAt === "number" && Number.isFinite(record.checkedAt) ? record.checkedAt : undefined,
         conflicts: count(record.conflicts),
+        cursor: typeof record.cursor === "string" ? record.cursor : undefined,
+        digests: Array.isArray(record.digests) ? record.digests.filter((digest): digest is string => typeof digest === "string") : [],
         filled: count(record.filled),
-        remaining: count(record.remaining),
+        skipped: count(record.skipped),
         status: typeof record.status === "string" ? record.status : "unknown",
     };
 };
 
+const conflictReason = (conflicts: number): string =>
+    `${String(conflicts)} address(es) belong to more than one account once case and Unicode form are ignored; merge or rename them, then deploy again`;
+
+/** Why a run stopped. */
+class BackfillStop extends Error {}
+
 /**
- * Calls the backfill until it answers `done`. Stops with an error on a conflict (two accounts that fold to one address), on
- * a call that makes no progress, on any other answer, or after `maxCalls`. A 429 is waited out. Prints counts only.
- * Returns the process exit code.
+ * Drives the backfill: a check over every account, page by page, that refuses any address two accounts fold to, also
+ * across pages (the digests); only then a fill, batch by batch; then a check again, which answers `done` once nothing is
+ * left. A round that left rows behind (they changed meanwhile) is followed by another, up to {@link EMAIL_CANONICAL_ROUNDS}.
+ * A 429 is waited out; {@link EMAIL_CANONICAL_STALLS} answers in a row that move nothing, a conflict, any other answer, or
+ * `maxCalls` stop it with an error. Prints counts only, never a digest or a cursor. Returns the process exit code.
  */
 export const runEmailCanonicalBackfill = async (options: RunBackfillOptions): Promise<number> => {
     const maxCalls = options.maxCalls ?? EMAIL_CANONICAL_MAX_CALLS;
     let filled = 0;
     let calls = 0;
 
-    const fail = (reason: string): number => {
-        options.error(`::error::${EMAIL_CANONICAL_BACKFILL}: ${reason} (filled ${String(filled)} over ${String(calls)} call(s))`);
-
-        return 1;
-    };
-
-    while (calls < maxCalls) {
-        let answer: BackfillCall;
-
-        calls += 1;
-
-        try {
-            answer = await options.call();
-        } catch (error) {
-            // A fetch error names the URL in its cause, never in its name.
-            return fail(`the request failed (${error instanceof Error ? error.name : "error"})`);
-        }
-
-        if (answer.status === 429) {
-            const waitMs = (answer.retryAfterSeconds ?? 60) * 1000;
-
-            if (waitMs > MAX_RETRY_AFTER_MS) {
-                return fail(`rate limited for ${String(answer.retryAfterSeconds)}s`);
+    /** One answered call; a 429 is waited out and asked again. */
+    const ask = async (request: BackfillRequest): Promise<BackfillAnswer> => {
+        for (;;) {
+            if (calls >= maxCalls) {
+                throw new BackfillStop(`not done after ${String(maxCalls)} calls`);
             }
 
-            options.log(`${EMAIL_CANONICAL_BACKFILL}: rate limited, waiting ${String(waitMs / 1000)}s`);
-            await options.sleep(waitMs);
-            continue;
+            let answer: BackfillCall;
+
+            calls += 1;
+
+            try {
+                answer = await options.call(request);
+            } catch (error) {
+                // A fetch error names the URL in its cause, never in its name.
+                throw new BackfillStop(`the request failed (${error instanceof Error ? error.name : "error"})`);
+            }
+
+            if (answer.status === 429) {
+                const waitMs = (answer.retryAfterSeconds ?? 60) * 1000;
+
+                if (waitMs > MAX_RETRY_AFTER_MS) {
+                    throw new BackfillStop(`rate limited for ${String(answer.retryAfterSeconds)}s`);
+                }
+
+                options.log(`${EMAIL_CANONICAL_BACKFILL}: rate limited, waiting ${String(waitMs / 1000)}s`);
+                await options.sleep(waitMs);
+                continue;
+            }
+
+            const body = backfillAnswer(answer.body);
+
+            filled += body.filled;
+
+            if (answer.status === 409 || body.status === "conflict") {
+                throw new BackfillStop(conflictReason(body.conflicts));
+            }
+
+            if (answer.status !== 200) {
+                throw new BackfillStop(`answered HTTP ${String(answer.status)}`);
+            }
+
+            return body;
+        }
+    };
+
+    /** Counts an answer that moved nothing; past {@link EMAIL_CANONICAL_STALLS} in a row, the run stops. */
+    let stalls = 0;
+    const moved = (progressed: boolean, answer: BackfillAnswer): void => {
+        stalls = progressed ? 0 : stalls + 1;
+
+        if (stalls >= EMAIL_CANONICAL_STALLS) {
+            throw new BackfillStop(`made no progress over ${String(stalls)} call(s) (${answer.status})`);
+        }
+    };
+
+    /** One check over every account: `undefined` when nothing is left to fill, otherwise the check's start. */
+    const check = async (): Promise<number | undefined> => {
+        const salt = options.salt();
+        const seen = new Set<string>();
+        const repeated = new Set<string>();
+        let checkedAt: number | undefined;
+        let cursor: string | undefined;
+
+        for (;;) {
+            const answer = await ask({ phase: "check", salt, ...(cursor === undefined ? {} : { cursor }) });
+
+            if (answer.status === "done") {
+                return undefined;
+            }
+
+            if (answer.status !== "checking" && answer.status !== "checked") {
+                throw new BackfillStop(`answered ${answer.status} to a check`);
+            }
+
+            checkedAt ??= answer.checkedAt;
+
+            for (const digest of answer.digests) {
+                if (seen.has(digest)) {
+                    repeated.add(digest);
+                }
+
+                seen.add(digest);
+            }
+
+            if (answer.status === "checked") {
+                break;
+            }
+
+            moved(answer.cursor !== undefined && answer.cursor !== cursor, answer);
+            cursor = answer.cursor ?? cursor;
         }
 
-        const body = backfillBody(answer.body);
-
-        filled += body.filled;
-
-        if (answer.status === 409 || body.status === "conflict") {
-            return fail(
-                `${String(body.conflicts)} address(es) belong to more than one account once case and Unicode form are ignored; merge or rename them, then deploy again`,
-            );
+        if (repeated.size > 0) {
+            throw new BackfillStop(conflictReason(repeated.size));
         }
 
-        if (answer.status !== 200) {
-            return fail(`answered HTTP ${String(answer.status)}`);
+        if (checkedAt === undefined) {
+            throw new BackfillStop("a check answered no start time");
         }
 
-        if (body.status === "done") {
-            options.log(`${EMAIL_CANONICAL_BACKFILL}: done, filled ${String(filled)} over ${String(calls)} call(s)`);
+        options.log(`${EMAIL_CANONICAL_BACKFILL}: checked ${String(seen.size)} account(s), no address shared`);
 
-            return 0;
+        return checkedAt;
+    };
+
+    /** One fill from the first batch to the last: how many rows it left behind. */
+    const fill = async (checkedAt: number): Promise<number> => {
+        let cursor: string | undefined;
+        let skipped = 0;
+
+        for (;;) {
+            const answer = await ask({ checkedAt, phase: "fill", ...(cursor === undefined ? {} : { cursor }) });
+
+            skipped += answer.skipped;
+
+            if (answer.status === "filled") {
+                return skipped;
+            }
+
+            if (answer.status !== "progress") {
+                throw new BackfillStop(`answered ${answer.status} to a fill`);
+            }
+
+            moved(answer.filled > 0 || (answer.cursor !== undefined && answer.cursor !== cursor), answer);
+            cursor = answer.cursor ?? cursor;
+        }
+    };
+
+    try {
+        // Each round ends with the next one's check, so the last round is a check alone.
+        for (let round = 1; ; round += 1) {
+            const checkedAt = await check();
+
+            if (checkedAt === undefined) {
+                options.log(`${EMAIL_CANONICAL_BACKFILL}: done, filled ${String(filled)} over ${String(calls)} call(s)`);
+
+                return 0;
+            }
+
+            if (round > EMAIL_CANONICAL_ROUNDS) {
+                throw new BackfillStop(`accounts still unfilled after ${String(EMAIL_CANONICAL_ROUNDS)} rounds`);
+            }
+
+            const left = await fill(checkedAt);
+
+            if (left > 0) {
+                options.log(`${EMAIL_CANONICAL_BACKFILL}: ${String(left)} account(s) changed during the fill, checking again`);
+                await options.sleep(EMAIL_CANONICAL_ROUND_PAUSE_MS);
+            }
+        }
+    } catch (error) {
+        if (!(error instanceof BackfillStop)) {
+            throw error;
         }
 
-        if (body.status !== "progress" || body.filled === 0) {
-            return fail(`made no progress (${body.status}, ${String(body.remaining)} left)`);
-        }
+        options.error(`::error::${EMAIL_CANONICAL_BACKFILL}: ${error.message} (filled ${String(filled)} over ${String(calls)} call(s))`);
+
+        return 1;
     }
-
-    return fail(`not done after ${String(maxCalls)} calls`);
 };
