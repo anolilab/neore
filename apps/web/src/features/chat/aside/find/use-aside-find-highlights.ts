@@ -73,11 +73,6 @@ export const isClippedWithin = (rect: Pick<DOMRect, "bottom" | "left" | "right" 
     return false;
 };
 
-/**
- * Brings the hit into view if it is out of sight. The hit's own rectangle decides, not its block's: a long answer can
- * carry the selected hit at its far edge while the block itself is partly on screen. jsdom lays out no ranges, so it
- * falls back to the block there.
- */
 /** Marks the sidebar's scroll container that holds the side-question panel (`thread-sidebar.tsx`). */
 const ASIDE_SCROLL_ATTRIBUTE = "data-aside-scroll";
 
@@ -88,6 +83,11 @@ const scrollerOf = (host: Element): HTMLElement | undefined => host.closest<HTML
 const hitRect = (range: Range | undefined, target: Element): DOMRect =>
     typeof range?.getBoundingClientRect === "function" ? range.getBoundingClientRect() : target.getBoundingClientRect();
 
+/**
+ * Brings the hit into view if it is out of sight. The hit's own rectangle decides, not its block's: a long answer can
+ * carry the selected hit at its far edge while the block itself is partly on screen. jsdom lays out no ranges, so it
+ * falls back to the block there.
+ */
 const revealIfOutOfSight = (range: Range | undefined, host: Element): void => {
     const target = range?.startContainer.parentElement;
 
