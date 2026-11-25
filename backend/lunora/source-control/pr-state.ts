@@ -129,13 +129,12 @@ export const dispatchLinkedPullRequestChecks = internalMutation
         const idleDays = isAutoArchiveDays(days) && days !== 0 ? days : undefined;
         const mergedOn = settings?.autoArchiveMergedChats === true && settings.autoArchiveMergedChatsSince !== undefined;
 
-        // With keep-open off, open links are not read (only the owed merges need the sweep then), so the keep setting is applied per link below.
-        const keepOpen = keepsOpenPullRequestChats(settings?.keepOpenPullRequestChats);
-
         if (idleDays === undefined && !mergedOn) {
             return { dispatched: 0 };
         }
 
+        // With keep-open off, open links are not read (only the owed merges need the sweep then), so the keep setting is applied per link below.
+        const keepOpen = keepsOpenPullRequestChats(settings?.keepOpenPullRequestChats);
         const { now } = ctx;
         const scan = await ctx.db
             .query("pullRequestStateScans")
