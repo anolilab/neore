@@ -13,7 +13,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { internalMutation } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
 import { addMessagesHandler } from "../agent/messages";
 import { insertThread } from "../agent/table-writes";
 import { isValidBranchName } from "../coding-agents/commands";
@@ -385,6 +385,19 @@ export const noteMergeAttempt = internalMutation
  * predate the merge, so only a link made at or after the end of that second is treated as made after it.
  */
 export const MERGE_TIME_PRECISION_MS = 1000;
+
+/** Whether the owner's merged-chat archiving is on, so a merge can be ordered against its opt-in: the merge action reads the host's time only then. */
+export const mergedArchiveOn = internalQuery
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.boolean())
+    .query(async ({ args, ctx }) => {
+        const settings = await ctx.db
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+            .unique();
+
+        return settings?.autoArchiveMergedChats === true && settings.autoArchiveMergedChatsSince !== undefined;
+    });
 
 /**
  * Records that a pull request was seen merged, on each link made before the merge. Internal: called by the merge action

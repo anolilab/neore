@@ -13,6 +13,8 @@
  */
 import { v } from "lunorash/server";
 
+import { internal } from "../_generated/internal";
+
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
@@ -130,7 +132,10 @@ export const mergePullRequest = authAction
         // An unconfirmed answer (the host may have merged, but its reply could not be read) is recorded only when a host read
         // confirms the merge: the read returns a merge time only for a merged pull request.
         const ref = { number: args.number, repository: args.repository };
-        const hostAt = outcome.status === "ok" || outcome.status === "unconfirmed" ? await hostMergedAt(token, ref) : undefined;
+        // The host's time is read only when it can change the outcome: an unconfirmed answer needs it to confirm the merge, and a
+        // merge that can archive needs it to order against the opt-in. Otherwise the merge is recorded at the request time.
+        const archiveOn = outcome.status === "ok" ? await ctx.runQuery(internal.source_control.pr_threads.mergedArchiveOn, { userId: ctx.user.userId }) : false;
+        const hostAt = outcome.status === "unconfirmed" || (outcome.status === "ok" && archiveOn) ? await hostMergedAt(token, ref) : undefined;
 
         if (outcome.status === "ok" || (outcome.status === "unconfirmed" && hostAt !== undefined)) {
             // The host's time is whole seconds, so the merge lies in the second it names; the request time is precise and never
