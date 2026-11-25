@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import type { AppError } from "@/lib/errors";
 
 import type { ChatToastSettings, ToastMessage } from "../lib/chat-toasts";
-import { isChatToastOn, lastReplyFailed, replySettled, waitingApprovalIds } from "../lib/chat-toasts";
+import { isChatToastOn, lastReplyFailed, replySettled, waitingApprovalIds, waitingCalls } from "../lib/chat-toasts";
 
 /** How long a finished run waits for its reply to settle before its outcome is decided anyway. */
 const SETTLE_MS = 2000;
@@ -52,7 +52,7 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
     const ended = useRef<EndedRun | undefined>(undefined);
     const settleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const lastError = useRef<AppError | null>(null);
-    const approvals = useRef<{ ids: ReadonlySet<string>; threadId: string | undefined } | undefined>(undefined);
+    const approvals = useRef<{ ids: ReadonlySet<string>; newest: string | undefined; threadId: string | undefined } | undefined>(undefined);
     const renderedThread = useRef<{ messages: ReadonlyArray<ToastMessage>; threadId: string | undefined }>({ messages, threadId });
     const staleMessages = useRef<ReadonlyArray<ToastMessage> | undefined>(undefined);
     // The newest inputs, for the settle timer, which fires outside any render.
@@ -125,14 +125,10 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
         if (ended.current) {
             ended.current = { ...ended.current, failed: true };
             settle();
-
-            return;
         }
 
-        if (isChatToastOn(settings, "failed")) {
-            toast.error(t`A chat reply failed`);
-        }
-    }, [error, settings, settle, t]);
+        // An error with no run open is not a reply's failure: a send refused before its reply starts leaves no reply to report.
+    }, [error, settle]);
 
     // A run starts and ends with its stream id. The outcome waits until the reply has settled (or the window passes).
     useEffect(() => {
@@ -205,16 +201,20 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
             return;
         }
 
-        const ids = new Set(waitingApprovalIds(messages));
+        const calls = waitingCalls(messages);
+        const ids = new Set(calls.map((call) => call.toolCallId));
         const previous = approvals.current;
+        const newest = messages[messages.length - 1]?.id;
 
-        approvals.current = { ids, threadId };
+        approvals.current = { ids, newest, threadId };
 
         if (!previous || previous.threadId !== threadId) {
             return;
         }
 
-        const arrived = [...ids].some((id) => !previous.ids.has(id));
+        // Older history loaded above the newest message the previous snapshot had is not a new call, even when it is still waiting.
+        const anchor = previous.newest === undefined ? -1 : messages.findIndex((message) => message.id === previous.newest);
+        const arrived = calls.some((call) => !previous.ids.has(call.toolCallId) && call.index > anchor);
 
         if (arrived && isChatToastOn(settings, "input")) {
             toast.warning(t`A chat needs your input or approval`);

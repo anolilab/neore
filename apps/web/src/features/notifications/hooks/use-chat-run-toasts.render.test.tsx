@@ -51,6 +51,15 @@ const finishRun = (rerender: (props: Props) => void, props: Props): void => {
     rerender({ ...props, activeStreamId: null });
 };
 
+/** Starts a run whose reply fails as the stream ends: the failure is recorded against the run, as the chat reports it. */
+const failRun = (rerender: (props: Props) => void, props: Props): void => {
+    const error = toAppError(new Error("Reply failed"));
+
+    rerender(streaming(props));
+    rerender({ ...props, activeStreamId: "stream-1", error });
+    rerender({ ...props, activeStreamId: null, error });
+};
+
 const setup = (initial: Props) => renderHook((props: Props) => useChatRunToasts(props), { initialProps: initial });
 
 beforeEach(() => {
@@ -71,7 +80,7 @@ describe("useChatRunToasts: each toggle suppresses its own toast", () => {
     it("shows no failed toast when the failed toggle is off", () => {
         const { rerender } = setup({ ...idle, settings: { chatFailedToastEnabled: false } });
 
-        rerender({ ...idle, error: toAppError(new Error("Reply failed")), settings: { chatFailedToastEnabled: false } });
+        failRun(rerender, { ...idle, settings: { chatFailedToastEnabled: false } });
 
         expect(toastError).not.toHaveBeenCalled();
     });
@@ -198,7 +207,7 @@ describe("useChatRunToasts: the other toasts still show", () => {
     it("shows the failed and needs-input toasts while the finished toggle is off", () => {
         const { rerender } = setup({ ...idle, settings: { chatFinishedToastEnabled: false } });
 
-        rerender({ ...idle, error: toAppError(new Error("Reply failed")), settings: { chatFinishedToastEnabled: false } });
+        failRun(rerender, { ...idle, settings: { chatFinishedToastEnabled: false } });
         rerender({ ...idle, error: null, messages: waitingOn("call-2"), settings: { chatFinishedToastEnabled: false } });
 
         expect(toastError).toHaveBeenCalledTimes(1);
@@ -224,10 +233,42 @@ describe("useChatRunToasts: the other toasts still show", () => {
         finishRun(rerender, { ...idle, messages: waitingOn("call-4"), settings: { chatInputToastEnabled: false } });
 
         // The run ended with its call still waiting: no finished toast, but the failed one (not waiting) still shows.
-        rerender({ ...idle, error: toAppError(new Error("Reply failed")), settings: { chatInputToastEnabled: false } });
+        failRun(rerender, { ...idle, settings: { chatInputToastEnabled: false } });
 
         expect(toastWarning).not.toHaveBeenCalled();
         expect(toastError).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not announce older history that loads above the newest message", () => {
+        const newest: Props["messages"] = [{ id: "m5", parts: [{ text: "hi", type: "text" }], role: "user" }];
+        const older: Props["messages"] = [
+            { id: "m1", parts: [{ state: "approval-requested", toolCallId: "old-call", type: "tool-shell" }], role: "assistant" },
+        ];
+        const { rerender } = setup({ ...idle, messages: newest, settings: {} });
+
+        rerender({ ...idle, messages: [...older, ...newest], settings: {} });
+
+        expect(toastWarning).not.toHaveBeenCalled();
+    });
+
+    it("announces a call that starts waiting after the newest message", () => {
+        const newest: Props["messages"] = [{ id: "m5", parts: [{ text: "hi", type: "text" }], role: "user" }];
+        const later: Props["messages"] = [
+            { id: "m6", parts: [{ state: "approval-requested", toolCallId: "new-call", type: "tool-shell" }], role: "assistant" },
+        ];
+        const { rerender } = setup({ ...idle, messages: newest, settings: {} });
+
+        rerender({ ...idle, messages: [...newest, ...later], settings: {} });
+
+        expect(toastWarning).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows no toast while the settings are still loading", () => {
+        const { rerender } = setup({ ...idle, settings: undefined });
+
+        finishRun(rerender, { ...idle, settings: undefined });
+
+        expect(toastSuccess).not.toHaveBeenCalled();
     });
 
     it("does not announce a new thread's calls that load after a thread switch", () => {
@@ -275,7 +316,7 @@ describe("useChatRunToasts: the other toasts still show", () => {
         const { rerender } = setup({ ...idle, settings: {} });
 
         finishRun(rerender, { ...idle, settings: {} });
-        rerender({ ...idle, error: toAppError(new Error("Reply failed")), settings: {} });
+        failRun(rerender, { ...idle, settings: {} });
         rerender({ ...idle, error: null, messages: waitingOn("call-5"), settings: {} });
 
         expect(toastSuccess).toHaveBeenCalledTimes(1);
