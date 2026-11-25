@@ -48,7 +48,14 @@ const ReviewThread = ({
                 {thread.comments.map((comment) => (
                     <li key={comment.id}>
                         <p className="text-muted-foreground text-xs">
-                            {comment.authorLogin} · {new Date(comment.createdAt).toLocaleString()}
+                            {comment.authorLogin} ·{" "}
+                            {comment.url === undefined ? (
+                                new Date(comment.createdAt).toLocaleString()
+                            ) : (
+                                <a className="underline-offset-2 hover:underline" href={comment.url} rel="noopener noreferrer" target="_blank">
+                                    {new Date(comment.createdAt).toLocaleString()}
+                                </a>
+                            )}
                         </p>
                         {/* The comment is text from the host: shown as text, never parsed as markup. */}
                         <p className="break-words whitespace-pre-wrap">{comment.body}</p>
