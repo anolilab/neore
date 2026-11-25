@@ -279,6 +279,17 @@ describe("events/poll", () => {
         expect(forbidden.body["result"]).toBeUndefined();
     });
 
+    it("answers Forbidden, not a server error, for a suspended account's poll", async () => {
+        const suspended = pollingWith(async () => {
+            throw new PublicApiError("forbidden", "Your account has been suspended");
+        });
+
+        const { body } = await serve(modern("events/poll", { _meta: OFFER, cursor: null, name: "run.completed" }, "run.completed"), suspended);
+
+        expect(body["error"]).toMatchObject({ code: -32_024, data: { reason: "forbidden" }, message: "Your account has been suspended" });
+        expect(body["result"]).toBeUndefined();
+    });
+
     it("refuses a request whose Mcp-Name header is not the event name, as a header mismatch", async () => {
         const poll = pollingWith(async () => pollBody);
         const { body, status } = await serve(modern("events/poll", { _meta: OFFER, name: "run.completed" }, "run.failed"), poll);

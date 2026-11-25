@@ -394,6 +394,11 @@ const eventsFailure = (id: number | string | undefined, error: unknown): Respons
         return rpcError(id, FORBIDDEN, "Forbidden", { data: { reason: "insufficient_scope", scope: "threads:read" } });
     }
 
+    // A suspended account's poll: the log's own ban check, mapped the same way the other routes map it.
+    if (error instanceof PublicApiError && error.code === "forbidden") {
+        return rpcError(id, FORBIDDEN, error.message, { data: { reason: "forbidden" } });
+    }
+
     throw error;
 };
 
