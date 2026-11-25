@@ -59,7 +59,7 @@ export interface EventLogStore {
 
 export interface PollQuery {
     fromSeq: number | null;
-    /** Whether an event is kept from the caller: the shard's locked threads' events are (their metadata is not for a poll). Skipped, not a gap. */
+    /** Whether an event is kept from the caller: a locked or trashed thread's events are (their metadata is not for a poll). Skipped, not a gap. */
     hidden?: (event: StoredEvent) => Promise<boolean>;
     maxAgeMs?: number;
     maxEvents: number;
@@ -151,7 +151,7 @@ export const pollEvents = async (store: EventLogStore, query: PollQuery): Promis
             // still kept for a window from when the log took it, so a poll must not skip it as old.
             if (floor !== undefined && event.createdAt < floor) {
                 // Older than the window the caller asked for. A gap only when it is an event the caller asked for and may see: another
-                // name or thread in that window was never the caller's to receive, and a hidden (locked-thread) event must not reveal
+                // name or thread in that window was never the caller's to receive, and a hidden event must not reveal
                 // itself by flagging a gap.
                 if (matches(event, query) && (query.hidden === undefined || !(await query.hidden(event)))) {
                     truncated = true;
