@@ -10,6 +10,7 @@ import { LunoraError, v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { checkUserBanStatus, enforceBanStatus } from "../lib/crpc-auth-helpers";
+import { isThreadLocked } from "../lib/thread-lock";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { pollEvents as pollLog } from "./events-poll";
 import type { EventLogStore } from "./events-poll";
@@ -20,6 +21,35 @@ import { internal } from "../_generated/internal";
 
 /** Rows the sweep deletes per call. The sweep runs again while it reports more. */
 const PRUNE_BATCH = 200;
+
+/**
+ * Whether an event belongs to a locked thread, which a poll leaves out. The thread list omits a locked chat, and its events carry the
+ * same thread id, so their metadata is kept from the key the same way. Each thread is read once per poll.
+ */
+const hiddenByLock = (ctx: QueryCtx) => {
+    const locked = new Map<string, boolean>();
+
+    return async (event: { data: Record<string, unknown> }): Promise<boolean> => {
+        const { threadId } = event.data;
+
+        if (typeof threadId !== "string") {
+            return false;
+        }
+
+        const known = locked.get(threadId);
+
+        if (known !== undefined) {
+            return known;
+        }
+
+        const thread = await ctx.db.threads.findFirst({ where: { _id: threadId as Id<"threads"> } });
+        const isLocked = thread !== null && isThreadLocked(thread);
+
+        locked.set(threadId, isLocked);
+
+        return isLocked;
+    };
+};
 
 const storeOn = (ctx: QueryCtx, userId: string): EventLogStore => {
     return {
@@ -94,6 +124,7 @@ export const pollEvents = internalQuery
 
         const outcome = await pollLog(storeOn(ctx, args.userId), {
             fromSeq: args.fromSeq ?? null,
+            hidden: hiddenByLock(ctx),
             // The window never reaches past retention: an event older than it is expired whether or not housekeeping has pruned it yet,
             // so a dormant shard's backlog is never read back to a returning user.
             maxAgeMs: args.maxAgeMs === undefined ? RETENTION_MS : Math.min(args.maxAgeMs, RETENTION_MS),
