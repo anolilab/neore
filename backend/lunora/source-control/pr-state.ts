@@ -82,22 +82,31 @@ export const rereadRelinkedLink = async (ctx: MutationCtx, link: Doc<"pullReques
 const vState = v.union(v.literal("open"), v.literal("closed"), v.literal("merged"));
 
 /**
- * One page of the person's links at `cursor`. A cursor the server no longer reads (`INVALID_CURSOR`: minted by an older build)
- * restarts the scan from the first page, so a deployment does not stop the refresh for anyone.
+ * Reads one page with `read` from `cursor`. A cursor the server no longer reads (`INVALID_CURSOR`: minted by an older build) restarts
+ * the read from the first page, so a deployment does not stop the scan for anyone.
  */
-const linksPageAt = async (ctx: MutationCtx, userId: string, cursor: string | null) => {
-    const links = () => ctx.db.query("pullRequestThreads").withIndex("by_user_and_repository_number", (q) => q.eq("userId", userId));
-
+const pageRestartingAt = async <P>(read: (cursor: string | null) => Promise<P>, cursor: string | null): Promise<P> => {
     try {
-        return await links().paginate({ cursor, numItems: SCAN_LIMIT });
+        return await read(cursor);
     } catch (error) {
         if (cursor === null || !(error instanceof LunoraError) || error.code !== "INVALID_CURSOR") {
             throw error;
         }
 
-        return await links().paginate({ cursor: null, numItems: SCAN_LIMIT });
+        return await read(null);
     }
 };
+
+/** One page of the person's links at `cursor`. */
+const linksPageAt = (ctx: MutationCtx, userId: string, cursor: string | null) =>
+    pageRestartingAt(
+        (at) =>
+            ctx.db
+                .query("pullRequestThreads")
+                .withIndex("by_user_and_repository_number", (q) => q.eq("userId", userId))
+                .paginate({ cursor: at, numItems: SCAN_LIMIT }),
+        cursor,
+    );
 
 /** Writes the scan position only when it moved, so a page that is still unfinished costs no write. */
 const saveScan = async (ctx: MutationCtx, scan: Doc<"pullRequestStateScans"> | null, userId: string, cursor: string | null): Promise<void> => {
@@ -221,20 +230,16 @@ export const dispatchLinkedPullRequestChecks = internalMutation
         return { dispatched: due.length + scheduled };
     });
 
-/** One bounded page of the chat's links from `cursor`. A cursor the server no longer reads restarts the scan from the first link. */
-const owedScanPageAt = async (ctx: MutationCtx, userId: string, threadId: Id<"threads">, cursor: string | null) => {
-    const links = () => ctx.db.query("pullRequestThreads").withIndex("by_user_and_threadId", (q) => q.eq("userId", userId).eq("threadId", threadId));
-
-    try {
-        return await links().paginate({ cursor, numItems: OWED_SCAN_ROWS });
-    } catch (error) {
-        if (cursor === null || !(error instanceof LunoraError) || error.code !== "INVALID_CURSOR") {
-            throw error;
-        }
-
-        return await links().paginate({ cursor: null, numItems: OWED_SCAN_ROWS });
-    }
-};
+/** One bounded page of the chat's links from `cursor`. */
+const owedScanPageAt = (ctx: MutationCtx, userId: string, threadId: Id<"threads">, cursor: string | null) =>
+    pageRestartingAt(
+        (at) =>
+            ctx.db
+                .query("pullRequestThreads")
+                .withIndex("by_user_and_threadId", (q) => q.eq("userId", userId).eq("threadId", threadId))
+                .paginate({ cursor: at, numItems: OWED_SCAN_ROWS }),
+        cursor,
+    );
 
 /**
  * Whether the chat owes a merge: one recorded for it and not yet settled. The chat's links are scanned one bounded page per sweep, and

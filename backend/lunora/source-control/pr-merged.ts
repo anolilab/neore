@@ -35,7 +35,7 @@ export interface MergedPullRequestRef {
 }
 
 /** The merge a recording walks: the pull request, and the host's merge time when the caller has one. */
-export interface MergeRecording {
+interface MergeRecording {
     mergedAt?: number;
     mergedBefore?: number;
     mergedBeforeIsHostBound?: boolean;
@@ -88,13 +88,13 @@ const pageArgsOf = (merge: MergeRecording) => {
  * kept once each, even when a restart sees them again. A cursor the server no longer reads (`INVALID_CURSOR`: a write or a deploy
  * between pages) restarts the walk from the first page, as the state sweep does.
  */
-const walkPages = async (ctx: Pick<ActionCtx, "runMutation">, merge: MergeRecording, start: string | null): Promise<Walk> => {
+const walkPages = async (ctx: Pick<ActionCtx, "runMutation">, merge: MergeRecording, start: string | null, maxPages: number): Promise<Walk> => {
     const owed = new Map<string, RecordedLink>();
     let cursor = start;
     let restarts = 0;
     let pages = 0;
 
-    while (pages < MAX_RECORD_PAGES_PER_ACTION) {
+    while (pages < maxPages) {
         let page: RecordedPage;
 
         try {
@@ -132,10 +132,10 @@ const walkPages = async (ctx: Pick<ActionCtx, "runMutation">, merge: MergeRecord
  */
 const recordAndArchive = async (ctx: RecordCtx, merge: MergeRecording, start: string | null): Promise<void> => {
     const address = { number: merge.number, repository: merge.repository };
-    const walk = await walkPages(ctx, merge, start);
+    const walk = await walkPages(ctx, merge, start, MAX_RECORD_PAGES_PER_ACTION);
 
     if (!walk.done && walk.continueCursor !== null) {
-        await queueRest(merge, walk.continueCursor);
+        await recordRest(ctx, merge, walk.continueCursor, walk.owed);
     }
 
     const owed = [...walk.owed.values()].toSorted((a, b) => a.lastAttemptAt - b.lastAttemptAt);
@@ -147,13 +147,22 @@ const recordAndArchive = async (ctx: RecordCtx, merge: MergeRecording, start: st
 
 /**
  * Queues the rest of a walk on the jobs queue, on the owner's shard, from the cursor the action stopped at. Long work belongs on the
- * queue, not the scheduler lane. A failure is logged: the next read records the walk again from its first page, so nothing is lost.
+ * queue, not the scheduler lane. When the queue refuses the send, the rest is recorded in this action instead, so no page is left
+ * unrecorded; the cost is this action's time. The owed links it finds join `owed`.
  */
-const queueRest = async (merge: MergeRecording, cursor: string): Promise<void> => {
+const recordRest = async (ctx: Pick<ActionCtx, "runMutation">, merge: MergeRecording, cursor: string, owed: Map<string, RecordedLink>): Promise<void> => {
     try {
         await enqueueJob(internal.source_control.pr_merged.continueMergedRecordingJob, { ...pageArgsOf(merge), cursor }, { shardKey: merge.userId });
+
+        return;
     } catch (error) {
-        console.error("[source-control] could not queue the rest of a merged pull request's recording; the next read records it", error);
+        console.error("[source-control] could not queue the rest of a merged pull request's recording; recording it in this action", error);
+    }
+
+    const rest = await walkPages(ctx, merge, cursor, Infinity);
+
+    for (const [linkId, link] of rest.owed) {
+        owed.set(linkId, link);
     }
 };
 
@@ -193,17 +202,13 @@ export const recordMergedPullRequest = async (
 };
 
 /**
- * The rest of a merge's recording, from the cursor an earlier action stopped at (`queueRest`). Exported as a plain function so a test
- * can run the continuation; the job wraps it below.
+ * The rest of a merge's recording, from the cursor an earlier action stopped at (`recordRest`). Errors propagate: the job that runs it
+ * fails, so the queue retries it. Every page is idempotent, so a retry repeats work without changing the result.
  */
 export const continueMergedRecording = async (ctx: RecordCtx, args: MergeRecording & { cursor: string }): Promise<void> => {
     const { cursor, ...merge } = args;
 
-    try {
-        await recordAndArchive(ctx, merge, cursor);
-    } catch (error) {
-        console.error("[source-control] could not continue a merged pull request's recording", error);
-    }
+    await recordAndArchive(ctx, merge, cursor);
 };
 
 /** The job that runs `continueMergedRecording`, on the owner's shard through the jobs queue. */

@@ -232,6 +232,45 @@ describe("recordMergedPullRequest", () => {
         expect(queued).not.toHaveBeenCalled();
     });
 
+    it("records the rest in the same action when the queue refuses the continuation, so no page is left unrecorded", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => undefined);
+        const calls: Call[] = [];
+        const runMutation = vi.fn(async (ref: unknown, args: Record<string, unknown>) => {
+            calls.push({ args, ref });
+
+            if (ref === internal.source_control.pr_threads.recordPullRequestMergedPage) {
+                const index = args.cursor === null ? 0 : Number(String(args.cursor).slice(2));
+
+                return { continueCursor: `c-${String(index + 1)}`, isDone: index === 11, owed: [] };
+            }
+
+            return null;
+        });
+        const queued = vi.mocked(enqueueJob);
+
+        queued.mockClear();
+        queued.mockRejectedValueOnce(new Error("queue unavailable"));
+        await recordMergedPullRequest({ runMutation, scheduler: {} } as never, "user-a", { number: 7, repository: "octo/hello" });
+
+        // All twelve pages were recorded in this action, and the queue was asked once.
+        expect(callsTo(calls, internal.source_control.pr_threads.recordPullRequestMergedPage)).toHaveLength(12);
+        expect(queued).toHaveBeenCalledTimes(1);
+    });
+
+    it("fails the continuation when a page fails, so the queue retries the job", async () => {
+        const runMutation = vi.fn(async (ref: unknown) => {
+            if (ref === internal.source_control.pr_threads.recordPullRequestMergedPage) {
+                throw new Error("page write failed");
+            }
+
+            return null;
+        });
+
+        await expect(
+            continueMergedRecording({ runMutation, scheduler: {} } as never, { cursor: "c-10", number: 7, repository: "octo/hello", userId: "user-a" }),
+        ).rejects.toThrow("page write failed");
+    });
+
     it("keeps going when one archive fails, and each owed link is archived by its own attempt", async () => {
         vi.spyOn(console, "error").mockImplementation(() => undefined);
         const { calls, ctx } = fakeContext(THREAD_A);
