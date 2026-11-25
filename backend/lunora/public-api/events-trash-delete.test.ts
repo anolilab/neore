@@ -88,6 +88,29 @@ describe("a trashed chat's events", () => {
         }
     });
 
+    it("keeps a live chat's events when its trash drain runs again, as a repeated undo does", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const left = (await runInShard(
+                "user",
+                async () =>
+                    await harness.run(async (context: any) => {
+                        // Restored already, with an event recorded since: a second undo must not remove it.
+                        const id = await chatWithEvents(context, false, 3);
+
+                        expect(await context.runMutation(drainTrashedThreadEvents, { threadId: id, userId: "user" })).toBe(true);
+
+                        return await eventsOf(context, id);
+                    }),
+            )) as number;
+
+            expect(left).toBe(3);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("refuses a restore while the trashed chat still has events, and allows it once they are drained", async () => {
         const harness = lunoraTest(schemaWithShardedTables([]) as never);
 
