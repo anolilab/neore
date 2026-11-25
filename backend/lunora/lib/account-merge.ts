@@ -1437,13 +1437,21 @@ export const importShardRows = internalMutation
 
             const imported = await copyMergedMcpEvents(ctx, fresh, args.to);
 
+            // The marker names the copy's own row on the new shard (`result`): a copy has a new id, so the reconcile takes it back there
+            // (`dropRowsGoneFromGuest`), and a row the expiry skipped has none.
             for (const row of fresh) {
+                const copy = await ctx.db.mcpEvents.findFirst({
+                    consistency: "primary",
+                    where: { eventId: row["eventId"] as string, userId: args.to },
+                });
+
                 await ctx.db.insert("idempotencyClaims", {
                     claimedAt: now,
                     expiresAt: IMPORT_MARKER_EXPIRES_AT,
                     key: markerKey(args.from, args.table, row._id as string),
                     scope: IMPORT_MARKER_SCOPE,
                     userId: args.to,
+                    ...(copy !== null && { result: copy._id as string }),
                 });
             }
 
@@ -1751,6 +1759,23 @@ export const dropRowsGoneFromGuest = internalMutation
 
         // One at a time: an audited table's delete writes its history row to D1.
         for (const id of args.ids) {
+            if (args.table === "mcpEvents") {
+                // A copied Event lives under its own row id here, and its marker names that row. An event is never edited, so the copy
+                // goes as it is.
+                const record = await ctx.db
+                    .query("idempotencyClaims")
+                    .withIndex("by_scope_key", (q) => q.eq("scope", IMPORT_MARKER_SCOPE).eq("key", markerKey(args.from, args.table, id)))
+                    .first();
+                const copyId = record?.result;
+
+                if (typeof copyId === "string" && (await db.get("mcpEvents", copyId)) !== null) {
+                    await db.delete("mcpEvents", copyId);
+                    dropped += 1;
+                }
+
+                continue;
+            }
+
             const existing = (await db.get(args.table, id)) as Record<string, unknown> | null;
 
             if (existing === null) {

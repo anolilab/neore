@@ -109,7 +109,8 @@ export const deleteUserMcpEvents = internalMutation
     .output(v.object({ hasMore: v.boolean() }))
     .mutation(async ({ args: { userId }, ctx }) => {
         // One row past the batch says whether more follow: a batch that ends the log is not reported as more.
-        const { page } = await ctx.db.mcpEvents.findMany({ limit: BATCH + 1, where: { userId } });
+        // From the primary: a replica that lags the deletion could report the log empty while rows remain.
+        const { page } = await ctx.db.mcpEvents.findMany({ consistency: "primary", limit: BATCH + 1, where: { userId } });
 
         for (const row of page.slice(0, BATCH)) {
             await ctx.db.delete("mcpEvents", row._id);
@@ -119,7 +120,7 @@ export const deleteUserMcpEvents = internalMutation
             return { hasMore: true };
         }
 
-        const { page: watermarks } = await ctx.db.mcpEventWatermarks.findMany({ where: { userId } });
+        const { page: watermarks } = await ctx.db.mcpEventWatermarks.findMany({ consistency: "primary", where: { userId } });
 
         for (const row of watermarks) {
             await ctx.db.delete("mcpEventWatermarks", row._id);

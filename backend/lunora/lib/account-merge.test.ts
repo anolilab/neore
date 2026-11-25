@@ -2339,6 +2339,47 @@ describe("mergeGuestInto across two real shards", () => {
         }
     });
 
+    it("takes a copied Event back from the new account once the guest has deleted it", async () => {
+        const merge = twoShards();
+
+        try {
+            await merge.shards.guest.run(async (context: any) => {
+                await context.db.insert("mcpEvents", {
+                    createdAt: Date.now(),
+                    data: "{}",
+                    eventId: "run:g2",
+                    name: "run.completed",
+                    seq: 1,
+                    timestamp: 1,
+                    userId: "guest",
+                });
+            });
+
+            const guestRow = (await merge.shards.guest.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10, where: { userId: "guest" } });
+
+                return page[0];
+            })) as Row;
+
+            await merge.shards.user.run(async (context: any) => await asLeaseHolder(context, importShardRows, { rows: [guestRow], table: "mcpEvents" }));
+
+            // The guest deletes the event before the clear reads it: the reconcile takes the copy back from the new account.
+            const reconciled = (await merge.shards.user.run(
+                async (context: any) => await asLeaseHolder(context, dropRowsGoneFromGuest, { ids: [guestRow._id], table: "mcpEvents" }),
+            )) as { dropped: number };
+            const onUser = (await merge.shards.user.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10, where: { userId: "user" } });
+
+                return page.length;
+            })) as number;
+
+            expect(reconciled.dropped).toBe(1);
+            expect(onUser).toBe(0);
+        } finally {
+            merge.close();
+        }
+    });
+
     it("finishes the merge when another user's Events sit on the guest's own store, and moves only the guest's", async () => {
         const merge = twoShards();
 
