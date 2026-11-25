@@ -2778,6 +2778,65 @@ describe("mergeGuestInto across two real shards", () => {
         }
     });
 
+    it("takes a large thread's copied Events back one batch per call, keeping the thread copy until none are left", async () => {
+        const merge = twoShards();
+
+        try {
+            const threadId = (await merge.shards.guest.run(
+                async (context: any) => await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "T", userId: "guest" }),
+            )) as string;
+
+            await merge.shards.guest.run(async (context: any) => {
+                for (let index = 0; index < 205; index += 1) {
+                    await context.db.insert("mcpEvents", {
+                        createdAt: Date.now(),
+                        data: JSON.stringify({ threadId }),
+                        eventId: `run:big-${String(index)}`,
+                        name: "run.completed",
+                        seq: index + 1,
+                        threadId,
+                        timestamp: 1,
+                        userId: "guest",
+                    });
+                }
+            });
+
+            const guestThread = (await merge.shards.guest.run(async (context: any) => {
+                const { page } = await context.db.threads.findMany({ limit: 10, where: { userId: "guest" } });
+
+                return page[0];
+            })) as Row;
+            const guestEvents = (await merge.shards.guest.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 300, where: { userId: "guest" } });
+
+                return page;
+            })) as Row[];
+
+            await merge.shards.user.run(async (context: any) => await asLeaseHolder(context, importShardRows, { rows: [guestThread], table: "threads" }));
+            await merge.shards.user.run(async (context: any) => await asLeaseHolder(context, importShardRows, { rows: guestEvents, table: "mcpEvents" }));
+            await merge.shards.guest.run(async (context: any) => {
+                await context.db.delete("threads", threadId);
+            });
+
+            // One call takes one batch (200): the thread copy stays, with its marker, until the rest is taken back by the retry.
+            const first = (await merge.shards.user.run(
+                async (context: any) => await asLeaseHolder(context, dropRowsGoneFromGuest, { ids: [threadId], table: "threads" }),
+            )) as { dropped: number };
+            const state = (await merge.shards.user.run(async (context: any) => {
+                const copy = await context.db.threads.findFirst({ consistency: "primary", where: { _id: threadId } });
+                const { page } = await context.db.mcpEvents.findMany({ limit: 300, where: { userId: "user" } });
+
+                return { events: page.length, thread: copy !== null };
+            })) as { events: number; thread: boolean };
+
+            expect(first.dropped).toBe(0);
+            expect(state.thread).toBe(true);
+            expect(state.events).toBe(5);
+        } finally {
+            merge.close();
+        }
+    });
+
     it("never takes back the account's own Event that shares a guest event's id", async () => {
         const merge = twoShards();
 

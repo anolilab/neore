@@ -105,6 +105,7 @@ import { SEARCH_INTERNAL_FIELDS } from "../agent/thread-search-plan";
 import { countUserTurns } from "../agent/thread-search-triggers";
 import { copyMergedRunWebhooks } from "../run-webhooks/table-writes";
 import { copyMergedMcpEvents, deleteMcpEventsOfThread, storedThreadOf } from "../public-api/events-log";
+import { runAfterOnShard } from "./shard-scheduler";
 
 /** Rows moved per round trip. */
 export const MERGE_PAGE_SIZE = 100;
@@ -1860,16 +1861,23 @@ export const dropRowsGoneFromGuest = internalMutation
                 .first();
 
             if (marker !== null && marker.result === (await rowDigest(args.table, existing))) {
+                // The thread's Events were copied with it. Its id is the guest's, so the new account holds those Events only as the
+                // merge's copies. One batch per call: the copy and its marker stay until none are left, and a retry, scheduled on the
+                // new shard, takes the next batch and finds the same marker.
+                if (args.table === "threads" && !(await deleteMcpEventsOfThread(ctx, args.to, id))) {
+                    await runAfterOnShard(
+                        ctx.scheduler,
+                        0,
+                        internal.lib.account_merge.dropRowsGoneFromGuest,
+                        { from: args.from, generation: args.generation, ids: [id], table: args.table, to: args.to },
+                        args.to,
+                    );
+
+                    continue;
+                }
+
                 await db.delete(args.table, id);
                 dropped += 1;
-
-                // The thread's Events were copied with it. Its id is the guest's, so the new account holds those Events only as the
-                // merge's copies, and they go with the copy. One batch per call.
-                if (args.table === "threads") {
-                    while (!(await deleteMcpEventsOfThread(ctx, args.to, id))) {
-                        // Each call removes up to one batch; the loop ends once none are left.
-                    }
-                }
             }
         }
 
