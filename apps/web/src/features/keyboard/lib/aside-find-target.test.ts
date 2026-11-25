@@ -36,6 +36,22 @@ describe("hasAsideFindTarget", () => {
         expect(hasAsideFindTarget()).toBe(false);
     });
 
+    it("is false when the sidebar is collapsed off-canvas with focus still inside the panel", () => {
+        document.body.innerHTML = `<div data-slot="sidebar" data-state="collapsed"><section data-aside-find-host="" tabindex="-1"><textarea id="inside"></textarea></section></div>`;
+
+        document.querySelector<HTMLElement>("#inside")?.focus();
+
+        expect(hasAsideFindTarget()).toBe(false);
+    });
+
+    it("is true while the sidebar is expanded", () => {
+        document.body.innerHTML = `<div data-slot="sidebar" data-state="expanded"><section data-aside-find-host="" tabindex="-1"><textarea id="inside"></textarea></section></div>`;
+
+        document.querySelector<HTMLElement>("#inside")?.focus();
+
+        expect(hasAsideFindTarget()).toBe(true);
+    });
+
     it("is false when the panel is hidden with focus still inside it", () => {
         document.body.innerHTML = `<div style="display: none"><section data-aside-find-host="" tabindex="-1"><textarea id="inside"></textarea></section></div>`;
 

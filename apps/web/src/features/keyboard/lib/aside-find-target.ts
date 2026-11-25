@@ -24,8 +24,14 @@ const isShown = (element: Element): boolean => {
     return true;
 };
 
+/**
+ * The desktop sidebar's root, marked `data-state="collapsed"` when it is closed. Its panel is slid off-canvas by a
+ * transform, which `isShown` cannot see, so a collapsed sidebar is checked for by name.
+ */
+const COLLAPSED_SIDEBAR = `[data-slot="sidebar"][data-state="collapsed"]`;
+
 export const hasAsideFindTarget = (): boolean => {
     const host = document.activeElement?.closest(`[${CSS.escape(ASIDE_FIND_HOST_ATTRIBUTE)}]`);
 
-    return host != null && isShown(host);
+    return host != null && isShown(host) && host.closest(COLLAPSED_SIDEBAR) == null;
 };
