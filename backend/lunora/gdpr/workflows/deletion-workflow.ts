@@ -833,6 +833,18 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 ),
         );
 
+        // An Event recorded before the sessions were revoked can land after the first Events drain, as a follow row can. The
+        // final drain takes what is left once no new one is admitted.
+        await drain(
+            "delete-user-mcp-events-final",
+            async (round) =>
+                await context.run(
+                    internal.public_api.gdpr.deleteUserMcpEvents,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-mcp-events-final", round) },
+                ),
+        );
+
         await drain(
             "delete-user-identity",
             async (round) =>
