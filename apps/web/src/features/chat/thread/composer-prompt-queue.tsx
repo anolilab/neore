@@ -56,6 +56,7 @@ import { useChatActions, useChatError, useChatIsStreaming, useChatThread } from 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-store";
 import { allowPromptQueueRestore, selectThreadQueue, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
+import type { HeldSend } from "@/features/chat/core/stores/queue-edit-store";
 import { selectThreadEdit, useQueueEditStore } from "@/features/chat/core/stores/queue-edit-store";
 import type { QueuedSteer, SteerWithdrawal } from "@/features/chat/core/utils/prompt-queue";
 import { cleanPromptText, decideAutoSend, deliveredSteerItems, takeNextToSend } from "@/features/chat/core/utils/prompt-queue";
@@ -75,6 +76,40 @@ const headIsBeingEdited = (threadId: string): boolean => {
     const edit = useQueueEditStore.getState().editing[threadId];
 
     return head !== undefined && edit?.id === head.id;
+};
+
+/**
+ * The one rule every release path follows for a held send: the edit's close, a reply's end or a chat's switch-in, and a
+ * permission-mode save's end. The hold goes now or stays held for Send next:
+ * - unpaused: it goes, with its intent;
+ * - paused by a chat error and explicit: the pause is lifted and it goes, as Send next does;
+ * - anything else (a failed save's pause, a Stop, an automatic send behind an error): it stays held.
+ * A queue seen unpaused drops any failed-save mark, which described a pause that has ended.
+ */
+const takeReleasableHeldSend = (threadId: string, paused: boolean, hasError: boolean): HeldSend | undefined => {
+    const store = useQueueEditStore.getState();
+
+    if (!paused && store.failedSave[threadId] === true) {
+        store.markFailedSave(threadId, false);
+    }
+
+    const held = store.held[threadId];
+
+    if (held === undefined) {
+        return undefined;
+    }
+
+    if (paused) {
+        const liftable = held.explicit && hasError && store.failedSave[threadId] !== true;
+
+        if (!liftable) {
+            return undefined;
+        }
+
+        usePromptQueueStore.getState().setPaused(threadId, false);
+    }
+
+    return store.takeHeldSend(threadId);
 };
 
 /**
@@ -773,16 +808,10 @@ const ComposerPromptQueue: FC = () => {
         wasModeSaving.current = modeSaving;
 
         if (ended && threadId && !isStreaming && queue.items.length > 0) {
-            // A send held while the save ran goes now, with its intent: an explicit one resumes a paused queue, as Send next does.
-            const held = useQueueEditStore.getState().takeHeldSend(threadId);
+            // A send held while the save ran goes now, under the shared release rule.
+            const held = takeReleasableHeldSend(threadId, queue.paused, Boolean(error));
 
             if (held) {
-                // A pause here came from a failed save or a stop: the held send does not override it. An explicit send
-                // still goes after a chat error, as canSend allows.
-                if (queue.paused) {
-                    return;
-                }
-
                 void sendNextPrompt(threadId, { explicit: held.explicit });
 
                 return;
@@ -809,22 +838,16 @@ const ComposerPromptQueue: FC = () => {
             return;
         }
 
-        const held = useQueueEditStore.getState().takeHeldSend(threadId);
-
-        if (!held || queue.items.length === 0) {
+        if (queue.items.length === 0) {
             return;
         }
 
-        // An explicit send (Send next) goes even after an error, resuming the queue as its own button does.
-        // A pause a failed permission-mode save set is not the reply's: the explicit send does not clear it.
-        if (held.explicit && useQueueEditStore.getState().failedSave[threadId] !== true) {
-            usePromptQueueStore.getState().setPaused(threadId, false);
-        } else if (queue.paused) {
-            return;
-        }
+        const held = takeReleasableHeldSend(threadId, queue.paused, Boolean(error));
 
-        void sendNextPrompt(threadId, { explicit: held.explicit });
-    }, [editOpen, isStreaming, modeSaving, queue.items.length, queue.paused, sendNextPrompt, threadId]);
+        if (held) {
+            void sendNextPrompt(threadId, { explicit: held.explicit });
+        }
+    }, [editOpen, error, isStreaming, modeSaving, queue.items.length, queue.paused, sendNextPrompt, threadId]);
 
     // A send held while the edit closed during a reply goes when that reply ends. An explicit one (Send next) goes even after
     // an error, resuming the queue as its own button does; an automatic one waits for the usual rules.
@@ -845,21 +868,12 @@ const ComposerPromptQueue: FC = () => {
             return;
         }
 
-        const held = useQueueEditStore.getState().takeHeldSend(threadId);
+        const held = takeReleasableHeldSend(threadId, queue.paused, Boolean(error));
 
-        if (!held) {
-            return;
+        if (held) {
+            void sendNextPrompt(threadId, { explicit: held.explicit });
         }
-
-        // A pause a failed permission-mode save set is not the reply's: the explicit send does not clear it.
-        if (held.explicit && useQueueEditStore.getState().failedSave[threadId] !== true) {
-            usePromptQueueStore.getState().setPaused(threadId, false);
-        } else if (queue.paused) {
-            return;
-        }
-
-        void sendNextPrompt(threadId, { explicit: held.explicit });
-    }, [isStreaming, modeSaving, queue.items.length, queue.paused, sendNextPrompt, threadId]);
+    }, [error, isStreaming, modeSaving, queue.items.length, queue.paused, sendNextPrompt, threadId]);
 
     const handleRemove = useCallback(
         (id: string) => {

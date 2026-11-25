@@ -1068,6 +1068,27 @@ describe("composer prompt queue", () => {
         expect(usePromptQueueStore.getState().queues[chat.threadId]?.paused).toBe(true);
     });
 
+    it("an explicit held send does not lift a Stop's pause when no chat error is set", async () => {
+        chat.error = undefined;
+
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        useQueueEditStore.getState().holdSend(chat.threadId, true);
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.paused).toBe(true);
+    });
+
     it("moves a dropped message to where it lands in the queue", async () => {
         const { enqueue, setPaused } = usePromptQueueStore.getState();
 
