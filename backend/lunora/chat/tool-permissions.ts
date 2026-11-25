@@ -822,14 +822,18 @@ export const recordPendingToolApprovals = internalMutation
                 return questionIds.has(approvalId) ? "question" : "approval";
             };
 
-            for (const approvalId of uniqueIds) {
-                await recordMcpEvent(ctx, {
-                    data: { kind: kindOf(approvalId), requestId: approvalId, threadId },
-                    eventId: `${APPROVAL_REQUESTED_EVENT}:${approvalId}`,
-                    name: APPROVAL_REQUESTED_EVENT,
-                    timestamp: createdAt,
-                    userId: ownerId,
-                });
+            // A thread that is gone has no one to answer its requests, and its events are kept out of every poll (a deleted thread's
+            // events go with it): none is recorded for it.
+            if (thread !== null) {
+                for (const approvalId of uniqueIds) {
+                    await recordMcpEvent(ctx, {
+                        data: { kind: kindOf(approvalId), requestId: approvalId, threadId },
+                        eventId: `${APPROVAL_REQUESTED_EVENT}:${approvalId}`,
+                        name: APPROVAL_REQUESTED_EVENT,
+                        timestamp: createdAt,
+                        userId: ownerId,
+                    });
+                }
             }
 
             // A question the owner was asked in this thread stays the thing it waits on: an approval does not overwrite it.
