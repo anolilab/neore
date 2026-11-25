@@ -5,7 +5,7 @@ import { registerModule } from "../../test/registered-api";
 import { runInShard } from "../lib/shard-context";
 import { runShardTick } from "../lib/shard-housekeeping";
 import { schemaWithShardedTables } from "../lib/test-schema";
-import { pruneMcpEvents } from "./events";
+import { pruneMcpEvents, pruneMcpEventsBacklog } from "./events";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
 
@@ -15,7 +15,7 @@ vi.mock("../_generated/internal", async (importOriginal) => {
     return wire(await importOriginal(), registry);
 });
 
-registerModule(registry, "public_api_events", { pruneMcpEvents });
+registerModule(registry, "public_api_events", { pruneMcpEvents, pruneMcpEventsBacklog });
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Rows one tick prunes: a single batch of 200, in its own transaction; the rest is a tick of its own. */
@@ -67,6 +67,43 @@ describe("a tick facing an Events backlog larger than its rounds", () => {
 
             expect(remaining).toBe(backlog - TICK_ROWS);
             expect(census?.nextDueAt).toBeDefined();
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("prunes one batch per call of its own job, leaving the rest for the next", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const now = Date.now();
+            const backlog = 2 * TICK_ROWS + 5;
+
+            await runInShard("user", async () => {
+                await harness.run(async (context: any) => {
+                    for (let index = 0; index < backlog; index += 1) {
+                        await context.db.insert("mcpEvents", {
+                            createdAt: now - 10 * DAY_MS,
+                            data: "{}",
+                            eventId: `run:old${String(index)}`,
+                            name: "run.completed",
+                            seq: index + 1,
+                            timestamp: now - 10 * DAY_MS,
+                            userId: "user",
+                        });
+                    }
+                });
+
+                await harness.run(async (context: any) => await context.runMutation(pruneMcpEventsBacklog, {}));
+            });
+
+            const remaining = (await harness.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10_000, where: { userId: "user" } });
+
+                return page.length;
+            })) as number;
+
+            expect(remaining).toBe(backlog - TICK_ROWS);
         } finally {
             harness.close();
         }

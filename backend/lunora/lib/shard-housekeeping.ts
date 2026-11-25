@@ -586,7 +586,7 @@ export const runShardTick = internalMutation
 
         if (eventsLeft && shardKey !== undefined) {
             await bestEffort("pruneMcpEventsNext", async () => {
-                await runAfterOnShard(ctx.scheduler, 0, internal.lib.shard_housekeeping.runShardTick, {}, shardKey);
+                await runAfterOnShard(ctx.scheduler, 0, internal.public_api.events.pruneMcpEventsBacklog, {}, shardKey);
             });
         }
 
