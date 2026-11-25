@@ -5,14 +5,16 @@
  * The cursor is decoded and encoded by the router (`router.ts`), where the signing secret lives. These functions speak in
  * seq numbers only.
  */
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { pollEvents as pollLog } from "./events-poll";
 import type { EventLogStore } from "./events-poll";
-import { RETENTION_MS } from "./events-log";
+import { EVENT_WAKE_MAX_ATTEMPTS, EVENT_WAKE_RETRY_MS, RETENTION_MS } from "./events-log";
 import { noteRetentionWake } from "../lib/shard-housekeeping";
+import { runAfterOnShard } from "../lib/shard-scheduler";
+import { internal } from "../_generated/internal";
 
 /** Rows the sweep deletes per call. The sweep runs again while it reports more. */
 const PRUNE_BATCH = 200;
@@ -127,3 +129,30 @@ export const pruneMcpEvents = internalMutation.output(v.object({ hasMore: v.bool
 
     return { hasMore, removed: page.length };
 });
+
+/**
+ * The retry of a wake that failed (`wakeForExpiry` in `events-log.ts`), run on the owner's shard: it writes the wake again, or schedules the
+ * next attempt after a longer wait. After the last attempt it fails visibly, so the gap shows in the job's record.
+ */
+export const retryEventWake = internalMutation
+    .input({ attempt: v.number(), dueAt: v.number(), userId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        if (await noteRetentionWake(ctx, args.dueAt, args.userId)) {
+            return null;
+        }
+
+        if (args.attempt >= EVENT_WAKE_MAX_ATTEMPTS) {
+            throw new LunoraError("INTERNAL", `The Events log's wake for ${args.userId} could not be written after ${String(args.attempt)} attempts.`);
+        }
+
+        await runAfterOnShard(
+            ctx.scheduler,
+            EVENT_WAKE_RETRY_MS * 2 ** (args.attempt - 1),
+            internal.public_api.events.retryEventWake,
+            { attempt: args.attempt + 1, dueAt: args.dueAt, userId: args.userId },
+            args.userId,
+        );
+
+        return null;
+    });

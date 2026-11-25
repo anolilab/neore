@@ -287,12 +287,13 @@ export const noteRetentionDueAt = async (ctx: CensusCtx, dueAt: number, shardKey
  * A reply's retained rows, expiring at `dueAt`: brings the shard's wake and its retained-rows time forward to it, if either is later (or
  * unset). One census read covers both, where two calls read it twice.
  */
-export const noteRetentionWake = async (ctx: CensusCtx, dueAt: number, shardKey: string | undefined = currentUserShard()): Promise<void> => {
+export const noteRetentionWake = async (ctx: CensusCtx, dueAt: number, shardKey: string | undefined = currentUserShard()): Promise<boolean> => {
     if (shardKey === undefined) {
-        return;
+        return true;
     }
 
-    await bestEffort("noteRetentionWake", async () => {
+    // Whether the wake was written: a caller that must not lose it (the Events log's retry) acts on a failure.
+    return await bestEffort("noteRetentionWake", async () => {
         const row = await censusRow(ctx, shardKey, "primary");
 
         if (!row) {
