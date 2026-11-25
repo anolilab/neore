@@ -23,7 +23,7 @@ import { isHostCapabilityAvailable } from "./capabilities";
 import { requireCapability } from "./capability-gate";
 import { DEVELOP_DRIVER } from "./develop-driver";
 import { recordMergedPullRequest } from "./pr-merged";
-import { MERGE_TIME_PRECISION_MS } from "./pr-threads";
+import { MERGE_TIME_PRECISION_MS } from "./pr-thread-links";
 import { readFromHost } from "./read-host";
 import { vFailed, vMergeMethod, vWriteFailed } from "./validators";
 import { writeToHost } from "./write-host";

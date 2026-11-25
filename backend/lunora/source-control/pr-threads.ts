@@ -23,7 +23,7 @@ import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import { GITHUB_WEB_ORIGIN, splitGithubRepo } from "./drivers/github";
 import { rereadRelinkedLink } from "./pr-state";
-import { noteMergeAttemptRow, pullRequestLinksOf, settleMergedLinkRow, someLinkOfThread } from "./pr-thread-links";
+import { MERGE_TIME_PRECISION_MS, noteMergeAttemptRow, pullRequestLinksOf, settleMergedLinkRow, someLinkOfThread } from "./pr-thread-links";
 
 /** Threads kept per pull request: a list, not a history. The newest are the ones anyone is working in. */
 export const MAX_THREADS_PER_PULL_REQUEST = 50;
@@ -379,12 +379,6 @@ export const noteMergeAttempt = internalMutation
 
         return null;
     });
-
-/**
- * The host's merge time is whole seconds: the real merge fell in the second it names. A link made inside that second may
- * predate the merge, so only a link made at or after the end of that second is treated as made after it.
- */
-export const MERGE_TIME_PRECISION_MS = 1000;
 
 /** Whether the owner's merged-chat archiving is on, so a merge can be ordered against its opt-in: the merge action reads the host's time only then. */
 export const mergedArchiveOn = internalQuery

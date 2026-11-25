@@ -28,7 +28,7 @@ import {
     runArchivePass,
     selectAutoArchiveDue,
 } from "./auto-archive-logic";
-import { noteMergeAttemptRow, settleMergedLinkRow, settleOwedMergesOf, someLinkOfThread } from "../source-control/pr-thread-links";
+import { MERGE_TIME_PRECISION_MS, noteMergeAttemptRow, settleMergedLinkRow, settleOwedMergesOf, someLinkOfThread } from "../source-control/pr-thread-links";
 import { markThreadArchived } from "./threads";
 
 /** Threads archived per pass. The rest wait for the next pass, which is idempotent. */
@@ -266,8 +266,9 @@ const attemptMergedArchive = async (ctx: MutationCtx, args: MergedArchiveArgs): 
         return "link-declined";
     }
 
-    // A merge that predates the chat's last archive was covered by that archive: a reopened chat is not archived again for it.
-    if (thread.archivedAt !== undefined && link.mergedAt <= thread.archivedAt) {
+    // A merge that certainly predates the chat's last archive was covered by it: a reopened chat is not archived again for it. The
+    // merge time is known only to the second, so a merge in the archive's second is not treated as covered.
+    if (thread.archivedAt !== undefined && link.mergedAt + MERGE_TIME_PRECISION_MS <= thread.archivedAt) {
         return "link-declined";
     }
 

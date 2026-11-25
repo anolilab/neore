@@ -85,6 +85,12 @@ export const pullRequestLinksOf = async (ctx: Pick<MutationCtx, "db">, userId: s
 };
 
 /**
+ * The host's merge time is whole seconds: the real merge fell in the second it names. A link made inside that second may
+ * predate the merge, so only a link made at or after the end of that second is treated as made after it.
+ */
+export const MERGE_TIME_PRECISION_MS = 1000;
+
+/**
  * Marks a link's archive attempt for its merge as final: the chat was archived, or a guard or the setting declined it. The
  * archive calls this in the same transaction as the attempt, so a retry can never run after the chat was reopened.
  */
