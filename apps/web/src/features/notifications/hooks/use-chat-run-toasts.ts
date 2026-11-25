@@ -145,7 +145,8 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
     // A run starts and ends with its stream id. The outcome waits until the reply has settled (or the window passes).
     useEffect(() => {
         // A stream seen before the thread's messages are ready may be stale cache from an earlier visit: it is not a run to announce.
-        if (activeStreamId && !messagesReady && !run.current) {
+        // A browser-local reply has no cached stream to be stale, so it is tracked whether or not the messages are ready.
+        if (activeStreamId && !messagesReady && !run.current && activeStreamId !== LOCAL_BROWSER_REPLY_RUN) {
             return;
         }
 
