@@ -1076,6 +1076,10 @@ msgstr "{extraRowCount, plural, one {+# wiersz więcej} few {+# wiersze więcej}
 msgid "{failed} document(s) could not be added."
 msgstr "Nie udało się dodać dokumentów: {failed}."
 
+#: src/features/knowledge/hooks/use-knowledge-import.ts
+msgid "Skipped {tooLarge} document(s) over {REQUEST_DOCUMENT_KB} KB once encoded."
+msgstr "Pominięto {tooLarge} dokument(y) większe niż {REQUEST_DOCUMENT_KB} KB po zakodowaniu."
+
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:211
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:288
 #: src/features/auth/components/settings/account/update-field-card.tsx:73

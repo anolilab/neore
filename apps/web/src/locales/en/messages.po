@@ -1075,6 +1075,10 @@ msgstr "{extraRowCount, plural, one {+# more row} other {+# more rows}}"
 msgid "{failed} document(s) could not be added."
 msgstr "{failed} document(s) could not be added."
 
+#: src/features/knowledge/hooks/use-knowledge-import.ts
+msgid "Skipped {tooLarge} document(s) over {REQUEST_DOCUMENT_KB} KB once encoded."
+msgstr "Skipped {tooLarge} document(s) over {REQUEST_DOCUMENT_KB} KB once encoded."
+
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:211
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:288
 #: src/features/auth/components/settings/account/update-field-card.tsx:73
