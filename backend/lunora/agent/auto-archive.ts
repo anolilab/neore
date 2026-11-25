@@ -266,6 +266,11 @@ const attemptMergedArchive = async (ctx: MutationCtx, args: MergedArchiveArgs): 
         return "link-declined";
     }
 
+    // A merge that predates the chat's last archive was covered by that archive: a reopened chat is not archived again for it.
+    if (thread.archivedAt !== undefined && link.mergedAt <= thread.archivedAt) {
+        return "link-declined";
+    }
+
     const pinnedProjectIds = await pinnedProjectIdsOf(ctx, thread);
 
     // Judged as if the run were over: a pin or any other permanent reason declines this merge for good, even while a run is

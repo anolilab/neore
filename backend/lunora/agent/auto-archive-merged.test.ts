@@ -692,7 +692,8 @@ describe("archiveMergedThread", () => {
             });
         });
         const owedSecond = await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { mergedAt: 2000, number: 8, repository: REPOSITORY, userId: OWNER }),
+            async (ctx: any) =>
+                await ctx.runMutation(recordPullRequestMerged, { mergedAt: Date.now() + 1000, number: 8, repository: REPOSITORY, userId: OWNER }),
         );
 
         expect(owedSecond.map((row: { linkId: string }) => row.linkId)).toEqual([secondLink]);
@@ -819,6 +820,35 @@ describe("archiveMergedThread", () => {
         expect(
             await harness.run(async (ctx: any) => await ctx.runMutation(archiveMergedThread, { linkId, number: NUMBER, repository: REPOSITORY, threadId })),
         ).toBe("declined");
+    });
+
+    it("does not archive a reopened chat for a merge that happened before its manual archive, even when no read had recorded that merge", async () => {
+        const threadId = await setUp({ autoArchiveMergedChats: true, linked: false });
+        const linkId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 1,
+                    kind: "attached",
+                    number: NUMBER,
+                    repository: REPOSITORY,
+                    threadId,
+                    title: "Feature work",
+                    url: URL,
+                    userId: OWNER,
+                }),
+        );
+
+        // The owner archives the chat by hand before any read has seen the merge.
+        await harness.run(async (ctx: any) => await ctx.runMutation(archiveThread, { threadId }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { status: "active" }));
+
+        // Then a read finds the merge, which happened before that archive (time 1000 is earlier than the archive's now).
+        await seeMerge(1000);
+
+        expect(await statusOf(threadId)).toBe("active");
+        const link = await harness.run(async (ctx: any) => await ctx.db.get("pullRequestThreads", linkId));
+
+        expect(link?.mergeSettledAt).toBeTypeOf("number");
     });
 
     it("keeps a merged chat that another open pull request keeps, as the idle archive does", async () => {

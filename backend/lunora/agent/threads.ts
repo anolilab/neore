@@ -354,6 +354,7 @@ export const markThreadArchived = async (context: MutationContext, threadId: Id<
     const thread = await context.db.get("threads", threadId);
 
     await context.db.patch("threads", threadId, {
+        archivedAt: context.now,
         status: "archived",
         updatedAt: context.now,
     });

@@ -30105,6 +30105,12 @@
           "optional": true,
           "unique": false
         },
+        "archivedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "autoModel": {
           "kind": "boolean",
           "nullable": false,
