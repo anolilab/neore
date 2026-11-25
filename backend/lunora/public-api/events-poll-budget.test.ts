@@ -49,4 +49,15 @@ describe("a poll whose events are large", () => {
         expect(outcome.nextSeq).toBeGreaterThan(0);
         expect(outcome.nextSeq).toBeLessThan(40);
     });
+
+    it("budgets an event as the answer serializes it, so escape-heavy payloads cut the answer sooner", async () => {
+        // Each payload is 16383 bytes of JSON; the answer encodes that text again, which doubles the backslashes.
+        const escaped = Array.from({ length: 20 }, (_, index) => {
+            return { ...large(index + 1), data: { blob: "\\".repeat(8186), threadId: "open" } };
+        });
+        const outcome = await pollEvents(logOf(escaped), { fromSeq: 0, maxEvents: 50, name: "run.completed", now: NOW });
+
+        expect(outcome.events.length).toBeLessThan(20);
+        expect(outcome.hasMore).toBe(true);
+    });
 });
