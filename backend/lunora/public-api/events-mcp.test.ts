@@ -142,6 +142,25 @@ describe("the read allowance a poll draws on", () => {
     });
 });
 
+describe("an unsupported poll's read allowance", () => {
+    it("is drawn: a request that did not offer the extension is refused as an unknown method, and still uses the allowance", async () => {
+        const charge = vi.fn(async () => undefined);
+        // No `_meta` offer: the extension was not negotiated, so the poll is refused before the router.
+        const request = modern("events/poll", { cursor: null, name: "run.completed" }, "run.completed");
+
+        const response = await serveMcp(request.body, {
+            ...dependenciesWith(
+                request,
+                pollingWith(async () => pollBody),
+            ),
+            chargeProtocolCall: charge,
+        });
+
+        expect(charge).toHaveBeenCalledTimes(1);
+        expect(await response.json()).toMatchObject({ error: { code: expect.any(Number) } });
+    });
+});
+
 describe("events/poll", () => {
     it("starts from now with a null cursor and returns the complete result", async () => {
         const poll = pollingWith(async () => pollBody);

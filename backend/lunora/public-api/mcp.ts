@@ -446,6 +446,9 @@ export const serveMcp = async (rawBody: string, dependencies: McpDependencies): 
     // Method not found, as if the method did not exist.
     if (method.startsWith("events/")) {
         if (!era.modern || !negotiatesEvents(params) || events === undefined) {
+            // An unsupported poll is refused without reaching the router, so it is charged here, as every other protocol call is.
+            await dependencies.chargeProtocolCall();
+
             return rpcError(id, METHOD_NOT_FOUND, `Method not found: ${method}`, { status: era.modern ? 404 : 200 });
         }
 
