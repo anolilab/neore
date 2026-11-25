@@ -200,12 +200,19 @@ export const retryEventWake = internalMutation
 
 /**
  * The rest of a trashed chat's events, one batch per call (`softDeleteThread` in `agent/threads.ts` runs the first batch in the trash
- * write and schedules this for any left). Each call runs in its own transaction and schedules the next while events remain.
+ * write and schedules this for any left). Each call runs in its own transaction and schedules the next while events remain. It stops
+ * as soon as the chat is no longer in the trash: a restored chat's events, recorded since, are not this batch's to remove.
  */
 export const deleteTrashedThreadEvents = internalMutation
     .input({ threadId: v.string(), userId: v.string() })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
+        const thread = await ctx.db.threads.findFirst({ consistency: "primary", where: { _id: args.threadId as Id<"threads"> } });
+
+        if (thread === null || thread.deleted !== true) {
+            return null;
+        }
+
         if (!(await deleteMcpEventsOfThread(ctx, args.userId, args.threadId))) {
             await runAfterOnShard(ctx.scheduler, 0, internal.public_api.events.deleteTrashedThreadEvents, args, args.userId);
         }
