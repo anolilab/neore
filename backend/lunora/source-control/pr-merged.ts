@@ -33,6 +33,7 @@ export const recordMergedPullRequest = async (
     ref: MergedPullRequestRef,
     mergedAt?: number,
     mergedBefore?: number,
+    mergedBeforeIsHostBound?: boolean,
 ): Promise<void> => {
     try {
         // Links are stored under the canonical (lowercase) repository, so the lookup must use it too; an invalid address throws here and is logged.
@@ -40,6 +41,7 @@ export const recordMergedPullRequest = async (
         const owed = await ctx.runMutation(internal.source_control.pr_threads.recordPullRequestMerged, {
             ...(mergedAt !== undefined && { mergedAt }),
             ...(mergedBefore !== undefined && { mergedBefore }),
+            ...(mergedBeforeIsHostBound !== undefined && { mergedBeforeIsHostBound }),
             number: address.number,
             repository: address.repository,
             userId,

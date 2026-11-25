@@ -163,7 +163,7 @@ export const mergePullRequest = authAction
             // records the merge with the host's time and then counts it.
             const mergedBefore = hostAt === undefined ? requestedAt : hostAt + MERGE_TIME_PRECISION_MS;
 
-            await recordMergedPullRequest(ctx, ctx.user.userId, ref, mergedAt, mergedBefore);
+            await recordMergedPullRequest(ctx, ctx.user.userId, ref, mergedAt, mergedBefore, hostAt !== undefined);
         }
 
         return outcome;

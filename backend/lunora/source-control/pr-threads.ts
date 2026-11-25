@@ -428,6 +428,8 @@ export const recordPullRequestMerged = internalMutation
         mergedAt: v.optional(v.number()),
         /** The merge's upper-bound time: a link created at or after it was not part of the merge. Absent: `mergedAt` plus a second. */
         mergedBefore: v.optional(v.number()),
+        /** False when `mergedBefore` is not the host's bound (the host gave no merge time): it orders the links, but it is not stored. */
+        mergedBeforeIsHostBound: v.optional(v.boolean()),
         number: v.number(),
         repository: v.string().max(MAX_LENGTH.short),
         userId: v.string().max(MAX_LENGTH.id),
@@ -459,7 +461,15 @@ export const recordPullRequestMerged = internalMutation
 
                 // The host's merge time when the read had it, else now: the export shows when the merge happened, not when it was seen.
                 // The host said merged: the link's state says so too, so the open-pull-request rule (`pr-state.ts`) no longer keeps its chat.
-                await ctx.db.patch("pullRequestThreads", link._id, { mergedAt, mergedBefore, state: "merged" });
+                // The bound is stored only when the host gave the merge time: a bound made from the request time says nothing about when
+                // the merge happened, so the reopen guard must not decline on it.
+                const storeBound = args.mergedBeforeIsHostBound !== false;
+
+                await ctx.db.patch("pullRequestThreads", link._id, {
+                    mergedAt,
+                    state: "merged",
+                    ...(storeBound && { mergedBefore }),
+                });
             } else {
                 // A link marked earlier keeps its merge time. A relink may have reset its state to open, but the host's merge still
                 // holds, so the state is restored before the link is skipped or judged.
