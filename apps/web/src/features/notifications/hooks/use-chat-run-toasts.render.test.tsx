@@ -154,6 +154,14 @@ describe("useChatRunToasts: the other toasts still show", () => {
         expect(toastError).toHaveBeenCalledTimes(1);
     });
 
+    it("announces a call that arrives after an empty first snapshot", () => {
+        const { rerender } = setup({ ...idle, messages: [], settings: {} });
+
+        rerender({ ...idle, messages: waitingOn("call-late"), settings: {} });
+
+        expect(toastWarning).toHaveBeenCalledTimes(1);
+    });
+
     it("announces nothing for a call already waiting when the thread opens", () => {
         setup({ ...idle, messages: waitingOn("call-open") });
 

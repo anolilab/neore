@@ -29,7 +29,7 @@ const useChatRunToasts = ({ activeStreamId, error, messages, settings, threadId 
     // The run in progress: whether it failed, and the thread it belongs to.
     const run = useRef<{ failed: boolean; streamId: string; threadId: string | undefined } | undefined>(undefined);
     const lastError = useRef<AppError | null>(null);
-    const approvals = useRef<{ count: number; ids: ReadonlySet<string>; threadId: string | undefined } | undefined>(undefined);
+    const approvals = useRef<{ ids: ReadonlySet<string>; threadId: string | undefined } | undefined>(undefined);
 
     // A run starts and ends with its stream id. Ending without a failure is a finish, unless the run stopped to wait for the person.
     useEffect(() => {
@@ -92,14 +92,15 @@ const useChatRunToasts = ({ activeStreamId, error, messages, settings, threadId 
         }
     }, [error, settings, t]);
 
-    // A tool call that starts waiting for the person. The first loaded snapshot of a thread only records what is already waiting.
+    // A tool call that starts waiting for the person. The first snapshot of a thread only records what is already waiting.
+    // Every later arrival is announced: a repeated alert for an approval already on screen is harmless, a missed one is not.
     useEffect(() => {
         const ids = new Set(waitingApprovalIds(messages));
         const previous = approvals.current;
 
-        approvals.current = { count: messages.length, ids, threadId };
+        approvals.current = { ids, threadId };
 
-        if (!previous || previous.threadId !== threadId || previous.count === 0) {
+        if (!previous || previous.threadId !== threadId) {
             return;
         }
 
