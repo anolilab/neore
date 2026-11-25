@@ -159,7 +159,7 @@ const cliRun = (status: string, exitCode = status === "completed" ? 0 : 1): CliR
 };
 
 /** Runs the loop with a fake CLI that answers `answers[id]` in turn, and records every call, pause and printed line. */
-const runWith = async (ids: string[], answers: Record<string, CliRun[]>) => {
+const runWith = async (ids: string[], answers: Record<string, CliRun[]>, production = true) => {
     const calls: string[] = [];
     const pauses: number[] = [];
     const printed: string[] = [];
@@ -170,7 +170,7 @@ const runWith = async (ids: string[], answers: Record<string, CliRun[]>) => {
         log: (line) => {
             printed.push(line);
         },
-        production: true,
+        production,
         run: (id) => {
             calls.push(id);
 
@@ -224,6 +224,38 @@ describe("the data migration runner", () => {
         expect(calls).toStrictEqual(["a"]);
         expect(pauses).toStrictEqual([]);
         expect(exitCode).not.toBe(0);
+    });
+
+    it("names the worker's refusal by its code in production, with no message", async () => {
+        const refused: CliRun = {
+            status: 4,
+            stdout: JSON.stringify({ code: 4, data: { id: "a", result: { error: { code: "FORBIDDEN", message: "Admin auth required" } } } }),
+        };
+        const { calls, exitCode, output } = await runWith(["a", "b"], { a: [refused] });
+
+        expect(calls).toStrictEqual(["a"]);
+        expect(output).toContain("worker refused: FORBIDDEN");
+        expect(output).not.toContain("Admin auth required");
+        expect(exitCode).not.toBe(0);
+    });
+
+    it("prints the refusal's message and the CLI's redacted stderr outside production", async () => {
+        const crashed: CliRun = {
+            status: 1,
+            stderr: `info  POST ${ADMIN_URL} -> up a\nerror  could not reach ${ADMIN_URL}: fetch failed\n`,
+            stdout: "",
+        };
+        const { exitCode, output } = await runWith(["a"], { a: [crashed] }, false);
+
+        expect(output).toContain("| error  could not reach <url>: fetch failed");
+        expect(exitCode).not.toBe(0);
+    });
+
+    it("prints no stderr in production", async () => {
+        const crashed: CliRun = { status: 1, stderr: "error  something broke\n", stdout: "" };
+        const { output } = await runWith(["a"], { a: [crashed] });
+
+        expect(output).not.toContain("something broke");
     });
 
     it("stops at once on output it cannot read", async () => {

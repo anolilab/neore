@@ -5,8 +5,8 @@
  *
  * Reads `BACKEND_URL` and `STAGE`; the CLI reads the admin token from `LUNORA_ADMIN_TOKEN` (never `--token`, which the
  * process table shows). The run log is public, so only ids and counts are printed: the CLI's own output (shard keys,
- * per-shard results, the request URL) is captured and dropped. Outside production a failure also prints the CLI's
- * own error (a refusal, an unreachable worker), which names the URL; production prints none.
+ * per-shard results, the request URL) is captured and dropped. A failure prints the worker's refusal code; outside
+ * production also its message and the last lines of the CLI's stderr with every URL replaced. Production prints no more.
  *
  * A run stays `in_progress` when a shard did not finish or did not answer in time (the CLI then exits non-zero too). It
  * resumes from each shard's cursor, so it is retried after a pause. `failed`, or output that cannot be read, stops the
@@ -53,7 +53,7 @@ process.exitCode = await runDataMigrations(ids, {
             encoding: "utf8",
             env: process.env,
             maxBuffer: MAX_OUTPUT_BYTES,
-            stdio: ["ignore", "pipe", "ignore"],
+            stdio: ["ignore", "pipe", "pipe"],
         }),
     sleep,
 });

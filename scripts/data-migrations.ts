@@ -62,6 +62,10 @@ export interface MigrationRunSummary {
     changed: number;
     /** The CLI's own error, when it refused or could not reach the worker. It names the URL, so it is never printed in production. */
     error: string | undefined;
+    /** The worker's refusal (`data.result.error`), e.g. `FORBIDDEN`. Its code names no URL and no row. */
+    resultErrorCode: string | undefined;
+    /** That refusal's message; printed outside production only. */
+    resultErrorMessage: string | undefined;
     exitCode: number;
     failedShards: number;
     okShards: number;
@@ -88,6 +92,7 @@ export const summarizeMigrationRun = (stdout: string, exitCode: number): Migrati
     }
 
     const result = parsed?.data?.result;
+    const resultError = (result?.error ?? undefined) as { code?: unknown; message?: unknown } | undefined;
     const shards = Array.isArray(result?.shards) ? (result.shards as { error?: { timedOut?: unknown } }[]) : [];
 
     return {
@@ -97,6 +102,8 @@ export const summarizeMigrationRun = (stdout: string, exitCode: number): Migrati
         failedShards: count(result?.failed),
         okShards: count(result?.ok),
         processed: count(result?.processed),
+        resultErrorCode: typeof resultError?.code === "string" ? resultError.code : undefined,
+        resultErrorMessage: typeof resultError?.message === "string" ? resultError.message : undefined,
         status: typeof result?.status === "string" ? result.status : "unknown",
         timedOutShards: shards.filter((shard) => shard.error?.timedOut === true).length,
     };
@@ -111,8 +118,21 @@ export interface CliRun {
     /** Set when the CLI did not run (ENOENT) or its output was cut off (ENOBUFS). */
     error?: Error | undefined;
     status: number | null;
+    /** The CLI's log; it names the request URL, so only its redacted tail is printed, and never in production. */
+    stderr?: string | null;
     stdout: string | null;
 }
+
+/** How many of the CLI's last stderr lines a failure prints outside production. */
+const STDERR_TAIL_LINES = 15;
+
+/** The last lines of the CLI's log with every URL replaced, so a host or query string never reaches the public log. */
+export const redactedStderrTail = (stderr: string): string[] =>
+    stderr
+        .split("\n")
+        .map((line) => line.replaceAll(/https?:\/\/[^\s"'<>]*[^\s"'<>:,.;)]/gu, "<url>").trimEnd())
+        .filter((line) => line !== "")
+        .slice(-STDERR_TAIL_LINES);
 
 export interface RunMigrationsOptions {
     error: (line: string) => void;
@@ -148,8 +168,23 @@ export const runDataMigrations = async (ids: readonly string[], options: RunMigr
             } else if (summary.status === "in_progress" && attempt < MIGRATION_ATTEMPTS) {
                 await options.sleep(MIGRATION_PAUSE_MS);
             } else {
+                if (summary.resultErrorCode !== undefined) {
+                    options.log(
+                        options.production || summary.resultErrorMessage === undefined
+                            ? `  worker refused: ${summary.resultErrorCode}`
+                            : `  worker refused: ${summary.resultErrorCode}: ${summary.resultErrorMessage}`,
+                    );
+                }
+
                 if (!options.production && summary.error !== undefined) {
                     options.log(`  ${summary.error}`);
+                }
+
+                // A CLI that failed before writing JSON says why only on stderr.
+                if (!options.production && run.stderr) {
+                    for (const tail of redactedStderrTail(run.stderr)) {
+                        options.log(`  | ${tail}`);
+                    }
                 }
 
                 break;
