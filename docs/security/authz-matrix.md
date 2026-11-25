@@ -346,7 +346,7 @@ for a schema table that is neither policed nor listed:
 | `chat_functions.softDeleteThread` | mutation | authMutation + RL | threads | refused while impersonating (trashing withdraws the guest link and held notes); row.userId == caller | ok |
 | `chat_functions.terminateBrowserSession` | mutation | authMutation + RL | — | row.userId == caller | ok |
 | `chat_functions.testMCPServerConnection` | action | authAction + RL | — | caller-scoped (ctx.user) | **fixed** (medium) — SSRF guard (`assertSafeMcpUrl`) on the URL |
-| `chat_functions.undoDeleteThread` | mutation | authMutation + RL | threads | refused while impersonating; row.userId == caller | ok |
+| `chat_functions.undoDeleteThread` | action | authAction + RL | threads | refused while impersonating; row.userId == caller (checked before the drain and the restore, which run as separate transactions) | ok |
 | `chat_functions.unpinThread` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `chat_functions.updateBrowserSettings` | mutation | authMutation + RL | aiUserPreferences | caller-scoped (ctx.user) | ok |
 | `chat_functions.setBrowserClickMode` | mutation | authMutation + RL | aiUserPreferences | caller-scoped (ctx.user) | ok — new; chooses how the caller's agent clicks (`browserClickMode`); a real-click mode (`pointer`, `all`) is refused while impersonating (`refuseImpersonation`), going back to `page` is not |
