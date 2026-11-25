@@ -61,6 +61,11 @@ export const Ratelimit = {
  * keeps the same checking on the values while preserving the literal keys.
  */
 export const RATE_LIMIT_CONFIGS = {
+    // `POST /admin/backfill-email-canonical`, per client IP and charged before the
+    // token check, like `admin/seedInvitations`. The deploy calls it once per batch
+    // until it is done, so its window is wider; a caller over it is told when to
+    // come back (`retry-after`).
+    "admin/backfillEmailCanonical": Ratelimit.fixedWindow(300, 15 * MINUTE),
     // Admin cleanup: a bulk delete over every eligible account.
     "admin/cleanup:free": Ratelimit.fixedWindow(5, HOUR),
 

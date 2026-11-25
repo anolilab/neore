@@ -131,6 +131,13 @@ Write`; without them the deploy fails, hence the switch.
   answers at once, so a deploy only pays one fan-out per migration. The admin token reaches the CLI only as `LUNORA_ADMIN_TOKEN` in the step's environment;
   the log shows ids and counts only, and production no error detail. A failed or unfinished
   migration fails the job. `backend/deploy-migrations.test.ts` pins it.
+- **A `defineMigration` never reaches a `.global()` table.** It runs in each shard's Durable Object, so on a D1 table
+  it fails on the root shard (staging: `shard "__root__" returned 500`) and stops every migration after it. The runner
+  refuses one, reading the shard modes from `backend/lunora/.lunora-schema.json`, and a test fails first. Backfill a
+  D1 table through an internal mutation behind an admin route the same step calls: `user.emailCanonical` is filled by
+  `POST /admin/backfill-email-canonical` (`backend/lunora/auth/email-canonical-backfill.ts`), one batch per call until
+  `done`, before the shard migrations; each runs whether the other fails, and either failing fails the job. Two
+  accounts whose addresses fold to one stop it with a count (409), with neither filled: merge or rename one.
 - **A Worker that passes the size cap can still fail Cloudflare's startup check** ("Script startup
   exceeded CPU time limit", error 10021): the module-level code of the whole bundle may take 1 s of
   CPU, and it is checked at upload, so it first shows on a deploy. `cd backend && pnpm exec wrangler

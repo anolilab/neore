@@ -7,13 +7,18 @@ import { join, relative } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import type { CliRun } from "../scripts/data-migrations";
+import ts from "typescript";
+
+import type { BackfillCall, CliRun } from "../scripts/data-migrations";
 import {
     declaredMigrationIds,
     formatMigrationRun,
+    globalTablesOf,
     MIGRATION_ATTEMPTS,
     MIGRATIONS_MODULE,
     runDataMigrations,
+    runEmailCanonicalBackfill,
+    SCHEMA_BASELINE,
     summarizeMigrationRun,
 } from "../scripts/data-migrations";
 import * as migrations from "./lunora/migrations"; // eslint-disable-line import/no-namespace -- every export is a migration
@@ -24,6 +29,28 @@ const smokeAt = workflow.indexOf('- name: "Smoke test the deployment"');
 const start = workflow.indexOf(`- name: "Run the backend's data migrations"`);
 const step = workflow.slice(start);
 const runner = readFileSync(join(REPO_ROOT, "scripts/run-data-migrations.ts"), "utf8");
+const baseline = readFileSync(join(REPO_ROOT, SCHEMA_BASELINE), "utf8");
+
+/** The tables `schema.ts` declares with `.global()` in their `defineTable` chain, read from the source. */
+const globalTablesInSchemaSource = (): Set<string> => {
+    const file = ts.createSourceFile("schema.ts", readFileSync(join(REPO_ROOT, "backend/lunora/schema.ts"), "utf8"), ts.ScriptTarget.Latest, true);
+    const found = new Set<string>();
+    const callsGlobal = (node: ts.Node): boolean =>
+        ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+            ? node.expression.name.text === "global" || callsGlobal(node.expression.expression)
+            : false;
+    const visit = (node: ts.Node): void => {
+        if (ts.isPropertyAssignment(node) && ts.isIdentifier(node.name) && node.getText(file).includes("defineTable(") && callsGlobal(node.initializer)) {
+            found.add(node.name.text);
+        }
+
+        ts.forEachChild(node, visit);
+    };
+
+    visit(file);
+
+    return found;
+};
 
 const sourceFiles = (directory: string): string[] =>
     readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -90,6 +117,28 @@ describe("the post-deploy data migrations", () => {
             `${MIGRATIONS_MODULE}:5: defineMigration needs a literal string`,
         );
         expect(() => declaredMigrationIds(`export const e = defineMigration({ id: \`with-\${String(1)}\` });`)).toThrow("literal string");
+    });
+
+    it("target no .global() table, which a shard migration never reaches", () => {
+        const globalTables = globalTablesOf(baseline);
+
+        // The baseline's record of the shard modes agrees with `schema.ts`.
+        expect(globalTables).toStrictEqual(globalTablesInSchemaSource());
+        expect(globalTables).toContain("user");
+        expect(() => declaredMigrationIds(readFileSync(join(REPO_ROOT, MIGRATIONS_MODULE), "utf8"), globalTables)).not.toThrow();
+        expect(runner).toContain("globalTablesOf(");
+    });
+
+    it("refuse a migration on a .global() table, naming it", () => {
+        const source = [
+            'export const a = defineMigration({ id: "fine", table: "messages" });',
+            'export const b = defineMigration({ id: "fill-user", table: "user" });',
+        ].join("\n");
+
+        expect(declaredMigrationIds(source)).toStrictEqual(["fine", "fill-user"]);
+        expect(() => declaredMigrationIds(source, new Set(["user"]))).toThrow(
+            `${MIGRATIONS_MODULE}:2: migration "fill-user" targets the .global() table "user"`,
+        );
     });
 
     it("are all declared in the one module the runner reads", () => {
@@ -264,5 +313,98 @@ describe("the data migration runner", () => {
         expect(calls).toStrictEqual(["a"]);
         expect(output).toContain("::error::data migration a: unknown");
         expect(exitCode).not.toBe(0);
+    });
+});
+
+/** Runs the backfill loop against `answers` in turn, recording calls, pauses and printed lines. */
+const backfillWith = async (answers: (BackfillCall | Error)[], maxCalls?: number) => {
+    const pauses: number[] = [];
+    const printed: string[] = [];
+    let calls = 0;
+    const exitCode = await runEmailCanonicalBackfill({
+        call: async () => {
+            calls += 1;
+
+            const answer = answers.shift() ?? { body: { conflicts: 0, filled: 0, remaining: 0, status: "done" }, status: 200 };
+
+            if (answer instanceof Error) {
+                throw answer;
+            }
+
+            return answer;
+        },
+        error: (line) => {
+            printed.push(line);
+        },
+        log: (line) => {
+            printed.push(line);
+        },
+        maxCalls,
+        sleep: async (ms) => {
+            pauses.push(ms);
+        },
+    });
+
+    return { calls, exitCode, output: printed.join("\n"), pauses };
+};
+
+const progress = (filled: number, remaining: number): BackfillCall => {
+    return { body: { conflicts: 0, filled, remaining, status: "progress" }, status: 200 };
+};
+
+describe("the user.emailCanonical backfill in the deploy", () => {
+    it("runs in the post-deploy step, through D1, before the shard migrations, and both decide the exit code", () => {
+        expect(runner).toContain('"/admin/backfill-email-canonical"');
+        expect(runner).toContain("signal: AbortSignal.timeout(");
+        expect(runner.indexOf("runEmailCanonicalBackfill(")).toBeLessThan(runner.indexOf("runDataMigrations(ids"));
+        expect(runner).toContain("process.exitCode = backfilled === 0 && migrated === 0 ? 0 : 1;");
+        expect(runner).toContain("authorization: `Bearer ${process.env.LUNORA_ADMIN_TOKEN");
+    });
+
+    it("calls until done and prints counts only", async () => {
+        const { calls, exitCode, output } = await backfillWith([
+            progress(8, 9),
+            progress(8, 1),
+            { body: { conflicts: 0, filled: 1, remaining: 0, status: "done" }, status: 200 },
+        ]);
+
+        expect(calls).toBe(3);
+        expect(exitCode).toBe(0);
+        expect(output).toBe("backfill-email-canonical: done, filled 17 over 3 call(s)");
+    });
+
+    it("waits out a 429, then goes on", async () => {
+        const { calls, exitCode, pauses } = await backfillWith([{ body: undefined, retryAfterSeconds: 42, status: 429 }, progress(2, 0)]);
+
+        expect(pauses).toStrictEqual([42_000]);
+        expect(calls).toBe(3);
+        expect(exitCode).toBe(0);
+    });
+
+    it("fails on a conflict, naming the count and what to do", async () => {
+        const { calls, exitCode, output } = await backfillWith([
+            progress(8, 3),
+            { body: { conflicts: 2, filled: 0, remaining: 3, status: "conflict" }, status: 409 },
+        ]);
+
+        expect(calls).toBe(2);
+        expect(exitCode).toBe(1);
+        expect(output).toContain("::error::backfill-email-canonical: 2 address(es) belong to more than one account");
+        expect(output).toContain("filled 8 over 2 call(s)");
+    });
+
+    it("fails on a call that makes no progress, on any other status, on a request error, and after its call cap", async () => {
+        const stuck = await backfillWith([progress(0, 4)]);
+        const refused = await backfillWith([{ body: { error: "Unauthorized" }, status: 401 }]);
+        const unreachable = await backfillWith([new TypeError("fetch failed https://backend.example.invalid")]);
+
+        expect(stuck.output).toContain("made no progress");
+        expect(refused.output).toContain("answered HTTP 401");
+        expect(unreachable.output).toBe("::error::backfill-email-canonical: the request failed (TypeError) (filled 0 over 1 call(s))");
+
+        const capped = await backfillWith([progress(1, 5), progress(1, 4), progress(1, 3)], 2);
+
+        expect(capped.exitCode).toBe(1);
+        expect(capped.output).toContain("not done after 2 calls");
     });
 });
