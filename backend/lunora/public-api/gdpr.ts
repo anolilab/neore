@@ -10,6 +10,9 @@ import { internalMutation, internalQuery } from "../_generated/server";
 
 const BATCH = 200;
 
+/** Rows the export reads per page. A page's payloads are held at once, and nothing caps a payload's size, so the page is kept small. */
+const EXPORT_PAGE = 25;
+
 /**
  * The most events the export carries: the newest. A step result and the export file's dispatch body are each Lunora's 1 MiB, so a
  * longer history is cut, and the section says so (`truncated`), as a long browser history is cut in its export section.
@@ -34,43 +37,57 @@ export const collectMcpEventsForExport = internalQuery
         }),
     )
     .query(async ({ args: { userId }, ctx }) => {
-        // Newest first, a page at a time, until one row past the cap is read: that row says the history was cut.
-        const rows: Doc<"mcpEvents">[] = [];
-        let cursor: string | undefined;
-
-        do {
-            const result = await ctx.db.mcpEvents.findMany({ consistency: "primary", cursor, limit: BATCH, orderBy: [{ seq: "desc" }], where: { userId } });
-
-            rows.push(...result.page);
-            cursor = result.isDone ? undefined : (result.continueCursor ?? undefined);
-        } while (cursor !== undefined && rows.length <= MAX_EXPORT_EVENTS);
-
-        // The newest that fit the byte budget: an event's payload can be large, and the cap on rows alone does not bound the bytes.
+        // Newest first, a page at a time. Each row is measured against the byte budget as it is read, so the rows held at once are
+        // one page and the kept ones, never the whole history: an event's payload can be large, and nothing caps it when recorded.
         const encoder = new TextEncoder();
         const newest: Doc<"mcpEvents">[] = [];
         let bytes = 0;
+        let truncated = false;
+        let cursor: string | undefined;
+        let more = true;
 
-        for (const row of rows.slice(0, MAX_EXPORT_EVENTS)) {
-            // Measured as the export writes the event: JSON escapes quotes, backslashes and control characters, so their raw
-            // bytes understate the size.
-            const shaped = { createdAt: row.createdAt, data: row.data, eventId: row.eventId, name: row.name, seq: row.seq, timestamp: row.timestamp };
-            const size = encoder.encode(JSON.stringify(shaped)).byteLength;
+        while (more) {
+            const result = await ctx.db.mcpEvents.findMany({
+                consistency: "primary",
+                cursor,
+                limit: EXPORT_PAGE,
+                orderBy: [{ seq: "desc" }],
+                where: { userId },
+            });
 
-            // An event that does not fit is left out, and the older ones that do fit are still kept: the section never exceeds the
-            // budget, and the gap it leaves is what `truncated` says.
-            if (bytes + size > EXPORT_EVENT_BYTES) {
-                continue;
+            for (const row of result.page) {
+                // A row past the cap exists, so the history was cut: the read stops there.
+                if (newest.length === MAX_EXPORT_EVENTS) {
+                    truncated = true;
+                    more = false;
+                    break;
+                }
+
+                // Measured as the export writes the event: JSON escapes quotes, backslashes and control characters, so their raw
+                // bytes understate the size.
+                const shaped = { createdAt: row.createdAt, data: row.data, eventId: row.eventId, name: row.name, seq: row.seq, timestamp: row.timestamp };
+                const size = encoder.encode(JSON.stringify(shaped)).byteLength;
+
+                // An event that does not fit is left out, and the older ones that do fit are still kept: the section never exceeds the
+                // budget, and the gap it leaves is what `truncated` says.
+                if (bytes + size > EXPORT_EVENT_BYTES) {
+                    truncated = true;
+                    continue;
+                }
+
+                bytes += size;
+                newest.push(row);
             }
 
-            bytes += size;
-            newest.push(row);
+            cursor = result.isDone ? undefined : (result.continueCursor ?? undefined);
+            more &&= cursor !== undefined;
         }
 
         return {
             events: newest.toReversed().map((row) => {
                 return { createdAt: row.createdAt, data: row.data, eventId: row.eventId, name: row.name, seq: row.seq, timestamp: row.timestamp };
             }),
-            truncated: rows.length > newest.length,
+            truncated,
         };
     });
 
