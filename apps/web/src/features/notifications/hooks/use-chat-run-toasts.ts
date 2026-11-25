@@ -142,12 +142,12 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
     useEffect(() => {
         if (activeStreamId) {
             // The stream ended but its reply still streams: the run that is in progress continues until the reply settles.
-            if (activeStreamId === THREAD_REPLY_RUN && run.current) {
+            if (activeStreamId === THREAD_REPLY_RUN && run.current && run.current.threadId === threadId) {
                 return;
             }
 
             // The real stream id of a reply already in progress is the same run, not a new one.
-            if (run.current?.streamId === THREAD_REPLY_RUN && activeStreamId !== THREAD_REPLY_RUN) {
+            if (run.current?.streamId === THREAD_REPLY_RUN && run.current.threadId === threadId && activeStreamId !== THREAD_REPLY_RUN) {
                 run.current = { ...run.current, streamId: activeStreamId };
 
                 return;
