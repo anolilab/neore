@@ -1020,10 +1020,12 @@ describe("composer prompt queue", () => {
         // Queued before the chip mounts: idle and unpaused, nothing has arrived since the mount.
         enqueue(chat.threadId, { attachments: [], text: "one" });
         enqueue(chat.threadId, { attachments: [], text: "two" });
+        const headId = usePromptQueueStore.getState().queues[chat.threadId]?.items[0]?.id;
+
         render(<ComposerPromptQueue />);
 
         fireEvent.click(screen.getByLabelText("Edit queued message 1"));
-        useQueueEditStore.getState().holdSend(chat.threadId, false);
+        useQueueEditStore.getState().holdSend(chat.threadId, false, headId);
 
         // "two" moves ahead of the edited head: the head changes, but the edit is still open.
         fireEvent.click(screen.getByLabelText("Move queued message 2 up"));
@@ -1159,6 +1161,33 @@ describe("composer prompt queue", () => {
 
         await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("one, edited", [], { draftFrom: undefined }));
         expect(useQueueEditStore.getState().held[chat.threadId]).toBeUndefined();
+    });
+
+    it("closing an edit after another message moved ahead of it sends nothing: the hold names the edited message", async () => {
+        chat.error = undefined;
+
+        const { enqueue } = usePromptQueueStore.getState();
+
+        // Queued before the chip mounts: idle and unpaused, nothing has arrived since the mount.
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        enqueue(chat.threadId, { attachments: [], text: "two" });
+        const headId = usePromptQueueStore.getState().queues[chat.threadId]?.items[0]?.id;
+
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        useQueueEditStore.getState().holdSend(chat.threadId, true, headId);
+
+        // "two" moves ahead of the edited "one", then the edit is cancelled.
+        fireEvent.click(screen.getByLabelText("Move queued message 2 up"));
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+        expect(useQueueEditStore.getState().held[chat.threadId]?.id).toBe(headId);
     });
 
     it("moves a dropped message to where it lands in the queue", async () => {

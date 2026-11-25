@@ -101,6 +101,13 @@ const takeReleasableHeldSend = (threadId: string, hasError: boolean): HeldSend |
         return undefined;
     }
 
+    // A hold names its message: while that message is not the head, the hold waits for its own release and sends nothing else.
+    const head = usePromptQueueStore.getState().queues[threadId]?.items[0];
+
+    if (held.id !== undefined && held.id !== head?.id) {
+        return undefined;
+    }
+
     if (paused) {
         // Only a reply's error pause lifts, and never a failed save's: a Stop, a rate limit or a refused send keeps the hold.
         const liftable = held.explicit && hasError && store.errorPaused[threadId] === true && store.failedSave[threadId] !== true;
@@ -868,6 +875,23 @@ const ComposerPromptQueue: FC = () => {
             void sendNextPrompt(threadId, { explicit: held.explicit });
         }
     }, [editOpen, error, isStreaming, modeSaving, queue.items.length, queue.paused, sendNextPrompt, threadId]);
+
+    // A held send whose message has become the head (a move ahead of it moved it up again) goes once that message may send:
+    // not while its own editor is open, since the edit's close releases it then.
+    const headId = queue.items[0]?.id;
+    const headEditingId = edit?.id;
+
+    useEffect(() => {
+        if (!threadId || headId === undefined || headEditingId === headId || isStreaming || modeSaving || queue.items.length === 0) {
+            return;
+        }
+
+        const held = takeReleasableHeldSend(threadId, Boolean(error));
+
+        if (held) {
+            void sendNextPrompt(threadId, { explicit: held.explicit });
+        }
+    }, [error, headEditingId, headId, isStreaming, modeSaving, queue.items.length, sendNextPrompt, threadId]);
 
     // A send held while the edit closed during a reply goes when that reply ends. An explicit one (Send next) goes even after
     // an error, resuming the queue as its own button does; an automatic one waits for the usual rules.
