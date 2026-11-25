@@ -4303,7 +4303,7 @@ export const schema = defineSchema({
         /** The Creem subscription that set `baseTier`; a cancel of any other one leaves it alone. */
         creemSubscriptionId: v.optional(v.string()),
         email: v.string(),
-        /** `@lunora/auth`'s case- and Unicode-folded copy of `email`. Its plugin adds it to the user table; not unique here, see the index. */
+        /** `@lunora/auth`'s case- and Unicode-folded copy of `email`, added to the user table by its plugin. */
         emailCanonical: v.optional(v.string()),
         emailVerified: v.boolean(),
         image: v.optional(v.string()),
@@ -4315,6 +4315,7 @@ export const schema = defineSchema({
         userId: v.optional(v.string()),
     })
         .global()
+        // Not unique: existing rows can share a folded address. Making it unique needs a de-duplication migration first.
         .index("emailCanonical", ["emailCanonical"])
         .index("email_name", ["email", "name"])
         .index("name", ["name"])

@@ -9,7 +9,7 @@ repo-relative. Project-wide rules stay in the root `AGENTS.md`.
 closed out. Open from us: [#687](https://github.com/anolilab/lunora/issues/687)
 (cloud spend cap prices 35 meters against one observed; non-blocking), and
 [#1709](https://github.com/anolilab/lunora/issues/1709) (codegen 443: `where` on an optional column rejects `null`;
-`agent/files.ts` casts it, runtime unchanged). Closed upstream and no longer held: [#1666](https://github.com/anolilab/lunora/issues/1666),
+`agent/files.ts` filters with `{ isNull: true }` instead). Closed upstream and no longer held: [#1666](https://github.com/anolilab/lunora/issues/1666),
 [#1667](https://github.com/anolilab/lunora/issues/1667), [#1668](https://github.com/anolilab/lunora/issues/1668),
 [#1702](https://github.com/anolilab/lunora/issues/1702) (`LunoraPayment` drops `adapter`, `scoped()` replaces it),
 [#1703](https://github.com/anolilab/lunora/issues/1703) (advisor false positives, `advisor.accept`),
