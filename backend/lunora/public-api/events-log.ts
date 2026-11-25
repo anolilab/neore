@@ -176,6 +176,12 @@ export const copyMergedMcpEvents = async (ctx: Pick<MutationCtx, "db" | "now">, 
     const ordered = rows.toSorted((a, b) => (a["seq"] as number) - (b["seq"] as number));
 
     for (const row of ordered) {
+        // A row a window old is expired already: copying it would restamp it now and make it readable again for a whole window. It is
+        // not copied; the merge still confirms it, so the clear removes it from the guest's shard.
+        if ((row["createdAt"] as number) < ctx.now - RETENTION_MS) {
+            continue;
+        }
+
         const eventId = row["eventId"] as string;
 
         if (await ctx.db.mcpEvents.findFirst({ where: { eventId, userId: to } })) {

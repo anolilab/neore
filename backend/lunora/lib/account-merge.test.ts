@@ -2231,7 +2231,7 @@ describe("mergeGuestInto across two real shards", () => {
         try {
             await merge.shards.user.run(async (context: any) => {
                 await context.db.insert("mcpEvents", {
-                    createdAt: 1,
+                    createdAt: Date.now(),
                     data: "{}",
                     eventId: "run:own",
                     name: "run.completed",
@@ -2244,7 +2244,7 @@ describe("mergeGuestInto across two real shards", () => {
             await merge.shards.guest.run(async (context: any) => {
                 for (let seq = 1; seq <= 250; seq += 1) {
                     await context.db.insert("mcpEvents", {
-                        createdAt: 1,
+                        createdAt: Date.now(),
                         data: "{}",
                         eventId: `run:g${String(seq)}`,
                         name: "run.completed",
@@ -2291,7 +2291,7 @@ describe("mergeGuestInto across two real shards", () => {
         try {
             await merge.shards.guest.run(async (context: any) => {
                 await context.db.insert("mcpEvents", {
-                    createdAt: 1,
+                    createdAt: Date.now(),
                     data: "{}",
                     eventId: "run:mine",
                     name: "run.completed",
@@ -2300,7 +2300,7 @@ describe("mergeGuestInto across two real shards", () => {
                     userId: "guest",
                 });
                 await context.db.insert("mcpEvents", {
-                    createdAt: 1,
+                    createdAt: Date.now(),
                     data: "{}",
                     eventId: "run:theirs",
                     name: "run.completed",
@@ -2337,7 +2337,7 @@ describe("mergeGuestInto across two real shards", () => {
             await merge.shards.guest.run(async (context: any) => {
                 for (let seq = 1; seq <= 3; seq += 1) {
                     await context.db.insert("mcpEvents", {
-                        createdAt: 1,
+                        createdAt: Date.now(),
                         data: payload,
                         eventId: `run:big${String(seq)}`,
                         name: "run.completed",
@@ -2372,7 +2372,7 @@ describe("mergeGuestInto across two real shards", () => {
             await merge.shards.guest.run(async (context: any) => {
                 for (let seq = 250; seq >= 1; seq -= 1) {
                     await context.db.insert("mcpEvents", {
-                        createdAt: 1,
+                        createdAt: Date.now(),
                         data: "{}",
                         eventId: `run:g${String(seq)}`,
                         name: "run.completed",
