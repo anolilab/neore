@@ -9,6 +9,7 @@
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import type { MutationCtx } from "../_generated/server";
+import { chatLogger } from "../lib/logger";
 import { noteRetentionWake } from "../lib/shard-housekeeping";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { RUN_COMPLETED_EVENT, RUN_FAILED_EVENT } from "./events-catalog";
@@ -75,8 +76,13 @@ const wakeForExpiry = async (ctx: LogWriteCtx, userId: string, dueAt: number): P
         return;
     }
 
-    // Always scheduled: the retry is what keeps a failed census write from leaving an expiring event with no wake.
-    await runAfterOnShard(ctx.scheduler, EVENT_WAKE_RETRY_MS, internal.public_api.events.retryEventWake, { attempt: 1, dueAt, userId }, userId);
+    // Always attempted: the retry is what keeps a failed census write from leaving an expiring event with no wake. Best-effort, as the
+    // census is: a retry that cannot be scheduled is logged, and the event still commits, so a run's end never fails on it.
+    try {
+        await runAfterOnShard(ctx.scheduler, EVENT_WAKE_RETRY_MS, internal.public_api.events.retryEventWake, { attempt: 1, dueAt, userId }, userId);
+    } catch (error) {
+        chatLogger.error("[events] could not schedule the expiry wake's retry; the event is kept without it", error);
+    }
 };
 
 /**
