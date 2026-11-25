@@ -48,12 +48,11 @@ const ReviewThread = ({
                 {thread.comments.map((comment) => (
                     <li key={comment.id}>
                         <p className="text-muted-foreground text-xs">
-                            {comment.authorLogin} ·{" "}
                             {comment.url === undefined ? (
-                                new Date(comment.createdAt).toLocaleString()
+                                `${comment.authorLogin} · ${new Date(comment.createdAt).toLocaleString()}`
                             ) : (
                                 <a className="underline-offset-2 hover:underline" href={comment.url} rel="noopener noreferrer" target="_blank">
-                                    {new Date(comment.createdAt).toLocaleString()}
+                                    {`${comment.authorLogin} · ${new Date(comment.createdAt).toLocaleString()}`}
                                 </a>
                             )}
                         </p>
