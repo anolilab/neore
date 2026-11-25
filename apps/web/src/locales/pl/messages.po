@@ -1026,6 +1026,10 @@ msgstr "{count} w kolejce — czeka na zapisanie trybu uprawnień"
 msgid "{count} queued — sends when the edit closes"
 msgstr "{count} w kolejce — wyślą się po zakończeniu edycji"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:563
+msgid "Type some visible text to save this message."
+msgstr "Wpisz widoczny tekst, aby zapisać tę wiadomość."
+
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:102
 msgid "{date}: {replies}, {cost}"
 msgstr "{date}: {replies}, {cost}"

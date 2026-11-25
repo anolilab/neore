@@ -1026,6 +1026,10 @@ msgstr "{count} en file d’attente, en attente du mode d’autorisation pour en
 msgid "{count} queued — sends when the edit closes"
 msgstr "{count} en file d'attente : envoi à la fin de la modification"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:563
+msgid "Type some visible text to save this message."
+msgstr "Saisissez un texte visible pour enregistrer ce message."
+
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:102
 msgid "{date}: {replies}, {cost}"
 msgstr "{date} : {replies}, {cost}"

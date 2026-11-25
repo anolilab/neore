@@ -50,7 +50,7 @@ import {
 } from "lucide-react";
 import { useReducedMotion } from "motion/react";
 import type { FC, ReactNode } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { useChatActions, useChatError, useChatIsStreaming, useChatThread } from "@/features/chat/core/context/chat-context";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
@@ -456,6 +456,7 @@ const QueueChip: FC<{
     const editing = editDraft !== undefined;
     const draft = editDraft ?? "";
     const blank = cleanPromptText(draft) === "";
+    const blankHintId = useId();
     const { isDragging, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({
         disabled: fixed || editing,
         id: prompt.id,
@@ -557,7 +558,19 @@ const QueueChip: FC<{
             )}
             {editing ? (
                 <>
-                    <Button className="h-6 px-2 text-xs" disabled={blank} onClick={saveEdit} size="sm" type="button">
+                    {blank && (
+                        <span className="sr-only" id={blankHintId}>
+                            {t`Type some visible text to save this message.`}
+                        </span>
+                    )}
+                    <Button
+                        aria-describedby={blank ? blankHintId : undefined}
+                        className="h-6 px-2 text-xs"
+                        disabled={blank}
+                        onClick={saveEdit}
+                        size="sm"
+                        type="button"
+                    >
                         {t`Save`}
                     </Button>
                     <Button
@@ -765,16 +778,45 @@ const ComposerPromptQueue: FC = () => {
 
         wasHeadEditing.current = { editing: headEditing, threadId };
 
-        if (!closed || !threadId) {
+        // While a reply streams, the held send waits for that reply's end (the effect below takes it there).
+        if (!closed || !threadId || isStreaming) {
             return;
         }
 
         const held = useQueueEditStore.getState().takeHeldSend(threadId);
 
-        if (held && !isStreaming && !queue.paused && queue.items.length > 0) {
+        if (held && !queue.paused && queue.items.length > 0) {
             void sendNextPrompt(threadId, { explicit: held.explicit });
         }
     }, [headEditing, isStreaming, queue.items.length, queue.paused, sendNextPrompt, threadId]);
+
+    // A send held while the edit closed during a reply goes when that reply ends. An explicit one (Send next) goes even after
+    // an error, resuming the queue as its own button does; an automatic one waits for the usual rules.
+    const wasStreamingRef = useRef(isStreaming);
+
+    useEffect(() => {
+        const ended = wasStreamingRef.current && !isStreaming;
+
+        wasStreamingRef.current = isStreaming;
+
+        if (!ended || !threadId || queue.items.length === 0) {
+            return;
+        }
+
+        const held = useQueueEditStore.getState().takeHeldSend(threadId);
+
+        if (!held) {
+            return;
+        }
+
+        if (held.explicit) {
+            usePromptQueueStore.getState().setPaused(threadId, false);
+        } else if (queue.paused) {
+            return;
+        }
+
+        void sendNextPrompt(threadId, { explicit: held.explicit });
+    }, [isStreaming, queue.items.length, queue.paused, sendNextPrompt, threadId]);
 
     const handleRemove = useCallback(
         (id: string) => {
@@ -849,6 +891,8 @@ const ComposerPromptQueue: FC = () => {
 
             if (after !== undefined) {
                 editFocus.current = after.id;
+                // The new id is the same message, edited: it is not an arrival for the queue's drain.
+                seenRef.current.ids.add(after.id);
             }
         },
         [threadId],
@@ -979,8 +1023,9 @@ const ComposerPromptQueue: FC = () => {
         statusText = <Plural one="# steering — the reply reads it at its next step" other="# steering — the reply reads them at its next step" value={count} />;
     }
 
-    // "Send next" is disabled while the head's text is open: say why, and that the send follows the edit.
-    if (headEditing) {
+    // "Send next" is disabled while the head's text is open: say why, and that the send follows the edit. A paused queue
+    // sends nothing on a close, so it makes no such promise.
+    if (headEditing && !queue.paused) {
         statusText = t`${count} queued — sends when the edit closes`;
     }
 

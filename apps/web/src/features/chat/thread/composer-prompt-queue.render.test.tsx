@@ -892,6 +892,27 @@ describe("composer prompt queue", () => {
         expect((screen.getByLabelText("Edit queued message 1") as HTMLButtonElement).disabled).toBe(false);
     });
 
+    it("saving an edit does not count as a new arrival: an idle, unpaused queue left unsent stays unsent", async () => {
+        chat.error = undefined;
+
+        const { enqueue } = usePromptQueueStore.getState();
+
+        // Queued before the chip mounts: the queue is idle and unpaused, and nothing in it has arrived since the mount.
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        enqueue(chat.threadId, { attachments: [], text: "two" });
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 2"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 2"), { target: { value: "two, edited" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+    });
+
     it("sends nothing when an edit of a paused head is cancelled", async () => {
         const { enqueue, setPaused } = usePromptQueueStore.getState();
 

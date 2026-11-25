@@ -1026,6 +1026,10 @@ msgstr "{count} in coda — in attesa che la modalità di autorizzazione salvi"
 msgid "{count} queued — sends when the edit closes"
 msgstr "{count} in coda: invio alla chiusura della modifica"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:563
+msgid "Type some visible text to save this message."
+msgstr "Scrivi del testo visibile per salvare questo messaggio."
+
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:102
 msgid "{date}: {replies}, {cost}"
 msgstr "{date}: {replies}, {cost}"

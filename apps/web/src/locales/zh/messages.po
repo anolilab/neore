@@ -1026,6 +1026,10 @@ msgstr "{count} 项已排队，等待保存权限模式"
 msgid "{count} queued — sends when the edit closes"
 msgstr "{count} 条排队中 — 编辑结束后发送"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:563
+msgid "Type some visible text to save this message."
+msgstr "请输入可见文字以保存此消息。"
+
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:102
 msgid "{date}: {replies}, {cost}"
 msgstr "{date}：{replies}，{cost}"

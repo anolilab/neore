@@ -1026,6 +1026,10 @@ msgstr "{count} en cola — esperando a que se guarde el modo de permisos"
 msgid "{count} queued — sends when the edit closes"
 msgstr "{count} en cola: se envía al cerrar la edición"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:563
+msgid "Type some visible text to save this message."
+msgstr "Escribe algún texto visible para guardar este mensaje."
+
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:102
 msgid "{date}: {replies}, {cost}"
 msgstr "{date}: {replies}, {cost}"

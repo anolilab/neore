@@ -1026,6 +1026,10 @@ msgstr "{count} 件がキューに入っています — 権限モードの保�
 msgid "{count} queued — sends when the edit closes"
 msgstr "{count} 件待機中 — 編集が終わると送信されます"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:563
+msgid "Type some visible text to save this message."
+msgstr "このメッセージを保存するには、表示される文字を入力してください。"
+
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:102
 msgid "{date}: {replies}, {cost}"
 msgstr "{date}：{replies}、{cost}"
