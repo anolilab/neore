@@ -142,6 +142,11 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
 
     // A run starts and ends with its stream id. The outcome waits until the reply has settled (or the window passes).
     useEffect(() => {
+        // A stream seen before the thread's messages are ready may be stale cache from an earlier visit: it is not a run to announce.
+        if (activeStreamId && !messagesReady && !run.current) {
+            return;
+        }
+
         if (activeStreamId) {
             // The stream ended but its reply still streams: the run that is in progress continues until the reply settles.
             if (activeStreamId === THREAD_REPLY_RUN && run.current && run.current.threadId === threadId) {
@@ -191,7 +196,7 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
         } else {
             settleTimer.current = setTimeout(settle, SETTLE_MS);
         }
-    }, [activeStreamId, error, messages, settle, threadId]);
+    }, [activeStreamId, error, messages, messagesReady, settle, threadId]);
 
     // The reply settles on its own: decide the finished run as soon as the thread shows the reply is no longer streaming.
     useEffect(() => {

@@ -395,6 +395,15 @@ describe("useChatRunToasts: the other toasts still show", () => {
         expect(toastWarning).toHaveBeenCalledTimes(2);
     });
 
+    it("does not announce a stream seen before the thread's messages are ready", () => {
+        const { rerender } = setup({ ...idle, messagesReady: false, settings: {} });
+
+        rerender({ ...idle, activeStreamId: "cached-stream", messagesReady: false, settings: {} });
+        rerender({ ...idle, activeStreamId: null, messagesReady: true, settings: {} });
+
+        expect(toastSuccess).not.toHaveBeenCalled();
+    });
+
     it("shows no toast while the settings are still loading", () => {
         const { rerender } = setup({ ...idle, settings: undefined });
 
