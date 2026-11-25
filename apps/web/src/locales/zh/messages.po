@@ -5230,7 +5230,7 @@ msgstr "入门"
 msgid "Behavior"
 msgstr "行为"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:190
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:236
 msgid "Behind {base}"
 msgstr "落后于 {base}"
 
@@ -6298,11 +6298,11 @@ msgstr "加泰罗尼亚语（西班牙）"
 msgid "catalog"
 msgstr "目录"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:213
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:259
 msgid "Catch up"
 msgstr "追上"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:180
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:226
 msgid "Catch up {pullRequest} with {base}"
 msgstr "让 {pullRequest} 追上 {base}"
 
@@ -27532,11 +27532,11 @@ msgstr "此浏览器上的推送通知"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "将多个各具角色的智能体放在同一对话中。审查小组可从安全和性能角度检查更改，辩论则可在综合前论证双方观点。"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:219
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:265
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
 msgstr "在输入框中填入一条提示，将此分支变基到 {base}、解决冲突、检查构建和测试并推送。不会发送任何内容。"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:220
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:266
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "在输入框中填入一条提示，在本地副本中将此复刻的分支变基到 {base}、解决冲突并检查构建和测试。不会推送。不会发送任何内容。"
 

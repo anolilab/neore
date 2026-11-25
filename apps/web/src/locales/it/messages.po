@@ -5230,7 +5230,7 @@ msgstr "principiante"
 msgid "Behavior"
 msgstr "Comportamento"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:190
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:236
 msgid "Behind {base}"
 msgstr "Indietro rispetto a {base}"
 
@@ -6298,11 +6298,11 @@ msgstr "Catalano (Spagna)"
 msgid "catalog"
 msgstr "catalogo"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:213
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:259
 msgid "Catch up"
 msgstr "Allinea"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:180
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:226
 msgid "Catch up {pullRequest} with {base}"
 msgstr "Allinea {pullRequest} con {base}"
 
@@ -27532,11 +27532,11 @@ msgstr "Notifiche push su questo browser"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "Metti più agenti con ruoli propri in un solo thread. Un pannello di revisione può controllare una modifica dal punto di vista della sicurezza e delle prestazioni, e un dibattito può sostenere entrambe le tesi prima di una sintesi."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:219
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:265
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
 msgstr "Inserisce nel composer un prompt per fare il rebase di questo branch su {base}, risolvere i conflitti, verificare build e test e fare push. Non viene inviato nulla."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:220
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:266
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "Inserisce nel composer un prompt per fare il rebase del branch di questo fork su {base} in una copia locale, risolvere i conflitti e verificare build e test. Non viene fatto push. Non viene inviato nulla."
 

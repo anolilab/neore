@@ -246,8 +246,10 @@ describe(catchUpPrompt, () => {
             "git show-ref --verify --quiet refs/heads/<name>",
             // One chain: the pull request's branch moves only once the new branch exists, is checked out and holds its commit.
             'git switch -c <name> && [ "$(git symbolic-ref -q HEAD)" = "refs/heads/<name>" ] && [ "$(git rev-parse --verify -q HEAD)" = "$(git rev-parse --verify -q refs/heads/feat/x)" ] && echo ready && git update-ref refs/heads/feat/x <commit from step 4> refs/heads/<name>',
+            // Where the rebase is left when that chain fails.
+            "git branch --show-current",
         ]);
-        expect(steps.get(7)).toContain("If it fails at any point, stop there: do not move feat/x in any other way, leave the rebase where it is");
+        expect(steps.get(7)).toContain("If it fails at any point, do not move feat/x in any other way: leave the rebase where it is");
         expect(steps.get(7)).toContain("start with pr-42-a1b2c3d4,");
         expect(commands.filter(({ command }: Command) => command.includes("git update-ref refs/heads/"))).toHaveLength(1);
         // A failed re-fetch, a rewritten base, the base moving twice and a refused push all set the rebase aside the same way.

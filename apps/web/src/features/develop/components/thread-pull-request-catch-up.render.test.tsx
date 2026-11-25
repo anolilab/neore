@@ -336,12 +336,13 @@ describe("ThreadPullRequestCatchUp", () => {
 
         let answer: (value: { data?: unknown }) => void = () => {};
 
-        refetch.mockImplementationOnce(
-            async () =>
-                new Promise<{ data?: unknown }>((resolve: (value: { data?: unknown }) => void) => {
-                    answer = resolve;
-                }),
-        );
+        // The tsconfig lib predates `Promise.withResolvers`.
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const promise = new Promise<{ data?: unknown }>((resolve: (value: { data?: unknown }) => void) => {
+            answer = resolve;
+        });
+
+        refetch.mockImplementationOnce(async () => promise);
         view.rerender(control());
 
         expect(refetch).toHaveBeenCalledTimes(1);

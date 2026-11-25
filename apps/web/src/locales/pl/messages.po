@@ -5230,7 +5230,7 @@ msgstr "początkujący"
 msgid "Behavior"
 msgstr "Zachowanie"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:190
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:236
 msgid "Behind {base}"
 msgstr "Za {base}"
 
@@ -6298,11 +6298,11 @@ msgstr "Kataloński (Hiszpania)"
 msgid "catalog"
 msgstr "katalog"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:213
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:259
 msgid "Catch up"
 msgstr "Nadrób zaległości"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:180
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:226
 msgid "Catch up {pullRequest} with {base}"
 msgstr "Zaktualizuj {pullRequest} względem {base}"
 
@@ -27532,11 +27532,11 @@ msgstr "Powiadomienia push w tej przeglądarce"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "Umieść kilku agentów z własnymi rolami w jednym wątku. Panel przeglądu może sprawdzić zmianę z perspektywy bezpieczeństwa i wydajności, a debata może argumentować obie strony przed podsumowaniem."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:219
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:265
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
 msgstr "Wstawia do kompozytora prompt, który robi rebase tej gałęzi na {base}, rozwiązuje konflikty, sprawdza build i testy oraz wykonuje push. Nic nie zostaje wysłane."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:220
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:266
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "Wstawia do kompozytora prompt, który w lokalnej kopii robi rebase gałęzi tego forka na {base}, rozwiązuje konflikty oraz sprawdza build i testy. Nie jest wykonywany push. Nic nie zostaje wysłane."
 

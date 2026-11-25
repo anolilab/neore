@@ -92,7 +92,10 @@ const CatchUpControl = ({
     const couldShow = detail === undefined || (open && promptable);
     // The turn ends heard while a read was pending, not yet followed by a read that started after them. Until that read
     // answers nothing shows: the pending read's "behind" may be from before the turn.
+    // An answer that rules the control out (closed, merged, a draft, names no prompt is made for) owes nothing: a hidden control
+    // reads nothing.
     const [owed, setOwed] = useState(0);
+    const owing = owed > 0 && couldShow;
     const owedReading = useRef(false);
 
     // Whether a turn's end reads again (`heard`, so a remount knows it too): set by a read that confirmed behind for names that make
@@ -101,7 +104,7 @@ const CatchUpControl = ({
     // it was, so the next turn's end reads again and the control comes back once the host answers behind.
     useEffect(() => {
         // While a missed turn's read, or one a turn's end owes, has not answered, the cached reads say nothing new.
-        if (stale || owed > 0) {
+        if (stale || owing) {
             return;
         }
 
@@ -180,19 +183,12 @@ const CatchUpControl = ({
     }, [stale]);
 
     // The read a turn's end owes, once no read is in flight: the pull request, then the comparison for the same revision (a new
-    // revision's key reads by itself). A turn that ends during it owes another. An answer that rules the control out (closed,
-    // merged, a draft, names no prompt is made for) drops it: a hidden control reads nothing.
+    // revision's key reads by itself). A turn that ends during it owes another.
     const pullFetching = pull.isFetching;
     const comparisonFetching = comparison.isFetching;
 
     useEffect(() => {
-        if (owed === 0 || owedReading.current || pullFetching || comparisonFetching) {
-            return;
-        }
-
-        if (!couldShow) {
-            setOwed(0);
-
+        if (!owing || owedReading.current || pullFetching || comparisonFetching) {
             return;
         }
 
@@ -205,7 +201,7 @@ const CatchUpControl = ({
         };
 
         void settle();
-    }, [owed, couldShow, pullFetching, comparisonFetching]);
+    }, [owing, owed, pullFetching, comparisonFetching]);
 
     useEffect(
         () =>
@@ -215,7 +211,7 @@ const CatchUpControl = ({
         [key, threadId],
     );
 
-    if (stale || owed > 0 || !shows || host === undefined) {
+    if (stale || owing || !shows || host === undefined) {
         return null;
     }
 
