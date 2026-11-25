@@ -152,7 +152,7 @@ describe("composer prompt queue", () => {
         withdrawSteer.mockReset();
         toast.showInfo.mockReset();
         usePromptQueueStore.setState({ offlineHolds: {}, queues: {} });
-        useQueueEditStore.setState({ editing: {} });
+        useQueueEditStore.setState({ editing: {}, held: {} });
 
         // A test that failed midway can leave a send marked as starting in the thread.
         while (isSendStarting(chat.threadId)) {
@@ -994,6 +994,22 @@ describe("composer prompt queue", () => {
         });
 
         expect(chat.sendMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it("sends a send held for a chat when the user comes back to it while it is idle", async () => {
+        chat.error = undefined;
+        chat.threadId = "thread-1";
+
+        usePromptQueueStore.getState().enqueue("thread-2", { attachments: [], text: "held for two" });
+
+        useQueueEditStore.getState().holdSend("thread-2", false);
+
+        const view = render(<ComposerPromptQueue />);
+
+        chat.threadId = "thread-2";
+        view.rerender(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("held for two", [], { draftFrom: undefined }));
     });
 
     it("moves a dropped message to where it lands in the queue", async () => {

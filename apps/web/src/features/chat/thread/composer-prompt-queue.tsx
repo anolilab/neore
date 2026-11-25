@@ -519,6 +519,7 @@ const QueueChip: FC<{
             )}
             {editing ? (
                 <textarea
+                    aria-describedby={blank ? blankHintId : undefined}
                     aria-label={t`Edit queued message ${position}`}
                     className="bg-background min-w-0 flex-1 resize-y rounded-md border px-1.5 py-1 text-xs"
                     // The composer's own cap: a longer text would be refused by the gateway after its chip had left the queue.
@@ -792,14 +793,18 @@ const ComposerPromptQueue: FC = () => {
 
     // A send held while the edit closed during a reply goes when that reply ends. An explicit one (Send next) goes even after
     // an error, resuming the queue as its own button does; an automatic one waits for the usual rules.
-    const wasStreamingRef = useRef(isStreaming);
+    // Kept with its thread: a reply that ends in another chat is not this one's end, and a switch to an idle chat with a held
+    // send for it is the moment that send goes (the user came back to it).
+    const streamRef = useRef<{ streaming: boolean; threadId: string | undefined }>({ streaming: isStreaming, threadId });
 
     useEffect(() => {
-        const ended = wasStreamingRef.current && !isStreaming;
+        const previous = streamRef.current;
+        const ended = previous.threadId === threadId && previous.streaming && !isStreaming;
+        const switchedIn = previous.threadId !== threadId;
 
-        wasStreamingRef.current = isStreaming;
+        streamRef.current = { streaming: isStreaming, threadId };
 
-        if (!ended || !threadId || queue.items.length === 0) {
+        if ((!ended && !switchedIn) || !threadId || isStreaming || queue.items.length === 0) {
             return;
         }
 
