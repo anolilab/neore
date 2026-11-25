@@ -299,3 +299,26 @@ describe("events/poll", () => {
         expect(poll.poll).not.toHaveBeenCalled();
     });
 });
+
+describe("a read allowance spent on an Events call", () => {
+    it("answers the call with its own request id as a rate-limit error, not a REST body", async () => {
+        const limited = async (): Promise<void> => {
+            throw new PublicApiError("rate_limited", "Too many requests for this API key.", { retryAfterSeconds: 2 });
+        };
+
+        for (const request of [modern("events/list", { _meta: OFFER }), modern("events/poll", { name: "run.completed" }, "run.completed")]) {
+            const response = await serveMcp(request.body, {
+                ...dependenciesWith(
+                    request,
+                    pollingWith(async () => pollBody),
+                ),
+                chargeProtocolCall: limited,
+            });
+            const body = (await response.json()) as Record<string, any>;
+
+            expect(response.status).toBe(429);
+            expect(body["id"]).toBe(1);
+            expect(body["error"]).toMatchObject({ code: -32_025, data: { reason: "rate_limited", retryAfterSeconds: 2 } });
+        }
+    });
+});

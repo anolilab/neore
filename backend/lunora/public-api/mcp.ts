@@ -48,6 +48,8 @@ const HEADER_MISMATCH = -32_020;
 const UNSUPPORTED_VERSION = -32_022;
 const NOT_FOUND = -32_023;
 const FORBIDDEN = -32_024;
+// An Events call refused for the key's read allowance. A code of this server's own, beside the ones above.
+const RATE_LIMITED = -32_025;
 
 /** One `events/poll`, as the dispatcher reads it. `cursor` is what the client holds; `null` means "start from now". */
 export interface PollRequest {
@@ -343,7 +345,7 @@ const negotiatesEvents = (params: Record<string, unknown> | undefined): boolean 
 /** The `events/poll` arguments, checked as the spec's errors say: an unknown event is NotFound, a malformed request InvalidParams. */
 type PollParse = { refusal: Response } | { request: PollRequest };
 
-const parsePollParams = (id: number | string | undefined, params: Record<string, unknown> | undefined): PollParse => {
+const parsePollParams = (id: RpcId, params: Record<string, unknown> | undefined): PollParse => {
     const fields: Record<string, unknown> = params ?? {};
     const { arguments: args, cursor, maxAgeMs, maxEvents, name } = fields;
 
@@ -385,7 +387,7 @@ const parsePollParams = (id: number | string | undefined, params: Record<string,
 };
 
 /** Maps the router's errors for an Events call to the spec's codes; any other error is the endpoint's own and is rethrown. */
-const eventsFailure = (id: number | string | undefined, error: unknown): Response => {
+const eventsFailure = (id: RpcId, error: unknown): Response => {
     if (error instanceof PublicApiError && error.code === "invalid_request") {
         return rpcError(id, INVALID_PARAMS, error.message);
     }
@@ -399,7 +401,28 @@ const eventsFailure = (id: number | string | undefined, error: unknown): Respons
         return rpcError(id, FORBIDDEN, error.message, { data: { reason: "forbidden" } });
     }
 
+    if (error instanceof PublicApiError && error.code === "rate_limited") {
+        return rpcError(id, RATE_LIMITED, error.message, {
+            data: { reason: "rate_limited", retryAfterSeconds: error.details?.["retryAfterSeconds"] },
+            status: 429,
+        });
+    }
+
     throw error;
+};
+
+/**
+ * Charges an Events call. A charge refused for the key's read allowance is answered as that call's own error, with its request id, rather
+ * than thrown out of the endpoint as a REST body. Returns the refusal when the charge was refused, `undefined` when it went through.
+ */
+const chargeEvents = async (dependencies: McpDependencies, id: RpcId): Promise<Response | undefined> => {
+    try {
+        await dependencies.chargeProtocolCall();
+    } catch (error) {
+        return eventsFailure(id, error);
+    }
+
+    return undefined;
 };
 
 const callResult = async (response: Response): Promise<Record<string, unknown>> => {
@@ -439,7 +462,11 @@ export const serveMcp = async (rawBody: string, dependencies: McpDependencies): 
     // allowance here, since the Events branch below never answers it.
     if (message.id === undefined) {
         if (message.method.startsWith("events/")) {
-            await dependencies.chargeProtocolCall();
+            const refused = await chargeEvents(dependencies, undefined);
+
+            if (refused) {
+                return refused;
+            }
         }
 
         return new Response(null, { status: 202 });
@@ -457,13 +484,21 @@ export const serveMcp = async (rawBody: string, dependencies: McpDependencies): 
     if (method.startsWith("events/")) {
         if (!era.modern || !negotiatesEvents(params) || events === undefined) {
             // An unsupported poll is refused without reaching the router, so it is charged here, as every other protocol call is.
-            await dependencies.chargeProtocolCall();
+            const refused = await chargeEvents(dependencies, id);
+
+            if (refused) {
+                return refused;
+            }
 
             return rpcError(id, METHOD_NOT_FOUND, `Method not found: ${method}`, { status: era.modern ? 404 : 200 });
         }
 
         if (method === "events/list") {
-            await dependencies.chargeProtocolCall();
+            const refused = await chargeEvents(dependencies, id);
+
+            if (refused) {
+                return refused;
+            }
 
             return respond({ events: describeEvents() });
         }
@@ -473,7 +508,11 @@ export const serveMcp = async (rawBody: string, dependencies: McpDependencies): 
 
             if ("refusal" in polled) {
                 // A malformed poll never reaches the router, so it is charged here, as every other protocol call is.
-                await dependencies.chargeProtocolCall();
+                const refused = await chargeEvents(dependencies, id);
+
+                if (refused) {
+                    return refused;
+                }
 
                 return polled.refusal;
             }
@@ -494,7 +533,11 @@ export const serveMcp = async (rawBody: string, dependencies: McpDependencies): 
         }
 
         // The rest of the extension (push, webhook) is a later part. Refused here, so charged here.
-        await dependencies.chargeProtocolCall();
+        const refused = await chargeEvents(dependencies, id);
+
+        if (refused) {
+            return refused;
+        }
 
         return rpcError(id, METHOD_NOT_FOUND, `Method not found: ${method}`, { status: 404 });
     }
