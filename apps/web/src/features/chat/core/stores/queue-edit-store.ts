@@ -37,13 +37,15 @@ interface QueueEditStore {
     markErrorPause: (threadId: string, on: boolean) => void;
     /** Marks (or clears) a failed permission-mode save for the thread. */
     markFailedSave: (threadId: string, failed: boolean) => void;
+    /** Returns the thread's held send and clears it. */
+    /** Moves a hold from a message's old id to its new one, when a saved change gave the message a new id. */
+    renameHeldSend: (threadId: string, fromId: string, toId: string) => void;
     /** Keeps the draft of the open edit of `id`. */
     setDraft: (threadId: string, id: string, draft: string) => void;
     /** Opens the edit of `id` with `draft` (the message's current text). Refused while another message's editor is open. */
     start: (threadId: string, id: string, draft: string) => void;
     /** Stops the edit of `id`, if that is the one open; a stale call for another chip changes nothing. */
     stop: (threadId: string, id: string) => void;
-    /** Returns the thread's held send and clears it. */
     takeHeldSend: (threadId: string) => HeldSend | undefined;
 }
 
@@ -106,6 +108,17 @@ export const useQueueEditStore = create<QueueEditStore>()((set, get) => {
                 }
 
                 return { editing: { ...state.editing, [threadId]: undefined } };
+            });
+        },
+        renameHeldSend: (threadId, fromId, toId) => {
+            set((state) => {
+                const held = state.held[threadId];
+
+                if (held?.id !== fromId) {
+                    return state;
+                }
+
+                return { held: { ...state.held, [threadId]: { ...held, id: toId } } };
             });
         },
         takeHeldSend: (threadId) => {

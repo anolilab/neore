@@ -1142,6 +1142,25 @@ describe("composer prompt queue", () => {
         expect(useQueueEditStore.getState().held[chat.threadId]).toBeUndefined();
     });
 
+    it("a hold for an edited message moves to the message's new id on save, so its send fulfils it", async () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        const oldId = usePromptQueueStore.getState().queues[chat.threadId]?.items[0]?.id;
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        useQueueEditStore.getState().holdSend(chat.threadId, true, oldId);
+        fireEvent.change(screen.getByLabelText("Edit queued message 1"), { target: { value: "one, edited" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("one, edited", [], { draftFrom: undefined }));
+        expect(useQueueEditStore.getState().held[chat.threadId]).toBeUndefined();
+    });
+
     it("moves a dropped message to where it lands in the queue", async () => {
         const { enqueue, setPaused } = usePromptQueueStore.getState();
 

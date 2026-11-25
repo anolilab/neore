@@ -989,6 +989,8 @@ const ComposerPromptQueue: FC = () => {
                 editFocus.current = after.id;
                 // The new id is the same message, edited: it is not an arrival for the queue's drain.
                 seenRef.current.ids.add(after.id);
+                // A hold for the old text now protects the saved message under its new id.
+                useQueueEditStore.getState().renameHeldSend(threadId, id, after.id);
             }
         },
         [threadId],
