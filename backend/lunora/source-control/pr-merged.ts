@@ -10,11 +10,18 @@ import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 import { requireAddress } from "./pr-threads";
 
+/** An owed link as a page reports it: its chat, and when an attempt last found the chat busy (0 when never). */
+interface RecordedLink {
+    lastAttemptAt: number;
+    linkId: Id<"pullRequestThreads">;
+    threadId: Id<"threads">;
+}
+
 /** One page of recorded links: the owed ones, and where the next page starts. */
 interface RecordedPage {
     continueCursor: string | null;
     isDone: boolean;
-    owed: { linkId: Id<"pullRequestThreads">; threadId: Id<"threads"> }[];
+    owed: RecordedLink[];
 }
 
 export interface MergedPullRequestRef {
@@ -45,10 +52,11 @@ export const recordMergedPullRequest = async (
     try {
         // Links are stored under the canonical (lowercase) repository, so the lookup must use it too; an invalid address throws here and is logged.
         const address = requireAddress(ref.repository, ref.number);
-        // The links are recorded one bounded page per call; the archive attempts are capped for the whole read, and what is left stays
-        // owed (the next read or sweep takes it).
+        // The links are recorded one bounded page per call. Every page is recorded before any archive attempt, so the attempts go to
+        // the owed links least recently attempted across all of them: a busy link on an early page cannot take every attempt of
+        // each read and starve the owed links after it. What is left stays owed (the next read or sweep takes it).
+        const owed: RecordedLink[] = [];
         let cursor: string | null = null;
-        let attempts = 0;
 
         for (;;) {
             const page: RecordedPage = await ctx.runMutation(internal.source_control.pr_threads.recordPullRequestMergedPage, {
@@ -61,20 +69,19 @@ export const recordMergedPullRequest = async (
                 userId,
             });
 
-            for (const link of page.owed) {
-                if (attempts >= MERGED_ARCHIVES_PER_READ) {
-                    break;
-                }
-
-                attempts += 1;
-                await archiveOwedLink(ctx, link, address);
-            }
+            owed.push(...page.owed);
 
             if (page.isDone) {
                 break;
             }
 
             cursor = page.continueCursor;
+        }
+
+        owed.sort((a, b) => a.lastAttemptAt - b.lastAttemptAt);
+
+        for (const link of owed.slice(0, MERGED_ARCHIVES_PER_READ)) {
+            await archiveOwedLink(ctx, link, address);
         }
     } catch (error) {
         console.error("[source-control] could not record the merged pull request", error);

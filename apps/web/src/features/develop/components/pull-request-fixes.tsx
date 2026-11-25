@@ -201,17 +201,16 @@ const PullRequestFixes = ({
         }
     });
 
-    if (status.isError || (data !== undefined && RETRYABLE.has(data.status))) {
+    // A retry is offered only where a read is allowed: a link outside this view's read selection shows no retry for a cached
+    // failure, since its retry would never read the host.
+    if (readStatus && (status.isError || (data !== undefined && RETRYABLE.has(data.status)))) {
         return (
             <RetryButton
                 buttonRef={retryRef}
                 label={t`Could not read what blocks ${name}. Try again`}
                 onFocusLost={reportLost}
                 onRetry={() => {
-                    // A link outside this view's read selection never reads the host, even from its own chip.
-                    if (readStatus) {
-                        void status.refetch();
-                    }
+                    void status.refetch();
                 }}
                 reading={status.isFetching}
             />

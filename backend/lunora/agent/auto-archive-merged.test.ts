@@ -293,6 +293,94 @@ describe("archiveMergedThread", () => {
         expect(sibling?.mergeSettledAt).toBeTypeOf("number");
     });
 
+    it("declines a reopened chat for an owed merge past the settlement bound, recorded without a host time", async () => {
+        const threadId = await setUp({ autoArchiveMergedChats: true });
+        const mergedAt = Date.now() - 60_000;
+
+        // The chat's first link (from setUp) archives it. Then 499 links to other pull requests, and a second link to the merged
+        // request as the 501st row: past the settlement's 500-row read, so its merge stays owed after the archive.
+        // Rows made in one millisecond have no fixed order, so the inserts are spaced: the row order is the creation order.
+        const pause = () =>
+            new Promise((resolve) => {
+                setTimeout(resolve, 5);
+            });
+
+        await pause();
+        await harness.run(async (ctx: any) => {
+            const settings = await ctx.db
+                .query("userSettings")
+                .withIndex("by_userId", (q: any) => q.eq("userId", OWNER))
+                .unique();
+
+            await ctx.db.patch("userSettings", settings._id, { keepOpenPullRequestChats: false });
+
+            for (let index = 0; index < 499; index += 1) {
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 1,
+                    kind: "linked",
+                    number: 2000 + index,
+                    repository: "octo/other",
+                    state: "closed",
+                    threadId,
+                    title: "Other",
+                    url: `https://github.com/octo/other/pull/${String(2000 + index)}`,
+                    userId: OWNER,
+                });
+            }
+        });
+
+        await pause();
+        const late = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 1,
+                    kind: "linked",
+                    number: NUMBER,
+                    repository: REPOSITORY,
+                    threadId,
+                    title: "Feature work",
+                    url: URL,
+                    userId: OWNER,
+                }),
+        );
+
+        // The host gave no merge time: the merge is recorded with the request's time and no stored bound.
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(recordPullRequestMerged, {
+                    mergedAt,
+                    mergedBefore: mergedAt + 1000,
+                    mergedBeforeIsHostBound: false,
+                    number: NUMBER,
+                    repository: REPOSITORY,
+                    userId: OWNER,
+                }),
+        );
+
+        const first = await linkIdOf(threadId);
+
+        expect(
+            await harness.run(
+                async (ctx: any) => await ctx.runMutation(archiveMergedThread, { linkId: first, number: NUMBER, repository: REPOSITORY, threadId }),
+            ),
+        ).toBe("archived");
+
+        // The archive's bounded settlement read the first 500 rows: the late link is past them and still owed.
+        const lateRow = await harness.run(async (ctx: any) => await ctx.db.get("pullRequestThreads", late));
+
+        expect(lateRow?.mergeSettledAt).toBeUndefined();
+
+        // The owner reopens the chat. The retry for the late link must not archive it again for the merge its archive covered.
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { status: "active" }));
+
+        expect(
+            await harness.run(
+                async (ctx: any) => await ctx.runMutation(archiveMergedThread, { linkId: late, number: NUMBER, repository: REPOSITORY, threadId }),
+            ),
+        ).toBe("declined");
+        expect(await statusOf(threadId)).toBe("active");
+    });
+
     it("with the setting off, settles every link of a merge, so turning it on later archives none of those chats", async () => {
         await harness.run(async (ctx: any) => {
             await ctx.db.insert("userSettings", { autoArchiveMergedChats: false, userId: OWNER });

@@ -2663,6 +2663,9 @@ export const schema = defineSchema({
         mergedAt: v.optional(v.number()),
         // The exclusive upper bound of the merge's time, as the recorder was given it. Unset: the merge is bounded by `mergedAt` plus a second.
         mergedBefore: v.optional(v.number()),
+        // When this link first recorded the merge. A merge is seen only after it happened, so this bounds the merge from above even
+        // without a host time; the reopen guard reads it (`agent/auto-archive.ts`).
+        mergeRecordedAt: v.optional(v.number()),
         // Set once this merge's archive attempt for the link finished: archived, or declined by a guard or the setting. Until then a read retries it.
         mergeSettledAt: v.optional(v.number()),
         number: v.number(),

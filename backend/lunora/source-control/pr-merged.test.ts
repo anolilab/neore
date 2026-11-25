@@ -25,8 +25,8 @@ const fakeContext = (failArchiveOf?: string) => {
                 continueCursor: null,
                 isDone: true,
                 owed: [
-                    { linkId: LINK_A, threadId: THREAD_A },
-                    { linkId: LINK_B, threadId: THREAD_B },
+                    { lastAttemptAt: 0, linkId: LINK_A, threadId: THREAD_A },
+                    { lastAttemptAt: 0, linkId: LINK_B, threadId: THREAD_B },
                 ],
             };
         }
@@ -88,9 +88,9 @@ describe("recordMergedPullRequest", () => {
 
     it("walks every page of a pull request's links, and caps the archive attempts across the whole read", async () => {
         const calls: Call[] = [];
-        const owedOf = (prefix: string, count: number) =>
+        const owedOf = (prefix: string, count: number, lastAttemptAt = 0) =>
             Array.from({ length: count }, (_, index) => {
-                return { linkId: `${prefix}-${String(index)}`, threadId: `${prefix}-thread-${String(index)}` };
+                return { lastAttemptAt, linkId: `${prefix}-${String(index)}`, threadId: `${prefix}-thread-${String(index)}` };
             });
         const pages = [
             { continueCursor: "page-2", isDone: false, owed: owedOf("a", 20) },
@@ -111,6 +111,36 @@ describe("recordMergedPullRequest", () => {
         // Both pages are recorded, the second with the first page's cursor; 40 owed links but only 25 archive attempts in this read.
         expect(callsTo(calls, internal.source_control.pr_threads.recordPullRequestMergedPage).map((call) => call.args.cursor)).toStrictEqual([null, "page-2"]);
         expect(callsTo(calls, internal.agent.auto_archive.archiveMergedThread)).toHaveLength(25);
+    });
+
+    it("spends the attempts on the least recently attempted owed links across every page, so busy first-page chats cannot starve a later page", async () => {
+        const calls: Call[] = [];
+        // Page one: 25 chats that were just found busy (attempted recently). Page two: one chat never attempted.
+        const busy = Array.from({ length: 25 }, (_, index) => {
+            return { lastAttemptAt: 1_000_000, linkId: `busy-${String(index)}`, threadId: `busy-thread-${String(index)}` };
+        });
+        const pages = [
+            { continueCursor: "page-2", isDone: false, owed: busy },
+            { continueCursor: null, isDone: true, owed: [{ lastAttemptAt: 0, linkId: "fresh", threadId: "fresh-thread" }] },
+        ];
+        const runMutation = vi.fn(async (ref: unknown, args: Record<string, unknown>) => {
+            calls.push({ args, ref });
+
+            if (ref === internal.source_control.pr_threads.recordPullRequestMergedPage) {
+                return pages[args.cursor === "page-2" ? 1 : 0];
+            }
+
+            return null;
+        });
+
+        await recordMergedPullRequest({ runMutation } as never, "user-a", { number: 7, repository: "octo/hello" });
+
+        const attempted = callsTo(calls, internal.agent.auto_archive.archiveMergedThread).map((call) => call.args.linkId);
+
+        // Every page is recorded before any attempt, and the never-attempted link on page two gets one within the cap.
+        expect(callsTo(calls, internal.source_control.pr_threads.recordPullRequestMergedPage)).toHaveLength(2);
+        expect(attempted).toContain("fresh");
+        expect(attempted).toHaveLength(25);
     });
 
     it("keeps going when one archive fails, and each owed link is archived by its own attempt", async () => {

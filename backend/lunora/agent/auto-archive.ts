@@ -266,9 +266,13 @@ const attemptMergedArchive = async (ctx: MutationCtx, args: MergedArchiveArgs): 
         return "link-declined";
     }
 
-    // A merge that certainly predates the chat's last archive was covered by it: a reopened chat is not archived again for it. The
-    // merge time is known only to the second, so a merge in the archive's second is not treated as covered.
-    if (thread.archivedAt !== undefined && link.mergedBefore !== undefined && link.mergedBefore <= thread.archivedAt) {
+    // A merge that certainly predates the chat's last archive was covered by it: a reopened chat is not archived again for it. Both
+    // bounds are upper bounds on the merge's time: the host's (known only to the second, so a merge in the archive's second is not
+    // treated as covered) and the time this link first recorded it, which may be earlier and is kept even without a host time. It
+    // matters when the archive's bounded settlement left this merge owed.
+    const mergedBy = [link.mergedBefore, link.mergeRecordedAt].filter((bound): bound is number => bound !== undefined);
+
+    if (thread.archivedAt !== undefined && mergedBy.length > 0 && Math.min(...mergedBy) <= thread.archivedAt) {
         return "link-declined";
     }
 

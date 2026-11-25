@@ -488,6 +488,7 @@ const markLinkMerged = async (ctx: MutationCtx, link: Doc<"pullRequestThreads">,
 
         await ctx.db.patch("pullRequestThreads", link._id, {
             mergedAt: merge.mergedAt,
+            mergeRecordedAt: ctx.now,
             state: "merged",
             ...(merge.storeBound && { mergedBefore: merge.mergedBefore }),
         });
@@ -532,7 +533,7 @@ export const recordPullRequestMergedPage = internalMutation
         v.object({
             continueCursor: v.union(v.string(), v.null()),
             isDone: v.boolean(),
-            owed: v.array(v.object({ linkId: v.id("pullRequestThreads"), threadId: v.id("threads") })),
+            owed: v.array(v.object({ lastAttemptAt: v.number(), linkId: v.id("pullRequestThreads"), threadId: v.id("threads") })),
         }),
     )
     .mutation(async ({ args, ctx }) => {
@@ -551,13 +552,14 @@ export const recordPullRequestMergedPage = internalMutation
             }
         }
 
+        // Least recently attempted first. The caller orders the owed links of every page together.
         owed.sort((a, b) => a.lastAttemptAt - b.lastAttemptAt);
 
         return {
             continueCursor: page.continueCursor,
             isDone: page.isDone,
             owed: owed.map((link) => {
-                return { linkId: link.linkId, threadId: link.threadId };
+                return { lastAttemptAt: link.lastAttemptAt, linkId: link.linkId, threadId: link.threadId };
             }),
         };
     });

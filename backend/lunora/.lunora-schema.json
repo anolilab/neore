@@ -24586,6 +24586,12 @@
           "optional": true,
           "unique": false
         },
+        "mergeRecordedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "mergeSettledAt": {
           "kind": "number",
           "nullable": false,
