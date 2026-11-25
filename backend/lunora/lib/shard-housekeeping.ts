@@ -572,20 +572,21 @@ export const runShardTick = internalMutation
 
         // The Events log's expired rows (`public-api/events.ts`), pruned before the retention sweep sets the shard's time, so that time
         // counts only what is left. A dormant shard gets no housekeeping visit, so its expired events expire here, with its other rows.
-        // Rows left after this tick's rounds are unfinished work: the tick re-arms itself for them (see `candidates` below).
+        // One batch in this transaction: a nested mutation shares the tick's read budget, so the rows left are a tick of their own, scheduled
+        // below in a transaction of its own (`eventsLeft`), not looped here.
         let eventsLeft = false;
 
         if (retentionDue) {
             await bestEffort("pruneMcpEvents", async () => {
-                for (let round = 0; round < MCP_EVENT_PRUNE_ROUNDS; round += 1) {
-                    const { hasMore } = await ctx.runMutation(internal.public_api.events.pruneMcpEvents, {});
+                const { hasMore } = await ctx.runMutation(internal.public_api.events.pruneMcpEvents, {});
 
-                    eventsLeft = hasMore;
+                eventsLeft = hasMore;
+            });
+        }
 
-                    if (!hasMore) {
-                        break;
-                    }
-                }
+        if (eventsLeft && shardKey !== undefined) {
+            await bestEffort("pruneMcpEventsNext", async () => {
+                await runAfterOnShard(ctx.scheduler, 0, internal.lib.shard_housekeeping.runShardTick, {}, shardKey);
             });
         }
 
