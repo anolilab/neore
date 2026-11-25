@@ -152,7 +152,7 @@ describe("composer prompt queue", () => {
         withdrawSteer.mockReset();
         toast.showInfo.mockReset();
         usePromptQueueStore.setState({ offlineHolds: {}, queues: {} });
-        useQueueEditStore.setState({ editing: {}, held: {} });
+        useQueueEditStore.setState({ editing: {}, failedSave: {}, held: {} });
 
         // A test that failed midway can leave a send marked as starting in the thread.
         while (isSendStarting(chat.threadId)) {
@@ -1046,6 +1046,26 @@ describe("composer prompt queue", () => {
         render(<ComposerPromptQueue />);
 
         await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("held on remount", [], { draftFrom: undefined }));
+    });
+
+    it("an explicit held send does not clear a pause a failed permission-mode save set", async () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        setPaused(chat.threadId, true);
+        useQueueEditStore.getState().markFailedSave(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        useQueueEditStore.getState().holdSend(chat.threadId, true);
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.paused).toBe(true);
     });
 
     it("moves a dropped message to where it lands in the queue", async () => {

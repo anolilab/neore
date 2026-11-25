@@ -816,7 +816,8 @@ const ComposerPromptQueue: FC = () => {
         }
 
         // An explicit send (Send next) goes even after an error, resuming the queue as its own button does.
-        if (held.explicit) {
+        // A pause a failed permission-mode save set is not the reply's: the explicit send does not clear it.
+        if (held.explicit && useQueueEditStore.getState().failedSave[threadId] !== true) {
             usePromptQueueStore.getState().setPaused(threadId, false);
         } else if (queue.paused) {
             return;
@@ -850,7 +851,8 @@ const ComposerPromptQueue: FC = () => {
             return;
         }
 
-        if (held.explicit) {
+        // A pause a failed permission-mode save set is not the reply's: the explicit send does not clear it.
+        if (held.explicit && useQueueEditStore.getState().failedSave[threadId] !== true) {
             usePromptQueueStore.getState().setPaused(threadId, false);
         } else if (queue.paused) {
             return;
@@ -1061,6 +1063,8 @@ const ComposerPromptQueue: FC = () => {
         }
 
         usePromptQueueStore.getState().setPaused(threadId, false);
+        // Send next is the owner's own resume: it lifts the failed-save mark along with the pause.
+        useQueueEditStore.getState().markFailedSave(threadId, false);
         void sendNextPrompt(threadId, { explicit: true });
     }, [sendNextPrompt, threadId]);
 
