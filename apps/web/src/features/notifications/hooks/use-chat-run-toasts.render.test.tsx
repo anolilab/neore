@@ -11,7 +11,7 @@ import { toAppError } from "@/features/chat/core/context/chat-action-shared";
 import type { AppError } from "@/lib/errors";
 
 import type { ChatToastSettings, ToastMessage } from "../lib/chat-toasts";
-import useChatRunToasts, { THREAD_REPLY_RUN } from "./use-chat-run-toasts";
+import useChatRunToasts, { LOCAL_BROWSER_REPLY_RUN, THREAD_REPLY_RUN } from "./use-chat-run-toasts";
 
 const toastSuccess = vi.hoisted(() => vi.fn());
 const toastWarning = vi.hoisted(() => vi.fn());
@@ -418,6 +418,22 @@ describe("useChatRunToasts: the other toasts still show", () => {
         const { rerender } = setup({ ...idle, activeStreamId: null, messages: userMessage, threadId: undefined, settings: {} });
 
         rerender({ ...idle, activeStreamId: "new-chat-stream", messages: userMessage, threadId: "thread-new", settings: {} });
+        rerender({ ...idle, activeStreamId: null, messages: userMessage, threadId: "thread-new", settings: {} });
+
+        expect(toastSuccess).toHaveBeenCalledTimes(1);
+    });
+
+    it("announces a local reply that began in a new chat and ended once the chat had its thread", () => {
+        const { rerender } = setup({ ...idle, activeStreamId: null, messages: userMessage, threadId: undefined, settings: {} });
+
+        rerender({
+            ...idle,
+            activeStreamId: LOCAL_BROWSER_REPLY_RUN,
+            messages: userMessage,
+            messagesReady: false,
+            threadId: undefined,
+            settings: {},
+        });
         rerender({ ...idle, activeStreamId: null, messages: userMessage, threadId: "thread-new", settings: {} });
 
         expect(toastSuccess).toHaveBeenCalledTimes(1);

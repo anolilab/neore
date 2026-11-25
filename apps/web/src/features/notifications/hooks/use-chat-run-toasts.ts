@@ -10,6 +10,12 @@ import { isChatToastOn, lastReplyFailed, replySettled, waitingApprovalIds, waiti
 /** How long a finished run waits for its reply to settle before its outcome is decided anyway. */
 const SETTLE_MS = 2000;
 
+/**
+ * Whether a run that began in `runThread` belongs to `thread`. A run that began in a chat without a thread yet (a new chat) ends
+ * in the thread that chat gets, so no thread id on the run matches any thread.
+ */
+const sameThread = (runThread: string | undefined, thread: string | undefined): boolean => runThread === undefined || runThread === thread;
+
 /** The run marker of a browser-local reply, which has no gateway stream. */
 export const LOCAL_BROWSER_REPLY_RUN = "local-browser-reply";
 /** The run marker of a reply still streaming in the thread, before its gateway stream id is known (an edit or a regenerate). */
@@ -92,7 +98,7 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
         clearTimeout(settleTimer.current);
 
         // A run that ended in another thread is not this thread's reply to classify.
-        if (pending.threadId !== current.threadId) {
+        if (!sameThread(pending.threadId, current.threadId)) {
             return;
         }
 
@@ -195,7 +201,7 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
 
         run.current = undefined;
 
-        if (!finished || finished.threadId !== threadId) {
+        if (!finished || !sameThread(finished.threadId, threadId)) {
             return;
         }
 
