@@ -1833,19 +1833,8 @@ export const dropRowsGoneFromGuest = internalMutation
         // One at a time: an audited table's delete writes its history row to D1.
         for (const id of args.ids) {
             if (args.table === "mcpEvents") {
-                // A copied Event lives under its own row id here, and its marker names that row. An event is never edited, so the copy
-                // goes as it is.
-                const record = await ctx.db
-                    .query("idempotencyClaims")
-                    .withIndex("by_scope_key", (q) => q.eq("scope", IMPORT_MARKER_SCOPE).eq("key", markerKey(args.from, args.table, id)))
-                    .first();
-                const copyId = record?.result;
-
-                if (typeof copyId === "string" && (await db.get("mcpEvents", copyId)) !== null) {
-                    await db.delete("mcpEvents", copyId);
-                    dropped += 1;
-                }
-
+                // A user never deletes an Event, so a guest row that is gone was expired by the guest's retention or erased with the
+                // account. The copy keeps its own window. A deleted thread's Events go with its copy (the thread take-back above).
                 continue;
             }
 

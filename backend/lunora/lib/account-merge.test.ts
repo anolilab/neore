@@ -2642,7 +2642,7 @@ describe("mergeGuestInto across two real shards", () => {
         }
     });
 
-    it("takes a copied Event back from the new account once the guest has deleted it", async () => {
+    it("keeps a copied Event when its guest row is gone, since only a deleted thread takes its Events back", async () => {
         const merge = twoShards();
 
         try {
@@ -2666,7 +2666,7 @@ describe("mergeGuestInto across two real shards", () => {
 
             await merge.shards.user.run(async (context: any) => await asLeaseHolder(context, importShardRows, { rows: [guestRow], table: "mcpEvents" }));
 
-            // The guest deletes the event before the clear reads it: the reconcile takes the copy back from the new account.
+            // The guest's row is gone before the clear reads it: the reconcile leaves the copy, which keeps its own retention window.
             const reconciled = (await merge.shards.user.run(
                 async (context: any) => await asLeaseHolder(context, dropRowsGoneFromGuest, { ids: [guestRow._id], table: "mcpEvents" }),
             )) as { dropped: number };
@@ -2676,8 +2676,8 @@ describe("mergeGuestInto across two real shards", () => {
                 return page.length;
             })) as number;
 
-            expect(reconciled.dropped).toBe(1);
-            expect(onUser).toBe(0);
+            expect(reconciled.dropped).toBe(0);
+            expect(onUser).toBe(1);
         } finally {
             merge.close();
         }
