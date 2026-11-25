@@ -14,6 +14,7 @@
 import { canonicalEmail } from "@lunora/auth";
 import { v } from "lunorash/server";
 
+import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 
@@ -45,7 +46,7 @@ export interface EmailCanonicalBackfillResult {
 }
 
 interface UnfilledRow {
-    _id: string;
+    _id: Id<"user">;
     email: string;
 }
 
@@ -63,10 +64,10 @@ const scanUnfilled = async (ctx: Pick<MutationCtx, "db">): Promise<UnfilledRow[]
         });
 
         for (const row of result.page) {
-            rows.push({ _id: row._id as string, email: row.email });
+            rows.push({ _id: row._id, email: row.email });
         }
 
-        if (result.isDone || result.continueCursor === undefined || result.continueCursor === null) {
+        if (result.isDone || !result.continueCursor) {
             break;
         }
 
@@ -126,7 +127,7 @@ export const backfillEmailCanonicalBatch = async (ctx: Pick<MutationCtx, "db">):
         try {
             // Only while the row is still unfilled and still has the address the canonical was computed from: a sign-in
             // that changed it in between leaves the row for the next run.
-            const { applied } = await ctx.db.patchIf("user", row._id as never, {
+            const { applied } = await ctx.db.patchIf("user", row._id, {
                 patch: { emailCanonical: row.canonical },
                 where: { email: row.email, emailCanonical: null },
             });
