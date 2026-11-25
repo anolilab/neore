@@ -42,7 +42,8 @@ const hiddenByLock = (ctx: QueryCtx) => {
             return known;
         }
 
-        const thread = await ctx.db.threads.findFirst({ where: { _id: threadId as Id<"threads"> } });
+        // From the primary: a replica that lags a lock would show the locked thread's events as unlocked.
+        const thread = await ctx.db.threads.findFirst({ consistency: "primary", where: { _id: threadId as Id<"threads"> } });
         const isLocked = thread !== null && isThreadLocked(thread);
 
         locked.set(threadId, isLocked);
@@ -118,7 +119,7 @@ export const pollEvents = internalQuery
     .query(async ({ args, ctx }) => {
         // A banned account reads nothing. Every other public route enforces this in its builder, and the poll reaches the log directly,
         // so the check is made here, on the same row the builders read.
-        const user = await ctx.db.user.findFirst({ where: { _id: args.userId as Id<"user"> } });
+        const user = await ctx.db.user.findFirst({ consistency: "primary", where: { _id: args.userId as Id<"user"> } });
 
         enforceBanStatus(checkUserBanStatus(user));
 
