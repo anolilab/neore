@@ -159,8 +159,11 @@ export const dispatchLinkedPullRequestChecks = internalMutation
         // Several stale links can share a chat: its merge answer is read once per sweep, and only when idle archiving does not already due it.
         const owesMerge = new Map<string, boolean>();
 
+        // A recorded merge is final, so an owed link is retried by the chat's archive job, with no host read.
+        let scheduled = 0;
+
         for (const link of lookups) {
-            if (due.length >= CHECK_LIMIT) {
+            if (due.length + scheduled >= CHECK_LIMIT) {
                 break;
             }
 
@@ -176,7 +179,13 @@ export const dispatchLinkedPullRequestChecks = internalMutation
                 owesMerge.set(key, mergeOwed);
             }
 
-            if (idleDue || mergeOwed) {
+            const owedLink = link.mergedAt !== undefined && link.mergeSettledAt === undefined;
+
+            if (owedLink && (idleDue || mergeOwed)) {
+                await ctx.db.patch("pullRequestThreads", link._id, { stateCheckedAt: now });
+                await scheduleArchiveAfterClose(ctx, link);
+                scheduled += 1;
+            } else if (idleDue || mergeOwed) {
                 due.push(link);
             } else {
                 // Stamped as checked without a host read, so it moves behind the others instead of holding the front of the order.
@@ -195,7 +204,7 @@ export const dispatchLinkedPullRequestChecks = internalMutation
             await ctx.scheduler.runAfter(0, internal.source_control.pr_state.checkLinkedPullRequest, { lease: now, linkId: link._id });
         }
 
-        return { dispatched: due.length };
+        return { dispatched: due.length + scheduled };
     });
 
 /** Whether the chat owes a merge: one recorded for it and not yet settled. */

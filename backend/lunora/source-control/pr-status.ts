@@ -237,6 +237,14 @@ export const getPullRequestStatus = authAction
         // collaborator's read (which names the pull request, not the owner's chats) must not write or archive the owner's chats.
         if (outcome.status === "ok" && outcome.state === "merged" && outcome.mergedAt !== undefined && owner) {
             await recordMergedPullRequest(ctx, ctx.user.userId, ref, outcome.mergedAt);
+        } else if (outcome.status === "ok" && outcome.state === "merged" && owner) {
+            // Merged without a merge time: the owner's links read merged, so they no longer block archiving. No merge is recorded
+            // (it has no time to order against the owner's opt-in), so nothing archives for it.
+            await ctx.runMutation(internal.source_control.pr_threads.noteLinksMerged, {
+                number: ref.number,
+                repository: ref.repository,
+                userId: ctx.user.userId,
+            });
         }
 
         return outcome;

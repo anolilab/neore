@@ -380,6 +380,25 @@ export const noteMergeAttempt = internalMutation
         return null;
     });
 
+/**
+ * The owner's links to a pull request read merged, when the host says so without a merge time. The state is all it writes: no merge is
+ * recorded, so nothing archives for it. Internal: called by the status read for the owner only.
+ */
+export const noteLinksMerged = internalMutation
+    .input({ number: v.number(), repository: v.string().max(MAX_LENGTH.short), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const links = await pullRequestLinksOf(ctx, args.userId, args.repository, args.number);
+
+        for (const link of links) {
+            if (link.state !== "merged") {
+                await ctx.db.patch("pullRequestThreads", link._id, { state: "merged" });
+            }
+        }
+
+        return null;
+    });
+
 /** Whether the owner's merged-chat archiving is on, so a merge can be ordered against its opt-in: the merge action reads the host's time only then. */
 export const mergedArchiveOn = internalQuery
     .input({ userId: v.string().max(MAX_LENGTH.id) })
