@@ -132,8 +132,9 @@ export const recordMcpEvent = async (ctx: LogWriteCtx, input: RecordEventInput):
 export const recordRunEnd = async (ctx: LogWriteCtx, input: { outcome: "succeeded" | "failed"; streamId: string; threadId: string }): Promise<void> => {
     const thread = await ctx.db.get("threads", input.threadId as Id<"threads">);
 
-    // A thread row that is gone was deleted: its run's log is not reachable from this shard, so nothing is recorded here.
-    if (!thread) {
+    // A thread row that is gone was deleted: its run's log is not reachable from this shard, so nothing is recorded here. A trashed
+    // chat records nothing either: its events are removed with the trash, and one recorded behind that removal would be found by restore.
+    if (!thread || thread.deleted === true) {
         return;
     }
 

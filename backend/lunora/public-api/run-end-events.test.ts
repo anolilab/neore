@@ -82,6 +82,14 @@ describe("a run's end in the Events log", () => {
         expect(await eventsOf()).toHaveLength(0);
     });
 
+    it("records no run end for a chat that is in the trash, so a restore finds none behind the drain", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { deleted: true }));
+
+        await finish({ runEnd: "succeeded" });
+
+        expect(await eventsOf()).toHaveLength(0);
+    });
+
     it("writes one run.failed for a run that ended with an error", async () => {
         await finish({ runEnd: "failed", text: "\n\nError: boom" });
 
