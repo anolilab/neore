@@ -274,7 +274,7 @@ describe("a coding-agent turn's end in the Events log", () => {
 });
 
 describe("a run whose thread has no owner in the Events log", () => {
-    it("records the end for the run's starter, when the thread's owner is gone", async () => {
+    it("records no end: nothing outlives the chat when it is deleted, since its events are removed only with an owned chat", async () => {
         const orphanThread = await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "Orphan" }));
         const orphanStream = await harness.run(
             async (ctx: any) =>
@@ -292,8 +292,7 @@ describe("a run whose thread has no owner in the Events log", () => {
 
         const events = await eventsOf();
 
-        expect(events).toHaveLength(1);
-        expect(events[0]).toMatchObject({ eventId: `run:${orphanStream}`, name: "run.completed", userId: OWNER });
+        expect(events).toHaveLength(0);
     });
 });
 

@@ -139,7 +139,9 @@ export const recordRunEnd = async (
         return;
     }
 
-    const owner = thread.userId ?? input.starterId;
+    // A chat with no owner records no run end: nothing deletes its events with the chat (`agent/threads.ts` removes an owned chat's
+    // events only), so they would outlive it. Approval requests for it record nothing for the same reason.
+    const owner = thread.userId;
 
     if (owner === undefined) {
         return;
