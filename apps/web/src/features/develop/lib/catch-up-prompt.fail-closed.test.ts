@@ -275,4 +275,55 @@ describe("catchUpPrompt's fetch and switch, run against a scratch origin", () =>
             expect(baseInHead(work)).not.toBe(0);
         });
     });
+
+    describe("step 8's pull request re-check, for a head in the base repository", () => {
+        const prompt = catchUpPrompt({ ...PULL, headInBaseRepository: true, number: 42 });
+        const headCheck = (lease: string): string =>
+            commandOf(prompt, "if git fetch --quiet origin +refs/pull/42/head:").replaceAll("<commit from step 4>", () => lease);
+
+        /** A clone of an origin of its own, and the pull request's head that step 4 recorded. */
+        const fetched = (name: string): { lease: string; origin: string; work: string } => {
+            const origin = join(root, `${name}.git`);
+
+            git(root, "clone", "--quiet", "--bare", join(root, "origin.git"), origin);
+            git(origin, "update-ref", "refs/pull/42/head", git(origin, "rev-parse", "refs/heads/feat/x"));
+
+            const work = join(root, name);
+
+            git(root, "clone", "--quiet", origin, work);
+
+            return { lease: git(origin, "rev-parse", "refs/pull/42/head"), origin, work };
+        };
+
+        it("prints same while the pull request's head is the commit step 4 recorded", () => {
+            const { lease, work } = fetched("pull-unchanged");
+
+            expect(sh(work, headCheck(lease))).toStrictEqual({ output: "same\n", status: 0 });
+        });
+
+        it("prints changed once the pull request's head moved, though origin's branch did not", () => {
+            const { lease, origin, work } = fetched("pull-moved");
+
+            git(
+                origin,
+                "update-ref",
+                "refs/pull/42/head",
+                git(origin, "commit-tree", "-p", lease, "-m", "pushed elsewhere", git(origin, "show", "--no-patch", "--format=%T", lease)),
+            );
+
+            expect(sh(work, headCheck(lease))).toStrictEqual({ output: "changed\n", status: 0 });
+            expect(git(origin, "rev-parse", "refs/heads/feat/x")).toBe(lease);
+        });
+
+        it("prints changed, and nothing else, when the pull request's head can no longer be fetched", () => {
+            const { lease, origin, work } = fetched("pull-gone");
+
+            git(origin, "update-ref", "-d", "refs/pull/42/head");
+
+            const { output } = spawnSync("/bin/sh", ["-c", headCheck(lease)], { cwd: work, encoding: "utf8", env: GIT_ENV });
+
+            expect(output.filter(Boolean).join("")).not.toContain(origin);
+            expect(sh(work, headCheck(lease))).toStrictEqual({ output: "changed\n", status: 0 });
+        });
+    });
 });

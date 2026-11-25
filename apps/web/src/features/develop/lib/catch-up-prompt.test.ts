@@ -235,6 +235,31 @@ describe(catchUpPrompt, () => {
         expect(SAME_REPO).toContain(`in place of ${expected}`);
     });
 
+    it("for a head in the base repository, re-reads the pull request's head ref, and its state and base through a signed-in CLI, right before the push", () => {
+        const step = stepsOf(SAME_REPO).get(8) ?? "";
+        const inBackticks = step.split("`").filter((_part: string, index: number) => index % 2 === 1);
+        const headCheck = inBackticks.find((part: string) => part.startsWith("if git fetch --quiet origin +refs/pull/42/head:")) ?? "";
+        const signedIn = inBackticks.find((part: string) => part.startsWith("gh auth status ")) ?? "";
+        const view = inBackticks.find((part: string) => part.startsWith("gh pr view ")) ?? "";
+        const order = [headCheck, signedIn, view, "git push "].map((part: string) => step.indexOf(`\`${part}`));
+
+        expect(headCheck).toBe(
+            'if git fetch --quiet origin +refs/pull/42/head:refs/neore/pull-42-a1b2c3d4-head && [ "$(git rev-parse --verify -q refs/neore/pull-42-a1b2c3d4-head)" = "<commit from step 4>" ]; then echo same; else echo changed; fi',
+        );
+        // Quiet: the status's output (account, token scopes) goes nowhere, only one word is printed.
+        expect(signedIn).toBe("gh auth status --hostname git.example >/dev/null 2>&1 && echo signed-in || echo none");
+        // Open, on the same base and head; a failed read prints `changed` too, so it stops the push.
+        expect(view).toBe(
+            'gh pr view 42 --repo git.example/octo/hello --json state,baseRefName,headRefName --jq \'if .state == "OPEN" and .baseRefName == "release/2.0" and .headRefName == "feat/x" then "same" else "changed" end\' 2>/dev/null || echo changed',
+        );
+        expect(order.every((index: number) => index > 0)).toBe(true);
+        expect(order).toEqual(order.toSorted((left: number, right: number) => left - right));
+        // Without a signed-in CLI the run goes on, on the head check alone, and says what it could not check.
+        expect(step).toContain("If it prints `none`, say in one line that the pull request's state and base could not be re-checked");
+        expect(FORK).not.toContain("gh ");
+        expect(FORK).not.toContain("echo same");
+    });
+
     it("for a head in the base repository, a run that does not push sets its rebase aside and puts the branch back on origin's commit", () => {
         const commands = commandsOf(SAME_REPO);
         const steps = stepsOf(SAME_REPO);
@@ -252,8 +277,9 @@ describe(catchUpPrompt, () => {
         expect(steps.get(7)).toContain("If it fails at any point, do not move feat/x in any other way: leave the rebase where it is");
         expect(steps.get(7)).toContain("start with pr-42-a1b2c3d4,");
         expect(commands.filter(({ command }: Command) => command.includes("git update-ref refs/heads/"))).toHaveLength(1);
-        // A failed re-fetch, a rewritten base, the base moving twice and a refused push all set the rebase aside the same way.
-        expect(steps.get(8)?.match(SET_ASIDE_AS_STEP_SEVEN)).toHaveLength(4);
+        // A failed re-fetch, a rewritten base, the base moving twice, a moved pull request head, a closed or retargeted pull
+        // request and a refused push all set the rebase aside the same way.
+        expect(steps.get(8)?.match(SET_ASIDE_AS_STEP_SEVEN)).toHaveLength(6);
         expect(steps.get(6)).toContain("as step 7 says");
         expect(SAME_REPO).not.toContain("leave the rebased commits in place");
         expect(SAME_REPO).not.toMatch(FORCED_BRANCH_MOVE);
