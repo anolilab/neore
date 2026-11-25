@@ -10,7 +10,7 @@ export interface HighlightNames {
 }
 
 /** The thread's find bar. Its names are the defaults, so its calls are unchanged. */
-export const THREAD_HIGHLIGHTS: HighlightNames = { current: "find-current", match: "find-match" };
+const THREAD_HIGHLIGHTS: HighlightNames = { current: "find-current", match: "find-match" };
 
 /** The side-question find bar (`chat/aside/find`). */
 export const ASIDE_HIGHLIGHTS: HighlightNames = { current: "aside-find-current", match: "aside-find-match" };

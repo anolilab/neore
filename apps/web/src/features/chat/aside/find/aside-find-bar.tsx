@@ -108,14 +108,23 @@ const AsideFindBar: FC = () => {
         setRevealKey((key) => key + 1);
     };
 
-    // Enter submits the form (next); Shift+Enter is the one key the form cannot tell apart.
+    // Enter submits the form (next); Shift+Enter is the one key the form cannot tell apart. An Enter that commits an IME
+    // candidate is text: it neither steps nor submits, and preventing it keeps the implicit form submit from firing.
     const handleInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-        if (!(event.key === "Enter" && event.shiftKey)) {
+        if (event.key !== "Enter") {
             return;
         }
 
-        event.preventDefault();
-        step(-1);
+        if (event.nativeEvent.isComposing) {
+            event.preventDefault();
+
+            return;
+        }
+
+        if (event.shiftKey) {
+            event.preventDefault();
+            step(-1);
+        }
     };
 
     const handleSubmit = (event: FormEvent<HTMLFormElement>) => {

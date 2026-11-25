@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { collectAsideRanges, isOutsideViewport } from "./use-aside-find-highlights";
+import { collectAsideRanges, isClippedWithin, isOutsideViewport } from "./use-aside-find-highlights";
 
 afterEach(() => {
     document.body.replaceChildren();
@@ -96,5 +96,37 @@ describe("collectAsideRanges", () => {
         document.body.innerHTML = panel(row("a", "cat"));
 
         expect(collectAsideRanges(document.querySelector("section") as Element, "  ")).toEqual([]);
+    });
+});
+
+describe("isClippedWithin", () => {
+    /** A hit at x 150 to 170 inside a code block whose own box spans `left` to `right`, in a panel with the given style. */
+    const clipped = (style: string, left: number, right: number): boolean => {
+        document.body.innerHTML = panel(row("a", "Q", `<pre style="${style}"><code>wide cat</code></pre>`));
+
+        const section = document.querySelector("section") as HTMLElement;
+        const pre = section.querySelector("pre") as HTMLElement;
+        const code = section.querySelector("code") as HTMLElement;
+
+        Object.defineProperty(pre, "getBoundingClientRect", {
+            configurable: true,
+            value: () => {
+                return { bottom: 100, left, right, top: 0 };
+            },
+        });
+
+        return isClippedWithin({ bottom: 20, left: 150, right: 170, top: 10 }, code, section);
+    };
+
+    it("is true when a code block's own scroll viewport hides the hit the panel still shows", () => {
+        expect(clipped("overflow-x: auto", 0, 100)).toBe(true);
+    });
+
+    it("is false when that scroll viewport still shows the hit", () => {
+        expect(clipped("overflow-x: auto", 0, 300)).toBe(false);
+    });
+
+    it("is false when nothing between the hit and the panel clips it", () => {
+        expect(clipped("", 0, 100)).toBe(false);
     });
 });

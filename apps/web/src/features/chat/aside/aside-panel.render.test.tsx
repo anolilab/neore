@@ -235,6 +235,30 @@ describe("AsidePanel", () => {
         expect(screen.getByText("3 of 3")).toBeTruthy();
     });
 
+    it("does not step to another match for an Enter that only commits an IME candidate", () => {
+        useAsideStore.setState({
+            byThread: {
+                "thread-1": [{ answer: "Safe to repeat: idempotent calls.", id: "a", question: "What is idempotent?", status: "answered", token: "tok" }],
+            },
+        });
+        render(<AsidePanel threadId="thread-1" />);
+
+        act(() => {
+            globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+        });
+        const input = screen.getByRole("textbox", { name: "Find in side questions" });
+
+        fireEvent.change(input, { target: { value: "idempotent" } });
+        expect(screen.getByText("1 of 2")).toBeTruthy();
+
+        fireEvent.keyDown(input, { isComposing: true, key: "Enter" });
+        expect(screen.getByText("1 of 2")).toBeTruthy();
+
+        // The same keystroke outside composition still steps, so the check above is not passing for want of a step.
+        fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
+        expect(screen.getByText("2 of 2")).toBeTruthy();
+    });
+
     it("brings the current hit into view once the layout has settled, and not for a query that changed first", () => {
         vi.useFakeTimers();
 

@@ -6,7 +6,7 @@ import { clampIndex } from "@/features/chat/thread/find/match";
 import { ASIDE_FIND_HOST_ATTRIBUTE } from "@/features/keyboard/lib/aside-find-target";
 
 /** The attribute on each entry's row (`aside-panel.tsx`), which the matches are grouped by. */
-export const ASIDE_ENTRY_ATTRIBUTE = "data-aside-entry-id";
+const ASIDE_ENTRY_ATTRIBUTE = "data-aside-entry-id";
 
 /**
  * What a reader cannot see, so a search neither counts nor paints it: a rendered answer's buttons (a code block's "show
@@ -25,7 +25,7 @@ export const isOutsideViewport = (rect: Pick<DOMRect, "bottom" | "top">, bounds:
     rect.top < bounds.top + STICKY_BAR_CLEARANCE_PX || rect.bottom > bounds.bottom;
 
 /** Whether two current hits are the same occurrence, by where each starts in the document. */
-export const isSameHit = (a: Range | undefined, b: Range | undefined): boolean => a?.startContainer === b?.startContainer && a?.startOffset === b?.startOffset;
+const isSameHit = (a: Range | undefined, b: Range | undefined): boolean => a?.startContainer === b?.startContainer && a?.startOffset === b?.startOffset;
 
 /**
  * Where a hit sits, measured from the panel's top edge. Scrolling the panel moves the hit and the panel together, so only
@@ -49,6 +49,30 @@ export const collectAsideRanges = (host: Element, query: string): Range[] => {
     return ranges;
 };
 
+const CLIPPING_OVERFLOW = new Set(["auto", "clip", "hidden", "scroll"]);
+
+/**
+ * Whether a scroll container between the hit and the panel hides part of it. A code block or a table can scroll on its
+ * own, so a hit can sit inside the panel's rectangle and still be cut off by that inner box.
+ */
+export const isClippedWithin = (rect: Pick<DOMRect, "bottom" | "left" | "right" | "top">, target: Element, viewport: Element): boolean => {
+    for (let node: Element | null = target; node && node !== viewport; node = node.parentElement) {
+        const style = getComputedStyle(node);
+
+        if (!CLIPPING_OVERFLOW.has(style.overflowX) && !CLIPPING_OVERFLOW.has(style.overflowY)) {
+            continue;
+        }
+
+        const box = node.getBoundingClientRect();
+
+        if (rect.top < box.top || rect.bottom > box.bottom || rect.left < box.left || rect.right > box.right) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
 /**
  * Brings the hit into view if it is out of sight. The hit's own rectangle decides, not its block's: a long answer can
  * carry the selected hit at its far edge while the block itself is partly on screen. jsdom lays out no ranges, so it
@@ -64,7 +88,7 @@ const revealIfOutOfSight = (range: Range | undefined, host: Element): void => {
 
     const viewport = host.closest(".overflow-y-auto") ?? document.documentElement;
 
-    if (isOutsideViewport(rect, viewport.getBoundingClientRect())) {
+    if (isOutsideViewport(rect, viewport.getBoundingClientRect()) || isClippedWithin(rect, target, viewport)) {
         target.scrollIntoView({ block: "center" });
     }
 };
