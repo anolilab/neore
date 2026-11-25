@@ -2003,6 +2003,18 @@ msgstr "há uma alteração aguardando leitura"
 msgid "A chat is waiting for your answer"
 msgstr "Um chat está aguardando sua resposta"
 
+#: src/features/notifications/hooks/use-chat-run-toasts.ts:279
+msgid "A chat needs your input or approval"
+msgstr "Um chat precisa da sua resposta ou aprovação"
+
+#: src/features/notifications/hooks/use-chat-run-toasts.ts:79
+msgid "A chat reply failed"
+msgstr "Uma resposta do chat falhou"
+
+#: src/features/notifications/hooks/use-chat-run-toasts.ts:79
+msgid "A chat reply finished"
+msgstr "Uma resposta do chat terminou"
+
 #: src/features/tasks/components/task-form-dialog.tsx:98
 msgid "A coding agent needs a repository to work on"
 msgstr "Um agente de código precisa de um repositório para trabalhar"
@@ -2060,11 +2072,11 @@ msgstr "Uma meta agrupa tarefas. O progresso dela depende de quantas foram concl
 msgid "A group chat. A question from the owner is answered by three agents in turn: a security reviewer, a performance reviewer, and a lead who sums up."
 msgstr "Um chat em grupo. Uma pergunta do dono é respondida por três agentes em sequência: um revisor de segurança, um revisor de desempenho e um líder que resume."
 
-#: src/features/chat/core/context/chat-context.tsx:751
+#: src/features/chat/core/context/chat-context.tsx:761
 msgid "A guest's message cannot be sent as a goal."
 msgstr "A mensagem de um convidado não pode ser enviada como objetivo."
 
-#: src/features/chat/core/context/chat-context.tsx:754
+#: src/features/chat/core/context/chat-context.tsx:764
 msgid "A guest's message is sent through a hosted model only. Pick one and send it again."
 msgstr "A mensagem de um convidado só é enviada por um modelo hospedado. Escolha um e envie de novo."
 
@@ -2227,7 +2239,7 @@ msgstr "A conversa de cada execução fica neste projeto. Mover a tarefa para ou
 msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 msgstr "Um sandbox que o bot mantém entre conversas. Pausado quando ocioso, sem cobrança enquanto pausado."
 
-#: src/features/notifications/components/notification-settings.tsx:227
+#: src/features/notifications/components/notification-settings.tsx:279
 msgid "A short summary each morning of what finished, what is running and what needs you. It counts toward your daily usage."
 msgstr "Um breve resumo toda manhã do que terminou, do que está em execução e do que precisa de você. Conta para o seu uso diário."
 
@@ -5230,7 +5242,7 @@ msgstr "iniciante"
 msgid "Behavior"
 msgstr "Comportamento"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:236
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:232
 msgid "Behind {base}"
 msgstr "Atrás de {base}"
 
@@ -6298,11 +6310,11 @@ msgstr "Catalão (Espanha)"
 msgid "catalog"
 msgstr "catálogo"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:259
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:255
 msgid "Catch up"
 msgstr "Atualizar"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:226
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:222
 msgid "Catch up {pullRequest} with {base}"
 msgstr "Atualizar {pullRequest} com {base}"
 
@@ -6507,6 +6519,14 @@ msgstr "Chat Completions (/v1/chat/completions) — Ollama, LM Studio, vLLM e a 
 msgid "Chat copied to clipboard as Markdown"
 msgstr "Chat copiado para a área de transferência como Markdown"
 
+#: src/features/notifications/components/notification-settings.tsx:327
+msgid "Chat failed"
+msgstr "Chat com falha"
+
+#: src/features/notifications/components/notification-settings.tsx:310
+msgid "Chat finished"
+msgstr "Chat concluído"
+
 #: src/features/marketing/components/tutorials-page.tsx:98
 msgid "Chat Import"
 msgstr "Importação de chats"
@@ -6531,6 +6551,18 @@ msgstr "Bloqueio do chat: bloqueado"
 #: src/features/settings/lib/settings-keywords.ts:70
 msgid "chat model"
 msgstr "modelo do chat"
+
+#: src/features/notifications/components/notification-settings.tsx:344
+msgid "Chat needs your input or approval"
+msgstr "O chat precisa da sua resposta ou aprovação"
+
+#: src/features/notifications/components/notification-settings.tsx:138
+msgid "Chat notification turned off"
+msgstr "Notificação do chat desativada"
+
+#: src/features/notifications/components/notification-settings.tsx:139
+msgid "Chat notification turned on"
+msgstr "Notificação do chat ativada"
 
 #: src/features/prompts/components/prompt-form-dialog.tsx:377
 msgid "Chat Settings (Optional)"
@@ -6783,7 +6815,7 @@ msgstr "Escolher modelos de texto padrão"
 msgid "Choose default video models"
 msgstr "Escolher modelos de vídeo padrão"
 
-#: src/features/notifications/components/notification-settings.tsx:199
+#: src/features/notifications/components/notification-settings.tsx:251
 msgid "Choose how Neore tells you about finished work and things that need you."
 msgstr "Escolha como o Neore avisa sobre trabalho concluído e o que precisa de você."
 
@@ -8938,7 +8970,7 @@ msgstr "Não foi possível cancelar a execução."
 msgid "Could not change Auto. Please try again."
 msgstr "Não foi possível alterar Auto. Tente novamente."
 
-#: src/features/notifications/components/notification-settings.tsx:169
+#: src/features/notifications/components/notification-settings.tsx:221
 msgid "Could not change push notifications. Try again."
 msgstr "Não foi possível alterar as notificações push. Tente novamente."
 
@@ -9222,7 +9254,7 @@ msgstr "Não foi possível pré-visualizar · Clique para baixar"
 msgid "Could not pull {0}: {1}"
 msgstr "Não foi possível baixar {0}: {1}"
 
-#: src/features/chat/core/context/chat-context.tsx:698
+#: src/features/chat/core/context/chat-context.tsx:708
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr "Não foi possível acessar o servidor para iniciar a geração. Verifique sua conexão e tente novamente."
 
@@ -9297,7 +9329,11 @@ msgstr "Não foi possível salvar essa escolha. Tente novamente."
 msgid "Could not save the bot's tools. Its tools are unchanged."
 msgstr "Não foi possível salvar as ferramentas do bot. As ferramentas dele não mudaram."
 
-#: src/features/notifications/components/notification-settings.tsx:110
+#: src/features/notifications/components/notification-settings.tsx:137
+msgid "Could not save the chat notification setting."
+msgstr "Não foi possível salvar a configuração de notificação do chat."
+
+#: src/features/notifications/components/notification-settings.tsx:162
 msgid "Could not save the Daily Brief setting."
 msgstr "Não foi possível salvar a configuração do Daily Brief."
 
@@ -9305,7 +9341,7 @@ msgstr "Não foi possível salvar a configuração do Daily Brief."
 msgid "Could not save the default permission mode"
 msgstr "Não foi possível salvar o modo de permissões padrão"
 
-#: src/features/notifications/components/notification-settings.tsx:103
+#: src/features/notifications/components/notification-settings.tsx:117
 msgid "Could not save the email setting."
 msgstr "Não foi possível salvar a configuração de e-mail."
 
@@ -10085,7 +10121,7 @@ msgid "Czech Republic"
 msgstr "República Tcheca"
 
 #: src/features/home/components/daily-brief-offer.tsx:105
-#: src/features/notifications/components/notification-settings.tsx:224
+#: src/features/notifications/components/notification-settings.tsx:276
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:57
 msgid "Daily Brief"
 msgstr "Daily Brief"
@@ -10099,11 +10135,11 @@ msgstr "O Daily Brief está ativado. Ele chega pela manhã quando há algo para 
 msgid "Daily Brief is on. The next one is planned for {0}; a morning with nothing to report sends none."
 msgstr "O Daily Brief está ativado. O próximo está previsto para {0}; numa manhã sem nada para relatar, nenhum é enviado."
 
-#: src/features/notifications/components/notification-settings.tsx:111
+#: src/features/notifications/components/notification-settings.tsx:163
 msgid "Daily Brief turned off"
 msgstr "Daily Brief desativado"
 
-#: src/features/notifications/components/notification-settings.tsx:112
+#: src/features/notifications/components/notification-settings.tsx:164
 msgid "Daily Brief turned on"
 msgstr "Daily Brief ativado"
 
@@ -12487,7 +12523,7 @@ msgstr "E-mail de verificação enviado"
 msgid "Email Verified:"
 msgstr "E-mail verificado:"
 
-#: src/features/notifications/components/notification-settings.tsx:241
+#: src/features/notifications/components/notification-settings.tsx:293
 msgid "Email when a task finishes"
 msgstr "E-mail quando uma tarefa terminar"
 
@@ -16253,7 +16289,7 @@ msgstr "Alemanha"
 msgid "Get a short summary each morning of what finished, what needs you and what is still running. It counts toward your daily usage."
 msgstr "Receba toda manhã um breve resumo do que terminou, do que precisa de você e do que ainda está em andamento. Conta para o seu uso diário."
 
-#: src/features/notifications/components/notification-settings.tsx:193
+#: src/features/notifications/components/notification-settings.tsx:245
 msgid "Get a system notification when a task finishes or something needs your approval, even with the app closed."
 msgstr "Receba uma notificação do sistema quando uma tarefa terminar ou algo precisar da sua aprovação, mesmo com o app fechado."
 
@@ -16261,7 +16297,7 @@ msgstr "Receba uma notificação do sistema quando uma tarefa terminar ou algo p
 msgid "Get Access"
 msgstr "Obter acesso"
 
-#: src/features/notifications/components/notification-settings.tsx:244
+#: src/features/notifications/components/notification-settings.tsx:296
 msgid "Get an email with a link to the result when a task or trigger run finishes with one."
 msgstr "Receba um e-mail com um link para o resultado quando uma tarefa ou execução de gatilho terminar com um."
 
@@ -20233,7 +20269,7 @@ msgstr "Carregando…"
 msgid "local"
 msgstr "local"
 
-#: src/features/chat/core/context/chat-context.tsx:758
+#: src/features/chat/core/context/chat-context.tsx:768
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "Modelos locais aceitam apenas texto. Remova os anexos para enviar."
 
@@ -23895,15 +23931,15 @@ msgstr "Fluxos de notificação, canais e preferências de destinatários"
 #: src/features/home/components/home-page.tsx:227
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
-#: src/features/notifications/components/notification-settings.tsx:199
+#: src/features/notifications/components/notification-settings.tsx:251
 msgid "Notifications"
 msgstr "Notificações"
 
-#: src/features/notifications/components/notification-settings.tsx:145
+#: src/features/notifications/components/notification-settings.tsx:197
 msgid "Notifications are blocked for this site in your browser."
 msgstr "As notificações estão bloqueadas para este site no seu navegador."
 
-#: src/features/notifications/components/notification-settings.tsx:186
+#: src/features/notifications/components/notification-settings.tsx:238
 msgid "Notifications are blocked for this site in your browser. Allow them in the site settings to turn this on."
 msgstr "As notificações estão bloqueadas para este site no seu navegador. Permita-as nas configurações do site para ativar isto."
 
@@ -27508,23 +27544,23 @@ msgstr "Criado especificamente para tarefas complexas de engenharia de software"
 msgid "Purpose-optimized for code generation and debugging"
 msgstr "Otimizado para geração e depuração de código"
 
-#: src/features/notifications/components/notification-settings.tsx:146
+#: src/features/notifications/components/notification-settings.tsx:198
 msgid "Push notifications are not available here."
 msgstr "As notificações push não estão disponíveis aqui."
 
-#: src/features/notifications/components/notification-settings.tsx:181
+#: src/features/notifications/components/notification-settings.tsx:233
 msgid "Push notifications are not configured on this server."
 msgstr "As notificações push não estão configuradas neste servidor."
 
-#: src/features/notifications/components/notification-settings.tsx:166
+#: src/features/notifications/components/notification-settings.tsx:218
 msgid "Push notifications are off for this browser"
 msgstr "As notificações push estão desativadas neste navegador"
 
-#: src/features/notifications/components/notification-settings.tsx:157
+#: src/features/notifications/components/notification-settings.tsx:209
 msgid "Push notifications are on for this browser"
 msgstr "As notificações push estão ativadas neste navegador"
 
-#: src/features/notifications/components/notification-settings.tsx:204
+#: src/features/notifications/components/notification-settings.tsx:256
 msgid "Push notifications on this browser"
 msgstr "Notificações push neste navegador"
 
@@ -27532,11 +27568,11 @@ msgstr "Notificações push neste navegador"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "Coloque vários agentes com papéis próprios em uma mesma conversa. Um painel de revisão pode verificar uma alteração pelos ângulos de segurança e desempenho, e um debate pode argumentar os dois lados antes de uma síntese."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:265
-msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
-msgstr "Coloca um prompt no compositor para fazer rebase deste branch em {base}, resolver conflitos, verificar o build e os testes e fazer push. Nada é enviado."
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:261
+msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, and check the build and tests. It pushes only when a signed-in gh confirms the pull request is still open on that base. Nothing is sent."
+msgstr "Coloca um prompt no compositor para fazer rebase deste branch em {base}, resolver conflitos e verificar o build e os testes. Só faz push quando um gh com sessão iniciada confirma que o pull request continua aberto nessa base. Nada é enviado."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:266
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:262
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "Coloca um prompt no compositor para fazer rebase do branch deste fork em {base} numa cópia local, resolver conflitos e verificar o build e os testes. Não é feito push. Nada é enviado."
 
@@ -28911,7 +28947,7 @@ msgstr "Responder"
 msgid "Reply complete"
 msgstr "Resposta concluída"
 
-#: src/features/chat/core/context/chat-context.tsx:644
+#: src/features/chat/core/context/chat-context.tsx:645
 msgid "Reply ready"
 msgstr "Resposta pronta"
 
@@ -31399,6 +31435,18 @@ msgstr "Mostrar {name} no seletor de modelos"
 msgid "Show {remainingCount} more"
 msgstr "Mostrar mais {remainingCount}"
 
+#: src/features/notifications/components/notification-settings.tsx:330
+msgid "Show a message in the app when a chat reply fails."
+msgstr "Mostra uma mensagem no app quando uma resposta do chat falha."
+
+#: src/features/notifications/components/notification-settings.tsx:313
+msgid "Show a message in the app when a chat reply finishes."
+msgstr "Mostra uma mensagem no app quando uma resposta do chat termina."
+
+#: src/features/notifications/components/notification-settings.tsx:347
+msgid "Show a message in the app when a chat waits for your answer or your approval."
+msgstr "Mostra uma mensagem no app quando um chat espera sua resposta ou aprovação."
+
 #: src/features/skills/components/bundle-import-dialog.tsx:99
 msgid "Show all"
 msgstr "Mostrar tudo"
@@ -33727,7 +33775,7 @@ msgstr "Mudar para {label}"
 msgid "Switch to {name}?"
 msgstr "Trocar para {name}?"
 
-#: src/features/chat/core/context/chat-context.tsx:753
+#: src/features/chat/core/context/chat-context.tsx:763
 msgid "Switch to a text model to send this message."
 msgstr "Mude para um modelo de texto para enviar esta mensagem."
 
@@ -33958,11 +34006,11 @@ msgstr "Detalhes da tarefa, sua revisão e o histórico de execuções."
 msgid "Task done: {title}"
 msgstr "Tarefa concluída: {title}"
 
-#: src/features/notifications/components/notification-settings.tsx:104
+#: src/features/notifications/components/notification-settings.tsx:118
 msgid "Task emails turned off"
 msgstr "E-mails de tarefas desativados"
 
-#: src/features/notifications/components/notification-settings.tsx:105
+#: src/features/notifications/components/notification-settings.tsx:119
 msgid "Task emails turned on"
 msgstr "E-mails de tarefas ativados"
 
@@ -34498,7 +34546,7 @@ msgstr "Essa pasta é a pasta inicial do servidor ou uma pasta acima dela. Escol
 msgid "That folder was not found."
 msgstr "Essa pasta não foi encontrada."
 
-#: src/features/chat/core/context/chat-context.tsx:749
+#: src/features/chat/core/context/chat-context.tsx:759
 msgid "That guest link has ended."
 msgstr "Esse link de convidado expirou."
 
@@ -34518,7 +34566,7 @@ msgstr "Não foi possível ler esse link."
 msgid "That message could not be found in this conversation."
 msgstr "Não foi possível encontrar essa mensagem nesta conversa."
 
-#: src/features/chat/core/context/chat-context.tsx:752
+#: src/features/chat/core/context/chat-context.tsx:762
 #: src/features/chat/guest-links/guest-link-panel.tsx:143
 msgid "That message is being sent."
 msgstr "Essa mensagem está sendo enviada."
@@ -34531,7 +34579,7 @@ msgstr "Essa mensagem não está mais aguardando."
 msgid "That message is too long to send from here."
 msgstr "Essa mensagem é longa demais para enviar daqui."
 
-#: src/features/chat/core/context/chat-context.tsx:750
+#: src/features/chat/core/context/chat-context.tsx:760
 #: src/features/chat/guest-links/guest-link-panel.tsx:240
 #: src/features/chat/guest-links/guest-link-panel.tsx:316
 msgid "That message was already sent."
@@ -35795,7 +35843,7 @@ msgstr "Esta branch está atrás da branch base."
 msgid "This branch was changed meanwhile. Check it and save again."
 msgstr "Este branch foi alterado entretanto. Verifique-o e guarde novamente."
 
-#: src/features/notifications/components/notification-settings.tsx:190
+#: src/features/notifications/components/notification-settings.tsx:242
 msgid "This browser cannot receive push notifications here."
 msgstr "Este navegador não pode receber notificações push aqui."
 
@@ -36174,7 +36222,7 @@ msgstr "Isto mescla o commit {0} na branch base com “{1}” em {hostLabel}. Se
 msgid "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
 msgstr "Não é possível deixar esta mensagem. Seja breve, não a comece com / nem mencione ninguém, ou tente novamente mais tarde."
 
-#: src/features/chat/core/context/chat-context.tsx:755
+#: src/features/chat/core/context/chat-context.tsx:765
 msgid "This message cannot be sent in this chat."
 msgstr "Esta mensagem não pode ser enviada neste chat."
 
@@ -39416,11 +39464,11 @@ msgstr "Repositórios monitorados"
 msgid "We could not check that you are signed in. Try again in a moment."
 msgstr "Não foi possível verificar se você está conectado. Tente novamente em instantes."
 
-#: src/features/chat/core/context/chat-context.tsx:757
+#: src/features/chat/core/context/chat-context.tsx:767
 msgid "We could not confirm your session in time. The guest's message was not sent; send it again from the Guests tab."
 msgstr "Não conseguimos confirmar sua sessão a tempo. A mensagem do convidado não foi enviada; envie de novo pela aba Convidados."
 
-#: src/features/chat/core/context/chat-context.tsx:760
+#: src/features/chat/core/context/chat-context.tsx:770
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "Não conseguimos confirmar sua sessão a tempo. Sua mensagem continua no campo de texto. Tente enviá-la novamente."
 
@@ -40510,7 +40558,7 @@ msgstr "Seu espaço de trabalho de IA <0>começa aqui.</0>"
 msgid "Your answer"
 msgstr "Sua resposta"
 
-#: src/features/chat/core/context/chat-context.tsx:644
+#: src/features/chat/core/context/chat-context.tsx:645
 msgid "Your answer in Neore has finished."
 msgstr "Sua resposta no Neore foi concluída."
 
@@ -40700,7 +40748,7 @@ msgstr "Sua mensagem"
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 msgstr "Sua mensagem mudou durante os uploads, então não foi enviada. Pressione Enviar para enviá-la."
 
-#: src/features/chat/core/context/chat-context.tsx:748
+#: src/features/chat/core/context/chat-context.tsx:758
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Sua mensagem contém conteúdo impróprio e não pode ser enviada."
 

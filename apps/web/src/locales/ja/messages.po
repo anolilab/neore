@@ -2003,6 +2003,18 @@ msgstr "読み取り待ちの変更があります"
 msgid "A chat is waiting for your answer"
 msgstr "チャットがあなたの回答を待っています"
 
+#: src/features/notifications/hooks/use-chat-run-toasts.ts:279
+msgid "A chat needs your input or approval"
+msgstr "チャットがあなたの入力または承認を待っています"
+
+#: src/features/notifications/hooks/use-chat-run-toasts.ts:79
+msgid "A chat reply failed"
+msgstr "チャットの返信が失敗しました"
+
+#: src/features/notifications/hooks/use-chat-run-toasts.ts:79
+msgid "A chat reply finished"
+msgstr "チャットの返信が完了しました"
+
 #: src/features/tasks/components/task-form-dialog.tsx:98
 msgid "A coding agent needs a repository to work on"
 msgstr "コーディングエージェントには作業対象のリポジトリが必要です"
@@ -2060,11 +2072,11 @@ msgstr "目標はタスクをまとめるものです。進捗は完了したタ
 msgid "A group chat. A question from the owner is answered by three agents in turn: a security reviewer, a performance reviewer, and a lead who sums up."
 msgstr "グループチャットです。所有者の質問には、セキュリティレビュアー、パフォーマンスレビュアー、そして要点をまとめるリードの 3 つのエージェントが順番に答えます。"
 
-#: src/features/chat/core/context/chat-context.tsx:751
+#: src/features/chat/core/context/chat-context.tsx:761
 msgid "A guest's message cannot be sent as a goal."
 msgstr "ゲストのメッセージは目標として送信できません。"
 
-#: src/features/chat/core/context/chat-context.tsx:754
+#: src/features/chat/core/context/chat-context.tsx:764
 msgid "A guest's message is sent through a hosted model only. Pick one and send it again."
 msgstr "ゲストのメッセージはホスト型モデルでのみ送信されます。モデルを選んでもう一度送信してください。"
 
@@ -2227,7 +2239,7 @@ msgstr "実行のスレッドはこのプロジェクトに保存されます。
 msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 msgstr "チャット間でボットが保持するサンドボックス。アイドル時は一時停止され、一時停止中は課金されません。"
 
-#: src/features/notifications/components/notification-settings.tsx:227
+#: src/features/notifications/components/notification-settings.tsx:279
 msgid "A short summary each morning of what finished, what is running and what needs you. It counts toward your daily usage."
 msgstr "毎朝、完了したこと、実行中のこと、対応が必要なことを短くまとめます。1日の利用量にカウントされます。"
 
@@ -5230,7 +5242,7 @@ msgstr "初級"
 msgid "Behavior"
 msgstr "動作"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:236
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:232
 msgid "Behind {base}"
 msgstr "{base} より遅れています"
 
@@ -6298,11 +6310,11 @@ msgstr "カタルーニャ語（スペイン）"
 msgid "catalog"
 msgstr "カタログ"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:259
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:255
 msgid "Catch up"
 msgstr "追いつく"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:226
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:222
 msgid "Catch up {pullRequest} with {base}"
 msgstr "{pullRequest} を {base} に追いつかせる"
 
@@ -6507,6 +6519,14 @@ msgstr "Chat Completions（/v1/chat/completions）— Ollama、LM Studio、vLLM 
 msgid "Chat copied to clipboard as Markdown"
 msgstr "チャットを Markdown としてクリップボードにコピーしました"
 
+#: src/features/notifications/components/notification-settings.tsx:327
+msgid "Chat failed"
+msgstr "チャットの失敗"
+
+#: src/features/notifications/components/notification-settings.tsx:310
+msgid "Chat finished"
+msgstr "チャットの完了"
+
 #: src/features/marketing/components/tutorials-page.tsx:98
 msgid "Chat Import"
 msgstr "チャットのインポート"
@@ -6531,6 +6551,18 @@ msgstr "チャットロック: ロック中"
 #: src/features/settings/lib/settings-keywords.ts:70
 msgid "chat model"
 msgstr "チャットモデル"
+
+#: src/features/notifications/components/notification-settings.tsx:344
+msgid "Chat needs your input or approval"
+msgstr "チャットが入力または承認を待っています"
+
+#: src/features/notifications/components/notification-settings.tsx:138
+msgid "Chat notification turned off"
+msgstr "チャットの通知をオフにしました"
+
+#: src/features/notifications/components/notification-settings.tsx:139
+msgid "Chat notification turned on"
+msgstr "チャットの通知をオンにしました"
 
 #: src/features/prompts/components/prompt-form-dialog.tsx:377
 msgid "Chat Settings (Optional)"
@@ -6783,7 +6815,7 @@ msgstr "既定のテキストモデルを選択"
 msgid "Choose default video models"
 msgstr "既定の動画モデルを選択"
 
-#: src/features/notifications/components/notification-settings.tsx:199
+#: src/features/notifications/components/notification-settings.tsx:251
 msgid "Choose how Neore tells you about finished work and things that need you."
 msgstr "完了した作業や対応が必要なことを Neore がどう知らせるかを選びます。"
 
@@ -8938,7 +8970,7 @@ msgstr "実行をキャンセルできませんでした。"
 msgid "Could not change Auto. Please try again."
 msgstr "Autoを変更できませんでした。もう一度お試しください。"
 
-#: src/features/notifications/components/notification-settings.tsx:169
+#: src/features/notifications/components/notification-settings.tsx:221
 msgid "Could not change push notifications. Try again."
 msgstr "プッシュ通知を変更できませんでした。もう一度お試しください。"
 
@@ -9222,7 +9254,7 @@ msgstr "プレビューできません · クリックしてダウンロード"
 msgid "Could not pull {0}: {1}"
 msgstr "{0} を取得できませんでした：{1}"
 
-#: src/features/chat/core/context/chat-context.tsx:698
+#: src/features/chat/core/context/chat-context.tsx:708
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr "生成を開始するためにサーバーに接続できませんでした。接続を確認して、もう一度お試しください。"
 
@@ -9297,7 +9329,11 @@ msgstr "その選択を保存できませんでした。もう一度お試しく
 msgid "Could not save the bot's tools. Its tools are unchanged."
 msgstr "ボットのツールを保存できませんでした。ツールは変更されていません。"
 
-#: src/features/notifications/components/notification-settings.tsx:110
+#: src/features/notifications/components/notification-settings.tsx:137
+msgid "Could not save the chat notification setting."
+msgstr "チャット通知の設定を保存できませんでした。"
+
+#: src/features/notifications/components/notification-settings.tsx:162
 msgid "Could not save the Daily Brief setting."
 msgstr "Daily Brief の設定を保存できませんでした。"
 
@@ -9305,7 +9341,7 @@ msgstr "Daily Brief の設定を保存できませんでした。"
 msgid "Could not save the default permission mode"
 msgstr "既定の権限モードを保存できませんでした"
 
-#: src/features/notifications/components/notification-settings.tsx:103
+#: src/features/notifications/components/notification-settings.tsx:117
 msgid "Could not save the email setting."
 msgstr "メール設定を保存できませんでした。"
 
@@ -10085,7 +10121,7 @@ msgid "Czech Republic"
 msgstr "チェコ共和国"
 
 #: src/features/home/components/daily-brief-offer.tsx:105
-#: src/features/notifications/components/notification-settings.tsx:224
+#: src/features/notifications/components/notification-settings.tsx:276
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:57
 msgid "Daily Brief"
 msgstr "Daily Brief"
@@ -10099,11 +10135,11 @@ msgstr "Daily Brief がオンになりました。伝えることがある日の
 msgid "Daily Brief is on. The next one is planned for {0}; a morning with nothing to report sends none."
 msgstr "Daily Brief がオンになりました。次回は {0} の予定です。伝えることがない朝は届きません。"
 
-#: src/features/notifications/components/notification-settings.tsx:111
+#: src/features/notifications/components/notification-settings.tsx:163
 msgid "Daily Brief turned off"
 msgstr "Daily Brief をオフにしました"
 
-#: src/features/notifications/components/notification-settings.tsx:112
+#: src/features/notifications/components/notification-settings.tsx:164
 msgid "Daily Brief turned on"
 msgstr "Daily Brief をオンにしました"
 
@@ -12487,7 +12523,7 @@ msgstr "確認メールを送信しました"
 msgid "Email Verified:"
 msgstr "メール認証済み："
 
-#: src/features/notifications/components/notification-settings.tsx:241
+#: src/features/notifications/components/notification-settings.tsx:293
 msgid "Email when a task finishes"
 msgstr "タスク完了時にメールを送信"
 
@@ -16253,7 +16289,7 @@ msgstr "ドイツ"
 msgid "Get a short summary each morning of what finished, what needs you and what is still running. It counts toward your daily usage."
 msgstr "毎朝、完了したこと、対応が必要なこと、実行中のことを短くまとめてお届けします。1日の使用量にカウントされます。"
 
-#: src/features/notifications/components/notification-settings.tsx:193
+#: src/features/notifications/components/notification-settings.tsx:245
 msgid "Get a system notification when a task finishes or something needs your approval, even with the app closed."
 msgstr "タスクが完了したときや承認が必要なときに、アプリを閉じていてもシステム通知を受け取れます。"
 
@@ -16261,7 +16297,7 @@ msgstr "タスクが完了したときや承認が必要なときに、アプリ
 msgid "Get Access"
 msgstr "アクセスする"
 
-#: src/features/notifications/components/notification-settings.tsx:244
+#: src/features/notifications/components/notification-settings.tsx:296
 msgid "Get an email with a link to the result when a task or trigger run finishes with one."
 msgstr "タスクまたはトリガーの実行が結果とともに終了したら、結果へのリンク付きのメールを受け取ります。"
 
@@ -20233,7 +20269,7 @@ msgstr "読み込んでいます…"
 msgid "local"
 msgstr "ローカル"
 
-#: src/features/chat/core/context/chat-context.tsx:758
+#: src/features/chat/core/context/chat-context.tsx:768
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "ローカルモデルはテキストのみに対応しています。送信するには添付ファイルを削除してください。"
 
@@ -23895,15 +23931,15 @@ msgstr "通知ワークフロー、チャネル、受信者の設定"
 #: src/features/home/components/home-page.tsx:227
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
-#: src/features/notifications/components/notification-settings.tsx:199
+#: src/features/notifications/components/notification-settings.tsx:251
 msgid "Notifications"
 msgstr "通知"
 
-#: src/features/notifications/components/notification-settings.tsx:145
+#: src/features/notifications/components/notification-settings.tsx:197
 msgid "Notifications are blocked for this site in your browser."
 msgstr "このサイトの通知はブラウザーでブロックされています。"
 
-#: src/features/notifications/components/notification-settings.tsx:186
+#: src/features/notifications/components/notification-settings.tsx:238
 msgid "Notifications are blocked for this site in your browser. Allow them in the site settings to turn this on."
 msgstr "このサイトの通知はブラウザーでブロックされています。オンにするにはサイトの設定で許可してください。"
 
@@ -27508,23 +27544,23 @@ msgstr "複雑なソフトウェアエンジニアリングタスク専用設計
 msgid "Purpose-optimized for code generation and debugging"
 msgstr "コード生成とデバッグに特化して最適化"
 
-#: src/features/notifications/components/notification-settings.tsx:146
+#: src/features/notifications/components/notification-settings.tsx:198
 msgid "Push notifications are not available here."
 msgstr "ここではプッシュ通知を利用できません。"
 
-#: src/features/notifications/components/notification-settings.tsx:181
+#: src/features/notifications/components/notification-settings.tsx:233
 msgid "Push notifications are not configured on this server."
 msgstr "このサーバーではプッシュ通知が設定されていません。"
 
-#: src/features/notifications/components/notification-settings.tsx:166
+#: src/features/notifications/components/notification-settings.tsx:218
 msgid "Push notifications are off for this browser"
 msgstr "このブラウザーのプッシュ通知はオフです"
 
-#: src/features/notifications/components/notification-settings.tsx:157
+#: src/features/notifications/components/notification-settings.tsx:209
 msgid "Push notifications are on for this browser"
 msgstr "このブラウザーのプッシュ通知はオンです"
 
-#: src/features/notifications/components/notification-settings.tsx:204
+#: src/features/notifications/components/notification-settings.tsx:256
 msgid "Push notifications on this browser"
 msgstr "このブラウザーでのプッシュ通知"
 
@@ -27532,11 +27568,11 @@ msgstr "このブラウザーでのプッシュ通知"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "役割の異なる複数のエージェントを 1 つのスレッドに配置できます。レビューパネルはセキュリティとパフォーマンスの観点から変更を確認でき、ディベートでは統合の前に両方の立場を議論できます。"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:265
-msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
-msgstr "このブランチを {base} にリベースし、コンフリクトを解消し、ビルドとテストを確認してプッシュするプロンプトをコンポーザーに入力します。送信はされません。"
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:261
+msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, and check the build and tests. It pushes only when a signed-in gh confirms the pull request is still open on that base. Nothing is sent."
+msgstr "このブランチを {base} にリベースし、コンフリクトを解消し、ビルドとテストを確認するプロンプトをコンポーザーに入力します。プッシュするのは、サインイン済みの gh でプルリクエストがそのベースのまま開いていると確認できた場合だけです。送信はされません。"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:266
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:262
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "このフォークのブランチをローカルのコピーで {base} にリベースし、コンフリクトを解消し、ビルドとテストを確認するプロンプトをコンポーザーに入力します。プッシュはされません。送信はされません。"
 
@@ -28911,7 +28947,7 @@ msgstr "返信"
 msgid "Reply complete"
 msgstr "返信が完了しました"
 
-#: src/features/chat/core/context/chat-context.tsx:644
+#: src/features/chat/core/context/chat-context.tsx:645
 msgid "Reply ready"
 msgstr "返信の準備ができました"
 
@@ -31399,6 +31435,18 @@ msgstr "{name} をモデルピッカーに表示する"
 msgid "Show {remainingCount} more"
 msgstr "さらに {remainingCount} 件表示"
 
+#: src/features/notifications/components/notification-settings.tsx:330
+msgid "Show a message in the app when a chat reply fails."
+msgstr "チャットの返信が失敗したときにアプリ内でメッセージを表示します。"
+
+#: src/features/notifications/components/notification-settings.tsx:313
+msgid "Show a message in the app when a chat reply finishes."
+msgstr "チャットの返信が完了したときにアプリ内でメッセージを表示します。"
+
+#: src/features/notifications/components/notification-settings.tsx:347
+msgid "Show a message in the app when a chat waits for your answer or your approval."
+msgstr "チャットがあなたの返答または承認を待っているときにアプリ内でメッセージを表示します。"
+
 #: src/features/skills/components/bundle-import-dialog.tsx:99
 msgid "Show all"
 msgstr "すべて表示"
@@ -33727,7 +33775,7 @@ msgstr "{label} に切り替え"
 msgid "Switch to {name}?"
 msgstr "{name} に切り替えますか？"
 
-#: src/features/chat/core/context/chat-context.tsx:753
+#: src/features/chat/core/context/chat-context.tsx:763
 msgid "Switch to a text model to send this message."
 msgstr "このメッセージを送信するには、テキストモデルに切り替えてください。"
 
@@ -33958,11 +34006,11 @@ msgstr "タスクの詳細、あなたのレビュー、実行履歴。"
 msgid "Task done: {title}"
 msgstr "タスク完了：{title}"
 
-#: src/features/notifications/components/notification-settings.tsx:104
+#: src/features/notifications/components/notification-settings.tsx:118
 msgid "Task emails turned off"
 msgstr "タスクのメールをオフにしました"
 
-#: src/features/notifications/components/notification-settings.tsx:105
+#: src/features/notifications/components/notification-settings.tsx:119
 msgid "Task emails turned on"
 msgstr "タスクのメールをオンにしました"
 
@@ -34498,7 +34546,7 @@ msgstr "そのフォルダーは、サーバーのホームフォルダー、ま
 msgid "That folder was not found."
 msgstr "そのフォルダーは見つかりませんでした。"
 
-#: src/features/chat/core/context/chat-context.tsx:749
+#: src/features/chat/core/context/chat-context.tsx:759
 msgid "That guest link has ended."
 msgstr "そのゲストリンクは終了しています。"
 
@@ -34518,7 +34566,7 @@ msgstr "そのリンクを読み取れませんでした。"
 msgid "That message could not be found in this conversation."
 msgstr "そのメッセージはこの会話内に見つかりませんでした。"
 
-#: src/features/chat/core/context/chat-context.tsx:752
+#: src/features/chat/core/context/chat-context.tsx:762
 #: src/features/chat/guest-links/guest-link-panel.tsx:143
 msgid "That message is being sent."
 msgstr "そのメッセージは送信中です。"
@@ -34531,7 +34579,7 @@ msgstr "そのメッセージはもう保留中ではありません。"
 msgid "That message is too long to send from here."
 msgstr "そのメッセージは長すぎて、ここから送信できません。"
 
-#: src/features/chat/core/context/chat-context.tsx:750
+#: src/features/chat/core/context/chat-context.tsx:760
 #: src/features/chat/guest-links/guest-link-panel.tsx:240
 #: src/features/chat/guest-links/guest-link-panel.tsx:316
 msgid "That message was already sent."
@@ -35795,7 +35843,7 @@ msgstr "このブランチはベースブランチより遅れています。"
 msgid "This branch was changed meanwhile. Check it and save again."
 msgstr "このブランチはその間に変更されました。確認してからもう一度保存してください。"
 
-#: src/features/notifications/components/notification-settings.tsx:190
+#: src/features/notifications/components/notification-settings.tsx:242
 msgid "This browser cannot receive push notifications here."
 msgstr "このブラウザーではここでプッシュ通知を受信できません。"
 
@@ -36174,7 +36222,7 @@ msgstr "{hostLabel} で、コミット {0} を「{1}」でベースブランチ�
 msgid "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
 msgstr "このメッセージは残せません。短くし、/ で始めたり誰かをメンションしたりしないでください。または後でもう一度お試しください。"
 
-#: src/features/chat/core/context/chat-context.tsx:755
+#: src/features/chat/core/context/chat-context.tsx:765
 msgid "This message cannot be sent in this chat."
 msgstr "このメッセージはこのチャットでは送信できません。"
 
@@ -39416,11 +39464,11 @@ msgstr "監視中のリポジトリ"
 msgid "We could not check that you are signed in. Try again in a moment."
 msgstr "サインインしているかを確認できませんでした。しばらくしてからもう一度お試しください。"
 
-#: src/features/chat/core/context/chat-context.tsx:757
+#: src/features/chat/core/context/chat-context.tsx:767
 msgid "We could not confirm your session in time. The guest's message was not sent; send it again from the Guests tab."
 msgstr "セッションを時間内に確認できませんでした。ゲストのメッセージは送信されていません。［ゲスト］タブからもう一度送信してください。"
 
-#: src/features/chat/core/context/chat-context.tsx:760
+#: src/features/chat/core/context/chat-context.tsx:770
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "時間内にセッションを確認できませんでした。メッセージは入力欄に残っています。もう一度送信してください。"
 
@@ -40510,7 +40558,7 @@ msgstr "あなたの AI ワークスペースは<0>ここから始まります�
 msgid "Your answer"
 msgstr "あなたの回答"
 
-#: src/features/chat/core/context/chat-context.tsx:644
+#: src/features/chat/core/context/chat-context.tsx:645
 msgid "Your answer in Neore has finished."
 msgstr "Neore での回答が完了しました。"
 
@@ -40700,7 +40748,7 @@ msgstr "あなたのメッセージ"
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 msgstr "アップロード中にメッセージが変更されたため、送信されませんでした。送信ボタンを押して送信してください。"
 
-#: src/features/chat/core/context/chat-context.tsx:748
+#: src/features/chat/core/context/chat-context.tsx:758
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "メッセージに不適切なコンテンツが含まれているため、送信できません。"
 

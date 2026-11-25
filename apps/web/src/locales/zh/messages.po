@@ -2003,6 +2003,18 @@ msgstr "有变更等待查看"
 msgid "A chat is waiting for your answer"
 msgstr "有一个对话在等待你的回复"
 
+#: src/features/notifications/hooks/use-chat-run-toasts.ts:279
+msgid "A chat needs your input or approval"
+msgstr "聊天需要你的输入或批准"
+
+#: src/features/notifications/hooks/use-chat-run-toasts.ts:79
+msgid "A chat reply failed"
+msgstr "聊天回复失败"
+
+#: src/features/notifications/hooks/use-chat-run-toasts.ts:79
+msgid "A chat reply finished"
+msgstr "聊天回复已完成"
+
 #: src/features/tasks/components/task-form-dialog.tsx:98
 msgid "A coding agent needs a repository to work on"
 msgstr "编程智能体需要一个代码仓库来工作"
@@ -2060,11 +2072,11 @@ msgstr "目标用于归组任务，其进度取决于已完成的任务数量。
 msgid "A group chat. A question from the owner is answered by three agents in turn: a security reviewer, a performance reviewer, and a lead who sums up."
 msgstr "群聊。所有者的问题由三个智能体依次回答：安全审查员、性能审查员，以及负责总结的负责人。"
 
-#: src/features/chat/core/context/chat-context.tsx:751
+#: src/features/chat/core/context/chat-context.tsx:761
 msgid "A guest's message cannot be sent as a goal."
 msgstr "访客的消息不能作为目标发送。"
 
-#: src/features/chat/core/context/chat-context.tsx:754
+#: src/features/chat/core/context/chat-context.tsx:764
 msgid "A guest's message is sent through a hosted model only. Pick one and send it again."
 msgstr "访客的消息只能通过托管模型发送。请选择一个模型后再次发送。"
 
@@ -2227,7 +2239,7 @@ msgstr "运行的对话会归入此项目。将任务移到其他项目会新建
 msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 msgstr "机器人在多次聊天之间保留的沙盒。空闲时暂停，暂停期间不计费。"
 
-#: src/features/notifications/components/notification-settings.tsx:227
+#: src/features/notifications/components/notification-settings.tsx:279
 msgid "A short summary each morning of what finished, what is running and what needs you. It counts toward your daily usage."
 msgstr "每天早上简要汇总已完成、正在运行和需要你处理的事项。计入每日用量。"
 
@@ -5230,7 +5242,7 @@ msgstr "入门"
 msgid "Behavior"
 msgstr "行为"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:236
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:232
 msgid "Behind {base}"
 msgstr "落后于 {base}"
 
@@ -6298,11 +6310,11 @@ msgstr "加泰罗尼亚语（西班牙）"
 msgid "catalog"
 msgstr "目录"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:259
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:255
 msgid "Catch up"
 msgstr "追上"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:226
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:222
 msgid "Catch up {pullRequest} with {base}"
 msgstr "让 {pullRequest} 追上 {base}"
 
@@ -6507,6 +6519,14 @@ msgstr "Chat Completions（/v1/chat/completions）——Ollama、LM Studio、vLL
 msgid "Chat copied to clipboard as Markdown"
 msgstr "已将聊天以 Markdown 格式复制到剪贴板"
 
+#: src/features/notifications/components/notification-settings.tsx:327
+msgid "Chat failed"
+msgstr "聊天失败"
+
+#: src/features/notifications/components/notification-settings.tsx:310
+msgid "Chat finished"
+msgstr "聊天已完成"
+
 #: src/features/marketing/components/tutorials-page.tsx:98
 msgid "Chat Import"
 msgstr "聊天导入"
@@ -6531,6 +6551,18 @@ msgstr "聊天锁定：已锁定"
 #: src/features/settings/lib/settings-keywords.ts:70
 msgid "chat model"
 msgstr "聊天模型"
+
+#: src/features/notifications/components/notification-settings.tsx:344
+msgid "Chat needs your input or approval"
+msgstr "聊天需要你的输入或批准"
+
+#: src/features/notifications/components/notification-settings.tsx:138
+msgid "Chat notification turned off"
+msgstr "已关闭聊天通知"
+
+#: src/features/notifications/components/notification-settings.tsx:139
+msgid "Chat notification turned on"
+msgstr "已开启聊天通知"
 
 #: src/features/prompts/components/prompt-form-dialog.tsx:377
 msgid "Chat Settings (Optional)"
@@ -6783,7 +6815,7 @@ msgstr "选择默认文本模型"
 msgid "Choose default video models"
 msgstr "选择默认视频模型"
 
-#: src/features/notifications/components/notification-settings.tsx:199
+#: src/features/notifications/components/notification-settings.tsx:251
 msgid "Choose how Neore tells you about finished work and things that need you."
 msgstr "选择 Neore 如何通知你已完成的工作和需要你处理的事项。"
 
@@ -8938,7 +8970,7 @@ msgstr "无法取消运行。"
 msgid "Could not change Auto. Please try again."
 msgstr "无法更改 Auto。请重试。"
 
-#: src/features/notifications/components/notification-settings.tsx:169
+#: src/features/notifications/components/notification-settings.tsx:221
 msgid "Could not change push notifications. Try again."
 msgstr "无法更改推送通知，请重试。"
 
@@ -9222,7 +9254,7 @@ msgstr "无法预览 · 点击下载"
 msgid "Could not pull {0}: {1}"
 msgstr "无法拉取 {0}：{1}"
 
-#: src/features/chat/core/context/chat-context.tsx:698
+#: src/features/chat/core/context/chat-context.tsx:708
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr "无法连接服务器以开始生成。请检查网络连接后重试。"
 
@@ -9297,7 +9329,11 @@ msgstr "无法保存该选择，请重试。"
 msgid "Could not save the bot's tools. Its tools are unchanged."
 msgstr "无法保存机器人的工具。其工具未改变。"
 
-#: src/features/notifications/components/notification-settings.tsx:110
+#: src/features/notifications/components/notification-settings.tsx:137
+msgid "Could not save the chat notification setting."
+msgstr "无法保存聊天通知设置。"
+
+#: src/features/notifications/components/notification-settings.tsx:162
 msgid "Could not save the Daily Brief setting."
 msgstr "无法保存每日简报设置。"
 
@@ -9305,7 +9341,7 @@ msgstr "无法保存每日简报设置。"
 msgid "Could not save the default permission mode"
 msgstr "无法保存默认权限模式"
 
-#: src/features/notifications/components/notification-settings.tsx:103
+#: src/features/notifications/components/notification-settings.tsx:117
 msgid "Could not save the email setting."
 msgstr "无法保存邮件设置。"
 
@@ -10085,7 +10121,7 @@ msgid "Czech Republic"
 msgstr "捷克"
 
 #: src/features/home/components/daily-brief-offer.tsx:105
-#: src/features/notifications/components/notification-settings.tsx:224
+#: src/features/notifications/components/notification-settings.tsx:276
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:57
 msgid "Daily Brief"
 msgstr "每日简报"
@@ -10099,11 +10135,11 @@ msgstr "每日简报已开启。有内容可报告时会在早上送达。"
 msgid "Daily Brief is on. The next one is planned for {0}; a morning with nothing to report sends none."
 msgstr "每日简报已开启。下一份计划于 {0} 送达；没有内容可报告的早上不会发送。"
 
-#: src/features/notifications/components/notification-settings.tsx:111
+#: src/features/notifications/components/notification-settings.tsx:163
 msgid "Daily Brief turned off"
 msgstr "每日简报已关闭"
 
-#: src/features/notifications/components/notification-settings.tsx:112
+#: src/features/notifications/components/notification-settings.tsx:164
 msgid "Daily Brief turned on"
 msgstr "每日简报已开启"
 
@@ -12487,7 +12523,7 @@ msgstr "验证邮件已发送"
 msgid "Email Verified:"
 msgstr "邮箱已验证："
 
-#: src/features/notifications/components/notification-settings.tsx:241
+#: src/features/notifications/components/notification-settings.tsx:293
 msgid "Email when a task finishes"
 msgstr "任务完成时发送邮件"
 
@@ -16253,7 +16289,7 @@ msgstr "德国"
 msgid "Get a short summary each morning of what finished, what needs you and what is still running. It counts toward your daily usage."
 msgstr "每天早上收到一份简短摘要：已完成的、需要你处理的以及仍在运行的。这会计入你的每日用量。"
 
-#: src/features/notifications/components/notification-settings.tsx:193
+#: src/features/notifications/components/notification-settings.tsx:245
 msgid "Get a system notification when a task finishes or something needs your approval, even with the app closed."
 msgstr "任务完成或有事项需要你批准时收到系统通知，即使应用已关闭。"
 
@@ -16261,7 +16297,7 @@ msgstr "任务完成或有事项需要你批准时收到系统通知，即使应
 msgid "Get Access"
 msgstr "获取访问权限"
 
-#: src/features/notifications/components/notification-settings.tsx:244
+#: src/features/notifications/components/notification-settings.tsx:296
 msgid "Get an email with a link to the result when a task or trigger run finishes with one."
 msgstr "当任务或触发器运行完成并有结果时，通过邮件获取结果链接。"
 
@@ -20233,7 +20269,7 @@ msgstr "正在加载…"
 msgid "local"
 msgstr "本地"
 
-#: src/features/chat/core/context/chat-context.tsx:758
+#: src/features/chat/core/context/chat-context.tsx:768
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "本地模型仅支持文本。请移除附件后再发送。"
 
@@ -23895,15 +23931,15 @@ msgstr "通知工作流、渠道和收件人偏好"
 #: src/features/home/components/home-page.tsx:227
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
-#: src/features/notifications/components/notification-settings.tsx:199
+#: src/features/notifications/components/notification-settings.tsx:251
 msgid "Notifications"
 msgstr "通知"
 
-#: src/features/notifications/components/notification-settings.tsx:145
+#: src/features/notifications/components/notification-settings.tsx:197
 msgid "Notifications are blocked for this site in your browser."
 msgstr "你的浏览器已阻止此网站的通知。"
 
-#: src/features/notifications/components/notification-settings.tsx:186
+#: src/features/notifications/components/notification-settings.tsx:238
 msgid "Notifications are blocked for this site in your browser. Allow them in the site settings to turn this on."
 msgstr "你的浏览器已阻止此网站的通知。请在网站设置中允许通知以开启此功能。"
 
@@ -27508,23 +27544,23 @@ msgstr "专为复杂软件工程任务打造"
 msgid "Purpose-optimized for code generation and debugging"
 msgstr "专门针对代码生成和调试优化"
 
-#: src/features/notifications/components/notification-settings.tsx:146
+#: src/features/notifications/components/notification-settings.tsx:198
 msgid "Push notifications are not available here."
 msgstr "此处无法使用推送通知。"
 
-#: src/features/notifications/components/notification-settings.tsx:181
+#: src/features/notifications/components/notification-settings.tsx:233
 msgid "Push notifications are not configured on this server."
 msgstr "此服务器未配置推送通知。"
 
-#: src/features/notifications/components/notification-settings.tsx:166
+#: src/features/notifications/components/notification-settings.tsx:218
 msgid "Push notifications are off for this browser"
 msgstr "此浏览器的推送通知已关闭"
 
-#: src/features/notifications/components/notification-settings.tsx:157
+#: src/features/notifications/components/notification-settings.tsx:209
 msgid "Push notifications are on for this browser"
 msgstr "此浏览器的推送通知已开启"
 
-#: src/features/notifications/components/notification-settings.tsx:204
+#: src/features/notifications/components/notification-settings.tsx:256
 msgid "Push notifications on this browser"
 msgstr "此浏览器上的推送通知"
 
@@ -27532,11 +27568,11 @@ msgstr "此浏览器上的推送通知"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "将多个各具角色的智能体放在同一对话中。审查小组可从安全和性能角度检查更改，辩论则可在综合前论证双方观点。"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:265
-msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
-msgstr "在输入框中填入一条提示，将此分支变基到 {base}、解决冲突、检查构建和测试并推送。不会发送任何内容。"
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:261
+msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, and check the build and tests. It pushes only when a signed-in gh confirms the pull request is still open on that base. Nothing is sent."
+msgstr "在输入框中填入一条提示，将此分支变基到 {base}、解决冲突并检查构建和测试。只有在已登录的 gh 确认该拉取请求仍在此基础分支上打开时才会推送。不会发送任何内容。"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:266
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:262
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "在输入框中填入一条提示，在本地副本中将此复刻的分支变基到 {base}、解决冲突并检查构建和测试。不会推送。不会发送任何内容。"
 
@@ -28911,7 +28947,7 @@ msgstr "回复"
 msgid "Reply complete"
 msgstr "回复完成"
 
-#: src/features/chat/core/context/chat-context.tsx:644
+#: src/features/chat/core/context/chat-context.tsx:645
 msgid "Reply ready"
 msgstr "回复已就绪"
 
@@ -31399,6 +31435,18 @@ msgstr "在模型选择器中显示 {name}"
 msgid "Show {remainingCount} more"
 msgstr "再显示 {remainingCount} 个"
 
+#: src/features/notifications/components/notification-settings.tsx:330
+msgid "Show a message in the app when a chat reply fails."
+msgstr "聊天回复失败时在应用内显示提醒。"
+
+#: src/features/notifications/components/notification-settings.tsx:313
+msgid "Show a message in the app when a chat reply finishes."
+msgstr "聊天回复完成时在应用内显示提醒。"
+
+#: src/features/notifications/components/notification-settings.tsx:347
+msgid "Show a message in the app when a chat waits for your answer or your approval."
+msgstr "聊天等待你的回复或批准时在应用内显示提醒。"
+
 #: src/features/skills/components/bundle-import-dialog.tsx:99
 msgid "Show all"
 msgstr "显示全部"
@@ -33727,7 +33775,7 @@ msgstr "切换到 {label}"
 msgid "Switch to {name}?"
 msgstr "切换到 {name}？"
 
-#: src/features/chat/core/context/chat-context.tsx:753
+#: src/features/chat/core/context/chat-context.tsx:763
 msgid "Switch to a text model to send this message."
 msgstr "请切换到文本模型以发送此消息。"
 
@@ -33958,11 +34006,11 @@ msgstr "任务详情、你的审核以及运行历史。"
 msgid "Task done: {title}"
 msgstr "任务已完成：{title}"
 
-#: src/features/notifications/components/notification-settings.tsx:104
+#: src/features/notifications/components/notification-settings.tsx:118
 msgid "Task emails turned off"
 msgstr "已关闭任务邮件"
 
-#: src/features/notifications/components/notification-settings.tsx:105
+#: src/features/notifications/components/notification-settings.tsx:119
 msgid "Task emails turned on"
 msgstr "已开启任务邮件"
 
@@ -34498,7 +34546,7 @@ msgstr "该文件夹是服务器的主目录或其上级目录。请选择其中
 msgid "That folder was not found."
 msgstr "未找到该文件夹。"
 
-#: src/features/chat/core/context/chat-context.tsx:749
+#: src/features/chat/core/context/chat-context.tsx:759
 msgid "That guest link has ended."
 msgstr "该访客链接已失效。"
 
@@ -34518,7 +34566,7 @@ msgstr "无法读取该链接。"
 msgid "That message could not be found in this conversation."
 msgstr "在此对话中找不到该消息。"
 
-#: src/features/chat/core/context/chat-context.tsx:752
+#: src/features/chat/core/context/chat-context.tsx:762
 #: src/features/chat/guest-links/guest-link-panel.tsx:143
 msgid "That message is being sent."
 msgstr "该消息正在发送。"
@@ -34531,7 +34579,7 @@ msgstr "该消息已不在等待中。"
 msgid "That message is too long to send from here."
 msgstr "该消息过长，无法从这里发送。"
 
-#: src/features/chat/core/context/chat-context.tsx:750
+#: src/features/chat/core/context/chat-context.tsx:760
 #: src/features/chat/guest-links/guest-link-panel.tsx:240
 #: src/features/chat/guest-links/guest-link-panel.tsx:316
 msgid "That message was already sent."
@@ -35795,7 +35843,7 @@ msgstr "此分支落后于其基础分支。"
 msgid "This branch was changed meanwhile. Check it and save again."
 msgstr "此分支在此期间已被更改。请检查后重新保存。"
 
-#: src/features/notifications/components/notification-settings.tsx:190
+#: src/features/notifications/components/notification-settings.tsx:242
 msgid "This browser cannot receive push notifications here."
 msgstr "此浏览器无法在此处接收推送通知。"
 
@@ -36174,7 +36222,7 @@ msgstr "这会在 {hostLabel} 上以“{1}”方式将提交 {0} 合并到基础
 msgid "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
 msgstr "无法留下此消息。请保持简短，不要以 / 开头或提及任何人，或稍后再试。"
 
-#: src/features/chat/core/context/chat-context.tsx:755
+#: src/features/chat/core/context/chat-context.tsx:765
 msgid "This message cannot be sent in this chat."
 msgstr "此消息无法在此聊天中发送。"
 
@@ -39416,11 +39464,11 @@ msgstr "已监视的仓库"
 msgid "We could not check that you are signed in. Try again in a moment."
 msgstr "无法确认你是否已登录，请稍后重试。"
 
-#: src/features/chat/core/context/chat-context.tsx:757
+#: src/features/chat/core/context/chat-context.tsx:767
 msgid "We could not confirm your session in time. The guest's message was not sent; send it again from the Guests tab."
 msgstr "未能及时确认你的会话。访客的消息未发送；请在“访客”标签页中重新发送。"
 
-#: src/features/chat/core/context/chat-context.tsx:760
+#: src/features/chat/core/context/chat-context.tsx:770
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "我们未能及时确认你的会话。你的消息仍在输入框中，请重新发送。"
 
@@ -40510,7 +40558,7 @@ msgstr "你的 AI 工作区<0>从这里开始。</0>"
 msgid "Your answer"
 msgstr "你的回答"
 
-#: src/features/chat/core/context/chat-context.tsx:644
+#: src/features/chat/core/context/chat-context.tsx:645
 msgid "Your answer in Neore has finished."
 msgstr "你在 Neore 中的回复已生成完毕。"
 
@@ -40700,7 +40748,7 @@ msgstr "你的消息"
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 msgstr "上传期间消息已更改，因此未发送。请按发送按钮发送。"
 
-#: src/features/chat/core/context/chat-context.tsx:748
+#: src/features/chat/core/context/chat-context.tsx:758
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "你的消息包含不当内容，无法发送。"
 

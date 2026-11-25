@@ -2002,6 +2002,18 @@ msgstr "a change is waiting to be read"
 msgid "A chat is waiting for your answer"
 msgstr "A chat is waiting for your answer"
 
+#: src/features/notifications/hooks/use-chat-run-toasts.ts:279
+msgid "A chat needs your input or approval"
+msgstr "A chat needs your input or approval"
+
+#: src/features/notifications/hooks/use-chat-run-toasts.ts:79
+msgid "A chat reply failed"
+msgstr "A chat reply failed"
+
+#: src/features/notifications/hooks/use-chat-run-toasts.ts:79
+msgid "A chat reply finished"
+msgstr "A chat reply finished"
+
 #: src/features/tasks/components/task-form-dialog.tsx:98
 msgid "A coding agent needs a repository to work on"
 msgstr "A coding agent needs a repository to work on"
@@ -2059,11 +2071,11 @@ msgstr "A goal groups tasks. Its progress follows from how many of them are done
 msgid "A group chat. A question from the owner is answered by three agents in turn: a security reviewer, a performance reviewer, and a lead who sums up."
 msgstr "A group chat. A question from the owner is answered by three agents in turn: a security reviewer, a performance reviewer, and a lead who sums up."
 
-#: src/features/chat/core/context/chat-context.tsx:751
+#: src/features/chat/core/context/chat-context.tsx:761
 msgid "A guest's message cannot be sent as a goal."
 msgstr "A guest's message cannot be sent as a goal."
 
-#: src/features/chat/core/context/chat-context.tsx:754
+#: src/features/chat/core/context/chat-context.tsx:764
 msgid "A guest's message is sent through a hosted model only. Pick one and send it again."
 msgstr "A guest's message is sent through a hosted model only. Pick one and send it again."
 
@@ -2226,7 +2238,7 @@ msgstr "A run's thread is filed in this project. Moving the task to another proj
 msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 msgstr "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 
-#: src/features/notifications/components/notification-settings.tsx:227
+#: src/features/notifications/components/notification-settings.tsx:279
 msgid "A short summary each morning of what finished, what is running and what needs you. It counts toward your daily usage."
 msgstr "A short summary each morning of what finished, what is running and what needs you. It counts toward your daily usage."
 
@@ -5229,7 +5241,7 @@ msgstr "beginner"
 msgid "Behavior"
 msgstr "Behavior"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:236
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:232
 msgid "Behind {base}"
 msgstr "Behind {base}"
 
@@ -6297,11 +6309,11 @@ msgstr "Catalan (Spain)"
 msgid "catalog"
 msgstr "catalog"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:259
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:255
 msgid "Catch up"
 msgstr "Catch up"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:226
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:222
 msgid "Catch up {pullRequest} with {base}"
 msgstr "Catch up {pullRequest} with {base}"
 
@@ -6506,6 +6518,14 @@ msgstr "Chat Completions (/v1/chat/completions) — Ollama, LM Studio, vLLM and 
 msgid "Chat copied to clipboard as Markdown"
 msgstr "Chat copied to clipboard as Markdown"
 
+#: src/features/notifications/components/notification-settings.tsx:327
+msgid "Chat failed"
+msgstr "Chat failed"
+
+#: src/features/notifications/components/notification-settings.tsx:310
+msgid "Chat finished"
+msgstr "Chat finished"
+
 #: src/features/marketing/components/tutorials-page.tsx:98
 msgid "Chat Import"
 msgstr "Chat Import"
@@ -6530,6 +6550,18 @@ msgstr "Chat lock: locked"
 #: src/features/settings/lib/settings-keywords.ts:70
 msgid "chat model"
 msgstr "chat model"
+
+#: src/features/notifications/components/notification-settings.tsx:344
+msgid "Chat needs your input or approval"
+msgstr "Chat needs your input or approval"
+
+#: src/features/notifications/components/notification-settings.tsx:138
+msgid "Chat notification turned off"
+msgstr "Chat notification turned off"
+
+#: src/features/notifications/components/notification-settings.tsx:139
+msgid "Chat notification turned on"
+msgstr "Chat notification turned on"
 
 #: src/features/prompts/components/prompt-form-dialog.tsx:377
 msgid "Chat Settings (Optional)"
@@ -6782,7 +6814,7 @@ msgstr "Choose default text models"
 msgid "Choose default video models"
 msgstr "Choose default video models"
 
-#: src/features/notifications/components/notification-settings.tsx:199
+#: src/features/notifications/components/notification-settings.tsx:251
 msgid "Choose how Neore tells you about finished work and things that need you."
 msgstr "Choose how Neore tells you about finished work and things that need you."
 
@@ -8937,7 +8969,7 @@ msgstr "Could not cancel the run."
 msgid "Could not change Auto. Please try again."
 msgstr "Could not change Auto. Please try again."
 
-#: src/features/notifications/components/notification-settings.tsx:169
+#: src/features/notifications/components/notification-settings.tsx:221
 msgid "Could not change push notifications. Try again."
 msgstr "Could not change push notifications. Try again."
 
@@ -9221,7 +9253,7 @@ msgstr "Could not preview · Click to download"
 msgid "Could not pull {0}: {1}"
 msgstr "Could not pull {0}: {1}"
 
-#: src/features/chat/core/context/chat-context.tsx:698
+#: src/features/chat/core/context/chat-context.tsx:708
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr "Could not reach the server to start generating. Check your connection and try again."
 
@@ -9296,7 +9328,11 @@ msgstr "Could not save that choice. Try again."
 msgid "Could not save the bot's tools. Its tools are unchanged."
 msgstr "Could not save the bot's tools. Its tools are unchanged."
 
-#: src/features/notifications/components/notification-settings.tsx:110
+#: src/features/notifications/components/notification-settings.tsx:137
+msgid "Could not save the chat notification setting."
+msgstr "Could not save the chat notification setting."
+
+#: src/features/notifications/components/notification-settings.tsx:162
 msgid "Could not save the Daily Brief setting."
 msgstr "Could not save the Daily Brief setting."
 
@@ -9304,7 +9340,7 @@ msgstr "Could not save the Daily Brief setting."
 msgid "Could not save the default permission mode"
 msgstr "Could not save the default permission mode"
 
-#: src/features/notifications/components/notification-settings.tsx:103
+#: src/features/notifications/components/notification-settings.tsx:117
 msgid "Could not save the email setting."
 msgstr "Could not save the email setting."
 
@@ -10084,7 +10120,7 @@ msgid "Czech Republic"
 msgstr "Czech Republic"
 
 #: src/features/home/components/daily-brief-offer.tsx:105
-#: src/features/notifications/components/notification-settings.tsx:224
+#: src/features/notifications/components/notification-settings.tsx:276
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:57
 msgid "Daily Brief"
 msgstr "Daily Brief"
@@ -10098,11 +10134,11 @@ msgstr "Daily Brief is on. It comes in the morning when there is something to re
 msgid "Daily Brief is on. The next one is planned for {0}; a morning with nothing to report sends none."
 msgstr "Daily Brief is on. The next one is planned for {0}; a morning with nothing to report sends none."
 
-#: src/features/notifications/components/notification-settings.tsx:111
+#: src/features/notifications/components/notification-settings.tsx:163
 msgid "Daily Brief turned off"
 msgstr "Daily Brief turned off"
 
-#: src/features/notifications/components/notification-settings.tsx:112
+#: src/features/notifications/components/notification-settings.tsx:164
 msgid "Daily Brief turned on"
 msgstr "Daily Brief turned on"
 
@@ -12486,7 +12522,7 @@ msgstr "Email verification sent"
 msgid "Email Verified:"
 msgstr "Email Verified:"
 
-#: src/features/notifications/components/notification-settings.tsx:241
+#: src/features/notifications/components/notification-settings.tsx:293
 msgid "Email when a task finishes"
 msgstr "Email when a task finishes"
 
@@ -16252,7 +16288,7 @@ msgstr "Germany"
 msgid "Get a short summary each morning of what finished, what needs you and what is still running. It counts toward your daily usage."
 msgstr "Get a short summary each morning of what finished, what needs you and what is still running. It counts toward your daily usage."
 
-#: src/features/notifications/components/notification-settings.tsx:193
+#: src/features/notifications/components/notification-settings.tsx:245
 msgid "Get a system notification when a task finishes or something needs your approval, even with the app closed."
 msgstr "Get a system notification when a task finishes or something needs your approval, even with the app closed."
 
@@ -16260,7 +16296,7 @@ msgstr "Get a system notification when a task finishes or something needs your a
 msgid "Get Access"
 msgstr "Get Access"
 
-#: src/features/notifications/components/notification-settings.tsx:244
+#: src/features/notifications/components/notification-settings.tsx:296
 msgid "Get an email with a link to the result when a task or trigger run finishes with one."
 msgstr "Get an email with a link to the result when a task or trigger run finishes with one."
 
@@ -20232,7 +20268,7 @@ msgstr "Loading…"
 msgid "local"
 msgstr "local"
 
-#: src/features/chat/core/context/chat-context.tsx:758
+#: src/features/chat/core/context/chat-context.tsx:768
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "Local models are text only. Remove the attachments to send."
 
@@ -23894,15 +23930,15 @@ msgstr "Notification workflows, channels, and recipient preferences"
 #: src/features/home/components/home-page.tsx:227
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
-#: src/features/notifications/components/notification-settings.tsx:199
+#: src/features/notifications/components/notification-settings.tsx:251
 msgid "Notifications"
 msgstr "Notifications"
 
-#: src/features/notifications/components/notification-settings.tsx:145
+#: src/features/notifications/components/notification-settings.tsx:197
 msgid "Notifications are blocked for this site in your browser."
 msgstr "Notifications are blocked for this site in your browser."
 
-#: src/features/notifications/components/notification-settings.tsx:186
+#: src/features/notifications/components/notification-settings.tsx:238
 msgid "Notifications are blocked for this site in your browser. Allow them in the site settings to turn this on."
 msgstr "Notifications are blocked for this site in your browser. Allow them in the site settings to turn this on."
 
@@ -27507,23 +27543,23 @@ msgstr "Purpose-built for complex software engineering tasks"
 msgid "Purpose-optimized for code generation and debugging"
 msgstr "Purpose-optimized for code generation and debugging"
 
-#: src/features/notifications/components/notification-settings.tsx:146
+#: src/features/notifications/components/notification-settings.tsx:198
 msgid "Push notifications are not available here."
 msgstr "Push notifications are not available here."
 
-#: src/features/notifications/components/notification-settings.tsx:181
+#: src/features/notifications/components/notification-settings.tsx:233
 msgid "Push notifications are not configured on this server."
 msgstr "Push notifications are not configured on this server."
 
-#: src/features/notifications/components/notification-settings.tsx:166
+#: src/features/notifications/components/notification-settings.tsx:218
 msgid "Push notifications are off for this browser"
 msgstr "Push notifications are off for this browser"
 
-#: src/features/notifications/components/notification-settings.tsx:157
+#: src/features/notifications/components/notification-settings.tsx:209
 msgid "Push notifications are on for this browser"
 msgstr "Push notifications are on for this browser"
 
-#: src/features/notifications/components/notification-settings.tsx:204
+#: src/features/notifications/components/notification-settings.tsx:256
 msgid "Push notifications on this browser"
 msgstr "Push notifications on this browser"
 
@@ -27531,11 +27567,11 @@ msgstr "Push notifications on this browser"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:265
-msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
-msgstr "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:261
+msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, and check the build and tests. It pushes only when a signed-in gh confirms the pull request is still open on that base. Nothing is sent."
+msgstr "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, and check the build and tests. It pushes only when a signed-in gh confirms the pull request is still open on that base. Nothing is sent."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:266
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:262
 msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 msgstr "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 
@@ -28910,7 +28946,7 @@ msgstr "Reply"
 msgid "Reply complete"
 msgstr "Reply complete"
 
-#: src/features/chat/core/context/chat-context.tsx:644
+#: src/features/chat/core/context/chat-context.tsx:645
 msgid "Reply ready"
 msgstr "Reply ready"
 
@@ -31398,6 +31434,18 @@ msgstr "Show {name} in model picker"
 msgid "Show {remainingCount} more"
 msgstr "Show {remainingCount} more"
 
+#: src/features/notifications/components/notification-settings.tsx:330
+msgid "Show a message in the app when a chat reply fails."
+msgstr "Show a message in the app when a chat reply fails."
+
+#: src/features/notifications/components/notification-settings.tsx:313
+msgid "Show a message in the app when a chat reply finishes."
+msgstr "Show a message in the app when a chat reply finishes."
+
+#: src/features/notifications/components/notification-settings.tsx:347
+msgid "Show a message in the app when a chat waits for your answer or your approval."
+msgstr "Show a message in the app when a chat waits for your answer or your approval."
+
 #: src/features/skills/components/bundle-import-dialog.tsx:99
 msgid "Show all"
 msgstr "Show all"
@@ -33726,7 +33774,7 @@ msgstr "Switch to {label}"
 msgid "Switch to {name}?"
 msgstr "Switch to {name}?"
 
-#: src/features/chat/core/context/chat-context.tsx:753
+#: src/features/chat/core/context/chat-context.tsx:763
 msgid "Switch to a text model to send this message."
 msgstr "Switch to a text model to send this message."
 
@@ -33957,11 +34005,11 @@ msgstr "Task details, your review and the run history."
 msgid "Task done: {title}"
 msgstr "Task done: {title}"
 
-#: src/features/notifications/components/notification-settings.tsx:104
+#: src/features/notifications/components/notification-settings.tsx:118
 msgid "Task emails turned off"
 msgstr "Task emails turned off"
 
-#: src/features/notifications/components/notification-settings.tsx:105
+#: src/features/notifications/components/notification-settings.tsx:119
 msgid "Task emails turned on"
 msgstr "Task emails turned on"
 
@@ -34497,7 +34545,7 @@ msgstr "That folder is the server's home folder or a folder above it. Choose a f
 msgid "That folder was not found."
 msgstr "That folder was not found."
 
-#: src/features/chat/core/context/chat-context.tsx:749
+#: src/features/chat/core/context/chat-context.tsx:759
 msgid "That guest link has ended."
 msgstr "That guest link has ended."
 
@@ -34517,7 +34565,7 @@ msgstr "That link could not be read."
 msgid "That message could not be found in this conversation."
 msgstr "That message could not be found in this conversation."
 
-#: src/features/chat/core/context/chat-context.tsx:752
+#: src/features/chat/core/context/chat-context.tsx:762
 #: src/features/chat/guest-links/guest-link-panel.tsx:143
 msgid "That message is being sent."
 msgstr "That message is being sent."
@@ -34530,7 +34578,7 @@ msgstr "That message is no longer waiting."
 msgid "That message is too long to send from here."
 msgstr "That message is too long to send from here."
 
-#: src/features/chat/core/context/chat-context.tsx:750
+#: src/features/chat/core/context/chat-context.tsx:760
 #: src/features/chat/guest-links/guest-link-panel.tsx:240
 #: src/features/chat/guest-links/guest-link-panel.tsx:316
 msgid "That message was already sent."
@@ -35794,7 +35842,7 @@ msgstr "This branch is behind its base branch."
 msgid "This branch was changed meanwhile. Check it and save again."
 msgstr "This branch was changed meanwhile. Check it and save again."
 
-#: src/features/notifications/components/notification-settings.tsx:190
+#: src/features/notifications/components/notification-settings.tsx:242
 msgid "This browser cannot receive push notifications here."
 msgstr "This browser cannot receive push notifications here."
 
@@ -36173,7 +36221,7 @@ msgstr "This merges the commit {0} into the base branch with “{1}” on {hostL
 msgid "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
 msgstr "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
 
-#: src/features/chat/core/context/chat-context.tsx:755
+#: src/features/chat/core/context/chat-context.tsx:765
 msgid "This message cannot be sent in this chat."
 msgstr "This message cannot be sent in this chat."
 
@@ -39415,11 +39463,11 @@ msgstr "Watched repositories"
 msgid "We could not check that you are signed in. Try again in a moment."
 msgstr "We could not check that you are signed in. Try again in a moment."
 
-#: src/features/chat/core/context/chat-context.tsx:757
+#: src/features/chat/core/context/chat-context.tsx:767
 msgid "We could not confirm your session in time. The guest's message was not sent; send it again from the Guests tab."
 msgstr "We could not confirm your session in time. The guest's message was not sent; send it again from the Guests tab."
 
-#: src/features/chat/core/context/chat-context.tsx:760
+#: src/features/chat/core/context/chat-context.tsx:770
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 
@@ -40509,7 +40557,7 @@ msgstr "Your AI workspace <0>starts here.</0>"
 msgid "Your answer"
 msgstr "Your answer"
 
-#: src/features/chat/core/context/chat-context.tsx:644
+#: src/features/chat/core/context/chat-context.tsx:645
 msgid "Your answer in Neore has finished."
 msgstr "Your answer in Neore has finished."
 
@@ -40699,7 +40747,7 @@ msgstr "Your message"
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 msgstr "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 
-#: src/features/chat/core/context/chat-context.tsx:748
+#: src/features/chat/core/context/chat-context.tsx:758
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Your message contains inappropriate content that cannot be sent."
 

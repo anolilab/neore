@@ -40,6 +40,10 @@ export const userSettingsFieldsWithoutUserId = {
     backupModel: v.optional(v.string().max(MAX_LENGTH.short)), // Model a reply is retried on once when the chosen model fails with an infrastructure error. "" or absent = none. Checked against the registry in `settingsUpsert`.
     // Appearance: cap long chat code blocks at 24 lines with an expand toggle. Absent means ON.
     capLongCodeBlocks: v.optional(v.boolean()),
+    // In-app toasts for chat events (`features/notifications/lib/chat-toasts.ts`). Absent means ON.
+    chatFailedToastEnabled: v.optional(v.boolean()),
+    chatFinishedToastEnabled: v.optional(v.boolean()),
+    chatInputToastEnabled: v.optional(v.boolean()),
     codeFont: v.optional(v.union(v.literal("fira-code"), v.literal("mono"), v.literal("consolas"), v.literal("jetbrains"), v.literal("source-code-pro"))),
     // Appearance: Shiki theme pair for code blocks (`apps/web/src/features/appearance/lib/code-themes.ts`).
     codeHighlightTheme: v.optional(
