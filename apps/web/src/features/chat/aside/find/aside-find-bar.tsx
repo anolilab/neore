@@ -153,7 +153,7 @@ const AsideFindBar: FC = () => {
                 type="text"
                 value={query}
             />
-            <span aria-live="polite" className="text-muted-foreground min-w-16 px-1 text-center text-xs tabular-nums" role="status">
+            <span aria-live="polite" className="text-muted-foreground min-w-16 px-1 text-center text-xs whitespace-nowrap tabular-nums" role="status">
                 {status}
             </span>
             <TooltipIconButton disabled={matchCount === 0} onClick={() => step(-1)} tooltip={t`Previous match`} type="button">
