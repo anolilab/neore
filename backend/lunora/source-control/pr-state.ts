@@ -41,7 +41,6 @@ const CHECK_LIMIT = 20;
 const THREAD_LOOKUP_FACTOR = 4;
 /** Links one sweep reads of a chat when it looks for an owed merge. A larger chat is scanned across sweeps, one page each. */
 const OWED_SCAN_ROWS = 500;
-
 /** Chats whose owed-merge scan a sweep runs. Each reads up to `OWED_SCAN_ROWS` link rows, so this bounds the sweep's reads across chats. */
 const OWED_SCANS_PER_SWEEP = 8;
 /** Auto-archive's idle rule alone. Its live-stream and pinned-project exclusions are left out, so a chat that is then kept still gets a read. */
@@ -204,12 +203,12 @@ export const dispatchLinkedPullRequestChecks = internalMutation
                 const key = String(link.threadId);
                 const known = owesMerge.get(key);
 
-                // A chat past this sweep's scan budget waits for a later sweep. Its link is left stale, so it keeps its place in the order.
-                if (known === undefined && owedScans >= OWED_SCANS_PER_SWEEP) {
-                    continue;
-                }
-
                 if (known === undefined) {
+                    // A chat past this sweep's scan budget waits for a later sweep. Its link is left stale, so it keeps its place in the order.
+                    if (owedScans >= OWED_SCANS_PER_SWEEP) {
+                        continue;
+                    }
+
                     owedScans += 1;
                 }
 

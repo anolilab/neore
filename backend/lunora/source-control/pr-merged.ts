@@ -40,7 +40,6 @@ interface MergeRecording {
     mergedBefore?: number;
     mergedBeforeIsHostBound?: boolean;
     number: number;
-    /** When the walk first saw the merge. Every page of the walk carries it, so a link stamped on a later page is still bounded by it. */
     recordedAt?: number;
     repository: string;
     userId: string;
