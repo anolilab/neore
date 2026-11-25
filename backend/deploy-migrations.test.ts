@@ -7,7 +7,15 @@ import { join, relative } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { declaredMigrationIds, formatMigrationRun, MIGRATIONS_MODULE, summarizeMigrationRun } from "../scripts/data-migrations";
+import type { CliRun } from "../scripts/data-migrations";
+import {
+    declaredMigrationIds,
+    formatMigrationRun,
+    MIGRATION_ATTEMPTS,
+    MIGRATIONS_MODULE,
+    runDataMigrations,
+    summarizeMigrationRun,
+} from "../scripts/data-migrations";
 import * as migrations from "./lunora/migrations"; // eslint-disable-line import/no-namespace -- every export is a migration
 
 const REPO_ROOT = join(import.meta.dirname, "..");
@@ -70,6 +78,20 @@ describe("the post-deploy data migrations", () => {
         expect(ids).toContain("backfill-message-typed-text");
     });
 
+    it("read every literal id, wherever it sits in the declaration, and refuse one that is not literal", () => {
+        const source = [
+            'export const a = defineMigration({ table: "t", options: { batch: { size: 10 } }, id: "after-nested" });',
+            "export const b = defineMigration({ id: 'single-quoted', up: () => ({}) });",
+            "export const c = defineMigration({ up: () => { return {}; }, id: `template-literal` });",
+        ].join("\n");
+
+        expect(declaredMigrationIds(source)).toStrictEqual(["after-nested", "single-quoted", "template-literal"]);
+        expect(() => declaredMigrationIds(`${source}\nconst name = "x";\nexport const d = defineMigration({ id: name });`)).toThrow(
+            `${MIGRATIONS_MODULE}:5: defineMigration needs a literal string`,
+        );
+        expect(() => declaredMigrationIds(`export const e = defineMigration({ id: \`with-\${String(1)}\` });`)).toThrow("literal string");
+    });
+
     it("are all declared in the one module the runner reads", () => {
         const declaring = sourceFiles(join(REPO_ROOT, "backend/lunora"))
             .filter((file) => readFileSync(file, "utf8").includes("defineMigration("))
@@ -121,5 +143,94 @@ describe("the post-deploy data migrations", () => {
             error: "admin token required",
             status: "unknown",
         });
+    });
+});
+
+const SHARD_KEY = "user-secret-shard";
+const ADMIN_URL = "https://backend.example.invalid/admin";
+
+const cliRun = (status: string, exitCode = status === "completed" ? 0 : 1): CliRun => {
+    const result = { changed: 1, failed: 0, ok: 1, processed: 2, shards: [{ result: {}, shardKey: SHARD_KEY }], status };
+
+    return {
+        status: exitCode,
+        stdout: JSON.stringify({ code: exitCode, data: { result }, error: status === "failed" ? `request to ${ADMIN_URL} failed` : undefined }),
+    };
+};
+
+/** Runs the loop with a fake CLI that answers `answers[id]` in turn, and records every call, pause and printed line. */
+const runWith = async (ids: string[], answers: Record<string, CliRun[]>) => {
+    const calls: string[] = [];
+    const pauses: number[] = [];
+    const printed: string[] = [];
+    const exitCode = await runDataMigrations(ids, {
+        error: (line) => {
+            printed.push(line);
+        },
+        log: (line) => {
+            printed.push(line);
+        },
+        production: true,
+        run: (id) => {
+            calls.push(id);
+
+            return answers[id]?.shift() ?? cliRun("completed");
+        },
+        sleep: async (ms) => {
+            pauses.push(ms);
+        },
+    });
+    const output = printed.join("\n");
+
+    expect(output).not.toContain(SHARD_KEY);
+    expect(output).not.toContain(ADMIN_URL);
+
+    return { calls, exitCode, output, pauses };
+};
+
+describe("the data migration runner", () => {
+    it("runs each id once, in declaration order, when every run completes", async () => {
+        const { calls, exitCode, pauses } = await runWith(["a", "b", "c"], {});
+
+        expect(calls).toStrictEqual(["a", "b", "c"]);
+        expect(pauses).toStrictEqual([]);
+        expect(exitCode).toBe(0);
+    });
+
+    it("retries a run that stays in progress after a pause, then goes on", async () => {
+        const { calls, exitCode, output, pauses } = await runWith(["a", "b"], { a: [cliRun("in_progress"), cliRun("in_progress"), cliRun("completed")] });
+
+        expect(calls).toStrictEqual(["a", "a", "a", "b"]);
+        expect(pauses).toHaveLength(2);
+        expect(output).toContain("[attempt 3]");
+        expect(exitCode).toBe(0);
+    });
+
+    it("stops after the last attempt when a run never completes, before the next id", async () => {
+        const { calls, exitCode, output, pauses } = await runWith(["a", "b"], {
+            a: Array.from({ length: MIGRATION_ATTEMPTS + 1 }, () => cliRun("in_progress")),
+        });
+
+        expect(calls).toHaveLength(MIGRATION_ATTEMPTS);
+        expect(calls).not.toContain("b");
+        expect(pauses).toHaveLength(MIGRATION_ATTEMPTS - 1);
+        expect(output).toContain("::error::data migration a: in_progress");
+        expect(exitCode).not.toBe(0);
+    });
+
+    it("stops at once on a failed run, before the next id, without printing the CLI's error in production", async () => {
+        const { calls, exitCode, pauses } = await runWith(["a", "b"], { a: [cliRun("failed")] });
+
+        expect(calls).toStrictEqual(["a"]);
+        expect(pauses).toStrictEqual([]);
+        expect(exitCode).not.toBe(0);
+    });
+
+    it("stops at once on output it cannot read", async () => {
+        const { calls, exitCode, output } = await runWith(["a", "b"], { a: [{ status: 0, stdout: "not json" }] });
+
+        expect(calls).toStrictEqual(["a"]);
+        expect(output).toContain("::error::data migration a: unknown");
+        expect(exitCode).not.toBe(0);
     });
 });

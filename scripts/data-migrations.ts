@@ -6,13 +6,56 @@
  * `backend/deploy-migrations.test.ts` pins that this list is every migration the module exports.
  */
 
+import ts from "typescript";
+
 /** The module that declares every data migration. Relative to the repository root. */
 export const MIGRATIONS_MODULE = "backend/lunora/migrations.ts";
 
-const DECLARATION = /defineMigration\(\{[^}]*?\bid:\s*"([^"]+)"/gu;
+/** How often one migration runs while it stays `in_progress`, and the pause between those runs. */
+export const MIGRATION_ATTEMPTS = 4;
+export const MIGRATION_PAUSE_MS = 15_000;
 
-/** Every migration id declared in `source`, in declaration order. */
-export const declaredMigrationIds = (source: string): string[] => [...source.matchAll(DECLARATION)].map((match) => match[1] as string);
+const literalText = (node: ts.Node | undefined): string | undefined =>
+    node !== undefined && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) ? node.text : undefined;
+
+const migrationId = (call: ts.CallExpression, file: ts.SourceFile): string => {
+    const [definition] = call.arguments;
+    const property =
+        definition !== undefined && ts.isObjectLiteralExpression(definition)
+            ? definition.properties.find(
+                  (member) => member.name !== undefined && (ts.isIdentifier(member.name) || ts.isStringLiteral(member.name)) && member.name.text === "id",
+              )
+            : undefined;
+    const id = property !== undefined && ts.isPropertyAssignment(property) ? literalText(property.initializer) : undefined;
+
+    if (id === undefined) {
+        const { line } = file.getLineAndCharacterOfPosition(call.getStart(file));
+
+        throw new Error(`${MIGRATIONS_MODULE}:${String(line + 1)}: defineMigration needs a literal string \`id\` so the deploy can run it`);
+    }
+
+    return id;
+};
+
+/**
+ * Every migration id declared in `source`, in declaration order. Throws when a `defineMigration` call's `id` is not a
+ * literal string: a partial list would skip that migration on deploy.
+ */
+export const declaredMigrationIds = (source: string): string[] => {
+    const file = ts.createSourceFile(MIGRATIONS_MODULE, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const ids: string[] = [];
+    const visit = (node: ts.Node): void => {
+        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "defineMigration") {
+            ids.push(migrationId(node, file));
+        }
+
+        ts.forEachChild(node, visit);
+    };
+
+    visit(file);
+
+    return ids;
+};
 
 /** What one `lunora migrate up <id> --format json` run reports. No shard keys, no rows: only counts. */
 export interface MigrationRunSummary {
@@ -62,3 +105,68 @@ export const summarizeMigrationRun = (stdout: string, exitCode: number): Migrati
 /** One log line: the id and counts only. */
 export const formatMigrationRun = (id: string, summary: MigrationRunSummary): string =>
     `${id}: ${summary.status}, processed ${String(summary.processed)}, changed ${String(summary.changed)}, shards ok ${String(summary.okShards)} failed ${String(summary.failedShards)}, timed out ${String(summary.timedOutShards)} (exit ${String(summary.exitCode)})`;
+
+/** One finished CLI process: what `spawnSync` returns, narrowed to what the runner reads. */
+export interface CliRun {
+    /** Set when the CLI did not run (ENOENT) or its output was cut off (ENOBUFS). */
+    error?: Error | undefined;
+    status: number | null;
+    stdout: string | null;
+}
+
+export interface RunMigrationsOptions {
+    attempts?: number;
+    error: (line: string) => void;
+    log: (line: string) => void;
+    pauseMs?: number;
+    /** Production prints no CLI error detail: it names the URL. */
+    production: boolean;
+    run: (id: string) => CliRun | Promise<CliRun>;
+    sleep: (ms: number) => Promise<unknown>;
+}
+
+/**
+ * Runs each migration in order. One that stays `in_progress` is retried after a pause, up to `attempts` runs; `failed`,
+ * unreadable output, or running out of attempts stops the job before the next id. Returns the process exit code.
+ */
+export const runDataMigrations = async (ids: readonly string[], options: RunMigrationsOptions): Promise<number> => {
+    const { attempts = MIGRATION_ATTEMPTS, pauseMs = MIGRATION_PAUSE_MS } = options;
+
+    for (const id of ids) {
+        let line = "";
+        let ok = false;
+
+        for (let attempt = 1; attempt <= attempts && !ok; attempt += 1) {
+            const run = await options.run(id);
+            const summary = summarizeMigrationRun(run.stdout ?? "", run.status ?? 1);
+
+            line = formatMigrationRun(id, summary);
+            options.log(attempt === 1 ? line : `${line} [attempt ${String(attempt)}]`);
+
+            if (run.error !== undefined) {
+                options.log(`  could not run the CLI: ${(run.error as NodeJS.ErrnoException).code ?? run.error.name}`);
+            }
+
+            if (summary.exitCode === 0 && summary.status === "completed") {
+                ok = true;
+            } else if (summary.status === "in_progress" && attempt < attempts) {
+                await options.sleep(pauseMs);
+            } else {
+                if (!options.production && summary.error !== undefined) {
+                    options.log(`  ${summary.error}`);
+                }
+
+                break;
+            }
+        }
+
+        if (!ok) {
+            // Order matters (a later backfill can read an earlier one's result), so stop at the first that did not finish.
+            options.error(`::error::data migration ${line}`);
+
+            return 1;
+        }
+    }
+
+    return 0;
+};

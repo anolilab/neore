@@ -19,15 +19,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { declaredMigrationIds, formatMigrationRun, MIGRATIONS_MODULE, summarizeMigrationRun } from "./data-migrations";
+import { declaredMigrationIds, MIGRATIONS_MODULE, runDataMigrations } from "./data-migrations";
 
-const ATTEMPTS = 4;
-const PAUSE_MS = 15_000;
 /** The CLI pretty-prints every shard's outcome to stdout. */
 const MAX_OUTPUT_BYTES = 256 * 1024 * 1024;
 
 const backendUrl = process.env.BACKEND_URL ?? "";
-const production = process.env.STAGE === "production";
 
 if (backendUrl === "" || (process.env.LUNORA_ADMIN_TOKEN ?? "") === "") {
     console.error("::error::BACKEND_URL and LUNORA_ADMIN_TOKEN must both be set");
@@ -35,48 +32,28 @@ if (backendUrl === "" || (process.env.LUNORA_ADMIN_TOKEN ?? "") === "") {
 }
 
 const backend = join(import.meta.dirname, "..", "backend");
-const ids = declaredMigrationIds(readFileSync(join(import.meta.dirname, "..", MIGRATIONS_MODULE), "utf8"));
+let ids: string[];
+
+try {
+    ids = declaredMigrationIds(readFileSync(join(import.meta.dirname, "..", MIGRATIONS_MODULE), "utf8"));
+} catch (error) {
+    console.error(`::error::${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+}
 
 console.log(`running ${String(ids.length)} data migration(s)`);
 
-for (const id of ids) {
-    let line = "";
-    let ok = false;
-
-    for (let attempt = 1; attempt <= ATTEMPTS && !ok; attempt += 1) {
-        const run = spawnSync(join(backend, "node_modules/.bin/lunora"), ["migrate", "up", id, "--prod", "--yes", "--url", backendUrl, "--format", "json"], {
+process.exitCode = await runDataMigrations(ids, {
+    error: console.error,
+    log: console.log,
+    production: process.env.STAGE === "production",
+    run: (id) =>
+        spawnSync(join(backend, "node_modules/.bin/lunora"), ["migrate", "up", id, "--prod", "--yes", "--url", backendUrl, "--format", "json"], {
             cwd: backend,
             encoding: "utf8",
             env: process.env,
             maxBuffer: MAX_OUTPUT_BYTES,
             stdio: ["ignore", "pipe", "ignore"],
-        });
-        const summary = summarizeMigrationRun(run.stdout ?? "", run.status ?? 1);
-
-        line = formatMigrationRun(id, summary);
-        console.log(attempt === 1 ? line : `${line} [attempt ${String(attempt)}]`);
-
-        if (run.error !== undefined) {
-            // ENOENT, ENOBUFS: the CLI did not run, or its output was cut off.
-            console.log(`  could not run the CLI: ${(run.error as NodeJS.ErrnoException).code ?? run.error.name}`);
-        }
-
-        if (summary.exitCode === 0 && summary.status === "completed") {
-            ok = true;
-        } else if (summary.status === "in_progress" && attempt < ATTEMPTS) {
-            await sleep(PAUSE_MS);
-        } else {
-            if (!production && summary.error !== undefined) {
-                console.log(`  ${summary.error}`);
-            }
-
-            break;
-        }
-    }
-
-    if (!ok) {
-        // Order matters (a later backfill can read an earlier one's result), so stop at the first that did not finish.
-        console.error(`::error::data migration ${line}`);
-        process.exit(1);
-    }
-}
+        }),
+    sleep,
+});
