@@ -222,6 +222,19 @@ describe("useChatRunToasts: settling a run", () => {
         expect(toastSuccess).toHaveBeenCalledTimes(1);
     });
 
+    it("keeps a run going while its reply still streams after its stream ends", () => {
+        const { rerender } = setup({ ...idle, settings: {} });
+
+        rerender({ ...idle, activeStreamId: "stream-1", messages: streamingReply, settings: {} });
+        rerender({ ...idle, activeStreamId: THREAD_REPLY_RUN, messages: streamingReply, settings: {} });
+
+        expect(toastSuccess).not.toHaveBeenCalled();
+
+        rerender({ ...idle, activeStreamId: null, messages: [{ parts: [], role: "assistant" }], settings: {} });
+
+        expect(toastSuccess).toHaveBeenCalledTimes(1);
+    });
+
     it("does not classify a run that ended in another thread", () => {
         vi.useFakeTimers();
 
