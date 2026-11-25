@@ -53,6 +53,9 @@ const USAGE_OBJECT_WRAPPER_BYTES = 1024;
 
 const TRAILING_SLASH = /\/$/;
 
+/** Shared-pin routes one owner-shard sweep step reads at most, so the erasure's step count stays under the workflow's cap. */
+const ROUTES_PER_OWNER_SWEEP_STEP = 1000;
+
 export const collectProfile = internalQuery
     .input({ userId: v.string() })
     .output(
@@ -461,14 +464,25 @@ export const collectSharedPins = internalAction.input({ userId: v.string() }).ac
  * Erases the caller's pins on the threads other people own, from each owner's shard, before the routes that find them are removed
  * (`gdpr/workflows/deletion-workflow.ts`). A collaborator's pins are written on the owner's shard, so the caller's own shard holds none.
  *
- * One page of routes per call, so no result carries every owner at once: the workflow repeats the call from `cursor` while `hasMore`.
+ * Up to `ROUTES_PER_OWNER_SWEEP_STEP` routes per call, read page by page: the workflow repeats the call from the returned `cursor` while
+ * `hasMore`. A step per page would exceed the workflow's step limit for a large route history; one per budget keeps the count far below it.
  */
 export const erasePinsOnOwnerShards = internalAction
     .input({ cursor: v.union(v.string(), v.null()), userId: v.string() })
     .output(v.object({ cursor: v.union(v.string(), v.null()), hasMore: v.boolean(), owners: v.array(v.string()) }))
     .action(async ({ args: { cursor, userId }, ctx: context }) => {
-        const result = await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, { cursor, userId });
-        const routes = result.page;
+        const routes: { ownerId: string; threadId: string }[] = [];
+        let next: string | null = cursor;
+        let done = false;
+
+        while (!done && routes.length < ROUTES_PER_OWNER_SWEEP_STEP) {
+            const result = await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, { cursor: next, userId });
+
+            routes.push(...result.page);
+            next = result.continueCursor;
+            done = result.isDone;
+        }
+
         const owners = [...new Set(routes.map((route) => route.ownerId))];
 
         // Each owner shard is fenced before it is swept, and stays fenced until the routes are gone (`releasePinFences`): a pin write of
@@ -492,7 +506,7 @@ export const erasePinsOnOwnerShards = internalAction
             }
         }
 
-        return { cursor: result.continueCursor, hasMore: !result.isDone, owners };
+        return { cursor: next, hasMore: !done, owners };
     });
 
 /**

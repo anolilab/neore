@@ -220,7 +220,8 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             await context.step.sleep(`pin-writes-wait-${String(round)}`, "1 minute");
         }
 
-        // One pass over every page of owner shards: a step per page, so no step result carries every owner. Returns the owners of all pages.
+        // One pass over every page of owner shards: a step per budget of routes (`erasePinsOnOwnerShards`), so the step count stays under the
+        // workflow's cap and no step result carries every owner. Returns the owners of all pages.
         const sweepOwnerShards = async (label: string): Promise<string[]> => {
             const owners: string[] = [];
             let cursor: string | null = null;
