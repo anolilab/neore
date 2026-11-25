@@ -336,6 +336,20 @@ export const listShardRowsPage = internalQuery
             return NO_ROWS;
         }
 
+        // The Events log is read in sequence order: the copy numbers each guest event after the last one it wrote, so the pages must
+        // come in seq order, not by creation time (a page boundary would otherwise put a later event before an earlier one). Its
+        // rows are small, so no byte cut is needed.
+        if (args.table === "mcpEvents") {
+            const result = await ctx.db.mcpEvents.findMany({
+                consistency: "primary",
+                cursor: args.cursor,
+                limit: pageSizeFor(args.table),
+                orderBy: [{ seq: "asc" }],
+            });
+
+            return { continueCursor: result.isDone ? null : (result.continueCursor ?? null), isDone: result.isDone, page: result.page };
+        }
+
         const read = async (size: number) => await rawDb(ctx).query(args.table).paginate({ cursor: args.cursor, numItems: size });
         const full = await read(pageSizeFor(args.table));
         const fits = withinClearBytes(full.page).length;
