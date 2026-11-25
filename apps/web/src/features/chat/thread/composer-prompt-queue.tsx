@@ -333,9 +333,15 @@ const useQueueActions = () => {
                 }
             } finally {
                 busyRef.current = false;
-                // A send starts a reply, and the next one waits for its end.
-                sendRequestedRef.current = undefined;
+
+                // A send starts a reply, and the next one waits for its end: requests made meanwhile are dropped then.
+                if (sent) {
+                    sendRequestedRef.current = undefined;
+                }
+
                 removeRequestedMeanwhile();
+                // A send asked for meanwhile, when this call sent nothing, runs now (as a removal's does), instead of being lost.
+                sendRequestedMeanwhile();
 
                 // A held send waits for this one's reply to end, like any other: it stays held until then.
                 if (!sent) {
@@ -343,7 +349,7 @@ const useQueueActions = () => {
                 }
             }
         },
-        [deferBehindStartingSend, holdOffline, queryClient, removeRequestedMeanwhile, replayOfflineHold, sendQueuedPrompt, withdraw],
+        [deferBehindStartingSend, holdOffline, queryClient, removeRequestedMeanwhile, replayOfflineHold, sendQueuedPrompt, sendRequestedMeanwhile, withdraw],
     );
 
     useEffect(() => {
