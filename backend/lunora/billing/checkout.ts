@@ -12,8 +12,8 @@
  * buyer's e-mail, and the webhook stores the customer id (and, for Team, the
  * purchaser) on the user or organization row, which is where the portal reads it.
  *
- * The portal goes through `./provider.ts` behind `portalCustomerFor`: only the
- * purchaser opens it, on the customer billing recorded for the subject.
+ * The portal is the facade's `createPortalSession`, scoped to the one subject and
+ * behind `portalCustomerFor`: only the purchaser opens it.
  */
 import { LunoraError, v } from "lunorash/server";
 
@@ -22,9 +22,9 @@ import { internalQuery } from "../_generated/server";
 import { getOrganization, getUser } from "../auth/lib/better-auth-queries";
 import { CREEM_API_KEY, SITE_URL } from "../env";
 import { authAction, authQuery, rateLimit } from "../lib/crpc";
+import { jobSubject, ownedOrganizationReference } from "./authorize";
 import { billingOrganizationOf, portalCustomerFor, productFor } from "./plans";
 import { checkoutProducts } from "./products";
-import { portalLink } from "./provider";
 
 const TRAILING_SLASH = /\/$/u;
 
@@ -155,7 +155,9 @@ export const createCheckout = authAction
         }
 
         // The opening seat count; `billing/seats.ts` keeps it in step with membership after.
-        const { url } = await ctx.payments.createCheckout({
+        // Pro is the caller's own reference, which the default rule admits; Team is scoped to the owned organization.
+        const payments = plan === "pro" ? ctx.payments : ctx.payments.scoped(ownedOrganizationReference(ctx.user));
+        const { url } = await payments.createCheckout({
             // The facade finds or creates the reference's Creem customer by it; without one Creem refuses the customer.
             email: ctx.user.email,
             // Read back by the webhook (`subscriptionEventOf`) as the organization's purchaser.
@@ -188,7 +190,10 @@ export const openCustomerPortal = authAction
         const id = kind === "user" ? ctx.user.userId : billingOrganizationOf(ctx.user);
         const { creemCustomerId, creemPurchaserId } = await ctx.runQuery(internal.billing.checkout.getBillingSubject, { id, kind });
 
-        const session = await portalLink(id, portalCustomerFor(ctx.user.userId, { creemCustomerId, creemPurchaserId }), billingPageUrl());
+        // The gate: only the purchaser opens the portal, and only once a customer was recorded for the subject.
+        portalCustomerFor(ctx.user.userId, { creemCustomerId, creemPurchaserId });
+
+        const session = await ctx.payments.scoped(jobSubject(id)).createPortalSession(id, billingPageUrl());
 
         ctx.log.event("billing.open_customer_portal", { subject: kind });
 

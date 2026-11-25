@@ -94,10 +94,29 @@ export const processCreemWebhook = internalAction
             return { applied, status: response.status };
         }
 
+        // The facade has just stored a row for this event. An erased reference keeps none: a late `canceled` would
+        // otherwise recreate a subscription row that names the deleted account.
+        if (subscription && (await ctx.runQuery(internal.billing.gdpr.isErased, { referenceId: subscription.referenceId }))) {
+            await ctx.runMutation(internal.billing.gdpr.dropErasedSubscription, { subscriptionId: event.subscriptionId });
+
+            return { applied, status: response.status };
+        }
+
         const update = subscription ? subscriptionUpdateOf(subscription, event, planProducts()) : undefined;
 
-        if (update) {
+        if (update && subscription) {
             await ctx.runMutation(internal.auth.billing.applyCreemSubscription, update);
+
+            // The portal opens on the store's customer for this subject. Checkout writes one only when Creem could bind
+            // the buyer's email to it, so seed it from the paid subscription when it is missing.
+            if (event.customerId !== undefined && (await ctx.payments.store.getCustomerByReference("creem", subscription.referenceId)) === undefined) {
+                await ctx.payments.store.upsertCustomer({
+                    createdAt: Date.now(),
+                    id: event.customerId,
+                    provider: "creem",
+                    referenceId: subscription.referenceId,
+                });
+            }
         } else {
             billingLogger.warn("Creem subscription event grants nothing here", { priceId: subscription?.priceId, subscriptionId: event.subscriptionId });
         }

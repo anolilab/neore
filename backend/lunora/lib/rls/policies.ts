@@ -430,6 +430,7 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     actionCache: "server-side cache of computed values; no user column",
     apikey: "better-auth's own table, reached through its adapter and `verifyApiKey`",
     auditLog: "admin-only audit trail (`admin*` procedures)",
+    billingErasures: "erased billing references; written by the deletion step and read by the webhook, system only",
     botOwners:
         "bot creator record, global: written by `createBot`, erased with its owner; read by the memory list (`listUserMemories` through `memory/bot-owner.ts`), which returns only whether a bot is someone else's and whether it was deleted, never the owner id",
     browserActions: "no owner column; read only after the parent browser session's owner check",

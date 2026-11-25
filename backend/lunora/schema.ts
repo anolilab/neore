@@ -376,6 +376,15 @@ export const schema = defineSchema({
         .index("action", ["action"])
         .index("timestamp", ["timestamp"]),
 
+    // A reference whose account was erased. A late Creem event for it must not recreate a payment row. The id is kept
+    // only so that refusal can be made; it names no one once the account row is gone.
+    billingErasures: defineTable({
+        erasedAt: v.number(),
+        referenceId: v.string(),
+    })
+        .global()
+        .index("by_referenceId", ["referenceId"]),
+
     /**
      * Who created each bot, kept for as long as the bot id can appear on a memory. A global table: a memory is written on
      * the shard of the person it belongs to, and a shared chat's bot lives on its owner's shard, so the write cannot read
@@ -810,7 +819,6 @@ export const schema = defineSchema({
                 userConnectors: r.many("userConnectors", { field: "connectorDefinitionId" }),
             };
         }),
-
     /**
      * The slot each periodic cron job last ran for (`lib/cron-schedule.ts`,
      * `crons.ts:cronTick`). One row per job name; claiming a slot is what makes
@@ -951,6 +959,7 @@ export const schema = defineSchema({
     })
         .shardBy("userId")
         .index("by_userId", ["userId"]),
+
     // Ported 1:1 from the audit-history component schema. Read by
     // GDPR (`listUserActivity`, `getDocumentAtTime`) and the canvas version
     // history, so it is a real table rather than a write-only log.
@@ -1857,7 +1866,6 @@ export const schema = defineSchema({
         status: v.union(v.literal("pending"), v.literal("running"), v.literal("completed"), v.literal("failed"), v.literal("skipped")),
         usage: v.optional(v.object({ completionTokens: v.number(), promptTokens: v.number(), totalTokens: v.number() })),
     }).index("by_execution_and_node", ["executionId", "nodeId"]),
-
     // The notification inbox (`notifications/`): one row per event for its
     // user, written only through `notify()`. `title` is the SUBJECT (a task's
     // title); the UI words what happened from `type` + `outcome`. Pruned after
@@ -1892,6 +1900,7 @@ export const schema = defineSchema({
         .index("by_state", ["state"])
         .index("by_expiresAt", ["expiresAt"])
         .index("by_userId", ["userId"]),
+
     organization: defineTable({
         allowedModels: v.optional(v.array(v.string())),
         baseTier: v.optional(v.union(v.literal("free"), v.literal("pro"), v.literal("enterprise"))),
@@ -2697,7 +2706,6 @@ export const schema = defineSchema({
         .index("by_key", ["key"])
         // `lib/rate-limit-sweep.ts` deletes rows past every limit's retention.
         .index("by_ts", ["ts"]),
-
     /**
      * A value the agent asked the user for with `requestSecret` (an API key, a token),
      * kept behind the opaque `ref` the agent sees. `encryptedValue` is BYOK-style
@@ -2729,6 +2737,7 @@ export const schema = defineSchema({
         .index("by_expiresAt", ["expiresAt"])
         .index("by_threadId", ["threadId"])
         .index("by_userId", ["userId"]),
+
     // Develop mode (`source-control/`): the review a user is writing on a pull request, kept on the
     // server so it follows them across devices. One row per (user, host origin, repository, number);
     // `commitId` is the head the comment lines refer to. A submit claims the row (`submittingAt` > 0,
@@ -3406,7 +3415,6 @@ export const schema = defineSchema({
                 thread: r.one("threads", { field: "threadId" }),
             };
         }),
-
     /**
      * A rolling summary of the older rows of ONE path of a thread, made while it
      * sits idle (`agent/thread-summaries.ts`) and fed to the agent ahead of the
@@ -3440,6 +3448,7 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_threadId", ["threadId"])
         .index("by_userId", ["userId"]),
+
     // Whether a person follows a thread for new-reply notifications (`chat/follows/functions.ts`). A row exists only
     // once a state is set (by the person, or by share/accept); no row means "off".
     // Global (D1) like `threadAccess`: the follower, the thread's owner and the erasure of either read the same rows.
@@ -3458,7 +3467,6 @@ export const schema = defineSchema({
                 thread: r.one("threads", { field: "threadId" }),
             };
         }),
-
     threadGoals: defineTable({
         // The highest round whose review has been claimed (`chat/goals/internal.ts#claimGoalRound`):
         // the review job is queued at least once, and only the delivery that claims a round reviews it.
@@ -3514,6 +3522,7 @@ export const schema = defineSchema({
         .index("by_linkHash", ["linkHash"])
         .index("by_expiresAt", ["expiresAt"])
         .index("by_userId", ["userId"]),
+
     /**
      * A message a guest left through a link. UNTRUSTED text that waits here: nothing reads it into a model,
      * a title or a summary. Only the owner's Send hands it to the owner's own client, which sends it through
@@ -4098,7 +4107,6 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_userId", ["userId"])
         .index("by_request_project", ["requestId", "pass", "projectId"]),
-
     // One small row per export run: its key, its owner, when it began, and the key of the usage JSON object it stored, if any. The
     // row is that object's record: kept until the object is confirmed deleted, so the sweep can retry the purge from it. `deleteAt` is
     // the time the sweep next acts on the run: each sweep that finds the run live sets it one time to live ahead, so a dead run's pieces
@@ -4118,6 +4126,7 @@ export const schema = defineSchema({
         .index("by_deleteAt", ["deleteAt"])
         .index("by_userId", ["userId"])
         .index("by_requestId", ["requestId"]),
+
     // One claimed booking slot per contributor booked under an organization (`usage/cohorts.ts`). The unique slot is the claim: two bookings
     // cannot take the same one. Holds no user, so it carries no one's usage.
     usageOrganizationCohortSlots: defineTable({
@@ -4173,7 +4182,6 @@ export const schema = defineSchema({
         // The retention sweep (`gdpr/retention.ts`), which reads a shard's rows by age.
         .index("by_at", ["at"])
         .index("by_user_and_reply", ["userId", "replyKey"]),
-
     // The replies already in `usageDaily`, keyed by the reply's first row id:
     // what makes `recordReplyUsage` and the backfill count a reply once.
     // Pruned by `usage/backfill.ts#sweepUsageRollup` once the backfill is done.
@@ -4193,6 +4201,7 @@ export const schema = defineSchema({
         .index("by_user_reply", ["userId", "replyKey"])
         // The prune, which serves a whole shard.
         .index("by_recordedAt", ["recordedAt"]),
+
     user: defineTable({
         banExpires: v.optional(v.number()),
         banned: v.optional(v.boolean()),
@@ -4472,7 +4481,6 @@ export const schema = defineSchema({
         .index("by_session", ["sessionId"])
         .index("by_heartbeat", ["lastHeartbeat"])
         .index("by_userId", ["userId"]),
-
     workflowVersions: defineTable({
         content: v.optional(
             v.object({
