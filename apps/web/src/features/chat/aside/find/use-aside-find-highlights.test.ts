@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { collectAsideRanges, isClippedWithin, isOutsideViewport } from "./use-aside-find-highlights";
+import { collectAsideRanges, isClippedWithin, isOutsideViewport, revealSideways } from "./use-aside-find-highlights";
 
 afterEach(() => {
     document.body.replaceChildren();
@@ -128,5 +128,47 @@ describe("isClippedWithin", () => {
 
     it("is false when nothing between the hit and the panel clips it", () => {
         expect(clipped("", 0, 100)).toBe(false);
+    });
+});
+
+describe("revealSideways", () => {
+    /** A code block whose own box spans x 0 to 100, holding a hit at x `left` to `right`, with its scroll spied on. */
+    const wideBlock = (left: number, right: number) => {
+        document.body.innerHTML = panel(row("a", "Q", `<pre style="overflow-x: auto"><code>wide cat</code></pre>`));
+
+        const section = document.querySelector("section") as HTMLElement;
+        const pre = section.querySelector("pre") as HTMLElement;
+        const code = section.querySelector("code") as HTMLElement;
+        const scrollBy = vi.fn();
+        const range = document.createRange();
+
+        range.selectNodeContents(code);
+        Object.defineProperties(pre, {
+            getBoundingClientRect: {
+                configurable: true,
+                value: () => {
+                    return { bottom: 100, left: 0, right: 100, top: 0 };
+                },
+            },
+            scrollBy: { configurable: true, value: scrollBy },
+        });
+        Object.defineProperty(range, "getBoundingClientRect", {
+            configurable: true,
+            value: () => {
+                return { bottom: 20, left, right, top: 10 };
+            },
+        });
+
+        revealSideways(range, code, section);
+
+        return scrollBy;
+    };
+
+    it("scrolls a code block sideways until a hit past its far edge lies inside it", () => {
+        expect(wideBlock(150, 170)).toHaveBeenCalledWith({ behavior: "instant", left: 70 });
+    });
+
+    it("leaves a code block alone when the hit already lies inside it", () => {
+        expect(wideBlock(10, 30)).not.toHaveBeenCalled();
     });
 });

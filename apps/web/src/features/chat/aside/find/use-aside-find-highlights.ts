@@ -84,6 +84,26 @@ const hitRect = (range: Range | undefined, target: Element): DOMRect =>
     typeof range?.getBoundingClientRect === "function" ? range.getBoundingClientRect() : target.getBoundingClientRect();
 
 /**
+ * Scrolls each scroll box between the hit and the panel sideways until the hit lies inside it, innermost first. Scrolling a
+ * wide table cell into view can leave the hit past the box's far edge, so the boxes are corrected here.
+ */
+export const revealSideways = (range: Range | undefined, target: Element, viewport: Element): void => {
+    for (let node: Element | null = target; node && node !== viewport; node = node.parentElement) {
+        if (!CLIPPING_OVERFLOW.has(getComputedStyle(node).overflowX)) {
+            continue;
+        }
+
+        const box = node.getBoundingClientRect();
+        const rect = hitRect(range, target);
+        const left = rect.left < box.left ? rect.left - box.left : Math.max(0, rect.right - box.right);
+
+        if (left !== 0) {
+            node.scrollBy({ behavior: "instant", left });
+        }
+    }
+};
+
+/**
  * Brings the hit into view if it is out of sight. The hit's own rectangle decides, not its block's: a long answer can
  * carry the selected hit at its far edge while the block itself is partly on screen. jsdom lays out no ranges, so it
  * falls back to the block there.
@@ -112,15 +132,15 @@ const revealIfOutOfSight = (range: Range | undefined, host: Element): void => {
     const correction =
         settled.top < bounds.top + STICKY_BAR_CLEARANCE_PX ? settled.top - (bounds.top + STICKY_BAR_CLEARANCE_PX) : Math.max(0, settled.bottom - bounds.bottom);
 
-    if (correction === 0) {
-        return;
+    if (correction !== 0) {
+        if (scroller) {
+            scroller.scrollBy({ behavior: "instant", top: correction });
+        } else {
+            window.scrollBy({ behavior: "instant", top: correction });
+        }
     }
 
-    if (scroller) {
-        scroller.scrollBy({ behavior: "instant", top: correction });
-    } else {
-        window.scrollBy({ behavior: "instant", top: correction });
-    }
+    revealSideways(range, target, scroller ?? document.documentElement);
 };
 
 /**
