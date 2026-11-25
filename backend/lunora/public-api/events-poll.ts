@@ -30,6 +30,13 @@ export const POLL_READ_BUDGET = 8 * 1024 * 1024;
 
 const encoder = new TextEncoder();
 
+/**
+ * The bytes an event adds to the poll's answer. The payload is JSON text inside the answer, so the answer encodes it a second time: the
+ * budget measures the event as it is serialized there, not the payload object alone.
+ */
+const answerBytesOf = (event: StoredEvent): number =>
+    encoder.encode(JSON.stringify({ data: JSON.stringify(event.data), eventId: event.eventId, name: event.name, timestamp: event.timestamp })).byteLength;
+
 export interface StoredEvent {
     /** When the log took the event (its insertion or copy time): the clock retention and the age window run on. */
     createdAt: number;
@@ -169,7 +176,7 @@ export const pollEvents = async (store: EventLogStore, query: PollQuery): Promis
                     break;
                 }
 
-                const size = encoder.encode(JSON.stringify(event.data)).byteLength;
+                const size = answerBytesOf(event);
 
                 if (events.length > 0 && bytes + size > POLL_BYTE_BUDGET) {
                     // The byte budget is full: the cursor stays before this event, which the next poll answers first.
