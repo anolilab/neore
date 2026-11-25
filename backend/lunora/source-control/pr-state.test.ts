@@ -266,7 +266,7 @@ describe("dispatchLinkedPullRequestChecks owed merges", () => {
         expect(mergedStateCheckedAt[0]).toBeTypeOf("number");
     });
 
-    it("does not read the links of a chat that owes no merge, though its merge is unsettled", async () => {
+    it("does not read the links of a chat that owes no merge: its merge is settled", async () => {
         const { dispatched } = await harness.run(async (ctx: any) => {
             await ctx.db.insert("userSettings", {
                 autoArchiveAfterDays: 30,
@@ -288,6 +288,7 @@ describe("dispatchLinkedPullRequestChecks owed merges", () => {
                 ...NOW_LINK,
                 kind: "attached",
                 mergedAt: 1000,
+                mergeSettledAt: 2000,
                 number: 1,
                 repository: "acme/app",
                 state: "merged",
@@ -300,6 +301,44 @@ describe("dispatchLinkedPullRequestChecks owed merges", () => {
         });
 
         expect(dispatched).toEqual([0]);
+    });
+
+    it("retries an owed merge of a chat flagged before the flag existed, and flags the chat from then on", async () => {
+        const { dispatched, flagged } = await harness.run(async (ctx: any) => {
+            await ctx.db.insert("userSettings", {
+                autoArchiveAfterDays: 30,
+                autoArchiveMergedChats: true,
+                autoArchiveMergedChatsSince: 0,
+                userId: OWNER,
+            });
+            // No `mergeOwed` on the chat: a merge recorded before the flag existed.
+            const threadId = await ctx.db.insert("threads", {
+                mode: "text",
+                model: "gpt-4o",
+                status: "active",
+                title: "Unflagged",
+                updatedAt: Date.now(),
+                userId: OWNER,
+            });
+
+            await ctx.db.insert("pullRequestThreads", {
+                ...NOW_LINK,
+                kind: "attached",
+                mergedAt: 1000,
+                number: 1,
+                repository: "acme/app",
+                state: "merged",
+                threadId,
+                userId: OWNER,
+            });
+            const result = await runInShard(OWNER, () => ctx.runMutation(dispatchLinkedPullRequestChecks, {}));
+            const thread = await ctx.db.get("threads", threadId);
+
+            return { dispatched: [result.dispatched], flagged: [thread?.mergeOwed] };
+        });
+
+        expect(dispatched).toEqual([1]);
+        expect(flagged).toEqual([true]);
     });
 });
 

@@ -175,18 +175,25 @@ export const dispatchLinkedPullRequestChecks = internalMutation
 
             const thread = await ctx.db.get("threads", link.threadId);
             const idleDue = thread !== null && cutoff !== undefined && selectAutoArchiveDue([candidateOf(thread)], cutoff, NO_EXCLUSIONS, 1).length === 1;
+            const owedLink = link.mergedAt !== undefined && link.mergeSettledAt === undefined;
             let mergeOwed = false;
 
-            // Only a chat flagged as owing a merge is read for one: the flag is set with every owed link (`pr-threads.ts`).
-            if (!idleDue && thread !== null && mergedOn && thread.mergeOwed === true) {
+            // An owed link owes its chat's merge by itself, so it needs no lookup. A chat whose flag predates this link (a merge recorded
+            // before the flag existed) is flagged here, so the chat's other links are read for owed merges from now on.
+            if (owedLink && thread !== null && thread.mergeOwed !== true) {
+                await setThreadMergeOwed(ctx, link.threadId, true);
+            }
+
+            if (owedLink) {
+                mergeOwed = thread !== null && mergedOn;
+            } else if (!idleDue && thread !== null && mergedOn && thread.mergeOwed === true) {
+                // Only a chat flagged as owing a merge is read for one: the flag is set with every owed link (`pr-threads.ts`).
                 const key = String(link.threadId);
                 const known = owesMerge.get(key);
 
                 mergeOwed = known ?? (await ownsMergeTo(ctx, userId, link.threadId));
                 owesMerge.set(key, mergeOwed);
             }
-
-            const owedLink = link.mergedAt !== undefined && link.mergeSettledAt === undefined;
 
             if (owedLink && (idleDue || mergeOwed)) {
                 await ctx.db.patch("pullRequestThreads", link._id, { stateCheckedAt: now });
