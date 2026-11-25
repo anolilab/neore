@@ -13,7 +13,7 @@ import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { internalQuery } from "../_generated/server";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
-import { admitPinWriteUnlessMoving } from "../lib/account-moves";
+import { admitPinWriteAs } from "../lib/account-moves";
 import { decryptKey, encryptKey } from "../lib/encryption";
 import { onOwnShard } from "../lib/own-shard";
 import { deliverRunWebhook } from "./delivery";
@@ -48,8 +48,8 @@ const refuseImpersonation = (impersonatedBy: string | null | undefined): void =>
  * would be lost, so a write takes the same fence pins use (`lib/account-moves.ts`): refused once the account is marked as
  * merging or erased, and otherwise holding the account's lease, which the merge waits out before it copies.
  */
-const refuseWhileMoving = async (ctx: Parameters<typeof admitPinWriteUnlessMoving>[0], userId: string, now: number): Promise<void> => {
-    if (await admitPinWriteUnlessMoving(ctx, userId, now)) {
+const refuseWhileMoving = async (ctx: Parameters<typeof admitPinWriteAs>[0], userId: string, now: number): Promise<void> => {
+    if ((await admitPinWriteAs(ctx, userId, now)) === null) {
         throw new LunoraError("FORBIDDEN", "The run webhook cannot be changed while this account is being moved or erased.");
     }
 };
