@@ -404,6 +404,36 @@ describe("archiveMergedThread", () => {
         expect(await statusOf(threadId)).toBe("active");
     });
 
+    it("archives a reopened chat for a merge recorded in the same millisecond as its archive, since that merge may come after it", async () => {
+        const threadId = await setUp({ autoArchiveMergedChats: true });
+        const linkId = await linkIdOf(threadId);
+        const archivedAt = Date.now();
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", threadId, { archivedAt, status: "active" });
+            await ctx.db.patch("pullRequestThreads", linkId, { mergedAt: 1000, mergeRecordedAt: archivedAt, state: "merged" });
+        });
+
+        expect(
+            await harness.run(async (ctx: any) => await ctx.runMutation(archiveMergedThread, { linkId, number: NUMBER, repository: REPOSITORY, threadId })),
+        ).toBe("archived");
+    });
+
+    it("declines a reopened chat for a merge recorded before its archive", async () => {
+        const threadId = await setUp({ autoArchiveMergedChats: true });
+        const linkId = await linkIdOf(threadId);
+        const archivedAt = Date.now();
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", threadId, { archivedAt, status: "active" });
+            await ctx.db.patch("pullRequestThreads", linkId, { mergedAt: 1000, mergeRecordedAt: archivedAt - 1, state: "merged" });
+        });
+
+        expect(
+            await harness.run(async (ctx: any) => await ctx.runMutation(archiveMergedThread, { linkId, number: NUMBER, repository: REPOSITORY, threadId })),
+        ).toBe("declined");
+    });
+
     it("with the setting off, settles every link of a merge, so turning it on later archives none of those chats", async () => {
         await harness.run(async (ctx: any) => {
             await ctx.db.insert("userSettings", { autoArchiveMergedChats: false, userId: OWNER });

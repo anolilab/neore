@@ -266,13 +266,15 @@ const attemptMergedArchive = async (ctx: MutationCtx, args: MergedArchiveArgs): 
         return "link-declined";
     }
 
-    // A merge that certainly predates the chat's last archive was covered by it: a reopened chat is not archived again for it. Both
-    // bounds are upper bounds on the merge's time: the host's (known only to the second, so a merge in the archive's second is not
-    // treated as covered) and the time this link first recorded it, which may be earlier and is kept even without a host time. It
-    // matters when the archive's bounded settlement left this merge owed.
-    const mergedBy = [link.mergedBefore, link.mergeRecordedAt].filter((bound): bound is number => bound !== undefined);
+    // A merge that certainly predates the chat's last archive was covered by it: a reopened chat is not archived again for it. The
+    // host's bound is exclusive (the merge came before it), so it may equal the archive's time. The recording time is inclusive (the
+    // merge came no later than it), so it must fall strictly before the archive. The host's bound is known only to the second; the
+    // recording time is kept even without a host time, and matters when the archive's bounded settlement left this merge owed.
+    const { archivedAt } = thread;
+    const coveredByHost = link.mergedBefore !== undefined && archivedAt !== undefined && link.mergedBefore <= archivedAt;
+    const coveredByRecording = link.mergeRecordedAt !== undefined && archivedAt !== undefined && link.mergeRecordedAt < archivedAt;
 
-    if (thread.archivedAt !== undefined && mergedBy.length > 0 && Math.min(...mergedBy) <= thread.archivedAt) {
+    if (coveredByHost || coveredByRecording) {
         return "link-declined";
     }
 

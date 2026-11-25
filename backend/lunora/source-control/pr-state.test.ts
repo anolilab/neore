@@ -340,6 +340,60 @@ describe("dispatchLinkedPullRequestChecks owed merges", () => {
         expect(dispatched).toEqual([1]);
         expect(flagged).toEqual([true]);
     });
+
+    it("clears the flag of a chat with more than 100 links once none of them owes a merge, and reads no host state for it", async () => {
+        const { dispatched, flag } = await harness.run(async (ctx: any) => {
+            await ctx.db.insert("userSettings", {
+                autoArchiveAfterDays: 30,
+                autoArchiveMergedChats: true,
+                autoArchiveMergedChatsSince: 0,
+                keepOpenPullRequestChats: true,
+                userId: OWNER,
+            });
+            // Flagged, though every merge settled past the archive's bounded read: the flag must not keep the sweep reading the chat.
+            const threadId = await ctx.db.insert("threads", {
+                mergeOwed: true,
+                mode: "text",
+                model: "gpt-4o",
+                status: "active",
+                title: "Large",
+                updatedAt: Date.now(),
+                userId: OWNER,
+            });
+
+            for (let index = 0; index < 105; index += 1) {
+                await ctx.db.insert("pullRequestThreads", {
+                    ...NOW_LINK,
+                    kind: "linked",
+                    mergedAt: 1000,
+                    mergeSettledAt: 2000,
+                    number: 3000 + index,
+                    repository: "octo/other",
+                    state: "merged",
+                    threadId,
+                    userId: OWNER,
+                });
+            }
+
+            await ctx.db.insert("pullRequestThreads", {
+                ...NOW_LINK,
+                kind: "attached",
+                number: 2,
+                repository: "acme/app",
+                state: "open",
+                threadId,
+                userId: OWNER,
+            });
+            const result = await runInShard(OWNER, () => ctx.runMutation(dispatchLinkedPullRequestChecks, {}));
+            const thread = await ctx.db.get("threads", threadId);
+
+            return { dispatched: [result.dispatched], flag: [thread?.mergeOwed] };
+        });
+
+        // Nothing owes a merge, so the open link is stamped rather than read from the host, and the flag is cleared.
+        expect(dispatched).toEqual([0]);
+        expect(flag).toEqual([false]);
+    });
 });
 
 describe("dispatchLinkedPullRequestChecks paging", () => {

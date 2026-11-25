@@ -25,7 +25,7 @@ import {
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { currentUserShard } from "../lib/shard-context";
 import { DEVELOP_DRIVER } from "./develop-driver";
-import { setThreadMergeOwed } from "./pr-thread-links";
+import { setThreadMergeOwed, someLinkOfThread } from "./pr-thread-links";
 import { readFromHost } from "./read-host";
 
 /** A link's state is re-read once it is this old. */
@@ -39,8 +39,6 @@ const SCAN_LIMIT = 500;
 const CHECK_LIMIT = 20;
 /** Thread lookups per sweep, as a multiple of `CHECK_LIMIT`: links on chats that are still active are skipped, within that bound. */
 const THREAD_LOOKUP_FACTOR = 4;
-/** Links read per chat when the sweep asks whether it owes a merge; a chat past this bound is checked rather than read further. */
-const OWED_MERGE_LOOKUP_LIMIT = 100;
 /** Auto-archive's idle rule alone. Its live-stream and pinned-project exclusions are left out, so a chat that is then kept still gets a read. */
 const NO_EXCLUSIONS = { liveThreadIds: new Set<string>(), pinnedProjectIds: new Set<string>() };
 
@@ -221,22 +219,14 @@ export const dispatchLinkedPullRequestChecks = internalMutation
         return { dispatched: due.length + scheduled };
     });
 
-/** Whether the chat owes a merge: one recorded for it and not yet settled. */
+/**
+ * Whether the chat owes a merge: one recorded for it and not yet settled. Every link is walked, a page at a time, until an owed one
+ * is found. A chat that owes nothing is flagged clear here, so the sweep stops reading it: a flag left by an owed merge that
+ * settled past the archive's bounded read clears on the first sweep that finds nothing owed.
+ */
 const ownsMergeTo = async (ctx: MutationCtx, userId: string, threadId: Id<"threads">): Promise<boolean> => {
-    // One bounded read per chat per sweep. A chat with more links than the bound may owe a merge past it, so it is checked (never
-    // skipped): the sweep's host reads stay bounded, and an owed merge is not missed.
-    const rows = await ctx.db
-        .query("pullRequestThreads")
-        .withIndex("by_user_and_threadId", (q) => q.eq("userId", userId).eq("threadId", threadId))
-        .take(OWED_MERGE_LOOKUP_LIMIT + 1);
+    const owed = await someLinkOfThread(ctx, userId, threadId, (row) => row.mergedAt !== undefined && row.mergeSettledAt === undefined);
 
-    if (rows.length > OWED_MERGE_LOOKUP_LIMIT) {
-        return true;
-    }
-
-    const owed = rows.some((row) => row.mergedAt !== undefined && row.mergeSettledAt === undefined);
-
-    // The whole chat was read and nothing is owed: a flag left by an owed merge that settled another way is cleared here.
     if (!owed) {
         await setThreadMergeOwed(ctx, threadId, false);
     }
