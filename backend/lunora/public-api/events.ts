@@ -14,7 +14,7 @@ import { isThreadLocked } from "../lib/thread-lock";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { pollEvents as pollLog } from "./events-poll";
 import type { EventLogStore } from "./events-poll";
-import { EVENT_WAKE_MAX_ATTEMPTS, EVENT_WAKE_RETRY_MS, RETENTION_MS } from "./events-log";
+import { deleteMcpEventsOfThread, EVENT_WAKE_MAX_ATTEMPTS, EVENT_WAKE_RETRY_MS, RETENTION_MS } from "./events-log";
 import { noteRetentionWake } from "../lib/shard-housekeeping";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { internal } from "../_generated/internal";
@@ -194,6 +194,21 @@ export const retryEventWake = internalMutation
             { attempt: args.attempt + 1, dueAt: args.dueAt, userId: args.userId },
             args.userId,
         );
+
+        return null;
+    });
+
+/**
+ * The rest of a trashed chat's events, one batch per call (`softDeleteThread` in `agent/threads.ts` runs the first batch in the trash
+ * write and schedules this for any left). Each call runs in its own transaction and schedules the next while events remain.
+ */
+export const deleteTrashedThreadEvents = internalMutation
+    .input({ threadId: v.string(), userId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        if (!(await deleteMcpEventsOfThread(ctx, args.userId, args.threadId))) {
+            await runAfterOnShard(ctx.scheduler, 0, internal.public_api.events.deleteTrashedThreadEvents, args, args.userId);
+        }
 
         return null;
     });
