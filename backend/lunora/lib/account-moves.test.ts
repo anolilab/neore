@@ -20,6 +20,7 @@ import {
     MERGE_MARKER_MAX_AGE_MS,
     isAccountMoving,
     pinWritesInFlightUntil,
+    reclaimPinWriteLeases,
 } from "./account-moves";
 
 describe("the account move marker", () => {
@@ -111,6 +112,40 @@ describe("the pin-write lease", () => {
 
             // Twenty of the fifty expired rows go, and the admitted write's own row is added.
             expect(rows.page).toHaveLength(50 - 20 + 1);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("the erasure's reclaim deletes one batch per call until no row of the account is left", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < 45; index += 1) {
+                    await context.db.insert("pinWriteLeases", { expiresAt: 1, userId: "user-erased", writerId: `old-${String(index)}` });
+                }
+            });
+
+            const rowsOf = async () => {
+                const { page } = await harness.run(async (context: any) => await context.db.pinWriteLeases.findMany({ where: { userId: "user-erased" } }));
+
+                return page;
+            };
+
+            const first = await harness.run(async (context: any) => await reclaimPinWriteLeases(context, "user-erased"));
+
+            expect(first).toBe(true);
+            expect(await rowsOf()).toHaveLength(25);
+
+            // Repeated until the reclaim reports nothing left: each call goes at most one batch.
+            let more = first;
+
+            while (more) {
+                more = await harness.run(async (context: any) => await reclaimPinWriteLeases(context, "user-erased"));
+            }
+
+            expect(await rowsOf()).toHaveLength(0);
         } finally {
             harness.close();
         }

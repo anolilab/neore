@@ -196,6 +196,29 @@ export const endAccountMove = async (context: Pick<MutationCtx, "db">, userId: s
     }
 };
 
+/**
+ * Deletes one batch of the account's lease rows and reports whether more may remain. The erasure repeats it after its marker goes, so
+ * every row of the account is gone before the workflow completes (`gdpr/workflows/deletion-workflow.ts`). One page per call keeps each
+ * call's writes bounded; the rows it removes are expired, since the move waited for every live lease.
+ */
+export const reclaimPinWriteLeases = async (context: Pick<MutationCtx, "db">, userId: string): Promise<boolean> => {
+    const { isDone, page } = await context.db.pinWriteLeases.findMany({ consistency: "primary", limit: LEASE_RECLAIM_BATCH, where: { userId } });
+
+    for (const row of page) {
+        await context.db.delete("pinWriteLeases", row._id);
+    }
+
+    return !isDone;
+};
+
+/** Reclaims one batch of the account's leases, from the erasure's reclaim drain. Idempotent. */
+export const reclaimPinWriteLeasesFor = internalMutation
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.object({ hasMore: v.boolean() }))
+    .mutation(async ({ args, ctx }) => {
+        return { hasMore: await reclaimPinWriteLeases(ctx, args.userId) };
+    });
+
 /** Removes the operation's marker, from a workflow or a job once its pins are moved or erased. Idempotent. */
 export const endAccountMoveFor = internalMutation
     .input({ kind: v.union(v.literal("erasing"), v.literal("importing"), v.literal("merging")), userId: v.string().max(MAX_LENGTH.id) })

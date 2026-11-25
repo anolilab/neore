@@ -884,6 +884,18 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 ),
         );
 
+        // The lease rows of the account go in batches, until none is left: admissions reclaim only a few per call, and a row that stays
+        // names the account after the erasure completes.
+        await drain(
+            "reclaim-pin-write-leases",
+            async (round) =>
+                await context.run(
+                    internal.lib.account_moves.reclaimPinWriteLeasesFor,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "reclaim-pin-write-leases", round) },
+                ),
+        );
+
         // --- Phase 5: Delete external analytics data ---
 
         // Throws on a PostHog failure, so the step retries and the request is never
