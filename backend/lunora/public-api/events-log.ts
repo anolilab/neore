@@ -76,13 +76,14 @@ export const recordMcpEvent = async (
     ctx: Partial<Pick<MutationCtx, "scheduler">> & Pick<MutationCtx, "db" | "now">,
     input: RecordEventInput,
 ): Promise<boolean> => {
-    const existing = await ctx.db.mcpEvents.findFirst({ where: { eventId: input.eventId, userId: input.userId } });
+    const existing = await ctx.db.mcpEvents.findFirst({ consistency: "primary", where: { eventId: input.eventId, userId: input.userId } });
 
     if (existing) {
         return false;
     }
 
-    const watermark = await ctx.db.mcpEventWatermarks.findFirst({ where: { userId: input.userId } });
+    // Read from the primary: a sequence number another write already took must not be reissued from a lagging replica.
+    const watermark = await ctx.db.mcpEventWatermarks.findFirst({ consistency: "primary", where: { userId: input.userId } });
     const seq = (watermark?.seq ?? 0) + 1;
     const threadId = threadOf(input.data);
 
@@ -169,7 +170,7 @@ export const deleteMcpEventsOfThread = async (ctx: Pick<MutationCtx, "db">, user
  * `timestamp` keeps the time it happened.
  */
 export const copyMergedMcpEvents = async (ctx: Pick<MutationCtx, "db" | "now">, rows: Record<string, unknown>[], to: string): Promise<number> => {
-    const watermark = await ctx.db.mcpEventWatermarks.findFirst({ where: { userId: to } });
+    const watermark = await ctx.db.mcpEventWatermarks.findFirst({ consistency: "primary", where: { userId: to } });
     let seq = watermark?.seq ?? 0;
     let appended = 0;
 
@@ -184,7 +185,7 @@ export const copyMergedMcpEvents = async (ctx: Pick<MutationCtx, "db" | "now">, 
 
         const eventId = row["eventId"] as string;
 
-        if (await ctx.db.mcpEvents.findFirst({ where: { eventId, userId: to } })) {
+        if (await ctx.db.mcpEvents.findFirst({ consistency: "primary", where: { eventId, userId: to } })) {
             continue;
         }
 
