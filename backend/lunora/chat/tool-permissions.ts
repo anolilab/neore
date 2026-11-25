@@ -829,6 +829,10 @@ export const recordPendingToolApprovals = internalMutation
                 // Keyed by the request's own row, not its approval id: a tool call id can repeat in a later turn, and a repeat is a new
                 // request that must still reach the log. `recordedIds` is in the order of `uniqueIds`.
                 for (const [index, approvalId] of [...uniqueIds].entries()) {
+                    if (approvalId.length > MAX_APPROVAL_ID_LENGTH) {
+                        continue;
+                    }
+
                     await recordMcpEvent(ctx, {
                         data: { kind: kindOf(approvalId), requestId: approvalId, threadId },
                         eventId: `${APPROVAL_REQUESTED_EVENT}:${recordedIds[index]!}`,
@@ -954,10 +958,13 @@ export const recordApprovalPreference = async (ctx: PreferenceCtx, decision: Too
  * What executes is the tool call stored under `approvalId`, never anything the
  * client names.
  */
+/** The longest approval id an answer accepts. A longer request is recorded as no event: a poll could not carry its id, so it is not kept. */
+export const MAX_APPROVAL_ID_LENGTH = 256;
+
 export const respondToToolApproval = authMutation
     .use(rateLimit("chat/stream"))
     .input({
-        approvalId: v.string().check((value) => value.length > 0 && value.length <= 256, { message: "Invalid approval id" }),
+        approvalId: v.string().check((value) => value.length > 0 && value.length <= MAX_APPROVAL_ID_LENGTH, { message: "Invalid approval id" }),
         decision: v.union(v.literal("approve"), v.literal("deny"), v.literal("always"), v.literal("hour"), v.literal("today")),
         threadId: v.id("threads"),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
