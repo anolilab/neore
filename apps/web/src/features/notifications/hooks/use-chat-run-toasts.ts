@@ -63,7 +63,9 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
     // Every call id seen waiting in this chat: a call is announced the first time it is seen, never again.
     const seenCalls = useRef(new Set<string>());
     // The stream a thread had when it was first observed: already running (or cached) then, so not a run to announce.
-    const streamAtOpen = useRef<{ streamId: string | null; threadId: string | undefined } | undefined>(undefined);
+    // `withReply`: the thread already had a reply when it was first observed. Only then is its stream from before the open;
+    // a new chat's first stream is its own first reply, and is announced.
+    const streamAtOpen = useRef<{ streamId: string | null; threadId: string | undefined; withReply: boolean } | undefined>(undefined);
     const renderedThread = useRef<{ messages: ReadonlyArray<ToastMessage>; threadId: string | undefined }>({ messages, threadId });
     const staleMessages = useRef<ReadonlyArray<ToastMessage> | undefined>(undefined);
     // The newest inputs, for the settle timer, which fires outside any render.
@@ -152,12 +154,12 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
 
         // The stream the thread already had when it opened (possibly stale cache) is not a run to announce; a stream that starts later is.
         if (streamAtOpen.current?.threadId !== threadId) {
-            streamAtOpen.current = { streamId: activeStreamId, threadId };
+            streamAtOpen.current = { streamId: activeStreamId, threadId, withReply: messages.some((message) => message.role === "assistant") };
         }
 
         const opened = streamAtOpen.current;
 
-        if (activeStreamId && opened?.streamId === activeStreamId && !run.current) {
+        if (activeStreamId && opened?.withReply && opened.streamId === activeStreamId && !run.current) {
             return;
         }
 

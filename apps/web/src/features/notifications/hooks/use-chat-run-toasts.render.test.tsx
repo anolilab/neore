@@ -406,11 +406,21 @@ describe("useChatRunToasts: the other toasts still show", () => {
     });
 
     it("does not announce a stream already running when the thread opens", () => {
-        const { rerender } = setup({ ...idle, activeStreamId: "open-stream", settings: {} });
+        const withReply: Props["messages"] = [...userMessage, { parts: [], role: "assistant" }];
+        const { rerender } = setup({ ...idle, activeStreamId: "open-stream", messages: withReply, settings: {} });
 
-        rerender({ ...idle, activeStreamId: null, settings: {} });
+        rerender({ ...idle, activeStreamId: null, messages: withReply, settings: {} });
 
         expect(toastSuccess).not.toHaveBeenCalled();
+    });
+
+    it("announces the first reply of a new chat even when its stream is live at the first observation", () => {
+        const { rerender } = setup({ ...idle, activeStreamId: null, messages: userMessage, threadId: undefined, settings: {} });
+
+        rerender({ ...idle, activeStreamId: "new-chat-stream", messages: userMessage, threadId: "thread-new", settings: {} });
+        rerender({ ...idle, activeStreamId: null, messages: userMessage, threadId: "thread-new", settings: {} });
+
+        expect(toastSuccess).toHaveBeenCalledTimes(1);
     });
 
     it("shows no toast while the settings are still loading", () => {
