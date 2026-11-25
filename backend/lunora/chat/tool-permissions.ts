@@ -71,6 +71,7 @@ import type { ApprovalKind } from "../public-api/events-catalog";
 import { recordMcpEvent } from "../public-api/events-log";
 import { chainStarterLabel } from "../sub-agents/logic";
 import { markRunAwaiting } from "../sub-agents/functions";
+import { threadHasLiveGrant } from "../agent/live-grant";
 
 const vToolPermissionMode = v.union(v.literal("auto"), v.literal("ask"), v.literal("off"));
 const vToolPermissions = v.record(v.string(), vToolPermissionMode);
@@ -151,9 +152,8 @@ const quickCheckAllowed = async (
     }
 
     const thread = await ctx.db.get("threads", threadId);
-    const grant = await ctx.db.threadAccess.findFirst({ where: { threadId } });
 
-    if (!isDeviceEligibleThread(thread, userId, grant !== null)) {
+    if (!isDeviceEligibleThread(thread, userId, await threadHasLiveGrant(ctx, threadId))) {
         return false;
     }
 

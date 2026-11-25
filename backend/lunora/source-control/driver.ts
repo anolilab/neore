@@ -10,6 +10,7 @@
 import type { HostKind } from "./identity";
 import type { HostRequest } from "./origin-fetch";
 import type {
+    BranchComparison,
     CheckLog,
     CheckSummary,
     CommitPage,
@@ -52,6 +53,11 @@ export interface CreatedPullRequest {
 export interface HostDriver {
     /** The host's API origin: the only place a token for this driver is sent. */
     readonly apiOrigin: string;
+    /**
+     * Compares the head commit `headSha` with the base branch `baseBranch` of the pull request's repository. By the commit,
+     * not the head's branch name: a fork's branch is not in this repository, its commit is in the host's network.
+     */
+    compareWithBase: (request: HostRequest, ref: PullRequestRef, baseBranch: string, headSha: string) => Promise<BranchComparison>;
     /**
      * Opens a pull request for an already-pushed branch, and answers its web page.
      * Optional: a driver whose host cannot open one leaves it undeclared, and

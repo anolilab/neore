@@ -6,7 +6,10 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
-import browserTool, { waitForAnswer, withAnswer } from "../chat/tools/browser";
+import { createThreadAccess, deleteThreadAccess, updateThreadAccess } from "../agent/sharing";
+import { approveToolCallFor } from "../agent/client/tool-approval";
+import { setRunReplyKey } from "../chat/lib/agent-run";
+import browserTool, { browserRunKey, waitForAnswer, withAnswer } from "../chat/tools/browser";
 import schema from "../schema";
 import { claimHumanCheckAsk, humanCheckAnswer } from "./functions";
 import { HUMAN_CHECK_ANSWER_WAIT_MS, HUMAN_CHECK_HAND_BACK_WINDOW_MS, humanCheckMessages } from "./human-check";
@@ -17,13 +20,66 @@ const READER = "user-reader";
 const STRANGER = "user-stranger";
 const WRITER = "user-writer";
 const NOW = Date.UTC(2026, 10, 22, 12);
+/** No ask the caller may read: the server's clock and nothing else. */
+const NO_CHECK = { kind: "none", now: expect.any(Number) };
 const GRANT_ENDS = NOW + 30 * 60_000;
 
-const { impersonation, registry, sessionFrom } = vi.hoisted(() => {
+const { impersonation, loggedDb, reads, registry, sessionFrom } = vi.hoisted(() => {
     const state: { by?: string } = {};
+    const readLog: { log: { by: "id" | "index"; fields?: Record<string, unknown>; index?: string; table: string }[] | undefined } = { log: undefined };
+    /** `target`'s member `key`, bound to it when a method, so a wrapper passes everything else through unchanged. */
+    const member = (target: any, key: string | symbol): unknown => {
+        const value = target[key];
+
+        return typeof value === "function" ? value.bind(target) : value;
+    };
+    /** An index range builder whose `eq` bounds land in `fields`. */
+    const watchedRange = (range: any, fields: Record<string, unknown>): any => {
+        const eq = (field: string, bound: unknown): any => {
+            fields[field] = bound;
+
+            return watchedRange(range.eq(field, bound), fields);
+        };
+
+        return new Proxy(range, { get: (target: any, key: string | symbol) => (key === "eq" ? eq : member(target, key)) });
+    };
+    const loggedQuery = (query: any, table: string): any =>
+        new Proxy(query, {
+            get: (target: any, key: string | symbol) => {
+                if (key !== "withIndex") {
+                    return member(target, key);
+                }
+
+                return (name: string, build: (q: any) => unknown) => {
+                    const fields: Record<string, unknown> = {};
+
+                    readLog.log?.push({ by: "index", fields, index: name, table });
+
+                    return target.withIndex(name, (q: any) => build(watchedRange(q, fields)));
+                };
+            },
+        });
+    const logged = (db: any): any =>
+        new Proxy(db, {
+            get: (target: any, key: string | symbol) => {
+                if (key === "get") {
+                    return async (table: string, id: unknown) => {
+                        readLog.log?.push({ by: "id", table });
+
+                        return await target.get(table, id);
+                    };
+                }
+
+                return key === "query" ? (table: string) => loggedQuery(target.query(table), table) : member(target, key);
+            },
+        });
 
     return {
         impersonation: state,
+        /** Wraps the database the card reads past row-level security with. */
+        loggedDb: logged,
+        /** While set, what the card's reads past row-level security touch: by-id reads, and each index range's `eq` bounds. */
+        reads: readLog,
         registry: new Map<string, unknown>(),
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
             context.auth.userId
@@ -44,6 +100,58 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
     };
 });
 
+/** The real `systemDb`, its by-id reads and index ranges logged while `reads.log` is set (`loggedDb`). */
+vi.mock("../lib/rls/scope", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../lib/rls/scope")>();
+
+    return { ...actual, systemDb: (ctx: any) => loggedDb(actual.systemDb(ctx)) };
+});
+
+// A read replica behind the primary: every grant read that does not ask for the primary gets `replica.grant` while it is
+// set (`null`: a replica that has not seen a grant yet). `afterPrimary` runs once after the next primary grant read, as a
+// write that commits right after it.
+const { replica } = vi.hoisted(() => {
+    return { replica: {} as { afterPrimary?: () => Promise<void>; grant?: Record<string, unknown> | null } };
+});
+
+vi.mock("../agent/thread-read-access", async (importOriginal) => {
+    const original = await importOriginal<typeof import("../agent/thread-read-access")>();
+    const lagging = (context: any): any => {
+        // The access read takes the grant's live copy from a page of them (`agent/live-grant.ts`).
+        const findMany = async (query: { consistency?: string }) => {
+            if (query.consistency !== "primary" && replica.grant !== undefined) {
+                return { continueCursor: null, isDone: true, page: replica.grant === null ? [] : [replica.grant] };
+            }
+
+            const result = await context.db.threadAccess.findMany(query);
+            const after = query.consistency === "primary" ? replica.afterPrimary : undefined;
+
+            if (after !== undefined) {
+                delete replica.afterPrimary;
+                await after();
+            }
+
+            return result;
+        };
+        const db = new Proxy(context.db, {
+            get: (target, key) =>
+                key === "threadAccess"
+                    ? new Proxy(target.threadAccess, {
+                          get: (table, name) => (name === "findMany" ? findMany : table[name]),
+                      })
+                    : target[key],
+        });
+
+        return new Proxy(context, { get: (target, key) => (key === "db" ? db : target[key]) });
+    };
+
+    return {
+        ...original,
+        resolveThreadReadAccess: async (context: any, ...rest: Parameters<typeof original.resolveThreadReadAccess> extends [unknown, ...infer R] ? R : never) =>
+            await original.resolveThreadReadAccess(lagging(context), ...rest),
+    };
+});
+
 vi.mock("../lib/rate-limiter", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("../lib/rate-limiter")>()), rateLimitGuard: async () => undefined };
 });
@@ -54,10 +162,11 @@ let threadId: string;
 const as = (userId: string) => harness.withIdentity({ userId } as never);
 const claim = async (run: string, site: string, thread = threadId): Promise<string | null> =>
     (await harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { run, site, threadId: thread }))) as string | null;
-const read = async (userId: string, checkId: string, thread = threadId): Promise<any> =>
-    await as(userId).query(getHumanCheck as never, { checkId, threadId: thread } as never);
-const resolve = async (userId: string, checkId: string, resolution: "declined" | "done", thread = threadId): Promise<any> =>
-    await as(userId).mutation(resolveHumanCheck as never, { checkId, resolution, threadId: thread } as never);
+/** `site` and `run`: the site and reply the browser tool's result names with the ask's id, which the card sends with it. */
+const read = async (userId: string, checkId: string, thread = threadId, site = "shop.example", run = "r1"): Promise<any> =>
+    await as(userId).query(getHumanCheck as never, { checkId, run, site, threadId: thread } as never);
+const resolve = async (userId: string, checkId: string, resolution: "declined" | "done", thread = threadId, site = "shop.example", run = "r1"): Promise<any> =>
+    await as(userId).mutation(resolveHumanCheck as never, { checkId, resolution, run, site, threadId: thread } as never);
 const row = async (checkId: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get("browserHumanChecks", checkId));
 
 beforeAll(async () => {
@@ -80,7 +189,10 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+    delete replica.grant;
+    delete replica.afterPrimary;
     impersonation.by = undefined;
+    reads.log = undefined;
     harness.close();
     vi.useRealTimers();
 });
@@ -91,34 +203,186 @@ describe("the card's read", () => {
 
         const expiresAt = NOW + HUMAN_CHECK_HAND_BACK_WINDOW_MS;
 
-        await expect(read(OWNER, checkId)).resolves.toStrictEqual({ canResolve: true, expiresAt, now: NOW, site: "shop.example", status: "open" });
+        await expect(read(OWNER, checkId)).resolves.toStrictEqual({
+            canResolve: true,
+            expiresAt,
+            kind: "found",
+            now: NOW,
+            site: "shop.example",
+            status: "open",
+        });
         // A grantee's card knows when the grant ends: a live answer is not re-read on the clock.
         await expect(read(WRITER, checkId)).resolves.toStrictEqual({
             accessUntil: GRANT_ENDS,
             canResolve: true,
             expiresAt,
+            kind: "found",
             now: NOW,
+            // The grant's revision this read saw (a grant from before revisions reads as 0); the owner's answer names none.
+            revision: 0,
             site: "shop.example",
             status: "open",
         });
-        await expect(read(READER, checkId)).resolves.toStrictEqual({ canResolve: false, expiresAt, now: NOW, site: "shop.example", status: "open" });
-        await expect(read(STRANGER, checkId)).resolves.toBeNull();
+        await expect(read(READER, checkId)).resolves.toStrictEqual({
+            canResolve: false,
+            expiresAt,
+            kind: "found",
+            now: NOW,
+            revision: 0,
+            site: "shop.example",
+            status: "open",
+        });
+        await expect(read(STRANGER, checkId)).resolves.toStrictEqual(NO_CHECK);
 
         impersonation.by = "admin-1";
 
         await expect(read(OWNER, checkId)).resolves.toMatchObject({ canResolve: false });
     });
 
-    it("shows nothing for an ask of another thread, and nothing of a trashed chat", async () => {
+    it("refuses a site or a reply key longer than any the browser tool names, before reading anything", async () => {
         const checkId = (await claim("r1", "shop.example"))!;
-        const other = (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "U", userId: OWNER }))) as string;
 
-        await expect(read(OWNER, checkId, other)).resolves.toBeNull();
+        await expect(read(OWNER, checkId, threadId, "a".repeat(501))).rejects.toThrow();
+        await expect(read(OWNER, checkId, threadId, "shop.example", "r".repeat(1025))).rejects.toThrow();
+        await expect(resolve(OWNER, checkId, "done", threadId, "a".repeat(501))).rejects.toThrow();
+        await expect(resolve(OWNER, checkId, "done", threadId, "shop.example", "r".repeat(1025))).rejects.toThrow();
+        const stored = await row(checkId);
+
+        expect(stored.resolution).toBeUndefined();
+    });
+
+    it("says an ask is of another thread only to a full reader of this one, the same as a missing ask, and nothing of a trashed chat", async () => {
+        const checkId = (await claim("r1", "shop.example"))!;
+        // A branch of the chat: its copied tool result names the parent's ask.
+        const other = (await harness.run(async (ctx: any) => {
+            const id = await ctx.db.insert("threads", { status: "active", title: "U", userId: OWNER });
+
+            await ctx.db.insert("threadAccess", { expiresAt: GRANT_ENDS, grantedAt: 0, grantedBy: OWNER, permission: "write", threadId: id, userId: WRITER });
+
+            return id;
+        })) as string;
+        const missing = await harness.run(async (ctx: any) => {
+            const id = await ctx.db.insert("browserHumanChecks", { askedAt: NOW, run: "r9", site: "gone.example", threadId: other, userId: OWNER });
+
+            await ctx.db.delete("browserHumanChecks", id);
+
+            return id;
+        });
+
+        await expect(read(OWNER, checkId, other)).resolves.toStrictEqual({ kind: "elsewhere", now: NOW });
+        await expect(read(OWNER, missing, other)).resolves.toStrictEqual({ kind: "elsewhere", now: NOW });
+        await expect(read(WRITER, checkId, other)).resolves.toStrictEqual({ accessUntil: GRANT_ENDS, kind: "elsewhere", now: NOW, revision: 0 });
+        // Someone who does not read the branch learns nothing of either thread.
+        await expect(read(STRANGER, checkId, other)).resolves.toStrictEqual(NO_CHECK);
         await expect(resolve(OWNER, checkId, "done", other)).rejects.toMatchObject({ code: "FORBIDDEN" });
 
         await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { deleted: true }));
 
-        await expect(read(OWNER, checkId)).resolves.toBeNull();
+        await expect(read(OWNER, checkId)).resolves.toStrictEqual(NO_CHECK);
+    });
+
+    it("names a removal's grant revision, higher than the grant's before it, to the reader it removed", async () => {
+        const checkId = (await claim("r1", "shop.example"))!;
+
+        await harness.run(async (ctx: any) => {
+            const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: READER } });
+
+            await ctx.runMutation(updateThreadAccess, { accessId: grant._id, permission: "read" });
+        });
+        await expect(read(READER, checkId)).resolves.toMatchObject({ kind: "found", revision: 1 });
+
+        await harness.run(async (ctx: any) => {
+            const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: READER } });
+
+            await ctx.runMutation(deleteThreadAccess, { accessId: grant._id });
+        });
+        await expect(read(READER, checkId)).resolves.toStrictEqual({ ...NO_CHECK, revision: 3 });
+        await expect(read(OWNER, checkId)).resolves.not.toHaveProperty("revision");
+    });
+
+    it("decides a reader's denial on the primary: a re-grant a replica has not seen yet reads as the grant it is", async () => {
+        const checkId = (await claim("r1", "shop.example"))!;
+
+        await harness.run(async (ctx: any) => {
+            const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: READER } });
+
+            await ctx.runMutation(deleteThreadAccess, { accessId: grant._id });
+            await ctx.runMutation(createThreadAccess, { grantedBy: OWNER, ownerId: OWNER, permission: "read", threadId, userId: READER });
+        });
+
+        // A replica that saw the removal but not the grant given again: its denial would name the new grant's revision.
+        replica.grant = null;
+        await expect(read(READER, checkId)).resolves.toMatchObject({ kind: "found", revision: 3 });
+    });
+
+    it("names a denial a revision read after the primary denial: a re-grant and its removal right after it do not leave it older", async () => {
+        const checkId = (await claim("r1", "shop.example"))!;
+
+        await harness.run(async (ctx: any) => {
+            const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: READER } });
+
+            await ctx.runMutation(deleteThreadAccess, { accessId: grant._id });
+        });
+        await expect(read(READER, checkId)).resolves.toStrictEqual({ ...NO_CHECK, revision: 2 });
+
+        // The replica already denies; a re-grant and its removal commit right after the primary read denied too.
+        replica.afterPrimary = async () =>
+            await harness.run(async (ctx: any) => {
+                await ctx.runMutation(createThreadAccess, { grantedBy: OWNER, ownerId: OWNER, permission: "read", threadId, userId: READER });
+
+                const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: READER } });
+
+                await ctx.runMutation(deleteThreadAccess, { accessId: grant._id });
+            });
+
+        // The re-grant took 3, its removal 4 and 5: the denial names 5, not the 2 a count read before the grant would.
+        await expect(read(READER, checkId)).resolves.toStrictEqual({ ...NO_CHECK, revision: 5 });
+    });
+
+    it("reads a branch's card through the branch's own asks: the parent's answer is not in its read set and changes nothing", async () => {
+        const parentAsk = (await claim("r1", "shop.example"))!;
+        // A branch of the chat with an ask of its own on the same site; its copied result names the parent's ask.
+        const branch = (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "U", userId: OWNER }))) as string;
+        const branchAsk = (await claim("r2", "shop.example", branch))!;
+
+        reads.log = [];
+
+        const before = await read(OWNER, parentAsk, branch);
+        const touched = reads.log.filter((entry) => entry.table === "browserHumanChecks");
+
+        expect(before).toStrictEqual({ kind: "elsewhere", now: NOW });
+        // Never the row by id: one read of the branch's own key for the result's site and reply, so no write to the
+        // parent's ask re-runs this query.
+        expect(touched).toStrictEqual([
+            { by: "index", fields: { run: "r1", site: "shop.example", threadId: branch }, index: "by_threadId_site_run", table: "browserHumanChecks" },
+        ]);
+
+        vi.setSystemTime(NOW + 1000);
+        await resolve(OWNER, parentAsk, "done");
+
+        await expect(read(OWNER, parentAsk, branch)).resolves.toStrictEqual({ kind: "elsewhere", now: NOW + 1000 });
+        await expect(read(OWNER, parentAsk)).resolves.toMatchObject({ kind: "found", status: "done" });
+        // The branch's own ask, on the same site, is found by its key; the parent's id under it is not.
+        await expect(read(OWNER, branchAsk, branch, "shop.example", "r2")).resolves.toMatchObject({ kind: "found", status: "open" });
+        await expect(read(OWNER, parentAsk, branch, "shop.example", "r2")).resolves.toStrictEqual({ kind: "elsewhere", now: NOW + 1000 });
+    });
+
+    it("reads one ask's key, however many asks the site had in the chat", async () => {
+        const oldest = (await claim("r1", "shop.example"))!;
+
+        for (let index = 0; index < 30; index += 1) {
+            await claim(`later-${index}`, "shop.example");
+        }
+
+        reads.log = [];
+
+        await expect(read(OWNER, oldest)).resolves.toMatchObject({ kind: "found", status: "open" });
+        await expect(resolve(OWNER, oldest, "done")).resolves.toStrictEqual({ changed: true, status: "done" });
+
+        // Every column of the unique key bound, on each read: one row at most, never a walk of the site's asks.
+        const range = { by: "index", fields: { run: "r1", site: "shop.example", threadId }, index: "by_threadId_site_run", table: "browserHumanChecks" };
+
+        expect(reads.log.filter((entry) => entry.table === "browserHumanChecks")).toStrictEqual([range, range]);
     });
 
     it("calls an unanswered ask past the hand-back window expired, and answers nothing on it", async () => {
@@ -186,7 +450,7 @@ describe("after an answer", () => {
         vi.setSystemTime(NOW + 1000);
         await claim("r1", "b.example");
         await claim("r2", "c.example");
-        await resolve(OWNER, first, "done");
+        await resolve(OWNER, first, "done", threadId, "a.example");
 
         const answerOf = async (args: Record<string, unknown>) =>
             await harness.action(async (ctx: any) => await ctx.runQuery(humanCheckAnswer, { askedSince: 0, threadId, ...args }));
@@ -219,7 +483,15 @@ describe("the browser result", () => {
         const result: any = { error: "asked", humanCheck: { site: "shop.example", status: "asked" }, success: false };
 
         await withAnswer(context(), threadId as never, "r1", result, new Map([["shop.example", "check-1"]]));
-        expect(result.humanCheck).toStrictEqual({ checkId: "check-1", site: "shop.example", status: "asked" });
+        expect(result.humanCheck).toStrictEqual({ checkId: "check-1", run: "r1", site: "shop.example", status: "asked" });
+        // The reply key is the card's, never the model's.
+        const forModel = (output: unknown): unknown => (browserTool.toModelOutput as (options: unknown) => unknown).call(browserTool, { output });
+
+        const askForModel = { ...result.humanCheck };
+
+        delete askForModel.run;
+        expect(forModel(result)).toStrictEqual(forModel({ ...result, humanCheck: askForModel }));
+        expect(JSON.stringify(forModel(result))).not.toContain("r1");
 
         const other: any = { humanCheck: { site: "other.example", status: "asked" }, success: false };
 
@@ -351,7 +623,7 @@ describe("the browser result", () => {
     it.each(["shop.example.", "shop.example.."])("keeps a decline of an ask stored as %s, from before sites lost the dot", async (stored) => {
         const checkId = (await claim("r1", stored))!;
 
-        await resolve(OWNER, checkId, "declined");
+        await resolve(OWNER, checkId, "declined", threadId, stored);
 
         const runAction = vi.fn(async () => {
             return { success: true, url: "https://shop.example/x" };
@@ -372,6 +644,74 @@ describe("the browser result", () => {
             answer: "declined",
             site: "shop.example",
         });
+    });
+});
+
+describe("approved continuations", () => {
+    /** Approves a pending browser click in a continuation that set `replyKey` as `resumeApprovedRun` does; the run key the tool saw. */
+    const approveIn = async (replyKey: string | undefined, toolCallId: string): Promise<string> => {
+        let seen: string | undefined;
+        const callRow = {
+            _creationTime: 11,
+            _id: `m-${toolCallId}`,
+            message: {
+                content: [
+                    { input: { action: "click", selector: "#go" }, toolCallId, toolName: "browser", type: "tool-call" },
+                    { approvalId: `approval-${toolCallId}`, toolCallId, type: "tool-approval-request" },
+                ],
+                role: "assistant",
+            },
+            order: 1,
+            status: "success",
+            stepOrder: 1,
+            threadId,
+            tool: false,
+        };
+        const execute = vi.fn(async function runClick(this: { ctx: object }, _input: unknown, options: { toolCallId: string }) {
+            seen = browserRunKey(this.ctx, options.toolCallId);
+
+            return { success: true, url: "https://shop.example/" };
+        });
+        const agent = {
+            getThreadMetadata: vi.fn(async () => {
+                return { userId: OWNER };
+            }),
+            listMessages: vi.fn(async () => {
+                return { continueCursor: null, isDone: true, page: [callRow] };
+            }),
+            options: { tools: { browser: { ...browserTool, execute } } },
+            saveMessage: vi.fn(async () => {
+                return { messageId: "saved" };
+            }),
+            streamText: vi.fn(),
+        };
+        const actionCtx = { runAction: vi.fn(), runMutation: vi.fn(), runQuery: vi.fn(), storage: {} };
+
+        if (replyKey !== undefined) {
+            setRunReplyKey(actionCtx, replyKey);
+        }
+
+        await approveToolCallFor(agent as never, actionCtx as never, { threadId, userId: OWNER }, { approvalId: `approval-${toolCallId}` });
+
+        return seen!;
+    };
+
+    it("ask on a site each in their own reply, so two in one chat each get a card", async () => {
+        const first = await approveIn("stream-a", "call-1");
+        const second = await approveIn("stream-b", "call-2");
+
+        expect([first, second]).toStrictEqual(["stream-a", "stream-b"]);
+        await expect(claim(first, "shop.example")).resolves.toEqual(expect.any(String));
+        await expect(claim(second, "shop.example")).resolves.toEqual(expect.any(String));
+    });
+
+    it("never fall back to the chat as the reply, so a continuation without a reply key still gets its card", async () => {
+        const earlier = await approveIn("stream-a", "call-1");
+        const keyless = await approveIn(undefined, "call-2");
+
+        expect(keyless).not.toBe(threadId);
+        await expect(claim(earlier, "shop.example")).resolves.toEqual(expect.any(String));
+        await expect(claim(keyless, "shop.example")).resolves.toEqual(expect.any(String));
     });
 });
 
@@ -450,7 +790,7 @@ describe("wait_for_person", () => {
 
         await vi.advanceTimersByTimeAsync(4000);
         await claim("r1", "b.example");
-        await resolve(OWNER, checkId, "declined");
+        await resolve(OWNER, checkId, "declined", threadId, "a.example");
         await vi.advanceTimersByTimeAsync(4000);
 
         await expect(waiting).resolves.toStrictEqual({ error: humanCheckMessages.answerDeclined("a.example"), success: false });

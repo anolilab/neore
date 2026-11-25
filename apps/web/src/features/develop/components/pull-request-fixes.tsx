@@ -5,9 +5,10 @@ import { Button } from "@neore/ui/components/button";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@neore/ui/components/popover";
 import { RefreshCw, TriangleAlert } from "lucide-react";
 import type { RefObject } from "react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { prefillComposer } from "@/features/chat/thread/composer-prefill";
+import { focusIsLost, useReportFocusLoss } from "@/lib/focus-loss";
 
 import type { FixKind, PullRequestProblems } from "../lib/fix-prompts";
 import { buildFixPrompt, fixesFor } from "../lib/fix-prompts";
@@ -15,31 +16,6 @@ import type { PullRequestAddress } from "../lib/use-develop";
 import { usePullRequestStatus } from "../lib/use-develop";
 
 const namesOf = (names: ReadonlyArray<string>, more: number): string => (more > 0 ? `${names.join(", ")} (+${String(more)})` : names.join(", "));
-
-/**
- * Calls `onLost` when the component unmounts while one of these elements holds focus, which the browser would drop to
- * the page. The cleanup of an unmounting component runs before React removes its nodes, so focus is still where it was.
- * Only on unmount: an update never reports, so a flag set here always means the element went away. `onLost` only sets a
- * ref, so the one from the first render is enough.
- */
-const useReportFocusLoss = (onLost: () => void, ...refs: ReadonlyArray<RefObject<HTMLElement | null>>) => {
-    const watched = refs;
-
-    useLayoutEffect(
-        () => () => {
-            const active = document.activeElement;
-
-            if (watched.some((ref) => ref.current?.contains(active) === true)) {
-                onLost();
-            }
-        },
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- unmount only, see above
-        [],
-    );
-};
-
-/** Focus went nowhere: nothing holds it, so moving it takes nothing from the person. */
-const focusIsLost = (): boolean => document.activeElement === null || document.activeElement === document.body;
 
 /** Failed reads a retry can help with; a missing connection or access is not fixed by reading again. */
 const RETRYABLE = new Set(["host_error", "rate_limited"]);
@@ -192,15 +168,18 @@ const FixesList = ({ chipRef, fixes, name, onFocusLost, onOpen, problems, refres
  */
 const PullRequestFixes = ({
     address,
+    readStatus = true,
     returnFocusTo,
     threadId,
 }: {
     address: PullRequestAddress;
+    /** False when this view does not read the host for the link: the chip then shows the status it already has, if any. */
+    readStatus?: boolean;
     returnFocusTo?: RefObject<HTMLElement | null>;
     threadId: string;
 }) => {
     const { t } = useLingui();
-    const status = usePullRequestStatus(address);
+    const status = usePullRequestStatus(address, threadId, readStatus);
     const { data } = status;
     const name = `${address.repository}#${String(address.number)}`;
     const chipRef = useRef<HTMLButtonElement>(null);

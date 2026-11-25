@@ -53,6 +53,7 @@ import {
     GLOBAL_USER_TABLES_NOT_REASSIGNED,
     firstTableWithGuestRows,
     handOverOrganizationContributors,
+    markGuestMerging,
     mergeGuestInto,
     NOT_USER_REFERENCE_FIELDS,
     reassignGlobalRows,
@@ -69,6 +70,28 @@ import { claimHeld, claimKey, purgeExpiredClaims, releaseKey } from "./claim-onc
 import { eraseWaitUntil, isAccountMoving } from "./account-moves";
 import { runInShard } from "./shard-context";
 import { schemaWithShardedTables } from "./test-schema";
+import { mergedGuestTarget, setShardRoute, shardRouteOwner } from "./shard-routes";
+
+/** Runs once, inside the merge's grant moves: a write by the chat's owner that races them. */
+const grantRace = vi.hoisted(() => {
+    return { run: undefined as ((context: any) => Promise<void>) | undefined };
+});
+
+vi.mock("../agent/grant-revision", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../agent/grant-revision")>();
+
+    return {
+        ...actual,
+        mergeGrantsPage: vi.fn(async (context: any, ...rest: [string, string, number]) => {
+            const race = grantRace.run;
+
+            grantRace.run = undefined;
+            await race?.(context);
+
+            return await actual.mergeGrantsPage(context, ...rest);
+        }),
+    };
+});
 
 // The action's own query runs in the harness, which takes the registered procedure; every other reference stays plain.
 const registry = vi.hoisted(() => new Map<string, unknown>());
@@ -721,16 +744,7 @@ describe("mergeGuestInto", () => {
         await mergeToEnd(call, "guest", "user");
 
         // Its own phase, under the run's lease: after the lease and the run's start, before the first page is read.
-        // The store probe comes before the first step, after the run has begun.
-        expect(calls.slice(0, 7)).toStrictEqual([
-            "acquireMergeLease",
-            "noteMergeGeneration",
-            "beginMergeRun",
-            "claimKey",
-            "claimHeld",
-            "releaseKey",
-            "handOverOrganizationContributors",
-        ]);
+        expect(calls.slice(0, 4)).toStrictEqual(["acquireMergeLease", "noteMergeGeneration", "beginMergeRun", "handOverOrganizationContributors"]);
         expect(calls.indexOf("listShardRowsPage")).toBeGreaterThan(calls.indexOf("handOverOrganizationContributors"));
     });
 
@@ -1165,6 +1179,48 @@ describe("mergeGuestInto", () => {
     });
 });
 
+/** Runs `reassignGlobalRows` until it reports done: the calls it took. */
+const reassignUntilDone = async (harness: { run: (body: (context: any) => Promise<unknown>) => Promise<unknown> }): Promise<number> => {
+    for (let call = 1; call <= 20; call += 1) {
+        const { done } = (await harness.run(async (context: any) => await asLeaseHolder(context, reassignGlobalRows))) as { done: boolean };
+
+        if (done) {
+            return call;
+        }
+    }
+
+    throw new Error("reassignGlobalRows never reported done");
+};
+
+/** D1 queries a `ctx.db` call runs on a `.global()` table: a write reads its row first (`@lunora/sql-store`). */
+const WRITE_QUERIES: Readonly<Record<string, number>> = { delete: 2, patch: 2, patchIf: 2 };
+
+/** `db` with the D1 queries of every call counted, a table's reads included. */
+const counting = (db: any, count: { queries: number }): any =>
+    new Proxy(db, {
+        get: (target, key) => {
+            const value = target[key];
+
+            // A shard-local read (`idempotencyClaims`, the merge's lease) is the shard's SQLite, never a D1 query.
+            if (key === "query" && typeof value === "function") {
+                return value.bind(target);
+            }
+
+            if (typeof value === "function") {
+                return async (...args: unknown[]) => {
+                    count.queries += WRITE_QUERIES[String(key)] ?? 1;
+
+                    return await value.apply(target, args);
+                };
+            }
+
+            return value !== null && typeof value === "object" && typeof value.findMany === "function" ? counting(value, count) : value;
+        },
+    });
+
+/** A procedure's handler, run on `ctx` as given (a counted or lagging `db`). */
+const handlerOf = (procedure: unknown) => (procedure as { handler: (ctx: unknown, args: unknown) => Promise<unknown> }).handler;
+
 describe("reassignGlobalRows", () => {
     it("decides every `.global()` table with a `userId`: re-pointed, or left alone for a stated reason", async () => {
         const { default: schema } = await vi.importActual<typeof import("../schema")>("../schema");
@@ -1239,6 +1295,159 @@ describe("reassignGlobalRows", () => {
 
             expect(second).toMatchObject({ done: true, reassigned: 2 });
             expect(moved.page).toHaveLength(10);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("moves a guest's grant revisions to the new account, keeping the higher count where both have one for a thread", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                await context.db.insert("threadAccessRevisions", { ownerId: "owner", revision: 4, threadId: "thread-1", userId: "guest" });
+                await context.db.insert("threadAccessRevisions", { ownerId: "owner", revision: 2, threadId: "thread-1", userId: "user" });
+                await context.db.insert("threadAccessRevisions", { ownerId: "owner", revision: 3, threadId: "thread-2", userId: "guest" });
+            });
+
+            // Grant work stops a call within its share of the invocation's D1 queries; the next call goes on.
+            await expect(reassignUntilDone(harness)).resolves.toBeLessThan(10);
+
+            const rows = await harness.run(async (context: any) => await context.db.threadAccessRevisions.findMany({ orderBy: [{ threadId: "asc" }] }));
+
+            expect(rows.page.map((row: any) => [row.threadId, row.userId, row.revision])).toStrictEqual([
+                ["thread-1", "user", 4],
+                ["thread-2", "user", 3],
+            ]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("leaves the new account one grant to a chat both held, at the merged count, the one that gives more", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
+        const grant = { grantedAt: 0, grantedBy: "owner", ownerId: "owner" };
+
+        try {
+            await harness.run(async (context: any) => {
+                await context.db.insert("threadAccess", { ...grant, permission: "read", revision: 4, threadId: "thread-1", userId: "guest" });
+                await context.db.insert("threadAccess", { ...grant, permission: "write", revision: 6, threadId: "thread-1", userId: "user" });
+                await context.db.insert("threadAccess", { ...grant, permission: "write", revision: 2, threadId: "thread-2", userId: "guest" });
+                await context.db.insert("threadAccess", { ...grant, permission: "read", revision: 3, threadId: "thread-2", userId: "user" });
+                // The guest's grant to thread-3 was removed (its count is left); the new account holds one there.
+                await context.db.insert("threadAccess", { ...grant, permission: "read", revision: 6, threadId: "thread-3", userId: "user" });
+                // The guest's wider grant to thread-4 has ended; the new account's lasting one is what reads.
+                await context.db.insert("threadAccess", { ...grant, expiresAt: 1, permission: "admin", revision: 1, threadId: "thread-4", userId: "guest" });
+                await context.db.insert("threadAccess", { ...grant, permission: "read", revision: 1, threadId: "thread-4", userId: "user" });
+                await context.db.insert("threadAccessRevisions", { ownerId: "owner", revision: 9, threadId: "thread-1", userId: "guest" });
+                await context.db.insert("threadAccessRevisions", { ownerId: "owner", revision: 6, threadId: "thread-1", userId: "user" });
+                await context.db.insert("threadAccessRevisions", { ownerId: "owner", revision: 2, threadId: "thread-2", userId: "guest" });
+                await context.db.insert("threadAccessRevisions", { ownerId: "owner", revision: 3, threadId: "thread-2", userId: "user" });
+                await context.db.insert("threadAccessRevisions", { ownerId: "owner", revision: 9, threadId: "thread-3", userId: "guest" });
+                await context.db.insert("threadAccessRevisions", { ownerId: "owner", revision: 6, threadId: "thread-3", userId: "user" });
+            });
+
+            // Grant work stops a call within its share of the invocation's D1 queries; the next call goes on.
+            await expect(reassignUntilDone(harness)).resolves.toBeLessThan(10);
+
+            const grants = await harness.run(async (context: any) => await context.db.threadAccess.findMany({ orderBy: [{ threadId: "asc" }] }));
+            const counts = await harness.run(async (context: any) => await context.db.threadAccessRevisions.findMany({ orderBy: [{ threadId: "asc" }] }));
+
+            // One grant per chat, past the higher count a denial could have named (9 on thread-1 and thread-3, 3 on thread-2).
+            expect(grants.page.map((row: any) => [row.threadId, row.userId, row.permission, row.revision])).toStrictEqual([
+                ["thread-1", "user", "write", 11],
+                ["thread-2", "user", "write", 4],
+                ["thread-3", "user", "read", 10],
+                ["thread-4", "user", "read", 2],
+            ]);
+            expect(counts.page.map((row: any) => [row.threadId, row.userId, row.revision])).toStrictEqual([
+                ["thread-1", "user", 11],
+                ["thread-2", "user", 4],
+                ["thread-3", "user", 10],
+                ["thread-4", "user", 2],
+            ]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("merges a count the guest's grant took after the first revision pass before it reports the grants moved", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                await context.db.insert("threadAccess", {
+                    grantedAt: 0,
+                    grantedBy: "owner",
+                    ownerId: "owner",
+                    permission: "read",
+                    revision: 2,
+                    threadId: "thread-1",
+                    userId: "user",
+                });
+                await context.db.insert("threadAccessRevisions", { ownerId: "owner", revision: 2, threadId: "thread-1", userId: "user" });
+            });
+            // The owner removed the guest's grant to thread-1 after the first pass had moved the guest's count: the
+            // removal advanced a count under the guest, past the new account's.
+            grantRace.run = async (context) => {
+                await context.db.insert("threadAccessRevisions", { ownerId: "owner", revision: 5, threadId: "thread-1", userId: "guest" });
+            };
+
+            for (let call = 0; call < 5; call += 1) {
+                const { done } = await harness.run(async (context: any) => await asLeaseHolder(context, reassignGlobalRows));
+
+                if (done) {
+                    break;
+                }
+            }
+
+            const grants = await harness.run(async (context: any) => await context.db.threadAccess.findMany({}));
+            const counts = await harness.run(async (context: any) => await context.db.threadAccessRevisions.findMany({}));
+
+            // Past the guest's 5 (a removal's last revision may equal the moved grant's), the grant settled past that.
+            expect(counts.page.map((row: any) => [row.userId, row.revision])).toStrictEqual([["user", 7]]);
+            expect(grants.page.map((row: any) => [row.userId, row.revision])).toStrictEqual([["user", 7]]);
+        } finally {
+            grantRace.run = undefined;
+            harness.close();
+        }
+    });
+
+    it("moves the counts on chats a guest owns over several calls, each within an invocation's D1 queries", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
+        const rows = 60;
+
+        try {
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < rows; index += 1) {
+                    await context.db.insert("threadAccessRevisions", { ownerId: "guest", revision: 1, threadId: `thread-${String(index)}`, userId: "reader" });
+                }
+            });
+
+            const queries: number[] = [];
+
+            for (let call = 0; call < 20; call += 1) {
+                const count = { queries: 0 };
+                const { done } = (await harness.run(async (context: any) => {
+                    const { generation } = (await context.runMutation(acquireMergeLease, { from: "guest", to: "user" })) as { generation: number };
+
+                    return await handlerOf(reassignGlobalRows)({ ...context, db: counting(context.db, count) }, { from: "guest", generation, to: "user" });
+                })) as { done: boolean };
+
+                queries.push(count.queries);
+
+                if (done) {
+                    break;
+                }
+            }
+
+            const left = await harness.run(async (context: any) => await context.db.threadAccessRevisions.findMany({ where: { ownerId: "guest" } }));
+            const moved = await harness.run(async (context: any) => await context.db.threadAccessRevisions.findMany({ where: { ownerId: "user" } }));
+
+            expect(queries.length).toBeGreaterThan(2);
+            expect(Math.max(...queries)).toBeLessThanOrEqual(50);
+            expect(left.page).toStrictEqual([]);
+            expect(moved.page).toHaveLength(rows);
         } finally {
             harness.close();
         }
@@ -1465,6 +1674,9 @@ describe("deleteMergedGuest", () => {
                 "passkey",
                 "shardRoutes",
                 "shardActivity",
+                "threadAccess",
+                "threadAccessRevisions",
+                "accountMoves",
                 "threadFollows",
                 "sharedPinRoutes",
             ]) as never,
@@ -1482,6 +1694,9 @@ describe("deleteMergedGuest", () => {
                     updatedAt: 0,
                 }),
         )) as string;
+
+    const mergeMarkOf = async (harness: ReturnType<typeof harnessWithUsers>, id: string) =>
+        await harness.run(async (context: any) => await mergedGuestTarget(context, id));
 
     const userExists = async (harness: ReturnType<typeof harnessWithUsers>, id: string) =>
         await harness.run(async (context: any) => (await context.db.user.findFirst({ where: { _id: id } })) !== null);
@@ -1571,6 +1786,8 @@ describe("deleteMergedGuest", () => {
 
             expect(result).toStrictEqual({ deleted: true });
             await expect(userExists(harness, guest)).resolves.toBe(false);
+            // The merge mark goes with the guest; the new account's other routes stay.
+            await expect(mergeMarkOf(harness, guest)).resolves.toBeNull();
             const sessions = await harness.run(async (context: any) => await context.db.session.findMany({ where: { userId: guest } }));
 
             expect(sessions.page).toStrictEqual([]);
@@ -1778,6 +1995,92 @@ describe("deleteMergedGuest", () => {
                 deleted: false,
             });
             await expect(userExists(harness, member)).resolves.toBe(true);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("keeps a guest that a thread grant still names, and says so", async () => {
+        const harness = harnessWithUsers();
+
+        try {
+            const guest = await insertUser(harness, true);
+
+            await harness.run(
+                async (context: any) =>
+                    await context.db.insert("threadAccessRevisions", { ownerId: "owner", revision: 1, threadId: "thread-1", userId: guest }),
+            );
+            await harness.run(async (context: any) => await setShardRoute(context, "merged-guest", guest, "user"));
+
+            const result = await deleteGuest(harness, guest);
+
+            expect(result).toStrictEqual({ deleted: false, grantsRemain: true });
+            await expect(userExists(harness, guest)).resolves.toBe(true);
+            // Still merging: the mark stays until the redelivery has moved the row.
+            await expect(mergeMarkOf(harness, guest)).resolves.toBe("user");
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("drops the merge mark of a guest already deleted, once nothing names it", async () => {
+        const harness = harnessWithUsers();
+
+        try {
+            const guest = await insertUser(harness, true);
+
+            // Deleted by the anonymous plugin when the conversion completed in the guest's own browser.
+            await harness.run(async (context: any) => {
+                await setShardRoute(context, "merged-guest", guest, "user");
+                await setShardRoute(context, "device", "device-1", "user");
+                await context.db.delete("user", guest);
+            });
+
+            await expect(deleteGuest(harness, guest)).resolves.toStrictEqual({ deleted: false });
+            await expect(mergeMarkOf(harness, guest)).resolves.toBeNull();
+            await expect(harness.run(async (context: any) => await shardRouteOwner(context, "device", "device-1"))).resolves.toBe("user");
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("leaves one merge mark when a retried mark reads a replica that has not seen the first, and none after the cleanup", async () => {
+        const harness = harnessWithUsers();
+
+        try {
+            const guest = await insertUser(harness, true);
+            const markOnce = async () =>
+                await harness.run(async (context: any) => {
+                    // A replica that has not seen the first mark yet: only a primary read finds it.
+                    const routes = new Proxy(context.db.shardRoutes, {
+                        get: (target, key) =>
+                            key === "findFirst"
+                                ? async (query: { consistency?: string }) => (query.consistency === "primary" ? await target.findFirst(query) : null)
+                                : target[key],
+                    });
+                    const db = new Proxy(context.db, { get: (target, key) => (key === "shardRoutes" ? routes : target[key]) });
+
+                    await markGuestMerging({ ...context, db }, guest, "user", 0);
+                });
+            const marks = async () =>
+                (await harness.run(async (context: any) => await context.db.shardRoutes.findMany({ where: { key: `merged-guest:${guest}` } }))) as {
+                    page: unknown[];
+                };
+
+            await markOnce();
+            await markOnce();
+
+            const { page: retried } = await marks();
+
+            expect(retried).toHaveLength(1);
+
+            // A second mark an older write left before the reads were made primary: the cleanup removes it too.
+            await harness.run(async (context: any) => await context.db.insert("shardRoutes", { createdAt: 0, key: `merged-guest:${guest}`, ownerId: "user" }));
+            await deleteGuest(harness, guest);
+
+            const { page: cleaned } = await marks();
+
+            expect(cleaned).toStrictEqual([]);
         } finally {
             harness.close();
         }
@@ -3634,6 +3937,16 @@ const movesOf = async (harness: ReturnType<typeof lunoraTest>, userId: string) =
         }
     ).page.map((row) => row.kind);
 
+/** The accounts the guest's `merged-guest` routes name: one while a run has it marked, none once it ended or stopped. */
+const mergeMarksOf = async (harness: ReturnType<typeof lunoraTest>, from = "guest") =>
+    (
+        (await harness.run(
+            async (context: any) => await context.db.shardRoutes.findMany({ consistency: "primary", where: { key: `merged-guest:${from}` } }),
+        )) as {
+            page: { ownerId: string }[];
+        }
+    ).page.map((row) => row.ownerId);
+
 describe("the account-move markers a merge holds", () => {
     it("marks the guest as merging and the new account as importing at each run, and drops both with the last page of import markers", async () => {
         const harness = lunoraTest(schemaWithShardedTables([]) as never);
@@ -3644,11 +3957,14 @@ describe("the account-move markers a merge holds", () => {
             expect(begun).toStrictEqual({ cleanup: false, finished: false, pinWritesUntil: null, stopped: false, superseded: false });
             expect(await movesOf(harness, "guest")).toStrictEqual(["merging"]);
             expect(await movesOf(harness, "user")).toStrictEqual(["importing"]);
+            // With the merging marker, the grants' mark: a grant or a count written under the guest from here on finds it.
+            expect(await mergeMarksOf(harness)).toStrictEqual(["user"]);
 
             // A later run renews the markers instead of adding a second pair.
             await beginRunOf(harness);
 
             expect(await movesOf(harness, "guest")).toStrictEqual(["merging"]);
+            expect(await mergeMarksOf(harness)).toStrictEqual(["user"]);
 
             const { generation } = (await harness.run(async (context: any) => await context.runMutation(acquireMergeLease, { from: "guest", to: "user" }))) as {
                 generation: number;
@@ -3660,6 +3976,7 @@ describe("the account-move markers a merge holds", () => {
             expect(dropped).toStrictEqual({ fenced: false, hasMore: false });
             expect(await movesOf(harness, "guest")).toStrictEqual([]);
             expect(await movesOf(harness, "user")).toStrictEqual([]);
+            expect(await mergeMarksOf(harness)).toStrictEqual([]);
         } finally {
             harness.close();
         }
@@ -3677,6 +3994,8 @@ describe("the account-move markers a merge holds", () => {
                 expect(begun).toStrictEqual({ cleanup: false, finished: false, pinWritesUntil: null, stopped: true, superseded: false });
                 expect(await movesOf(harness, erased)).toStrictEqual(["erasing"]);
                 expect(await movesOf(harness, erased === "guest" ? "user" : "guest")).toStrictEqual([]);
+                // A stop keeps the guest: its grants' mark goes with its merging marker, so they work as any account's again.
+                expect(await mergeMarksOf(harness)).toStrictEqual([]);
             } finally {
                 harness.close();
             }

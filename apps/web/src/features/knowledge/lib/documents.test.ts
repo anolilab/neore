@@ -3,7 +3,16 @@ import { describe, expect, it } from "vitest";
 
 import { loadJsZip } from "@/lib/zip";
 
-import { collectFolderDocuments, documentMimeType, encodeDocument, MAX_BATCH_CHARS, MAX_DOCUMENT_BYTES, MAX_DOCUMENTS_PER_BATCH, toBatches } from "./documents";
+import {
+    collectFolderDocuments,
+    documentMimeType,
+    encodeDocument,
+    MAX_DOCUMENT_BYTES,
+    MAX_DOCUMENTS_PER_BATCH,
+    MAX_REQUEST_BATCH_BYTES,
+    MAX_REQUEST_DOCUMENT_BYTES,
+    toBatches,
+} from "./documents";
 import { listArchiveEntries, notionDocuments, stripNotionIds } from "./notion-export";
 
 const fakeFile = (webkitRelativePath: string, content: string | Uint8Array, type = "") => {
@@ -57,11 +66,29 @@ describe(toBatches, () => {
             return { content: String(index) };
         });
 
-        expect(toBatches(small).map((batch) => batch.length)).toEqual([MAX_DOCUMENTS_PER_BATCH, 1]);
+        expect(toBatches(small).batches.map((batch) => batch.length)).toEqual([MAX_DOCUMENTS_PER_BATCH, 1]);
 
-        const half = "x".repeat(MAX_BATCH_CHARS / 2 + 1);
+        // Each document is about half the budget as JSON, so two cannot share a call.
+        const half = { content: "x".repeat(Math.floor(MAX_REQUEST_BATCH_BYTES / 2)) };
 
-        expect(toBatches([{ content: half }, { content: half }, { content: "y" }]).map((batch) => batch.length)).toEqual([1, 2]);
+        expect(toBatches([half, half, { content: "y" }]).batches.map((batch) => batch.length)).toEqual([1, 2]);
+    });
+
+    it("sends a document over the batch budget alone, in its place in the order", () => {
+        // Over the batch budget as JSON, under the single-document limit: it cannot share a call, but it can go by itself.
+        const large = { content: "x".repeat(MAX_REQUEST_BATCH_BYTES) };
+        const { batches, oversize } = toBatches([{ content: "a" }, large, { content: "b" }]);
+
+        expect(oversize).toEqual([]);
+        expect(batches).toEqual([[{ content: "a" }], [large], [{ content: "b" }]]);
+    });
+
+    it("sets aside a document over the single-document limit, keeping the rest", () => {
+        const huge = { content: "x".repeat(MAX_REQUEST_DOCUMENT_BYTES) };
+        const { batches, oversize } = toBatches([{ content: "a" }, huge, { content: "b" }]);
+
+        expect(oversize).toEqual([huge]);
+        expect(batches).toEqual([[{ content: "a" }, { content: "b" }]]);
     });
 });
 

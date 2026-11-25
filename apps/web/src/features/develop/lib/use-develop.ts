@@ -125,6 +125,27 @@ export const usePullRequestChecks = (address: PullRequestAddress | undefined, he
     });
 };
 
+/**
+ * How far a pull request's head commit is behind its base branch, from the host comparing the two. Keyed by the base branch
+ * and the head commit, so a push or a retarget reads again instead of answering from another revision's cache.
+ */
+export const useBranchComparison = (address: PullRequestAddress | undefined, revision: { baseBranch: string; headSha: string } | undefined) => {
+    const client = useLunora();
+    const userId = useDevelopUser();
+    const options = createLunoraActionQueryOptions(client, api.source_control.functions.getBranchComparison, {
+        ...(address as PullRequestAddress),
+        ...(revision as { baseBranch: string; headSha: string }),
+    });
+
+    return useQuery({
+        ...READ,
+        ...options,
+        enabled: address !== undefined && revision !== undefined && userId !== undefined,
+        queryKey: [DEVELOP_QUERY_ROOT, userId, "compare", address, revision?.baseBranch, revision?.headSha],
+        staleTime: MINUTE_MS,
+    });
+};
+
 /** When each status read first answered "unknown" in a row; a known answer ends the row, so a later push starts a new one. */
 const mergeUnknownSince = new WeakMap<object, number>();
 
@@ -134,16 +155,19 @@ const mergeUnknownSince = new WeakMap<object, number>();
  * never live and never on focus, so showing a thread does not cost a host call per render. While the host still works
  * out whether it merges cleanly, it is read again shortly, a few times, so a conflict found then shows up.
  */
-export const usePullRequestStatus = (address: PullRequestAddress | undefined) => {
+export const usePullRequestStatus = (address: PullRequestAddress | undefined, viewingThreadId?: string, read = true) => {
     const client = useLunora();
     const userId = useDevelopUser();
-    const options = createLunoraActionQueryOptions(client, api.source_control.pr_status.getPullRequestStatus, address as PullRequestAddress);
+    // The chat whose header asks: the server stamps that chat's own link as read, and only a chat's header passes it.
+    const args = address === undefined ? undefined : { ...address, ...(viewingThreadId !== undefined && { threadId: viewingThreadId }) };
+    const options = createLunoraActionQueryOptions(client, api.source_control.pr_status.getPullRequestStatus, args as PullRequestAddress);
 
     return useQuery({
         ...READ,
         ...options,
-        enabled: address !== undefined && userId !== undefined,
-        queryKey: [DEVELOP_QUERY_ROOT, userId, "status", address],
+        // A link this view does not read keeps whatever status it already has, and asks the host for nothing.
+        enabled: address !== undefined && userId !== undefined && read,
+        queryKey: [DEVELOP_QUERY_ROOT, userId, "status", address, viewingThreadId],
         refetchInterval: (query) => {
             const { delay, since } = nextMergeReread(query.state.data, mergeUnknownSince.get(query), Date.now(), query.state.status === "error");
 

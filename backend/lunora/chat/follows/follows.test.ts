@@ -16,6 +16,7 @@ import {
     getThreadFollow,
     setThreadFollow,
     setThreadFollowState,
+    withdrawThreadFollowDefault,
 } from "./functions";
 
 const OWNER = "user-owner";
@@ -332,5 +333,58 @@ describe("thread follow writes that race", () => {
         });
 
         expect(await followRowsFor(OWNER)).toMatchObject([{ state: "muted" }]);
+    });
+});
+
+describe("taking back a refused accept's follow default", () => {
+    const writeDefault = async (now: number) =>
+        await harness.run(async (context: any) => await ensureThreadFollowDefault(context, { now, state: "on", threadId, userId: GRANTEE }));
+
+    it("removes the default while it is unchanged", async () => {
+        const written = await writeDefault(5);
+
+        expect(written).toMatchObject({ state: "on", updatedAt: 5 });
+        await expect(harness.run(async (context: any) => await withdrawThreadFollowDefault(context, written!))).resolves.toBe(true);
+        expect(await followRowsFor(GRANTEE)).toHaveLength(0);
+    });
+
+    it("keeps a choice the person made after the default, even in the same millisecond and with the same state", async () => {
+        const written = await writeDefault(5);
+
+        await harness.run(async (context: any) => {
+            await setThreadFollowState(context, { now: 5, state: "on", threadId, userId: GRANTEE });
+        });
+
+        await expect(harness.run(async (context: any) => await withdrawThreadFollowDefault(context, written!))).resolves.toBe(false);
+        expect(await followRowsFor(GRANTEE)).toMatchObject([{ state: "on", updatedAt: 6 }]);
+    });
+
+    it("takes back nothing when a follow stood before, so the default wrote none", async () => {
+        await harness.run(async (context: any) => {
+            await setThreadFollowState(context, { now: 1, state: "muted", threadId, userId: GRANTEE });
+        });
+
+        await expect(writeDefault(5)).resolves.toBeNull();
+        expect(await followRowsFor(GRANTEE)).toMatchObject([{ state: "muted" }]);
+    });
+
+    it("a choice made while the take-back stands between its stamp and its delete is written as a new row and survives", async () => {
+        const written = await writeDefault(5);
+
+        await harness.run(async (context: any) => {
+            // The take-back's stamp, without its delete yet.
+            await context.db.patchIf("threadFollows", written!.id, {
+                patch: { state: "off", updatedAt: -1 },
+                where: { state: "on", updatedAt: 5 },
+            });
+            await setThreadFollowState(context, { now: 6, state: "muted", threadId, userId: GRANTEE });
+
+            // The take-back's delete, keyed on the old row.
+            if (await context.db.threadFollows.findFirst({ where: { _id: written!.id } })) {
+                await context.db.delete("threadFollows", written!.id);
+            }
+        });
+
+        expect(await followRowsFor(GRANTEE)).toMatchObject([{ state: "muted", updatedAt: 6 }]);
     });
 });

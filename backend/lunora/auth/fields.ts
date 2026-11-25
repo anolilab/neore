@@ -30,6 +30,8 @@ export const userSettingsFieldsWithoutUserId = {
             message: "Auto-archive must be off or 7 to 365 days",
         }),
     ),
+    // Archive a chat when a pull request it is linked to merges (`agent/auto-archive.ts#archiveMergedThread`). Absent = off.
+    autoArchiveMergedChats: v.optional(v.boolean()),
     // Compact a thread's model context before a reply once it fills this percentage of the model's window (`agent/thread-compaction.ts`). 0 or absent = off.
     autoCompactThreshold: v.optional(
         v.number().check((value) => value === 0 || (Number.isSafeInteger(value) && value >= 50 && value <= 95), {
@@ -40,6 +42,10 @@ export const userSettingsFieldsWithoutUserId = {
     backupModel: v.optional(v.string().max(MAX_LENGTH.short)), // Model a reply is retried on once when the chosen model fails with an infrastructure error. "" or absent = none. Checked against the registry in `settingsUpsert`.
     // Appearance: cap long chat code blocks at 24 lines with an expand toggle. Absent means ON.
     capLongCodeBlocks: v.optional(v.boolean()),
+    // In-app toasts for chat events (`features/notifications/lib/chat-toasts.ts`). Absent means ON.
+    chatFailedToastEnabled: v.optional(v.boolean()),
+    chatFinishedToastEnabled: v.optional(v.boolean()),
+    chatInputToastEnabled: v.optional(v.boolean()),
     codeFont: v.optional(v.union(v.literal("fira-code"), v.literal("mono"), v.literal("consolas"), v.literal("jetbrains"), v.literal("source-code-pro"))),
     // Appearance: Shiki theme pair for code blocks (`apps/web/src/features/appearance/lib/code-themes.ts`).
     codeHighlightTheme: v.optional(
@@ -72,6 +78,8 @@ export const userSettingsFieldsWithoutUserId = {
     disableExternalLinkWarning: v.optional(v.boolean()),
     enableFollowupSuggestions: v.optional(v.boolean()), // Enable/disable follow-up suggestions after assistant messages
     favoriteModels: v.optional(v.array(v.string().max(MAX_LENGTH.short))),
+    // A message sent while a reply streams joins that reply at its next step, instead of queueing behind it. Absent means queue.
+    followUpSteer: v.optional(v.boolean()),
     hidePersonalInfo: v.optional(v.boolean()),
     hostFollowUpSteer: v.optional(v.boolean()), // A message sent during a coding agent's turn interrupts it and goes next. Absent means queue.
     id: v.optional(v.string().max(MAX_LENGTH.id)),

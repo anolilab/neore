@@ -1,9 +1,11 @@
+import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PendingAttachment } from "@/features/chat/core/stores/chat-ui-store";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import { prefillComposer, resetComposerPrefillForTests, useComposerPrefill } from "@/features/chat/thread/composer-prefill";
 
-import { clearComposerDrafts, draftOwnership, dropStoredDrafts, saveComposerDraft, setSplitViewMounted } from "./composer-drafts";
+import { clearComposerDrafts, draftOwnership, dropStoredDrafts, saveComposerDraft, setDraftBound, setSplitViewMounted } from "./composer-drafts";
 import { leaveSplitView, restoreLiveComposerFor, watchPaneFocus } from "./pane-state";
 import { initialSplitLayout, splitLayoutReducer } from "./split-layout";
 import { useSplitLayoutStore } from "./split-layout-store";
@@ -607,6 +609,45 @@ describe("a prefilled message", () => {
         useChatUIStore.getState().setIsSubmitting(false);
 
         expect(useChatUIStore.getState().composerText).toBe("saved draft");
+    });
+
+    it("brings the chat's saved draft back when a prompt arrives during the prefill's send, then adds the prompt after it", () => {
+        resetComposerPrefillForTests();
+        put("thread-a", "saved draft");
+        prefill("from the link");
+        bindStoredDrafts("thread-a", "user-1", false);
+        setDraftBound("thread-a", true);
+        // The shared composer appends a prompt after what it holds (`composer-input.tsx`).
+        renderHook(() =>
+            useComposerPrefill(
+                "thread-a",
+                (prompt: string) => {
+                    const current = useChatUIStore.getState().composerText;
+
+                    type(current === "" ? prompt : `${current}\n${prompt}`);
+                },
+                { awaitStoredDraft: true },
+            ),
+        );
+        useChatUIStore.getState().setIsSubmitting(true);
+        useChatUIStore.getState().clearComposer();
+        act(() => {
+            prefillComposer("thread-a", "Catch up");
+        });
+
+        // Held: in the composer now, it would keep the saved draft out.
+        expect(useChatUIStore.getState().composerText).toBe("");
+
+        act(() => {
+            useChatUIStore.getState().setIsSubmitting(false);
+        });
+
+        // The saved draft first, then the prompt: the chat's draft from here on.
+        expect(useChatUIStore.getState().composerText).toBe("saved draft\nCatch up");
+
+        vi.advanceTimersByTime(DRAFT_WRITE_DELAY_MS);
+
+        expect(text("thread-a")).toBe("saved draft\nCatch up");
     });
 
     it("keeps the draft of the chat whose text it replaced when it came along to another chat", () => {

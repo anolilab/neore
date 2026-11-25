@@ -24,7 +24,8 @@ const ALICE = "user-alice";
 const BOB = "user-bob";
 const MB = 1024 * 1024;
 const PDF = new TextEncoder().encode("%PDF-1.7\nhello pdf body\n%%EOF");
-const CANONICAL_KEY = /^agent-files\/[\da-f]{64}$/u;
+/** The upload's own key: the hash, then a fresh id (`lib/chat-file-key.ts`). */
+const CANONICAL_KEY = /^agent-files\/[\da-f]{64}\/[\da-f-]{36}$/u;
 const byString = (a: string, b: string): number => a.localeCompare(b);
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -131,7 +132,7 @@ afterEach(() => {
 describe(finalizeStagedUpload, () => {
     const UPLOAD = "V1StGXR8_Z5jdHi6B-myT";
 
-    it("stores the staged bytes content-addressed, grants the caller and deletes the staging object", async () => {
+    it("stores the staged bytes under their own key, grants the caller and deletes the staging object", async () => {
         const ctx = actionContext();
         const staged = stage(ALICE, UPLOAD, PDF);
         const { fileId, url } = await finalize(ctx, ALICE, UPLOAD);

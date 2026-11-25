@@ -33,7 +33,7 @@ import type { DraftOrigin } from "@/features/chat/core/utils/draft-origin";
 import ForwardSelectionBar from "@/features/chat/forward/forward-selection-bar";
 import ChatImageGallery from "@/features/chat/image-gallery/chat-image-gallery";
 import { useImageGalleryStore } from "@/features/chat/image-gallery/image-gallery-store";
-import useStoredDrafts, { keepsStoredDraft } from "@/features/chat/split/use-stored-drafts";
+import useStoredDrafts, { keepsStoredDraft, storedDraftKnown } from "@/features/chat/split/use-stored-drafts";
 import { hasUnseenReply } from "@/features/chat/thread-list/lib/thread-state-rules";
 import { isThreadLocked } from "@/features/chat/thread-list/thread-lock";
 import WorkerComposer from "@/features/sub-agents/components/worker-composer";
@@ -133,8 +133,8 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
     const viewportRef = useRef<ThreadViewportRef>(null);
     const isEmpty = useChatIsEmpty();
     const { isStreaming } = useChatIsStreaming();
-    const { isNewThread, thread, threadId } = useChatThread();
-    const { data: sessionData } = useAuthSession();
+    const { isNewThread, thread, threadId, threadLoad } = useChatThread();
+    const { data: sessionData, isPending: isSessionPending } = useAuthSession();
     // Only the owner may archive or delete from the keyboard; a shared thread's viewer gets the server's refusal otherwise.
     const isOwner = !!thread?.userId && thread.userId === sessionData?.user?.id;
 
@@ -151,6 +151,8 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
         isNewThread || !threadId ? "new" : threadId,
         keepsStoredDraft(composerActive, isNewThread, thread, Boolean(worker) || isWorkerLoading) ? sessionData?.user?.id : undefined,
         isThreadLocked(thread?.lockedAt),
+        // Until the session, the chat and its worker are known, whether it keeps a stored draft is not: nothing may fill the composer yet.
+        storedDraftKnown({ isNewThread, isSessionPending, isWorkerLoading, threadId, threadLoad }),
     );
 
     const crpc = useCRPC();

@@ -2,7 +2,7 @@
  * Who may start a checkout and open the customer portal.
  *
  * The handlers run directly against a hand-built action context: `ctx.payments`
- * (the facade) and `./provider` (the portal) are recording fakes, `ctx.runQuery` answers the billing
+ * (the facade, and each `scoped` facade it hands out) is a recording fake, `ctx.runQuery` answers the billing
  * subject from a map, and the session is whatever the test sets. Nothing here
  * reaches Creem.
  */
@@ -53,18 +53,6 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("../lib/rate-limiter")>()), rateLimitGuard: async () => undefined };
 });
 
-const portalCalls = vi.hoisted(() => {
-    return { createPortalSession: undefined as unknown as (input: Record<string, unknown>) => Promise<{ url: string }> };
-});
-
-vi.mock("./provider", async (importOriginal) => {
-    return {
-        ...(await importOriginal<typeof import("./provider")>()),
-        portalLink: async (referenceId: string, customerId: string, returnUrl: string) =>
-            await portalCalls.createPortalSession({ customerId, referenceId, returnUrl }),
-    };
-});
-
 const { createCheckout, getBillingSubject, openCustomerPortal } = await import("./checkout");
 
 interface Subject {
@@ -102,18 +90,29 @@ const subjects = new Map<string, Subject>();
 const createCheckoutSession = vi.fn(async (_input: Record<string, unknown>) => {
     return { url: "https://checkout.example.com/c1" };
 });
-const createPortalSession = vi.fn(async (_input: Record<string, unknown>) => {
+const createPortalSession = vi.fn(async (_referenceId: string, _returnUrl: string) => {
     return { url: "https://portal.example.com/p1" };
 });
 
-portalCalls.createPortalSession = createPortalSession;
+// A scoped facade records the authorize it was given, so a test can check which reference it admits.
+const scoped = vi.fn((_authorize: (referenceId: string) => boolean) => {
+    return { createCheckout: createCheckoutSession, createPortalSession };
+});
+
+// Whether the store accepts the portal customer write (`billing/customers.ts`): false when another reference owns it.
+const seeding = vi.hoisted(() => {
+    return { allowed: true };
+});
 
 const context = (userId: string) => {
     return {
         auth: { getIdentity: async () => null, userId },
         db: {},
         log: { event: vi.fn() },
-        payments: { createCheckout: createCheckoutSession },
+        payments: { createCheckout: createCheckoutSession, scoped },
+        runMutation: vi.fn(async () => {
+            return { seeded: seeding.allowed };
+        }),
         runQuery: vi.fn(async (_reference: unknown, { id, kind }: { id: string; kind: string }) => subjects.get(`${kind}:${id}`) ?? subject({ exists: false })),
     };
 };
@@ -130,6 +129,8 @@ beforeEach(() => {
     subjects.clear();
     createCheckoutSession.mockClear();
     createPortalSession.mockClear();
+    scoped.mockClear();
+    seeding.allowed = true;
     env.CREEM_API_KEY = "creem_key";
     env.CREEM_YEARLY_CHECKOUT = "";
     env.CREEM_PRODUCT_TEAM_YEARLY = "";
@@ -251,6 +252,19 @@ describe("createCheckout", () => {
         expect(createCheckoutSession).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ priceId: "prod_pro_year", referenceId: OWNER }));
     });
 
+    it("scopes the Team checkout to the one organization the owner acts for", async () => {
+        session.current = sessionOf(OWNER, { id: ORG, role: "owner" });
+        subjects.set(`organization:${ORG}`, subject({ seats: 2 }));
+
+        await checkout(OWNER, { plan: "team" });
+
+        const authorize = scoped.mock.calls[0]?.[0] as (referenceId: string) => boolean;
+
+        expect(authorize(ORG)).toBe(true);
+        expect(authorize(OWNER)).toBe(false);
+        expect(authorize("org-other")).toBe(false);
+    });
+
     it("sells the Team yearly product to the active organization, one seat per member", async () => {
         session.current = sessionOf(OWNER, { id: ORG, role: "owner" });
         subjects.set(`organization:${ORG}`, subject({ seats: 3 }));
@@ -290,20 +304,36 @@ describe("openCustomerPortal", () => {
 
         await expect(portal(OWNER, { subject: "user" })).resolves.toStrictEqual({ url: "https://portal.example.com/p1" });
 
-        expect(createPortalSession).toHaveBeenCalledExactlyOnceWith({
-            customerId: "cus_1",
-            referenceId: OWNER,
-            returnUrl: "https://app.example.com/chat?settings=true&settingsTab=auth-billing",
-        });
+        expect(createPortalSession).toHaveBeenCalledExactlyOnceWith(OWNER, "https://app.example.com/chat?settings=true&settingsTab=auth-billing");
     });
 
-    it("never reads another user's row: the id is the caller's, not an argument", async () => {
+    it("never opens another user's portal: the reference is the caller's, not an argument", async () => {
         subjects.set(`user:${OWNER}`, subject({ creemCustomerId: "cus_mine", creemPurchaserId: OWNER }));
         subjects.set(`user:${OTHER_OWNER}`, subject({ creemCustomerId: "cus_theirs", creemPurchaserId: OTHER_OWNER }));
 
         await portal(OWNER, { subject: "user" });
 
-        expect(createPortalSession).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ customerId: "cus_mine", referenceId: OWNER }));
+        expect(createPortalSession).toHaveBeenCalledExactlyOnceWith(OWNER, expect.any(String));
+    });
+
+    it("scopes the portal to the one subject it opens", async () => {
+        subjects.set(`user:${OWNER}`, subject({ baseTier: "pro", creemCustomerId: "cus_1", creemPurchaserId: OWNER }));
+
+        await portal(OWNER, { subject: "user" });
+
+        const authorize = scoped.mock.calls[0]?.[0] as (referenceId: string) => boolean;
+
+        expect(authorize(OWNER)).toBe(true);
+        expect(authorize(OTHER_OWNER)).toBe(false);
+    });
+
+    it("refuses a portal whose customer another reference already owns, and opens nothing", async () => {
+        subjects.set(`user:${OWNER}`, subject({ baseTier: "pro", creemCustomerId: "cus_shared", creemPurchaserId: OWNER }));
+        seeding.allowed = false;
+
+        await expect(portal(OWNER, { subject: "user" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+        expect(createPortalSession).not.toHaveBeenCalled();
     });
 
     it("opens a Team portal for the owner who subscribed", async () => {
@@ -312,7 +342,7 @@ describe("openCustomerPortal", () => {
 
         await portal(OWNER, { subject: "organization" });
 
-        expect(createPortalSession).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ customerId: "cus_team", referenceId: ORG }));
+        expect(createPortalSession).toHaveBeenCalledExactlyOnceWith(ORG, expect.any(String));
     });
 
     it("refuses another owner of the same organization: the customer is the purchaser's own", async () => {

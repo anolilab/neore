@@ -194,7 +194,7 @@ export const chatFixtures = (options: ChatFixtureOptions = {}): LunoraFixture[] 
         lunora(api.chat.sharing.getThreadInvites, []),
         lunora(api.chat.streaming.getActiveStreamForThread, options.activeStream ? { streamId: STREAM_ID, ...options.activeStream } : null),
         // No cloud browser runs for the thread: the composer's Browser card stays away.
-        lunora(api.browser.live_view.getThreadBrowser, null),
+        lunora(api.browser.live_view.getThreadBrowser, { kind: "none", now: STORY_NOW }),
         lunora(api.chat.streaming.getStreamBody, options.streamBody ?? ({ reasoning: "", status: "pending", text: "" } as StreamBody)),
         lunora(api.chat.thread_state.markThreadViewed, { updated: true }),
         lunora(api.knowledge.functions.getThreadKnowledge, []),

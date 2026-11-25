@@ -19,9 +19,10 @@ import { internalQuery } from "../_generated/server";
  * device's id to its owner, for the host ingest (`acp/http.ts`). `watch` routes a
  * watched repository's id to its owner, for the repository webhook
  * (`source-control/webhook.ts`). `guest-link` routes the SHA-256 of a guest link token to the
- * thread owner, for the guest's message and view (`chat/guest-links.ts`).
+ * thread owner, for the guest's message and view (`chat/guest-links.ts`). `merged-guest` routes a converting guest's id
+ * to the account it merges into, written before the merge reads any of the guest's grants (`lib/account-merge.ts`).
  */
-export type ShardRouteKind = "device" | "guest-link" | "messenger" | "page-public" | "thread-public" | "thread-share" | "trigger" | "watch";
+export type ShardRouteKind = "device" | "guest-link" | "merged-guest" | "messenger" | "page-public" | "thread-public" | "thread-share" | "trigger" | "watch";
 
 /** The `shardRoutes.key` for `value` of `kind`. */
 export const shardRouteKey = (kind: ShardRouteKind, value: string): string => `${kind}:${value}`;
@@ -33,10 +34,29 @@ export const shardRouteOwner = async (context: Pick<QueryCtx, "db">, kind: Shard
     return route?.ownerId ?? null;
 };
 
-/** Route `value` of `kind` to `ownerId`'s shard. Idempotent. */
-export const setShardRoute = async (context: Pick<MutationCtx, "db">, kind: ShardRouteKind, value: string, ownerId: string): Promise<void> => {
+/**
+ * The account guest `userId` is merging into, once its merge has started: read from the primary, as a write under the
+ * guest reads it right after itself (`agent/grant-revision.ts`), and a replica could still miss the mark.
+ */
+export const mergedGuestTarget = async (context: Pick<QueryCtx, "db">, userId: string): Promise<string | null> => {
+    const route = await context.db.shardRoutes.findFirst({ consistency: "primary", where: { key: shardRouteKey("merged-guest", userId) } });
+
+    return route?.ownerId ?? null;
+};
+
+/**
+ * Route `value` of `kind` to `ownerId`'s shard. Idempotent. `primary` for a route written again right after itself (a
+ * retried `merged-guest` mark): a replica that has not seen the first write yet would read as "no route" and add a second.
+ */
+export const setShardRoute = async (
+    context: Pick<MutationCtx, "db">,
+    kind: ShardRouteKind,
+    value: string,
+    ownerId: string,
+    { primary = false }: { primary?: boolean } = {},
+): Promise<void> => {
     const key = shardRouteKey(kind, value);
-    const existing = await context.db.shardRoutes.findFirst({ where: { key } });
+    const existing = await context.db.shardRoutes.findFirst(primary ? { consistency: "primary", where: { key } } : { where: { key } });
 
     if (existing) {
         if (existing.ownerId !== ownerId) {
@@ -49,12 +69,16 @@ export const setShardRoute = async (context: Pick<MutationCtx, "db">, kind: Shar
     await context.db.insert("shardRoutes", { createdAt: Date.now(), key, ownerId });
 };
 
-/** Forget the route for `value` of `kind`, if any. */
+/**
+ * Forget every route for `value` of `kind`. Read from the primary: a replica that has not seen the route yet would read
+ * as "no route" and leave it behind (a `merged-guest` mark set moments before, say). Every row, not the first: `key` has
+ * no unique index, so a write that once read a stale replica may have left a second.
+ */
 export const deleteShardRoute = async (context: Pick<MutationCtx, "db">, kind: ShardRouteKind, value: string): Promise<void> => {
-    const existing = await context.db.shardRoutes.findFirst({ where: { key: shardRouteKey(kind, value) } });
+    const { page } = await context.db.shardRoutes.findMany({ consistency: "primary", where: { key: shardRouteKey(kind, value) } });
 
-    if (existing) {
-        await context.db.delete("shardRoutes", existing._id);
+    for (const row of page) {
+        await context.db.delete("shardRoutes", row._id);
     }
 };
 

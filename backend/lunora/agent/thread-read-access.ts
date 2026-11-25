@@ -6,7 +6,7 @@ import { admitThread, systemDb } from "../lib/rls/scope";
 import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
 
 import { isUnlockProofValid } from "./thread-passcode";
-import { storedRow } from "../lib/stored-row";
+import { findLiveGrant } from "./live-grant";
 
 /**
  * Who may read a thread's raw message rows through a CLIENT-reachable procedure.
@@ -49,7 +49,8 @@ export const meetsThreadPermission = (granted: ThreadPermission, required: Threa
 /**
  * - `full` — owner (`admin`) or live grantee (the grant's permission): the raw row. `expiresAt`: when a
  *   grantee's grant ends, for a live read that must stop showing the thread then (a cached live query is not
- *   re-run when only the clock moves).
+ *   re-run when only the clock moves). `revision`: a grantee's grant revision as this read saw it
+ *   (`agent/grant-revision.ts`; 0 for a grant from before revisions).
  * - `redacted` — a live PUBLIC thread and anyone else, including no caller at
  *   all: only what `redactThreadForPublicViewer` / `toPublicThreadMessages`
  *   let through. Never an authorization for anything but that projection.
@@ -60,7 +61,7 @@ export const meetsThreadPermission = (granted: ThreadPermission, required: Threa
  *   public view).
  */
 export type ThreadReadAccess =
-    | { expiresAt?: number; kind: "full"; permission: ThreadPermission; thread: Doc<"threads"> }
+    | { expiresAt?: number; kind: "full"; permission: ThreadPermission; revision?: number; thread: Doc<"threads"> }
     | { kind: "locked"; thread: Doc<"threads"> }
     | { kind: "redacted"; thread: Doc<"threads"> }
     | null;
@@ -113,17 +114,19 @@ export const resolveThreadReadAccess = async (
     if (userId) {
         // `.global()` (D1): a grant is read from whichever shard the caller is on.
         // `primary`: a caller about to write on the strength of the grant must not see one a replica still holds.
-        const access = storedRow(
-            await context.db.threadAccess.findFirst({
-                ...(options.primary === true && { consistency: "primary" as const }),
-                where: { threadId, userId },
-            }),
-        );
+        // A copy a removal or a merge is deleting (its tombstone) grants nothing, also when that delete stopped part way.
+        const access = await findLiveGrant(context, threadId, userId, { primary: options.primary === true });
 
         if (access && hasThreadReadAccess({ access, now: Date.now(), thread, userId })) {
             admitThread(context, threadId, access.permission, userId);
 
-            return { ...(access.expiresAt !== undefined && { expiresAt: access.expiresAt }), kind: "full", permission: access.permission, thread };
+            return {
+                ...(access.expiresAt !== undefined && { expiresAt: access.expiresAt }),
+                kind: "full",
+                permission: access.permission,
+                revision: access.revision ?? 0,
+                thread,
+            };
         }
     }
 

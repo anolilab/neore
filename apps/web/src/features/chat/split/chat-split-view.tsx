@@ -22,6 +22,7 @@ import { setSplitViewMounted } from "./composer-drafts";
 import { useIsDesktop } from "./desktop-layout";
 import { COMPOSER_INPUT, focusComposerWhenMounted, useComposerFocusRequest } from "./focus-composer";
 import { leaveSplitView, restoreLiveComposerFor, syncFocusedModel, watchPaneFocus } from "./pane-state";
+import { useFocusFollowsPaneSwitch } from "./pane-switch-focus";
 import { MIN_PANE_PX } from "./split-layout";
 import { readSavedLayoutOrEmpty, useSplitLayoutStore } from "./split-layout-store";
 import { useChatHasDraft } from "./use-chat-has-draft";
@@ -358,6 +359,9 @@ const ChatSplitView: FC<ChatSplitViewProps> = ({ headerSlot = null, initialMessa
     }, [dispatch, ready, routeThreadId]);
 
     const focusedThreadId = layout.panes[layout.focus];
+
+    // The old pane's header and composer go away with the switch; focus they held follows to the new pane.
+    useFocusFollowsPaneSwitch(containerRef, focusedThreadId);
 
     useEffect(() => {
         focusedRef.current = focusedThreadId;
