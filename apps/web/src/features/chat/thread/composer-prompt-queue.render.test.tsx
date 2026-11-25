@@ -1128,6 +1128,20 @@ describe("composer prompt queue", () => {
         expect(usePromptQueueStore.getState().queues[chat.threadId]?.paused).toBe(true);
     });
 
+    it("Send next replaces a hold the queue left, so a later error cannot send it unasked", async () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        setPaused(chat.threadId, true);
+        useQueueEditStore.getState().holdSend(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("one", [], { draftFrom: undefined }));
+        expect(useQueueEditStore.getState().held[chat.threadId]).toBeUndefined();
+    });
+
     it("moves a dropped message to where it lands in the queue", async () => {
         const { enqueue, setPaused } = usePromptQueueStore.getState();
 

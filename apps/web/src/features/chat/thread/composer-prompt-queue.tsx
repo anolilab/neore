@@ -361,8 +361,9 @@ const useQueueActions = () => {
 
                 if (next?.kind === "send") {
                     sent = true;
-                    // It went: nothing waits for the send that held it any more.
+                    // It went: nothing waits for the send that held it any more, and no hold it left may send later.
                     deferredRef.current.delete(threadId);
+                    useQueueEditStore.getState().takeHeldSend(threadId);
                     sendQueuedPrompt(next.prompt);
                 } else if (next?.kind === "failed") {
                     setPaused(threadId, true);
@@ -1090,8 +1091,9 @@ const ComposerPromptQueue: FC = () => {
         }
 
         usePromptQueueStore.getState().setPaused(threadId, false);
-        // Send next is the owner's own resume: it lifts the failed-save mark along with the pause.
+        // Send next is the owner's own resume: it lifts the failed-save mark along with the pause, and replaces any hold.
         useQueueEditStore.getState().markFailedSave(threadId, false);
+        useQueueEditStore.getState().takeHeldSend(threadId);
         void sendNextPrompt(threadId, { explicit: true });
     }, [sendNextPrompt, threadId]);
 
