@@ -13,9 +13,13 @@ export interface QueueEdit {
     id: string;
 }
 
-/** A send the queue refused while the head's text was open; `explicit` is the Send next button's (or an offline replay's) intent. */
+/**
+ * A send the queue refused while the head's text was open; `explicit` is the Send next button's (or an offline replay's)
+ * intent. `id` is the message the hold protects: only a send of that message fulfils it.
+ */
 export interface HeldSend {
     explicit: boolean;
+    id?: string;
 }
 
 interface QueueEditStore {
@@ -27,8 +31,8 @@ interface QueueEditStore {
     /** A permission-mode save failed for the thread and paused its queue: an explicit held send must not resume that pause. */
     failedSave: Record<string, boolean | undefined>;
     held: Record<string, HeldSend | undefined>;
-    /** Records that a send was refused for the open head edit. Repeated holds keep the explicit intent of any of them. */
-    holdSend: (threadId: string, explicit: boolean) => void;
+    /** Records that a send was refused for the open head edit of `id`. Repeated holds for one message keep any explicit intent. */
+    holdSend: (threadId: string, explicit: boolean, id?: string) => void;
     /** Marks (or clears) that the thread's queue is paused by a reply's error, the only pause an explicit held send may lift. */
     markErrorPause: (threadId: string, on: boolean) => void;
     /** Marks (or clears) a failed permission-mode save for the thread. */
@@ -62,15 +66,16 @@ export const useQueueEditStore = create<QueueEditStore>()((set, get) => {
                 return { failedSave: { ...state.failedSave, [threadId]: failed } };
             });
         },
-        holdSend: (threadId, explicit) => {
+        holdSend: (threadId, explicit, id) => {
             const current = get().held[threadId];
+            const sameMessage = current?.id === id;
 
-            if (current !== undefined && (current.explicit || !explicit)) {
+            if (current !== undefined && sameMessage && (current.explicit || !explicit)) {
                 return;
             }
 
             set((state) => {
-                return { held: { ...state.held, [threadId]: { explicit: explicit || current?.explicit === true } } };
+                return { held: { ...state.held, [threadId]: { explicit: explicit || (sameMessage && current?.explicit === true), id } } };
             });
         },
         setDraft: (threadId, id, draft) => {

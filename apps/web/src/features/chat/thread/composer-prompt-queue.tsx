@@ -324,7 +324,7 @@ const useQueueActions = () => {
                         // The head's text is open in its chip: the send is held with its intent, and the edit's close sends it
                         // with its own text (the close effect takes the held send; nothing else sends it under the editor).
                         if (headIsBeingEdited(threadId)) {
-                            useQueueEditStore.getState().holdSend(threadId, explicit);
+                            useQueueEditStore.getState().holdSend(threadId, explicit, usePromptQueueStore.getState().queues[threadId]?.items[0]?.id);
 
                             return false;
                         }
@@ -363,7 +363,13 @@ const useQueueActions = () => {
                     sent = true;
                     // It went: nothing waits for the send that held it any more, and no hold it left may send later.
                     deferredRef.current.delete(threadId);
-                    useQueueEditStore.getState().takeHeldSend(threadId);
+                    // Only a hold for this message is fulfilled by its send; another message's hold waits for its own release.
+                    const heldNow = useQueueEditStore.getState().held[threadId];
+
+                    if (heldNow !== undefined && (heldNow.id === undefined || heldNow.id === next.prompt.id)) {
+                        useQueueEditStore.getState().takeHeldSend(threadId);
+                    }
+
                     sendQueuedPrompt(next.prompt);
                 } else if (next?.kind === "failed") {
                     setPaused(threadId, true);
@@ -920,11 +926,17 @@ const ComposerPromptQueue: FC = () => {
 
         const focused = focusedChip.current;
 
-        if (focused !== undefined && queue.items.every((item) => item.id !== focused)) {
-            focusedChip.current = undefined;
+        if (focused !== undefined) {
+            if (queue.items.every((item) => item.id !== focused)) {
+                // The chip left the queue: focus that was on it moves to the first chip's Edit button, when one can take it.
+                focusedChip.current = undefined;
 
-            if (document.activeElement === null || document.activeElement === document.body) {
-                document.querySelector<HTMLButtonElement>("[data-queue-chip-id] [data-edit]")?.focus();
+                if (document.activeElement === null || document.activeElement === document.body) {
+                    document.querySelector<HTMLButtonElement>("[data-queue-chip-id] [data-edit]:not(:disabled)")?.focus();
+                }
+            } else if (!document.activeElement?.closest("[data-queue-chip-id]")) {
+                // Focus has moved on (the user clicked elsewhere): a later removal of this chip is no reason to take focus.
+                focusedChip.current = undefined;
             }
         }
     });
@@ -1093,7 +1105,7 @@ const ComposerPromptQueue: FC = () => {
         usePromptQueueStore.getState().setPaused(threadId, false);
         // Send next is the owner's own resume: it lifts the failed-save mark along with the pause, and replaces any hold.
         useQueueEditStore.getState().markFailedSave(threadId, false);
-        useQueueEditStore.getState().takeHeldSend(threadId);
+        // The hold is not taken here: a send that goes fulfils it, and a refused send leaves it for the next release.
         void sendNextPrompt(threadId, { explicit: true });
     }, [sendNextPrompt, threadId]);
 
