@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { api } from "@neore/backend/api";
 import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -92,7 +93,6 @@ vi.mock("@/lib/lunora/crpc", () => {
                     functions: {
                         deleteThreads: mutation("deleteThreads"),
                         pinThread: mutation("pin"),
-                        undoDeleteThread: mutation("undoDelete"),
                         unpinThread: mutation("unpin"),
                     },
                 },
@@ -101,8 +101,8 @@ vi.mock("@/lib/lunora/crpc", () => {
         useLunora: () => {
             return { query: vi.fn() };
         },
-        useLunoraActionOptions: () => {
-            return { fn: "updateThread" };
+        useLunoraActionOptions: (ref: unknown) => {
+            return { fn: ref === api.chat.functions.undoDeleteThread ? "undoDelete" : "updateThread" };
         },
     };
 });
