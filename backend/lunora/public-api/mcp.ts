@@ -44,6 +44,7 @@ const PARSE_ERROR = -32_700;
 const INVALID_REQUEST = -32_600;
 const METHOD_NOT_FOUND = -32_601;
 const INVALID_PARAMS = -32_602;
+const INTERNAL_ERROR = -32_603;
 const HEADER_MISMATCH = -32_020;
 const UNSUPPORTED_VERSION = -32_022;
 const NOT_FOUND = -32_023;
@@ -406,6 +407,11 @@ const eventsFailure = (id: RpcId, error: unknown): Response => {
             data: { reason: "rate_limited", retryAfterSeconds: error.details?.["retryAfterSeconds"] },
             status: 429,
         });
+    }
+
+    // Any other error the router reports, its generic `internal_error` included, is answered in the same shape, not sent as a REST body.
+    if (error instanceof PublicApiError) {
+        return rpcError(id, INTERNAL_ERROR, error.message, { data: { reason: error.code }, status: error.status });
     }
 
     throw error;

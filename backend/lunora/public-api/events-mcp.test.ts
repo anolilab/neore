@@ -322,3 +322,16 @@ describe("a read allowance spent on an Events call", () => {
         }
     });
 });
+
+describe("an Events call that fails inside the router", () => {
+    it("answers with a JSON-RPC error carrying the request's id, not a REST body", async () => {
+        const failing = pollingWith(async () => {
+            throw new PublicApiError("internal_error", "An unexpected error occurred.");
+        });
+        const { body, status } = await serve(modern("events/poll", { _meta: OFFER, name: "run.completed" }, "run.completed"), failing);
+
+        expect(status).toBe(500);
+        expect(body["id"]).toBe(1);
+        expect(body["error"]).toMatchObject({ code: -32_603, data: { reason: "internal_error" }, message: "An unexpected error occurred." });
+    });
+});
