@@ -469,11 +469,16 @@ const QueueChip: FC<{
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    // Focus moves into the text when editing opens (not `autoFocus`, which the a11y rules refuse).
+    // Focus moves into the text when editing opens (not `autoFocus`, which the a11y rules refuse). A chip that mounts with its
+    // editor already open (a remount) keeps focus where it is.
+    const wasEditingRef = useRef(editing);
+
     useEffect(() => {
-        if (editing) {
+        if (editing && !wasEditingRef.current) {
             textareaRef.current?.focus();
         }
+
+        wasEditingRef.current = editing;
     }, [editing]);
 
     const startEdit = (): void => {
@@ -767,6 +772,23 @@ const ComposerPromptQueue: FC = () => {
 
         wasModeSaving.current = modeSaving;
 
+        if (ended && threadId && !isStreaming && queue.items.length > 0) {
+            // A send held while the save ran goes now, with its intent: an explicit one resumes a paused queue, as Send next does.
+            const held = useQueueEditStore.getState().takeHeldSend(threadId);
+
+            if (held) {
+                if (held.explicit) {
+                    usePromptQueueStore.getState().setPaused(threadId, false);
+                } else if (error || queue.paused) {
+                    return;
+                }
+
+                void sendNextPrompt(threadId, { explicit: held.explicit });
+
+                return;
+            }
+        }
+
         if (ended && threadId && !isStreaming && !error && !queue.paused && queue.items.length > 0) {
             void sendNextPrompt(threadId);
         }
@@ -782,7 +804,8 @@ const ComposerPromptQueue: FC = () => {
         wasHeadEditing.current = { editing: editOpen, threadId };
 
         // While a reply streams, the held send waits for that reply's end (the effect below takes it there).
-        if (!closed || !threadId || isStreaming) {
+        // While a mode save runs, the held send waits for the save to settle (the mode-save path takes it there).
+        if (!closed || !threadId || isStreaming || modeSaving) {
             return;
         }
 
@@ -800,13 +823,14 @@ const ComposerPromptQueue: FC = () => {
         }
 
         void sendNextPrompt(threadId, { explicit: held.explicit });
-    }, [editOpen, isStreaming, queue.items.length, queue.paused, sendNextPrompt, threadId]);
+    }, [editOpen, isStreaming, modeSaving, queue.items.length, queue.paused, sendNextPrompt, threadId]);
 
     // A send held while the edit closed during a reply goes when that reply ends. An explicit one (Send next) goes even after
     // an error, resuming the queue as its own button does; an automatic one waits for the usual rules.
     // Kept with its thread: a reply that ends in another chat is not this one's end, and a switch to an idle chat with a held
     // send for it is the moment that send goes (the user came back to it).
-    const streamRef = useRef<{ streaming: boolean; threadId: string | undefined }>({ streaming: isStreaming, threadId });
+    // No thread at first: a mount (a remount on returning to the chat) counts as switching into it, so a held send goes then.
+    const streamRef = useRef<{ streaming: boolean; threadId: string | undefined }>({ streaming: isStreaming, threadId: undefined });
 
     useEffect(() => {
         const previous = streamRef.current;

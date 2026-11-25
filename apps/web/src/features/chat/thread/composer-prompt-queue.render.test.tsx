@@ -1036,6 +1036,18 @@ describe("composer prompt queue", () => {
         expect(screen.getByLabelText("Edit queued message 2")).toBeTruthy();
     });
 
+    it("a chat that mounts idle sends the send held for it, so a remount after its reply ended is not stalled", async () => {
+        chat.error = undefined;
+        chat.threadId = "thread-2";
+
+        usePromptQueueStore.getState().enqueue("thread-2", { attachments: [], text: "held on remount" });
+        useQueueEditStore.getState().holdSend("thread-2", false);
+
+        render(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("held on remount", [], { draftFrom: undefined }));
+    });
+
     it("moves a dropped message to where it lands in the queue", async () => {
         const { enqueue, setPaused } = usePromptQueueStore.getState();
 
