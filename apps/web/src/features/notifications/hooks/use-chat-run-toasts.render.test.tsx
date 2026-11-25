@@ -283,6 +283,28 @@ describe("useChatRunToasts: the other toasts still show", () => {
         expect(toastWarning).toHaveBeenCalledTimes(1);
     });
 
+    it("announces a call that appears inside the newest message while it streams", () => {
+        const streamingNewest: Props["messages"] = [{ id: "m5", parts: [{ text: "hi", type: "text" }], role: "assistant" }];
+        const { rerender } = setup({ ...idle, messages: streamingNewest, settings: {} });
+
+        rerender({
+            ...idle,
+            messages: [
+                {
+                    id: "m5",
+                    parts: [
+                        { text: "hi", type: "text" },
+                        { state: "approval-requested", toolCallId: "in-reply", type: "tool-shell" },
+                    ],
+                    role: "assistant",
+                },
+            ],
+            settings: {},
+        });
+
+        expect(toastWarning).toHaveBeenCalledTimes(1);
+    });
+
     it("shows no toast while the settings are still loading", () => {
         const { rerender } = setup({ ...idle, settings: undefined });
 

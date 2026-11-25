@@ -212,8 +212,9 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
         }
 
         // Older history loaded above the newest message the previous snapshot had is not a new call, even when it is still waiting.
+        // A call inside that newest message is new when it was not waiting before: the reply it belongs to is still streaming.
         const anchor = previous.newest === undefined ? -1 : messages.findIndex((message) => message.id === previous.newest);
-        const arrived = calls.some((call) => !previous.ids.has(call.toolCallId) && call.index > anchor);
+        const arrived = calls.some((call) => !previous.ids.has(call.toolCallId) && call.index >= anchor);
 
         if (arrived && isChatToastOn(settings, "input")) {
             toast.warning(t`A chat needs your input or approval`);
