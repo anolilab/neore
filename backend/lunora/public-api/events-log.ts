@@ -68,11 +68,14 @@ export const EVENT_WAKE_MAX_ATTEMPTS = 10;
 
 /**
  * Wakes `userId`'s shard for an event's expiry. The census write is best-effort, so a run's write never fails on it. A write that
- * failed is retried by a job scheduled here, in the same transaction as the event, so the event and its retry commit together. If
- * the retry cannot be scheduled either, it is logged and the event still commits without one.
+ * failed is retried by a job scheduled here, in the same transaction as the event, so the event and its retry commit together. If the
+ * retry cannot be scheduled either, it is logged and the event still commits without one.
+ *
+ * The owner's shard is named explicitly: a write from the root shard (the shared-store setup) has no shard of its own to default to,
+ * and would otherwise skip the wake and the retry.
  */
 const wakeForExpiry = async (ctx: LogWriteCtx, userId: string, dueAt: number): Promise<void> => {
-    if (await noteRetentionWake(ctx, dueAt)) {
+    if (await noteRetentionWake(ctx, dueAt, userId)) {
         return;
     }
 
