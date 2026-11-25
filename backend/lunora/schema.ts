@@ -4303,6 +4303,8 @@ export const schema = defineSchema({
         /** The Creem subscription that set `baseTier`; a cancel of any other one leaves it alone. */
         creemSubscriptionId: v.optional(v.string()),
         email: v.string(),
+        /** `@lunora/auth`'s case- and Unicode-folded copy of `email`, added to the user table by its plugin. */
+        emailCanonical: v.optional(v.string()),
         emailVerified: v.boolean(),
         image: v.optional(v.string()),
         isAnonymous: v.optional(v.boolean()),
@@ -4313,6 +4315,8 @@ export const schema = defineSchema({
         userId: v.optional(v.string()),
     })
         .global()
+        // Unique: `@lunora/auth` relies on it to reject a concurrent sign-up that repeats a folded address.
+        .index("emailCanonical", ["emailCanonical"], { unique: true })
         .index("email_name", ["email", "name"])
         .index("name", ["name"])
         .index("role", ["role"])
