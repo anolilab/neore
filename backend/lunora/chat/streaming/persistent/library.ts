@@ -244,6 +244,8 @@ export const addChunk = internalMutation
 
 export const setStreamStatus = internalMutation
     .input({
+        /** The writing run's epoch (`run-epoch.ts`): a run a newer one replaced sets nothing, in the same transaction as the check. */
+        runEpoch: v.optional(v.number()),
         status: streamStatusValidator,
         streamId: v.id("persistentStreams"),
     })
@@ -253,6 +255,8 @@ export const setStreamStatus = internalMutation
         if (!stream) {
             throw new LunoraError("NOT_FOUND", "Stream not found");
         }
+
+        assertCurrentRun(stream, args.runEpoch);
 
         if (stream.status !== "pending" && stream.status !== "streaming") {
             console.log("Stream is already finalized; ignoring status change", stream);

@@ -5,6 +5,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { isRunReplaced } from "../chat/lib/run-epoch";
 import { closeGroupTurnStream } from "../chat/group/run";
 import { cleanupExpiredStreams } from "../chat/streaming/persistent/crons";
 import { endHostStream } from "../chat/streaming/persistent/host";
@@ -49,6 +50,36 @@ describe("a run's end in the Events log", () => {
         expect(events).toHaveLength(1);
         expect(events[0]).toMatchObject({ eventId: `run:${streamId}`, name: "run.completed", seq: 1, userId: OWNER });
         expect(JSON.parse(events[0]!.data)).toMatchObject({ outcome: "succeeded", threadId });
+    });
+
+    it("refuses an error status from a run a newer run replaced, and leaves that run's stream and event alone", async () => {
+        const replacedStream = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    messageId: "prompt",
+                    runEpoch: 1,
+                    status: "streaming",
+                    streamingConfig: { contentType: "text", model: "test-model" },
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        const error = await harness
+            .run(async (ctx: any) => await ctx.runMutation(setStreamStatus, { runEpoch: 0, status: "error", streamId: replacedStream }))
+            .catch((error_: unknown) => error_);
+
+        expect(isRunReplaced(error)).toBe(true);
+
+        const status = await harness.run(async (ctx: any) => {
+            const row = await ctx.db.get("persistentStreams", replacedStream);
+
+            return row.status;
+        });
+
+        expect(status).toBe("streaming");
+        expect(await eventsOf()).toHaveLength(0);
     });
 
     it("writes one run.failed for a run that ended with an error", async () => {

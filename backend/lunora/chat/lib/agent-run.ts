@@ -1960,10 +1960,20 @@ export const failRun = async (
             endedElsewhere = (await readStatus()) === "done";
 
             if (!endedElsewhere) {
-                await ctx.runMutation(internal.chat.streaming.persistent.library.setStreamStatus, {
-                    status: "error",
-                    streamId: streamId as Id<"persistentStreams">,
-                });
+                try {
+                    await ctx.runMutation(internal.chat.streaming.persistent.library.setStreamStatus, {
+                        status: "error",
+                        ...(runEpoch !== undefined && { runEpoch }),
+                        streamId: streamId as Id<"persistentStreams">,
+                    });
+                } catch (statusError) {
+                    // A newer run took the stream between the refused write and this one: it is not this run's to fail.
+                    if (isRunReplaced(statusError)) {
+                        return { replaced: true };
+                    }
+
+                    throw statusError;
+                }
             }
         }
     }
