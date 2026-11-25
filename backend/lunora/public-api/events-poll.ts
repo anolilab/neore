@@ -22,6 +22,9 @@ export const POLL_SCAN_LIMIT = 1000;
  */
 export const POLL_BYTE_BUDGET = 512 * 1024;
 
+/** Reserved out of {@link POLL_BYTE_BUDGET} for the answer around its event list: `events`, `hasMore`, `nextSeq`, `truncated`, and the wrapper. */
+export const ANSWER_ENVELOPE_BYTES = 1024;
+
 /**
  * The bytes of event payloads one poll may read from the store, whether or not the event matches. It sits well inside the
  * transaction's read budget, so a log of large payloads cannot fail a poll for unrelated events.
@@ -35,7 +38,8 @@ const encoder = new TextEncoder();
  * budget measures the event as it is serialized there, not the payload object alone.
  */
 const answerBytesOf = (event: StoredEvent): number =>
-    encoder.encode(JSON.stringify({ data: JSON.stringify(event.data), eventId: event.eventId, name: event.name, timestamp: event.timestamp })).byteLength;
+    // The `+ 1` is the comma that separates this event from the one before it in the answer's list.
+    encoder.encode(JSON.stringify({ data: JSON.stringify(event.data), eventId: event.eventId, name: event.name, timestamp: event.timestamp })).byteLength + 1;
 
 export interface StoredEvent {
     /** When the log took the event (its insertion or copy time): the clock retention and the age window run on. */
@@ -178,7 +182,7 @@ export const pollEvents = async (store: EventLogStore, query: PollQuery): Promis
 
                 const size = answerBytesOf(event);
 
-                if (events.length > 0 && bytes + size > POLL_BYTE_BUDGET) {
+                if (events.length > 0 && bytes + size > POLL_BYTE_BUDGET - ANSWER_ENVELOPE_BYTES) {
                     // The byte budget is full: the cursor stays before this event, which the next poll answers first.
                     hasMore = true;
                     stopped = true;
