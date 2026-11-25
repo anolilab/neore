@@ -2285,6 +2285,43 @@ describe("mergeGuestInto across two real shards", () => {
         }
     });
 
+    it("copies a guest's large Events one page at a time, each within the byte budget, and loses none", async () => {
+        const merge = twoShards();
+
+        try {
+            // Each payload is about 300 KB, so a page holds one event: the byte cut must hand the rest on, in order.
+            const payload = "x".repeat(300 * 1024);
+
+            await merge.shards.guest.run(async (context: any) => {
+                for (let seq = 1; seq <= 3; seq += 1) {
+                    await context.db.insert("mcpEvents", {
+                        createdAt: 1,
+                        data: payload,
+                        eventId: `run:big${String(seq)}`,
+                        name: "run.completed",
+                        seq,
+                        timestamp: 1,
+                        userId: "guest",
+                    });
+                }
+
+                await context.db.insert("mcpEventWatermarks", { seq: 3, userId: "guest" });
+            });
+
+            await mergeToEnd(merge.call, "guest", "user");
+
+            const eventIds = (await merge.shards.user.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10, orderBy: [{ seq: "asc" }], where: { userId: "user" } });
+
+                return page.map((row: { eventId: string }) => row.eventId);
+            })) as string[];
+
+            expect(eventIds).toStrictEqual(["run:big1", "run:big2", "run:big3"]);
+        } finally {
+            merge.close();
+        }
+    });
+
     it("copies a guest's Events in sequence order across pages, though they were stored out of sequence", async () => {
         const merge = twoShards();
 
