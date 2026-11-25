@@ -211,13 +211,8 @@ export const archiveClosedLinkChat = internalMutation
             return false;
         }
 
-        const archivedForMerge = await archiveOwedMergesOf(ctx, thread.userId, args.threadId);
-
-        if (archivedForMerge) {
-            ctx.log.event("chat.auto_archive", { archived: 1, reason: "pull_request_closed" });
-        }
-
-        return archivedForMerge;
+        // The merged archive logs its own event (`merged_pull_request`), so this one is not logged again as a closed request.
+        return await archiveOwedMergesOf(ctx, thread.userId, args.threadId);
     });
 
 type MergedArchiveArgs = {
