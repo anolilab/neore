@@ -121,6 +121,8 @@ const NotificationSettings: FC = () => {
 
     // The in-app toasts for chat events. Each defaults on: an absent setting keeps the toast.
     // One mutation observer per switch: a shared one would drop an earlier change's callbacks when a later change starts.
+    // Until the settings load, an absent value is not yet known to mean on: the three switches stay off and disabled.
+    const chatToastsLoaded = userSettings.data !== undefined;
     const chatToastOptions = crpc.notifications.chat_toast_settings.setChatToastEnabled.mutationOptions();
     const setChatFinishedToast = useMutation(chatToastOptions);
     const setChatFailedToast = useMutation(chatToastOptions);
@@ -313,8 +315,8 @@ const NotificationSettings: FC = () => {
                     </div>
                     <Switch
                         aria-describedby="chat-finished-toast-hint"
-                        checked={chatFinishedToast.checked}
-                        disabled={chatFinishedToast.disabled}
+                        checked={chatToastsLoaded && chatFinishedToast.checked}
+                        disabled={chatFinishedToast.disabled || !chatToastsLoaded}
                         id="chat-finished-toast"
                         onCheckedChange={chatFinishedToast.onCheckedChange}
                     />
@@ -330,8 +332,8 @@ const NotificationSettings: FC = () => {
                     </div>
                     <Switch
                         aria-describedby="chat-failed-toast-hint"
-                        checked={chatFailedToast.checked}
-                        disabled={chatFailedToast.disabled}
+                        checked={chatToastsLoaded && chatFailedToast.checked}
+                        disabled={chatFailedToast.disabled || !chatToastsLoaded}
                         id="chat-failed-toast"
                         onCheckedChange={chatFailedToast.onCheckedChange}
                     />
@@ -347,8 +349,8 @@ const NotificationSettings: FC = () => {
                     </div>
                     <Switch
                         aria-describedby="chat-input-toast-hint"
-                        checked={chatInputToast.checked}
-                        disabled={chatInputToast.disabled}
+                        checked={chatToastsLoaded && chatInputToast.checked}
+                        disabled={chatInputToast.disabled || !chatToastsLoaded}
                         id="chat-input-toast"
                         onCheckedChange={chatInputToast.onCheckedChange}
                     />
