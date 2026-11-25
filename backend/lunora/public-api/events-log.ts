@@ -30,6 +30,18 @@ export interface RecordEventInput {
     userId: string;
 }
 
+/**
+ * The most bytes a recorded payload may hold. A larger one is kept as its thread and an `omitted` mark, so the event still reaches
+ * a poll and a poll's answer stays within its size budget (`events-poll.ts`).
+ */
+export const MAX_EVENT_PAYLOAD_BYTES = 16 * 1024;
+
+const omittedPayload = (thread: string | undefined): string => JSON.stringify({ omitted: true, ...(thread !== undefined && { threadId: thread }) });
+
+/** The stored payload, bounded: JSON text within the limit, or the omitted mark for one past it. */
+const boundedPayload = (json: string, thread: string | undefined): string =>
+    new TextEncoder().encode(json).byteLength <= MAX_EVENT_PAYLOAD_BYTES ? json : omittedPayload(thread);
+
 /** Events a thread's removal deletes per call; the caller runs again while any are left. */
 const THREAD_EVENT_BATCH = 200;
 
@@ -88,7 +100,7 @@ export const recordMcpEvent = async (ctx: LogWriteCtx, input: RecordEventInput):
 
     await ctx.db.insert("mcpEvents", {
         createdAt: ctx.now,
-        data: JSON.stringify(input.data),
+        data: boundedPayload(JSON.stringify(input.data), threadOf(input.data)),
         eventId: input.eventId,
         name: input.name,
         seq,
@@ -195,7 +207,7 @@ export const copyMergedMcpEvents = async (ctx: LogWriteCtx, rows: Record<string,
 
         await ctx.db.insert("mcpEvents", {
             createdAt: ctx.now,
-            data: row["data"] as string,
+            data: boundedPayload(row["data"] as string, storedThreadOf(row["data"] as string)),
             eventId,
             name: row["name"] as string,
             seq,
