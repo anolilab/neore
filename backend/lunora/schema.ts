@@ -2680,6 +2680,22 @@ export const schema = defineSchema({
         title: v.string(),
         url: v.string(),
         userId: v.string(),
+        // The person asked for this thread to be woken when the pull request fails checks, conflicts or gets a review
+        // (`source-control/pr-watch-logic.ts`). Absent: no watch. Its keys are the decision's state, between reads.
+        watch: v.optional(
+            v.object({
+                baselined: v.optional(v.boolean()),
+                checksHeadSha: v.optional(v.string()),
+                conflictHeadSha: v.optional(v.string()),
+                headSha: v.optional(v.string()),
+                lastWakeAt: v.optional(v.number()),
+                reviewId: v.optional(v.string()),
+                startedAt: v.number(),
+                // Set when the person stopped the watch, or the pull request ended it. A stopped watch is kept, not removed.
+                stoppedAt: v.optional(v.number()),
+                wakes: v.optional(v.number()),
+            }),
+        ),
     })
         .shardBy("userId")
         .index("by_user_and_repository_number", ["userId", "repository", "number"])
