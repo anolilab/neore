@@ -25,6 +25,12 @@ const DELETE_REF = /^git update-ref -d (\S+)$/u;
 /** The ref a push leases on, and the value it expects that ref to hold. */
 const LEASE = /--force-with-lease=([^:\s]+):(\S+)/u;
 
+/** The push the agent runs: of the checked-out rebase. The hand-off without a signed-in CLI pushes a named branch instead. */
+const AGENT_PUSH = "git push --no-follow-tags --force-with-lease=refs/heads/feat/x:<commit from step 4> origin HEAD:refs/heads/feat/x";
+
+/** The push the person runs themselves without a signed-in CLI, from the branch that holds the set-aside rebase. */
+const HAND_OFF_PUSH = "git push --no-follow-tags --force-with-lease=refs/heads/feat/x:<commit from step 4> origin refs/heads/<name>:refs/heads/feat/x";
+
 const SET_ASIDE_AS_STEP_SEVEN = /set the rebase aside as step 7 says/gu;
 
 /** A command that moves or deletes a branch whatever it holds. */
@@ -213,21 +219,24 @@ describe(catchUpPrompt, () => {
 
     it("for a head in the base repository, pushes only its branch, after step 7 and the base re-check, on the commit step 4 recorded", () => {
         const commands = commandsOf(SAME_REPO);
-        const push = firstIndex(commands, "git push");
+        const push = firstIndex(commands, AGENT_PUSH);
         const stepEight = commands.filter(({ step }: Command) => step === 8).map(({ command }: Command) => command);
 
+        // The agent's own push, and the one it hands to the person when no signed-in CLI confirms the pull request.
         expect(commandsMatching(commands, "git push")).toEqual([
-            { command: "git push --no-follow-tags --force-with-lease=refs/heads/feat/x:<commit from step 4> origin HEAD:refs/heads/feat/x", step: 8 },
+            { command: HAND_OFF_PUSH, step: 8 },
+            { command: AGENT_PUSH, step: 8 },
         ]);
         expect(stepsOf(SAME_REPO).get(8)).toMatch(STEP_EIGHT_GATE);
         // The base can move during the rebase and the checks: it is fetched again; a base that no longer holds the commit the
         // rebase was built on (recorded in step 3) stops the run, and one that only moved on sends it back to step 5.
-        expect(stepEight.slice(0, 6)).toEqual([
+        expect(stepEight.slice(0, 7)).toEqual([
             STATUS,
             "git fetch origin +refs/heads/release/2.0:refs/worktree/neore/pull-42-a1b2c3d4-base",
             "git merge-base --is-ancestor <base commit from step 3> refs/worktree/neore/pull-42-a1b2c3d4-base",
             "git merge-base --is-ancestor refs/worktree/neore/pull-42-a1b2c3d4-base HEAD",
             "git rev-parse refs/worktree/neore/pull-42-a1b2c3d4-base",
+            HAND_OFF_PUSH,
             commands[push]?.command,
         ]);
         expect(commandsMatching(commands, "git rev-parse refs/worktree/neore/pull-42-a1b2c3d4-base")[0]?.step).toBe(3);
@@ -247,7 +256,7 @@ describe(catchUpPrompt, () => {
         const headCheck = inBackticks.find((part: string) => part.startsWith("if git fetch --quiet origin +refs/pull/42/head:")) ?? "";
         const signedIn = inBackticks.find((part: string) => part.startsWith("gh auth status ")) ?? "";
         const view = inBackticks.find((part: string) => part.startsWith("gh pr view ")) ?? "";
-        const order = [headCheck, signedIn, view, "git push "].map((part: string) => step.indexOf(`\`${part}`));
+        const order = [headCheck, signedIn, view, AGENT_PUSH].map((part: string) => step.indexOf(`\`${part}`));
 
         expect(headCheck).toBe(
             'if git fetch --quiet origin +refs/pull/42/head:refs/worktree/neore/pull-42-a1b2c3d4-head 2>/dev/null && [ "$(git rev-parse --verify -q refs/worktree/neore/pull-42-a1b2c3d4-head)" = "<commit from step 4>" ]; then echo same; else echo changed; fi',
@@ -267,7 +276,16 @@ describe(catchUpPrompt, () => {
         expect(noCli).toContain("Unless it prints `signed-in`, do not push");
         expect(noCli).toContain("set the rebase aside as step 7 says");
         expect(noCli).toContain("do step 9, then stop");
-        expect(noCli).not.toContain("git push");
+        // The person pushes the set-aside branch themselves: a plain push of a rebase is refused, so they get the exact
+        // command, leased on the commit step 4 recorded, after checking the pull request is still open on its base.
+        expect(noCli.split("`").filter((_part: string, index: number) => index % 2 === 1)).toContain(HAND_OFF_PUSH);
+        expect(noCli).toContain("once they have checked the pull request is still open on release/2.0");
+        expect(noCli).toContain("They run it, not you.");
+        expect(noCli.indexOf("set the rebase aside as step 7 says")).toBeLessThan(noCli.indexOf(HAND_OFF_PUSH));
+        // It names the remote, never a URL: no `scheme://`, and no scp-like `user@host:`.
+        expect(HAND_OFF_PUSH).not.toContain("://");
+        expect(HAND_OFF_PUSH).not.toContain("@");
+        expect(noCli).not.toContain(AGENT_PUSH);
         expect(step).not.toContain("go on");
         expect(FORK).not.toContain("gh ");
         expect(FORK).not.toContain("echo same");
@@ -348,6 +366,7 @@ describe(catchUpPrompt, () => {
             "git fetch origin +refs/heads/pr-42:refs/worktree/neore/pull-42-a1b2c3d4-branch +refs/heads/release/2.0:refs/worktree/neore/pull-42-a1b2c3d4-base +refs/pull/42/head:refs/worktree/neore/pull-42-a1b2c3d4-head",
         );
         expect(commandsMatching(commands, "git push").map(({ command }: Command) => command)).toEqual([
+            "git push --no-follow-tags --force-with-lease=refs/heads/pr-42:<commit from step 4> origin refs/heads/<name>:refs/heads/pr-42",
             "git push --no-follow-tags --force-with-lease=refs/heads/pr-42:<commit from step 4> origin HEAD:refs/heads/pr-42",
         ]);
     });

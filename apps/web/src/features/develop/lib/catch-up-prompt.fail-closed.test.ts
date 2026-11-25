@@ -386,6 +386,56 @@ describe("catchUpPrompt's fetch and switch, run against a scratch origin", () =>
         });
     });
 
+    describe("step 8's hand-off without a signed-in CLI, for a head in the base repository", () => {
+        const prompt = catchUpPrompt({ ...PULL, headInBaseRepository: true, number: 42 });
+        const handOff = (name: string, lease: string): string =>
+            commandOf(prompt, "git push --no-follow-tags --force-with-lease=refs/heads/feat/x:<commit from step 4> origin refs/heads/<name>:")
+                .replaceAll("<name>", () => name)
+                .replaceAll("<commit from step 4>", () => lease);
+
+        /**
+         * A clone of an origin of its own whose `feat/x` the rebase rewrote, set aside on `pr-42-a1b2c3d4` as step 7 leaves it:
+         * the rebase is not a fast-forward of origin's branch. `lease` is origin's commit that step 4 recorded.
+         */
+        const setAside = (name: string): { lease: string; origin: string; rebase: string; work: string } => {
+            const origin = join(root, `${name}.git`);
+
+            git(root, "clone", "--quiet", "--bare", join(root, "origin.git"), origin);
+
+            const work = join(root, name);
+
+            git(root, "clone", "--quiet", origin, work);
+
+            const lease = git(work, "rev-parse", "origin/feat/x");
+
+            git(work, "switch", "--quiet", "-c", "pr-42-a1b2c3d4", "origin/main");
+            git(work, "commit", "--quiet", "--allow-empty", "-m", "change, rebased");
+
+            return { lease, origin, rebase: git(work, "rev-parse", "HEAD"), work };
+        };
+
+        it("pushes the set-aside branch to the pull request's branch while origin's is still at the commit step 4 recorded, which a plain push cannot", () => {
+            const { lease, origin, rebase, work } = setAside("hand-off-unchanged");
+
+            // The rebase rewrote the branch: a push without the lease is refused as non-fast-forward.
+            expect(sh(work, "git push --quiet origin refs/heads/pr-42-a1b2c3d4:refs/heads/feat/x 2>/dev/null").status).not.toBe(0);
+            expect(sh(work, handOff("pr-42-a1b2c3d4", lease)).status).toBe(0);
+            expect(git(origin, "rev-parse", "refs/heads/feat/x")).toBe(rebase);
+        });
+
+        it("is refused, and leaves origin's branch alone, once origin's branch moved after step 4", () => {
+            const { lease, origin, work } = setAside("hand-off-moved");
+            const moved = git(origin, "commit-tree", "-p", lease, "-m", "pushed elsewhere", git(origin, "show", "--no-patch", "--format=%T", lease));
+
+            git(origin, "update-ref", "refs/heads/feat/x", moved);
+            // The person's checkout has fetched since, so its tracking ref no longer stands in for the recorded commit.
+            git(work, "fetch", "--quiet", "origin");
+
+            expect(sh(work, `${handOff("pr-42-a1b2c3d4", lease)} 2>/dev/null`).status).not.toBe(0);
+            expect(git(origin, "rev-parse", "refs/heads/feat/x")).toBe(moved);
+        });
+    });
+
     describe("step 8's signed-in check, for a head in the base repository", () => {
         const signedIn = commandOf(catchUpPrompt({ ...PULL, headInBaseRepository: true, number: 42 }), "gh auth status ");
 

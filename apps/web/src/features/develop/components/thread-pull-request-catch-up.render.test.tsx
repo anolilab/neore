@@ -574,6 +574,53 @@ describe("ThreadPullRequestCatchUp", () => {
         expect(screen.getByText("Behind main")).toBeTruthy();
     });
 
+    it("stays hidden on a remount until the read for a turn that ended during the missed turn's read has answered", async () => {
+        const missed = () => <ThreadPullRequestCatchUp link={{ number: 7, repository: "octo/hello" }} threadId="thread-missed-twice" />;
+
+        given("open", "behind");
+
+        const view = render(missed());
+
+        composer.takes = false;
+        view.rerender(missed());
+        turnEnds("thread-missed-twice");
+
+        // Each read of the pull request waits for the host until the test answers it.
+        const answers: ((value: { data?: unknown }) => void)[] = [];
+
+        refetch.mockImplementation(
+            async () =>
+                await new Promise<{ data?: unknown }>((resolve) => {
+                    answers.push(resolve);
+                }),
+        );
+        composer.takes = true;
+        view.rerender(missed());
+
+        expect(refetch).toHaveBeenCalledTimes(1);
+
+        // Another turn ends while the missed turn's read is in flight: that read may answer with the state from before it.
+        turnEnds("thread-missed-twice");
+
+        await act(async () => {
+            answers[0]?.({ data: pull.current.data });
+            await Promise.resolve();
+        });
+
+        expect(refetch).toHaveBeenCalledTimes(2);
+        expect(screen.queryByText("Behind main")).toBeNull();
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
+
+        await act(async () => {
+            answers[1]?.({ data: pull.current.data });
+            await Promise.resolve();
+        });
+
+        expect(refetch).toHaveBeenCalledTimes(2);
+        expect(compareRefetch).toHaveBeenCalledTimes(2);
+        expect(screen.getByText("Behind main")).toBeTruthy();
+    });
+
     it("reads nothing extra on a remount when no turn ended while it was not mounted", () => {
         const quiet = () => <ThreadPullRequestCatchUp link={{ number: 7, repository: "octo/hello" }} threadId="thread-quiet" />;
 

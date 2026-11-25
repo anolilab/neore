@@ -97,6 +97,9 @@ const CatchUpControl = ({
     const [owed, setOwed] = useState(0);
     const owing = owed > 0 && couldShow;
     const owedReading = useRef(false);
+    // Whether the read for turns that ended while this was not mounted is in flight.
+    const missedTurnsReading = useRef(false);
+    const latestTurn = useEffectEvent((): number => turnEndedGeneration(threadId));
 
     // Whether a turn's end reads again (`heard`, so a remount knows it too): set by a read that confirmed behind for names that make
     // a prompt (so the control shows), cleared only by one that confirmed the pull request closed, merged, a draft, caught up or
@@ -138,12 +141,17 @@ const CatchUpControl = ({
      * control that could show owes one more read of each, made once the pending one settles, and hides the control until then:
      * that read may answer with the state from before the turn, a shown control's background refresh too. Otherwise it reads
      * again when the last read said behind (or a failed read hid it after that), or when a missed turn finds a cached "behind".
-     * Returns that read, or nothing when there is none.
+     * Returns that read, or nothing when there is none. While the missed turns' read is in flight, a turn's end starts no read of
+     * its own: that read goes on until one started after the latest turn's end has settled (`forMissedTurns` marks its own calls).
      */
-    const hear = useEffectEvent((): Promise<void> | undefined => {
+    const hear = useEffectEvent((forMissedTurns = false): Promise<void> | undefined => {
         const rereads = heard.get(key)?.rereads === true;
 
         heard.set(key, { generation: turnEndedGeneration(threadId), rereads });
+
+        if (missedTurnsReading.current && !forMissedTurns) {
+            return undefined;
+        }
 
         if (couldShow && pending) {
             setOwed((count: number) => count + 1);
@@ -173,14 +181,25 @@ const CatchUpControl = ({
 
     // A turn that ended may have pushed the rebased branch (or merged or closed the pull request): one read, while it shows or
     // while a failed read hides a pull request last known to be behind. One read too for the turns that ended while this was
-    // not mounted; until it answers the cached "behind" is not shown.
+    // not mounted; until it answers the cached "behind" is not shown. A turn that ends during that read is read for again, and the
+    // control stays hidden until a read started after the latest turn's end has settled: an earlier read's "behind" predates it.
     useEffect(() => {
         if (!stale) {
             return;
         }
 
         const settle = async (): Promise<void> => {
-            await hear();
+            missedTurnsReading.current = true;
+
+            // The count of ended turns the last settled read started after.
+            let answeredFor = -1;
+
+            while (answeredFor < latestTurn()) {
+                answeredFor = latestTurn();
+                await hear(true);
+            }
+
+            missedTurnsReading.current = false;
             setStale(false);
         };
 
