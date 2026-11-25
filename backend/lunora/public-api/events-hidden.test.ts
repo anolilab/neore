@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { pollEvents, type StoredEvent } from "./events-poll";
 
@@ -37,6 +37,15 @@ describe("a poll that hides some events", () => {
         expect(outcome.events.map((row) => row.eventId)).toStrictEqual(["run:1", "run:3"]);
         expect(outcome.truncated).toBe(false);
         expect(outcome.nextSeq).toBe(3);
+    });
+
+    it("looks up visibility only for the events the poll asked for", async () => {
+        const log = logOf([event(1, "open"), event(2, "locked"), { ...event(3, "open"), name: "run.failed" }]);
+        const hidden = vi.fn(async (row: StoredEvent) => row.data["threadId"] === "locked");
+
+        await pollEvents(log, { fromSeq: 0, hidden, maxEvents: 50, name: "run.completed", now: NOW });
+
+        expect(hidden.mock.calls.map(([row]) => row.seq)).toStrictEqual([1, 2]);
     });
 
     it("does not report a gap for an aged-out event on a locked thread", async () => {

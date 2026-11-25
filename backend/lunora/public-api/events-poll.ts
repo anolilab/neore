@@ -123,7 +123,8 @@ export const pollEvents = async (store: EventLogStore, query: PollQuery): Promis
             }
 
             // A hidden event is passed over as the window's old events are, and it is no gap: the caller was never meant to see it.
-            if (query.hidden !== undefined && (await query.hidden(event))) {
+            // Only a row the caller asked for is looked up: another name or thread is passed over without a lookup.
+            if (matches(event, query) && query.hidden !== undefined && (await query.hidden(event))) {
                 from = event.seq;
                 continue;
             }
