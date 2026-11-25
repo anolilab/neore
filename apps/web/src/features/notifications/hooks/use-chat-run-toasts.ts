@@ -59,7 +59,9 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
     const ended = useRef<EndedRun | undefined>(undefined);
     const settleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const lastError = useRef<AppError | null>(null);
-    const approvals = useRef<{ ids: ReadonlySet<string>; newest: string | undefined; threadId: string | undefined } | undefined>(undefined);
+    const approvals = useRef<{ newest: string | undefined; threadId: string | undefined } | undefined>(undefined);
+    // Every call id seen waiting in this chat: a call is announced the first time it is seen, never again.
+    const seenCalls = useRef(new Set<string>());
     const renderedThread = useRef<{ messages: ReadonlyArray<ToastMessage>; threadId: string | undefined }>({ messages, threadId });
     const staleMessages = useRef<ReadonlyArray<ToastMessage> | undefined>(undefined);
     // The newest inputs, for the settle timer, which fires outside any render.
@@ -223,11 +225,16 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
         }
 
         const calls = waitingCalls(messages);
-        const ids = new Set(calls.map((call) => call.toolCallId));
         const previous = approvals.current;
         const newest = messages[messages.length - 1]?.id;
+        // A call is announced once: one already seen waiting in this chat (even in a cached snapshot before a reopen) is not new.
+        const fresh = calls.filter((call) => !seenCalls.current.has(call.toolCallId));
 
-        approvals.current = { ids, newest, threadId };
+        for (const call of calls) {
+            seenCalls.current.add(call.toolCallId);
+        }
+
+        approvals.current = { newest, threadId };
 
         if (!previous || previous.threadId !== threadId) {
             return;
@@ -236,7 +243,7 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
         // Older history loaded above the newest message the previous snapshot had is not a new call, even when it is still waiting.
         // A call inside that newest message is new when it was not waiting before: the reply it belongs to is still streaming.
         const anchor = previous.newest === undefined ? -1 : messages.findIndex((message) => message.id === previous.newest);
-        const arrived = calls.some((call) => !previous.ids.has(call.toolCallId) && call.index >= anchor);
+        const arrived = fresh.some((call) => call.index >= anchor);
 
         if (arrived && isChatToastOn(settings, "input")) {
             toast.warning(t`A chat needs your input or approval`);
