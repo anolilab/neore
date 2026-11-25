@@ -4285,12 +4285,12 @@ export const hardDeleteThread = internalMutation
         return null;
     });
 
-export const undoDeleteThread = authMutation
+export const undoDeleteThread = authAction
     .use(rateLimit("chat/update"))
     .input({
         threadId: v.id("threads"),
     })
-    .mutation(async ({ args: { threadId }, ctx: context }) => {
+    .action(async ({ args: { threadId }, ctx: context }) => {
         refuseImpersonation(context.user.impersonatedBy, "A chat cannot be restored from the trash");
 
         const { userId } = context.user;
@@ -4302,8 +4302,8 @@ export const undoDeleteThread = authMutation
             throwForbidden("Not allowed");
         }
 
-        // The trashed chat's leftover events go first, a batch per call, each in its own transaction, so restore can refuse while any
-        // remain (`agent/threads.ts`). A batch that is not the last loops; the last one returns `true`.
+        // The trashed chat's leftover events go first, one batch per `runMutation`. This is an action, so each call is its own
+        // transaction and the batches do not share a budget. Restore then refuses while any events remain (`agent/threads.ts`).
         while (!(await context.runMutation(internal.public_api.events.drainTrashedThreadEvents, { threadId, userId }))) {
             // Each call removes up to one batch; the loop ends once none are left.
         }
