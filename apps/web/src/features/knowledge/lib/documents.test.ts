@@ -10,6 +10,7 @@ import {
     MAX_DOCUMENT_BYTES,
     MAX_DOCUMENTS_PER_BATCH,
     MAX_REQUEST_BATCH_BYTES,
+    MAX_REQUEST_DOCUMENT_BYTES,
     toBatches,
 } from "./documents";
 import { listArchiveEntries, notionDocuments, stripNotionIds } from "./notion-export";
@@ -73,8 +74,17 @@ describe(toBatches, () => {
         expect(toBatches([half, half, { content: "y" }]).batches.map((batch) => batch.length)).toEqual([1, 2]);
     });
 
-    it("sets aside a document that is over the request budget on its own, keeping the rest", () => {
-        const huge = { content: "x".repeat(MAX_REQUEST_BATCH_BYTES) };
+    it("sends a document over the batch budget alone, in its place in the order", () => {
+        // Over the batch budget as JSON, under the single-document limit: it cannot share a call, but it can go by itself.
+        const large = { content: "x".repeat(MAX_REQUEST_BATCH_BYTES) };
+        const { batches, oversize } = toBatches([{ content: "a" }, large, { content: "b" }]);
+
+        expect(oversize).toEqual([]);
+        expect(batches).toEqual([[{ content: "a" }], [large], [{ content: "b" }]]);
+    });
+
+    it("sets aside a document over the single-document limit, keeping the rest", () => {
+        const huge = { content: "x".repeat(MAX_REQUEST_DOCUMENT_BYTES) };
         const { batches, oversize } = toBatches([{ content: "a" }, huge, { content: "b" }]);
 
         expect(oversize).toEqual([huge]);

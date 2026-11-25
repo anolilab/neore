@@ -1081,8 +1081,8 @@ msgid "{failed} document(s) could not be added."
 msgstr "Non è stato possibile aggiungere {failed} documento/i."
 
 #: src/features/knowledge/hooks/use-knowledge-import.ts
-msgid "{tooLarge} document(s) are too large to import: each must be under {REQUEST_BATCH_KB} KB once encoded."
-msgstr "{tooLarge} documento/i sono troppo grandi da importare: ciascuno deve essere sotto {REQUEST_BATCH_KB} KB una volta codificato."
+msgid "{tooLarge} document(s) are too large to import: each must be under {REQUEST_DOCUMENT_KB} KB once encoded."
+msgstr "{tooLarge} documento/i sono troppo grandi da importare: ciascuno deve essere sotto {REQUEST_DOCUMENT_KB} KB una volta codificato."
 
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:211
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:288

@@ -16,6 +16,12 @@ export const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
  * leaves room for the request's other fields. A document is measured as its JSON, the bytes the body carries.
  */
 export const MAX_REQUEST_BATCH_BYTES = 768 * 1024;
+
+/**
+ * What one document may take alone, in its request body: a document that is over the batch budget still goes by itself, up to
+ * this. The rest of the 1 MiB is left for the request's other fields.
+ */
+export const MAX_REQUEST_DOCUMENT_BYTES = 960 * 1024;
 /** A folder or export is capped so one pick cannot queue thousands of ingestions. */
 export const MAX_DOCUMENTS_PER_IMPORT = 500;
 
@@ -142,8 +148,8 @@ export const encodeDocument = async (candidate: DocumentCandidate): Promise<Enco
 const jsonBytes = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).byteLength;
 
 /**
- * Groups documents into calls under the count cap and the request byte budget, in order. A document that is over the budget
- * on its own fits no call, so it is returned in `oversize` for the caller to report instead of sending.
+ * Groups documents into calls under the count cap and the request byte budget, in order. A document over the batch budget goes
+ * alone; one over the single-document limit fits no call, so it is returned in `oversize` for the caller to report instead.
  */
 export const toBatches = <T>(documents: ReadonlyArray<T>): { batches: T[][]; oversize: T[] } => {
     const batches: T[][] = [];
@@ -154,8 +160,20 @@ export const toBatches = <T>(documents: ReadonlyArray<T>): { batches: T[][]; ove
     for (const document of documents) {
         const size = jsonBytes(document);
 
-        if (size > MAX_REQUEST_BATCH_BYTES) {
+        if (size > MAX_REQUEST_DOCUMENT_BYTES) {
             oversize.push(document);
+
+            continue;
+        }
+
+        if (size > MAX_REQUEST_BATCH_BYTES) {
+            if (current.length > 0) {
+                batches.push(current);
+            }
+
+            batches.push([document]);
+            current = [];
+            bytes = 0;
 
             continue;
         }

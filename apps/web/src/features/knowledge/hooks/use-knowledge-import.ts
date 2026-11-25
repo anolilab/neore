@@ -8,7 +8,7 @@ import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
 import type { DocumentCandidate, EncodedDocument } from "@/features/knowledge/lib/documents";
-import { encodeDocument, MAX_DOCUMENTS_PER_IMPORT, MAX_REQUEST_BATCH_BYTES, toBatches } from "@/features/knowledge/lib/documents";
+import { encodeDocument, MAX_DOCUMENTS_PER_IMPORT, MAX_REQUEST_DOCUMENT_BYTES, toBatches } from "@/features/knowledge/lib/documents";
 import { classifyImportBatchError, knowledgeErrorKind } from "@/features/knowledge/lib/import-batch-error";
 import { listArchiveEntries, notionDocuments } from "@/features/knowledge/lib/notion-export";
 import { useCRPC, useLunoraActionOptions } from "@/lib/lunora/crpc";
@@ -22,8 +22,8 @@ export type CollectionId = Id<"knowledgeCollections">;
 /** How often one rate-limited batch is sent again before it counts as failed. */
 const MAX_BATCH_RETRIES = 3;
 
-/** The request budget in KB, for the message that names it. */
-const REQUEST_BATCH_KB = MAX_REQUEST_BATCH_BYTES / 1024;
+/** The largest document one request takes, in KB, for the message that names it. */
+const REQUEST_DOCUMENT_KB = MAX_REQUEST_DOCUMENT_BYTES / 1024;
 
 const wait = async (ms: number): Promise<void> => {
     await new Promise<void>((resolve) => {
@@ -125,6 +125,8 @@ const useKnowledgeImport = (onChange: () => void) => {
                     const { batches, oversize } = toBatches(encoded);
 
                     tooLarge += oversize.length;
+                    // Set-aside documents are processed too: the count moves even for a slice that sends no batch.
+                    setProgress({ done: added + failed + tooLarge, total: limited.length });
 
                     for (const batch of batches) {
                         const result = await sendBatch(async () => await addDocuments({ collectionId, documents: batch }));
@@ -136,7 +138,7 @@ const useKnowledgeImport = (onChange: () => void) => {
                             quotaReached = result.quota;
                         }
 
-                        setProgress({ done: added + failed, total: limited.length });
+                        setProgress({ done: added + failed + tooLarge, total: limited.length });
 
                         if (quotaReached) {
                             break;
@@ -161,7 +163,7 @@ const useKnowledgeImport = (onChange: () => void) => {
             }
 
             if (tooLarge > 0) {
-                toast.error(t`${tooLarge} document(s) are too large to import: each must be under ${REQUEST_BATCH_KB} KB once encoded.`);
+                toast.error(t`${tooLarge} document(s) are too large to import: each must be under ${REQUEST_DOCUMENT_KB} KB once encoded.`);
             }
 
             if (candidates.length > limited.length) {
