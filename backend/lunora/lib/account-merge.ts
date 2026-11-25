@@ -1435,15 +1435,33 @@ export const importShardRows = internalMutation
                 }
             }
 
-            const imported = await copyMergedMcpEvents(ctx, fresh, args.to);
+            // The event ids the new account already holds: a copy skipped for one of them is the account's own row, never the copy.
+            const alreadyHeld = new Set<string>();
 
-            // The marker names the copy's own row on the new shard (`result`): a copy has a new id, so the reconcile takes it back there
-            // (`dropRowsGoneFromGuest`), and a row the expiry skipped has none.
             for (const row of fresh) {
-                const copy = await ctx.db.mcpEvents.findFirst({
+                const held = await ctx.db.mcpEvents.findFirst({
                     consistency: "primary",
                     where: { eventId: row["eventId"] as string, userId: args.to },
                 });
+
+                if (held !== null) {
+                    alreadyHeld.add(row["eventId"] as string);
+                }
+            }
+
+            const imported = await copyMergedMcpEvents(ctx, fresh, args.to);
+
+            // The marker names the copy's own row on the new shard (`result`): a copy has a new id, so the reconcile takes it back there
+            // (`dropRowsGoneFromGuest`). A row the expiry skipped, or one the account already held, has none, so the reconcile never
+            // deletes the account's own event.
+            for (const row of fresh) {
+                const eventId = row["eventId"] as string;
+                const copy = alreadyHeld.has(eventId)
+                    ? null
+                    : await ctx.db.mcpEvents.findFirst({
+                          consistency: "primary",
+                          where: { eventId, userId: args.to },
+                      });
 
                 await ctx.db.insert("idempotencyClaims", {
                     claimedAt: now,

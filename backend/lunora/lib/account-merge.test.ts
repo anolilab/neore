@@ -2380,6 +2380,60 @@ describe("mergeGuestInto across two real shards", () => {
         }
     });
 
+    it("never takes back the account's own Event that shares a guest event's id", async () => {
+        const merge = twoShards();
+
+        try {
+            await merge.shards.user.run(async (context: any) => {
+                await context.db.insert("mcpEvents", {
+                    createdAt: Date.now(),
+                    data: "{}",
+                    eventId: "run:shared",
+                    name: "run.completed",
+                    seq: 1,
+                    timestamp: 1,
+                    userId: "user",
+                });
+            });
+            await merge.shards.guest.run(async (context: any) => {
+                await context.db.insert("mcpEvents", {
+                    createdAt: Date.now(),
+                    data: "{}",
+                    eventId: "run:shared",
+                    name: "run.completed",
+                    seq: 1,
+                    timestamp: 1,
+                    userId: "guest",
+                });
+            });
+
+            const guestRow = (await merge.shards.guest.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10, where: { userId: "guest" } });
+
+                return page[0];
+            })) as Row;
+
+            // The account already holds this id, so the import copies nothing, and the reconcile must not reach its own event.
+            const imported = (await merge.shards.user.run(
+                async (context: any) => await asLeaseHolder(context, importShardRows, { rows: [guestRow], table: "mcpEvents" }),
+            )) as { imported: number };
+            const reconciled = (await merge.shards.user.run(
+                async (context: any) => await asLeaseHolder(context, dropRowsGoneFromGuest, { ids: [guestRow._id], table: "mcpEvents" }),
+            )) as { dropped: number };
+            const onUser = (await merge.shards.user.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10, where: { userId: "user" } });
+
+                return page.map((row: { eventId: string }) => row.eventId);
+            })) as string[];
+
+            expect(imported.imported).toBe(0);
+            expect(reconciled.dropped).toBe(0);
+            expect(onUser).toStrictEqual(["run:shared"]);
+        } finally {
+            merge.close();
+        }
+    });
+
     it("finishes the merge when another user's Events sit on the guest's own store, and moves only the guest's", async () => {
         const merge = twoShards();
 
