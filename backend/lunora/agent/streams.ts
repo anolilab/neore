@@ -18,6 +18,7 @@ import { patchThread } from "./table-writes";
 import { isLockedWithoutProof } from "./thread-passcode";
 import { MAX_LENGTH } from "../lib/validators";
 import { mergedStream, stream } from "../lib/streams";
+import { deleteMcpEventsOfThread } from "../public-api/events-log";
 import { streamDeltasFields, streamingMessagesFieldsWithoutState } from "../schema";
 import { deriveUIMessagesFromDeltas, fromUIMessages, type MessageWithMetadataInternal, type StreamDelta, type StreamMessage } from "./client";
 import { vStreamDelta, vStreamMessage } from "./validators";
@@ -539,8 +540,11 @@ export const deleteAllStreamsForThreadIdAsync = internalMutation
     .mutation(async ({ args, ctx }) => {
         const result = await deleteStreamsPageForThreadId(ctx, args);
 
-        // The thread goes once its follow rows are gone (`chat/follows/functions.ts`); until then this re-runs.
-        if (result.isDone && (await deleteFollowRowsOfThread(ctx, args.threadId))) {
+        // The thread goes once its follow rows and its Events (`public-api/events-log.ts`) are gone; until then this re-runs.
+        const thread = await ctx.db.get("threads", args.threadId);
+        const eventsGone = thread?.userId === undefined || (await deleteMcpEventsOfThread(ctx, thread.userId, args.threadId));
+
+        if (result.isDone && eventsGone && (await deleteFollowRowsOfThread(ctx, args.threadId))) {
             await ctx.db.delete("threads", args.threadId);
         } else {
             await ctx.scheduler.runAfter(0, internal.agent.streams.deleteAllStreamsForThreadIdAsync, {

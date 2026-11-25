@@ -20,17 +20,18 @@ describe("the Events log's retention wake", () => {
         const harness = lunoraTest(schemaWithShardedTables([]) as never);
 
         try {
-            const before = Date.now();
+            // An injected clock: the event is recorded at `now`, so its expiry is exactly one retention window later.
+            const now = 1_700_000_000_000;
 
             await runInShard("user", async () => {
                 await harness.run(async (context: any) => {
                     await recordMcpEvent(
-                        { db: context.db, now: Date.now() },
+                        { db: context.db, now },
                         {
                             data: {},
                             eventId: "run:new",
                             name: "run.completed",
-                            timestamp: before,
+                            timestamp: now,
                             userId: "user",
                         },
                     );
@@ -39,8 +40,8 @@ describe("the Events log's retention wake", () => {
 
             const census = await censusOf(harness);
 
-            expect(census?.retentionDueAt).toBeGreaterThanOrEqual(before + RETENTION_MS);
-            expect(census?.nextDueAt).toBeGreaterThanOrEqual(before + RETENTION_MS);
+            expect(census?.retentionDueAt).toBe(now + RETENTION_MS);
+            expect(census?.nextDueAt).toBe(now + RETENTION_MS);
         } finally {
             harness.close();
         }

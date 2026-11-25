@@ -36,6 +36,7 @@ import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as v
 import { systemDb } from "../lib/rls/scope";
 import { readPasscodeRow } from "./thread-passcode";
 import { clearAwaitingInput, patchThread } from "./table-writes";
+import { deleteMcpEventsOfThread } from "../public-api/events-log";
 import { deletePullRequestLinksOfThread, setLinksThreadDeleted } from "../source-control/pr-thread-links";
 import { deleteThreadSummaries } from "./thread-summaries";
 import { SEARCH_INTERNAL_FIELDS } from "./thread-search-plan";
@@ -596,6 +597,11 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
         const thread = await context.db.get("threads", args.threadId);
 
         if (thread) {
+            // The thread's Events (`public-api/events-log.ts`), one batch per call; the thread goes once none are left.
+            if (thread.userId !== undefined && !(await deleteMcpEventsOfThread(context, thread.userId, args.threadId))) {
+                return { cursor: messages.continueCursor, isDone: false };
+            }
+
             // The pull requests it was attached to or opened name it; a link to a deleted thread is a dead one.
             await deletePullRequestLinksOfThread(context, thread.userId, args.threadId);
 

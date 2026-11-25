@@ -1614,12 +1614,15 @@ export const schema = defineSchema({
         eventId: v.string(),
         name: v.string(),
         seq: v.number(),
+        /** The thread the event concerns, as its payload names it: a thread's events are removed with the thread. */
+        threadId: v.optional(v.string()),
         timestamp: v.number(),
         userId: v.string(),
     })
         .shardBy("userId")
         .index("by_userId_seq", ["userId", "seq"])
         .index("by_userId_eventId", ["userId", "eventId"])
+        .index("by_userId_threadId", ["userId", "threadId"])
         .index("by_createdAt", ["createdAt"]),
 
     /**
