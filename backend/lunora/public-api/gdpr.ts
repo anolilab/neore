@@ -23,6 +23,12 @@ export const MAX_EXPORT_EVENTS = 500;
 export const EXPORT_EVENT_BYTES = 512 * 1024;
 
 /**
+ * The rows one export may read, kept or skipped. An event left out for its size is still read, so a log of oversized events must not
+ * keep the export step reading its whole history: past this the read stops, and the section says it was cut.
+ */
+export const EXPORT_SCAN_LIMIT = 1000;
+
+/**
  * The user's newest Events, up to {@link MAX_EXPORT_EVENTS}, oldest first, for the export. The data is the event's stored payload,
  * as recorded: the thread it concerns and its outcome or request, never a secret.
  */
@@ -45,6 +51,7 @@ export const collectMcpEventsForExport = internalQuery
         let truncated = false;
         let cursor: string | undefined;
         let more = true;
+        let scanned = 0;
 
         while (more) {
             const result = await ctx.db.mcpEvents.findMany({
@@ -56,12 +63,14 @@ export const collectMcpEventsForExport = internalQuery
             });
 
             for (const row of result.page) {
-                // A row past the cap exists, so the history was cut: the read stops there.
-                if (newest.length === MAX_EXPORT_EVENTS) {
+                // A row past the cap, or past the scan limit, exists, so the history was cut: the read stops there.
+                if (newest.length === MAX_EXPORT_EVENTS || scanned === EXPORT_SCAN_LIMIT) {
                     truncated = true;
                     more = false;
                     break;
                 }
+
+                scanned += 1;
 
                 // Measured as the export writes the event: JSON escapes quotes, backslashes and control characters, so their raw
                 // bytes understate the size.
