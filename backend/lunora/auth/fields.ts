@@ -30,6 +30,8 @@ export const userSettingsFieldsWithoutUserId = {
             message: "Auto-archive must be off or 7 to 365 days",
         }),
     ),
+    // Archive a chat when a pull request it is linked to merges (`agent/auto-archive.ts#archiveMergedThread`). Absent = off.
+    autoArchiveMergedChats: v.optional(v.boolean()),
     // Compact a thread's model context before a reply once it fills this percentage of the model's window (`agent/thread-compaction.ts`). 0 or absent = off.
     autoCompactThreshold: v.optional(
         v.number().check((value) => value === 0 || (Number.isSafeInteger(value) && value >= 50 && value <= 95), {

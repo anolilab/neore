@@ -4828,6 +4828,22 @@ msgstr "Arricchimento multimediale automatico"
 msgid "Auto pricing"
 msgstr "Prezzi automatici"
 
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:107
+msgid "Auto-archive merged chats"
+msgstr "Archivia automaticamente le chat unite"
+
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:111
+msgid "Archive a chat when its linked pull request is merged. Archived chats stay searchable."
+msgstr "Archivia una chat quando la pull request collegata viene unita. Le chat archiviate restano ricercabili."
+
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:118
+msgid "Merged chats will be archived"
+msgstr "Le chat unite verranno archiviate"
+
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:118
+msgid "Merged chats stay as they are"
+msgstr "Le chat unite restano come sono"
+
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:72
 msgid "Auto-archive inactive chats"
 msgstr "Archivia automaticamente le chat inattive"

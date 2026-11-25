@@ -381,4 +381,36 @@ describe("pull request / thread links in GDPR flows", () => {
         expect(new Set(deleted).size).toBe(deleted.length);
         expect(exportSource).toMatch(EXPORT_THREADS_ARGS);
     });
+
+    it("exports a link's status-read time when it has one", async () => {
+        await harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", {
+                createdBy: "user-c",
+                mode: "text",
+                status: "active",
+                title: "read",
+                updatedAt: 1,
+                userId: "user-c",
+            });
+
+            await ctx.db.insert("pullRequestThreads", {
+                createdAt: 1,
+                kind: "opened",
+                number: 1,
+                repository: "o/r",
+                statusReadAt: 42,
+                threadId,
+                title: "read",
+                url: "https://github.com/o/r/pull/1",
+                userId: "user-c",
+            });
+        });
+
+        const { links } = await collectAllPullRequestThreads(
+            async (cursor) =>
+                await harness.run(async (ctx: any) => await ctx.runQuery(collectPullRequestThreadsForExport as never, { cursor, userId: "user-c" } as never)),
+        );
+
+        expect(links).toMatchObject([{ statusReadAt: 42 }]);
+    });
 });

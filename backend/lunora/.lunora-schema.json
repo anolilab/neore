@@ -24505,6 +24505,30 @@
             }
           ]
         },
+        "mergeAttemptedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "mergeSettledAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "mergedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "mergedBefore": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "number": {
           "kind": "number",
           "nullable": false,
@@ -24547,6 +24571,12 @@
           ]
         },
         "stateCheckedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "statusReadAt": {
           "kind": "number",
           "nullable": false,
           "optional": true,
@@ -30115,6 +30145,12 @@
           "optional": true,
           "unique": false
         },
+        "archivedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "autoModel": {
           "kind": "boolean",
           "nullable": false,
@@ -33538,6 +33574,18 @@
           "unique": false
         },
         "autoArchiveAfterDays": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "autoArchiveMergedChats": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "autoArchiveMergedChatsSince": {
           "kind": "number",
           "nullable": false,
           "optional": true,

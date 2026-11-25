@@ -986,6 +986,11 @@ export const updateUserSettings = authMutation
     .input(userSettingsFieldsWithoutUserId)
     .mutation(async (options) => {
         const { ctx } = options;
+        const { userId } = ctx.user;
+        const before = await ctx.db
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .unique();
 
         // The default mode of new chats is the owner's to set by hand: neither an admin acting as them nor a grant session (an app or the
         // browser extension) may change it, since the default would then reach every chat they start (`callerRestrictsFull`).
@@ -993,7 +998,25 @@ export const updateUserSettings = authMutation
             throw new LunoraError("FORBIDDEN", "The default permission mode cannot be changed from an impersonated or grant session");
         }
 
+        // Turning merged-chat archiving on archives the owner's chats as their pull requests merge: only the owner may turn it on, as
+        // with the default mode. Turning it off is always allowed.
+        if (options.args.autoArchiveMergedChats === true && (await callerRestrictsFull(ctx))) {
+            throw new LunoraError("FORBIDDEN", "Merged-chat archiving cannot be turned on from an impersonated or grant session");
+        }
+
         const result = await settingsUpsert("userSettings", options);
+
+        // Turning the merged-chat archive on stamps when: only merges from then on archive a chat (`agent/auto-archive.ts`).
+        if (options.args.autoArchiveMergedChats === true && before?.autoArchiveMergedChats !== true) {
+            const after = await ctx.db
+                .query("userSettings")
+                .withIndex("by_userId", (q) => q.eq("userId", userId))
+                .unique();
+
+            if (after) {
+                await patchRow(ctx.db, "userSettings", after, { autoArchiveMergedChatsSince: ctx.now });
+            }
+        }
 
         ctx.log.event("auth.update_user_settings", { fieldCount: Object.keys(options.args).length });
 

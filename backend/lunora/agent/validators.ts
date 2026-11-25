@@ -726,6 +726,8 @@ export const vThreadDocFields = {
     // Written only by `agent/branches.ts` (the switcher, regenerate, edit), so
     // deliberately not a create field.
     activeLeafMessageId: v.optional(v.string()),
+    // When the chat was last archived. Written by `markThreadArchived`; declared here so a read of an archived chat validates.
+    archivedAt: v.optional(v.number()),
     // Set when a run pauses for the owner, in the status write that ends the run
     // (`chat/lib/agent-run.ts#setThreadStatus`); removed when the thread runs again.
     awaitingInput: v.optional(v.union(v.literal("approval"), v.literal("question"))),
