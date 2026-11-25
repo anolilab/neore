@@ -683,13 +683,13 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
                         { shardKey: userId },
                     );
 
-                    // The owner's alert comes after the secret is in hand: a failure to hand it off must not cost the machine
-                    // its secret (the code is then spent). A missed alert is logged, not retried.
-                    try {
-                        await shard.call(internal.devices.internal.announceHeadlessDevice, { deviceId: registered.deviceId, userId }, { shardKey: userId });
-                    } catch (error) {
-                        console.warn("[devices] Failed to announce a machine paired by code:", error);
-                    }
+                    // Not awaited: the secret goes back to the machine now, and a slow alert must not hold it or the spent code.
+                    // The pending-row sweep is the fallback if this call never completes.
+                    void shard
+                        .call(internal.devices.internal.announceHeadlessDevice, { deviceId: registered.deviceId, userId }, { shardKey: userId })
+                        .catch((error: unknown) => {
+                            console.warn("[devices] Failed to announce a machine paired by code:", error);
+                        });
 
                     return registered;
                 },

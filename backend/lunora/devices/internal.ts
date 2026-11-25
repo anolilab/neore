@@ -31,6 +31,7 @@ import { signDevicePayload, utf8Length } from "./lib/signing";
 import { announceNewDevice, assertRoomForDevice, insertDevice } from "./lib/register";
 import { mergeTaint } from "./lib/taint";
 import { clearMachineFromProjects } from "../projects/machine-location";
+import { noteShardActivity } from "../lib/shard-housekeeping";
 import { runAfterWithRetry } from "../lib/shard-scheduler";
 import { countOpenCalls, isAcpTool, isDeviceOnline, isDeviceOutdated, isTerminalCallStatus, OPEN_CALL_STATUSES } from "./lib/state";
 import { vDeviceCallStatus, vDeviceManifestTool, vDevicePlatform, vDeviceTaintSource } from "./validators";
@@ -455,6 +456,9 @@ export const registerHeadlessDevice = internalMutation
             transport: "headless",
             userId: args.userId,
         });
+
+        // Makes the owner's shard eligible for the pending-alert sweep even if it has been dormant for a while. Best-effort.
+        await noteShardActivity(ctx, args.userId);
 
         ctx.log.event("devices.register_headless_device", { platform: args.platform });
 

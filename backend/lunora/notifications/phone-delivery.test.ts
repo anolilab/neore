@@ -20,7 +20,6 @@ import {
     RECEIPT_DELAY_MS,
     RECEIPT_RETRY_DELAYS_MS,
     recordPushDeliveries,
-    phoneSkipsType,
     sendPhonePush,
 } from "./phone-delivery";
 
@@ -527,13 +526,5 @@ describe("checkPushReceipts", () => {
 
         expect(ctx.scheduler.runAfter).not.toHaveBeenCalled();
         expect(ctx.runMutation).not.toHaveBeenCalled();
-    });
-});
-
-describe("the notifications a phone is sent", () => {
-    it("leaves out a device alert, whose link opens a web page the phone cannot show, and keeps every chat notification", () => {
-        expect(phoneSkipsType("device_paired")).toBe(true);
-        expect(phoneSkipsType("task")).toBe(false);
-        expect(phoneSkipsType("tool_approval")).toBe(false);
     });
 });

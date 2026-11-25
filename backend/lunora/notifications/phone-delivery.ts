@@ -291,11 +291,6 @@ const SUB_AGENT_WAIT_MS = 30_000;
 /** …and is checked this many times (five minutes) before the owner gets the generic alert instead. */
 const SUB_AGENT_WAIT_ATTEMPTS = 10;
 
-/** Notification types no phone is sent: each links to a web page the app cannot open. */
-const PHONE_SKIPPED_TYPES: ReadonlySet<string> = new Set(["device_paired"]);
-
-export const phoneSkipsType = (type: string): boolean => PHONE_SKIPPED_TYPES.has(type);
-
 /**
  * The phone half of a notification's push, its own job beside the browsers' (`push.ts`), so each is retried on its
  * own. Only the ids and the urgency are read from the notification; its title and text never leave here.
@@ -307,12 +302,6 @@ export const sendPhonePush = internalAction
         const notification = await ctx.runQuery(internal.notifications.push.loadPushNotification, { notificationId: args.notificationId, userId: args.userId });
 
         if (!notification) {
-            return null;
-        }
-
-        // A phone tap opens the chat list, not a web page, so a device alert (whose link is device settings) stays in the
-        // owner's inbox and browsers.
-        if (phoneSkipsType(notification.type)) {
             return null;
         }
 

@@ -36,6 +36,7 @@ import {
 } from "./lib/constants";
 import { isAppVersion } from "./lib/app-version";
 import { scheduleClearDeviceProjects } from "./internal";
+import { noteShardActivity } from "../lib/shard-housekeeping";
 import { announceNewDevice, assertRoomForDevice, insertDevice } from "./lib/register";
 import { parseAcpOffers, parseManifestTools } from "./lib/manifest";
 import { filterOwnProjectIds, ownProjectTitles } from "./lib/scope";
@@ -144,6 +145,9 @@ export const registerDevice = authMutation
             userId,
             ...(args.viaDeviceId !== undefined && { transport: "ssh" as const, viaDeviceId: args.viaDeviceId }),
         });
+
+        // Makes the owner's shard eligible for the pending-alert sweep even if it has been dormant for a while. Best-effort.
+        await noteShardActivity(ctx, userId);
 
         ctx.log.event("devices.register_device", { platform: args.platform, ssh: args.viaDeviceId !== undefined });
 
