@@ -1077,8 +1077,8 @@ msgid "{failed} document(s) could not be added."
 msgstr "Nie udało się dodać dokumentów: {failed}."
 
 #: src/features/knowledge/hooks/use-knowledge-import.ts
-msgid "{tooLarge} document(s) are too large to import: each must be under {REQUEST_DOCUMENT_KB} KB once encoded."
-msgstr "{tooLarge} dokumentów jest zbyt dużych, by je zaimportować: po zakodowaniu każdy musi mieć poniżej {REQUEST_DOCUMENT_KB} KB."
+msgid "Skipped {tooLarge} document(s) over {REQUEST_DOCUMENT_KB} KB once encoded."
+msgstr "Pominięto {tooLarge} dokument(y) większe niż {REQUEST_DOCUMENT_KB} KB po zakodowaniu."
 
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:211
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:288

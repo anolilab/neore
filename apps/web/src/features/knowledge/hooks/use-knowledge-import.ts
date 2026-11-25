@@ -163,7 +163,7 @@ const useKnowledgeImport = (onChange: () => void) => {
             }
 
             if (tooLarge > 0) {
-                toast.error(t`${tooLarge} document(s) are too large to import: each must be under ${REQUEST_DOCUMENT_KB} KB once encoded.`);
+                toast.error(t`Skipped ${tooLarge} document(s) over ${REQUEST_DOCUMENT_KB} KB once encoded.`);
             }
 
             if (candidates.length > limited.length) {
