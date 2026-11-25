@@ -66,14 +66,14 @@ const focusOn = (element: HTMLElement) => {
 };
 
 describe("linked pull requests' focus", () => {
-    it("moves focus to the row's link when a new link pushes its focused Catch up button out of the newest five", () => {
+    it("keeps a focused Catch up button where it is when a new link is added, since the view reads that link too", () => {
         const view = render(list([5, 4, 3, 2, 1]));
 
         focusOn(screen.getByRole("button", { name: "Catch up octo/hello#1" }));
         view.rerender(list([6, 5, 4, 3, 2, 1]));
 
-        expect(screen.queryByRole("button", { name: "Catch up octo/hello#1" })).toBeNull();
-        expect(document.activeElement).toBe(screen.getByRole("link", { name: "Open the pull request octo/hello#1" }));
+        expect(screen.getByRole("button", { name: "Catch up octo/hello#1" })).toBeTruthy();
+        expect(document.activeElement).toBe(screen.getByRole("button", { name: "Catch up octo/hello#1" }));
     });
 
     it("moves focus to the next row's link when the focused row is unlinked, else the one before, else the link button", () => {
