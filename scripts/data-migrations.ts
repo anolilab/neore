@@ -11,6 +11,9 @@ import ts from "typescript";
 /** The module that declares every data migration. Relative to the repository root. */
 export const MIGRATIONS_MODULE = "backend/lunora/migrations.ts";
 
+/** The committed schema baseline (`lunora prepare`), which records each table's shard mode. Relative to the repository root. */
+export const SCHEMA_BASELINE = "backend/lunora/.lunora-schema.json";
+
 /** How often one migration runs while it stays `in_progress`, and the pause between those runs. */
 export const MIGRATION_ATTEMPTS = 4;
 const MIGRATION_PAUSE_MS = 15_000;
@@ -18,35 +21,62 @@ const MIGRATION_PAUSE_MS = 15_000;
 const literalText = (node: ts.Node | undefined): string | undefined =>
     node !== undefined && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) ? node.text : undefined;
 
-const migrationId = (call: ts.CallExpression, file: ts.SourceFile): string => {
+/** The literal string value of the `name` property of `call`'s first argument. */
+const definitionProperty = (call: ts.CallExpression, name: string): string | undefined => {
     const [definition] = call.arguments;
     const property =
         definition !== undefined && ts.isObjectLiteralExpression(definition)
             ? definition.properties.find(
-                  (member) => member.name !== undefined && (ts.isIdentifier(member.name) || ts.isStringLiteral(member.name)) && member.name.text === "id",
+                  (member) => member.name !== undefined && (ts.isIdentifier(member.name) || ts.isStringLiteral(member.name)) && member.name.text === name,
               )
             : undefined;
-    const id = property !== undefined && ts.isPropertyAssignment(property) ? literalText(property.initializer) : undefined;
+
+    return property !== undefined && ts.isPropertyAssignment(property) ? literalText(property.initializer) : undefined;
+};
+
+const migrationId = (call: ts.CallExpression, file: ts.SourceFile, globalTables: ReadonlySet<string>): string => {
+    const id = definitionProperty(call, "id");
+    const { line } = file.getLineAndCharacterOfPosition(call.getStart(file));
+    const at = `${MIGRATIONS_MODULE}:${String(line + 1)}`;
 
     if (id === undefined) {
-        const { line } = file.getLineAndCharacterOfPosition(call.getStart(file));
+        throw new Error(`${at}: defineMigration needs a literal string \`id\` so the deploy can run it`);
+    }
 
-        throw new Error(`${MIGRATIONS_MODULE}:${String(line + 1)}: defineMigration needs a literal string \`id\` so the deploy can run it`);
+    const table = definitionProperty(call, "table");
+
+    if (table !== undefined && globalTables.has(table)) {
+        throw new Error(
+            `${at}: migration "${id}" targets the .global() table "${table}", which defineMigration never reaches (it runs in the shard Durable Objects, not D1); backfill it through D1 instead`,
+        );
     }
 
     return id;
 };
 
+/** The tables `baseline` (the committed `.lunora-schema.json`) records as `.global()`, on any backend. */
+export const globalTablesOf = (baseline: string): Set<string> => {
+    const { tables } = JSON.parse(baseline) as { tables?: Record<string, { shardMode?: unknown }> };
+
+    return new Set(
+        Object.entries(tables ?? {})
+            .filter(([, table]) => typeof table.shardMode === "string" && table.shardMode.startsWith("global"))
+            .map(([name]) => name),
+    );
+};
+
 /**
  * Every migration id declared in `source`, in declaration order. Throws when a `defineMigration` call's `id` is not a
- * literal string: a partial list would skip that migration on deploy.
+ * literal string (a partial list would skip that migration on deploy), and when one targets a table in `globalTables`: a
+ * shard migration does not reach a `.global()` table's rows, and its run fails on the root shard, stopping every
+ * migration after it.
  */
-export const declaredMigrationIds = (source: string): string[] => {
+export const declaredMigrationIds = (source: string, globalTables: ReadonlySet<string> = new Set()): string[] => {
     const file = ts.createSourceFile(MIGRATIONS_MODULE, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
     const ids: string[] = [];
     const visit = (node: ts.Node): void => {
         if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "defineMigration") {
-            ids.push(migrationId(node, file));
+            ids.push(migrationId(node, file, globalTables));
         }
 
         ts.forEachChild(node, visit);
@@ -200,4 +230,107 @@ export const runDataMigrations = async (ids: readonly string[], options: RunMigr
     }
 
     return 0;
+};
+
+/** The backfill of `user.emailCanonical`, which the deploy runs through D1 (`backend/lunora/auth/email-canonical-backfill.ts`). */
+export const EMAIL_CANONICAL_BACKFILL = "backfill-email-canonical";
+
+/** Calls one run of the backfill may make; each fills one batch. */
+export const EMAIL_CANONICAL_MAX_CALLS = 2000;
+
+/** The longest `retry-after` the runner waits out; a longer one fails the step. */
+const MAX_RETRY_AFTER_MS = 15 * 60 * 1000;
+
+/** One call of `POST /admin/backfill-email-canonical`: its HTTP status, its JSON body (or `undefined`) and `retry-after`. */
+export interface BackfillCall {
+    body: unknown;
+    retryAfterSeconds?: number | undefined;
+    status: number;
+}
+
+export interface RunBackfillOptions {
+    call: () => Promise<BackfillCall>;
+    error: (line: string) => void;
+    log: (line: string) => void;
+    maxCalls?: number;
+    sleep: (ms: number) => Promise<unknown>;
+}
+
+const backfillBody = (body: unknown): { conflicts: number; filled: number; remaining: number; status: string } => {
+    const record = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
+
+    return {
+        conflicts: count(record.conflicts),
+        filled: count(record.filled),
+        remaining: count(record.remaining),
+        status: typeof record.status === "string" ? record.status : "unknown",
+    };
+};
+
+/**
+ * Calls the backfill until it answers `done`. Stops with an error on a conflict (two accounts that fold to one address), on
+ * a call that makes no progress, on any other answer, or after `maxCalls`. A 429 is waited out. Prints counts only.
+ * Returns the process exit code.
+ */
+export const runEmailCanonicalBackfill = async (options: RunBackfillOptions): Promise<number> => {
+    const maxCalls = options.maxCalls ?? EMAIL_CANONICAL_MAX_CALLS;
+    let filled = 0;
+    let calls = 0;
+
+    const fail = (reason: string): number => {
+        options.error(`::error::${EMAIL_CANONICAL_BACKFILL}: ${reason} (filled ${String(filled)} over ${String(calls)} call(s))`);
+
+        return 1;
+    };
+
+    while (calls < maxCalls) {
+        let answer: BackfillCall;
+
+        calls += 1;
+
+        try {
+            answer = await options.call();
+        } catch (error) {
+            // A fetch error names the URL in its cause, never in its name.
+            return fail(`the request failed (${error instanceof Error ? error.name : "error"})`);
+        }
+
+        if (answer.status === 429) {
+            const waitMs = (answer.retryAfterSeconds ?? 60) * 1000;
+
+            if (waitMs > MAX_RETRY_AFTER_MS) {
+                return fail(`rate limited for ${String(answer.retryAfterSeconds)}s`);
+            }
+
+            options.log(`${EMAIL_CANONICAL_BACKFILL}: rate limited, waiting ${String(waitMs / 1000)}s`);
+            await options.sleep(waitMs);
+            continue;
+        }
+
+        const body = backfillBody(answer.body);
+
+        filled += body.filled;
+
+        if (answer.status === 409 || body.status === "conflict") {
+            return fail(
+                `${String(body.conflicts)} address(es) belong to more than one account once case and Unicode form are ignored; merge or rename them, then deploy again`,
+            );
+        }
+
+        if (answer.status !== 200) {
+            return fail(`answered HTTP ${String(answer.status)}`);
+        }
+
+        if (body.status === "done") {
+            options.log(`${EMAIL_CANONICAL_BACKFILL}: done, filled ${String(filled)} over ${String(calls)} call(s)`);
+
+            return 0;
+        }
+
+        if (body.status !== "progress" || body.filled === 0) {
+            return fail(`made no progress (${body.status}, ${String(body.remaining)} left)`);
+        }
+    }
+
+    return fail(`not done after ${String(maxCalls)} calls`);
 };
