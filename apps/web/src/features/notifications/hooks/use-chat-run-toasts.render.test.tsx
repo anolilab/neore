@@ -377,6 +377,24 @@ describe("useChatRunToasts: the other toasts still show", () => {
         expect(toastWarning).toHaveBeenCalledTimes(1);
     });
 
+    it("announces a new call that reuses an earlier tool call id", () => {
+        const newest: Props["messages"] = [{ id: "m5", parts: [{ text: "hi", type: "text" }], role: "user" }];
+        const first: Props["messages"] = [
+            ...newest,
+            { id: "m6", parts: [{ state: "approval-requested", toolCallId: "call_0", type: "tool-shell" }], role: "assistant" },
+        ];
+        const second: Props["messages"] = [
+            ...first,
+            { id: "m7", parts: [{ state: "approval-requested", toolCallId: "call_0", type: "tool-shell" }], role: "assistant" },
+        ];
+        const { rerender } = setup({ ...idle, messages: newest, settings: {} });
+
+        rerender({ ...idle, messages: first, settings: {} });
+        rerender({ ...idle, messages: second, settings: {} });
+
+        expect(toastWarning).toHaveBeenCalledTimes(2);
+    });
+
     it("shows no toast while the settings are still loading", () => {
         const { rerender } = setup({ ...idle, settings: undefined });
 

@@ -4,7 +4,7 @@ import { toast } from "sonner";
 
 import type { AppError } from "@/lib/errors";
 
-import type { ChatToastSettings, ToastMessage } from "../lib/chat-toasts";
+import type { ChatToastSettings, ToastMessage, WaitingCall } from "../lib/chat-toasts";
 import { isChatToastOn, lastReplyFailed, replySettled, waitingApprovalIds, waitingCalls } from "../lib/chat-toasts";
 
 /** How long a finished run waits for its reply to settle before its outcome is decided anyway. */
@@ -229,10 +229,12 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
         const previous = approvals.current;
         const newest = messages[messages.length - 1]?.id;
         // A call is announced once: one already seen waiting in this chat (even in a cached snapshot before a reopen) is not new.
-        const fresh = calls.filter((call) => !seenCalls.current.has(call.toolCallId));
+        // The key is the thread, the message and the call: providers reuse tool call ids, so the id alone is not enough.
+        const keyOf = (call: WaitingCall): string => `${threadId ?? ""}|${call.messageId}|${call.toolCallId}`;
+        const fresh = calls.filter((call) => !seenCalls.current.has(keyOf(call)));
 
         for (const call of calls) {
-            seenCalls.current.add(call.toolCallId);
+            seenCalls.current.add(keyOf(call));
         }
 
         approvals.current = { newest, threadId };

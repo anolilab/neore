@@ -65,9 +65,10 @@ export const lastReplyFailed = (messages: ReadonlyArray<ToastMessage>): boolean 
 /** Whether the latest assistant reply has stopped streaming. The stream can end before its reply is written to the thread. */
 export const replySettled = (messages: ReadonlyArray<ToastMessage>): boolean => lastAssistantReply(messages)?.status !== "streaming";
 
-/** A tool call that waits for the person, with the index of the message that holds it. */
+/** A tool call that waits for the person, with the index and id of the message that holds it. */
 export interface WaitingCall {
     index: number;
+    messageId: string;
     toolCallId: string;
 }
 
@@ -85,7 +86,7 @@ export const waitingCalls = (messages: ReadonlyArray<ToastMessage>): WaitingCall
             const waiting = typeof part === "object" && part !== null && "state" in part && part.state === "approval-requested";
 
             if (waiting && "toolCallId" in part && typeof part.toolCallId === "string") {
-                calls.push({ index, toolCallId: part.toolCallId });
+                calls.push({ index, messageId: message.id ?? `#${index}`, toolCallId: part.toolCallId });
             }
         }
     });
