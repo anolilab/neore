@@ -572,10 +572,15 @@ export const runShardTick = internalMutation
 
         // The Events log's expired rows (`public-api/events.ts`), pruned before the retention sweep sets the shard's time, so that time
         // counts only what is left. A dormant shard gets no housekeeping visit, so its expired events expire here, with its other rows.
+        // Rows left after this tick's rounds are unfinished work: the tick re-arms itself for them (see `candidates` below).
+        let eventsLeft = false;
+
         if (retentionDue) {
             await bestEffort("pruneMcpEvents", async () => {
                 for (let round = 0; round < MCP_EVENT_PRUNE_ROUNDS; round += 1) {
                     const { hasMore } = await ctx.runMutation(internal.public_api.events.pruneMcpEvents, {});
+
+                    eventsLeft = hasMore;
 
                     if (!hasMore) {
                         break;
@@ -664,8 +669,8 @@ export const runShardTick = internalMutation
         ].filter((at): at is number => at !== undefined);
 
         // The dispatch cleared this shard's due time; a reap, a merge check, a retention prune or an export-run read that failed recorded
-        // no next time, so try again.
-        if (!reaped || !mergesChecked || !pruned || !triggersChecked || exportRunRead === undefined) {
+        // no next time, so try again. So does an Events backlog the rounds above did not finish.
+        if (!reaped || !mergesChecked || !pruned || !triggersChecked || exportRunRead === undefined || eventsLeft) {
             candidates.push(now);
         }
 
