@@ -3,10 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 
-import { clearComposerDrafts, draftOwnership, dropStoredDrafts, saveComposerDraft, setSplitViewMounted } from "./composer-drafts";
+import { clearComposerDrafts, draftOwnership, dropStoredDrafts, saveComposerDraft, setSplitViewMounted, useBoundDraftStore } from "./composer-drafts";
 import { leaveSplitView } from "./pane-state";
 import { draftKey, flushStoredDrafts, resetStoredDraftsForTests } from "./stored-drafts";
-import useStoredDrafts, { keepsStoredDraft } from "./use-stored-drafts";
+import useStoredDrafts, { keepsStoredDraft, storedDraftKnown } from "./use-stored-drafts";
 
 const storeDrafts = (texts: Record<string, string>): void => {
     for (const [owner, t] of Object.entries(texts)) {
@@ -24,6 +24,7 @@ beforeEach(() => {
     // A fresh page: the storage module has not loaded, so nothing is bound and no hand-over is installed.
     draftOwnership.first = undefined;
     draftOwnership.handOver = undefined;
+    useBoundDraftStore.setState({ owners: new Set<string>() });
 });
 
 describe("useStoredDrafts", () => {
@@ -70,6 +71,43 @@ describe("useStoredDrafts", () => {
         flushStoredDrafts();
 
         expect(Object.keys(localStorage).filter((key: string) => key.startsWith("neore-draft:"))).toStrictEqual([]);
+    });
+});
+
+describe("when the chat's draft is settled", () => {
+    const settled = (owner: string): boolean => useBoundDraftStore.getState().owners.has(owner);
+
+    it("only once the stored draft came back, so text put in from elsewhere does not keep it out", async () => {
+        storeDrafts({ "thread-a": "draft a" });
+        renderHook(() => {
+            useStoredDrafts("thread-a", "user-1", false);
+        });
+
+        expect(settled("thread-a")).toBe(false);
+
+        await vi.dynamicImportSettled();
+
+        expect(useChatUIStore.getState().composerText).toBe("draft a");
+        expect(settled("thread-a")).toBe(true);
+    });
+
+    it("not while the chat is still loading, and at once when it is known to keep no draft", () => {
+        const { rerender, unmount } = renderHook(
+            ({ known }: { known: boolean }) => {
+                useStoredDrafts("thread-a", undefined, false, known);
+            },
+            { initialProps: { known: false } },
+        );
+
+        expect(settled("thread-a")).toBe(false);
+
+        rerender({ known: true });
+
+        expect(settled("thread-a")).toBe(true);
+
+        unmount();
+
+        expect(settled("thread-a")).toBe(false);
     });
 });
 
@@ -163,5 +201,26 @@ describe("keepsStoredDraft", () => {
         expect(keepsStoredDraft(true, false, undefined, false)).toBe(false);
         expect(keepsStoredDraft(false, false, {}, false)).toBe(false);
         expect(keepsStoredDraft(true, false, {}, true)).toBe(false);
+    });
+});
+
+describe(storedDraftKnown, () => {
+    const chat = { isNewThread: false, isSessionPending: false, isWorkerLoading: false, threadId: "t1", threadLoad: "ready" } as const;
+
+    it("knows at once for a new chat once the session is known", () => {
+        expect(storedDraftKnown({ ...chat, isNewThread: true, isWorkerLoading: true, threadLoad: "loading" })).toBe(true);
+        expect(storedDraftKnown({ ...chat, threadId: undefined, threadLoad: "loading" })).toBe(true);
+    });
+
+    it("waits while the session loads, the chat's read loads or has failed, and for its worker", () => {
+        expect(storedDraftKnown({ ...chat, isSessionPending: true })).toBe(false);
+        expect(storedDraftKnown({ ...chat, isNewThread: true, isSessionPending: true })).toBe(false);
+        expect(storedDraftKnown({ ...chat, threadLoad: "loading" })).toBe(false);
+        expect(storedDraftKnown({ ...chat, threadLoad: "failed" })).toBe(false);
+        expect(storedDraftKnown({ ...chat, isWorkerLoading: true })).toBe(false);
+    });
+
+    it("knows once the session and the chat's read answered and its worker is known", () => {
+        expect(storedDraftKnown(chat)).toBe(true);
     });
 });

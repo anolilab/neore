@@ -17,6 +17,7 @@ import { HostApiError } from "../origin-fetch";
 import type { HostRequest } from "../origin-fetch";
 import { discard, parse, readJson } from "../response";
 import type {
+    BranchComparison,
     CheckLog,
     CheckRun,
     CheckState,
@@ -342,14 +343,15 @@ const pollReviewRequests = async (request: HostRequest, repo: string, known: { e
 
 const pullSchema = z.object({
     additions: z.number(),
-    base: z.object({ ref: z.string() }),
+    base: z.object({ ref: z.string(), repo: z.object({ id: z.number() }).optional() }),
     body: z.string().nullable(),
     changed_files: z.number(),
     commits: z.number(),
     created_at: z.string(),
     deletions: z.number(),
     draft: z.boolean().optional(),
-    head: z.object({ ref: z.string(), sha: z.string() }),
+    // `repo` is null once a fork is deleted.
+    head: z.object({ ref: z.string(), repo: z.object({ id: z.number() }).nullable().optional(), sha: z.string() }),
     html_url: z.string(),
     mergeable_state: z.string().optional(),
     merged: z.boolean().optional(),
@@ -395,6 +397,9 @@ const getPullRequest = async (request: HostRequest, ref: PullRequestRef): Promis
         deletions: pull.deletions,
         draft: pull.draft === true,
         headBranch: pull.head.ref,
+        // By the repositories' ids, which survive a rename: a fork may have a branch of the same name and the same commit. Either
+        // id missing reads as a fork, which is never pushed to.
+        headInBaseRepository: pull.head.repo?.id !== undefined && pull.head.repo.id === pull.base.repo?.id,
         headSha: pull.head.sha,
         mergeState: MERGE_STATES[pull.mergeable_state ?? ""] ?? "unknown",
         number: pull.number,
@@ -1003,6 +1008,29 @@ const branchPath = (branch: string): string | undefined => {
         // A lone surrogate cannot be encoded.
         return undefined;
     }
+};
+
+const comparisonSchema = z.object({ ahead_by: z.int().nonnegative(), behind_by: z.int().nonnegative() });
+
+/**
+ * `GET /repos/{o}/{r}/compare/{base}...{sha}`: the head by its commit, which the host finds in a fork too (a fork shares the
+ * base repository's network). Only the counts are read, and the host sends them on every page but lists the changed files
+ * (patches included, up to 300) only on the first, so the second page of one commit is asked for: a large diff is
+ * never downloaded and cannot outgrow the response cap.
+ */
+const compareWithBase = async (request: HostRequest, ref: PullRequestRef, baseBranch: string, headSha: string): Promise<BranchComparison> => {
+    const base = branchPath(baseBranch);
+
+    if (base === undefined || !SHA.test(headSha)) {
+        throw new HostApiError("Not a branch and commit to compare", 404);
+    }
+
+    const comparison = parse(
+        comparisonSchema,
+        await readJson(await request(`${repoPath(ref)}/compare/${base}...${headSha}`, { query: { page: 2, per_page: 1 } })),
+    );
+
+    return { aheadBy: comparison.ahead_by, behindBy: comparison.behind_by };
 };
 
 const createdPullRequestSchema = z.object({ html_url: z.string().nullable().optional(), number: z.int().positive() });
@@ -1733,6 +1761,7 @@ const revertPullRequest = async (request: HostRequest, ref: PullRequestRef, reve
 
 export const githubDriver: HostDriver = {
     apiOrigin: GITHUB_API_ORIGIN,
+    compareWithBase,
     createPullRequest,
     editPullRequest,
     findOpenPullRequest,

@@ -121,7 +121,7 @@ msgstr "({0} of {MAX_PARTICIPANTS}, at least {MIN_PARTICIPANTS})"
 msgid "({jobFailed} failed)"
 msgstr "({jobFailed} failed)"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:414
+#: src/features/chat/thread/composer-prompt-queue.tsx:519
 msgid "(attachments only)"
 msgstr "(attachments only)"
 
@@ -896,7 +896,7 @@ msgstr "{activeCount, plural, one {You have # messenger connected} other {You ha
 msgid "{activeCount} of {0} MCP servers active"
 msgstr "{activeCount} of {0} MCP servers active"
 
-#: src/features/develop/components/thread-pull-requests.tsx:162
+#: src/features/develop/components/thread-pull-requests.tsx:167
 msgid "{address}: {reason}"
 msgstr "{address}: {reason}"
 
@@ -973,7 +973,7 @@ msgstr "{count, plural, one {# message selected} other {# messages selected}}"
 msgid "{count, plural, one {# of {maxReferenceImages} reference attached} other {# of {maxReferenceImages} references attached}}"
 msgstr "{count, plural, one {# of {maxReferenceImages} reference attached} other {# of {maxReferenceImages} references attached}}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:755
+#: src/features/chat/thread/composer-prompt-queue.tsx:1149
 msgid "{count, plural, one {# steering — the reply reads it at its next step} other {# steering — the reply reads them at its next step}}"
 msgstr "{count, plural, one {# steering — the reply reads it at its next step} other {# steering — the reply reads them at its next step}}"
 
@@ -993,25 +993,21 @@ msgstr "{count, plural, one {Used # source} other {Used # sources}}"
 msgid "{count} characters now."
 msgstr "{count} characters now."
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:752
+#: src/features/chat/thread/composer-prompt-queue.tsx:1146
 msgid "{count} queued"
 msgstr "{count} queued"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:752
+#: src/features/chat/thread/composer-prompt-queue.tsx:1146
 msgid "{count} queued — sends when the current reply finishes"
 msgstr "{count} queued — sends when the current reply finishes"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:760
-msgid "{count} queued — waiting for the permission mode to save"
-msgstr "{count} queued — waiting for the permission mode to save"
-
-#: src/features/chat/thread/composer-prompt-queue.tsx:978
+#: src/features/chat/thread/composer-prompt-queue.tsx:1156
 msgid "{count} queued — sends when the edit closes"
 msgstr "{count} queued — sends when the edit closes"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:563
-msgid "Type some visible text to save this message."
-msgstr "Type some visible text to save this message."
+#: src/features/chat/thread/composer-prompt-queue.tsx:1161
+msgid "{count} queued — waiting for the permission mode to save"
+msgstr "{count} queued — waiting for the permission mode to save"
 
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:102
 msgid "{date}: {replies}, {cost}"
@@ -1047,7 +1043,7 @@ msgstr "{done} of {total} tasks done"
 msgid "{done} of {total} tasks done. In progress: {inProgress}"
 msgstr "{done} of {total} tasks done. In progress: {inProgress}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:455
+#: src/features/chat/thread/composer-prompt-queue.tsx:622
 msgid "{droppedCount, plural, one {# attachment removed on reload} other {# attachments removed on reload}}"
 msgstr "{droppedCount, plural, one {# attachment removed on reload} other {# attachments removed on reload}}"
 
@@ -1327,7 +1323,7 @@ msgstr "{minutes}m remaining"
 msgid "{modeLabel} mode — click to change"
 msgstr "{modeLabel} mode — click to change"
 
-#: src/features/chat/thread/thread.tsx:264
+#: src/features/chat/thread/thread.tsx:266
 msgid "{modelCount, plural, one {Ask # model anything...} other {Ask # models anything...}}"
 msgstr "{modelCount, plural, one {Ask # model anything...} other {Ask # models anything...}}"
 
@@ -1605,7 +1601,7 @@ msgstr "{star, plural, one {# star} other {# stars}}"
 msgid "{stateLabel} Stop hands-free voice mode"
 msgstr "{stateLabel} Stop hands-free voice mode"
 
-#: src/features/develop/components/thread-pull-requests.tsx:252
+#: src/features/develop/components/thread-pull-requests.tsx:257
 msgid "{success, plural, one {# pull request linked.} other {# pull requests linked.}}"
 msgstr "{success, plural, one {# pull request linked.} other {# pull requests linked.}}"
 
@@ -2010,15 +2006,15 @@ msgstr "a change is waiting to be read"
 msgid "A chat is waiting for your answer"
 msgstr "A chat is waiting for your answer"
 
-#: src/features/notifications/hooks/use-chat-run-toasts.ts:100
+#: src/features/notifications/hooks/use-chat-run-toasts.ts:279
 msgid "A chat needs your input or approval"
 msgstr "A chat needs your input or approval"
 
-#: src/features/notifications/hooks/use-chat-run-toasts.ts:82
+#: src/features/notifications/hooks/use-chat-run-toasts.ts:79
 msgid "A chat reply failed"
 msgstr "A chat reply failed"
 
-#: src/features/notifications/hooks/use-chat-run-toasts.ts:61
+#: src/features/notifications/hooks/use-chat-run-toasts.ts:79
 msgid "A chat reply finished"
 msgstr "A chat reply finished"
 
@@ -2079,11 +2075,11 @@ msgstr "A goal groups tasks. Its progress follows from how many of them are done
 msgid "A group chat. A question from the owner is answered by three agents in turn: a security reviewer, a performance reviewer, and a lead who sums up."
 msgstr "A group chat. A question from the owner is answered by three agents in turn: a security reviewer, a performance reviewer, and a lead who sums up."
 
-#: src/features/chat/core/context/chat-context.tsx:729
+#: src/features/chat/core/context/chat-context.tsx:761
 msgid "A guest's message cannot be sent as a goal."
 msgstr "A guest's message cannot be sent as a goal."
 
-#: src/features/chat/core/context/chat-context.tsx:732
+#: src/features/chat/core/context/chat-context.tsx:764
 msgid "A guest's message is sent through a hosted model only. Pick one and send it again."
 msgstr "A guest's message is sent through a hosted model only. Pick one and send it again."
 
@@ -2246,7 +2242,7 @@ msgstr "A run's thread is filed in this project. Moving the task to another proj
 msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 msgstr "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 
-#: src/features/notifications/components/notification-settings.tsx:248
+#: src/features/notifications/components/notification-settings.tsx:279
 msgid "A short summary each morning of what finished, what is running and what needs you. It counts toward your daily usage."
 msgstr "A short summary each morning of what finished, what is running and what needs you. It counts toward your daily usage."
 
@@ -2769,7 +2765,7 @@ msgstr "Add prompt"
 msgid "Add Provider"
 msgstr "Add Provider"
 
-#: src/features/develop/components/thread-pull-requests.tsx:230
+#: src/features/develop/components/thread-pull-requests.tsx:235
 msgid "Add pull requests that already exist to this thread. Each one is read from the host with your own connection first."
 msgstr "Add pull requests that already exist to this thread. Each one is read from the host with your own connection first."
 
@@ -2966,7 +2962,7 @@ msgstr "Adding…"
 msgid "Address"
 msgstr "Address"
 
-#: src/features/develop/components/pull-request-fixes.tsx:134
+#: src/features/develop/components/pull-request-fixes.tsx:110
 msgid "Address review"
 msgstr "Address review"
 
@@ -3757,7 +3753,7 @@ msgstr "Alphabetical"
 msgid "Already have an account?"
 msgstr "Already have an account?"
 
-#: src/features/develop/components/thread-pull-requests.tsx:96
+#: src/features/develop/components/thread-pull-requests.tsx:101
 msgid "Already linked to this thread."
 msgstr "Already linked to this thread."
 
@@ -4101,7 +4097,7 @@ msgstr "Anyone with the link can read this page. Comments are never shown. Turni
 msgid "Anyone with the link can view this thread"
 msgstr "Anyone with the link can view this thread"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:49
+#: src/features/chat/thread/composer-permission-mode.tsx:50
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:49
 msgid "Anything that is not a plain lookup asks first"
 msgstr "Anything that is not a plain lookup asks first"
@@ -4584,7 +4580,7 @@ msgstr "Ask a Side Question"
 msgid "Ask a side question without interrupting the reply"
 msgstr "Ask a side question without interrupting the reply"
 
-#: src/features/chat/thread/thread.tsx:264
+#: src/features/chat/thread/thread.tsx:266
 msgid "Ask all models anything..."
 msgstr "Ask all models anything..."
 
@@ -4726,7 +4722,7 @@ msgstr "Attachment {0} is over {MAX_FEEDBACK_IMAGE_MB} MB and could not be made 
 msgid "Attachment only"
 msgstr "Attachment only"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:449
+#: src/features/chat/thread/composer-prompt-queue.tsx:616
 msgid "Attachments:"
 msgstr "Attachments:"
 
@@ -4808,7 +4804,7 @@ msgstr "auto"
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
 #: src/features/chat/thread/composer-model-selector.tsx:122
-#: src/features/chat/thread/composer-permission-mode.tsx:41
+#: src/features/chat/thread/composer-permission-mode.tsx:42
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:65
 #: src/features/chat/thread/media-gallery-view.tsx:511
@@ -5248,6 +5244,10 @@ msgstr "beginner"
 #: src/features/settings/lib/settings-keywords.ts:28
 msgid "Behavior"
 msgstr "Behavior"
+
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:256
+msgid "Behind {base}"
+msgstr "Behind {base}"
 
 #: src/features/chat/core/utils/language-utilities.ts:336
 msgid "Belarus"
@@ -6091,6 +6091,7 @@ msgstr "Canada"
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:178
 #: src/features/chat/thread-list/snooze-until-dialog.tsx:111
 #: src/features/chat/thread/composer-draw-dialog.tsx:384
+#: src/features/chat/thread/composer-prompt-queue.tsx:651
 #: src/features/chat/thread/edit-composer.tsx:162
 #: src/features/chat/thread/fork-branch-dialog.tsx:91
 #: src/features/chat/thread/generation-model-menu.tsx:163
@@ -6313,6 +6314,14 @@ msgstr "Catalan (Spain)"
 msgid "catalog"
 msgstr "catalog"
 
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:279
+msgid "Catch up"
+msgstr "Catch up"
+
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:246
+msgid "Catch up {pullRequest} with {base}"
+msgstr "Catch up {pullRequest} with {base}"
+
 #: src/features/skills/components/skill-builder-diff.tsx:27
 #: src/features/skills/components/skill-form-dialog.tsx:317
 #: src/features/skills/components/skill-marketplace.tsx:160
@@ -6423,7 +6432,7 @@ msgstr "Changes from the last refinement"
 msgid "Changes in this turn"
 msgstr "Changes in this turn"
 
-#: src/features/develop/components/pull-request-fixes.tsx:134
+#: src/features/develop/components/pull-request-fixes.tsx:110
 msgid "Changes requested by {reviewers}"
 msgstr "Changes requested by {reviewers}"
 
@@ -6514,11 +6523,11 @@ msgstr "Chat Completions (/v1/chat/completions) — Ollama, LM Studio, vLLM and 
 msgid "Chat copied to clipboard as Markdown"
 msgstr "Chat copied to clipboard as Markdown"
 
-#: src/features/notifications/components/notification-settings.tsx:296
+#: src/features/notifications/components/notification-settings.tsx:327
 msgid "Chat failed"
 msgstr "Chat failed"
 
-#: src/features/notifications/components/notification-settings.tsx:279
+#: src/features/notifications/components/notification-settings.tsx:310
 msgid "Chat finished"
 msgstr "Chat finished"
 
@@ -6547,15 +6556,15 @@ msgstr "Chat lock: locked"
 msgid "chat model"
 msgstr "chat model"
 
-#: src/features/notifications/components/notification-settings.tsx:313
+#: src/features/notifications/components/notification-settings.tsx:344
 msgid "Chat needs your input or approval"
 msgstr "Chat needs your input or approval"
 
-#: src/features/notifications/components/notification-settings.tsx:122
+#: src/features/notifications/components/notification-settings.tsx:138
 msgid "Chat notification turned off"
 msgstr "Chat notification turned off"
 
-#: src/features/notifications/components/notification-settings.tsx:123
+#: src/features/notifications/components/notification-settings.tsx:139
 msgid "Chat notification turned on"
 msgstr "Chat notification turned on"
 
@@ -6810,7 +6819,7 @@ msgstr "Choose default text models"
 msgid "Choose default video models"
 msgstr "Choose default video models"
 
-#: src/features/notifications/components/notification-settings.tsx:220
+#: src/features/notifications/components/notification-settings.tsx:251
 msgid "Choose how Neore tells you about finished work and things that need you."
 msgstr "Choose how Neore tells you about finished work and things that need you."
 
@@ -7175,7 +7184,7 @@ msgstr "Clone or create new…"
 #: src/features/canvas/canvas-panel.tsx:835
 #: src/features/canvas/pdf-preview-panel.tsx:105
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
-#: src/features/develop/components/thread-pull-requests.tsx:275
+#: src/features/develop/components/thread-pull-requests.tsx:280
 #: src/features/evals/components/save-eval-case-action.tsx:95
 #: src/features/prompts/components/prompt-history-dialog.tsx:195
 #: src/features/settings/components/chat/custom-providers-settings.tsx:441
@@ -8057,7 +8066,7 @@ msgstr "Confirm password is required"
 msgid "Confirm your password"
 msgstr "Confirm your password"
 
-#: src/features/develop/components/pull-request-fixes.tsx:133
+#: src/features/develop/components/pull-request-fixes.tsx:109
 msgid "Conflicts with {base}"
 msgstr "Conflicts with {base}"
 
@@ -8198,7 +8207,7 @@ msgstr "Connect WhatsApp"
 msgid "Connect your {label} account to see what needs your review, what is yours, and what is ready to merge."
 msgstr "Connect your {label} account to see what needs your review, what is yours, and what is ready to merge."
 
-#: src/features/develop/components/thread-pull-requests.tsx:101
+#: src/features/develop/components/thread-pull-requests.tsx:106
 msgid "Connect your Git host in settings to link a pull request."
 msgstr "Connect your Git host in settings to link a pull request."
 
@@ -8615,7 +8624,7 @@ msgid "Conversations on lines this diff no longer shows"
 msgstr "Conversations on lines this diff no longer shows"
 
 #: src/features/chat/thread/composer-input.tsx:904
-#: src/features/chat/thread/composer-input.tsx:1888
+#: src/features/chat/thread/composer-input.tsx:1901
 msgid "Conversion failed"
 msgstr "Conversion failed"
 
@@ -8945,7 +8954,7 @@ msgstr "Could not attach {0}. The other files were attached; try those again."
 msgid "Could not attach {0}. Try those again."
 msgstr "Could not attach {0}. Try those again."
 
-#: src/features/chat/thread/composer-input.tsx:1918
+#: src/features/chat/thread/composer-input.tsx:1931
 msgid "Could not attach the chat"
 msgstr "Could not attach the chat"
 
@@ -8953,7 +8962,7 @@ msgstr "Could not attach the chat"
 msgid "could not be saved"
 msgstr "could not be saved"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:379
+#: src/features/chat/thread/composer-prompt-queue.tsx:469
 msgid "Could not cancel the message. It is still queued."
 msgstr "Could not cancel the message. It is still queued."
 
@@ -8965,7 +8974,7 @@ msgstr "Could not cancel the run."
 msgid "Could not change Auto. Please try again."
 msgstr "Could not change Auto. Please try again."
 
-#: src/features/notifications/components/notification-settings.tsx:190
+#: src/features/notifications/components/notification-settings.tsx:221
 msgid "Could not change push notifications. Try again."
 msgstr "Could not change push notifications. Try again."
 
@@ -8978,7 +8987,7 @@ msgstr "Could not change the bot's permission mode."
 msgid "Could not change the model. Please try again."
 msgstr "Could not change the model. Please try again."
 
-#: src/features/chat/thread/composer-permission-mode.tsx:202
+#: src/features/chat/thread/composer-permission-mode.tsx:205
 msgid "Could not change the permission mode. Please try again."
 msgstr "Could not change the permission mode. Please try again."
 
@@ -9111,7 +9120,7 @@ msgstr "Could not import the workflow"
 msgid "Could not keep this as yours. Try again."
 msgstr "Could not keep this as yours. Try again."
 
-#: src/features/develop/components/thread-pull-requests.tsx:178
+#: src/features/develop/components/thread-pull-requests.tsx:183
 msgid "Could not link. Try again."
 msgstr "Could not link. Try again."
 
@@ -9132,7 +9141,7 @@ msgstr "Could not load more projects."
 msgid "Could not load statistics for this thread."
 msgstr "Could not load statistics for this thread."
 
-#: src/features/develop/components/thread-pull-requests.tsx:196
+#: src/features/develop/components/thread-pull-requests.tsx:201
 msgid "Could not load the linked pull requests."
 msgstr "Could not load the linked pull requests."
 
@@ -9165,7 +9174,7 @@ msgid "Could not load this"
 msgstr "Could not load this"
 
 #: src/features/chat/split/chat-split-view.tsx:206
-#: src/features/chat/thread/thread.tsx:365
+#: src/features/chat/thread/thread.tsx:367
 msgid "Could not load this chat's details."
 msgstr "Could not load this chat's details."
 
@@ -9249,7 +9258,7 @@ msgstr "Could not preview · Click to download"
 msgid "Could not pull {0}: {1}"
 msgstr "Could not pull {0}: {1}"
 
-#: src/features/chat/core/context/chat-context.tsx:676
+#: src/features/chat/core/context/chat-context.tsx:708
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr "Could not reach the server to start generating. Check your connection and try again."
 
@@ -9257,11 +9266,11 @@ msgstr "Could not reach the server to start generating. Check your connection an
 msgid "Could not reach the server. Try again."
 msgstr "Could not reach the server. Try again."
 
-#: src/features/chat/thread/composer-input.tsx:1921
+#: src/features/chat/thread/composer-input.tsx:1934
 msgid "Could not read that chat"
 msgstr "Could not read that chat"
 
-#: src/features/chat/thread/composer-input.tsx:1922
+#: src/features/chat/thread/composer-input.tsx:1935
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Could not read that chat. If it is locked, unlock it first."
 
@@ -9269,7 +9278,7 @@ msgstr "Could not read that chat. If it is locked, unlock it first."
 msgid "Could not read the pasted list"
 msgstr "Could not read the pasted list"
 
-#: src/features/develop/components/pull-request-fixes.tsx:229
+#: src/features/develop/components/pull-request-fixes.tsx:205
 msgid "Could not read what blocks {name}. Try again"
 msgstr "Could not read what blocks {name}. Try again"
 
@@ -9324,11 +9333,11 @@ msgstr "Could not save that choice. Try again."
 msgid "Could not save the bot's tools. Its tools are unchanged."
 msgstr "Could not save the bot's tools. Its tools are unchanged."
 
-#: src/features/notifications/components/notification-settings.tsx:121
+#: src/features/notifications/components/notification-settings.tsx:137
 msgid "Could not save the chat notification setting."
 msgstr "Could not save the chat notification setting."
 
-#: src/features/notifications/components/notification-settings.tsx:131
+#: src/features/notifications/components/notification-settings.tsx:162
 msgid "Could not save the Daily Brief setting."
 msgstr "Could not save the Daily Brief setting."
 
@@ -9336,7 +9345,7 @@ msgstr "Could not save the Daily Brief setting."
 msgid "Could not save the default permission mode"
 msgstr "Could not save the default permission mode"
 
-#: src/features/notifications/components/notification-settings.tsx:107
+#: src/features/notifications/components/notification-settings.tsx:117
 msgid "Could not save the email setting."
 msgstr "Could not save the email setting."
 
@@ -10116,7 +10125,7 @@ msgid "Czech Republic"
 msgstr "Czech Republic"
 
 #: src/features/home/components/daily-brief-offer.tsx:105
-#: src/features/notifications/components/notification-settings.tsx:245
+#: src/features/notifications/components/notification-settings.tsx:276
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:57
 msgid "Daily Brief"
 msgstr "Daily Brief"
@@ -10130,11 +10139,11 @@ msgstr "Daily Brief is on. It comes in the morning when there is something to re
 msgid "Daily Brief is on. The next one is planned for {0}; a morning with nothing to report sends none."
 msgstr "Daily Brief is on. The next one is planned for {0}; a morning with nothing to report sends none."
 
-#: src/features/notifications/components/notification-settings.tsx:132
+#: src/features/notifications/components/notification-settings.tsx:163
 msgid "Daily Brief turned off"
 msgstr "Daily Brief turned off"
 
-#: src/features/notifications/components/notification-settings.tsx:133
+#: src/features/notifications/components/notification-settings.tsx:164
 msgid "Daily Brief turned on"
 msgstr "Daily Brief turned on"
 
@@ -11814,7 +11823,7 @@ msgstr "Drop file or click to upload"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:2117
+#: src/features/chat/thread/composer-input.tsx:2130
 msgid "Drop files here"
 msgstr "Drop files here"
 
@@ -11984,7 +11993,7 @@ msgstr "e.g., Professional Writer"
 msgid "e.g., Strict JSON coder"
 msgstr "e.g., Strict JSON coder"
 
-#: src/features/develop/components/pull-request-fixes.tsx:160
+#: src/features/develop/components/pull-request-fixes.tsx:136
 msgid "Each action puts a prompt into this chat's message box. Read it, then send it yourself."
 msgstr "Each action puts a prompt into this chat's message box. Read it, then send it yourself."
 
@@ -12232,8 +12241,8 @@ msgstr "Edit queued message"
 msgid "Edit queued message {0}"
 msgstr "Edit queued message {0}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:466
-#: src/features/chat/thread/composer-prompt-queue.tsx:513
+#: src/features/chat/thread/composer-prompt-queue.tsx:581
+#: src/features/chat/thread/composer-prompt-queue.tsx:657
 msgid "Edit queued message {position}"
 msgstr "Edit queued message {position}"
 
@@ -12523,7 +12532,7 @@ msgstr "Email verification sent"
 msgid "Email Verified:"
 msgstr "Email Verified:"
 
-#: src/features/notifications/components/notification-settings.tsx:262
+#: src/features/notifications/components/notification-settings.tsx:293
 msgid "Email when a task finishes"
 msgstr "Email when a task finishes"
 
@@ -12860,7 +12869,7 @@ msgstr "Enter organization name"
 msgid "Enter organization slug"
 msgstr "Enter organization slug"
 
-#: src/features/develop/components/thread-pull-requests.tsx:120
+#: src/features/develop/components/thread-pull-requests.tsx:125
 msgid "Enter pull requests as owner/name#123."
 msgstr "Enter pull requests as owner/name#123."
 
@@ -13275,7 +13284,7 @@ msgstr "Every request must be signed. Send <0>X-Neore-Timestamp</0> (the current
 msgid "Every Sunday at midnight"
 msgstr "Every Sunday at midnight"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:48
+#: src/features/chat/thread/composer-permission-mode.tsx:49
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:48
 msgid "Every tool runs without asking, except those that need your answer"
 msgstr "Every tool runs without asking, except those that need your answer"
@@ -13872,7 +13881,7 @@ msgid "Failed to attach collection"
 msgstr "Failed to attach collection"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1701
+#: src/features/chat/thread/composer-input.tsx:1704
 msgid "Failed to attach file"
 msgstr "Failed to attach file"
 
@@ -14282,7 +14291,7 @@ msgstr "Failed to request export"
 msgid "Failed to reset to defaults"
 msgstr "Failed to reset to defaults"
 
-#: src/features/chat/thread/composer-input.tsx:1733
+#: src/features/chat/thread/composer-input.tsx:1736
 msgid "Failed to restore attachment"
 msgstr "Failed to restore attachment"
 
@@ -14590,7 +14599,7 @@ msgstr "Failed to upload file. Please try again."
 msgid "Failed to upload files. Please try again."
 msgstr "Failed to upload files. Please try again."
 
-#: src/features/develop/components/pull-request-fixes.tsx:132
+#: src/features/develop/components/pull-request-fixes.tsx:108
 msgid "Failing checks: {checks}"
 msgstr "Failing checks: {checks}"
 
@@ -15374,7 +15383,7 @@ msgstr "Fisheye, extreme distortion"
 msgid "Fit view"
 msgstr "Fit view"
 
-#: src/features/develop/components/pull-request-fixes.tsx:132
+#: src/features/develop/components/pull-request-fixes.tsx:108
 msgid "Fix checks"
 msgstr "Fix checks"
 
@@ -15943,7 +15952,7 @@ msgid "Full 1080p high-definition video output"
 msgstr "Full 1080p high-definition video output"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
-#: src/features/chat/thread/composer-permission-mode.tsx:42
+#: src/features/chat/thread/composer-permission-mode.tsx:43
 #: src/features/settings/components/chat/bots-settings.tsx:133
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:42
 msgid "Full access"
@@ -16289,7 +16298,7 @@ msgstr "Germany"
 msgid "Get a short summary each morning of what finished, what needs you and what is still running. It counts toward your daily usage."
 msgstr "Get a short summary each morning of what finished, what needs you and what is still running. It counts toward your daily usage."
 
-#: src/features/notifications/components/notification-settings.tsx:214
+#: src/features/notifications/components/notification-settings.tsx:245
 msgid "Get a system notification when a task finishes or something needs your approval, even with the app closed."
 msgstr "Get a system notification when a task finishes or something needs your approval, even with the app closed."
 
@@ -16297,7 +16306,7 @@ msgstr "Get a system notification when a task finishes or something needs your a
 msgid "Get Access"
 msgstr "Get Access"
 
-#: src/features/notifications/components/notification-settings.tsx:265
+#: src/features/notifications/components/notification-settings.tsx:296
 msgid "Get an email with a link to the result when a task or trigger run finishes with one."
 msgstr "Get an email with a link to the result when a task or trigger run finishes with one."
 
@@ -19768,7 +19777,7 @@ msgstr "Lines that are not valid JSON"
 
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:340
 #: src/features/auth/components/settings/providers/provider-cell.tsx:113
-#: src/features/develop/components/thread-pull-requests.tsx:277
+#: src/features/develop/components/thread-pull-requests.tsx:282
 msgid "Link"
 msgstr "Link"
 
@@ -19776,7 +19785,7 @@ msgstr "Link"
 msgid "Link active until {expiresAt}"
 msgstr "Link active until {expiresAt}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:132
+#: src/features/develop/components/thread-pull-requests.tsx:137
 msgid "Link at most {MAX_PULL_REQUESTS_PER_ATTACH} pull requests at a time."
 msgstr "Link at most {MAX_PULL_REQUESTS_PER_ATTACH} pull requests at a time."
 
@@ -19794,11 +19803,11 @@ msgstr "Link preview"
 msgid "Link previews"
 msgstr "Link previews"
 
-#: src/features/develop/components/thread-pull-requests.tsx:210
+#: src/features/develop/components/thread-pull-requests.tsx:215
 msgid "Link pull request"
 msgstr "Link pull request"
 
-#: src/features/develop/components/thread-pull-requests.tsx:229
+#: src/features/develop/components/thread-pull-requests.tsx:234
 msgid "Link pull requests"
 msgstr "Link pull requests"
 
@@ -19810,7 +19819,7 @@ msgstr "Linked by hand"
 msgid "Linked pull requests: {linkedPullRequests}"
 msgstr "Linked pull requests: {linkedPullRequests}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:97
+#: src/features/develop/components/thread-pull-requests.tsx:102
 msgid "Linked to this thread."
 msgstr "Linked to this thread."
 
@@ -19818,8 +19827,8 @@ msgstr "Linked to this thread."
 msgid "LinkedIn Post"
 msgstr "LinkedIn Post"
 
-#: src/features/develop/components/thread-pull-requests.tsx:258
-#: src/features/develop/components/thread-pull-requests.tsx:277
+#: src/features/develop/components/thread-pull-requests.tsx:263
+#: src/features/develop/components/thread-pull-requests.tsx:282
 msgid "Linking…"
 msgstr "Linking…"
 
@@ -20174,7 +20183,7 @@ msgstr "Loading the guest link…"
 msgid "Loading the guide"
 msgstr "Loading the guide"
 
-#: src/features/develop/components/thread-pull-requests.tsx:191
+#: src/features/develop/components/thread-pull-requests.tsx:196
 msgid "Loading the linked pull requests…"
 msgstr "Loading the linked pull requests…"
 
@@ -20269,7 +20278,7 @@ msgstr "Loading…"
 msgid "local"
 msgstr "local"
 
-#: src/features/chat/core/context/chat-context.tsx:736
+#: src/features/chat/core/context/chat-context.tsx:768
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "Local models are text only. Remove the attachments to send."
 
@@ -22030,11 +22039,11 @@ msgstr "Move down one page"
 msgid "Move out one level"
 msgstr "Move out one level"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:469
+#: src/features/chat/thread/composer-prompt-queue.tsx:677
 msgid "Move queued message {position} down"
 msgstr "Move queued message {position} down"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:459
+#: src/features/chat/thread/composer-prompt-queue.tsx:667
 msgid "Move queued message {position} up"
 msgstr "Move queued message {position} up"
 
@@ -22101,8 +22110,8 @@ msgid "Moved selected node {0}. New position, x: {x}, y: {y}"
 msgstr "Moved selected node {0}. New position, x: {x}, y: {y}"
 
 #. placeholder {0}: to + 1
-#: src/features/chat/thread/composer-prompt-queue.tsx:702
-#: src/features/chat/thread/composer-prompt-queue.tsx:729
+#: src/features/chat/thread/composer-prompt-queue.tsx:1093
+#: src/features/chat/thread/composer-prompt-queue.tsx:1120
 msgid "Moved to position {0}"
 msgstr "Moved to position {0}"
 
@@ -23808,7 +23817,7 @@ msgstr "Not delivered to the lead"
 msgid "Not found"
 msgstr "Not found"
 
-#: src/features/develop/components/thread-pull-requests.tsx:263
+#: src/features/develop/components/thread-pull-requests.tsx:268
 msgid "Not linked"
 msgstr "Not linked"
 
@@ -23931,15 +23940,15 @@ msgstr "Notification workflows, channels, and recipient preferences"
 #: src/features/home/components/home-page.tsx:227
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
-#: src/features/notifications/components/notification-settings.tsx:220
+#: src/features/notifications/components/notification-settings.tsx:251
 msgid "Notifications"
 msgstr "Notifications"
 
-#: src/features/notifications/components/notification-settings.tsx:166
+#: src/features/notifications/components/notification-settings.tsx:197
 msgid "Notifications are blocked for this site in your browser."
 msgstr "Notifications are blocked for this site in your browser."
 
-#: src/features/notifications/components/notification-settings.tsx:207
+#: src/features/notifications/components/notification-settings.tsx:238
 msgid "Notifications are blocked for this site in your browser. Allow them in the site settings to turn this on."
 msgstr "Notifications are blocked for this site in your browser. Allow them in the site settings to turn this on."
 
@@ -24734,7 +24743,7 @@ msgstr "Open the model picker in the composer ({0})"
 
 #. placeholder {0}: link.repository
 #. placeholder {1}: link.number
-#: src/features/develop/components/thread-pull-requests.tsx:36
+#: src/features/develop/components/thread-pull-requests.tsx:40
 msgid "Open the pull request {0}#{1}"
 msgstr "Open the pull request {0}#{1}"
 
@@ -26020,7 +26029,7 @@ msgstr "Permanently delete your account and all associated data"
 msgid "Permission Level"
 msgstr "Permission Level"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:89
+#: src/features/chat/thread/composer-permission-mode.tsx:90
 #: src/features/settings/components/chat/bots-settings.tsx:415
 msgid "Permission mode"
 msgstr "Permission mode"
@@ -26031,8 +26040,8 @@ msgid "Permission mode for {0}"
 msgstr "Permission mode for {0}"
 
 #. placeholder {0}: labels[mode]
-#: src/features/chat/thread/composer-permission-mode.tsx:63
-#: src/features/chat/thread/composer-permission-mode.tsx:81
+#: src/features/chat/thread/composer-permission-mode.tsx:64
+#: src/features/chat/thread/composer-permission-mode.tsx:82
 msgid "Permission mode: {0}"
 msgstr "Permission mode: {0}"
 
@@ -26992,7 +27001,7 @@ msgstr "Problem"
 msgid "Problems"
 msgstr "Problems"
 
-#: src/features/develop/components/pull-request-fixes.tsx:152
+#: src/features/develop/components/pull-request-fixes.tsx:128
 msgid "Problems on {name}: {count}"
 msgstr "Problems on {name}: {count}"
 
@@ -27512,7 +27521,7 @@ msgid "Pull request settings updated"
 msgstr "Pull request settings updated"
 
 #: src/features/code/components/code-shell.tsx:95
-#: src/features/develop/components/thread-pull-requests.tsx:233
+#: src/features/develop/components/thread-pull-requests.tsx:238
 msgid "Pull requests"
 msgstr "Pull requests"
 
@@ -27544,29 +27553,37 @@ msgstr "Purpose-built for complex software engineering tasks"
 msgid "Purpose-optimized for code generation and debugging"
 msgstr "Purpose-optimized for code generation and debugging"
 
-#: src/features/notifications/components/notification-settings.tsx:167
+#: src/features/notifications/components/notification-settings.tsx:198
 msgid "Push notifications are not available here."
 msgstr "Push notifications are not available here."
 
-#: src/features/notifications/components/notification-settings.tsx:202
+#: src/features/notifications/components/notification-settings.tsx:233
 msgid "Push notifications are not configured on this server."
 msgstr "Push notifications are not configured on this server."
 
-#: src/features/notifications/components/notification-settings.tsx:187
+#: src/features/notifications/components/notification-settings.tsx:218
 msgid "Push notifications are off for this browser"
 msgstr "Push notifications are off for this browser"
 
-#: src/features/notifications/components/notification-settings.tsx:178
+#: src/features/notifications/components/notification-settings.tsx:209
 msgid "Push notifications are on for this browser"
 msgstr "Push notifications are on for this browser"
 
-#: src/features/notifications/components/notification-settings.tsx:225
+#: src/features/notifications/components/notification-settings.tsx:256
 msgid "Push notifications on this browser"
 msgstr "Push notifications on this browser"
 
 #: src/features/marketing/use-cases/use-case-data.ts:104
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
+
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:285
+msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, and check the build and tests. It pushes only when a signed-in gh confirms the pull request is still open on that base. Nothing is sent."
+msgstr "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, and check the build and tests. It pushes only when a signed-in gh confirms the pull request is still open on that base. Nothing is sent."
+
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:286
+msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
+msgstr "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
 
 #: src/features/chat/thread/composer-image-settings.tsx:181
 #: src/features/chat/thread/media-gallery-view.tsx:483
@@ -27608,7 +27625,7 @@ msgid "Queued"
 msgstr "Queued"
 
 #: src/features/chat/host/host-composer.tsx:374
-#: src/features/chat/thread/composer-prompt-queue.tsx:774
+#: src/features/chat/thread/composer-prompt-queue.tsx:1175
 msgid "Queued messages"
 msgstr "Queued messages"
 
@@ -28157,7 +28174,7 @@ msgstr "Reconnect"
 msgid "Reconnect {0}"
 msgstr "Reconnect {0}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:100
+#: src/features/develop/components/thread-pull-requests.tsx:105
 msgid "Reconnect your Git host in settings to link a pull request."
 msgstr "Reconnect your Git host in settings to link a pull request."
 
@@ -28745,7 +28762,7 @@ msgstr "Remove provider?"
 msgid "Remove queued message {0}"
 msgstr "Remove queued message {0}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:479
+#: src/features/chat/thread/composer-prompt-queue.tsx:687
 msgid "Remove queued message {position}"
 msgstr "Remove queued message {position}"
 
@@ -28939,7 +28956,7 @@ msgstr "Reply"
 msgid "Reply complete"
 msgstr "Reply complete"
 
-#: src/features/chat/core/context/chat-context.tsx:640
+#: src/features/chat/core/context/chat-context.tsx:645
 msgid "Reply ready"
 msgstr "Reply ready"
 
@@ -29170,7 +29187,7 @@ msgstr "Resolution"
 msgid "Resolve"
 msgstr "Resolve"
 
-#: src/features/develop/components/pull-request-fixes.tsx:133
+#: src/features/develop/components/pull-request-fixes.tsx:109
 msgid "Resolve conflicts"
 msgstr "Resolve conflicts"
 
@@ -29959,6 +29976,7 @@ msgstr "Saudi Arabia"
 #: src/features/chat/pins/pin-item.tsx:304
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:181
+#: src/features/chat/thread/composer-prompt-queue.tsx:640
 #: src/features/chat/thread/edit-composer.tsx:166
 #: src/features/chat/thread/request-secret-prompt.tsx:490
 #: src/features/develop/components/draft-comment-card.tsx:43
@@ -30222,7 +30240,7 @@ msgstr "Score"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 
-#: src/features/chat/thread/composer-input.tsx:1660
+#: src/features/chat/thread/composer-input.tsx:1663
 msgid "Screen capture failed. Please try again."
 msgstr "Screen capture failed. Please try again."
 
@@ -30969,7 +30987,7 @@ msgid "Send messages to the AI bot via Telegram. Conversations appear as threads
 msgstr "Send messages to the AI bot via Telegram. Conversations appear as threads in your chat list."
 
 #: src/features/chat/host/host-composer.tsx:1035
-#: src/features/chat/thread/composer-prompt-queue.tsx:793
+#: src/features/chat/thread/composer-prompt-queue.tsx:1207
 msgid "Send next"
 msgstr "Send next"
 
@@ -31427,15 +31445,15 @@ msgstr "Show {name} in model picker"
 msgid "Show {remainingCount} more"
 msgstr "Show {remainingCount} more"
 
-#: src/features/notifications/components/notification-settings.tsx:299
+#: src/features/notifications/components/notification-settings.tsx:330
 msgid "Show a message in the app when a chat reply fails."
 msgstr "Show a message in the app when a chat reply fails."
 
-#: src/features/notifications/components/notification-settings.tsx:282
+#: src/features/notifications/components/notification-settings.tsx:313
 msgid "Show a message in the app when a chat reply finishes."
 msgstr "Show a message in the app when a chat reply finishes."
 
-#: src/features/notifications/components/notification-settings.tsx:316
+#: src/features/notifications/components/notification-settings.tsx:347
 msgid "Show a message in the app when a chat waits for your answer or your approval."
 msgstr "Show a message in the app when a chat waits for your answer or your approval."
 
@@ -32947,7 +32965,7 @@ msgstr "Steer — the current reply reads this at its next step"
 msgid "Steer the reply"
 msgstr "Steer the reply"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:440
+#: src/features/chat/thread/composer-prompt-queue.tsx:575
 msgid "Steering:"
 msgstr "Steering:"
 
@@ -33673,7 +33691,7 @@ msgstr "Superior multi-file code generation and refactoring"
 msgid "Superior understanding of complex visual concepts"
 msgstr "Superior understanding of complex visual concepts"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:43
+#: src/features/chat/thread/composer-permission-mode.tsx:44
 #: src/features/settings/components/chat/bots-settings.tsx:134
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:43
 msgid "Supervised"
@@ -33767,7 +33785,7 @@ msgstr "Switch to {label}"
 msgid "Switch to {name}?"
 msgstr "Switch to {name}?"
 
-#: src/features/chat/core/context/chat-context.tsx:731
+#: src/features/chat/core/context/chat-context.tsx:763
 msgid "Switch to a text model to send this message."
 msgstr "Switch to a text model to send this message."
 
@@ -33998,11 +34016,11 @@ msgstr "Task details, your review and the run history."
 msgid "Task done: {title}"
 msgstr "Task done: {title}"
 
-#: src/features/notifications/components/notification-settings.tsx:108
+#: src/features/notifications/components/notification-settings.tsx:118
 msgid "Task emails turned off"
 msgstr "Task emails turned off"
 
-#: src/features/notifications/components/notification-settings.tsx:109
+#: src/features/notifications/components/notification-settings.tsx:119
 msgid "Task emails turned on"
 msgstr "Task emails turned on"
 
@@ -34538,7 +34556,7 @@ msgstr "That folder is the server's home folder or a folder above it. Choose a f
 msgid "That folder was not found."
 msgstr "That folder was not found."
 
-#: src/features/chat/core/context/chat-context.tsx:727
+#: src/features/chat/core/context/chat-context.tsx:759
 msgid "That guest link has ended."
 msgstr "That guest link has ended."
 
@@ -34558,7 +34576,7 @@ msgstr "That link could not be read."
 msgid "That message could not be found in this conversation."
 msgstr "That message could not be found in this conversation."
 
-#: src/features/chat/core/context/chat-context.tsx:730
+#: src/features/chat/core/context/chat-context.tsx:762
 #: src/features/chat/guest-links/guest-link-panel.tsx:143
 msgid "That message is being sent."
 msgstr "That message is being sent."
@@ -34571,7 +34589,7 @@ msgstr "That message is no longer waiting."
 msgid "That message is too long to send from here."
 msgstr "That message is too long to send from here."
 
-#: src/features/chat/core/context/chat-context.tsx:728
+#: src/features/chat/core/context/chat-context.tsx:760
 #: src/features/chat/guest-links/guest-link-panel.tsx:240
 #: src/features/chat/guest-links/guest-link-panel.tsx:316
 msgid "That message was already sent."
@@ -35115,7 +35133,7 @@ msgstr "The host"
 msgid "the host did not answer"
 msgstr "the host did not answer"
 
-#: src/features/develop/components/thread-pull-requests.tsx:99
+#: src/features/develop/components/thread-pull-requests.tsx:104
 msgid "The host did not answer. Try again."
 msgstr "The host did not answer. Try again."
 
@@ -35127,11 +35145,11 @@ msgstr "The host did not answer. Trying again later."
 msgid "the host did not change the option"
 msgstr "the host did not change the option"
 
-#: src/features/develop/components/thread-pull-requests.tsx:102
+#: src/features/develop/components/thread-pull-requests.tsx:107
 msgid "The host has no pull request at that address."
 msgstr "The host has no pull request at that address."
 
-#: src/features/develop/components/thread-pull-requests.tsx:104
+#: src/features/develop/components/thread-pull-requests.tsx:109
 msgid "The host is limiting requests. Try again shortly."
 msgstr "The host is limiting requests. Try again shortly."
 
@@ -35309,7 +35327,7 @@ msgstr "The model in the link is not available. The chat keeps its model."
 msgid "The model picker now lists {0} models from {1}"
 msgstr "The model picker now lists {0} models from {1}"
 
-#: src/features/chat/thread/composer-input.tsx:1595
+#: src/features/chat/thread/composer-input.tsx:1598
 msgid "The model selection changed while the uploads ran, so the message was not sent. Press send to send it."
 msgstr "The model selection changed while the uploads ran, so the message was not sent. Press send to send it."
 
@@ -35618,7 +35636,7 @@ msgstr "The unified LLM gateway for modern AI applications."
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "The upload of \"{fileName}\" expired. Please attach it again."
 
-#: src/features/chat/thread/composer-input.tsx:1608
+#: src/features/chat/thread/composer-input.tsx:1611
 msgid "The uploads finished, but the message was not sent. Press send to send it."
 msgstr "The uploads finished, but the message was not sent. Press send to send it."
 
@@ -35835,7 +35853,7 @@ msgstr "This branch is behind its base branch."
 msgid "This branch was changed meanwhile. Check it and save again."
 msgstr "This branch was changed meanwhile. Check it and save again."
 
-#: src/features/notifications/components/notification-settings.tsx:211
+#: src/features/notifications/components/notification-settings.tsx:242
 msgid "This browser cannot receive push notifications here."
 msgstr "This browser cannot receive push notifications here."
 
@@ -35933,7 +35951,7 @@ msgstr "This collection is shared with you by a member of your organization. You
 msgid "This command name is reserved"
 msgstr "This command name is reserved"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:198
+#: src/features/chat/thread/composer-permission-mode.tsx:201
 msgid "This comparison's mode applies to every column. Change it on the comparison."
 msgstr "This comparison's mode applies to every column. Change it on the comparison."
 
@@ -36214,7 +36232,7 @@ msgstr "This merges the commit {0} into the base branch with “{1}” on {hostL
 msgid "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
 msgstr "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
 
-#: src/features/chat/core/context/chat-context.tsx:733
+#: src/features/chat/core/context/chat-context.tsx:765
 msgid "This message cannot be sent in this chat."
 msgstr "This message cannot be sent in this chat."
 
@@ -36326,7 +36344,7 @@ msgstr "This prompt will be used for every message. Each message is processed in
 msgid "This prompt will configure:"
 msgstr "This prompt will configure:"
 
-#: src/features/develop/components/thread-pull-requests.tsx:103
+#: src/features/develop/components/thread-pull-requests.tsx:108
 msgid "This pull request already has as many threads linked as it can keep."
 msgstr "This pull request already has as many threads linked as it can keep."
 
@@ -36439,7 +36457,7 @@ msgstr "This text is only hidden characters, so there is nothing to save."
 msgid "This thread"
 msgstr "This thread"
 
-#: src/features/develop/components/thread-pull-requests.tsx:105
+#: src/features/develop/components/thread-pull-requests.tsx:110
 msgid "This thread already has as many pull requests linked as it can keep."
 msgstr "This thread already has as many pull requests linked as it can keep."
 
@@ -37005,7 +37023,7 @@ msgstr "Tools"
 msgid "Tools for {0}"
 msgstr "Tools for {0}"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:47
+#: src/features/chat/thread/composer-permission-mode.tsx:48
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:47
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr "Tools run on their own settings; a quick check can clear low-risk calls"
@@ -37344,7 +37362,7 @@ msgstr "Try adjusting your search terms."
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
-#: src/features/develop/components/thread-pull-requests.tsx:198
+#: src/features/develop/components/thread-pull-requests.tsx:203
 #: src/features/home/components/home-page.tsx:154
 #: src/features/projects/components/computer-rule-file-import.tsx:495
 #: src/features/projects/components/project-repo-picker.tsx:190
@@ -37529,6 +37547,10 @@ msgstr "Type into \"{selector}\""
 msgid "Type it again"
 msgstr "Type it again"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:629
+msgid "Type some visible text to save this message."
+msgstr "Type some visible text to save this message."
+
 #: ../../packages/ui/src/components/data-grid/data-grid-search.tsx:221
 msgid "Type to search"
 msgstr "Type to search"
@@ -37543,7 +37565,7 @@ msgid "Type your answer…"
 msgstr "Type your answer…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:250
-#: src/features/chat/thread/composer-input.tsx:2107
+#: src/features/chat/thread/composer-input.tsx:2120
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:231
 msgid "Type your message..."
 msgstr "Type your message..."
@@ -37971,7 +37993,7 @@ msgstr "Up-to-date docs for any library or framework"
 msgid "Update Duration"
 msgstr "Update Duration"
 
-#: src/features/chat/thread/composer-input.tsx:1957
+#: src/features/chat/thread/composer-input.tsx:1970
 msgid "Update failed"
 msgstr "Update failed"
 
@@ -38171,12 +38193,12 @@ msgstr "Upload documents to your knowledge base and group them into collections.
 
 #: src/features/chat/thread/composer-input.tsx:436
 #: src/features/chat/thread/composer-input.tsx:759
-#: src/features/chat/thread/composer-input.tsx:1863
+#: src/features/chat/thread/composer-input.tsx:1876
 msgid "Upload failed"
 msgstr "Upload failed"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1856
+#: src/features/chat/thread/composer-input.tsx:1869
 msgid "Upload failed: {0}"
 msgstr "Upload failed: {0}"
 
@@ -39456,11 +39478,11 @@ msgstr "Watched repositories"
 msgid "We could not check that you are signed in. Try again in a moment."
 msgstr "We could not check that you are signed in. Try again in a moment."
 
-#: src/features/chat/core/context/chat-context.tsx:735
+#: src/features/chat/core/context/chat-context.tsx:767
 msgid "We could not confirm your session in time. The guest's message was not sent; send it again from the Guests tab."
 msgstr "We could not confirm your session in time. The guest's message was not sent; send it again from the Guests tab."
 
-#: src/features/chat/core/context/chat-context.tsx:738
+#: src/features/chat/core/context/chat-context.tsx:770
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 
@@ -39651,7 +39673,7 @@ msgstr "What are the latest developments in quantum computing?"
 msgid "What are the top-rated productivity apps in 2025?"
 msgstr "What are the top-rated productivity apps in 2025?"
 
-#: src/features/develop/components/pull-request-fixes.tsx:159
+#: src/features/develop/components/pull-request-fixes.tsx:135
 msgid "What blocks {name}"
 msgstr "What blocks {name}"
 
@@ -40310,7 +40332,7 @@ msgstr "You are offline. Reconnect and try again."
 
 #: src/features/chat/thread/composer-input.tsx:1195
 #: src/features/chat/thread/composer-input.tsx:1320
-#: src/features/chat/thread/composer-prompt-queue.tsx:112
+#: src/features/chat/thread/composer-prompt-queue.tsx:181
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "You are offline. Your message stays here; send it once you are back online."
 
@@ -40359,7 +40381,7 @@ msgstr "You can view this page but not edit it."
 msgid "You cannot ask a side question in this chat."
 msgstr "You cannot ask a side question in this chat."
 
-#: src/features/develop/components/thread-pull-requests.tsx:98
+#: src/features/develop/components/thread-pull-requests.tsx:103
 msgid "You cannot see that pull request on the host."
 msgstr "You cannot see that pull request on the host."
 
@@ -40550,7 +40572,7 @@ msgstr "Your AI workspace <0>starts here.</0>"
 msgid "Your answer"
 msgstr "Your answer"
 
-#: src/features/chat/core/context/chat-context.tsx:640
+#: src/features/chat/core/context/chat-context.tsx:645
 msgid "Your answer in Neore has finished."
 msgstr "Your answer in Neore has finished."
 
@@ -40736,11 +40758,11 @@ msgstr "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgid "Your message"
 msgstr "Your message"
 
-#: src/features/chat/thread/composer-input.tsx:1580
+#: src/features/chat/thread/composer-input.tsx:1583
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 msgstr "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 
-#: src/features/chat/core/context/chat-context.tsx:726
+#: src/features/chat/core/context/chat-context.tsx:758
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Your message contains inappropriate content that cannot be sent."
 

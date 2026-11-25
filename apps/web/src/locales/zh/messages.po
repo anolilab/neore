@@ -122,7 +122,7 @@ msgstr "（{0}/{MAX_PARTICIPANTS}，至少 {MIN_PARTICIPANTS} 个）"
 msgid "({jobFailed} failed)"
 msgstr "（{jobFailed} 个失败）"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:414
+#: src/features/chat/thread/composer-prompt-queue.tsx:519
 msgid "(attachments only)"
 msgstr "（仅附件）"
 
@@ -897,7 +897,7 @@ msgstr "{activeCount, plural, other {你已连接 # 个即时通讯平台}}"
 msgid "{activeCount} of {0} MCP servers active"
 msgstr "{activeCount}/{0} 个 MCP 服务器已启用"
 
-#: src/features/develop/components/thread-pull-requests.tsx:162
+#: src/features/develop/components/thread-pull-requests.tsx:167
 msgid "{address}: {reason}"
 msgstr "{address}：{reason}"
 
@@ -974,7 +974,7 @@ msgstr "{count, plural, other {已选择 # 条消息}}"
 msgid "{count, plural, one {# of {maxReferenceImages} reference attached} other {# of {maxReferenceImages} references attached}}"
 msgstr "{count, plural, other {已附加 #/{maxReferenceImages} 张参考图}}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:755
+#: src/features/chat/thread/composer-prompt-queue.tsx:1149
 msgid "{count, plural, one {# steering — the reply reads it at its next step} other {# steering — the reply reads them at its next step}}"
 msgstr "{count, plural, other {# 条引导——回复会在下一步读取}}"
 
@@ -994,25 +994,21 @@ msgstr "{count, plural, other {使用了 # 个来源}}"
 msgid "{count} characters now."
 msgstr "当前 {count} 个字符。"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:752
+#: src/features/chat/thread/composer-prompt-queue.tsx:1146
 msgid "{count} queued"
 msgstr "{count} 条排队中"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:752
+#: src/features/chat/thread/composer-prompt-queue.tsx:1146
 msgid "{count} queued — sends when the current reply finishes"
 msgstr "{count} 条排队中——当前回复完成后发送"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:760
-msgid "{count} queued — waiting for the permission mode to save"
-msgstr "{count} 项已排队，等待保存权限模式"
-
-#: src/features/chat/thread/composer-prompt-queue.tsx:978
+#: src/features/chat/thread/composer-prompt-queue.tsx:1156
 msgid "{count} queued — sends when the edit closes"
 msgstr "{count} 条排队中 — 编辑结束后发送"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:563
-msgid "Type some visible text to save this message."
-msgstr "请输入可见文字以保存此消息。"
+#: src/features/chat/thread/composer-prompt-queue.tsx:1161
+msgid "{count} queued — waiting for the permission mode to save"
+msgstr "{count} 项已排队，等待保存权限模式"
 
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:102
 msgid "{date}: {replies}, {cost}"
@@ -1048,7 +1044,7 @@ msgstr "已完成 {done}/{total} 项任务"
 msgid "{done} of {total} tasks done. In progress: {inProgress}"
 msgstr "已完成 {done}/{total} 项任务。进行中：{inProgress}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:455
+#: src/features/chat/thread/composer-prompt-queue.tsx:622
 msgid "{droppedCount, plural, one {# attachment removed on reload} other {# attachments removed on reload}}"
 msgstr "{droppedCount, plural, other {重新加载时移除了 # 个附件}}"
 
@@ -1328,7 +1324,7 @@ msgstr "剩余 {minutes} 分钟"
 msgid "{modeLabel} mode — click to change"
 msgstr "{modeLabel}模式——点击更改"
 
-#: src/features/chat/thread/thread.tsx:264
+#: src/features/chat/thread/thread.tsx:266
 msgid "{modelCount, plural, one {Ask # model anything...} other {Ask # models anything...}}"
 msgstr "{modelCount, plural, other {向 # 个模型提问任何问题...}}"
 
@@ -1576,7 +1572,7 @@ msgstr "已将 {shortened, plural, other {# 个名称}}缩短为 {titleLimit} �
 
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:134
 msgid "{shown}. {queuedNote}"
-msgstr ""
+msgstr "{shown}。{queuedNote}"
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:77
 msgid "{skipped, plural, one {# file could not be imported and was} other {# files could not be imported and were}} left out"
@@ -1606,7 +1602,7 @@ msgstr "{star, plural, other {# 星}}"
 msgid "{stateLabel} Stop hands-free voice mode"
 msgstr "{stateLabel} 停止免提语音模式"
 
-#: src/features/develop/components/thread-pull-requests.tsx:252
+#: src/features/develop/components/thread-pull-requests.tsx:257
 msgid "{success, plural, one {# pull request linked.} other {# pull requests linked.}}"
 msgstr "{success, plural, other {已关联 # 个拉取请求。}}"
 
@@ -2011,15 +2007,15 @@ msgstr "有变更等待查看"
 msgid "A chat is waiting for your answer"
 msgstr "有一个对话在等待你的回复"
 
-#: src/features/notifications/hooks/use-chat-run-toasts.ts:100
+#: src/features/notifications/hooks/use-chat-run-toasts.ts:279
 msgid "A chat needs your input or approval"
 msgstr "聊天需要你的输入或批准"
 
-#: src/features/notifications/hooks/use-chat-run-toasts.ts:82
+#: src/features/notifications/hooks/use-chat-run-toasts.ts:79
 msgid "A chat reply failed"
 msgstr "聊天回复失败"
 
-#: src/features/notifications/hooks/use-chat-run-toasts.ts:61
+#: src/features/notifications/hooks/use-chat-run-toasts.ts:79
 msgid "A chat reply finished"
 msgstr "聊天回复已完成"
 
@@ -2080,11 +2076,11 @@ msgstr "目标用于归组任务，其进度取决于已完成的任务数量。
 msgid "A group chat. A question from the owner is answered by three agents in turn: a security reviewer, a performance reviewer, and a lead who sums up."
 msgstr "群聊。所有者的问题由三个智能体依次回答：安全审查员、性能审查员，以及负责总结的负责人。"
 
-#: src/features/chat/core/context/chat-context.tsx:729
+#: src/features/chat/core/context/chat-context.tsx:761
 msgid "A guest's message cannot be sent as a goal."
 msgstr "访客的消息不能作为目标发送。"
 
-#: src/features/chat/core/context/chat-context.tsx:732
+#: src/features/chat/core/context/chat-context.tsx:764
 msgid "A guest's message is sent through a hosted model only. Pick one and send it again."
 msgstr "访客的消息只能通过托管模型发送。请选择一个模型后再次发送。"
 
@@ -2247,7 +2243,7 @@ msgstr "运行的对话会归入此项目。将任务移到其他项目会新建
 msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 msgstr "机器人在多次聊天之间保留的沙盒。空闲时暂停，暂停期间不计费。"
 
-#: src/features/notifications/components/notification-settings.tsx:248
+#: src/features/notifications/components/notification-settings.tsx:279
 msgid "A short summary each morning of what finished, what is running and what needs you. It counts toward your daily usage."
 msgstr "每天早上简要汇总已完成、正在运行和需要你处理的事项。计入每日用量。"
 
@@ -2770,7 +2766,7 @@ msgstr "添加提示词"
 msgid "Add Provider"
 msgstr "添加提供商"
 
-#: src/features/develop/components/thread-pull-requests.tsx:230
+#: src/features/develop/components/thread-pull-requests.tsx:235
 msgid "Add pull requests that already exist to this thread. Each one is read from the host with your own connection first."
 msgstr "将已有的拉取请求添加到此对话。每个请求会先通过你自己的连接从托管方读取。"
 
@@ -2967,7 +2963,7 @@ msgstr "正在添加…"
 msgid "Address"
 msgstr "地址"
 
-#: src/features/develop/components/pull-request-fixes.tsx:134
+#: src/features/develop/components/pull-request-fixes.tsx:110
 msgid "Address review"
 msgstr "处理审查意见"
 
@@ -3758,7 +3754,7 @@ msgstr "按字母顺序"
 msgid "Already have an account?"
 msgstr "已有账号？"
 
-#: src/features/develop/components/thread-pull-requests.tsx:96
+#: src/features/develop/components/thread-pull-requests.tsx:101
 msgid "Already linked to this thread."
 msgstr "已关联到此对话。"
 
@@ -4102,7 +4098,7 @@ msgstr "任何拥有链接的人都可以阅读此页面。评论永远不会显
 msgid "Anyone with the link can view this thread"
 msgstr "任何拥有链接的人都可以查看此对话"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:49
+#: src/features/chat/thread/composer-permission-mode.tsx:50
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:49
 msgid "Anything that is not a plain lookup asks first"
 msgstr "凡非单纯查询的操作均需先询问"
@@ -4585,7 +4581,7 @@ msgstr "提出旁支问题"
 msgid "Ask a side question without interrupting the reply"
 msgstr "在不打断回复的情况下提出旁支问题"
 
-#: src/features/chat/thread/thread.tsx:264
+#: src/features/chat/thread/thread.tsx:266
 msgid "Ask all models anything..."
 msgstr "向所有模型提问任何问题..."
 
@@ -4727,7 +4723,7 @@ msgstr "附件 {0} 超过 {MAX_FEEDBACK_IMAGE_MB} MB 且无法压缩。请移除
 msgid "Attachment only"
 msgstr "仅附件"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:449
+#: src/features/chat/thread/composer-prompt-queue.tsx:616
 msgid "Attachments:"
 msgstr "附件："
 
@@ -4809,7 +4805,7 @@ msgstr "自动"
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
 #: src/features/chat/thread/composer-model-selector.tsx:122
-#: src/features/chat/thread/composer-permission-mode.tsx:41
+#: src/features/chat/thread/composer-permission-mode.tsx:42
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:65
 #: src/features/chat/thread/media-gallery-view.tsx:511
@@ -4834,7 +4830,7 @@ msgstr "自动归档不活跃的聊天"
 
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:110
 msgid "Auto-archive skips a chat while it is linked to a pull request that is still open."
-msgstr ""
+msgstr "只要聊天关联的拉取请求仍处于打开状态，自动归档就会跳过该聊天。"
 
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:81
 msgid "Auto-archive turned off"
@@ -5249,6 +5245,10 @@ msgstr "入门"
 #: src/features/settings/lib/settings-keywords.ts:28
 msgid "Behavior"
 msgstr "行为"
+
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:256
+msgid "Behind {base}"
+msgstr "落后于 {base}"
 
 #: src/features/chat/core/utils/language-utilities.ts:336
 msgid "Belarus"
@@ -6092,6 +6092,7 @@ msgstr "加拿大"
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:178
 #: src/features/chat/thread-list/snooze-until-dialog.tsx:111
 #: src/features/chat/thread/composer-draw-dialog.tsx:384
+#: src/features/chat/thread/composer-prompt-queue.tsx:651
 #: src/features/chat/thread/edit-composer.tsx:162
 #: src/features/chat/thread/fork-branch-dialog.tsx:91
 #: src/features/chat/thread/generation-model-menu.tsx:163
@@ -6314,6 +6315,14 @@ msgstr "加泰罗尼亚语（西班牙）"
 msgid "catalog"
 msgstr "目录"
 
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:279
+msgid "Catch up"
+msgstr "追上"
+
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:246
+msgid "Catch up {pullRequest} with {base}"
+msgstr "让 {pullRequest} 追上 {base}"
+
 #: src/features/skills/components/skill-builder-diff.tsx:27
 #: src/features/skills/components/skill-form-dialog.tsx:317
 #: src/features/skills/components/skill-marketplace.tsx:160
@@ -6424,7 +6433,7 @@ msgstr "上次优化带来的更改"
 msgid "Changes in this turn"
 msgstr "本轮的更改"
 
-#: src/features/develop/components/pull-request-fixes.tsx:134
+#: src/features/develop/components/pull-request-fixes.tsx:110
 msgid "Changes requested by {reviewers}"
 msgstr "{reviewers} 请求了更改"
 
@@ -6515,11 +6524,11 @@ msgstr "Chat Completions（/v1/chat/completions）——Ollama、LM Studio、vLL
 msgid "Chat copied to clipboard as Markdown"
 msgstr "已将聊天以 Markdown 格式复制到剪贴板"
 
-#: src/features/notifications/components/notification-settings.tsx:296
+#: src/features/notifications/components/notification-settings.tsx:327
 msgid "Chat failed"
 msgstr "聊天失败"
 
-#: src/features/notifications/components/notification-settings.tsx:279
+#: src/features/notifications/components/notification-settings.tsx:310
 msgid "Chat finished"
 msgstr "聊天已完成"
 
@@ -6548,15 +6557,15 @@ msgstr "聊天锁定：已锁定"
 msgid "chat model"
 msgstr "聊天模型"
 
-#: src/features/notifications/components/notification-settings.tsx:313
+#: src/features/notifications/components/notification-settings.tsx:344
 msgid "Chat needs your input or approval"
 msgstr "聊天需要你的输入或批准"
 
-#: src/features/notifications/components/notification-settings.tsx:122
+#: src/features/notifications/components/notification-settings.tsx:138
 msgid "Chat notification turned off"
 msgstr "已关闭聊天通知"
 
-#: src/features/notifications/components/notification-settings.tsx:123
+#: src/features/notifications/components/notification-settings.tsx:139
 msgid "Chat notification turned on"
 msgstr "已开启聊天通知"
 
@@ -6636,11 +6645,11 @@ msgstr "聊天不会自动压缩"
 
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:120
 msgid "Chats with an open pull request are kept"
-msgstr ""
+msgstr "有打开的拉取请求的聊天会被保留"
 
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:120
 msgid "Chats with an open pull request can be archived"
-msgstr ""
+msgstr "有打开的拉取请求的聊天可以被归档"
 
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:75
 msgid "Chats with no activity for this long are archived. Archived chats stay searchable."
@@ -6811,7 +6820,7 @@ msgstr "选择默认文本模型"
 msgid "Choose default video models"
 msgstr "选择默认视频模型"
 
-#: src/features/notifications/components/notification-settings.tsx:220
+#: src/features/notifications/components/notification-settings.tsx:251
 msgid "Choose how Neore tells you about finished work and things that need you."
 msgstr "选择 Neore 如何通知你已完成的工作和需要你处理的事项。"
 
@@ -7176,7 +7185,7 @@ msgstr "克隆或新建…"
 #: src/features/canvas/canvas-panel.tsx:835
 #: src/features/canvas/pdf-preview-panel.tsx:105
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
-#: src/features/develop/components/thread-pull-requests.tsx:275
+#: src/features/develop/components/thread-pull-requests.tsx:280
 #: src/features/evals/components/save-eval-case-action.tsx:95
 #: src/features/prompts/components/prompt-history-dialog.tsx:195
 #: src/features/settings/components/chat/custom-providers-settings.tsx:441
@@ -8058,7 +8067,7 @@ msgstr "请确认密码"
 msgid "Confirm your password"
 msgstr "确认你的密码"
 
-#: src/features/develop/components/pull-request-fixes.tsx:133
+#: src/features/develop/components/pull-request-fixes.tsx:109
 msgid "Conflicts with {base}"
 msgstr "与 {base} 存在冲突"
 
@@ -8199,7 +8208,7 @@ msgstr "连接 WhatsApp"
 msgid "Connect your {label} account to see what needs your review, what is yours, and what is ready to merge."
 msgstr "连接你的 {label} 账号，即可查看需要你审查的内容、属于你的内容以及可合并的内容。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:101
+#: src/features/develop/components/thread-pull-requests.tsx:106
 msgid "Connect your Git host in settings to link a pull request."
 msgstr "请在设置中连接 Git 托管服务，以关联拉取请求。"
 
@@ -8616,7 +8625,7 @@ msgid "Conversations on lines this diff no longer shows"
 msgstr "此差异不再显示的行上的对话"
 
 #: src/features/chat/thread/composer-input.tsx:904
-#: src/features/chat/thread/composer-input.tsx:1888
+#: src/features/chat/thread/composer-input.tsx:1901
 msgid "Conversion failed"
 msgstr "转换失败"
 
@@ -8946,7 +8955,7 @@ msgstr "无法附加 {0}。其他文件已附加；请重试这些文件。"
 msgid "Could not attach {0}. Try those again."
 msgstr "无法附加 {0}。请重试。"
 
-#: src/features/chat/thread/composer-input.tsx:1918
+#: src/features/chat/thread/composer-input.tsx:1931
 msgid "Could not attach the chat"
 msgstr "无法附加该聊天"
 
@@ -8954,7 +8963,7 @@ msgstr "无法附加该聊天"
 msgid "could not be saved"
 msgstr "无法保存"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:379
+#: src/features/chat/thread/composer-prompt-queue.tsx:469
 msgid "Could not cancel the message. It is still queued."
 msgstr "无法取消该消息。它仍在队列中。"
 
@@ -8966,7 +8975,7 @@ msgstr "无法取消运行。"
 msgid "Could not change Auto. Please try again."
 msgstr "无法更改 Auto。请重试。"
 
-#: src/features/notifications/components/notification-settings.tsx:190
+#: src/features/notifications/components/notification-settings.tsx:221
 msgid "Could not change push notifications. Try again."
 msgstr "无法更改推送通知，请重试。"
 
@@ -8979,7 +8988,7 @@ msgstr "无法更改机器人的权限模式。"
 msgid "Could not change the model. Please try again."
 msgstr "无法更改模型。请重试。"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:202
+#: src/features/chat/thread/composer-permission-mode.tsx:205
 msgid "Could not change the permission mode. Please try again."
 msgstr "无法更改权限模式，请重试。"
 
@@ -9112,7 +9121,7 @@ msgstr "无法导入工作流"
 msgid "Could not keep this as yours. Try again."
 msgstr "无法保留为你的内容。请重试。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:178
+#: src/features/develop/components/thread-pull-requests.tsx:183
 msgid "Could not link. Try again."
 msgstr "无法关联。请重试。"
 
@@ -9133,7 +9142,7 @@ msgstr "无法加载更多项目。"
 msgid "Could not load statistics for this thread."
 msgstr "无法加载此对话的统计数据。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:196
+#: src/features/develop/components/thread-pull-requests.tsx:201
 msgid "Could not load the linked pull requests."
 msgstr "无法加载已关联的拉取请求。"
 
@@ -9166,7 +9175,7 @@ msgid "Could not load this"
 msgstr "无法加载此内容"
 
 #: src/features/chat/split/chat-split-view.tsx:206
-#: src/features/chat/thread/thread.tsx:365
+#: src/features/chat/thread/thread.tsx:367
 msgid "Could not load this chat's details."
 msgstr "无法加载此聊天的详情。"
 
@@ -9250,7 +9259,7 @@ msgstr "无法预览 · 点击下载"
 msgid "Could not pull {0}: {1}"
 msgstr "无法拉取 {0}：{1}"
 
-#: src/features/chat/core/context/chat-context.tsx:676
+#: src/features/chat/core/context/chat-context.tsx:708
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr "无法连接服务器以开始生成。请检查网络连接后重试。"
 
@@ -9258,11 +9267,11 @@ msgstr "无法连接服务器以开始生成。请检查网络连接后重试。
 msgid "Could not reach the server. Try again."
 msgstr "无法连接服务器。请重试。"
 
-#: src/features/chat/thread/composer-input.tsx:1921
+#: src/features/chat/thread/composer-input.tsx:1934
 msgid "Could not read that chat"
 msgstr "无法读取该聊天"
 
-#: src/features/chat/thread/composer-input.tsx:1922
+#: src/features/chat/thread/composer-input.tsx:1935
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "无法读取该聊天。如果已锁定，请先解锁。"
 
@@ -9270,7 +9279,7 @@ msgstr "无法读取该聊天。如果已锁定，请先解锁。"
 msgid "Could not read the pasted list"
 msgstr "无法读取粘贴的列表"
 
-#: src/features/develop/components/pull-request-fixes.tsx:229
+#: src/features/develop/components/pull-request-fixes.tsx:205
 msgid "Could not read what blocks {name}. Try again"
 msgstr "无法读取阻碍 {name} 的问题。重试"
 
@@ -9325,11 +9334,11 @@ msgstr "无法保存该选择，请重试。"
 msgid "Could not save the bot's tools. Its tools are unchanged."
 msgstr "无法保存机器人的工具。其工具未改变。"
 
-#: src/features/notifications/components/notification-settings.tsx:121
+#: src/features/notifications/components/notification-settings.tsx:137
 msgid "Could not save the chat notification setting."
 msgstr "无法保存聊天通知设置。"
 
-#: src/features/notifications/components/notification-settings.tsx:131
+#: src/features/notifications/components/notification-settings.tsx:162
 msgid "Could not save the Daily Brief setting."
 msgstr "无法保存每日简报设置。"
 
@@ -9337,7 +9346,7 @@ msgstr "无法保存每日简报设置。"
 msgid "Could not save the default permission mode"
 msgstr "无法保存默认权限模式"
 
-#: src/features/notifications/components/notification-settings.tsx:107
+#: src/features/notifications/components/notification-settings.tsx:117
 msgid "Could not save the email setting."
 msgstr "无法保存邮件设置。"
 
@@ -10117,7 +10126,7 @@ msgid "Czech Republic"
 msgstr "捷克"
 
 #: src/features/home/components/daily-brief-offer.tsx:105
-#: src/features/notifications/components/notification-settings.tsx:245
+#: src/features/notifications/components/notification-settings.tsx:276
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:57
 msgid "Daily Brief"
 msgstr "每日简报"
@@ -10131,11 +10140,11 @@ msgstr "每日简报已开启。有内容可报告时会在早上送达。"
 msgid "Daily Brief is on. The next one is planned for {0}; a morning with nothing to report sends none."
 msgstr "每日简报已开启。下一份计划于 {0} 送达；没有内容可报告的早上不会发送。"
 
-#: src/features/notifications/components/notification-settings.tsx:132
+#: src/features/notifications/components/notification-settings.tsx:163
 msgid "Daily Brief turned off"
 msgstr "每日简报已关闭"
 
-#: src/features/notifications/components/notification-settings.tsx:133
+#: src/features/notifications/components/notification-settings.tsx:164
 msgid "Daily Brief turned on"
 msgstr "每日简报已开启"
 
@@ -11815,7 +11824,7 @@ msgstr "拖放文件或点击上传"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:2117
+#: src/features/chat/thread/composer-input.tsx:2130
 msgid "Drop files here"
 msgstr "将文件拖放到此处"
 
@@ -11985,7 +11994,7 @@ msgstr "例如：专业写手"
 msgid "e.g., Strict JSON coder"
 msgstr "例如：严格 JSON 编码器"
 
-#: src/features/develop/components/pull-request-fixes.tsx:160
+#: src/features/develop/components/pull-request-fixes.tsx:136
 msgid "Each action puts a prompt into this chat's message box. Read it, then send it yourself."
 msgstr "每个操作都会把一条提示词填入此对话的消息框。请先阅读，再由你自己发送。"
 
@@ -12233,8 +12242,8 @@ msgstr "编辑排队的消息"
 msgid "Edit queued message {0}"
 msgstr "编辑排队的消息 {0}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:466
-#: src/features/chat/thread/composer-prompt-queue.tsx:513
+#: src/features/chat/thread/composer-prompt-queue.tsx:581
+#: src/features/chat/thread/composer-prompt-queue.tsx:657
 msgid "Edit queued message {position}"
 msgstr "编辑排队中的消息 {position}"
 
@@ -12524,7 +12533,7 @@ msgstr "验证邮件已发送"
 msgid "Email Verified:"
 msgstr "邮箱已验证："
 
-#: src/features/notifications/components/notification-settings.tsx:262
+#: src/features/notifications/components/notification-settings.tsx:293
 msgid "Email when a task finishes"
 msgstr "任务完成时发送邮件"
 
@@ -12861,7 +12870,7 @@ msgstr "输入组织名称"
 msgid "Enter organization slug"
 msgstr "输入组织 slug"
 
-#: src/features/develop/components/thread-pull-requests.tsx:120
+#: src/features/develop/components/thread-pull-requests.tsx:125
 msgid "Enter pull requests as owner/name#123."
 msgstr "请按 owner/name#123 的格式输入拉取请求。"
 
@@ -13276,7 +13285,7 @@ msgstr "每个请求都必须签名。请发送 <0>X-Neore-Timestamp</0>（当�
 msgid "Every Sunday at midnight"
 msgstr "每周日午夜"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:48
+#: src/features/chat/thread/composer-permission-mode.tsx:49
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:48
 msgid "Every tool runs without asking, except those that need your answer"
 msgstr "除需要你作答的工具外，所有工具均无需询问即可运行"
@@ -13873,7 +13882,7 @@ msgid "Failed to attach collection"
 msgstr "附加集合失败"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1701
+#: src/features/chat/thread/composer-input.tsx:1704
 msgid "Failed to attach file"
 msgstr "附加文件失败"
 
@@ -14283,7 +14292,7 @@ msgstr "请求导出失败"
 msgid "Failed to reset to defaults"
 msgstr "恢复默认设置失败"
 
-#: src/features/chat/thread/composer-input.tsx:1733
+#: src/features/chat/thread/composer-input.tsx:1736
 msgid "Failed to restore attachment"
 msgstr "恢复附件失败"
 
@@ -14591,7 +14600,7 @@ msgstr "上传文件失败，请重试。"
 msgid "Failed to upload files. Please try again."
 msgstr "上传文件失败，请重试。"
 
-#: src/features/develop/components/pull-request-fixes.tsx:132
+#: src/features/develop/components/pull-request-fixes.tsx:108
 msgid "Failing checks: {checks}"
 msgstr "未通过的检查项：{checks}"
 
@@ -15375,7 +15384,7 @@ msgstr "鱼眼，极度畸变"
 msgid "Fit view"
 msgstr "适应视图"
 
-#: src/features/develop/components/pull-request-fixes.tsx:132
+#: src/features/develop/components/pull-request-fixes.tsx:108
 msgid "Fix checks"
 msgstr "修复检查项"
 
@@ -15944,7 +15953,7 @@ msgid "Full 1080p high-definition video output"
 msgstr "完整 1080p 高清视频输出"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
-#: src/features/chat/thread/composer-permission-mode.tsx:42
+#: src/features/chat/thread/composer-permission-mode.tsx:43
 #: src/features/settings/components/chat/bots-settings.tsx:133
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:42
 msgid "Full access"
@@ -16290,7 +16299,7 @@ msgstr "德国"
 msgid "Get a short summary each morning of what finished, what needs you and what is still running. It counts toward your daily usage."
 msgstr "每天早上收到一份简短摘要：已完成的、需要你处理的以及仍在运行的。这会计入你的每日用量。"
 
-#: src/features/notifications/components/notification-settings.tsx:214
+#: src/features/notifications/components/notification-settings.tsx:245
 msgid "Get a system notification when a task finishes or something needs your approval, even with the app closed."
 msgstr "任务完成或有事项需要你批准时收到系统通知，即使应用已关闭。"
 
@@ -16298,7 +16307,7 @@ msgstr "任务完成或有事项需要你批准时收到系统通知，即使应
 msgid "Get Access"
 msgstr "获取访问权限"
 
-#: src/features/notifications/components/notification-settings.tsx:265
+#: src/features/notifications/components/notification-settings.tsx:296
 msgid "Get an email with a link to the result when a task or trigger run finishes with one."
 msgstr "当任务或触发器运行完成并有结果时，通过邮件获取结果链接。"
 
@@ -18915,7 +18924,7 @@ msgstr "保留为我的"
 
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:107
 msgid "Keep chats with an open pull request"
-msgstr ""
+msgstr "保留有打开的拉取请求的聊天"
 
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1071
 msgid "Keep control"
@@ -19769,7 +19778,7 @@ msgstr "不是有效 JSON 的行"
 
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:340
 #: src/features/auth/components/settings/providers/provider-cell.tsx:113
-#: src/features/develop/components/thread-pull-requests.tsx:277
+#: src/features/develop/components/thread-pull-requests.tsx:282
 msgid "Link"
 msgstr "关联"
 
@@ -19777,7 +19786,7 @@ msgstr "关联"
 msgid "Link active until {expiresAt}"
 msgstr "链接有效期至 {expiresAt}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:132
+#: src/features/develop/components/thread-pull-requests.tsx:137
 msgid "Link at most {MAX_PULL_REQUESTS_PER_ATTACH} pull requests at a time."
 msgstr "一次最多关联 {MAX_PULL_REQUESTS_PER_ATTACH} 个拉取请求。"
 
@@ -19795,11 +19804,11 @@ msgstr "链接预览"
 msgid "Link previews"
 msgstr "链接预览"
 
-#: src/features/develop/components/thread-pull-requests.tsx:210
+#: src/features/develop/components/thread-pull-requests.tsx:215
 msgid "Link pull request"
 msgstr "关联拉取请求"
 
-#: src/features/develop/components/thread-pull-requests.tsx:229
+#: src/features/develop/components/thread-pull-requests.tsx:234
 msgid "Link pull requests"
 msgstr "关联拉取请求"
 
@@ -19811,7 +19820,7 @@ msgstr "手动关联"
 msgid "Linked pull requests: {linkedPullRequests}"
 msgstr "已关联的拉取请求：{linkedPullRequests}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:97
+#: src/features/develop/components/thread-pull-requests.tsx:102
 msgid "Linked to this thread."
 msgstr "已关联到此对话。"
 
@@ -19819,8 +19828,8 @@ msgstr "已关联到此对话。"
 msgid "LinkedIn Post"
 msgstr "LinkedIn 帖子"
 
-#: src/features/develop/components/thread-pull-requests.tsx:258
-#: src/features/develop/components/thread-pull-requests.tsx:277
+#: src/features/develop/components/thread-pull-requests.tsx:263
+#: src/features/develop/components/thread-pull-requests.tsx:282
 msgid "Linking…"
 msgstr "正在关联…"
 
@@ -20175,7 +20184,7 @@ msgstr "正在加载访客链接…"
 msgid "Loading the guide"
 msgstr "正在加载指南"
 
-#: src/features/develop/components/thread-pull-requests.tsx:191
+#: src/features/develop/components/thread-pull-requests.tsx:196
 msgid "Loading the linked pull requests…"
 msgstr "正在加载已关联的拉取请求…"
 
@@ -20270,7 +20279,7 @@ msgstr "正在加载…"
 msgid "local"
 msgstr "本地"
 
-#: src/features/chat/core/context/chat-context.tsx:736
+#: src/features/chat/core/context/chat-context.tsx:768
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "本地模型仅支持文本。请移除附件后再发送。"
 
@@ -22031,11 +22040,11 @@ msgstr "向下移动一页"
 msgid "Move out one level"
 msgstr "上移一级"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:469
+#: src/features/chat/thread/composer-prompt-queue.tsx:677
 msgid "Move queued message {position} down"
 msgstr "下移队列中的消息 {position}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:459
+#: src/features/chat/thread/composer-prompt-queue.tsx:667
 msgid "Move queued message {position} up"
 msgstr "上移队列中的消息 {position}"
 
@@ -22102,8 +22111,8 @@ msgid "Moved selected node {0}. New position, x: {x}, y: {y}"
 msgstr "已移动所选节点{0}。新位置，x：{x}，y：{y}"
 
 #. placeholder {0}: to + 1
-#: src/features/chat/thread/composer-prompt-queue.tsx:702
-#: src/features/chat/thread/composer-prompt-queue.tsx:729
+#: src/features/chat/thread/composer-prompt-queue.tsx:1093
+#: src/features/chat/thread/composer-prompt-queue.tsx:1120
 msgid "Moved to position {0}"
 msgstr "已移动到第 {0} 位"
 
@@ -23809,7 +23818,7 @@ msgstr "未送达主导者"
 msgid "Not found"
 msgstr "未找到"
 
-#: src/features/develop/components/thread-pull-requests.tsx:263
+#: src/features/develop/components/thread-pull-requests.tsx:268
 msgid "Not linked"
 msgstr "未关联"
 
@@ -23932,15 +23941,15 @@ msgstr "通知工作流、渠道和收件人偏好"
 #: src/features/home/components/home-page.tsx:227
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
-#: src/features/notifications/components/notification-settings.tsx:220
+#: src/features/notifications/components/notification-settings.tsx:251
 msgid "Notifications"
 msgstr "通知"
 
-#: src/features/notifications/components/notification-settings.tsx:166
+#: src/features/notifications/components/notification-settings.tsx:197
 msgid "Notifications are blocked for this site in your browser."
 msgstr "你的浏览器已阻止此网站的通知。"
 
-#: src/features/notifications/components/notification-settings.tsx:207
+#: src/features/notifications/components/notification-settings.tsx:238
 msgid "Notifications are blocked for this site in your browser. Allow them in the site settings to turn this on."
 msgstr "你的浏览器已阻止此网站的通知。请在网站设置中允许通知以开启此功能。"
 
@@ -24735,7 +24744,7 @@ msgstr "在输入框中打开模型选择器（{0}）"
 
 #. placeholder {0}: link.repository
 #. placeholder {1}: link.number
-#: src/features/develop/components/thread-pull-requests.tsx:36
+#: src/features/develop/components/thread-pull-requests.tsx:40
 msgid "Open the pull request {0}#{1}"
 msgstr "打开拉取请求 {0}#{1}"
 
@@ -26021,7 +26030,7 @@ msgstr "永久删除你的账号及所有相关数据"
 msgid "Permission Level"
 msgstr "权限级别"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:89
+#: src/features/chat/thread/composer-permission-mode.tsx:90
 #: src/features/settings/components/chat/bots-settings.tsx:415
 msgid "Permission mode"
 msgstr "权限模式"
@@ -26032,8 +26041,8 @@ msgid "Permission mode for {0}"
 msgstr "{0} 的权限模式"
 
 #. placeholder {0}: labels[mode]
-#: src/features/chat/thread/composer-permission-mode.tsx:63
-#: src/features/chat/thread/composer-permission-mode.tsx:81
+#: src/features/chat/thread/composer-permission-mode.tsx:64
+#: src/features/chat/thread/composer-permission-mode.tsx:82
 msgid "Permission mode: {0}"
 msgstr "权限模式：{0}"
 
@@ -26993,7 +27002,7 @@ msgstr "问题"
 msgid "Problems"
 msgstr "问题"
 
-#: src/features/develop/components/pull-request-fixes.tsx:152
+#: src/features/develop/components/pull-request-fixes.tsx:128
 msgid "Problems on {name}: {count}"
 msgstr "{name} 上的问题：{count}"
 
@@ -27513,7 +27522,7 @@ msgid "Pull request settings updated"
 msgstr "拉取请求设置已更新"
 
 #: src/features/code/components/code-shell.tsx:95
-#: src/features/develop/components/thread-pull-requests.tsx:233
+#: src/features/develop/components/thread-pull-requests.tsx:238
 msgid "Pull requests"
 msgstr "拉取请求"
 
@@ -27545,29 +27554,37 @@ msgstr "专为复杂软件工程任务打造"
 msgid "Purpose-optimized for code generation and debugging"
 msgstr "专门针对代码生成和调试优化"
 
-#: src/features/notifications/components/notification-settings.tsx:167
+#: src/features/notifications/components/notification-settings.tsx:198
 msgid "Push notifications are not available here."
 msgstr "此处无法使用推送通知。"
 
-#: src/features/notifications/components/notification-settings.tsx:202
+#: src/features/notifications/components/notification-settings.tsx:233
 msgid "Push notifications are not configured on this server."
 msgstr "此服务器未配置推送通知。"
 
-#: src/features/notifications/components/notification-settings.tsx:187
+#: src/features/notifications/components/notification-settings.tsx:218
 msgid "Push notifications are off for this browser"
 msgstr "此浏览器的推送通知已关闭"
 
-#: src/features/notifications/components/notification-settings.tsx:178
+#: src/features/notifications/components/notification-settings.tsx:209
 msgid "Push notifications are on for this browser"
 msgstr "此浏览器的推送通知已开启"
 
-#: src/features/notifications/components/notification-settings.tsx:225
+#: src/features/notifications/components/notification-settings.tsx:256
 msgid "Push notifications on this browser"
 msgstr "此浏览器上的推送通知"
 
 #: src/features/marketing/use-cases/use-case-data.ts:104
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "将多个各具角色的智能体放在同一对话中。审查小组可从安全和性能角度检查更改，辩论则可在综合前论证双方观点。"
+
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:285
+msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, and check the build and tests. It pushes only when a signed-in gh confirms the pull request is still open on that base. Nothing is sent."
+msgstr "在输入框中填入一条提示，将此分支变基到 {base}、解决冲突并检查构建和测试。只有在已登录的 gh 确认该拉取请求仍在此基础分支上打开时才会推送。不会发送任何内容。"
+
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:286
+msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
+msgstr "在输入框中填入一条提示，在本地副本中将此复刻的分支变基到 {base}、解决冲突并检查构建和测试。不会推送。不会发送任何内容。"
 
 #: src/features/chat/thread/composer-image-settings.tsx:181
 #: src/features/chat/thread/media-gallery-view.tsx:483
@@ -27609,7 +27626,7 @@ msgid "Queued"
 msgstr "排队中"
 
 #: src/features/chat/host/host-composer.tsx:374
-#: src/features/chat/thread/composer-prompt-queue.tsx:774
+#: src/features/chat/thread/composer-prompt-queue.tsx:1175
 msgid "Queued messages"
 msgstr "排队中的消息"
 
@@ -28158,7 +28175,7 @@ msgstr "重新连接"
 msgid "Reconnect {0}"
 msgstr "重新连接 {0}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:100
+#: src/features/develop/components/thread-pull-requests.tsx:105
 msgid "Reconnect your Git host in settings to link a pull request."
 msgstr "请在设置中重新连接 Git 托管服务，以关联拉取请求。"
 
@@ -28746,7 +28763,7 @@ msgstr "要移除提供商吗？"
 msgid "Remove queued message {0}"
 msgstr "移除排队的消息 {0}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:479
+#: src/features/chat/thread/composer-prompt-queue.tsx:687
 msgid "Remove queued message {position}"
 msgstr "移除排队消息 {position}"
 
@@ -28940,7 +28957,7 @@ msgstr "回复"
 msgid "Reply complete"
 msgstr "回复完成"
 
-#: src/features/chat/core/context/chat-context.tsx:640
+#: src/features/chat/core/context/chat-context.tsx:645
 msgid "Reply ready"
 msgstr "回复已就绪"
 
@@ -29171,7 +29188,7 @@ msgstr "分辨率"
 msgid "Resolve"
 msgstr "解决"
 
-#: src/features/develop/components/pull-request-fixes.tsx:133
+#: src/features/develop/components/pull-request-fixes.tsx:109
 msgid "Resolve conflicts"
 msgstr "解决冲突"
 
@@ -29960,6 +29977,7 @@ msgstr "沙特阿拉伯"
 #: src/features/chat/pins/pin-item.tsx:304
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:181
+#: src/features/chat/thread/composer-prompt-queue.tsx:640
 #: src/features/chat/thread/edit-composer.tsx:166
 #: src/features/chat/thread/request-secret-prompt.tsx:490
 #: src/features/develop/components/draft-comment-card.tsx:43
@@ -30223,7 +30241,7 @@ msgstr "得分"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "根据预期答案或评分标准为每个答案打 0–100% 的分。每个用例会额外调用一次小模型。"
 
-#: src/features/chat/thread/composer-input.tsx:1660
+#: src/features/chat/thread/composer-input.tsx:1663
 msgid "Screen capture failed. Please try again."
 msgstr "屏幕截取失败。请重试。"
 
@@ -30970,7 +30988,7 @@ msgid "Send messages to the AI bot via Telegram. Conversations appear as threads
 msgstr "通过 Telegram 向 AI 机器人发送消息。对话会显示在你的聊天列表中。"
 
 #: src/features/chat/host/host-composer.tsx:1035
-#: src/features/chat/thread/composer-prompt-queue.tsx:793
+#: src/features/chat/thread/composer-prompt-queue.tsx:1207
 msgid "Send next"
 msgstr "发送下一条"
 
@@ -31428,15 +31446,15 @@ msgstr "在模型选择器中显示 {name}"
 msgid "Show {remainingCount} more"
 msgstr "再显示 {remainingCount} 个"
 
-#: src/features/notifications/components/notification-settings.tsx:299
+#: src/features/notifications/components/notification-settings.tsx:330
 msgid "Show a message in the app when a chat reply fails."
 msgstr "聊天回复失败时在应用内显示提醒。"
 
-#: src/features/notifications/components/notification-settings.tsx:282
+#: src/features/notifications/components/notification-settings.tsx:313
 msgid "Show a message in the app when a chat reply finishes."
 msgstr "聊天回复完成时在应用内显示提醒。"
 
-#: src/features/notifications/components/notification-settings.tsx:316
+#: src/features/notifications/components/notification-settings.tsx:347
 msgid "Show a message in the app when a chat waits for your answer or your approval."
 msgstr "聊天等待你的回复或批准时在应用内显示提醒。"
 
@@ -32948,7 +32966,7 @@ msgstr "引导——当前回复会在下一步读取此内容"
 msgid "Steer the reply"
 msgstr "引导回复"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:440
+#: src/features/chat/thread/composer-prompt-queue.tsx:575
 msgid "Steering:"
 msgstr "引导："
 
@@ -33674,7 +33692,7 @@ msgstr "出众的多文件代码生成与重构"
 msgid "Superior understanding of complex visual concepts"
 msgstr "对复杂视觉概念的理解出众"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:43
+#: src/features/chat/thread/composer-permission-mode.tsx:44
 #: src/features/settings/components/chat/bots-settings.tsx:134
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:43
 msgid "Supervised"
@@ -33768,7 +33786,7 @@ msgstr "切换到 {label}"
 msgid "Switch to {name}?"
 msgstr "切换到 {name}？"
 
-#: src/features/chat/core/context/chat-context.tsx:731
+#: src/features/chat/core/context/chat-context.tsx:763
 msgid "Switch to a text model to send this message."
 msgstr "请切换到文本模型以发送此消息。"
 
@@ -33999,11 +34017,11 @@ msgstr "任务详情、你的审核以及运行历史。"
 msgid "Task done: {title}"
 msgstr "任务已完成：{title}"
 
-#: src/features/notifications/components/notification-settings.tsx:108
+#: src/features/notifications/components/notification-settings.tsx:118
 msgid "Task emails turned off"
 msgstr "已关闭任务邮件"
 
-#: src/features/notifications/components/notification-settings.tsx:109
+#: src/features/notifications/components/notification-settings.tsx:119
 msgid "Task emails turned on"
 msgstr "已开启任务邮件"
 
@@ -34539,7 +34557,7 @@ msgstr "该文件夹是服务器的主目录或其上级目录。请选择其中
 msgid "That folder was not found."
 msgstr "未找到该文件夹。"
 
-#: src/features/chat/core/context/chat-context.tsx:727
+#: src/features/chat/core/context/chat-context.tsx:759
 msgid "That guest link has ended."
 msgstr "该访客链接已失效。"
 
@@ -34559,7 +34577,7 @@ msgstr "无法读取该链接。"
 msgid "That message could not be found in this conversation."
 msgstr "在此对话中找不到该消息。"
 
-#: src/features/chat/core/context/chat-context.tsx:730
+#: src/features/chat/core/context/chat-context.tsx:762
 #: src/features/chat/guest-links/guest-link-panel.tsx:143
 msgid "That message is being sent."
 msgstr "该消息正在发送。"
@@ -34572,7 +34590,7 @@ msgstr "该消息已不在等待中。"
 msgid "That message is too long to send from here."
 msgstr "该消息过长，无法从这里发送。"
 
-#: src/features/chat/core/context/chat-context.tsx:728
+#: src/features/chat/core/context/chat-context.tsx:760
 #: src/features/chat/guest-links/guest-link-panel.tsx:240
 #: src/features/chat/guest-links/guest-link-panel.tsx:316
 msgid "That message was already sent."
@@ -35116,7 +35134,7 @@ msgstr "托管方"
 msgid "the host did not answer"
 msgstr "主机未作答"
 
-#: src/features/develop/components/thread-pull-requests.tsx:99
+#: src/features/develop/components/thread-pull-requests.tsx:104
 msgid "The host did not answer. Try again."
 msgstr "托管方没有响应。请重试。"
 
@@ -35128,11 +35146,11 @@ msgstr "托管方没有响应。稍后将重试。"
 msgid "the host did not change the option"
 msgstr "主机未更改该选项"
 
-#: src/features/develop/components/thread-pull-requests.tsx:102
+#: src/features/develop/components/thread-pull-requests.tsx:107
 msgid "The host has no pull request at that address."
 msgstr "托管方在该地址没有拉取请求。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:104
+#: src/features/develop/components/thread-pull-requests.tsx:109
 msgid "The host is limiting requests. Try again shortly."
 msgstr "托管方正在限制请求。请稍后重试。"
 
@@ -35310,7 +35328,7 @@ msgstr "链接中的模型不可用。聊天将保留其原有模型。"
 msgid "The model picker now lists {0} models from {1}"
 msgstr "模型选择器现已列出 {1} 的 {0} 个模型"
 
-#: src/features/chat/thread/composer-input.tsx:1595
+#: src/features/chat/thread/composer-input.tsx:1598
 msgid "The model selection changed while the uploads ran, so the message was not sent. Press send to send it."
 msgstr "上传期间模型选择已更改，因此消息未发送。请按发送按钮发送。"
 
@@ -35619,7 +35637,7 @@ msgstr "面向现代 AI 应用的统一 LLM 网关。"
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "“{fileName}”的上传已过期。请重新附加该文件。"
 
-#: src/features/chat/thread/composer-input.tsx:1608
+#: src/features/chat/thread/composer-input.tsx:1611
 msgid "The uploads finished, but the message was not sent. Press send to send it."
 msgstr "上传已完成，但消息未发送。请按发送按钮发送。"
 
@@ -35836,7 +35854,7 @@ msgstr "此分支落后于其基础分支。"
 msgid "This branch was changed meanwhile. Check it and save again."
 msgstr "此分支在此期间已被更改。请检查后重新保存。"
 
-#: src/features/notifications/components/notification-settings.tsx:211
+#: src/features/notifications/components/notification-settings.tsx:242
 msgid "This browser cannot receive push notifications here."
 msgstr "此浏览器无法在此处接收推送通知。"
 
@@ -35934,7 +35952,7 @@ msgstr "此集合由你组织中的成员共享给你。你可以将其附加到
 msgid "This command name is reserved"
 msgstr "此命令名称已被保留"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:198
+#: src/features/chat/thread/composer-permission-mode.tsx:201
 msgid "This comparison's mode applies to every column. Change it on the comparison."
 msgstr "此对比的模式适用于所有列。请在对比中更改。"
 
@@ -36215,7 +36233,7 @@ msgstr "这会在 {hostLabel} 上以“{1}”方式将提交 {0} 合并到基础
 msgid "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
 msgstr "无法留下此消息。请保持简短，不要以 / 开头或提及任何人，或稍后再试。"
 
-#: src/features/chat/core/context/chat-context.tsx:733
+#: src/features/chat/core/context/chat-context.tsx:765
 msgid "This message cannot be sent in this chat."
 msgstr "此消息无法在此聊天中发送。"
 
@@ -36327,7 +36345,7 @@ msgstr "此提示词将用于每条消息。每条消息都独立处理，不带
 msgid "This prompt will configure:"
 msgstr "此提示词将配置："
 
-#: src/features/develop/components/thread-pull-requests.tsx:103
+#: src/features/develop/components/thread-pull-requests.tsx:108
 msgid "This pull request already has as many threads linked as it can keep."
 msgstr "此拉取请求已关联了所能保留的最多对话数。"
 
@@ -36440,7 +36458,7 @@ msgstr "此文本仅包含隐藏字符，因此没有可保存的内容。"
 msgid "This thread"
 msgstr "此对话"
 
-#: src/features/develop/components/thread-pull-requests.tsx:105
+#: src/features/develop/components/thread-pull-requests.tsx:110
 msgid "This thread already has as many pull requests linked as it can keep."
 msgstr "此对话已关联了所能保留的最多拉取请求数。"
 
@@ -37006,7 +37024,7 @@ msgstr "工具"
 msgid "Tools for {0}"
 msgstr "{0} 的工具"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:47
+#: src/features/chat/thread/composer-permission-mode.tsx:48
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:47
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr "工具按各自的设置运行；快速检查可放行低风险调用"
@@ -37345,7 +37363,7 @@ msgstr "尝试调整搜索词。"
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
-#: src/features/develop/components/thread-pull-requests.tsx:198
+#: src/features/develop/components/thread-pull-requests.tsx:203
 #: src/features/home/components/home-page.tsx:154
 #: src/features/projects/components/computer-rule-file-import.tsx:495
 #: src/features/projects/components/project-repo-picker.tsx:190
@@ -37530,6 +37548,10 @@ msgstr "在“{selector}”中输入"
 msgid "Type it again"
 msgstr "再输入一次"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:629
+msgid "Type some visible text to save this message."
+msgstr "请输入可见文字以保存此消息。"
+
 #: ../../packages/ui/src/components/data-grid/data-grid-search.tsx:221
 msgid "Type to search"
 msgstr "输入以搜索"
@@ -37544,7 +37566,7 @@ msgid "Type your answer…"
 msgstr "输入你的回答…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:250
-#: src/features/chat/thread/composer-input.tsx:2107
+#: src/features/chat/thread/composer-input.tsx:2120
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:231
 msgid "Type your message..."
 msgstr "输入你的消息..."
@@ -37972,7 +37994,7 @@ msgstr "任意库或框架的最新文档"
 msgid "Update Duration"
 msgstr "更新时长"
 
-#: src/features/chat/thread/composer-input.tsx:1957
+#: src/features/chat/thread/composer-input.tsx:1970
 msgid "Update failed"
 msgstr "更新失败"
 
@@ -38172,12 +38194,12 @@ msgstr "将文档上传到知识库并分组为集合。AI 会从中搜索相关
 
 #: src/features/chat/thread/composer-input.tsx:436
 #: src/features/chat/thread/composer-input.tsx:759
-#: src/features/chat/thread/composer-input.tsx:1863
+#: src/features/chat/thread/composer-input.tsx:1876
 msgid "Upload failed"
 msgstr "上传失败"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1856
+#: src/features/chat/thread/composer-input.tsx:1869
 msgid "Upload failed: {0}"
 msgstr "上传失败：{0}"
 
@@ -39457,11 +39479,11 @@ msgstr "已监视的仓库"
 msgid "We could not check that you are signed in. Try again in a moment."
 msgstr "无法确认你是否已登录，请稍后重试。"
 
-#: src/features/chat/core/context/chat-context.tsx:735
+#: src/features/chat/core/context/chat-context.tsx:767
 msgid "We could not confirm your session in time. The guest's message was not sent; send it again from the Guests tab."
 msgstr "未能及时确认你的会话。访客的消息未发送；请在“访客”标签页中重新发送。"
 
-#: src/features/chat/core/context/chat-context.tsx:738
+#: src/features/chat/core/context/chat-context.tsx:770
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "我们未能及时确认你的会话。你的消息仍在输入框中，请重新发送。"
 
@@ -39652,7 +39674,7 @@ msgstr "量子计算有哪些最新进展？"
 msgid "What are the top-rated productivity apps in 2025?"
 msgstr "2025 年评分最高的效率应用有哪些？"
 
-#: src/features/develop/components/pull-request-fixes.tsx:159
+#: src/features/develop/components/pull-request-fixes.tsx:135
 msgid "What blocks {name}"
 msgstr "阻碍 {name} 的问题"
 
@@ -40311,7 +40333,7 @@ msgstr "你已离线。请重新连接后重试。"
 
 #: src/features/chat/thread/composer-input.tsx:1195
 #: src/features/chat/thread/composer-input.tsx:1320
-#: src/features/chat/thread/composer-prompt-queue.tsx:112
+#: src/features/chat/thread/composer-prompt-queue.tsx:181
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "你已离线。你的消息会保留在这里；恢复在线后再发送。"
 
@@ -40360,7 +40382,7 @@ msgstr "你可以查看此页面，但不能编辑。"
 msgid "You cannot ask a side question in this chat."
 msgstr "你不能在此聊天中提出旁支问题。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:98
+#: src/features/develop/components/thread-pull-requests.tsx:103
 msgid "You cannot see that pull request on the host."
 msgstr "你在托管方上看不到该拉取请求。"
 
@@ -40551,7 +40573,7 @@ msgstr "你的 AI 工作区<0>从这里开始。</0>"
 msgid "Your answer"
 msgstr "你的回答"
 
-#: src/features/chat/core/context/chat-context.tsx:640
+#: src/features/chat/core/context/chat-context.tsx:645
 msgid "Your answer in Neore has finished."
 msgstr "你在 Neore 中的回复已生成完毕。"
 
@@ -40737,11 +40759,11 @@ msgstr "你的位置（例如“New York, USA”“Berlin, Germany”）。"
 msgid "Your message"
 msgstr "你的消息"
 
-#: src/features/chat/thread/composer-input.tsx:1580
+#: src/features/chat/thread/composer-input.tsx:1583
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 msgstr "上传期间消息已更改，因此未发送。请按发送按钮发送。"
 
-#: src/features/chat/core/context/chat-context.tsx:726
+#: src/features/chat/core/context/chat-context.tsx:758
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "你的消息包含不当内容，无法发送。"
 
