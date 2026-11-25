@@ -83,7 +83,7 @@ const useAsideFindHighlights = (
 
         // The occurrence can sit in an answer that is still rendering, so the scroll waits for the layout to settle.
         const reveal = setTimeout(() => {
-            apply()?.startContainer.parentElement?.scrollIntoView({ block: "nearest" });
+            apply()?.startContainer.parentElement?.scrollIntoView({ block: "center" });
         }, REVEAL_DELAY_MS);
 
         return () => {
