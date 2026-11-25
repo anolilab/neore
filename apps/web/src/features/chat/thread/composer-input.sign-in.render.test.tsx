@@ -18,6 +18,7 @@ import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-st
 import { requestComposerRestore } from "@/features/chat/core/utils/composer-restore";
 import { requestComposerSubmit } from "@/features/chat/core/utils/composer-submit";
 import { clearSendStarting, markSendStarting } from "@/features/chat/core/utils/send-in-flight";
+import { setDraftBound } from "@/features/chat/split/composer-drafts";
 import { prefillComposer } from "@/features/chat/thread/composer-prefill";
 
 import type { ComposerInputAreaRef } from "./composer-input-area";
@@ -482,6 +483,8 @@ describe("ComposerInput fix prompts from the pull request chip", () => {
     beforeEach(() => {
         harness.mustSignIn = false;
         harness.threadId = "thread-1";
+        // The thread's stored draft is back: the composer takes prompts from then on.
+        setDraftBound("thread-1", true);
         useChatUIStore.getState().setComposerText("");
     });
 
@@ -511,6 +514,23 @@ describe("ComposerInput fix prompts from the pull request chip", () => {
 
         expect(useChatUIStore.getState().composerText).toContain("Resolve conflicts with main");
         expect(onSubmitOverride).not.toHaveBeenCalled();
+    });
+
+    it("holds a prompt from a comparison parent's shared composer until the thread's stored draft is back", () => {
+        setDraftBound("thread-1", false);
+        renderComposer({ onSubmitOverride: vi.fn(async () => undefined) });
+        act(() => {
+            prefillComposer("thread-1", "Resolve conflicts with main");
+        });
+
+        // Text in the composer now would keep the saved draft out, and be stored in its place.
+        expect(useChatUIStore.getState().composerText).toBe("");
+
+        act(() => {
+            setDraftBound("thread-1", true);
+        });
+
+        expect(useChatUIStore.getState().composerText).toContain("Resolve conflicts with main");
     });
 
     it("leaves a prompt for another thread alone", () => {
