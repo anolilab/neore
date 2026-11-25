@@ -52,10 +52,10 @@ const useChatRunToasts = ({ activeStreamId, error, messages, settings, threadId 
     const lastError = useRef<AppError | null>(null);
     const approvals = useRef<{ count: number; ids: ReadonlySet<string>; threadId: string | undefined } | undefined>(undefined);
     // The newest inputs, for the settle timer, which fires outside any render.
-    const latest = useRef({ error, messages, settings, t });
+    const latest = useRef({ error, messages, settings, t, threadId });
 
     useEffect(() => {
-        latest.current = { error, messages, settings, t };
+        latest.current = { error, messages, settings, t, threadId };
     });
 
     // Decides the outcome of an ended run and shows its toast. Runs once per run: it clears the run first.
@@ -70,6 +70,11 @@ const useChatRunToasts = ({ activeStreamId, error, messages, settings, threadId 
 
         ended.current = undefined;
         clearTimeout(settleTimer.current);
+
+        // A run that ended in another thread is not this thread's reply to classify.
+        if (pending.threadId !== current.threadId) {
+            return;
+        }
 
         const errorDuringRun = current.error !== null && current.error !== pending.startError;
 

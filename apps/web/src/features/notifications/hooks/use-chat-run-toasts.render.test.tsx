@@ -164,6 +164,24 @@ describe("useChatRunToasts: settling a run", () => {
         }
     });
 
+    it("does not classify a run that ended in another thread", () => {
+        vi.useFakeTimers();
+
+        try {
+            const { rerender } = setup({ ...idle, settings: {} });
+
+            rerender({ ...idle, activeStreamId: "stream-1", messages: streamingReply, settings: {} });
+            rerender({ ...idle, activeStreamId: null, messages: streamingReply, settings: {} });
+            rerender({ ...idle, activeStreamId: null, messages: erroredReply, settings: {}, threadId: "thread-2" });
+            vi.advanceTimersByTime(2000);
+
+            expect(toastError).not.toHaveBeenCalled();
+            expect(toastSuccess).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("shows one failed toast, not a finished one, when a local reply errors as its stream ends", () => {
         const { rerender } = setup({ ...idle, settings: {} });
 
