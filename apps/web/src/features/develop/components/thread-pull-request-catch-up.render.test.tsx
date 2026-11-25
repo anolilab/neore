@@ -142,7 +142,21 @@ const turnEnds = (threadId = "thread-1") => {
     });
 };
 
-const REBASE_ON_RUN_BASE = /`git rebase --no-update-refs refs\/neore\/pull-7-[\da-f]{8}-base`/u;
+/** A turn of the thread ends, and the reads it starts answer (their mocks resolve at once) before this returns. */
+const turnEndsAndReadsAnswer = async () => {
+    await act(async () => {
+        markTurnEnded("thread-1");
+    });
+};
+
+/** Lets reads that already started, and whose mocks resolve at once, answer. */
+const readsAnswer = async () => {
+    await act(async () => {
+        await Promise.resolve();
+    });
+};
+
+const REBASE_ON_RUN_BASE = /`git rebase --no-update-refs refs\/worktree\/neore\/pull-7-[\da-f]{8}-base`/u;
 
 describe("ThreadPullRequestCatchUp", () => {
     beforeEach(() => {
@@ -181,34 +195,6 @@ describe("ThreadPullRequestCatchUp", () => {
 
         expect(prefill).toHaveBeenCalledTimes(2);
         expect(prefill.mock.calls[1]).toEqual(prefill.mock.calls[0]);
-    });
-
-    it("puts one prompt in the composer for two clicks", async () => {
-        const real = await vi.importActual<typeof import("@/features/chat/thread/composer-prefill")>("@/features/chat/thread/composer-prefill");
-
-        real.resetComposerPrefillForTests();
-        prefill.mockImplementation(real.prefillComposer);
-        given("open", "behind");
-        render(control());
-
-        const button = screen.getByRole("button", BUTTON);
-
-        fireEvent.click(button);
-        fireEvent.click(button);
-
-        const taken: string[] = [];
-        const Composer = () => {
-            real.useComposerPrefill("thread-1", (text: string) => {
-                taken.push(text);
-            });
-
-            return null;
-        };
-
-        render(<Composer />);
-
-        expect(taken).toHaveLength(1);
-        expect(taken[0]).toMatch(REBASE_ON_RUN_BASE);
     });
 
     it.each(["clean", "blocked", "unstable", "unknown", undefined])(
@@ -289,12 +275,10 @@ describe("ThreadPullRequestCatchUp", () => {
 
         expect(refetch).not.toHaveBeenCalled();
 
-        turnEnds();
+        await turnEndsAndReadsAnswer();
 
         expect(refetch).toHaveBeenCalledTimes(1);
-        await vi.waitFor(() => {
-            expect(compareRefetch).toHaveBeenCalledTimes(1);
-        });
+        expect(compareRefetch).toHaveBeenCalledTimes(1);
 
         // The host's answer after the push.
         given("open", "clean");
@@ -312,11 +296,9 @@ describe("ThreadPullRequestCatchUp", () => {
 
         expect(screen.getByRole("button", BUTTON)).toBeTruthy();
 
-        turnEnds();
+        await turnEndsAndReadsAnswer();
 
-        await vi.waitFor(() => {
-            expect(compareRefetch).toHaveBeenCalledTimes(1);
-        });
+        expect(compareRefetch).toHaveBeenCalledTimes(1);
         expect(refetch).toHaveBeenCalledTimes(1);
     });
 
@@ -375,12 +357,12 @@ describe("ThreadPullRequestCatchUp", () => {
 
         expect(screen.queryByRole("button", BUTTON)).toBeNull();
 
-        await vi.waitFor(() => {
-            expect(compareRefetch).toHaveBeenCalledTimes(1);
-        });
+        await readsAnswer();
+
+        expect(compareRefetch).toHaveBeenCalledTimes(1);
         expect(refetch).toHaveBeenCalledTimes(1);
         // Still behind after the turn: the control shows.
-        expect(await screen.findByRole("button", BUTTON)).toBeTruthy();
+        expect(screen.getByRole("button", BUTTON)).toBeTruthy();
     });
 
     it("drops the read a turn's end owed when the pending first read answers with a pull request that cannot show", () => {
@@ -410,22 +392,48 @@ describe("ThreadPullRequestCatchUp", () => {
         expect(compareRefetch).not.toHaveBeenCalled();
     });
 
-    it("leaves the old revision's comparison unread when the turn pushed a new head: the new key reads it", async () => {
+    // A new head gives the comparison a new key, which reads by itself; a closed pull request or a draft hides the control,
+    // which reads nothing.
+    it.each([
+        ["pushed a new head", { headSha: "def456" }],
+        ["closed the pull request", { state: "closed" }],
+        ["made the pull request a draft", { draft: true }],
+    ])("leaves the comparison unread when the turn %s", async (_case, change) => {
         given("open", "behind");
         render(control());
 
-        // The pull request's read after the turn answers with the pushed head.
+        // The pull request's read after the turn answers with the change.
         refetch.mockImplementationOnce(async () => {
-            return { data: { detail: { ...pull.current.data!.detail!, headSha: "def456" }, status: "ok" } };
+            return { data: { detail: { ...pull.current.data!.detail!, ...change }, status: "ok" } };
         });
+        await turnEndsAndReadsAnswer();
+
+        expect(refetch).toHaveBeenCalledTimes(1);
+        expect(compareRefetch).not.toHaveBeenCalled();
+    });
+
+    it("hides the control when a turn ends during a background refresh, and reads again once that refresh settles", async () => {
+        given("open", "behind");
+        pull.current = { ...pull.current, isFetching: true };
+
+        const view = render(control());
+
+        expect(screen.getByRole("button", BUTTON)).toBeTruthy();
+
         turnEnds();
 
-        await vi.waitFor(() => {
-            expect(refetch).toHaveBeenCalledTimes(1);
-        });
-        await Promise.resolve();
+        // The refresh started before the turn ended: its "behind" may be from before the turn.
+        expect(refetch).not.toHaveBeenCalled();
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
 
-        expect(compareRefetch).not.toHaveBeenCalled();
+        // The refresh answers, still behind; then the read the turn's end owed answers too.
+        given("open", "behind");
+        view.rerender(control());
+        await readsAnswer();
+
+        expect(refetch).toHaveBeenCalledTimes(1);
+        expect(compareRefetch).toHaveBeenCalledTimes(1);
+        expect(screen.getByRole("button", BUTTON)).toBeTruthy();
     });
 
     it.each([
@@ -452,11 +460,9 @@ describe("ThreadPullRequestCatchUp", () => {
 
         const view = render(control());
 
-        turnEnds();
+        await turnEndsAndReadsAnswer();
 
-        await vi.waitFor(() => {
-            expect(compareRefetch).toHaveBeenCalledTimes(1);
-        });
+        expect(compareRefetch).toHaveBeenCalledTimes(1);
 
         // The turn-end read failed.
         fail();

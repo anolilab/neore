@@ -10,7 +10,7 @@ import { catchUpPrompt } from "./catch-up-prompt";
 
 const PULL = { baseBranch: "main", headBranch: "feat/x", host: "git.example", repository: "octo/hello", run: "a1b2c3d4" };
 
-const REF_PREFIX = "refs/neore/pull-42-a1b2c3d4";
+const REF_PREFIX = "refs/worktree/neore/pull-42-a1b2c3d4";
 
 /** Git with no global or system config, so the person's hooks, signing and aliases cannot change what these commands do. */
 const GIT_ENV = {
@@ -43,6 +43,13 @@ const sh = (cwd: string, command: string): { output: string; status: number | nu
     const result = spawnSync("/bin/sh", ["-c", command], { cwd, encoding: "utf8", env: GIT_ENV });
 
     return { output: result.stdout, status: result.status };
+};
+
+/** The same, with what the command writes to stderr. */
+const shAll = (cwd: string, command: string): { status: number | null; stderr: string; stdout: string } => {
+    const result = spawnSync("/bin/sh", ["-c", command], { cwd, encoding: "utf8", env: GIT_ENV });
+
+    return { status: result.status, stderr: result.stderr, stdout: result.stdout };
 };
 
 const root = mkdtempSync(join(tmpdir(), "catch-up-fail-closed-"));
@@ -123,6 +130,10 @@ describe("catchUpPrompt's fetch and switch, run against a scratch origin", () =>
 
         it("never fast-forwards the branch already checked out when the switch fails, and prints no ready", () => {
             const work = cloneOrigin("same-switch-fails");
+
+            // Back to the commit feat/x branched from, so a merge that ran anyway would fast-forward main.
+            git(work, "reset", "--quiet", "--hard", "HEAD~1");
+
             const main = git(work, "rev-parse", "main");
 
             expect(sh(work, fetch()).status).toBe(0);
@@ -170,6 +181,56 @@ describe("catchUpPrompt's fetch and switch, run against a scratch origin", () =>
             expect(sh(work, fetch()).status).toBe(0);
             expect(sh(work, switchNew()).status).toBe(0);
             expect(sh(work, ready())).toStrictEqual({ output: "ready\n", status: 0 });
+        });
+    });
+
+    describe("step 2's clean check, the run's refs and step 5's rebase, for a head in the base repository", () => {
+        const prompt = catchUpPrompt({ ...PULL, headInBaseRepository: true, number: 42 });
+        const status = (): string => commandOf(prompt, "git status ");
+
+        it.each([
+            ["status.showUntrackedFiles", "no"],
+            ["status.showUntrackedFiles", "normal"],
+        ])("lists an untracked file in a new folder under %s=%s", (key: string, value: string) => {
+            const work = cloneOrigin(`clean-${value}`);
+
+            git(work, "config", key, value);
+            mkdirSync(join(work, "out"));
+            writeFileSync(join(work, "out", "result.txt"), "");
+
+            expect(sh(work, status())).toStrictEqual({ output: "?? out/result.txt\n", status: 0 });
+        });
+
+        it("fetches into refs of each linked worktree's own, so one run's clean-up leaves the other's base", () => {
+            const work = cloneOrigin("refs-worktree");
+            const other = join(root, "refs-worktree-linked");
+            const base = `${REF_PREFIX}-base`;
+
+            git(work, "worktree", "add", "--quiet", "--detach", other);
+
+            expect(sh(work, commandOf(prompt, "git fetch origin ")).status).toBe(0);
+            expect(sh(other, commandOf(prompt, "git fetch origin ")).status).toBe(0);
+            expect(sh(work, `git update-ref -d ${base}`).status).toBe(0);
+            expect(git(other, "rev-parse", base)).toBe(git(other, "rev-parse", "origin/main"));
+        });
+
+        it("tells a rebase a hook refused, which started nothing, from one that stopped on a conflict", () => {
+            const work = cloneOrigin("rebase-refused");
+            const started = commandOf(prompt, "test -d ");
+
+            expect(sh(work, commandOf(prompt, "git fetch origin ")).status).toBe(0);
+            git(work, "switch", "--quiet", "-c", "feat/x", `${REF_PREFIX}-branch`);
+            writeFileSync(join(work, ".git", "hooks", "pre-rebase"), "#!/bin/sh\nexit 1\n");
+            chmodSync(join(work, ".git", "hooks", "pre-rebase"), 0o755);
+
+            expect(sh(work, commandOf(prompt, "git rebase --no-update-refs ")).status).not.toBe(0);
+            expect(sh(work, started).status).not.toBe(0);
+
+            rmSync(join(work, ".git", "hooks", "pre-rebase"));
+            git(work, "commit", "--quiet", "--allow-empty", "-m", "local");
+            git(work, "-c", "sequence.editor=sed -i 1s/^pick/edit/", "rebase", "--quiet", "-i", "HEAD~1");
+
+            expect(sh(work, started).status).toBe(0);
         });
     });
 
@@ -320,10 +381,8 @@ describe("catchUpPrompt's fetch and switch, run against a scratch origin", () =>
 
             git(origin, "update-ref", "-d", "refs/pull/42/head");
 
-            const { output } = spawnSync("/bin/sh", ["-c", headCheck(lease)], { cwd: work, encoding: "utf8", env: GIT_ENV });
-
-            expect(output.filter(Boolean).join("")).not.toContain(origin);
-            expect(sh(work, headCheck(lease))).toStrictEqual({ output: "changed\n", status: 0 });
+            // Git's own error names the remote, whose URL can hold the person's credential: it goes nowhere.
+            expect(shAll(work, headCheck(lease))).toStrictEqual({ status: 0, stderr: "", stdout: "changed\n" });
         });
     });
 

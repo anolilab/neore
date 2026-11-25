@@ -122,32 +122,37 @@ const CatchUpControl = ({
         const revision = open ? { baseBranch: detail.baseBranch, headSha: detail.headSha } : undefined;
 
         // The pull request first: a turn that pushed or retargeted it gives the comparison a new key, which its query reads by
-        // itself. Only the same base and head keep the old key, and the base branch may have moved, so only then is it read again.
+        // itself. Only the same base and head keep the old key, and the base branch may have moved, so only then is it read again,
+        // and only while the pull request is still open and not a draft: a hidden control reads nothing.
         const result = await pull.refetch();
         const next = !result.isError && result.data?.status === "ok" ? result.data.detail : undefined;
+        const stillOpen = next?.state === "open" && !next.draft;
 
-        if (revision !== undefined && next?.baseBranch === revision.baseBranch && next.headSha === revision.headSha) {
+        if (revision !== undefined && stillOpen && next.baseBranch === revision.baseBranch && next.headSha === revision.headSha) {
             await comparison.refetch();
         }
     });
 
     /**
-     * Notes every ended turn of the thread as heard, and reads again when the last read said behind (or a failed read hid it
-     * after that), or when a missed turn finds a cached "behind". Returns that read, or nothing when there is none. A turn that
-     * ends while a read is pending (or before the first answer) of a control that could show owes one more read of each, made
-     * once the pending one settles.
+     * Notes every ended turn of the thread as heard. A turn that ends while a read is pending (or before the first answer) of a
+     * control that could show owes one more read of each, made once the pending one settles, and hides the control until then:
+     * that read may answer with the state from before the turn, a shown control's background refresh too. Otherwise it reads
+     * again when the last read said behind (or a failed read hid it after that), or when a missed turn finds a cached "behind".
+     * Returns that read, or nothing when there is none.
      */
     const hear = useEffectEvent((): Promise<void> | undefined => {
         const rereads = heard.get(key)?.rereads === true;
 
         heard.set(key, { generation: turnEndedGeneration(threadId), rereads });
 
-        if ((rereads || (stale && shows)) && pull.data !== undefined) {
-            return readAgain();
-        }
-
         if (couldShow && pending) {
             setOwed((count: number) => count + 1);
+
+            return undefined;
+        }
+
+        if ((rereads || (stale && shows)) && pull.data !== undefined) {
+            return readAgain();
         }
 
         return undefined;

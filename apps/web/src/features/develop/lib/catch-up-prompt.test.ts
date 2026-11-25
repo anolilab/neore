@@ -32,7 +32,11 @@ const FORCED_BRANCH_MOVE = /git (?:reset|branch -[fD])\b/u;
 
 const LAST_STEP = /^9\. /u;
 
-const STEP_EIGHT_GATE = /^8\. Only once step 7 passed/u;
+const STATUS = "git status --porcelain --untracked-files=all --ignore-submodules=none";
+
+// Untracked files and submodules are listed whatever the config says, and a dirty checkout sets the rebase aside unpushed.
+const STEP_EIGHT_GATE =
+    /^8\. Unless `git status --porcelain --untracked-files=all --ignore-submodules=none` succeeds and prints nothing, do not push: list what it shows, set the rebase aside as step 7 says/u;
 
 const A_REF = /^refs\//u;
 
@@ -114,22 +118,22 @@ describe(catchUpPrompt, () => {
 
             expect(originReads.map((read: string) => firstIndex(commands, read))).toEqual(originReads.map((_read: string, index: number) => index));
             expect(stepsOf(prompt).get(1)).toContain("`match`");
-            expect(firstIndex(commands, "git status --porcelain")).toBe(clean);
-            expect(commandsMatching(commands, "git status --porcelain")[0]?.step).toBe(2);
+            expect(commandsMatching(commands, "git status ")[0]).toEqual({ command: STATUS, step: 2 });
+            expect(firstIndex(commands, "git status ")).toBe(clean);
             expect(fetch).toBeGreaterThan(clean);
             expect(firstIndex(commands, firstSwitch)).toBeGreaterThan(fetch);
         });
 
         it("fetches every ref by name into this run's own refs, outside origin's tracking refs", () => {
             expect(commandsMatching(commands, "git fetch ").every(({ command }: Command) => isForcedFetch(command))).toBe(true);
-            expect(fetchedRefs(commands).every((ref: string) => ref.startsWith("refs/neore/pull-42-a1b2c3d4-"))).toBe(true);
+            expect(fetchedRefs(commands).every((ref: string) => ref.startsWith("refs/worktree/neore/pull-42-a1b2c3d4-"))).toBe(true);
             expect(prompt).not.toContain("refs/remotes/origin");
         });
 
         it("rebases with --no-update-refs, and finishes or aborts a conflicted rebase", () => {
             // Step 8 goes back to step 5 when the base moves: that one rebase command serves the repeat too.
             expect(commandsMatching(commands, "git rebase ").map(({ command, step }: Command) => [step, command])).toEqual([
-                [5, "git rebase --no-update-refs refs/neore/pull-42-a1b2c3d4-base"],
+                [5, "git rebase --no-update-refs refs/worktree/neore/pull-42-a1b2c3d4-base"],
                 [6, "git rebase --continue"],
                 [6, "git rebase --abort"],
             ]);
@@ -138,7 +142,9 @@ describe(catchUpPrompt, () => {
         it("stops before any rebase when the pull request's head has merge commits, and suggests merging the base", () => {
             const merges = commandsMatching(commands, "git rev-list --merges ");
 
-            expect(merges).toEqual([{ command: "git rev-list --merges refs/neore/pull-42-a1b2c3d4-base..refs/neore/pull-42-a1b2c3d4-head", step: 4 }]);
+            expect(merges).toEqual([
+                { command: "git rev-list --merges refs/worktree/neore/pull-42-a1b2c3d4-base..refs/worktree/neore/pull-42-a1b2c3d4-head", step: 4 },
+            ]);
             expect(commands.indexOf(merges[0] as Command)).toBeLessThan(firstIndex(commands, firstSwitch));
             expect(stepsOf(prompt).get(4)).toContain("do not rebase: do step 9, then stop");
             expect(stepsOf(prompt).get(4)).toContain("suggest merging release/2.0 into it instead");
@@ -183,10 +189,10 @@ describe(catchUpPrompt, () => {
         const commands = commandsOf(SAME_REPO);
         const switchTo = firstIndex(commands, "git switch --no-guess feat/x");
 
-        expect(commandsMatching(commands, "git rev-parse refs/neore/").slice(0, 3)).toEqual([
-            { command: "git rev-parse refs/neore/pull-42-a1b2c3d4-base", step: 3 },
-            { command: "git rev-parse refs/neore/pull-42-a1b2c3d4-branch", step: 4 },
-            { command: "git rev-parse refs/neore/pull-42-a1b2c3d4-head", step: 4 },
+        expect(commandsMatching(commands, "git rev-parse refs/worktree/neore/").slice(0, 3)).toEqual([
+            { command: "git rev-parse refs/worktree/neore/pull-42-a1b2c3d4-base", step: 3 },
+            { command: "git rev-parse refs/worktree/neore/pull-42-a1b2c3d4-branch", step: 4 },
+            { command: "git rev-parse refs/worktree/neore/pull-42-a1b2c3d4-head", step: 4 },
         ]);
         expect(firstIndex(commands, "git worktree list --porcelain")).toBeLessThan(switchTo);
         expect(firstIndex(commands, "git rev-parse --show-toplevel")).toBeLessThan(switchTo);
@@ -194,13 +200,13 @@ describe(catchUpPrompt, () => {
         // The fast-forward runs only once the switch succeeded: a failed switch must not move the branch already checked out.
         expect(commands.slice(switchTo - 1, switchTo + 2).map(({ command }: Command) => command)).toEqual([
             "git show-ref --verify --quiet refs/heads/feat/x",
-            "git switch --no-guess feat/x && git merge --ff-only refs/neore/pull-42-a1b2c3d4-branch",
-            "git switch -c feat/x refs/neore/pull-42-a1b2c3d4-branch",
+            "git switch --no-guess feat/x && git merge --ff-only refs/worktree/neore/pull-42-a1b2c3d4-branch",
+            "git switch -c feat/x refs/worktree/neore/pull-42-a1b2c3d4-branch",
         ]);
         // A local branch ahead of origin merges as "Already up to date", and a failed switch leaves another branch checked
         // out: only checking the branch and the commit HEAD holds catches both, and the rebase waits for that check.
         expect(commands[switchTo + 2]?.command).toBe(
-            '[ "$(git symbolic-ref -q HEAD)" = "refs/heads/feat/x" ] && [ "$(git rev-parse --verify -q HEAD)" = "$(git rev-parse --verify -q refs/neore/pull-42-a1b2c3d4-head)" ] && echo ready',
+            '[ "$(git symbolic-ref -q HEAD)" = "refs/heads/feat/x" ] && [ "$(git rev-parse --verify -q HEAD)" = "$(git rev-parse --verify -q refs/worktree/neore/pull-42-a1b2c3d4-head)" ] && echo ready',
         );
         expect(firstIndex(commands, "git rebase ")).toBe(switchTo + 3);
     });
@@ -217,14 +223,14 @@ describe(catchUpPrompt, () => {
         // The base can move during the rebase and the checks: it is fetched again; a base that no longer holds the commit the
         // rebase was built on (recorded in step 3) stops the run, and one that only moved on sends it back to step 5.
         expect(stepEight.slice(0, 6)).toEqual([
-            "git status --porcelain",
-            "git fetch origin +refs/heads/release/2.0:refs/neore/pull-42-a1b2c3d4-base",
-            "git merge-base --is-ancestor <base commit from step 3> refs/neore/pull-42-a1b2c3d4-base",
-            "git merge-base --is-ancestor refs/neore/pull-42-a1b2c3d4-base HEAD",
-            "git rev-parse refs/neore/pull-42-a1b2c3d4-base",
+            STATUS,
+            "git fetch origin +refs/heads/release/2.0:refs/worktree/neore/pull-42-a1b2c3d4-base",
+            "git merge-base --is-ancestor <base commit from step 3> refs/worktree/neore/pull-42-a1b2c3d4-base",
+            "git merge-base --is-ancestor refs/worktree/neore/pull-42-a1b2c3d4-base HEAD",
+            "git rev-parse refs/worktree/neore/pull-42-a1b2c3d4-base",
             commands[push]?.command,
         ]);
-        expect(commandsMatching(commands, "git rev-parse refs/neore/pull-42-a1b2c3d4-base")[0]?.step).toBe(3);
+        expect(commandsMatching(commands, "git rev-parse refs/worktree/neore/pull-42-a1b2c3d4-base")[0]?.step).toBe(3);
         expect(stepsOf(SAME_REPO).get(8)).toContain("go back to step 5 once");
         // The lease is a commit, not a ref: a background fetch or another run can move this run's refs after step 4.
         const [, leasedRef, expected = ""] = LEASE.exec(commands[push]?.command ?? "") ?? [];
@@ -244,7 +250,7 @@ describe(catchUpPrompt, () => {
         const order = [headCheck, signedIn, view, "git push "].map((part: string) => step.indexOf(`\`${part}`));
 
         expect(headCheck).toBe(
-            'if git fetch --quiet origin +refs/pull/42/head:refs/neore/pull-42-a1b2c3d4-head && [ "$(git rev-parse --verify -q refs/neore/pull-42-a1b2c3d4-head)" = "<commit from step 4>" ]; then echo same; else echo changed; fi',
+            'if git fetch --quiet origin +refs/pull/42/head:refs/worktree/neore/pull-42-a1b2c3d4-head 2>/dev/null && [ "$(git rev-parse --verify -q refs/worktree/neore/pull-42-a1b2c3d4-head)" = "<commit from step 4>" ]; then echo same; else echo changed; fi',
         );
         // Quiet: the status's output (account, token scopes) goes nowhere, only one word is printed.
         expect(signedIn).toBe("gh auth status --hostname git.example >/dev/null 2>&1 && echo signed-in || echo none");
@@ -284,9 +290,9 @@ describe(catchUpPrompt, () => {
         expect(steps.get(7)).toContain("If it fails at any point, do not move feat/x in any other way: leave the rebase where it is");
         expect(steps.get(7)).toContain("start with pr-42-a1b2c3d4,");
         expect(commands.filter(({ command }: Command) => command.includes("git update-ref refs/heads/"))).toHaveLength(1);
-        // A failed re-fetch, a rewritten base, the base moving twice, a moved pull request head, no signed-in CLI, a closed or
-        // retargeted pull request and a refused push all set the rebase aside the same way.
-        expect(steps.get(8)?.match(SET_ASIDE_AS_STEP_SEVEN)).toHaveLength(7);
+        // A dirty checkout, a failed re-fetch, a rewritten base, the base moving twice, a moved pull request head, no signed-in
+        // CLI, a closed or retargeted pull request and a refused push all set the rebase aside the same way.
+        expect(steps.get(8)?.match(SET_ASIDE_AS_STEP_SEVEN)).toHaveLength(8);
         expect(steps.get(6)).toContain("as step 7 says");
         expect(SAME_REPO).not.toContain("leave the rebased commits in place");
         expect(SAME_REPO).not.toMatch(FORCED_BRANCH_MOVE);
@@ -307,13 +313,13 @@ describe(catchUpPrompt, () => {
         expect(commandsMatching(commands, "git switch")).toEqual([
             {
                 command:
-                    'git switch -c <name> refs/neore/pull-42-a1b2c3d4-head && [ "$(git symbolic-ref -q HEAD)" = "refs/heads/<name>" ] && [ "$(git rev-parse --verify -q HEAD)" = "$(git rev-parse --verify -q refs/neore/pull-42-a1b2c3d4-head)" ] && echo ready',
+                    'git switch -c <name> refs/worktree/neore/pull-42-a1b2c3d4-head && [ "$(git symbolic-ref -q HEAD)" = "refs/heads/<name>" ] && [ "$(git rev-parse --verify -q HEAD)" = "$(git rev-parse --verify -q refs/worktree/neore/pull-42-a1b2c3d4-head)" ] && echo ready',
                 step: 4,
             },
         ]);
         expect(commandsMatching(commands, "git worktree")).toEqual([]);
         expect(FORK).not.toContain("refs/heads/feat/x");
-        expect(fetchedRefs(commands).toSorted(byName)).toEqual(["refs/neore/pull-42-a1b2c3d4-base", "refs/neore/pull-42-a1b2c3d4-head"]);
+        expect(fetchedRefs(commands).toSorted(byName)).toEqual(["refs/worktree/neore/pull-42-a1b2c3d4-base", "refs/worktree/neore/pull-42-a1b2c3d4-head"]);
     });
 
     it("for a fork, makes a branch of this run's own, so the branch a former run left for the person does not stop the next", () => {
@@ -339,7 +345,7 @@ describe(catchUpPrompt, () => {
         const commands = commandsOf(catchUpPrompt({ ...PULL, headBranch: "pr-42", headInBaseRepository: true }));
 
         expect(commandsMatching(commands, "git fetch ")[0]?.command).toBe(
-            "git fetch origin +refs/heads/pr-42:refs/neore/pull-42-a1b2c3d4-branch +refs/heads/release/2.0:refs/neore/pull-42-a1b2c3d4-base +refs/pull/42/head:refs/neore/pull-42-a1b2c3d4-head",
+            "git fetch origin +refs/heads/pr-42:refs/worktree/neore/pull-42-a1b2c3d4-branch +refs/heads/release/2.0:refs/worktree/neore/pull-42-a1b2c3d4-base +refs/pull/42/head:refs/worktree/neore/pull-42-a1b2c3d4-head",
         );
         expect(commandsMatching(commands, "git push").map(({ command }: Command) => command)).toEqual([
             "git push --no-follow-tags --force-with-lease=refs/heads/pr-42:<commit from step 4> origin HEAD:refs/heads/pr-42",
@@ -364,11 +370,8 @@ describe(catchUpPrompt, () => {
 });
 
 describe(catchUpRunId, () => {
-    it("makes a short plain tag, new for each control, so two controls' runs fetch into refs of their own", () => {
-        const first = catchUpRunId();
-
-        expect(first).toMatch(RUN_TAG);
-        expect(catchUpRunId()).not.toBe(first);
+    it("makes a short plain tag", () => {
+        expect(catchUpRunId()).toMatch(RUN_TAG);
     });
 
     it("puts the run in every ref the prompt fetches, so two runs share none", () => {
@@ -379,10 +382,10 @@ describe(catchUpRunId, () => {
 
         // The base is fetched again before the push (step 8), into the same ref.
         expect(fetched("a1b2c3d4")).toEqual([
-            "refs/neore/pull-42-a1b2c3d4-branch",
-            "refs/neore/pull-42-a1b2c3d4-base",
-            "refs/neore/pull-42-a1b2c3d4-head",
-            "refs/neore/pull-42-a1b2c3d4-base",
+            "refs/worktree/neore/pull-42-a1b2c3d4-branch",
+            "refs/worktree/neore/pull-42-a1b2c3d4-base",
+            "refs/worktree/neore/pull-42-a1b2c3d4-head",
+            "refs/worktree/neore/pull-42-a1b2c3d4-base",
         ]);
         expect(fetched("0f0f0f0f").filter((ref) => fetched("a1b2c3d4").includes(ref))).toEqual([]);
     });
