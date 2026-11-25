@@ -25,6 +25,25 @@ export interface RecordEventInput {
     userId: string;
 }
 
+/** Events a thread's removal deletes per call; the caller runs again while any are left. */
+const THREAD_EVENT_BATCH = 200;
+
+/** The thread an event's payload names, or `undefined` for an event that names none. */
+const threadOf = (data: Record<string, unknown>): string | undefined => (typeof data["threadId"] === "string" ? data["threadId"] : undefined);
+
+/** The thread a stored payload (JSON text) names: a payload that is not a JSON object names none. */
+const storedThreadOf = (data: string): string | undefined => {
+    let parsed: unknown;
+
+    try {
+        parsed = JSON.parse(data);
+    } catch {
+        return undefined;
+    }
+
+    return typeof parsed === "object" && parsed !== null ? threadOf(parsed as Record<string, unknown>) : undefined;
+};
+
 /** How long after a failed wake write its retry runs; each further failure doubles the wait, up to `EVENT_WAKE_MAX_ATTEMPTS`. */
 export const EVENT_WAKE_RETRY_MS = 60 * 1000;
 export const EVENT_WAKE_MAX_ATTEMPTS = 10;
@@ -60,6 +79,7 @@ export const recordMcpEvent = async (ctx: Pick<MutationCtx, "db" | "now">, input
 
     const watermark = await ctx.db.mcpEventWatermarks.findFirst({ where: { userId: input.userId } });
     const seq = (watermark?.seq ?? 0) + 1;
+    const threadId = threadOf(input.data);
 
     await ctx.db.insert("mcpEvents", {
         createdAt: ctx.now,
@@ -67,6 +87,7 @@ export const recordMcpEvent = async (ctx: Pick<MutationCtx, "db" | "now">, input
         eventId: input.eventId,
         name: input.name,
         seq,
+        ...(threadId !== undefined && { threadId }),
         timestamp: input.timestamp,
         userId: input.userId,
     });
@@ -83,6 +104,21 @@ const setWatermark = async (ctx: Pick<MutationCtx, "db">, userId: string, rowId:
     } else {
         await ctx.db.patch("mcpEventWatermarks", rowId as never, { seq });
     }
+};
+
+/**
+ * Deletes up to a batch of `userId`'s events for `threadId`, and returns `true` once none are left. A deleted thread's events go
+ * with it: the poll hides a locked thread's events only while the thread exists, so they must not outlive it.
+ */
+export const deleteMcpEventsOfThread = async (ctx: Pick<MutationCtx, "db">, userId: string, threadId: string): Promise<boolean> => {
+    // One row past the batch says whether more follow: a batch that ends the thread's events is not reported as more.
+    const { page } = await ctx.db.mcpEvents.findMany({ limit: THREAD_EVENT_BATCH + 1, where: { threadId, userId } });
+
+    for (const row of page.slice(0, THREAD_EVENT_BATCH)) {
+        await ctx.db.delete("mcpEvents", row._id);
+    }
+
+    return page.length <= THREAD_EVENT_BATCH;
 };
 
 /**
@@ -111,12 +147,15 @@ export const copyMergedMcpEvents = async (ctx: Pick<MutationCtx, "db" | "now">, 
         seq += 1;
         appended += 1;
 
+        const threadId = storedThreadOf(row["data"] as string);
+
         await ctx.db.insert("mcpEvents", {
             createdAt: ctx.now,
             data: row["data"] as string,
             eventId,
             name: row["name"] as string,
             seq,
+            ...(threadId !== undefined && { threadId }),
             timestamp: row["timestamp"] as number,
             userId: to,
         });

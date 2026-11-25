@@ -10886,6 +10886,12 @@
           "optional": false,
           "unique": false
         },
+        "threadId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "timestamp": {
           "kind": "number",
           "nullable": false,
@@ -10917,6 +10923,13 @@
           "fields": [
             "userId",
             "seq"
+          ],
+          "unique": false
+        },
+        "by_userId_threadId": {
+          "fields": [
+            "userId",
+            "threadId"
           ],
           "unique": false
         }
