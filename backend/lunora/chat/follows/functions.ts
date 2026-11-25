@@ -4,7 +4,7 @@ import { internalMutation, internalQuery } from "../../_generated/server";
 import { requireThreadPermission } from "../../agent/thread-read-access";
 import { authMutation, authQuery, rateLimit } from "../../lib/crpc";
 import { isUniqueViolation } from "../../lib/error-helpers";
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 import { MAX_LENGTH } from "../../lib/validators";
 
 /**
@@ -32,59 +32,119 @@ const FOLLOW_BATCH = 100;
  */
 const FOLLOW_DELETE_BATCH = 20;
 
+/** Rounds a follow write goes again when a concurrent write changed the row between its read and its write. */
+const FOLLOW_WRITE_ATTEMPTS = 5;
+
 /**
- * Writes a person's follow state, creating the row when there is none. Two first writes that race cannot both insert:
- * `by_user_and_thread` is unique, so the one that loses patches the row the other wrote.
+ * The `updatedAt` of a row a refused accept is taking back ({@link withdrawThreadFollowDefault}): stamped by a
+ * conditional write before the delete, so a write that reads it treats the row as gone and never lands on it.
+ */
+const WITHDRAWN = -1;
+
+/** The stamp a write leaves: past the row's, so every write changes it and a conditional write on the old one misses. */
+const nextStamp = (now: number, previous: number): number => Math.max(now, previous + 1);
+
+/**
+ * Writes a person's follow state, creating the row when there is none. Each write is conditional on the stamp it read
+ * and leaves a later one, so a refused accept's take-back ({@link withdrawThreadFollowDefault}) never erases it. Two
+ * first writes that race cannot both insert: `by_user_and_thread` is unique, so the one that loses reads again and
+ * writes over the other's row.
  */
 export const setThreadFollowState = async (
     ctx: Pick<MutationCtx, "db">,
     { now, state, threadId, userId }: { now: number; state: ThreadFollowState; threadId: Id<"threads">; userId: string },
 ): Promise<void> => {
-    const existing = await ctx.db.threadFollows.findFirst({ consistency: "primary", where: { threadId, userId } });
+    for (let attempt = 0; attempt < FOLLOW_WRITE_ATTEMPTS; attempt += 1) {
+        const existing = await ctx.db.threadFollows.findFirst({ consistency: "primary", where: { threadId, userId } });
 
-    if (existing) {
-        await ctx.db.patch("threadFollows", existing._id, { state, updatedAt: now });
+        if (existing && existing.updatedAt !== WITHDRAWN) {
+            const { applied } = await ctx.db.patchIf("threadFollows", existing._id, {
+                patch: { state, updatedAt: nextStamp(now, existing.updatedAt) },
+                where: { updatedAt: existing.updatedAt },
+            });
 
-        return;
-    }
+            if (applied) {
+                return;
+            }
 
-    try {
-        await ctx.db.insert("threadFollows", { createdAt: now, state, threadId, updatedAt: now, userId });
-    } catch (error) {
-        if (!isUniqueViolation(error)) {
-            throw error;
+            continue;
         }
 
-        // Another write for this person and thread inserted between the read and the insert: this choice is the later one.
-        const raced = await ctx.db.threadFollows.findFirst({ consistency: "primary", where: { threadId, userId } });
-
-        if (!raced) {
-            throw error;
+        // A row a refused accept is taking back: deleted here too (deleting it twice is harmless), and this choice
+        // written as a new row, which that take-back, keyed on the old row's id, does not touch.
+        if (existing) {
+            await ctx.db.delete("threadFollows", existing._id);
         }
 
-        await ctx.db.patch("threadFollows", raced._id, { state, updatedAt: now });
+        try {
+            await ctx.db.insert("threadFollows", { createdAt: now, state, threadId, updatedAt: now, userId });
+
+            return;
+        } catch (error) {
+            // Another write for this person and thread inserted between the read and the insert: read it again.
+            if (!isUniqueViolation(error)) {
+                throw error;
+            }
+        }
     }
+
+    throw new LunoraError("CONFLICT", "The follow setting changed at the same moment. Try again.");
 };
 
-/** Writes a default state only when the person has no row yet, so an explicit choice is never overwritten. */
+/** The follow row a default wrote, as it wrote it: what {@link withdrawThreadFollowDefault} takes back. */
+export interface WrittenThreadFollow {
+    id: Id<"threadFollows">;
+    state: ThreadFollowState;
+    updatedAt: number;
+}
+
+/**
+ * Writes a default state only when the person has no row yet, so an explicit choice is never overwritten. The row it
+ * wrote, `null` when one stood already: a caller that is refused afterwards takes back only a row it wrote, unchanged.
+ */
 export const ensureThreadFollowDefault = async (
     ctx: Pick<MutationCtx, "db">,
     { now, state, threadId, userId }: { now: number; state: ThreadFollowState; threadId: Id<"threads">; userId: string },
-): Promise<void> => {
+): Promise<WrittenThreadFollow | null> => {
     const existing = await ctx.db.threadFollows.findFirst({ consistency: "primary", where: { threadId, userId } });
 
     if (existing) {
-        return;
+        return null;
     }
 
     try {
-        await ctx.db.insert("threadFollows", { createdAt: now, state, threadId, updatedAt: now, userId });
+        const id = (await ctx.db.insert("threadFollows", { createdAt: now, state, threadId, updatedAt: now, userId })) as Id<"threadFollows">;
+
+        return { id, state, updatedAt: now };
     } catch (error) {
         // Another write inserted the person's row between the read and the insert: that row stands.
         if (!isUniqueViolation(error)) {
             throw error;
         }
+
+        return null;
     }
+};
+
+/**
+ * Takes back the default a refused accept wrote, only while the row is still that default: the stamp is a conditional
+ * write on the state and stamp written (one statement, decided with the write), so a choice the person made since,
+ * which always leaves a later stamp, is kept. Once stamped, a follow write treats the row as gone
+ * ({@link setThreadFollowState}), so none lands between the stamp and the delete. `true` when it removed the row.
+ */
+export const withdrawThreadFollowDefault = async (ctx: Pick<MutationCtx, "db">, written: WrittenThreadFollow): Promise<boolean> => {
+    const { applied } = await ctx.db.patchIf("threadFollows", written.id, {
+        patch: { state: "off", updatedAt: WITHDRAWN },
+        where: { state: written.state, updatedAt: written.updatedAt },
+    });
+
+    if (!applied) {
+        return false;
+    }
+
+    await ctx.db.delete("threadFollows", written.id);
+
+    return true;
 };
 
 /** Deletes a person's follow row for a thread, if any: used when they leave the thread or the thread goes. */

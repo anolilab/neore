@@ -1,13 +1,16 @@
 import type { JSONValue } from "@ai-sdk/provider";
-import type { Context as AiContext, ToolContent } from "@ai-sdk/provider-utils";
+import type { Context as AiContext, ProviderOptions, ToolContent } from "@ai-sdk/provider-utils";
 import type { ModelMessage, StaticToolError, StaticToolResult, StreamTextResult, Tool, ToolSet } from "ai";
 
-import { createToolModelOutput } from "../shared";
+import type { Id } from "../../_generated/dataModel";
+import { internal } from "../../_generated/internal";
+import { deleteStoredObjects } from "./object-deletes";
+import { serializeStepContent } from "../mapping";
 import type { MessageDoc } from "../validators";
 import type { ContextAcceptingTool } from "./agent-types";
 import type { Agent } from "./index";
 import type { StreamingOptions } from "./streaming";
-import type { ActionCtx as ActionContext, AgentPrompt, GenerationOutputMetadata, Options, StreamingTextArgs } from "./types";
+import type { ActionCtx as ActionContext, AgentPrompt, Config, GenerationOutputMetadata, Options, StreamingTextArgs } from "./types";
 
 /**
  * The approval of one tool call as the SDK records it, for the `messages` a tool's `execute` gets when the approval is run
@@ -18,6 +21,27 @@ export const approvalMessagesFor = (approvalId: string, toolCallId: string): Mod
     { content: [{ approvalId, toolCallId, type: "tool-approval-request" }], role: "assistant" },
     { content: [{ approvalId, approved: true, type: "tool-approval-response" }], role: "tool" },
 ];
+
+/**
+ * Delete the files a result's serialization wrote when no saved message came to reference them: the rows and grants
+ * (`agent_files.discardUnsavedFiles`, which keeps a file a message counts or another store reused by now), then the storage
+ * objects of the rows it took (`deleteStoredObjects`). Each upload has its own key, so that delete never takes the bytes of a
+ * store of the same bytes. Never throws — a failed cleanup is logged and its recorded object delete left to the unused-file
+ * sweep, so the caller's own error stands.
+ */
+export const discardUnsavedFiles = async (ctx: ActionContext, fileIds: string[]): Promise<void> => {
+    if (fileIds.length === 0) {
+        return;
+    }
+
+    try {
+        const deleteIds = await ctx.runMutation(internal.agent.files.discardUnsavedFiles, { fileIds: fileIds as Id<"chatFiles">[] });
+
+        await deleteStoredObjects(ctx, deleteIds);
+    } catch (error) {
+        console.error("Failed to discard unsaved tool media:", error);
+    }
+};
 
 /**
  * Approve a pending tool call and continue generation. The body of
@@ -99,6 +123,9 @@ export async function approveToolCallFor<CustomContext extends object, AgentTool
             type: "tool-approval-response" as const,
         },
     ];
+    let resultFileIds: string[] | undefined;
+    // The files the result's serialization wrote: unreferenced until the save below lands.
+    const createdFileIds: string[] = [];
 
     try {
         // Execute with context injection (like wrapTools does)
@@ -124,18 +151,18 @@ export async function approveToolCallFor<CustomContext extends object, AgentTool
             toolCallId,
         });
 
-        toolResult.push({
-            output: await createToolModelOutput({
-                errorMode: "none",
-                input: toolInput,
-                output,
-                tool,
-                toolCallId,
-            }),
-            toolCallId,
-            toolName,
-            type: "tool-result" as const,
-        });
+        // Saved as the tool returned it, like a step's result (`serializeStepContent`): the transcript reads the result's
+        // own fields (a human check's `run` for its card), and its inline media moves to storage. Each run gives the model
+        // the tool's `toModelOutput` of the saved row instead (`withApprovedToolModelOutputs`, below).
+        const { messageFileIds, partContent } = await serializeStepContent(
+            ctx,
+            [{ dynamic: false, input: toolInput, output, toolCallId, toolName, type: "tool-result" }] as never,
+            resolvedUserId ? { threadId, userId: resolvedUserId } : undefined,
+            createdFileIds,
+        );
+
+        toolResult.push(...(partContent as ToolContent).map((part) => (part.type === "tool-result" ? withRawToolResultMark(part) : part)));
+        resultFileIds = messageFileIds;
     } catch (error) {
         toolResult.push({
             output: {
@@ -147,18 +174,33 @@ export async function approveToolCallFor<CustomContext extends object, AgentTool
             type: "tool-result" as const,
         });
         console.error("Tool execution error:", error);
+        // The error row saved below references none of the media stored before the failure.
+        const unreferenced = [...createdFileIds];
+
+        createdFileIds.length = 0;
+        await discardUnsavedFiles(ctx, unreferenced);
     }
 
     // Save approval response and tool result together
-    const { messageId: toolResultId } = await agent.saveMessage(ctx, {
-        message: {
-            content: toolResult,
-            role: "tool",
-        },
-        promptMessageId: parentMessageId,
-        skipEmbeddings: true,
-        threadId,
-    });
+    let toolResultId: string;
+
+    try {
+        ({ messageId: toolResultId } = await agent.saveMessage(ctx, {
+            message: {
+                content: toolResult,
+                role: "tool",
+            },
+            ...(resultFileIds && { metadata: { fileIds: resultFileIds } }),
+            promptMessageId: parentMessageId,
+            skipEmbeddings: true,
+            threadId,
+        }));
+    } catch (error) {
+        // No saved row references the media this result stored: take it back, and fail with the save's own error.
+        await discardUnsavedFiles(ctx, createdFileIds);
+
+        throw error;
+    }
 
     // Continue generation with forceNewOrder to create a separate message.
     //
@@ -366,3 +408,108 @@ async function findToolCallInfo<CustomContext extends object, AgentTools extends
 
     return { parentMessageId, toolCallId, toolInput, toolName };
 }
+
+/**
+ * Marks a result an approval saved as the tool returned it (`providerOptions.neore.rawToolResult`). A row approved before
+ * results were saved raw holds the tool's model output already: it carries no mark and reaches the model as saved, never
+ * converted a second time.
+ */
+const withRawToolResultMark = <Part extends { providerOptions?: ProviderOptions }>(part: Part): Part => {
+    return { ...part, providerOptions: { ...part.providerOptions, neore: { ...part.providerOptions?.neore, rawToolResult: true } } };
+};
+
+const hasRawToolResultMark = (part: { providerOptions?: unknown }): boolean =>
+    (part.providerOptions as { neore?: { rawToolResult?: unknown } } | undefined)?.neore?.rawToolResult === true;
+
+/**
+ * The tool calls whose saved result an approval ran (`approveToolCallFor`): a `tool` row holding an approved
+ * `tool-approval-response` and the result saved raw (marked by `withRawToolResultMark`). Read from the stored rows, since a
+ * model message carries no approval part.
+ */
+export const approvedToolCallIdsOf = (messages: ReadonlyArray<ModelMessage | MessageDoc["message"]>): Set<string> => {
+    const ids = new Set<string>();
+
+    for (const message of messages) {
+        if (message?.role !== "tool" || !Array.isArray(message.content)) {
+            continue;
+        }
+
+        const parts = message.content as { approved?: boolean; providerOptions?: unknown; toolCallId?: string; type: string }[];
+
+        if (parts.every((part) => !(part.type === "tool-approval-response" && part.approved === true))) {
+            continue;
+        }
+
+        for (const part of parts) {
+            if (part.type === "tool-result" && part.toolCallId && hasRawToolResultMark(part)) {
+                ids.add(part.toolCallId);
+            }
+        }
+    }
+
+    return ids;
+};
+
+/**
+ * `messages` with each approved call's saved result given to the model through its tool's `toModelOutput`, as a step's
+ * own result is: the row keeps what the tool returned (the transcript reads it), the model gets the tool's view of it.
+ * A result whose tool is neither in the run nor found by `builtInToolFormatter`, has no `toModelOutput`, or is an error
+ * stays as saved.
+ */
+export const withApprovedToolModelOutputs = async (
+    messages: ModelMessage[],
+    tools: ToolSet,
+    approvedIds: ReadonlySet<string>,
+    builtInToolFormatter?: Config["builtInToolFormatter"],
+): Promise<ModelMessage[]> => {
+    if (approvedIds.size === 0) {
+        return messages;
+    }
+
+    return await Promise.all(
+        messages.map(async (message) => {
+            if (message.role !== "tool") {
+                return message;
+            }
+
+            let changed = false;
+            const content = await Promise.all(
+                message.content.map(async (part) => {
+                    if (part.type !== "tool-result" || !approvedIds.has(part.toolCallId) || (part.output.type !== "json" && part.output.type !== "text")) {
+                        return part;
+                    }
+
+                    // The run's own tool, else the built-in of that name: never only the run's, as a call that offers
+                    // no tools (a cap's wrap-up) or a tool switched off since must still show the model the tool's view.
+                    const offered = tools[part.toolName] as Tool | undefined;
+                    const tool = offered?.toModelOutput ? offered : await builtInToolFormatter?.(part.toolName);
+
+                    if (!tool?.toModelOutput) {
+                        return part;
+                    }
+
+                    try {
+                        const output = await tool.toModelOutput.call(tool, {
+                            input: (part as { input?: unknown }).input,
+                            output: part.output.value,
+                            toolCallId: part.toolCallId,
+                        });
+
+                        changed = true;
+
+                        return { ...part, output };
+                    } catch (error) {
+                        console.error("[withApprovedToolModelOutputs] toModelOutput failed; the saved result is sent", {
+                            error: error instanceof Error ? error.message : String(error),
+                            toolName: part.toolName,
+                        });
+
+                        return part;
+                    }
+                }),
+            );
+
+            return changed ? ({ ...message, content } as ModelMessage) : message;
+        }),
+    );
+};

@@ -160,7 +160,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             async () =>
                 await workflowContext.run(
                     internal.billing.gdpr.cancelBilling,
-                    { referenceId: args.userId },
+                    { erase: true, referenceId: args.userId },
                     { dedupId: stepDedupId(scope, "cancel-user-billing"), shardKey: ROOT_SHARD_KEY },
                 ),
         );
@@ -408,6 +408,16 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     steps.deleteUserThreadSummaries,
                     { userId: args.userId },
                     { dedupId: stepDedupId(scope, "delete-user-thread-summaries", round) },
+                ),
+        );
+
+        await drain(
+            "delete-user-grant-revisions",
+            async (round) =>
+                await context.run(
+                    steps.deleteUserGrantRevisions,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-grant-revisions", round) },
                 ),
         );
 

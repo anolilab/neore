@@ -305,3 +305,61 @@ export const withChatFiles = (rest: string, chatFiles: unknown): string => {
 
     return `${rest.slice(0, -2)},\n  "chatFiles": ${value}\n}`;
 };
+
+/**
+ * The most grant-revision pages (a workflow step each, `agent/gdpr.ts#GRANT_REVISIONS_EXPORT_PAGE` rows) one export stores: with
+ * the browser pages at their own cap and the export's other steps, a run stays under 1,024 steps (the lowest workflow step
+ * limit), and the section under the export file's size. A user who held more
+ * gets no export rather than one that leaves some out ({@link GrantRevisionsExportError}).
+ */
+export const GRANT_REVISIONS_EXPORT_PAGES = 128;
+
+/**
+ * Where page `page` of a run's grant revisions is stored: under the run's browser prefix (`browser/export-pages.ts`), so the
+ * run's cleanup, the sweep of a dead run and account erasure delete it with the browser pages. The name never collides with
+ * theirs (`<page>.json`).
+ */
+export const grantRevisionsExportPageKey = (prefix: string, page: number): string => `${prefix}grant-revisions-${String(page)}.json`;
+
+/** The grant revisions went past {@link GRANT_REVISIONS_EXPORT_PAGES}: the export fails, never completes with some left out. */
+export class GrantRevisionsExportError extends Error {
+    public constructor() {
+        super(`The grant revisions passed ${String(GRANT_REVISIONS_EXPORT_PAGES)} export pages`);
+        this.name = "GrantRevisionsExportError";
+    }
+}
+
+/**
+ * Stores every page of the grant revisions a user held and returns how many there are. `storePage` runs one page as its own
+ * workflow step (given the cursor and the page number, for the step's name and the object's key), reads it within that step's
+ * own query and stores it, and returns the next cursor, absent after the last page. Every page is stored: nothing is cut for a
+ * budget, and past {@link GRANT_REVISIONS_EXPORT_PAGES} it throws, so the export fails instead of completing short.
+ */
+export const storeAllGrantRevisionPages = async (storePage: (cursor: string | undefined, page: number) => Promise<{ next?: string }>): Promise<number> => {
+    let cursor: string | undefined;
+
+    for (let page = 0; page < GRANT_REVISIONS_EXPORT_PAGES; page += 1) {
+        const { next } = await storePage(cursor, page);
+
+        if (next === undefined) {
+            return page + 1;
+        }
+
+        cursor = next;
+    }
+
+    throw new GrantRevisionsExportError();
+};
+
+/** The `pages` stored pages read back in order into the export's section: every revision, none left out. */
+export const readAllGrantRevisionPages = async (readPage: (page: number) => Promise<string>, pages: number): Promise<{ revisions: unknown[] }> => {
+    const revisions: unknown[] = [];
+
+    for (let page = 0; page < pages; page += 1) {
+        const stored = JSON.parse(await readPage(page)) as { revisions?: unknown[] };
+
+        revisions.push(...(stored.revisions ?? []));
+    }
+
+    return { revisions };
+};

@@ -6,11 +6,16 @@
  */
 import { v } from "lunorash/server";
 
+import { internal } from "../_generated/internal";
+import type { ActionCtx } from "../_generated/server";
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { authAction, rateLimit } from "../lib/crpc";
+import { threadShardFor } from "../lib/thread-shard";
 import { MAX_LENGTH } from "../lib/validators";
 import { DEVELOP_DRIVER } from "./develop-driver";
+import { recordMergedPullRequest } from "./pr-merged";
 import { readFromHost } from "./read-host";
+import { requireAddress } from "./pr-threads";
 import type { CheckRun, PullRequestReview } from "./types";
 import { vFailed } from "./validators";
 
@@ -115,19 +120,71 @@ const vOpen = v.object({
     url: v.string(),
 });
 
+/**
+ * Whether the caller is the thread's owner: only then may this read write the thread's link rows (the stamp and the merge). A
+ * collaborator's read names a pull request the owner's chats may link to, and it must not move or archive the owner's rows, so it
+ * writes nothing. A failed grant lookup answers "not the owner": the host answer is still returned, and nothing is written.
+ */
+export const ownsThread = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, threadId: string | undefined): Promise<boolean> => {
+    if (threadId === undefined) {
+        return false;
+    }
+
+    try {
+        return (await threadShardFor(ctx, userId, threadId)) === userId;
+    } catch (error) {
+        console.error("[source-control] could not read a thread's owner for a status read", error);
+
+        return false;
+    }
+};
+
+/** Records that the links to this pull request were read now, on the caller's own shard. Never throws: the answer is what the caller gets. */
+export const stampStatusRead = async (
+    ctx: Pick<ActionCtx, "runMutation">,
+    userId: string,
+    ref: { number: number; repository: string },
+    threadId: string,
+    readStartedAt: number,
+): Promise<void> => {
+    try {
+        const address = requireAddress(ref.repository, ref.number);
+
+        await ctx.runMutation(internal.source_control.pr_threads.recordStatusRead, {
+            number: address.number,
+            // Only links that existed when the host was asked were part of this read: a link made since is left for the next one.
+            readStartedAt,
+            repository: address.repository,
+            threadId,
+            userId,
+        });
+    } catch (error) {
+        console.error("[source-control] could not record a status read", error);
+    }
+};
+
 /** The problems on one open pull request; a closed or merged one is reported as such, with no further host call. */
 export const getPullRequestStatus = authAction
-    .input({ number: v.number(), repository: v.string().max(MAX_LENGTH.short) })
+    // `threadId`: the chat whose header asks, so its own link rows are the ones stamped as read.
+    .input({ number: v.number(), repository: v.string().max(MAX_LENGTH.short), threadId: v.optional(v.string().max(MAX_LENGTH.id)) })
     .use(rateLimit("sourceControl/read"))
-    .output(v.union(vOpen, v.object({ state: v.union(v.literal("closed"), v.literal("merged")), status: v.literal("ok") }), vFailed))
+    .output(
+        v.union(
+            vOpen,
+            v.object({ mergedAt: v.optional(v.number()), state: v.union(v.literal("closed"), v.literal("merged")), status: v.literal("ok") }),
+            vFailed,
+        ),
+    )
     .action(async ({ args, ctx }) => {
         const token = await resolveGithubToken(ctx, ctx.user.userId);
         const ref = { number: args.number, repository: args.repository };
+        // Taken before the host is asked: a link made after this moment was not part of what the host answered.
+        const readStartedAt = Date.now();
         const outcome = await readFromHost(DEVELOP_DRIVER, token, async (request) => {
             const detail = await DEVELOP_DRIVER.getPullRequest(request, ref);
 
             if (detail.state !== "open") {
-                return { state: detail.state };
+                return { mergedAt: detail.mergedAt, state: detail.state };
             }
 
             // The merge state comes with the pull request when the host answers it there; only otherwise is it asked for.
@@ -159,6 +216,44 @@ export const getPullRequestStatus = authAction
         });
 
         ctx.log.event("source_control.get_pull_request_status", { status: outcome.status });
+
+        // A host answer moves this chat's links to the back of its read rotation. So does a failure that repeats (the pull request is
+        // gone, or the token cannot see it): otherwise such a link holds the front of the rotation and starves the others. A temporary
+        // failure (rate limit, host error, reconnect) stays eligible for the next view.
+        const repeatableFailure = outcome.status === "not_found" || outcome.status === "forbidden";
+
+        // The links are the owner's: a stamp and a merge record for a shared chat go to the owner's shard (the host read above used
+        // the caller's own token, and is unchanged).
+        const owner = await ownsThread(ctx, ctx.user.userId, args.threadId);
+
+        if ((outcome.status === "ok" || repeatableFailure) && args.threadId !== undefined && owner) {
+            await stampStatusRead(ctx, ctx.user.userId, ref, args.threadId, readStartedAt);
+        }
+
+        // A merge made outside the app is seen here, when the chat's pull request is read (`pr-merged.ts`).
+        // Without the host's merge time the merge cannot be ordered against the owner's opt-in, so it is not recorded at the
+        // sighting time (which could archive chats for a merge that came before the opt-in).
+        // Only the owner's own read records a merge: that merge marks every chat the owner linked to the pull request, so a
+        // collaborator's read (which names the pull request, not the owner's chats) must not write or archive the owner's chats.
+        if (outcome.status === "ok" && outcome.state === "merged" && outcome.mergedAt !== undefined && owner) {
+            await recordMergedPullRequest(ctx, ctx.user.userId, ref, outcome.mergedAt);
+        } else if (outcome.status === "ok" && outcome.state === "merged" && owner) {
+            // Merged without a merge time: the owner's links read merged, so they no longer block archiving. No merge is recorded
+            // (it has no time to order against the owner's opt-in), so nothing archives for it.
+            // Stored links carry the canonical (lowercase) repository, so the lookup uses it too.
+            const address = requireAddress(ref.repository, ref.number);
+
+            // Best-effort: a failed write must not fail the answer GitHub already gave.
+            try {
+                await ctx.runMutation(internal.source_control.pr_threads.noteLinksMerged, {
+                    number: address.number,
+                    repository: address.repository,
+                    userId: ctx.user.userId,
+                });
+            } catch (error) {
+                console.error("[source-control] could not mark a merged pull request's links", error);
+            }
+        }
 
         return outcome;
     });

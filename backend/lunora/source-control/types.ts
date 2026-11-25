@@ -61,7 +61,14 @@ export interface PullRequestDetail extends PullRequestRef {
     deletions: number;
     draft: boolean;
     headBranch: string;
+    /**
+     * Whether the head branch lives in this same repository, by the host's repository identity: `false` for a fork, and for a head
+     * whose repository the host no longer reports (a deleted fork). Never inferred from branch names or commits.
+     */
+    headInBaseRepository: boolean;
     headSha: string;
+    /** When the host merged it, if it did. Absent until then. */
+    mergedAt?: number;
     /** Whether it merges cleanly, when the host says so on this same read (`unknown` while the host still works it out). */
     mergeState?: MergeState;
     state: "closed" | "merged" | "open";
@@ -157,6 +164,17 @@ export interface CheckLog {
 export const MERGE_METHODS = ["merge", "squash", "rebase"] as const;
 
 export type MergeMethod = (typeof MERGE_METHODS)[number];
+
+/**
+ * How a pull request's head commit compares with its base branch, from the host comparing the two (not the host's
+ * mergeability, which says `behind` only where branch protection asks for an up-to-date branch).
+ */
+export interface BranchComparison {
+    /** Commits on the head that the base does not have. */
+    aheadBy: number;
+    /** Commits on the base that the head does not have: above 0, the branch is behind. */
+    behindBy: number;
+}
 
 /** What the host says of the change's mergeability; the host's rules, not ours, decide at merge time. */
 export type MergeState = "behind" | "blocked" | "clean" | "conflicting" | "draft" | "unknown" | "unstable";

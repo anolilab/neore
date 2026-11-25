@@ -27,6 +27,7 @@ import { assert } from "../lib/error-helpers";
 import { patchById, patchRow, withoutUndefined } from "../lib/patch";
 import { paginationOptionsValidator, MAX_LENGTH } from "../lib/validators";
 import { endHostThread, restoreHostThread } from "../acp/lib/thread-removed";
+import { settleOwedMergesOf } from "../source-control/pr-thread-links";
 import { deleteMessage } from "./messages";
 import { deleteChatFileLinksForThread } from "./files";
 import { deleteStreamsPageForThreadId } from "./streams";
@@ -351,10 +352,19 @@ export const searchThreadTitles = query
 
 /** The archive write itself, shared by manual archive and the auto-archive sweep (`auto-archive.ts`). */
 export const markThreadArchived = async (context: MutationContext, threadId: Id<"threads">): Promise<void> => {
+    const thread = await context.db.get("threads", threadId);
+
     await context.db.patch("threads", threadId, {
+        archivedAt: context.now,
         status: "archived",
         updatedAt: context.now,
     });
+
+    // Every archive is final for the chat: its owed merges settle with it, so reopening the chat cannot archive it again for them.
+    if (thread?.userId !== undefined) {
+        await settleOwedMergesOf(context, thread.userId, threadId, context.now);
+    }
+
     // A guest link is for a thread in use: archiving withdraws it and what guests left on it.
     await withdrawGuestLinksForThread(context, threadId);
 };
@@ -500,8 +510,8 @@ export const deleteAllForThreadIdAsync = internalMutation
             }
 
             await deleteThreadSummaries(ctx, args.threadId);
-            // A chat deleted for good without passing the trash keeps no grant either.
-            await revokeThreadGrants(ctx, args.threadId);
+            // A chat deleted for good without passing the trash keeps no grant either, nor any grant's revision.
+            await revokeThreadGrants(ctx, args.threadId, { purge: true });
         } else {
             await ctx.scheduler.runAfter(0, internal.agent.threads.deleteAllForThreadIdAsync, {
                 cursor: messagesResult.cursor,

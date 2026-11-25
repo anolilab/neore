@@ -188,8 +188,8 @@ export interface LadderResult extends PageSignals {
     error?: string;
     /** The person had driven the browser and gave it back; this is the first look at the page since. */
     handedBack?: boolean;
-    /** `checkId`: the ask's row (`browserHumanChecks`), which the card answers; only on `asked`. */
-    humanCheck?: { browserId?: string; checkId?: string; site: string; status: "already_asked" | "asked" | "declined" };
+    /** `checkId`: the ask's row (`browserHumanChecks`), which the card answers, `run` its reply; only on `asked`. */
+    humanCheck?: { browserId?: string; checkId?: string; run?: string; site: string; status: "already_asked" | "asked" | "declined" };
     screenshot?: string;
     screenshotFormat?: string;
     success?: boolean;

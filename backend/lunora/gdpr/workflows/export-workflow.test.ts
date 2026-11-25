@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { BROWSER_EXPORT_PAGES } from "../../browser/export-pages";
 import { UsageExportError, usageObjectKey } from "../usage-export-steps";
+import { GRANT_REVISIONS_EXPORT_PAGES } from "../../agent/export-pages";
 import { dataExportWorkflowConfig, exportFailureMessage } from "./export-workflow";
 
 const PARAMS = { requestId: "request-1", userEmail: "user@example.com", userId: "user-1" };
@@ -183,6 +184,57 @@ describe("data export workflow: watched repositories", () => {
 
         expect(rest).toEqual([]);
         expect(collect?.dedupId).toContain(PARAMS.requestId);
+    });
+});
+
+describe("data export workflow: grant revisions", () => {
+    const pagesWithCursors = (count: number): (() => unknown) => {
+        let page = 0;
+
+        return () => {
+            page += 1;
+
+            return page < count ? { next: `cursor-${String(page)}` } : {};
+        };
+    };
+
+    it("stores every page a step at a time under the run's prefix, and hands the export file only how many there are", async () => {
+        stubs["agent_gdpr:storeGrantRevisionsExportPage"] = pagesWithCursors(3);
+
+        await execute();
+
+        const stores = ran("agent_gdpr:storeGrantRevisionsExportPage");
+        const generated = ran("gdpr_steps:generateExportFile")[0]?.args;
+        const prefix = generated?.["browserPrefix"] as string;
+
+        // No step result or dispatch body carries a revision: the workflow never reads them itself.
+        expect(ran("agent_gdpr:collectGrantRevisionsForExport")).toStrictEqual([]);
+        expect(stores.map((call) => call.args["cursor"])).toStrictEqual([undefined, "cursor-1", "cursor-2"]);
+        expect(stores.map((call) => call.args["key"])).toStrictEqual([0, 1, 2].map((page) => `${prefix}grant-revisions-${String(page)}.json`));
+        expect(stepNames).toEqual(expect.arrayContaining(["collect-grant-revisions-0", "collect-grant-revisions-1", "collect-grant-revisions-2"]));
+        expect(generated).toMatchObject({ grantRevisionPages: 3 });
+        expect(generated).not.toHaveProperty("grantRevisions");
+        // Every page was stored before the file was written, and the export completed with all of them.
+        expect(progressWith("completed")).toHaveLength(1);
+        // The pages sit under the run's prefix, so its cleanup deletes them with the browser pages.
+        expect(ran("browser_gdpr:deleteBrowserExportPages").map((call) => call.args["prefix"])).toStrictEqual([prefix]);
+    });
+
+    it("fails the export, never completes it, when the revisions run past the page cap", async () => {
+        // A history that never ends: every page names a next one.
+        stubs["agent_gdpr:storeGrantRevisionsExportPage"] = () => {
+            return { next: "more" };
+        };
+
+        await execute();
+
+        expect(ran("agent_gdpr:storeGrantRevisionsExportPage")).toHaveLength(GRANT_REVISIONS_EXPORT_PAGES);
+        expect(ran("gdpr_steps:generateExportFile")).toStrictEqual([]);
+        expect(progressWith("completed")).toStrictEqual([]);
+        expect(progressWith("failed").map((call) => call.args["errorMessage"])).toStrictEqual([
+            "Your sharing history is too large to export in one file; contact support",
+        ]);
+        expect(stepNames.length).toBeLessThan(1024);
     });
 });
 

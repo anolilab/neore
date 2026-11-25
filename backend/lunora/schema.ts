@@ -376,6 +376,16 @@ export const schema = defineSchema({
         .index("action", ["action"])
         .index("timestamp", ["timestamp"]),
 
+    // A reference whose account was erased. A late Creem event for it must not recreate a payment row. The id is kept
+    // only so that refusal can be made; it names no one once the account row is gone.
+    billingErasures: defineTable({
+        erasedAt: v.number(),
+        referenceId: v.string(),
+    })
+        // Not `.global()`: the tombstone lives on the root shard with the payment rows it guards, so one mutation
+        // writes both or neither.
+        .index("by_referenceId", ["referenceId"]),
+
     /**
      * Who created each bot, kept for as long as the bot id can appear on a memory. A global table: a memory is written on
      * the shard of the person it belongs to, and a shared chat's bot lives on its owner's shard, so the write cannot read
@@ -592,7 +602,7 @@ export const schema = defineSchema({
     }).global(),
 
     /**
-     * Who may attach a `chatFiles` row. The rows are content-addressed and
+     * Who may attach a `chatFiles` row. The rows are deduplicated by hash and
      * SHARED — two users uploading the same bytes get the same row — so the
      * file itself cannot carry an owner. A grant is written whenever a user
      * stores (or re-stores) the bytes; `agent_files.getFileForUser` is the
@@ -625,7 +635,35 @@ export const schema = defineSchema({
         .global()
         .index("by_fileId", ["fileId"]),
 
+    /**
+     * A chat-file storage object no row names (any more, or yet), to be deleted: written when a delete takes a file's last row
+     * (`agent/files.ts#discardFileRow`), and before a store uploads to its own new key (`useExistingFile`'s `uploadKey`), which
+     * the row that store writes takes back (`addFile`). It goes once the object delete returned (`deleteStoredObjects`); the sweep
+     * deletes again every record past `deleteAfter` (`retryObjectDeletes`), so a failed delete or a store that died never leaves
+     * bytes behind.
+     */
+    chatFileObjectDeletes: defineTable({
+        /** The sweep takes the record up after this; a store's claim sets it beyond any sweep. */
+        deleteAfter: v.number(),
+        /**
+         * `store`: an upload under way, which only its own store's row may take back (`addFile`). `delete`: the object is to go; a
+         * sweep's claim of a due `store` record makes it one, so a store that comes back late finds it gone.
+         */
+        kind: v.union(v.literal("store"), v.literal("delete")),
+        storageId: v.string(),
+    })
+        // `.global()`, like `chatFiles`: the stores and deletes it records run on any user's shard.
+        .global()
+        .index("by_storageId", ["storageId"])
+        .index("by_deleteAfter", ["deleteAfter"]),
+
     chatFiles: defineTable({
+        /**
+         * Set by the conditional write that decides a delete (a save rollback, the unused-file sweep), before the row's grants,
+         * metadata and row go. A reuse and a new reference are conditional on it being unset, so each lands before the decision
+         * (and the delete skips the row) or finds it marked and stores its own row.
+         */
+        discardingAt: v.optional(v.number()),
         extractedText: v.optional(v.string()),
         extractionError: v.optional(v.string()),
         extractionStatus: v.optional(
@@ -638,15 +676,24 @@ export const schema = defineSchema({
         nsfwScores: v.optional(v.object({ drawing: v.number(), hentai: v.number(), neutral: v.number(), porn: v.number(), sexy: v.number() })),
         nsfwStatus: v.optional(v.union(v.literal("pending"), v.literal("checking"), v.literal("safe"), v.literal("blocked"), v.literal("failed"))),
         refcount: v.number(),
+        /**
+         * Set when a store found this row and handed it out again (`useExistingFile`, a racing `addFile`). That store's message
+         * counts the row only when it saves, so until then `refcount` cannot show it: a save rollback (`discardUnsavedFiles`)
+         * takes back only a row no other store reused.
+         */
+        reusedAt: v.optional(v.number()),
         storageId: v.string(),
         unreferencedSince: v.optional(v.number()),
     })
-        // `.global()`: content-addressed (`agent-files/<sha256>`), so identical
-        // bytes stored by two users share ONE R2 object. Its refcount must see
-        // every user's references — per-shard copies would each reap the object
-        // the other still uses.
+        // `.global()`: deduplicated by hash, so identical bytes stored by two
+        // users share ONE row and its object (`agent-files/<sha256>/<uuid>`,
+        // `lib/chat-file-key.ts`). Its refcount must see every user's
+        // references — per-shard copies would each reap the object the other
+        // still uses.
         .global()
         .index("hash_filename", ["hash", "filename"])
+        // The rows naming one storage object (`lib/storage-ownership.ts`, `agent/files.ts`): a hash can have any number of rows.
+        .index("by_storageId", ["storageId"])
         .index("refcount", ["refcount"]),
 
     /**
@@ -810,7 +857,6 @@ export const schema = defineSchema({
                 userConnectors: r.many("userConnectors", { field: "connectorDefinitionId" }),
             };
         }),
-
     /**
      * The slot each periodic cron job last ran for (`lib/cron-schedule.ts`,
      * `crons.ts:cronTick`). One row per job name; claiming a slot is what makes
@@ -951,6 +997,7 @@ export const schema = defineSchema({
     })
         .shardBy("userId")
         .index("by_userId", ["userId"]),
+
     // Ported 1:1 from the audit-history component schema. Read by
     // GDPR (`listUserActivity`, `getDocumentAtTime`) and the canvas version
     // history, so it is a real table rather than a write-only log.
@@ -1890,7 +1937,6 @@ export const schema = defineSchema({
         status: v.union(v.literal("pending"), v.literal("running"), v.literal("completed"), v.literal("failed"), v.literal("skipped")),
         usage: v.optional(v.object({ completionTokens: v.number(), promptTokens: v.number(), totalTokens: v.number() })),
     }).index("by_execution_and_node", ["executionId", "nodeId"]),
-
     // The notification inbox (`notifications/`): one row per event for its
     // user, written only through `notify()`. `title` is the SUBJECT (a task's
     // title); the UI words what happened from `type` + `outcome`. Pruned after
@@ -1925,6 +1971,7 @@ export const schema = defineSchema({
         .index("by_state", ["state"])
         .index("by_expiresAt", ["expiresAt"])
         .index("by_userId", ["userId"]),
+
     organization: defineTable({
         allowedModels: v.optional(v.array(v.string())),
         baseTier: v.optional(v.union(v.literal("free"), v.literal("pro"), v.literal("enterprise"))),
@@ -2643,12 +2690,23 @@ export const schema = defineSchema({
         headBranch: v.optional(v.string()),
         // `attached`: a thread started on the pull request. `linked`: an existing thread linked by hand. `opened`: a run opened it.
         kind: v.union(v.literal("attached"), v.literal("linked"), v.literal("opened")),
+        // The last archive attempt for this merge that found the chat busy. The next read tries the least recently attempted links first.
+        mergeAttemptedAt: v.optional(v.number()),
+        // Set once the pull request is seen merged (`source-control/pr-threads.ts#recordPullRequestMerged`). Written once: a merge is terminal.
+        mergedAt: v.optional(v.number()),
+        // The exclusive upper bound of the merge's time, as the recorder was given it. Unset: the merge is bounded by `mergedAt` plus a second.
+        mergedBefore: v.optional(v.number()),
+        // Set once this merge's archive attempt for the link finished: archived, or declined by a guard or the setting. Until then a read retries it.
+        mergeSettledAt: v.optional(v.number()),
         number: v.number(),
         repository: v.string(),
         // The host's state of the pull request, as the last refresh read it (`source-control/pr-state.ts`). Absent until the
         // first read: an unknown state keeps the thread out of auto-archive, like an open one.
         state: v.optional(v.union(v.literal("open"), v.literal("closed"), v.literal("merged"))),
         stateCheckedAt: v.optional(v.number()),
+        // The last time a chat's view read this pull request's state from the host. The header reads the least recently read
+        // links first, so a link past the first few still gets its merge seen (`source-control/pr-status.ts`).
+        statusReadAt: v.optional(v.number()),
         // Set while the thread is soft-deleted, so the sidebar count reads these rows alone. Kept in step by the thread's delete and restore.
         threadDeleted: v.optional(v.boolean()),
         threadId: v.id("threads"),
@@ -2730,7 +2788,6 @@ export const schema = defineSchema({
         .index("by_key", ["key"])
         // `lib/rate-limit-sweep.ts` deletes rows past every limit's retention.
         .index("by_ts", ["ts"]),
-
     /**
      * A value the agent asked the user for with `requestSecret` (an API key, a token),
      * kept behind the opaque `ref` the agent sees. `encryptedValue` is BYOK-style
@@ -2762,6 +2819,7 @@ export const schema = defineSchema({
         .index("by_expiresAt", ["expiresAt"])
         .index("by_threadId", ["threadId"])
         .index("by_userId", ["userId"]),
+
     // Develop mode (`source-control/`): the review a user is writing on a pull request, kept on the
     // server so it follows them across devices. One row per (user, host origin, repository, number);
     // `commitId` is the head the comment lines refer to. A submit claims the row (`submittingAt` > 0,
@@ -3427,6 +3485,8 @@ export const schema = defineSchema({
         /** The thread's owner — the shard the thread lives on, and the key `authorizeShard` admits the grantee to. */
         ownerId: v.optional(v.string()),
         permission: v.union(v.literal("read"), v.literal("write"), v.literal("admin")),
+        /** Advanced by every write to the grant (`agent/grant-revision.ts`); absent on a grant from before revisions (0). */
+        revision: v.optional(v.number()),
         threadId: v.id("threads"),
         userId: v.string(),
     })
@@ -3434,11 +3494,31 @@ export const schema = defineSchema({
         .global()
         .index("by_thread_and_user", ["threadId", "userId"])
         .index("by_user_and_owner", ["userId", "ownerId"])
+        // The grants on a user's chats: a guest merge's last check and the owner's erasure, without a table scan.
+        .index("by_owner", ["ownerId"])
         .relations((r) => {
             return {
                 thread: r.one("threads", { field: "threadId" }),
             };
         }),
+    /**
+     * The last revision of a thread grant (`agent/grant-revision.ts`), one row per thread and grantee. It outlives the
+     * grant row, so a grant written after a removal continues past the removal's revision and a denial names it. Erased
+     * when the chat is deleted for good (`revokeThreadGrantsJob` with `purge`) and with either user's account.
+     */
+    threadAccessRevisions: defineTable({
+        /** The thread's owner, so the owner's account deletion erases the row. */
+        ownerId: v.optional(v.string()),
+        revision: v.number(),
+        threadId: v.id("threads"),
+        /** The grantee. */
+        userId: v.string(),
+    })
+        .global()
+        // Unique: two writers that both find no row cannot both make one (`advanceGrantRevision`).
+        .index("by_thread_and_user", ["threadId", "userId"], { unique: true })
+        .index("by_user_and_owner", ["userId", "ownerId"])
+        .index("by_owner", ["ownerId"]),
 
     /**
      * A rolling summary of the older rows of ONE path of a thread, made while it
@@ -3473,6 +3553,7 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_threadId", ["threadId"])
         .index("by_userId", ["userId"]),
+
     // Whether a person follows a thread for new-reply notifications (`chat/follows/functions.ts`). A row exists only
     // once a state is set (by the person, or by share/accept); no row means "off".
     // Global (D1) like `threadAccess`: the follower, the thread's owner and the erasure of either read the same rows.
@@ -3491,7 +3572,6 @@ export const schema = defineSchema({
                 thread: r.one("threads", { field: "threadId" }),
             };
         }),
-
     threadGoals: defineTable({
         // The highest round whose review has been claimed (`chat/goals/internal.ts#claimGoalRound`):
         // the review job is queued at least once, and only the delivery that claims a round reviews it.
@@ -3547,6 +3627,7 @@ export const schema = defineSchema({
         .index("by_linkHash", ["linkHash"])
         .index("by_expiresAt", ["expiresAt"])
         .index("by_userId", ["userId"]),
+
     /**
      * A message a guest left through a link. UNTRUSTED text that waits here: nothing reads it into a model,
      * a title or a summary. Only the owner's Send hands it to the owner's own client, which sends it through
@@ -3656,6 +3737,20 @@ export const schema = defineSchema({
             };
         }),
 
+    /**
+     * A chat deleted for good (`agent/grant-revision.ts#markThreadPurged`): written by its grant purge before the purge
+     * reads a grant or a revision, and read by every write that makes one (a new grant, a new count) after its own write,
+     * which then takes it back. So a write the purge's reads miss (an invite accept already past its invite read) finds
+     * the mark. Holds no user; dropped a day after the purge finishes (`dropThreadPurgeMark`), when no such write is left.
+     */
+    threadPurgeMarks: defineTable({
+        purgedAt: v.number(),
+        threadId: v.id("threads"),
+    })
+        .global()
+        // Unique: a purge redelivered or run twice (a delete and the account's erasure) writes one mark.
+        .index("by_thread", ["threadId"], { unique: true }),
+
     threadRelationships: defineTable({
         branchPoint: v.optional(v.number()),
         branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("subagent"))),
@@ -3684,6 +3779,9 @@ export const schema = defineSchema({
         // Unset = the thread never branched, and reads stay on the linear fast
         // path. The displayed path descends from here by latest child.
         activeLeafMessageId: v.optional(v.string()),
+        // When the chat was last archived (by hand, idle, or for a merge). A merge that predates it was covered by that archive, so a
+        // later read does not archive the reopened chat again for it (`agent/auto-archive.ts`). Kept on reopen.
+        archivedAt: v.optional(v.number()),
         // Each send resolves to one concrete model chosen by the gateway's query routing (`chat/lib/auto-model.ts`).
         // `model` stays a concrete id (the fallback); unset = off. Never set on a switched thread's behalf.
         autoModel: v.optional(v.boolean()),
@@ -4131,7 +4229,6 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_userId", ["userId"])
         .index("by_request_project", ["requestId", "pass", "projectId"]),
-
     // One small row per export run: its key, its owner, when it began, and the key of the usage JSON object it stored, if any. The
     // row is that object's record: kept until the object is confirmed deleted, so the sweep can retry the purge from it. `deleteAt` is
     // the time the sweep next acts on the run: each sweep that finds the run live sets it one time to live ahead, so a dead run's pieces
@@ -4151,6 +4248,7 @@ export const schema = defineSchema({
         .index("by_deleteAt", ["deleteAt"])
         .index("by_userId", ["userId"])
         .index("by_requestId", ["requestId"]),
+
     // One claimed booking slot per contributor booked under an organization (`usage/cohorts.ts`). The unique slot is the claim: two bookings
     // cannot take the same one. Holds no user, so it carries no one's usage.
     usageOrganizationCohortSlots: defineTable({
@@ -4206,7 +4304,6 @@ export const schema = defineSchema({
         // The retention sweep (`gdpr/retention.ts`), which reads a shard's rows by age.
         .index("by_at", ["at"])
         .index("by_user_and_reply", ["userId", "replyKey"]),
-
     // The replies already in `usageDaily`, keyed by the reply's first row id:
     // what makes `recordReplyUsage` and the backfill count a reply once.
     // Pruned by `usage/backfill.ts#sweepUsageRollup` once the backfill is done.
@@ -4226,6 +4323,7 @@ export const schema = defineSchema({
         .index("by_user_reply", ["userId", "replyKey"])
         // The prune, which serves a whole shard.
         .index("by_recordedAt", ["recordedAt"]),
+
     user: defineTable({
         banExpires: v.optional(v.number()),
         banned: v.optional(v.boolean()),
@@ -4294,6 +4392,11 @@ export const schema = defineSchema({
         accentColor: v.optional(v.string()),
         // Auto-archive threads idle this many days (`agent/auto-archive.ts`). Absent or 0 = off; 7-365 otherwise.
         autoArchiveAfterDays: v.optional(v.number()),
+        // Archive a chat when a pull request it is linked to merges (`agent/auto-archive.ts#archiveMergedThread`). Absent = off.
+        autoArchiveMergedChats: v.optional(v.boolean()),
+        // When the owner last turned `autoArchiveMergedChats` on (set by the settings write, never by the client). Only a merge at or
+        // after it archives a chat: a merge from before the opt-in, first seen after it, does not.
+        autoArchiveMergedChatsSince: v.optional(v.number()),
         // Compact a thread's model context before a reply once it fills this percentage of the model's window (`agent/thread-compaction.ts`). Absent or 0 = off; 50-95 otherwise.
         autoCompactThreshold: v.optional(v.number()),
         // Opt-in: speak every finished reply aloud (`features/chat/voice-mode`). Absent = off.
@@ -4302,6 +4405,10 @@ export const schema = defineSchema({
         backupModel: v.optional(v.string()),
         // Appearance: cap long chat code blocks (absent = on). Accepted values: `auth/fields.ts`.
         capLongCodeBlocks: v.optional(v.boolean()),
+        // In-app toasts for chat events (`features/notifications/lib/chat-toasts.ts`). Absent = on.
+        chatFailedToastEnabled: v.optional(v.boolean()),
+        chatFinishedToastEnabled: v.optional(v.boolean()),
+        chatInputToastEnabled: v.optional(v.boolean()),
         codeFont: v.optional(v.string()),
         codeHighlightTheme: v.optional(v.string()),
         codeLineNumbers: v.optional(v.boolean()),
@@ -4328,6 +4435,8 @@ export const schema = defineSchema({
         disableExternalLinkWarning: v.optional(v.boolean()),
         enableFollowupSuggestions: v.optional(v.boolean()),
         favoriteModels: v.optional(v.array(v.string())),
+        // A message sent while a reply streams joins that reply at its next step, instead of queueing behind it. Absent = queue.
+        followUpSteer: v.optional(v.boolean()),
         hidePersonalInfo: v.optional(v.boolean()),
         // A message sent during a coding agent's turn interrupts that turn and goes next, instead of queueing behind it. Absent = queue.
         hostFollowUpSteer: v.optional(v.boolean()),
@@ -4501,7 +4610,6 @@ export const schema = defineSchema({
         .index("by_session", ["sessionId"])
         .index("by_heartbeat", ["lastHeartbeat"])
         .index("by_userId", ["userId"]),
-
     workflowVersions: defineTable({
         content: v.optional(
             v.object({

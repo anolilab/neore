@@ -94,6 +94,7 @@ const AccountSettings: FC = () => {
     const isSnoozeUntilUsageLimitReset = userSettings?.snoozeUntilUsageLimitReset === true;
     // Opt-in: absent means a message sent during a coding agent's turn waits in the queue behind it.
     const isHostFollowUpSteer = userSettings?.hostFollowUpSteer === true;
+    const isFollowUpSteer = userSettings?.followUpSteer === true;
     // Opt-in: absent means off.
     const isComposerVimMode = userSettings?.composerVimMode === true;
 
@@ -623,6 +624,28 @@ const AccountSettings: FC = () => {
                                     "hostFollowUpSteer",
                                     checked,
                                     checked ? t`Messages will interrupt the agent's turn` : t`Messages will wait for the agent's turn to end`,
+                                );
+                            }}
+                        />
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <Label className="text-base font-medium" htmlFor="follow-up-steer">
+                                {t`Send while a reply is writing`}
+                            </Label>
+                            <p className="text-muted-foreground text-sm" id="follow-up-steer-description">
+                                {t`Off: a message you send while a reply is streaming waits in the queue and goes after it. On: it joins the reply at its next step.`}
+                            </p>
+                        </div>
+                        <Switch
+                            aria-describedby="follow-up-steer-description"
+                            checked={isFollowUpSteer}
+                            id="follow-up-steer"
+                            onCheckedChange={(checked) => {
+                                handleUpdateSetting(
+                                    "followUpSteer",
+                                    checked,
+                                    checked ? t`Messages will join the reply as it writes` : t`Messages will wait for the reply to finish`,
                                 );
                             }}
                         />

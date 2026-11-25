@@ -25,7 +25,9 @@ import { type ToolCtx as ToolContext, wrapTools } from "./create-tool";
 import type { Agent } from "./index";
 import saveInputMessages from "./save-input-messages";
 import { applyStepLabels } from "./step-labels";
+import { inlineToolResultImages, isLocalOrigin } from "./files";
 import { embedMessages, fetchContextWithPrompt } from "./search";
+import { withApprovedToolModelOutputs } from "./tool-approval";
 import type { ActionCtx as ActionContext, AgentComponent, Config, Options, TakeSteer } from "./types";
 
 const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext extends object = object>(
@@ -148,6 +150,11 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
         userId,
     });
 
+    const model = args.model ?? options.languageModel;
+
+    assert(model, "model is required");
+    let activeModel: ModelOrMetadata = model;
+
     const saveMessages = options.storageOptions?.saveMessages ?? "promptAndOutput";
     // When forceNewOrder is true, skip creating a pendingMessage because it would
     // be created with the wrong order. The message will be created fresh when saved.
@@ -187,11 +194,6 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
     }
 
     let pendingMessageId = pendingMessage?._id;
-
-    const model = args.model ?? options.languageModel;
-
-    assert(model, "model is required");
-    let activeModel: ModelOrMetadata = model;
 
     const fail = async (reason: string) => {
         if (!pendingMessageId) {
@@ -245,16 +247,42 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
         threadId,
         userId,
     } satisfies ToolContext;
-    const tools = wrapTools(toolContext, args.tools) as Tools;
-    // Late compression: prevent context-exceeded errors by compressing messages
-    // that are close to the model's context window limit before sending to LLM.
-    // A call that may fall back must fit the smaller of the two models' windows.
-    const fallback = model instanceof FallbackLanguageModel ? model : undefined;
-    const modelId = fallback ? fallback.primaryModelId : getModelName(model);
-    // A backup that would be skipped for this call (tools, images or documents it cannot take) does not size this prompt.
-    const hasTools = Object.keys(args.tools ?? {}).length > 0;
-    const sizedForBackup = fallback?.canServe({ hasTools, messages: context.messages }) ? fallback.backupModelId : undefined;
-    const messages = applyLateCompression(context.messages, modelId, sizedForBackup);
+    // The pending row is saved and the caller gets `fail` only once this returns: a failure on the way there fails the row here,
+    // or it would stay pending with no reply and no error.
+    const { messages, tools } = await (async () => {
+        const wrapped = wrapTools(toolContext, args.tools) as Tools;
+        // Late compression: prevent context-exceeded errors by compressing messages
+        // that are close to the model's context window limit before sending to LLM.
+        // A call that may fall back must fit the smaller of the two models' windows.
+        const fallback = model instanceof FallbackLanguageModel ? model : undefined;
+        const modelId = fallback ? fallback.primaryModelId : getModelName(model);
+        // A backup that would be skipped for this call (tools, images or documents it cannot take) does not size this prompt.
+        const hasTools = Object.keys(args.tools ?? {}).length > 0;
+        const sizedForBackup = fallback?.canServe({ hasTools, messages: context.messages }) ? fallback.backupModelId : undefined;
+        // An approved call's saved result reaches the model as its tool's view, as a step's own result does.
+        const approvedMessages = context.approvedToolCallIds
+            ? await withApprovedToolModelOutputs(context.messages, wrapped, context.approvedToolCallIds, options.builtInToolFormatter)
+            : undefined;
+        // In local dev a view's signed screenshot URL points at localhost, which no provider can reach: its bytes are inlined, as
+        // `fetchContextWithPrompt` inlines the messages' own files.
+        const modelMessages =
+            approvedMessages !== undefined && isLocalOrigin(process.env.PUBLIC_ORIGIN)
+                ? await inlineToolResultImages(approvedMessages)
+                : (approvedMessages ?? context.messages);
+
+        return { messages: applyLateCompression(modelMessages, modelId, sizedForBackup), tools: wrapped };
+    })().catch(async (error: unknown) => {
+        await fail(error instanceof Error ? error.message : String(error)).catch((failError: unknown) => {
+            console.error("[startGeneration] prepare.fail_pending_message", {
+                error: failError instanceof Error ? { message: failError.message, name: failError.name } : String(failError),
+                messageId: pendingMessageId,
+                operation: "agent.messages.finalizeMessage",
+                threadId,
+            });
+        });
+
+        throw error;
+    });
 
     // The notes on the thread's older turns ride in the system prompt: they are reference material, not a turn.
     const system = [(args as { system?: string }).system, context.threadNotes].filter(Boolean).join("\n\n");

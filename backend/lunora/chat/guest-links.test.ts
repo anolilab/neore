@@ -161,12 +161,13 @@ describe("withdrawing a link", () => {
 });
 
 describe("a deleted chat's share grants", () => {
-    const deletions: [string, () => Promise<unknown>][] = [
-        ["trashed", async () => await harness.run(async (ctx: any) => await ctx.runMutation(softDeleteThread, { threadId }))],
-        ["deleted for good", async () => await harness.run(async (ctx: any) => await ctx.runMutation(deleteAllForThreadIdAsync, { threadId }))],
+    // 121 grants and an invite: a trashed chat's removal claims revisions, one a batch (121); a purge deletes fourteen (9).
+    const deletions: [string, () => Promise<unknown>, number][] = [
+        ["trashed", async () => await harness.run(async (ctx: any) => await ctx.runMutation(softDeleteThread, { threadId })), 121],
+        ["deleted for good", async () => await harness.run(async (ctx: any) => await ctx.runMutation(deleteAllForThreadIdAsync, { threadId })), 9],
     ];
 
-    it.each(deletions)("are removed when the chat is %s, so no collaborator keeps reading it", async (_label, remove) => {
+    it.each(deletions)("are removed when the chat is %s, so no collaborator keeps reading it", async (_label, remove, batches) => {
         await harness.run(async (ctx: any) => {
             // More grants than one page reads, so every page must go.
             for (let index = 0; index < 120; index += 1) {
@@ -198,8 +199,9 @@ describe("a deleted chat's share grants", () => {
         // The delete schedules the revocation; it runs a batch at a time and schedules the next until none is left.
         const ran = new Set<string>();
 
-        for (let pass = 0; pass < 10; pass += 1) {
-            const due = harness.scheduler.list().filter((job) => !ran.has(job.id) && Object.keys(job.args).join(",") === "threadId");
+        // Bounded past the expected count, so a job that reschedules itself forever fails the count instead of hanging.
+        for (let pass = 0; pass <= batches; pass += 1) {
+            const due = harness.scheduler.list().filter((job) => !ran.has(job.id) && job.functionPath === "agent_sharing:revokeThreadGrantsJob");
 
             for (const job of due) {
                 ran.add(job.id);
@@ -207,8 +209,7 @@ describe("a deleted chat's share grants", () => {
             }
         }
 
-        // 121 grants and an invite take four batches.
-        expect(ran.size).toBeGreaterThan(3);
+        expect(ran.size).toBe(batches);
 
         const grants = await harness.run(async (ctx: any) => await ctx.db.threadAccess.findMany({ where: { userId: "collaborator" } }));
         const invites = await harness.run(async (ctx: any) => await ctx.db.threadInvites.findMany({ where: { threadId } }));

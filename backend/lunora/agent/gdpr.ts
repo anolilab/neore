@@ -4,17 +4,21 @@
  * the orchestrator's mutation and the writes are the owner's, not the GDPR module's.
  * Batching follows `gdpr/batch.ts`: at most `BATCH` rows per table, `{ hasMore }` back.
  */
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
-import { internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
+import { internal } from "../_generated/internal";
+import { internalAction, internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
 import { BATCH, type BatchResult, deleteParentsWithChildren, full } from "../gdpr/batch";
+import { browserExportUserPrefix } from "../browser/export-pages";
+import { withDependency } from "../lib/dependency";
 import { gdprLogger } from "../lib/logger";
 import { patchRow } from "../lib/patch";
 import { storedRow, storedRows } from "../lib/stored-row";
 import { countedWorkflowFileIds } from "../workflow/images";
 import { changeRefcount, ensureChatFileMetadata } from "./files";
 import { MAX_LENGTH } from "../lib/validators";
+import { GRANT_PAGE_STATEMENTS, WRITE_STATEMENTS } from "./grant-revision";
 import { eraseProjectRuleFilesForUser, eraseProjectsRuleFiles, markProjectsRuleFilesErasing, RULE_FILE_ROWS_PER_PAGE } from "../projects/gdpr";
 import { erasePinsNamingDocuments } from "../chat/gdpr";
 import { deleteVectorRow } from "./table-writes";
@@ -339,10 +343,12 @@ export const eraseThreadMetadataForUser = async (ctx: MutationCtx, userId: strin
             .withIndex("by_userId_expiresAt", (q) => q.eq("userId", userId))
             .collect(),
         // `.global()`: the grants this user HOLDS and the grants others hold on
-        // this user's threads — the second set is orphaned once the threads go.
-        Promise.all([ctx.db.threadAccess.findMany({ where: { userId } }), ctx.db.threadAccess.findMany({ where: { ownerId: userId } })]).then(
-            ([held, given]) => [...held.page, ...given.page.filter((grant) => grant.userId !== userId)],
-        ),
+        // this user's threads — the second set is orphaned once the threads go. From the primary: a replica that has
+        // not seen a grant written just before would leave it behind.
+        Promise.all([
+            ctx.db.threadAccess.findMany({ consistency: "primary", where: { userId } }),
+            ctx.db.threadAccess.findMany({ consistency: "primary", where: { ownerId: userId } }),
+        ]).then(([held, given]) => [...held.page, ...given.page.filter((grant) => grant.userId !== userId)]),
     ]);
 
     await Promise.all([
@@ -352,7 +358,119 @@ export const eraseThreadMetadataForUser = async (ctx: MutationCtx, userId: strin
     ]);
 };
 
-/** One thread's follow-up suggestions, context summaries and invites, one batch each. `true` when any batch came back full. */
+/** Grant revisions each of {@link eraseGrantRevisionsForUser}'s two reads takes: both reads and every delete within `GRANT_PAGE_STATEMENTS`. */
+const GRANT_REVISIONS_ERASED = Math.floor((GRANT_PAGE_STATEMENTS - 2) / (2 * WRITE_STATEMENTS));
+
+/**
+ * One batch of the grant revisions (`agent/grant-revision.ts`) of grants the user held or gave. They outlive the grants,
+ * so a user shared on many chats has many: drained a batch at a time. Read from the primary: a short page ends the
+ * erasure, and a lagging replica's short page would leave a revision written just before behind.
+ */
+export const eraseGrantRevisionsForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
+    const [{ page: held }, { page: given }] = await Promise.all([
+        ctx.db.threadAccessRevisions.findMany({ consistency: "primary", limit: GRANT_REVISIONS_ERASED, where: { userId } }),
+        ctx.db.threadAccessRevisions.findMany({ consistency: "primary", limit: GRANT_REVISIONS_ERASED, where: { ownerId: userId } }),
+    ]);
+    const rows = [...held, ...given.filter((row) => row.userId !== userId)];
+
+    await Promise.all(rows.map(async (row) => await ctx.db.delete("threadAccessRevisions", row._id)));
+
+    return { hasMore: held.length >= GRANT_REVISIONS_ERASED || given.length >= GRANT_REVISIONS_ERASED };
+};
+
+/** Grant revisions one {@link collectGrantRevisionsForExport} page reads (one D1 query). */
+export const GRANT_REVISIONS_EXPORT_PAGE = 500;
+
+/**
+ * One page of the grant revisions (`agent/grant-revision.ts`) of grants the user held: which chat they were shared on,
+ * and how often that grant was written. Never the revisions of grants on the user's own chats: those name the people
+ * they shared with, which is their data, not the user's (the page export keeps to the same rule). From the primary, a
+ * page at a time until `cursor` is `null`: a lagging replica's short page would end the export early.
+ */
+export const collectGrantRevisionsForExport = internalQuery
+    .input({ cursor: v.optional(v.string()), userId: v.string() })
+    .output(
+        v.object({
+            cursor: v.union(v.string(), v.null()),
+            revisions: v.array(v.object({ revision: v.number(), threadId: v.string() })),
+        }),
+    )
+    .query(async ({ args: { cursor, userId }, ctx }) => {
+        const result = await ctx.db.threadAccessRevisions.findMany({
+            consistency: "primary",
+            ...(cursor !== undefined && { cursor }),
+            limit: GRANT_REVISIONS_EXPORT_PAGE,
+            where: { userId },
+        });
+
+        return {
+            cursor: result.isDone ? null : result.continueCursor,
+            // A count a merge is folding holds its tombstone (negated): the revision it stands for.
+            revisions: storedRows(result.page).map((row) => {
+                return { revision: Math.abs(row.revision), threadId: row.threadId };
+            }),
+        };
+    });
+
+/** The most a stored grant-revision page can be: {@link GRANT_REVISIONS_EXPORT_PAGE} rows of a chat id and a count, with room. */
+const GRANT_REVISIONS_PAGE_MAX_BYTES = 256 * 1024;
+
+/**
+ * One page of the grant revisions the user held ({@link collectGrantRevisionsForExport}), read in this action's own query and
+ * stored at `key` (`export-pages.ts#grantRevisionsExportPageKey`); only its `next` cursor goes back to the workflow, so no step
+ * result or dispatch body carries the rows. As `browser/gdpr.ts#storeBrowserExportPage`: nothing is stored once the run has
+ * stopped (`usage/gdpr.ts#exportRunStopped`), and a page whose write ends after it stopped is deleted again.
+ */
+export const storeGrantRevisionsExportPage = internalAction
+    .input({
+        cursor: v.optional(v.string()),
+        key: v.string(),
+        runKey: v.string().max(MAX_LENGTH.key),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.object({ next: v.optional(v.string()) }))
+    .action(async ({ args: { cursor, key, runKey, userId }, ctx }) => {
+        // Only ever under the user's own export prefix: a key anywhere else would write another account's object.
+        if (!key.startsWith(browserExportUserPrefix(userId))) {
+            throw new LunoraError("FORBIDDEN", "A grant revision page belongs under the user's own export prefix");
+        }
+
+        const stopIfRunStopped = async (): Promise<void> => {
+            if ((await ctx.runQuery(internal.usage.gdpr.exportRunStopped, { runKey, userId })) !== true) {
+                return;
+            }
+
+            await withDependency("file storage", () => ctx.storage.delete(key));
+
+            throw new LunoraError("CONFLICT", "The export has stopped: its request ended or the account's deletion is underway");
+        };
+
+        await stopIfRunStopped();
+
+        const page = (await ctx.runQuery(internal.agent.gdpr.collectGrantRevisionsForExport, { ...(cursor !== undefined && { cursor }), userId })) as {
+            cursor: string | null;
+            revisions: { revision: number; threadId: string }[];
+        };
+        const blob = new Blob([JSON.stringify({ revisions: page.revisions })], { type: "application/json" });
+
+        await withDependency("file storage", () =>
+            ctx.storage.store(key, blob, {
+                allowedContentTypes: ["application/json"],
+                contentType: "application/json",
+                maxSize: GRANT_REVISIONS_PAGE_MAX_BYTES,
+            }),
+        );
+
+        await stopIfRunStopped();
+
+        return page.cursor === null ? {} : { next: page.cursor };
+    });
+
+/**
+ * One thread's follow-up suggestions, context summaries and invites, one batch each. `true` when any batch came back
+ * full. Not its grant revisions: the thread's delete purges them (`revokeThreadGrantsJob`), and
+ * {@link eraseGrantRevisionsForUser} those of the user's chats, each within an invocation's D1 queries.
+ */
 export const eraseThreadSuggestionsAndInvites = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<boolean> => {
     const [suggestions, summaries, { page: invites }] = await Promise.all([
         ctx.db

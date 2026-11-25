@@ -334,7 +334,7 @@ app.get("/api/health", async (c) =>
 /**
  * Worker-signed download URLs — `<PUBLIC_ORIGIN>/<key>?exp&method&bucket&sig`,
  * minted by `ctx.storage.getSignedUrl`. Keys contain slashes
- * (`agent-files/<hash>`), so this is a catch-all, and therefore registered
+ * (`agent-files/<hash>/<uuid>`), so this is a catch-all, and therefore registered
  * LAST: every real route above wins. An unsigned request falls through to the
  * 404 below. See `lib/signed-storage.ts`.
  */

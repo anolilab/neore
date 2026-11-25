@@ -268,7 +268,7 @@ describe("account deletion workflow: targets", () => {
         }
 
         // Billing is keyed by the reference id, not the user id.
-        expect(runs().find((entry) => entry.ref === "billing_gdpr:cancelBilling")?.args).toStrictEqual({ referenceId: USER });
+        expect(runs().find((entry) => entry.ref === "billing_gdpr:cancelBilling")?.args).toStrictEqual({ erase: true, referenceId: USER });
 
         const reports = runs().filter((item) => item.ref === "gdpr_functions:updateRequestProgress");
 

@@ -58,6 +58,17 @@ insert into a `.global()` table re-runs the subscriptions that read it, and only
 built-in that polls D1 (every 2s). Until then a list that other members change is read with refetches, not
 subscriptions: `projects_functions:listProjectRepos` is in `NEVER_LIVE` (`apps/web/src/lib/lunora/crpc.tsx`).
 
+**Not filed yet (owner to decide): a `.global()` `patchIf` cannot be held to a query budget.** In
+`@lunora/sql-store@alpha.239` a conditional patch reads the row (`SELECT … CASE WHEN <where>`), then writes it under the
+version it read; when the write misses and the next read still matches `where`, it goes round again, up to 16 times,
+then throws `occ`. No option caps the rounds and the result (`{ applied, doc }`) does not say how many ran, so a caller
+on the 50-query Free plan cannot stop a page early on contention. A round only repeats after a commit that left `where`
+true: the grant paths (`agent/grant-revision.ts`) condition every write on `revision`, and every writer but a merge's
+own `userId`/`ownerId` move changes it, so a race costs one read more and then misses. `GRANT_PAGE_STATEMENTS` keeps 18
+of the 50 for that. A burst of commits that keep `revision` to one row can still pass the limit; the invocation then
+fails, and the merge job's redelivery continues the page. A `maxAttempts` option or a reported `attempts` count would
+let the page stop early instead.
+
 **Not filed yet (owner to decide): a post-commit schedule handoff fails the committed write's caller.** In the installed
 `@lunora/server`, `ctx.scheduler.runAfter`/`runAt` inside a mutation only buffer the job (`withDeferredSchedules`); the
 settle after the commit hands it to the scheduler and, when that fails, keeps it in the outbox for a retry but still throws,

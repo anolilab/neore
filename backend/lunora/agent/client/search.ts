@@ -4,7 +4,7 @@ import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import { assert } from "../../lib/error-helpers";
 import { assembleHandoffContext, deltaOrphans, needsEarlierHandoff, withHandoff } from "../handoff-context";
-import { docsToModelMessages, toModelMessage } from "../mapping";
+import { docsToModelMessages, toModelMessage, withoutHumanCheckRun } from "../mapping";
 import { DEFAULT_MESSAGE_RANGE, DEFAULT_RECENT_MESSAGES, extractText, getModelName, getProviderName, isTool, sorted } from "../shared";
 import type { MessageDoc as MessageDocument } from "../validators";
 import type { Message } from "../validators";
@@ -16,6 +16,7 @@ import { issuedStorageOrigins } from "../../lib/storage-ref";
 import { signedReadUrl } from "../../lib/storage-read";
 import { resolveDocsStoredMedia } from "../stored-media";
 import { inlineMessagesFiles, isLocalOrigin } from "./files";
+import { approvedToolCallIdsOf } from "./tool-approval";
 import type {
     ActionCtx as ActionContext,
     AgentComponent,
@@ -576,6 +577,8 @@ export const fetchContextWithPrompt = async (
             userId: string | undefined;
         },
 ): Promise<{
+    /** Calls whose result an approval saved; the run gives the model their tool's view (`withApprovedToolModelOutputs`). */
+    approvedToolCallIds?: Set<string>;
     messages: ModelMessage[];
     order: number | undefined;
     stepOrder: number | undefined;
@@ -588,11 +591,14 @@ export const fetchContextWithPrompt = async (
     // No search context, no recent messages, no existing responses
     if (statelessMode) {
         const promptArray = getPromptArray(args.prompt);
-        const inputMessages = (args.messages ?? []).map((item) => toModelMessage(item));
-        const inputPrompt = promptArray.map((item) => toModelMessage(item));
+        // A saved browser result among the explicit messages keeps its human check's reply key from the model here too.
+        const inputMessages = (args.messages ?? []).map((item) => withoutHumanCheckRun(toModelMessage(item)));
+        const inputPrompt = promptArray.map((item) => withoutHumanCheckRun(toModelMessage(item)));
+        const approvedToolCallIds = approvedToolCallIdsOf([...(args.messages ?? []), ...promptArray]);
 
         // Return only the current input, no context
         return {
+            ...(approvedToolCallIds.size > 0 && { approvedToolCallIds }),
             messages: [...inputMessages, ...inputPrompt],
             order: undefined,
             stepOrder: undefined,
@@ -763,9 +769,15 @@ export const fetchContextWithPrompt = async (
 
     const search = docsToModelMessages(signedSearch).map((hit) => markSearchHit(hit));
     const recent = withHandoff(signedPrePrompt, handoff.blocks);
-    const inputMessages = messages.map((item) => toModelMessage(item));
-    const inputPrompt = promptArray.map((item) => toModelMessage(item));
+    // The prompt and input rows skip `docsToModelMessages`: the human check's reply key is dropped from them here.
+    const inputMessages = messages.map((item) => withoutHumanCheckRun(toModelMessage(item)));
+    const inputPrompt = promptArray.map((item) => withoutHumanCheckRun(toModelMessage(item)));
     const existingResponses = docsToModelMessages(signedExisting);
+    const approvedToolCallIds = approvedToolCallIdsOf([
+        ...[...signedSearch, ...signedPrePrompt, ...signedExisting].map((doc) => doc.message),
+        ...messages,
+        ...promptArray,
+    ]);
 
     const allMessages = [...search, ...recent, ...inputMessages, ...inputPrompt, ...existingResponses];
     let processedMessages = args.contextHandler
@@ -792,6 +804,7 @@ export const fetchContextWithPrompt = async (
         order: promptMessage?.order,
         stepOrder: promptMessage?.stepOrder,
         ...(olderSummary && { threadNotes: summaryNotesBlock(olderSummary.summary) }),
+        ...(approvedToolCallIds.size > 0 && { approvedToolCallIds }),
     };
 };
 
