@@ -426,6 +426,8 @@ const QueueChip: FC<{
     count: number;
     /** The draft of this chip's open editor; undefined while the message is not being edited. Kept by the queue's edit store. */
     editDraft: string | undefined;
+    /** Another message's editor is open: this one's Edit waits for it, so its draft is not replaced. */
+    editLocked: boolean;
     onEdit: (id: string, text: string) => void;
     onEditDraft: (id: string, draft: string) => void;
     onEditStart: (id: string, text: string) => void;
@@ -434,7 +436,7 @@ const QueueChip: FC<{
     onRemove: (id: string) => void;
     position: number;
     prompt: QueuedChatPrompt;
-}> = ({ blockedDown, blockedUp, count, editDraft, onEdit, onEditDraft, onEditStart, onEditStop, onMove, onRemove, position, prompt }) => {
+}> = ({ blockedDown, blockedUp, count, editDraft, editLocked, onEdit, onEditDraft, onEditStart, onEditStop, onMove, onRemove, position, prompt }) => {
     const { t } = useLingui();
     const pending = Boolean(prompt.steer?.pending);
     // A steered message keeps its place in the order the reply reads it, so it cannot be dragged, moved or edited.
@@ -563,7 +565,7 @@ const QueueChip: FC<{
                         aria-label={t`Edit queued message ${position}`}
                         className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground flex size-6 items-center justify-center rounded-full disabled:opacity-40"
                         data-edit=""
-                        disabled={fixed}
+                        disabled={fixed || editLocked}
                         onClick={startEdit}
                         type="button"
                     >
@@ -613,7 +615,8 @@ const ComposerPromptQueue: FC = () => {
     const edit = useQueueEditStore(selectThreadEdit(threadId));
     // The head's text is open in its chip: the queue holds its send until the edit closes (see `headIsBeingEdited`).
     const headEditing = edit !== undefined && queue.items[0]?.id === edit.id;
-    const wasHeadEditing = useRef(headEditing);
+    // Kept with its thread: a switch of chats must not read the previous thread's edit as this one's close.
+    const wasHeadEditing = useRef<{ editing: boolean; threadId: string | undefined }>({ editing: headEditing, threadId });
     const { removePrompt, sendNextPrompt } = useQueueActions();
     const modeSaving = usePermissionModeSaving(threadId);
     const wasModeSaving = useRef(modeSaving);
@@ -743,9 +746,10 @@ const ComposerPromptQueue: FC = () => {
 
     // The head's send held while its text was open goes once the edit closes, unless the queue is busy, failed or paused.
     useEffect(() => {
-        const closed = wasHeadEditing.current && !headEditing;
+        const previous = wasHeadEditing.current;
+        const closed = previous.threadId === threadId && previous.editing && !headEditing;
 
-        wasHeadEditing.current = headEditing;
+        wasHeadEditing.current = { editing: headEditing, threadId };
 
         if (closed && threadId && !isStreaming && !error && !queue.paused && queue.items.length > 0) {
             void sendNextPrompt(threadId);
@@ -978,6 +982,7 @@ const ComposerPromptQueue: FC = () => {
                                 blockedUp={index > 0 && queue.items[index - 1]?.steer !== undefined}
                                 count={count}
                                 editDraft={edit?.id === prompt.id ? edit.draft : undefined}
+                                editLocked={edit !== undefined && edit.id !== prompt.id}
                                 key={prompt.id}
                                 onEdit={handleEdit}
                                 onEditDraft={handleEditDraft}

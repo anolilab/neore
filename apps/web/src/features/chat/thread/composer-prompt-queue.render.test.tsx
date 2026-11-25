@@ -821,6 +821,27 @@ describe("composer prompt queue", () => {
         expect((screen.getByLabelText("Edit queued message 1") as HTMLTextAreaElement).value).toBe("typed, not saved");
     });
 
+    it("keeps one open editor per thread: another message's Edit waits, and the open draft is not replaced", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        for (const text of ["one", "two"]) {
+            enqueue(chat.threadId, { attachments: [], text });
+        }
+
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 1"), { target: { value: "one, typed" } });
+
+        expect((screen.getByLabelText("Edit queued message 2") as HTMLButtonElement).disabled).toBe(true);
+
+        // The store itself refuses a second editor, whatever the caller.
+        useQueueEditStore.getState().start(chat.threadId, "some-other-id", "replacement");
+
+        expect((screen.getByLabelText("Edit queued message 1") as HTMLTextAreaElement).value).toBe("one, typed");
+    });
+
     it("moves a dropped message to where it lands in the queue", async () => {
         const { enqueue, setPaused } = usePromptQueueStore.getState();
 

@@ -36,6 +36,13 @@ export const useQueueEditStore = create<QueueEditStore>()((set) => {
         },
         start: (threadId, id, draft) => {
             set((state) => {
+                // One open editor per thread: another chip's unsaved draft is not replaced.
+                const open = state.editing[threadId];
+
+                if (open !== undefined && open.id !== id) {
+                    return state;
+                }
+
                 return { editing: { ...state.editing, [threadId]: { draft, id } } };
             });
         },
