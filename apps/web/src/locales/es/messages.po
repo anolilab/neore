@@ -12219,6 +12219,11 @@ msgstr "Editar mensaje en cola"
 msgid "Edit queued message {0}"
 msgstr "Editar mensaje en cola {0}"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:466
+#: src/features/chat/thread/composer-prompt-queue.tsx:513
+msgid "Edit queued message {position}"
+msgstr "Editar el mensaje en cola {position}"
+
 #: src/features/skills/components/skill-form-dialog.tsx:174
 msgid "Edit skill"
 msgstr "Editar habilidad"

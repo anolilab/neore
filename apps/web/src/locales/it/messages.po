@@ -12219,6 +12219,11 @@ msgstr "Modifica il messaggio in coda"
 msgid "Edit queued message {0}"
 msgstr "Modifica il messaggio in coda {0}"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:466
+#: src/features/chat/thread/composer-prompt-queue.tsx:513
+msgid "Edit queued message {position}"
+msgstr "Modifica il messaggio in coda {position}"
+
 #: src/features/skills/components/skill-form-dialog.tsx:174
 msgid "Edit skill"
 msgstr "Modifica skill"

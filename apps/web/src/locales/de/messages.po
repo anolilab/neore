@@ -12219,6 +12219,11 @@ msgstr "Wartende Nachricht bearbeiten"
 msgid "Edit queued message {0}"
 msgstr "Wartende Nachricht {0} bearbeiten"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:466
+#: src/features/chat/thread/composer-prompt-queue.tsx:513
+msgid "Edit queued message {position}"
+msgstr "Wartende Nachricht {position} bearbeiten"
+
 #: src/features/skills/components/skill-form-dialog.tsx:174
 msgid "Edit skill"
 msgstr "Skill bearbeiten"

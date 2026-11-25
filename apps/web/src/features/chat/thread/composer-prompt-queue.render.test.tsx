@@ -710,6 +710,40 @@ describe("composer prompt queue", () => {
         await vi.waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("three", [], { draftFrom: undefined }));
     });
 
+    it("edits a queued message in place, keeps its place, and leaves it unchanged on Escape or an empty text", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        for (const text of ["one", "two", "three"]) {
+            enqueue(chat.threadId, { attachments: [], text });
+        }
+
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        const texts = () => usePromptQueueStore.getState().queues[chat.threadId]?.items.map((item) => item.text);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 2"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 2"), { target: { value: "two, edited" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        expect(texts()).toEqual(["one", "two, edited", "three"]);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 1"), { target: { value: "dropped" } });
+        fireEvent.keyDown(screen.getByLabelText("Edit queued message 1"), { key: "Escape" });
+
+        expect(texts()).toEqual(["one", "two, edited", "three"]);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 3"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 3"), { target: { value: " ".repeat(3) } });
+
+        expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
+
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        expect(texts()).toEqual(["one", "two, edited", "three"]);
+    });
+
     it("moves a dropped message to where it lands in the queue", async () => {
         const { enqueue, setPaused } = usePromptQueueStore.getState();
 

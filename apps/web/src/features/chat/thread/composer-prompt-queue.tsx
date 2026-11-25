@@ -36,7 +36,17 @@ import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import cn from "@neore/ui/utils/cn";
 import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDownIcon, ChevronUpIcon, CornerDownRightIcon, GripVerticalIcon, ListOrderedIcon, PaperclipIcon, SendIcon, XIcon } from "lucide-react";
+import {
+    ChevronDownIcon,
+    ChevronUpIcon,
+    CornerDownRightIcon,
+    GripVerticalIcon,
+    ListOrderedIcon,
+    PaperclipIcon,
+    PencilIcon,
+    SendIcon,
+    XIcon,
+} from "lucide-react";
 import { useReducedMotion } from "motion/react";
 import type { FC, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -399,26 +409,56 @@ const QueueChip: FC<{
     blockedDown: boolean;
     blockedUp: boolean;
     count: number;
+    onEdit: (id: string, text: string) => void;
     onMove: (id: string, step: -1 | 1) => void;
     onRemove: (id: string) => void;
     position: number;
     prompt: QueuedChatPrompt;
-}> = ({ blockedDown, blockedUp, count, onMove, onRemove, position, prompt }) => {
+}> = ({ blockedDown, blockedUp, count, onEdit, onMove, onRemove, position, prompt }) => {
     const { t } = useLingui();
     const pending = Boolean(prompt.steer?.pending);
-    // A steered message keeps its place in the order the reply reads it, so it cannot be dragged or moved.
+    // A steered message keeps its place in the order the reply reads it, so it cannot be dragged, moved or edited.
     const fixed = Boolean(prompt.steer);
-    const { isDragging, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({ disabled: fixed, id: prompt.id });
+    const [editing, setEditing] = useState(false);
+    const [draft, setDraft] = useState("");
+    const { isDragging, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({
+        disabled: fixed || editing,
+        id: prompt.id,
+    });
     // Reduced motion: the chip still moves, without the sliding transition.
     const reduceMotion = useReducedMotion();
     const preview = prompt.text.trim() || t`(attachments only)`;
     const attachmentCount = prompt.attachments.length;
     const droppedCount = prompt.droppedAttachments ?? 0;
 
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    // Focus moves into the text when editing opens (not `autoFocus`, which the a11y rules refuse).
+    useEffect(() => {
+        if (editing) {
+            textareaRef.current?.focus();
+        }
+    }, [editing]);
+
+    const startEdit = (): void => {
+        setDraft(prompt.text);
+        setEditing(true);
+    };
+
+    const saveEdit = (): void => {
+        // An empty text is no message: the store keeps the old text, so the chip simply closes.
+        if (draft.trim() !== "") {
+            onEdit(prompt.id, draft);
+        }
+
+        setEditing(false);
+    };
+
     return (
         <li
             className={cn(
-                "bg-muted/60 flex max-w-full min-w-0 items-center gap-1.5 rounded-full border py-0.5 pr-0.5 pl-2.5 text-xs",
+                "bg-muted/60 flex max-w-full min-w-0 items-center gap-1.5 border py-0.5 pr-0.5 pl-2.5 text-xs",
+                editing ? "rounded-xl" : "rounded-full",
                 isDragging && "opacity-50",
             )}
             data-queue-chip-id={prompt.id}
@@ -429,7 +469,7 @@ const QueueChip: FC<{
                 {position}.
             </span>
             {/* The only drag surface: `touch-none` keeps a touch drag from scrolling the page, and the buttons stay free for taps. */}
-            {!fixed && (
+            {!fixed && !editing && (
                 <span aria-hidden="true" className="text-muted-foreground flex cursor-grab touch-none items-center" ref={setActivatorNodeRef} {...listeners}>
                     <GripVerticalIcon className="size-3" />
                 </span>
@@ -440,10 +480,32 @@ const QueueChip: FC<{
                     <span className="sr-only">{t`Steering:`}</span>
                 </span>
             )}
-            <span className="max-w-64 truncate" title={prompt.text}>
-                {preview}
-            </span>
-            {attachmentCount > 0 && (
+            {editing ? (
+                <textarea
+                    aria-label={t`Edit queued message ${position}`}
+                    className="bg-background min-w-0 flex-1 resize-y rounded-md border px-1.5 py-1 text-xs"
+                    onChange={(event) => {
+                        setDraft(event.target.value);
+                    }}
+                    onKeyDown={(event) => {
+                        if (event.key === "Escape") {
+                            event.preventDefault();
+                            setEditing(false);
+                        } else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                            event.preventDefault();
+                            saveEdit();
+                        }
+                    }}
+                    ref={textareaRef}
+                    rows={2}
+                    value={draft}
+                />
+            ) : (
+                <span className="max-w-64 truncate" title={prompt.text}>
+                    {preview}
+                </span>
+            )}
+            {attachmentCount > 0 && !editing && (
                 <span className="text-muted-foreground flex items-center gap-0.5">
                     <PaperclipIcon aria-hidden="true" className="size-3" />
                     <span className="sr-only">{t`Attachments:`}</span>
@@ -455,35 +517,58 @@ const QueueChip: FC<{
                     <Plural one="# attachment removed on reload" other="# attachments removed on reload" value={droppedCount} />
                 </span>
             )}
-            <button
-                aria-label={t`Move queued message ${position} up`}
-                className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground flex size-6 items-center justify-center rounded-full disabled:opacity-40"
-                data-move-up=""
-                disabled={fixed || position === 1 || blockedUp}
-                onClick={() => onMove(prompt.id, -1)}
-                type="button"
-            >
-                <ChevronUpIcon aria-hidden="true" className="size-3" />
-            </button>
-            <button
-                aria-label={t`Move queued message ${position} down`}
-                className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground flex size-6 items-center justify-center rounded-full disabled:opacity-40"
-                data-move-down=""
-                disabled={fixed || position === count || blockedDown}
-                onClick={() => onMove(prompt.id, 1)}
-                type="button"
-            >
-                <ChevronDownIcon aria-hidden="true" className="size-3" />
-            </button>
-            <button
-                aria-label={t`Remove queued message ${position}`}
-                className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground rounded-full p-0.5"
-                disabled={pending}
-                onClick={() => onRemove(prompt.id)}
-                type="button"
-            >
-                <XIcon aria-hidden="true" className="size-3" />
-            </button>
+            {editing ? (
+                <>
+                    <Button className="h-6 px-2 text-xs" disabled={draft.trim() === ""} onClick={saveEdit} size="sm" type="button">
+                        {t`Save`}
+                    </Button>
+                    <Button className="h-6 px-2 text-xs" onClick={() => setEditing(false)} size="sm" type="button" variant="ghost">
+                        {t`Cancel`}
+                    </Button>
+                </>
+            ) : (
+                <>
+                    <button
+                        aria-label={t`Edit queued message ${position}`}
+                        className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground flex size-6 items-center justify-center rounded-full disabled:opacity-40"
+                        data-edit=""
+                        disabled={fixed}
+                        onClick={startEdit}
+                        type="button"
+                    >
+                        <PencilIcon aria-hidden="true" className="size-3" />
+                    </button>
+                    <button
+                        aria-label={t`Move queued message ${position} up`}
+                        className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground flex size-6 items-center justify-center rounded-full disabled:opacity-40"
+                        data-move-up=""
+                        disabled={fixed || position === 1 || blockedUp}
+                        onClick={() => onMove(prompt.id, -1)}
+                        type="button"
+                    >
+                        <ChevronUpIcon aria-hidden="true" className="size-3" />
+                    </button>
+                    <button
+                        aria-label={t`Move queued message ${position} down`}
+                        className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground flex size-6 items-center justify-center rounded-full disabled:opacity-40"
+                        data-move-down=""
+                        disabled={fixed || position === count || blockedDown}
+                        onClick={() => onMove(prompt.id, 1)}
+                        type="button"
+                    >
+                        <ChevronDownIcon aria-hidden="true" className="size-3" />
+                    </button>
+                    <button
+                        aria-label={t`Remove queued message ${position}`}
+                        className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground rounded-full p-0.5"
+                        disabled={pending}
+                        onClick={() => onRemove(prompt.id)}
+                        type="button"
+                    >
+                        <XIcon aria-hidden="true" className="size-3" />
+                    </button>
+                </>
+            )}
         </li>
     );
 };
@@ -628,6 +713,15 @@ const ComposerPromptQueue: FC = () => {
             }
         },
         [removePrompt, threadId],
+    );
+
+    const handleEdit = useCallback(
+        (id: string, text: string) => {
+            if (threadId) {
+                usePromptQueueStore.getState().edit(threadId, id, text);
+            }
+        },
+        [threadId],
     );
 
     // The chip a keyboard move was made from, so its button can take focus again once React has moved the chip.
@@ -778,6 +872,7 @@ const ComposerPromptQueue: FC = () => {
                                 blockedUp={index > 0 && queue.items[index - 1]?.steer !== undefined}
                                 count={count}
                                 key={prompt.id}
+                                onEdit={handleEdit}
                                 onMove={handleMove}
                                 onRemove={handleRemove}
                                 position={index + 1}
