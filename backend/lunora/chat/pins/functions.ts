@@ -2,7 +2,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
-import { admitPinWriteUnlessMoving, isErasing, refusesPinWrite } from "../../lib/account-moves";
+import { admitPinWriteAs, isErasing, otherPinWritesInFlight, refusesPinWrite, releasePinWrite } from "../../lib/account-moves";
 import { authMutation, authQuery, internalMutation, internalQuery, rateLimit } from "../../lib/crpc";
 import { MAX_LENGTH } from "../../lib/validators";
 import { systemDb } from "../../lib/rls/scope";
@@ -219,7 +219,8 @@ const dropRoutesWithoutPins = async (context: MutationCtx, threadId: Id<"threads
  *
  * The one exception is a refusal: the account is being erased, so the route must not outlive it. A refused write can run after the
  * erasure's route drain (the route write is not in the refused transaction), so it takes the route back when the caller has no pin
- * on the thread. A refusal is account-wide, so no other pin write of the account is admitted while it stands.
+ * on the thread and no other admitted write of the account is still in flight. A route that an in-flight write may still use stays:
+ * the erasure waits for every admitted write to pass before it sweeps and drains, so such a route is drained with the rest.
  */
 export const withSharedPinRoute = async <T>(
     context: MutationCtx,
@@ -227,6 +228,7 @@ export const withSharedPinRoute = async <T>(
     userId: string,
     now: number,
     write: () => Promise<T>,
+    writerId: string | null = null,
 ): Promise<T> => {
     await recordSharedPinRoute(context, threadId, userId, now);
 
@@ -234,7 +236,14 @@ export const withSharedPinRoute = async <T>(
         return await write();
     } catch (error) {
         if (error instanceof LunoraError && error.code === "FORBIDDEN") {
-            await dropRoutesWithoutPins(context, threadId, userId);
+            // This write's own lease goes first, so it does not hold back its own cleanup.
+            if (writerId !== null) {
+                await releasePinWrite(context, userId, writerId);
+            }
+
+            if (!(await otherPinWritesInFlight(context, userId, writerId, now))) {
+                await dropRoutesWithoutPins(context, threadId, userId);
+            }
         }
 
         throw error;
@@ -338,31 +347,40 @@ export const createPin = authMutation
         // A pin is listed only through the thread's read grant (`getThreadPins`), so it is written only under that grant, locked or not.
         throwUnlessGranted(await threadGateOutcome(context, { level: "read", primary: true, threadId, unlockProof, userId }));
 
-        // A refused write renews no lease; an admitted one holds its lease until it commits (`lib/account-moves.ts`).
-        if (await admitPinWriteUnlessMoving(context, userId, now)) {
+        // A refused write adds no lease; an admitted one adds its own, which lasts until it expires (`lib/account-moves.ts`).
+        const writerId = await admitPinWriteAs(context, userId, now);
+
+        if (writerId === null) {
             throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
         }
 
-        const pinId = await withSharedPinRoute(context, threadId as Id<"threads">, userId, now, async () => {
-            // The last check, after the route write and right before the insert. No external call sits between them, so an erasure
-            // that fences this shard either runs before this check (the write is refused) or after the insert (its sweep sees the pin).
-            if (await refusesPinWrite(context, userId, now)) {
-                throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
-            }
+        const pinId = await withSharedPinRoute(
+            context,
+            threadId as Id<"threads">,
+            userId,
+            now,
+            async () => {
+                // The last check, after the route write and right before the insert. No external call sits between them, so an erasure
+                // that fences this shard either runs before this check (the write is refused) or after the insert (its sweep sees the pin).
+                if (await refusesPinWrite(context, userId, now)) {
+                    throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
+                }
 
-            return await context.db.insert("threadPins", {
-                createdAt: now,
-                // A message pin is stored as before (no kind), so old and new rows read the same.
-                ...(kind === "image" && { imageIndex, kind }),
-                ...(kind === "image" && imageKey !== undefined && { imageKey }),
-                messageId,
-                messageRole,
-                selectedText,
-                threadId: threadId as Id<"threads">,
-                updatedAt: now,
-                userId,
-            });
-        });
+                return await context.db.insert("threadPins", {
+                    createdAt: now,
+                    // A message pin is stored as before (no kind), so old and new rows read the same.
+                    ...(kind === "image" && { imageIndex, kind }),
+                    ...(kind === "image" && imageKey !== undefined && { imageKey }),
+                    messageId,
+                    messageRole,
+                    selectedText,
+                    threadId: threadId as Id<"threads">,
+                    updatedAt: now,
+                    userId,
+                });
+            },
+            writerId,
+        );
 
         context.log.event("chat.create_pin", { hasSelectedText: selectedText !== undefined, kind: kind ?? "message", messageRole });
 
@@ -415,31 +433,40 @@ export const createDocumentPin = authMutation
             return existing._id;
         }
 
-        // A refused write renews no lease; an admitted one holds its lease until it commits (`lib/account-moves.ts`).
-        if (await admitPinWriteUnlessMoving(context, userId, now)) {
+        // A refused write adds no lease; an admitted one adds its own, which lasts until it expires (`lib/account-moves.ts`).
+        const writerId = await admitPinWriteAs(context, userId, now);
+
+        if (writerId === null) {
             throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
         }
 
-        const pinId = await withSharedPinRoute(context, threadId as Id<"threads">, userId, now, async () => {
-            // The last check, as in `createPin`: after the route write, right before the insert.
-            if (await refusesPinWrite(context, userId, now)) {
-                throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
-            }
+        const pinId = await withSharedPinRoute(
+            context,
+            threadId as Id<"threads">,
+            userId,
+            now,
+            async () => {
+                // The last check, as in `createPin`: after the route write, right before the insert.
+                if (await refusesPinWrite(context, userId, now)) {
+                    throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
+                }
 
-            return await context.db.insert("threadPins", {
-                createdAt: now,
-                documentId: document._id,
-                documentKind: document.kind,
-                kind: "document",
-                messageId: document.messageId,
-                // Documents are made by the assistant, so the quoted message is an assistant message.
-                messageRole: "assistant",
-                selectedText: document.title,
-                threadId: threadId as Id<"threads">,
-                updatedAt: now,
-                userId,
-            });
-        });
+                return await context.db.insert("threadPins", {
+                    createdAt: now,
+                    documentId: document._id,
+                    documentKind: document.kind,
+                    kind: "document",
+                    messageId: document.messageId,
+                    // Documents are made by the assistant, so the quoted message is an assistant message.
+                    messageRole: "assistant",
+                    selectedText: document.title,
+                    threadId: threadId as Id<"threads">,
+                    updatedAt: now,
+                    userId,
+                });
+            },
+            writerId,
+        );
 
         context.log.event("chat.create_document_pin", { documentKind: document.kind });
 

@@ -2307,10 +2307,12 @@ export const schema = defineSchema({
             };
         }),
 
-    // One row per account that writes pins: the latest time a pin write of the account may still be in flight. A move waits for it
-    // to pass before it sweeps the account's pins (`lib/account-moves.ts`).
+    // One row per admitted pin write: the time that write may still be in flight. A move waits for the latest of them to pass before it
+    // sweeps the account's pins, and a refused write's route cleanup waits for the others (`lib/account-moves.ts`).
     pinWriteLeases: defineTable({
         expiresAt: v.number(),
+        // Absent on rows an earlier build wrote; such a row counts as another writer's.
+        writerId: v.optional(v.string()),
         userId: v.string(),
     })
         .global()

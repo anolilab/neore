@@ -95,17 +95,23 @@ describe("the pin-write lease", () => {
         }
     });
 
-    it("keeps one row per account, renewed by each later write", async () => {
+    it("adds one row per admitted write, and removes a row once it has expired", async () => {
         const harness = lunoraTest(schema as never);
 
         try {
             await harness.run(async (context: any) => await admitPinWrite(context, "user-writer", 1000));
-            await harness.run(async (context: any) => await admitPinWrite(context, "user-writer", 50_000));
+
+            const afterFirst = await harness.run(async (context: any) => await context.db.pinWriteLeases.findMany({ where: { userId: "user-writer" } }));
+
+            expect(afterFirst.page).toHaveLength(1);
+
+            // The first write's lease has run out by 70 000, so the next admission removes it and adds its own.
+            await harness.run(async (context: any) => await admitPinWrite(context, "user-writer", 70_000));
 
             const rows = await harness.run(async (context: any) => await context.db.pinWriteLeases.findMany({ where: { userId: "user-writer" } }));
 
             expect(rows.page).toHaveLength(1);
-            expect(rows.page[0].expiresAt).toBe(50_000 + PIN_WRITE_LEASE_MS);
+            expect(rows.page[0].expiresAt).toBe(70_000 + PIN_WRITE_LEASE_MS);
         } finally {
             harness.close();
         }

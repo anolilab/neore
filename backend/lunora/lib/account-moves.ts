@@ -68,34 +68,61 @@ export const beginAccountMove = async (context: Pick<MutationCtx, "db">, userId:
 };
 
 /**
- * Renews the account's lease. The account has one lease row; a second one (two first writes at once) is harmless, since the wait reads
- * them all.
+ * Adds the lease of one admitted pin write, and returns its writer id. Each write has its own row, which the move's wait reads until it
+ * expires, and which a refused write's route cleanup reads to see whether another write is still in flight. Rows the account's earlier
+ * writes left past their expiry are removed here.
  */
-export const admitPinWrite = async (context: Pick<MutationCtx, "db">, userId: string, now: number): Promise<void> => {
-    const expiresAt = now + PIN_WRITE_LEASE_MS;
-    const lease = await context.db.pinWriteLeases.findFirst({ consistency: "primary", where: { userId } });
+export const admitPinWrite = async (context: Pick<MutationCtx, "db">, userId: string, now: number): Promise<string> => {
+    const writerId = crypto.randomUUID();
+    const { page } = await context.db.pinWriteLeases.findMany({ consistency: "primary", where: { userId } });
 
-    if (lease === null) {
-        await context.db.insert("pinWriteLeases", { expiresAt, userId });
-    } else if (lease.expiresAt < expiresAt) {
-        await context.db.patch("pinWriteLeases", lease._id, { expiresAt });
+    for (const lease of page) {
+        if (lease.expiresAt <= now) {
+            await context.db.delete("pinWriteLeases", lease._id);
+        }
+    }
+
+    await context.db.insert("pinWriteLeases", { expiresAt: now + PIN_WRITE_LEASE_MS, userId, writerId });
+
+    return writerId;
+};
+
+/**
+ * Admits a pin write: checks the marker once, then adds its lease. Returns the writer id, or null when the account is moving, in which
+ * case the write is refused and adds no lease. An admitted write is not yet safe: it must call `refusesPinWrite` again as the last step
+ * before its insert, after its route write (`chat/pins/functions.ts`).
+ */
+export const admitPinWriteAs = async (context: MutationCtx, userId: string, now: number): Promise<string | null> => {
+    if (await refusesPinWrite(context, userId, now)) {
+        return null;
+    }
+
+    return await admitPinWrite(context, userId, now);
+};
+
+/** Whether the account's refused write may take back a route: no other admitted pin write of the account can still be in flight. */
+export const otherPinWritesInFlight = async (context: Pick<QueryCtx, "db">, userId: string, writerId: string | null, now: number): Promise<boolean> => {
+    const { page } = await context.db.pinWriteLeases.findMany({ consistency: "primary", where: { userId } });
+
+    return page.some((lease) => lease.expiresAt > now && lease.writerId !== writerId);
+};
+
+/** Removes one admitted write's own lease, so the refused write does not hold back its own cleanup. */
+export const releasePinWrite = async (context: Pick<MutationCtx, "db">, userId: string, writerId: string): Promise<void> => {
+    const { page } = await context.db.pinWriteLeases.findMany({ consistency: "primary", where: { userId } });
+
+    for (const lease of page) {
+        if (lease.writerId === writerId) {
+            await context.db.delete("pinWriteLeases", lease._id);
+        }
     }
 };
 
 /**
- * Admits a pin write: checks the marker once, then renews the lease. Returns whether the account is moving, in which case the caller
- * refuses the write and renews nothing. An admitted write is not yet safe: it must call `refusesPinWrite` again as the last step before
- * its insert, after its route write (`chat/pins/functions.ts`).
+ * Admits a pin write without its writer id: `true` when the account is moving and the write is refused (`admitPinWriteAs`).
  */
-export const admitPinWriteUnlessMoving = async (context: MutationCtx, userId: string, now: number): Promise<boolean> => {
-    if (await refusesPinWrite(context, userId, now)) {
-        return true;
-    }
-
-    await admitPinWrite(context, userId, now);
-
-    return false;
-};
+export const admitPinWriteUnlessMoving = async (context: MutationCtx, userId: string, now: number): Promise<boolean> =>
+    (await admitPinWriteAs(context, userId, now)) === null;
 
 /**
  * Whether a pin write of the account must be refused on this shard: a move is marking it, or this shard is fenced by an erasure. A

@@ -587,6 +587,49 @@ describe("a refused pin write takes back the route it wrote", () => {
 
         expect(routes.page).toHaveLength(0);
     });
+
+    it("keeps the route while another admitted write of the account is still in flight", async () => {
+        // The other write's lease has not expired at 1, so it may still use the route: the refused write must not take it back.
+        const routes = await harness.run(async (context: any) => {
+            await context.db.insert("pinWriteLeases", { expiresAt: 1000, userId: "user-collaborator", writerId: "writer-other" });
+
+            await withSharedPinRoute(
+                context,
+                threadId,
+                "user-collaborator",
+                1,
+                async () => {
+                    throw refusal();
+                },
+                "writer-self",
+            ).catch(() => null);
+
+            return await context.db.sharedPinRoutes.findMany({ where: { threadId } });
+        });
+
+        expect(routes.page).toHaveLength(1);
+    });
+
+    it("ignores its own lease, and removes the route once no other write is in flight", async () => {
+        const routes = await harness.run(async (context: any) => {
+            await context.db.insert("pinWriteLeases", { expiresAt: 1000, userId: "user-collaborator", writerId: "writer-self" });
+
+            await withSharedPinRoute(
+                context,
+                threadId,
+                "user-collaborator",
+                1,
+                async () => {
+                    throw refusal();
+                },
+                "writer-self",
+            ).catch(() => null);
+
+            return await context.db.sharedPinRoutes.findMany({ where: { threadId } });
+        });
+
+        expect(routes.page).toHaveLength(0);
+    });
 });
 
 describe("a pin write renews the writer's lease before its move check", () => {

@@ -220,16 +220,34 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             await context.step.sleep(`pin-writes-wait-${String(round)}`, "1 minute");
         }
 
+        // One pass over every page of owner shards: a step per page, so no step result carries every owner. Returns the owners of all pages.
+        const sweepOwnerShards = async (label: string): Promise<string[]> => {
+            const owners: string[] = [];
+            let cursor: string | null = null;
+
+            for (let round = 0; ; round += 1) {
+                const page = (await context.step.do(
+                    `${label}-${String(round)}`,
+                    async () =>
+                        await context.run(
+                            internal.gdpr.steps.erasePinsOnOwnerShards,
+                            { cursor, userId: args.userId },
+                            { dedupId: stepDedupId(scope, label, round) },
+                        ),
+                )) as { cursor: string | null; hasMore: boolean; owners: string[] };
+
+                owners.push(...page.owners);
+
+                if (!page.hasMore) {
+                    return owners;
+                }
+
+                cursor = page.cursor;
+            }
+        };
+
         // The pins this user made on other owners' threads are removed from those owners' shards first: their routes are the only way to find them.
-        const firstSweep = (await context.step.do(
-            "erase-pins-on-owner-shards",
-            async () =>
-                await context.run(
-                    internal.gdpr.steps.erasePinsOnOwnerShards,
-                    { userId: args.userId },
-                    { dedupId: stepDedupId(scope, "erase-pins-on-owner-shards") },
-                ),
-        )) as { owners: string[] } | null;
+        const firstOwners = await sweepOwnerShards("erase-pins-on-owner-shards");
 
         // Owner shards named by a route are fenced before their sweep. A pin write on a fenced shard is refused in its own transaction, and a
         // write that committed before its fence is swept. So a pin on a known owner shard cannot outlive the erasure. The grace sweep still
@@ -237,27 +255,26 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         // assumption (not a guarantee).
         await context.step.sleep("erase-pins-grace", "2 minutes");
 
-        const secondSweep = (await context.step.do(
-            "erase-pins-on-owner-shards-again",
-            async () =>
-                await context.run(
-                    internal.gdpr.steps.erasePinsOnOwnerShards,
-                    { userId: args.userId },
-                    { dedupId: stepDedupId(scope, "erase-pins-on-owner-shards-again") },
-                ),
-        )) as { owners: string[] } | null;
+        const secondOwners = await sweepOwnerShards("erase-pins-on-owner-shards-again");
 
-        // The owner shards are lifted now, from the owners both sweeps fenced, and before the routes go: the owners live only in those routes,
-        // so a fresh instance that restarts after the drain could not find them. Once lifted, a pin write of the account is still refused,
-        // because the erasing marker stays live until the erasure ends and every write checks it before its insert (`lib/account-moves.ts`).
-        // A null result (an earlier build's) names no owners.
-        const owners = [...new Set([...(firstSweep?.owners ?? []), ...(secondSweep?.owners ?? [])])];
+        // The owner shards are lifted now, from every owner both passes fenced, and before the routes go: the owners live only in those
+        // routes, so a fresh instance that restarts after the drain could not find them. Once lifted, a pin write of the account is still
+        // refused, because the erasing marker stays live until the erasure ends and every write checks it before its insert
+        // (`lib/account-moves.ts`). Batches keep each call's input small.
+        const owners = [...new Set([...firstOwners, ...secondOwners])];
+        const releaseBatch = 200;
 
-        await context.step.do(
-            "release-pin-fences",
-            async () =>
-                await context.run(internal.gdpr.steps.releasePinFences, { owners, userId: args.userId }, { dedupId: stepDedupId(scope, "release-pin-fences") }),
-        );
+        for (let batch = 0; batch * releaseBatch < owners.length; batch += 1) {
+            await context.step.do(
+                `release-pin-fences-${String(batch)}`,
+                async () =>
+                    await context.run(
+                        internal.gdpr.steps.releasePinFences,
+                        { owners: owners.slice(batch * releaseBatch, (batch + 1) * releaseBatch), userId: args.userId },
+                        { dedupId: stepDedupId(scope, "release-pin-fences", batch) },
+                    ),
+            );
+        }
 
         await context.step.do(
             "delete-user-thread-metadata",

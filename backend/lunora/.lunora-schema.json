@@ -22189,6 +22189,12 @@
           "nullable": false,
           "optional": false,
           "unique": false
+        },
+        "writerId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
