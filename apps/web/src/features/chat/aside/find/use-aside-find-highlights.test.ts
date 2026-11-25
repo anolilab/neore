@@ -75,6 +75,23 @@ describe("collectAsideRanges", () => {
         expect(collectAsideRanges(document.querySelector("section") as Element, "foo bar")).toEqual([]);
     });
 
+    const TEX = String.raw`\frac{cat}{dog}`;
+
+    it("does not count the TeX source a formula carries for screen readers, but counts the glyphs it shows", () => {
+        document.body.innerHTML = panel(
+            row(
+                "a",
+                "Q",
+                `<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>frac</mi></mrow><annotation encoding="application/x-tex">${TEX}</annotation></semantics></math></span><span class="katex-html">frac</span></span>`,
+            ),
+        );
+
+        const host = document.querySelector("section") as Element;
+
+        expect(collectAsideRanges(host, "cat")).toEqual([]);
+        expect(collectAsideRanges(host, "frac")).toHaveLength(1);
+    });
+
     it("returns nothing for a blank query", () => {
         document.body.innerHTML = panel(row("a", "cat"));
 

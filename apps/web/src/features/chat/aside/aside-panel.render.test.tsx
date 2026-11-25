@@ -274,4 +274,39 @@ describe("AsidePanel", () => {
             vi.useRealTimers();
         }
     });
+    it("brings a hit that arrives with a later answer into view", async () => {
+        useAsideStore.setState({ byThread: { "thread-1": [{ id: "a", question: "Why?", status: "pending" }] } });
+        render(<AsidePanel threadId="thread-1" />);
+
+        // jsdom has no layout, so it has no scrollIntoView to spy on: install one for this test.
+        const scroll = vi.fn();
+
+        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
+
+        try {
+            act(() => {
+                globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+            });
+            fireEvent.change(screen.getByRole("textbox", { name: "Find in side questions" }), { target: { value: "cat" } });
+
+            // The first reveal runs with no hit yet: nothing to bring into view.
+            await act(
+                () =>
+                    new Promise<void>((resolve) => {
+                        setTimeout(resolve, 200);
+                    }),
+            );
+            expect(scroll).not.toHaveBeenCalled();
+
+            act(() => {
+                useAsideStore.setState({
+                    byThread: { "thread-1": [{ answer: "A cat.", id: "a", question: "Why?", status: "answered", token: "tok" }] },
+                });
+            });
+
+            await waitFor(() => expect(scroll).toHaveBeenCalled());
+        } finally {
+            Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+        }
+    });
 });
