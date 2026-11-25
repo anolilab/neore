@@ -13,10 +13,13 @@ const PAGE = 100;
 export const POLL_SCAN_LIMIT = 1000;
 
 export interface StoredEvent {
+    /** When the log took the event (its insertion or copy time): the clock retention and the age window run on. */
+    createdAt: number;
     data: Record<string, unknown>;
     eventId: string;
     name: string;
     seq: number;
+    /** When the event itself happened (upstream). Reported as recorded; it does not decide what the window keeps. */
     timestamp: number;
 }
 
@@ -103,7 +106,9 @@ export const pollEvents = async (store: EventLogStore, query: PollQuery): Promis
 
             scanned += 1;
 
-            if (floor !== undefined && event.timestamp < floor) {
+            // The window is on `createdAt`, the same clock retention deletes by: an event recorded late (its upstream time long past) is
+            // still kept for a window from when the log took it, so a poll must not skip it as old.
+            if (floor !== undefined && event.createdAt < floor) {
                 // Older than the window the caller asked for. A gap only when it is an event the caller asked for: another name or
                 // thread in that window was never the caller's to receive.
                 if (matches(event, query)) {
