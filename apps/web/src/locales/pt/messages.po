@@ -1006,6 +1006,14 @@ msgstr "{count} na fila — será enviado quando a resposta atual terminar"
 msgid "{count} queued — waiting for the permission mode to save"
 msgstr "{count} na fila — aguardando o modo de permissão ser salvo"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:978
+msgid "{count} queued — sends when the edit closes"
+msgstr "{count} na fila — enviadas ao fechar a edição"
+
+#: src/features/chat/thread/composer-prompt-queue.tsx:563
+msgid "Type some visible text to save this message."
+msgstr "Escreva algum texto visível para salvar esta mensagem."
+
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:102
 msgid "{date}: {replies}, {cost}"
 msgstr "{date}: {replies}, {cost}"
@@ -12224,6 +12232,11 @@ msgstr "Editar mensagem na fila"
 #: src/features/chat/host/host-composer.tsx:1053
 msgid "Edit queued message {0}"
 msgstr "Editar mensagem na fila {0}"
+
+#: src/features/chat/thread/composer-prompt-queue.tsx:466
+#: src/features/chat/thread/composer-prompt-queue.tsx:513
+msgid "Edit queued message {position}"
+msgstr "Editar a mensagem na fila {position}"
 
 #: src/features/skills/components/skill-form-dialog.tsx:174
 msgid "Edit skill"

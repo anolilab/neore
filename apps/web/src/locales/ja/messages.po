@@ -1006,6 +1006,14 @@ msgstr "{count} 件待機中 — 現在の返信が終わると送信されま�
 msgid "{count} queued — waiting for the permission mode to save"
 msgstr "{count} 件がキューに入っています — 権限モードの保存待ち"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:978
+msgid "{count} queued — sends when the edit closes"
+msgstr "{count} 件待機中 — 編集が終わると送信されます"
+
+#: src/features/chat/thread/composer-prompt-queue.tsx:563
+msgid "Type some visible text to save this message."
+msgstr "このメッセージを保存するには、表示される文字を入力してください。"
+
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:102
 msgid "{date}: {replies}, {cost}"
 msgstr "{date}：{replies}、{cost}"
@@ -12224,6 +12232,11 @@ msgstr "キューのメッセージを編集"
 #: src/features/chat/host/host-composer.tsx:1053
 msgid "Edit queued message {0}"
 msgstr "キューのメッセージ {0} を編集"
+
+#: src/features/chat/thread/composer-prompt-queue.tsx:466
+#: src/features/chat/thread/composer-prompt-queue.tsx:513
+msgid "Edit queued message {position}"
+msgstr "待機中のメッセージ {position} を編集"
 
 #: src/features/skills/components/skill-form-dialog.tsx:174
 msgid "Edit skill"

@@ -1006,6 +1006,14 @@ msgstr "{count} in der Warteschlange – wird gesendet, wenn die aktuelle Antwor
 msgid "{count} queued — waiting for the permission mode to save"
 msgstr "{count} in der Warteschlange – wartet auf das Speichern des Berechtigungsmodus"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:978
+msgid "{count} queued — sends when the edit closes"
+msgstr "{count} in der Warteschlange – wird gesendet, wenn die Bearbeitung endet"
+
+#: src/features/chat/thread/composer-prompt-queue.tsx:563
+msgid "Type some visible text to save this message."
+msgstr "Gib sichtbaren Text ein, um diese Nachricht zu speichern."
+
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:102
 msgid "{date}: {replies}, {cost}"
 msgstr "{date}: {replies}, {cost}"
@@ -12224,6 +12232,11 @@ msgstr "Wartende Nachricht bearbeiten"
 #: src/features/chat/host/host-composer.tsx:1053
 msgid "Edit queued message {0}"
 msgstr "Wartende Nachricht {0} bearbeiten"
+
+#: src/features/chat/thread/composer-prompt-queue.tsx:466
+#: src/features/chat/thread/composer-prompt-queue.tsx:513
+msgid "Edit queued message {position}"
+msgstr "Wartende Nachricht {position} bearbeiten"
 
 #: src/features/skills/components/skill-form-dialog.tsx:174
 msgid "Edit skill"

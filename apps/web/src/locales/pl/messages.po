@@ -1006,6 +1006,14 @@ msgstr "W kolejce: {count} — wyśle się, gdy bieżąca odpowiedź się zakoń
 msgid "{count} queued — waiting for the permission mode to save"
 msgstr "{count} w kolejce — czeka na zapisanie trybu uprawnień"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:978
+msgid "{count} queued — sends when the edit closes"
+msgstr "{count} w kolejce — wyślą się po zakończeniu edycji"
+
+#: src/features/chat/thread/composer-prompt-queue.tsx:563
+msgid "Type some visible text to save this message."
+msgstr "Wpisz widoczny tekst, aby zapisać tę wiadomość."
+
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:102
 msgid "{date}: {replies}, {cost}"
 msgstr "{date}: {replies}, {cost}"
@@ -12224,6 +12232,11 @@ msgstr "Edytuj wiadomość w kolejce"
 #: src/features/chat/host/host-composer.tsx:1053
 msgid "Edit queued message {0}"
 msgstr "Edytuj wiadomość w kolejce {0}"
+
+#: src/features/chat/thread/composer-prompt-queue.tsx:466
+#: src/features/chat/thread/composer-prompt-queue.tsx:513
+msgid "Edit queued message {position}"
+msgstr "Edytuj oczekującą wiadomość {position}"
 
 #: src/features/skills/components/skill-form-dialog.tsx:174
 msgid "Edit skill"
