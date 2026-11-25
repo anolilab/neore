@@ -106,6 +106,20 @@ export const noteMergeAttemptRow = async (ctx: Pick<MutationCtx, "db">, linkId: 
 };
 
 /**
+ * Settles every owed merge link of the chat, whichever pull request it names. Every archive of the chat calls this (`markThreadArchived`),
+ * so reopening an archived chat cannot archive it again for a merge it already covered. Read over the chat's own links.
+ */
+export const settleOwedMergesOf = async (ctx: Pick<MutationCtx, "db">, userId: string, threadId: Id<"threads">, at: number): Promise<void> => {
+    await someLinkOfThread(ctx, userId, threadId, async (row) => {
+        if (row.mergedAt !== undefined && row.mergeSettledAt === undefined) {
+            await settleMergedLinkRow(ctx, row._id, at);
+        }
+
+        return false;
+    });
+};
+
+/**
  * Visits the links of one chat, paged over its own index, and stops at the first row `visit` accepts. Returns whether one was
  * accepted. Every link is reached, so no chat's link count is cut short; a visit may patch the row it is given.
  */

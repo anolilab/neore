@@ -26,7 +26,6 @@ import { resolveGithubToken } from "../connectors/lib/github-token";
 import { currentUserShard } from "../lib/shard-context";
 import { DEVELOP_DRIVER } from "./develop-driver";
 import { readFromHost } from "./read-host";
-import { someLinkOfThread } from "./pr-thread-links";
 
 /** A link's state is re-read once it is this old. */
 export const PR_STATE_MAX_AGE_MS = 10 * 60 * 1000;
@@ -40,6 +39,8 @@ const CHECK_LIMIT = 20;
 /** Thread lookups per sweep, as a multiple of `CHECK_LIMIT`: links on chats that are still active are skipped, within that bound. */
 const THREAD_LOOKUP_FACTOR = 4;
 /** Auto-archive's idle rule alone. Its live-stream and pinned-project exclusions are left out, so a chat that is then kept still gets a read. */
+/** Links read per chat when the sweep asks whether it owes a merge; a chat past this bound is checked rather than read further. */
+const OWED_MERGE_LOOKUP_LIMIT = 100;
 const NO_EXCLUSIONS = { liveThreadIds: new Set<string>(), pinnedProjectIds: new Set<string>() };
 
 const candidateOf = (thread: {
@@ -195,8 +196,20 @@ export const dispatchLinkedPullRequestChecks = internalMutation
     });
 
 /** Whether the chat owes a merge: one recorded for it and not yet settled. */
-const ownsMergeTo = async (ctx: MutationCtx, userId: string, threadId: Id<"threads">): Promise<boolean> =>
-    await someLinkOfThread(ctx, userId, threadId, (row) => row.mergedAt !== undefined && row.mergeSettledAt === undefined);
+const ownsMergeTo = async (ctx: MutationCtx, userId: string, threadId: Id<"threads">): Promise<boolean> => {
+    // One bounded read per chat per sweep. A chat with more links than the bound may owe a merge past it, so it is checked (never
+    // skipped): the sweep's host reads stay bounded, and an owed merge is not missed.
+    const rows = await ctx.db
+        .query("pullRequestThreads")
+        .withIndex("by_user_and_threadId", (q) => q.eq("userId", userId).eq("threadId", threadId))
+        .take(OWED_MERGE_LOOKUP_LIMIT + 1);
+
+    if (rows.length > OWED_MERGE_LOOKUP_LIMIT) {
+        return true;
+    }
+
+    return rows.some((row) => row.mergedAt !== undefined && row.mergeSettledAt === undefined);
+};
 
 /**
  * A link just recorded as closed or merged makes its chat due for archive now, not at the next housekeeping pass: the sweep

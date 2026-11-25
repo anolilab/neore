@@ -12,6 +12,7 @@ import { recordMergedPullRequest } from "../source-control/pr-merged";
 import { recordLinkState } from "../source-control/pr-state";
 import { noteMergeAttempt, recordPullRequestMerged } from "../source-control/pr-threads";
 import { archiveClosedLinkChat, archiveMergedThread } from "./auto-archive";
+import { archiveThread } from "./threads";
 
 /**
  * The helper names its mutations by their generated references; the harness runs the functions themselves. This maps each
@@ -785,6 +786,34 @@ describe("archiveMergedThread", () => {
         expect(await statusOf(threadId)).toBe("archived");
 
         // The owner reopens the chat; the merge that the idle archive already covered must not archive it again.
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { status: "active" }));
+
+        expect(
+            await harness.run(async (ctx: any) => await ctx.runMutation(archiveMergedThread, { linkId, number: NUMBER, repository: REPOSITORY, threadId })),
+        ).toBe("declined");
+    });
+
+    it("settles a chat's owed merge when the owner archives the chat by hand, so reopening it does not archive it again", async () => {
+        const threadId = await setUp({ autoArchiveMergedChats: true, linked: false });
+        const linkId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 1,
+                    kind: "attached",
+                    mergedAt: 1000,
+                    number: NUMBER,
+                    repository: REPOSITORY,
+                    state: "merged",
+                    threadId,
+                    title: "Feature work",
+                    url: URL,
+                    userId: OWNER,
+                }),
+        );
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(archiveThread, { threadId }));
+        expect(await statusOf(threadId)).toBe("archived");
+
         await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { status: "active" }));
 
         expect(

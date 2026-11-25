@@ -28,7 +28,7 @@ import {
     runArchivePass,
     selectAutoArchiveDue,
 } from "./auto-archive-logic";
-import { noteMergeAttemptRow, settleMergedLinkRow, someLinkOfThread } from "../source-control/pr-thread-links";
+import { noteMergeAttemptRow, settleMergedLinkRow, settleOwedMergesOf, someLinkOfThread } from "../source-control/pr-thread-links";
 import { markThreadArchived } from "./threads";
 
 /** Threads archived per pass. The rest wait for the next pass, which is idempotent. */
@@ -165,11 +165,6 @@ const archiveThreadIfDue = async (ctx: MutationCtx, threadId: Id<"threads">, cut
     }
 
     await markThreadArchived(ctx, threadId);
-
-    // Every archive is final for the chat: its owed merges settle with it, so reopening the chat does not archive it again for them.
-    if (thread.userId !== undefined) {
-        await settleOwedMergesOf(ctx, thread.userId, threadId, ctx.now);
-    }
 
     return true;
 };
@@ -331,8 +326,14 @@ const runMergedArchive = async (ctx: MutationCtx, args: MergedArchiveArgs): Prom
     return outcome === "link-declined" ? "declined" : outcome;
 };
 
-/** Archives the chat for the first of its owed merges that is now eligible. */
-const archiveOwedMergesOf = async (ctx: MutationCtx, userId: string, threadId: Id<"threads">): Promise<boolean> =>
+/**
+ * Archives the chat for the first of its owed merges that is now eligible. A busy answer is thread-wide (a run, a request waiting on
+ * the owner, an open request), so it holds for the other owed merges too: the walk stops there and leaves them owed. A decline about
+ * one link keeps the walk going.
+ */
+const archiveOwedMergesOf = async (ctx: MutationCtx, userId: string, threadId: Id<"threads">): Promise<boolean> => {
+    let archived = false;
+
     await someLinkOfThread(ctx, userId, threadId, async (row) => {
         if (row.mergedAt === undefined || row.mergeSettledAt !== undefined) {
             return false;
@@ -340,8 +341,15 @@ const archiveOwedMergesOf = async (ctx: MutationCtx, userId: string, threadId: I
 
         const outcome = await runMergedArchive(ctx, { linkId: row._id, number: row.number, repository: row.repository, threadId });
 
-        return outcome === "archived";
+        if (outcome === "archived") {
+            archived = true;
+        }
+
+        return outcome === "archived" || outcome === "busy";
     });
+
+    return archived;
+};
 
 /**
  * Archives a chat linked to a pull request that has just merged, when the owner turned on `autoArchiveMergedChats`.
@@ -354,20 +362,6 @@ export const archiveMergedThread = internalMutation
     .input({ linkId: v.id("pullRequestThreads"), number: v.number(), repository: v.string().max(MAX_LENGTH.short), threadId: v.id("threads") })
     .output(v.union(v.literal("archived"), v.literal("busy"), v.literal("declined")))
     .mutation(async ({ args, ctx }) => await runMergedArchive(ctx, args));
-
-/**
- * Settles every owed merge link of the chat, whichever pull request it names. Otherwise another merged request still owed to
- * the chat would archive it again once the owner reopens it. Read over the chat's own links, not a pull request's.
- */
-const settleOwedMergesOf = async (ctx: MutationCtx, userId: string, threadId: Id<"threads">, at: number): Promise<void> => {
-    await someLinkOfThread(ctx, userId, threadId, async (row) => {
-        if (row.mergedAt !== undefined && row.mergeSettledAt === undefined) {
-            await settleMergedLinkRow(ctx, row._id, at);
-        }
-
-        return false;
-    });
-};
 
 const settleOwedSiblingRows = async (ctx: MutationCtx, linkId: Id<"pullRequestThreads">, threadId: Id<"threads">, at: number): Promise<void> => {
     const link = await ctx.db.get("pullRequestThreads", linkId);
