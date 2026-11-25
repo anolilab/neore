@@ -460,18 +460,19 @@ export const collectSharedPins = internalAction.input({ userId: v.string() }).ac
 /**
  * Erases the caller's pins on the threads other people own, from each owner's shard, before the routes that find them are removed
  * (`gdpr/workflows/deletion-workflow.ts`). A collaborator's pins are written on the owner's shard, so the caller's own shard holds none.
+ *
+ * One page of routes per call, so no result carries every owner at once: the workflow repeats the call from `cursor` while `hasMore`.
  */
 export const erasePinsOnOwnerShards = internalAction
-    .input({ release: v.optional(v.boolean()), userId: v.string() })
-    .output(v.null())
-    .action(async ({ args: { release, userId }, ctx: context }) => {
-        const routes = await readAllPages(
-            async (cursor) => await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, { cursor, userId }),
-        );
+    .input({ cursor: v.union(v.string(), v.null()), userId: v.string() })
+    .output(v.object({ cursor: v.union(v.string(), v.null()), hasMore: v.boolean(), owners: v.array(v.string()) }))
+    .action(async ({ args: { cursor, userId }, ctx: context }) => {
+        const result = await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, { cursor, userId });
+        const routes = result.page;
         const owners = [...new Set(routes.map((route) => route.ownerId))];
 
-        // Each owner shard is fenced before it is swept: a pin write of this account that commits on it from now on is refused in its own
-        // transaction, so nothing it writes escapes the sweep. The fence is lifted once the second sweep has run (`release`).
+        // Each owner shard is fenced before it is swept, and stays fenced until the routes are gone (`releasePinFences`): a pin write of
+        // this account on that shard is refused in its own transaction for the whole erasure, so nothing it commits can escape the sweep.
         for (const ownerId of owners) {
             await callOnShard(internal.lib.account_moves.fencePinsOnShardFor, { userId }, { shardKey: ownerId });
         }
@@ -481,20 +482,30 @@ export const erasePinsOnOwnerShards = internalAction
             let more = true;
 
             while (more) {
-                const result = await callOnShard(
+                const erased = await callOnShard(
                     internal.chat.pins.functions.eraseUserPinsOnThread,
                     { threadId: route.threadId as Id<"threads">, userId },
                     { shardKey: route.ownerId },
                 );
 
-                more = result.hasMore;
+                more = erased.hasMore;
             }
         }
 
-        if (release === true) {
-            for (const ownerId of owners) {
-                await callOnShard(internal.lib.account_moves.unfencePinsOnShardFor, { userId }, { shardKey: ownerId });
-            }
+        return { cursor: result.continueCursor, hasMore: !result.isDone, owners };
+    });
+
+/**
+ * Lifts the erasure's fences on the owner shards (`gdpr/workflows/deletion-workflow.ts`), before the routes are drained: the owners are
+ * read from those routes, so a fresh instance could not find them afterwards. A pin write is still refused once lifted, since the erasing
+ * marker is live until the erasure ends. The workflow calls it in batches of owners.
+ */
+export const releasePinFences = internalAction
+    .input({ owners: v.array(v.string()), userId: v.string() })
+    .output(v.null())
+    .action(async ({ args: { owners, userId } }) => {
+        for (const ownerId of owners) {
+            await callOnShard(internal.lib.account_moves.unfencePinsOnShardFor, { userId }, { shardKey: ownerId });
         }
 
         return null;

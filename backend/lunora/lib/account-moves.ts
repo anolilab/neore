@@ -83,18 +83,26 @@ export const admitPinWrite = async (context: Pick<MutationCtx, "db">, userId: st
 };
 
 /**
- * Admits a pin write: checks the marker, renews the lease, checks the marker again. Returns whether the account is moving, in which case
- * the caller refuses the write. The second check closes the window where a move starts between the first check and the renewal.
+ * Admits a pin write: checks the marker once, then renews the lease. Returns whether the account is moving, in which case the caller
+ * refuses the write and renews nothing. An admitted write is not yet safe: it must call `refusesPinWrite` again as the last step before
+ * its insert, after its route write (`chat/pins/functions.ts`).
  */
 export const admitPinWriteUnlessMoving = async (context: MutationCtx, userId: string, now: number): Promise<boolean> => {
-    if ((await isAccountMoving(context, userId, now)) || (await isShardFenced(context, userId))) {
+    if (await refusesPinWrite(context, userId, now)) {
         return true;
     }
 
     await admitPinWrite(context, userId, now);
 
-    return (await isAccountMoving(context, userId, now)) || (await isShardFenced(context, userId));
+    return false;
 };
+
+/**
+ * Whether a pin write of the account must be refused on this shard: a move is marking it, or this shard is fenced by an erasure. A
+ * pin write calls it once before it renews its lease, and again as the last step before its insert (`chat/pins/functions.ts`).
+ */
+export const refusesPinWrite = async (context: Pick<QueryCtx, "db">, userId: string, now: number): Promise<boolean> =>
+    (await isAccountMoving(context, userId, now)) || (await isShardFenced(context, userId));
 
 /**
  * The latest moment a pin write of the account may still be in flight, or null when none can be. A move waits until that moment (an

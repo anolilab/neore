@@ -114,7 +114,7 @@ export const RATE_LIMIT_CONFIGS = {
 
     "browser/action:premium": Ratelimit.fixedWindow(200, HOUR),
     "browser/action:public": Ratelimit.fixedWindow(5, HOUR),
-    // Keeping, handing back and steering the browser a person took control of (`browser/live-view.ts`).
+    // Keeping and steering the browser a person took control of (`browser/live-view.ts`).
     "browser/control:free": Ratelimit.fixedWindow(240, HOUR),
     "browser/control:premium": Ratelimit.fixedWindow(600, HOUR),
     // Each call mints a live view URL at the provider (`browser/live-view.ts`).
@@ -246,6 +246,8 @@ export const RATE_LIMIT_CONFIGS = {
     "codingAgent/run:premium": Ratelimit.fixedWindow(20, HOUR),
     // Connector OAuth: start/complete each make outbound discovery, registration
     // and token calls, and disconnect a revocation call.
+    "connectors/access:free": Ratelimit.fixedWindow(30, MINUTE),
+    "connectors/access:premium": Ratelimit.fixedWindow(60, MINUTE),
     "connectors/oauth:free": Ratelimit.fixedWindow(20, MINUTE),
     "connectors/oauth:premium": Ratelimit.fixedWindow(40, MINUTE),
     // Device execution (`devices/`). Pairing is rare; a call is one approval
@@ -971,7 +973,8 @@ export const rateLimitGuard = async (
         // loosely is what let `rateLimit("skills/create")` reach production
         // naming a limit that was never in the table.
         rateLimitKey: RateLimitName;
-        user: Pick<SessionUser, "userId" | "plan"> | null;
+        // `isAdmin` lets `getUserTier` give an admin without a plan the premium tier.
+        user: (Partial<Pick<SessionUser, "isAdmin">> & Pick<SessionUser, "userId" | "plan">) | null;
     } & (ActionContext | MutationContext),
 ): Promise<void> => {
     const count = Math.max(1, Math.trunc(context.count ?? 1));
@@ -1007,11 +1010,15 @@ export const rateLimitGuard = async (
         const result = await limiter.limit(identifier, { count });
 
         if (!result.ok) {
+            const retryAfter = Math.max(0, result.reset - Date.now());
+
+            // `retryAfterMs` is the hint the Lunora client reads for its retry delay; `retryAfter` stays for the readers that already use it.
             throw new LunoraError("TOO_MANY_REQUESTS", "Rate limit exceeded. Please try again later.", {
                 data: {
                     code: "TOO_MANY_REQUESTS",
                     message: "Rate limit exceeded. Please try again later.",
-                    retryAfter: Math.max(0, result.reset - Date.now()),
+                    retryAfter,
+                    retryAfterMs: retryAfter,
                 },
             });
         }
@@ -1026,7 +1033,12 @@ export const rateLimitGuard = async (
 
         if (!result.ok) {
             throw new LunoraError("TOO_MANY_REQUESTS", "Rate limit exceeded. Please try again later.", {
-                data: { code: "TOO_MANY_REQUESTS", message: "Rate limit exceeded. Please try again later.", retryAfter: result.retryAfter },
+                data: {
+                    code: "TOO_MANY_REQUESTS",
+                    message: "Rate limit exceeded. Please try again later.",
+                    retryAfter: result.retryAfter,
+                    retryAfterMs: result.retryAfter,
+                },
             });
         }
     }
@@ -1122,7 +1134,12 @@ export const checkRateLimit = async (
 
         if (!result.ok && options.throws) {
             throw new LunoraError("TOO_MANY_REQUESTS", "Rate limit exceeded. Please try again later.", {
-                data: { code: "TOO_MANY_REQUESTS", message: "Rate limit exceeded. Please try again later.", retryAfter: result.retryAfter },
+                data: {
+                    code: "TOO_MANY_REQUESTS",
+                    message: "Rate limit exceeded. Please try again later.",
+                    retryAfter: result.retryAfter,
+                    retryAfterMs: result.retryAfter,
+                },
             });
         }
 

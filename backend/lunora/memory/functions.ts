@@ -1069,7 +1069,7 @@ export const saveImportedMemoryBatch = internalMutation
         const finished = (list: (ImportOutcome | undefined)[]): ImportOutcome[] =>
             list.map((outcome) => {
                 if (!outcome) {
-                    throw new Error("[memory/import] A fact was left without an outcome");
+                    throw new LunoraError("INTERNAL", "[memory/import] A fact was left without an outcome");
                 }
 
                 return outcome;
