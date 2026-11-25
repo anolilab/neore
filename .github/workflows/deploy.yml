@@ -645,6 +645,7 @@ jobs:
             # retries. On a failure outside production, replay the RPC while tailing the
             # Worker's logs; production's logs stay out of this public run log.
             - name: "Smoke test the deployment"
+              id: "smoke"
               if: "${{ !inputs.dry_run && steps.alchemy.conclusion == 'success' }}"
               timeout-minutes: 20
               env:
@@ -715,3 +716,20 @@ jobs:
                   fi
 
                   exit "$failed"
+
+            # Data migrations (`defineMigration` in backend/lunora/migrations.ts) are not part of
+            # the deploy itself: each is a `lunora migrate up <id>` call against the new backend.
+            # This runs every declared one, in declaration order, so a new backfill needs no edit
+            # here. `up` is idempotent and resumable: one a shard has completed returns at once.
+            # The token reaches the CLI only through its environment (`--token` would show in the
+            # process table). The run log is public, so the script prints ids and counts only; the
+            # CLI's own output (shard keys, per-shard results) is dropped, and production prints
+            # no error detail either.
+            - name: "Run the backend's data migrations"
+              if: "${{ !inputs.dry_run && steps.smoke.conclusion == 'success' }}"
+              timeout-minutes: 30
+              env:
+                  BACKEND_URL: "${{ steps.origins.outputs.backend }}"
+                  STAGE: "${{ needs.resolve-env.outputs.stage }}"
+                  LUNORA_ADMIN_TOKEN: "${{ secrets.LUNORA_ADMIN_TOKEN }}"
+              run: "pnpm exec tsx scripts/run-data-migrations.ts"
