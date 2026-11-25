@@ -777,9 +777,9 @@ const ComposerPromptQueue: FC = () => {
             const held = useQueueEditStore.getState().takeHeldSend(threadId);
 
             if (held) {
-                if (held.explicit) {
-                    usePromptQueueStore.getState().setPaused(threadId, false);
-                } else if (error || queue.paused) {
+                // A pause here came from a failed save or a stop: the held send does not override it. An explicit send
+                // still goes after a chat error, as canSend allows.
+                if (queue.paused) {
                     return;
                 }
 
@@ -839,7 +839,8 @@ const ComposerPromptQueue: FC = () => {
 
         streamRef.current = { streaming: isStreaming, threadId };
 
-        if ((!ended && !switchedIn) || !threadId || isStreaming || queue.items.length === 0) {
+        // A mode save in flight owns the held send: its settling takes it (the mode-save path above).
+        if ((!ended && !switchedIn) || !threadId || isStreaming || modeSaving || queue.items.length === 0) {
             return;
         }
 
@@ -856,7 +857,7 @@ const ComposerPromptQueue: FC = () => {
         }
 
         void sendNextPrompt(threadId, { explicit: held.explicit });
-    }, [isStreaming, queue.items.length, queue.paused, sendNextPrompt, threadId]);
+    }, [isStreaming, modeSaving, queue.items.length, queue.paused, sendNextPrompt, threadId]);
 
     const handleRemove = useCallback(
         (id: string) => {
@@ -870,19 +871,32 @@ const ComposerPromptQueue: FC = () => {
     // The chip whose editor just closed: its Edit button takes focus once the queue has rendered, since the editor's own
     // control is gone by then. A saved change names the message's new id.
     const editFocus = useRef<string | undefined>(undefined);
+    // The chip focus was last moved to. When it leaves the queue (a held send went), focus moves to the queue's first chip.
+    const focusedChip = useRef<string | undefined>(undefined);
 
     useEffect(() => {
         const target = editFocus.current;
 
-        if (target === undefined) {
+        if (target !== undefined) {
+            editFocus.current = undefined;
+            focusedChip.current = target;
+
+            const chip = [...document.querySelectorAll<HTMLElement>("[data-queue-chip-id]")].find((element) => element.dataset.queueChipId === target);
+
+            chip?.querySelector<HTMLButtonElement>("[data-edit]")?.focus();
+
             return;
         }
 
-        editFocus.current = undefined;
+        const focused = focusedChip.current;
 
-        const chip = [...document.querySelectorAll<HTMLElement>("[data-queue-chip-id]")].find((element) => element.dataset.queueChipId === target);
+        if (focused !== undefined && queue.items.every((item) => item.id !== focused)) {
+            focusedChip.current = undefined;
 
-        chip?.querySelector<HTMLButtonElement>("[data-edit]")?.focus();
+            if (document.activeElement === null || document.activeElement === document.body) {
+                document.querySelector<HTMLButtonElement>("[data-queue-chip-id] [data-edit]")?.focus();
+            }
+        }
     });
 
     const handleEditStart = useCallback(
