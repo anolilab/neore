@@ -23,7 +23,7 @@ import { submitDraft } from "./submit-review";
 import { vDiffSide, vFailed, vWriteFailed } from "./validators";
 import { writeToHost } from "./write-host";
 
-const vThreadComment = v.object({ authorLogin: v.string(), body: v.string(), createdAt: v.number(), id: v.string() });
+const vThreadComment = v.object({ authorLogin: v.string(), body: v.string(), createdAt: v.number(), id: v.string(), url: v.optional(v.string()) });
 
 /** One review thread as the driver reads it: every key it sends is declared, since `.output()` refuses any other. */
 export const vThread = v.object({

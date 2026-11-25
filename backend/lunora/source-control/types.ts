@@ -265,6 +265,8 @@ export interface ThreadComment {
     createdAt: number;
     /** The host's id for the comment: the one a reply addresses. */
     id: string;
+    /** The comment's page on the host, when the host gives one on its own web origin. */
+    url?: string;
 }
 
 export interface ReviewThread {
