@@ -20,7 +20,13 @@ const PRUNE_BATCH = 200;
 const storeOn = (ctx: QueryCtx, userId: string): EventLogStore => {
     return {
         after: async (afterSeq, limit) => {
-            const { page } = await ctx.db.mcpEvents.findMany({ limit, orderBy: [{ seq: "asc" }], where: { seq: { gt: afterSeq }, userId } });
+            // From the primary: a replica that lags behind a just-recorded event would let the poll move its cursor past it.
+            const { page } = await ctx.db.mcpEvents.findMany({
+                consistency: "primary",
+                limit,
+                orderBy: [{ seq: "asc" }],
+                where: { seq: { gt: afterSeq }, userId },
+            });
 
             return page.map((row) => {
                 return {
@@ -34,12 +40,12 @@ const storeOn = (ctx: QueryCtx, userId: string): EventLogStore => {
             });
         },
         latestSeq: async () => {
-            const watermark = await ctx.db.mcpEventWatermarks.findFirst({ where: { userId } });
+            const watermark = await ctx.db.mcpEventWatermarks.findFirst({ consistency: "primary", where: { userId } });
 
             return watermark?.seq ?? 0;
         },
         oldestSeq: async () => {
-            const oldest = await ctx.db.mcpEvents.findFirst({ orderBy: [{ seq: "asc" }], where: { userId } });
+            const oldest = await ctx.db.mcpEvents.findFirst({ consistency: "primary", orderBy: [{ seq: "asc" }], where: { userId } });
 
             return oldest?.seq;
         },
