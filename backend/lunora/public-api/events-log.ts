@@ -7,8 +7,10 @@
  * redelivered job cannot double a run's event.
  */
 import type { Id } from "../_generated/dataModel";
+import { internal } from "../_generated/internal";
 import type { MutationCtx } from "../_generated/server";
 import { noteRetentionWake } from "../lib/shard-housekeeping";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import { RUN_COMPLETED_EVENT, RUN_FAILED_EVENT } from "./events-catalog";
 
 /** How long a poll can look back: a cursor older than this reads as truncated. */
@@ -24,6 +26,25 @@ export interface RecordEventInput {
     /** The owner whose log the event goes to (the thread owner, never a collaborator). */
     userId: string;
 }
+
+/** How long after a failed wake write its retry runs; each further failure doubles the wait, up to `EVENT_WAKE_MAX_ATTEMPTS`. */
+export const EVENT_WAKE_RETRY_MS = 60 * 1000;
+export const EVENT_WAKE_MAX_ATTEMPTS = 10;
+
+/**
+ * Wakes `userId`'s shard for an event's expiry. The census write is best-effort, so a run's write never fails on it. A write that
+ * failed is retried by a job scheduled here, in the same transaction as the event: the event and its retry commit together, so a
+ * shard is never left holding an expiring event with no wake for it.
+ */
+const wakeForExpiry = async (ctx: Partial<Pick<MutationCtx, "scheduler">> & Pick<MutationCtx, "db" | "now">, userId: string, dueAt: number): Promise<void> => {
+    if (await noteRetentionWake(ctx, dueAt)) {
+        return;
+    }
+
+    if (ctx.scheduler !== undefined) {
+        await runAfterOnShard(ctx.scheduler, EVENT_WAKE_RETRY_MS, internal.public_api.events.retryEventWake, { attempt: 1, dueAt, userId }, userId);
+    }
+};
 
 /**
  * Appends the event to `userId`'s log and returns `true`, or returns `false` when that event is already there.
@@ -53,7 +74,7 @@ export const recordMcpEvent = async (ctx: Pick<MutationCtx, "db" | "now">, input
     });
     await setWatermark(ctx, input.userId, watermark?._id, seq);
     // The event expires a window from now: the shard is woken then, so the sweep finds it even with no other retained rows.
-    await noteRetentionWake(ctx, ctx.now + RETENTION_MS);
+    await wakeForExpiry(ctx, input.userId, ctx.now + RETENTION_MS);
 
     return true;
 };
@@ -139,7 +160,7 @@ export const copyMergedMcpEvents = async (ctx: Pick<MutationCtx, "db" | "now">, 
     if (appended > 0) {
         await setWatermark(ctx, to, watermark?._id, seq);
         // The copied rows expire a window from the copy, as a recorded event does (see `recordMcpEvent`).
-        await noteRetentionWake(ctx, ctx.now + RETENTION_MS);
+        await wakeForExpiry(ctx, to, ctx.now + RETENTION_MS);
     }
 
     return appended;
