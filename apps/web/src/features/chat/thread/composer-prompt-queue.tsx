@@ -1151,7 +1151,8 @@ const ComposerPromptQueue: FC = () => {
 
     // "Send next" is disabled while the head's text is open: say why, and that the send follows the edit. A paused queue
     // sends nothing on a close, so it makes no such promise.
-    if (headEditing && !queue.paused && !isStreaming && heldSend !== undefined) {
+    // The promise holds only for a hold that names the message being edited (the release rule's own match).
+    if (headEditing && !queue.paused && !isStreaming && heldSend !== undefined && (heldSend.id === undefined || heldSend.id === edit?.id)) {
         statusText = t`${count} queued — sends when the edit closes`;
     }
 

@@ -37,7 +37,6 @@ interface QueueEditStore {
     markErrorPause: (threadId: string, on: boolean) => void;
     /** Marks (or clears) a failed permission-mode save for the thread. */
     markFailedSave: (threadId: string, failed: boolean) => void;
-    /** Returns the thread's held send and clears it. */
     /** Moves a hold from a message's old id to its new one, when a saved change gave the message a new id. */
     renameHeldSend: (threadId: string, fromId: string, toId: string) => void;
     /** Keeps the draft of the open edit of `id`. */
@@ -46,6 +45,7 @@ interface QueueEditStore {
     start: (threadId: string, id: string, draft: string) => void;
     /** Stops the edit of `id`, if that is the one open; a stale call for another chip changes nothing. */
     stop: (threadId: string, id: string) => void;
+    /** Returns the thread's held send and clears it. */
     takeHeldSend: (threadId: string) => HeldSend | undefined;
 }
 
