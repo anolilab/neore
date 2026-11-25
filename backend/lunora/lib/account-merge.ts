@@ -340,11 +340,13 @@ export const listShardRowsPage = internalQuery
         // come in seq order, not by creation time (a page boundary would otherwise put a later event before an earlier one). Its
         // rows are small, so no byte cut is needed.
         if (args.table === "mcpEvents") {
+            // Only the guest's own events: a shared store also holds the other users' logs, which the copy never moves.
             const result = await ctx.db.mcpEvents.findMany({
                 consistency: "primary",
                 cursor: args.cursor,
                 limit: pageSizeFor(args.table),
                 orderBy: [{ seq: "asc" }],
+                where: { userId: args.from },
             });
 
             return { continueCursor: result.isDone ? null : (result.continueCursor ?? null), isDone: result.isDone, page: result.page };
