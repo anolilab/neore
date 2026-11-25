@@ -1956,7 +1956,8 @@ describe("a saved session is reattached only if it received the conversation", (
 
         expect((await lastStart()).nativeSessionId).toBeUndefined();
         expect((await dividers(threadId)).at(-1)?.mode).toBe("portable");
-    });
+        // Scans 3,000 rows: about 2 seconds on a developer machine, but past the 5-second default on the CI shard under load.
+    }, 30_000);
 
     it("reattaches once the agent has been prompted with it", async () => {
         const device = await pairedDevice(ownerId);
