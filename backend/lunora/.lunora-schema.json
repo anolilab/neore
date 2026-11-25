@@ -4145,6 +4145,34 @@
       "relations": {},
       "shardMode": "global:d1"
     },
+    "billingErasures": {
+      "commitOrdered": false,
+      "fields": {
+        "erasedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "referenceId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_referenceId": {
+          "fields": [
+            "referenceId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "root"
+    },
     "botOwners": {
       "commitOrdered": false,
       "fields": {
@@ -14139,6 +14167,12 @@
           "unique": false
         },
         "lastEventAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "priceEventAt": {
           "kind": "number",
           "nullable": false,
           "optional": true,

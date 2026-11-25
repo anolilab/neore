@@ -482,7 +482,7 @@ export const deleteUserIdentity = internalMutation
                 const remainingMembers = await context.db.member.count({ organizationId });
                 const action = teamBillingOnAccountDeletion({ isPurchaser: purchasedIds.has(organizationId), remainingMembers });
 
-                await (action === "cancel" ? queueOrganizationBillingCancel(organizationId) : queueSeatSync(organizationId));
+                await (action === "cancel" ? queueOrganizationBillingCancel(organizationId, false) : queueSeatSync(organizationId));
             }),
         );
 
