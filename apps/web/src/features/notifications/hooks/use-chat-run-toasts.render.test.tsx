@@ -174,7 +174,7 @@ describe("useChatRunToasts: settling a run", () => {
         }
     });
 
-    it("keeps a settling run's outcome when a new run starts in the same thread", () => {
+    it("decides a settling run from its own state when a new run starts in the same thread", () => {
         vi.useFakeTimers();
 
         try {
@@ -182,13 +182,10 @@ describe("useChatRunToasts: settling a run", () => {
 
             rerender({ ...idle, activeStreamId: "stream-1", messages: streamingReply, settings: {} });
             rerender({ ...idle, activeStreamId: null, messages: streamingReply, settings: {} });
-            rerender({ ...idle, activeStreamId: "stream-2", messages: streamingReply, settings: {} });
-
-            expect(toastSuccess).not.toHaveBeenCalled();
-
-            vi.advanceTimersByTime(2000);
+            rerender({ ...idle, activeStreamId: "stream-2", messages: erroredReply, settings: {} });
 
             expect(toastSuccess).toHaveBeenCalledTimes(1);
+            expect(toastError).not.toHaveBeenCalled();
         } finally {
             vi.useRealTimers();
         }

@@ -65,7 +65,8 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
     });
 
     // Decides the outcome of an ended run and shows its toast. Runs once per run: it clears the run first.
-    const settle = useCallback((): void => {
+    // `runOnly` decides from the run's own state alone: the reply and the errors in the thread may already belong to a newer run.
+    const settle = useCallback((runOnly = false): void => {
         const pending = ended.current;
 
         if (!pending) {
@@ -82,9 +83,9 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
             return;
         }
 
-        const errorDuringRun = current.error !== null && current.error !== pending.startError;
+        const errorDuringRun = !runOnly && current.error !== null && current.error !== pending.startError;
 
-        if (pending.failed || errorDuringRun || lastReplyFailed(current.messages)) {
+        if (pending.failed || errorDuringRun || (!runOnly && lastReplyFailed(current.messages))) {
             if (isChatToastOn(current.settings, "failed")) {
                 toast.error(current.copy.failed);
             }
@@ -94,7 +95,7 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
 
         // A run that stopped to wait for the person is not finished. Only a call that started waiting during the run counts:
         // one already waiting when the run began is an older turn's, and does not stop this one.
-        if (waitingApprovalIds(current.messages).some((id) => !pending.startWaiting.has(id))) {
+        if (!runOnly && waitingApprovalIds(current.messages).some((id) => !pending.startWaiting.has(id))) {
             return;
         }
 
@@ -134,7 +135,8 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
     useEffect(() => {
         if (activeStreamId) {
             if (run.current?.streamId !== activeStreamId) {
-                // A finished run still settling keeps its own decision (its reply, or the settle window): a new run must not take it.
+                // A finished run still settling is decided now, from its own state: the reply and errors in the thread now belong to the new run.
+                settle(true);
                 run.current = {
                     failed: false,
                     startError: error,
