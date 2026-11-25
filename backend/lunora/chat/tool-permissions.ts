@@ -822,9 +822,9 @@ export const recordPendingToolApprovals = internalMutation
                 return questionIds.has(approvalId) ? "question" : "approval";
             };
 
-            // A thread that is gone has no one to answer its requests, and its events are kept out of every poll (a deleted thread's
-            // events go with it): none is recorded for it.
-            if (thread !== null) {
+            // A thread that is gone, or has no owner, gets no event: nobody can answer its requests, and a deleted thread's events go
+            // with it, which only an owned thread's delete does (`agent/threads.ts`). None is recorded for it.
+            if (thread?.userId !== undefined) {
                 // Keyed by the request's own row, not its approval id: a tool call id can repeat in a later turn, and a repeat is a new
                 // request that must still reach the log. `recordedIds` is in the order of `uniqueIds`.
                 for (const [index, approvalId] of [...uniqueIds].entries()) {
