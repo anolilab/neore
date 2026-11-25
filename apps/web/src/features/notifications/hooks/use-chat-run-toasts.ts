@@ -53,6 +53,8 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
     const settleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const lastError = useRef<AppError | null>(null);
     const approvals = useRef<{ ids: ReadonlySet<string>; threadId: string | undefined } | undefined>(undefined);
+    const renderedThread = useRef<{ messages: ReadonlyArray<ToastMessage>; threadId: string | undefined }>({ messages, threadId });
+    const staleMessages = useRef<ReadonlyArray<ToastMessage> | undefined>(undefined);
     // The newest inputs, for the settle timer, which fires outside any render.
     // The toast texts are translated here, in render, and only the strings are kept: the settle step runs outside any render.
     const copy = { failed: t`A chat reply failed`, finished: t`A chat reply finished` };
@@ -186,11 +188,20 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
         [],
     );
 
+    // The list of the render before the last thread change: while it is still the one on screen, it is not the new thread's.
+    useEffect(() => {
+        if (renderedThread.current.threadId !== threadId) {
+            staleMessages.current = renderedThread.current.messages;
+        }
+
+        renderedThread.current = { messages, threadId };
+    });
+
     // A tool call that starts waiting for the person. The baseline is the thread's first fully loaded snapshot: a thread that
     // opens already waiting shows its card on screen, so it is not announced. A partial load is not a baseline, so the older
     // calls that arrive with the rest of the history are not announced either. A call that arrives after the baseline is.
     useEffect(() => {
-        if (!messagesReady) {
+        if (!messagesReady || messages === staleMessages.current) {
             return;
         }
 

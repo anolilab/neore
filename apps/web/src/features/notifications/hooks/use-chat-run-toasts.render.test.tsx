@@ -230,6 +230,16 @@ describe("useChatRunToasts: the other toasts still show", () => {
         expect(toastError).toHaveBeenCalledTimes(1);
     });
 
+    it("does not announce a new thread's calls that load after a thread switch", () => {
+        const oldList = waitingOn("call-a");
+        const { rerender } = setup({ ...idle, messages: oldList, settings: {} });
+
+        rerender({ ...idle, messages: oldList, settings: {}, threadId: "thread-2" });
+        rerender({ ...idle, messages: waitingOn("call-b"), settings: {}, threadId: "thread-2" });
+
+        expect(toastWarning).not.toHaveBeenCalled();
+    });
+
     it("does not announce a call that is waiting when a thread finishes loading", () => {
         const { rerender } = setup({ ...idle, messages: [], messagesReady: false, settings: {} });
 
