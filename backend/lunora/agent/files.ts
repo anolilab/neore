@@ -81,7 +81,9 @@ const CLAIMED_INTENT = Number.MAX_SAFE_INTEGER;
  * none does, none will.
  */
 const isStorageKeyNamed = async (context: Pick<QueryCtx, "db">, storageId: string): Promise<boolean> =>
-    (await context.db.chatFiles.findFirst({ consistency: "primary", where: { discardingAt: null, storageId } })) !== null;
+    // `null` is the runtime "not discarding" filter. Codegen 443 types an optional column as absent in `where`,
+    // which rejects `null` (upstream gap, see docs/agents/lunora-upstream.md); the cast keeps the runtime value.
+    (await context.db.chatFiles.findFirst({ consistency: "primary", where: { discardingAt: null as unknown as undefined, storageId } })) !== null;
 
 /** The record of `storageId` as an object to delete (`chatFileObjectDeletes`), read from the primary. */
 const objectDeleteFor = async (context: Pick<QueryCtx, "db">, storageId: string) =>

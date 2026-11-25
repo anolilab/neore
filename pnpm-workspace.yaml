@@ -299,35 +299,26 @@ catalogs:
     tailwind-csstree: 0.4.2
     typescript-eslint: 8.73.0
   lunora:
-    # `cli` 505 brings `@lunora/codegen` 428, which types an optional `.global()` column
-    # `?: T | null` though no read returns `null` (lunora#1668): reads narrow it back with
-    # `backend/lunora/lib/stored-row.ts`. `d1` 238 imports a `sql-store` 239 export while
-    # declaring ^237 (lunora#1666): the lockfile must hold `@lunora/sql-store` 239; after a
-    # re-resolve, check it and run `pnpm update --depth 100 @lunora/sql-store`.
-    # `testing` 338 pins `queue` 143 and `bindings` 151, and `lunorash` pins `platform` 80,
-    # so those keep a second copy (none is branded).
-    # HELD: `studio` 384. 385+ want `client` ^297, and `react` 301 (the newest) pins
-    # `client` 291 exactly (lunora#1667). Move `studio` with a `react` that admits ^297.
-    "@lunora/auth": 1.0.0-alpha.268
-    "@lunora/bindings": 1.0.0-alpha.153
-    "@lunora/client": 1.0.0-alpha.291
-    "@lunora/cli": 1.0.0-alpha.505
-    "@lunora/d1": 1.0.0-alpha.238
-    "@lunora/mail": 1.0.0-alpha.140
+    "@lunora/auth": 1.0.0-alpha.275
+    "@lunora/bindings": 1.0.0-alpha.154
+    "@lunora/client": 1.0.0-alpha.304
+    "@lunora/cli": 1.0.0-alpha.510
+    "@lunora/d1": 1.0.0-alpha.242
+    "@lunora/mail": 1.0.0-alpha.141
     "@lunora/notify": 1.0.0-alpha.113
     "@lunora/payment": 1.0.0-alpha.279
-    "@lunora/queue": 1.0.0-alpha.145
-    "@lunora/ratelimit": 1.0.0-alpha.196
-    "@lunora/react": 1.0.0-alpha.301
-    "@lunora/scheduler": 1.0.0-alpha.171
+    "@lunora/queue": 1.0.0-alpha.146
+    "@lunora/ratelimit": 1.0.0-alpha.198
+    "@lunora/react": 1.0.0-alpha.306
+    "@lunora/scheduler": 1.0.0-alpha.174
     "@lunora/seed": 1.0.0-alpha.283
     "@lunora/server": 1.0.0-alpha.281
-    "@lunora/storage": 1.0.0-alpha.173
-    "@lunora/studio": 1.0.0-alpha.384
-    "@lunora/testing": 1.0.0-alpha.338
+    "@lunora/storage": 1.0.0-alpha.175
+    "@lunora/studio": 1.0.0-alpha.391
+    "@lunora/testing": 1.0.0-alpha.342
     "@lunora/workflow": 1.0.0-alpha.111
     "@lunora/wire": 1.0.0-alpha.6
-    lunorash: 1.0.0-alpha.479
+    lunorash: 1.0.0-alpha.481
   markdown:
     "@streamdown/cjk": 1.0.5
     "@streamdown/math": 1.0.4
