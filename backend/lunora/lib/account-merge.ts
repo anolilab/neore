@@ -2381,8 +2381,9 @@ export interface MergeProgress {
     /** Runs taken so far. */
     run: number;
     /**
-     * Whether the two keys serve one store ({@link probeSharedStore}), probed once by the merge's first clear page and kept
-     * here, so every later run, and the guest's deletion, decide alike. Absent until then.
+     * Whether the two keys serve one store ({@link probeSharedStore}), probed once, before the first step of any phase but
+     * the markers (`mergeGuestInto`), and kept here, so every later run, and the guest's deletion, decide alike. Absent until
+     * then. A probe that fails stops the run in whichever phase it was made, not only in the clear.
      */
     sharedStore?: boolean;
     /** The table the copy, the clear or the reconcile stopped in; another phase ignores it. */

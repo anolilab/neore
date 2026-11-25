@@ -37,4 +37,16 @@ describe("a poll whose events are large", () => {
 
         expect(second.events.map((row) => row.eventId)).toStrictEqual(["run:2"]);
     });
+
+    it("stops reading after the read budget, even when the rows it reads do not match, and resumes from the last one read", async () => {
+        const unrelated = Array.from({ length: 40 }, (_, index) => {
+            return { ...large(index + 1), name: "run.failed" };
+        });
+        const outcome = await pollEvents(logOf(unrelated), { fromSeq: 0, maxEvents: 50, name: "run.completed", now: NOW });
+
+        expect(outcome.events).toStrictEqual([]);
+        expect(outcome.hasMore).toBe(true);
+        expect(outcome.nextSeq).toBeGreaterThan(0);
+        expect(outcome.nextSeq).toBeLessThan(40);
+    });
 });

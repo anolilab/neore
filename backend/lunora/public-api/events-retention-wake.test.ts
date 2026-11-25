@@ -26,7 +26,7 @@ describe("the Events log's retention wake", () => {
             await runInShard("user", async () => {
                 await harness.run(async (context: any) => {
                     await recordMcpEvent(
-                        { db: context.db, now },
+                        { db: context.db, now, scheduler: context.scheduler },
                         {
                             data: {},
                             eventId: "run:new",

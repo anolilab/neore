@@ -184,7 +184,7 @@ const hostRunOutcome = (end: { reason: EndReason; status: "done" | "error" | "ti
  * live to one client and ended to another. Returns false when the stream was already over.
  */
 export const endHostStream = async (
-    ctx: Partial<Pick<MutationCtx, "scheduler">> & Pick<MutationCtx, "db">,
+    ctx: Pick<MutationCtx, "db" | "scheduler">,
     stream: Stream,
     end: { reason: EndReason; status: "done" | "error" | "timeout" },
     now: number,
