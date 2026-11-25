@@ -220,7 +220,8 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
     // opens already waiting shows its card on screen, so it is not announced. A partial load is not a baseline, so the older
     // calls that arrive with the rest of the history are not announced either. A call that arrives after the baseline is.
     useEffect(() => {
-        if (!messagesReady || messages === staleMessages.current) {
+        // Settings still loading: nothing is recorded yet, so a call is not marked seen while its setting is unknown.
+        if (!messagesReady || settings === undefined || messages === staleMessages.current) {
             return;
         }
 
