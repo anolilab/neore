@@ -825,10 +825,12 @@ export const recordPendingToolApprovals = internalMutation
             // A thread that is gone has no one to answer its requests, and its events are kept out of every poll (a deleted thread's
             // events go with it): none is recorded for it.
             if (thread !== null) {
-                for (const approvalId of uniqueIds) {
+                // Keyed by the request's own row, not its approval id: a tool call id can repeat in a later turn, and a repeat is a new
+                // request that must still reach the log. `recordedIds` is in the order of `uniqueIds`.
+                for (const [index, approvalId] of [...uniqueIds].entries()) {
                     await recordMcpEvent(ctx, {
                         data: { kind: kindOf(approvalId), requestId: approvalId, threadId },
-                        eventId: `${APPROVAL_REQUESTED_EVENT}:${approvalId}`,
+                        eventId: `${APPROVAL_REQUESTED_EVENT}:${recordedIds[index] ?? approvalId}`,
                         name: APPROVAL_REQUESTED_EVENT,
                         timestamp: createdAt,
                         userId: ownerId,
