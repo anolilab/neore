@@ -1863,7 +1863,7 @@ const webhookRow = (fields: Record<string, unknown>) => {
 };
 
 describe("firstTableWithGuestRows on a store the new account shares", () => {
-    it("counts only the guest's own rows of an owned table there, while another user's row counts on a separate store", async () => {
+    it("counts only the guest's own rows of an owned table, on a shared store or a separate one: another user's row never holds the deletion up", async () => {
         const harness = lunoraTest(schemaWithShardedTables([]) as never);
 
         try {
@@ -1875,7 +1875,7 @@ describe("firstTableWithGuestRows on a store the new account shares", () => {
             const separate = await harness.run(async (context: any) => await firstTableWithGuestRows(context, "guest", false));
 
             expect(shared).toBeNull();
-            expect(separate).toBe("runWebhooks");
+            expect(separate).toBeNull();
         } finally {
             harness.close();
         }
@@ -2280,6 +2280,48 @@ describe("mergeGuestInto across two real shards", () => {
             })) as number;
 
             expect(leftOnGuest).toBe(0);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("finishes the merge when another user's Events sit on the guest's own store, and moves only the guest's", async () => {
+        const merge = twoShards();
+
+        try {
+            await merge.shards.guest.run(async (context: any) => {
+                await context.db.insert("mcpEvents", {
+                    createdAt: 1,
+                    data: "{}",
+                    eventId: "run:mine",
+                    name: "run.completed",
+                    seq: 1,
+                    timestamp: 1,
+                    userId: "guest",
+                });
+                await context.db.insert("mcpEvents", {
+                    createdAt: 1,
+                    data: "{}",
+                    eventId: "run:theirs",
+                    name: "run.completed",
+                    seq: 1,
+                    timestamp: 1,
+                    userId: "stranger",
+                });
+            });
+
+            await mergeToEnd(merge.call, "guest", "user");
+
+            // The copy moved the guest's event to the new account's store; the stranger's stayed on the guest's own, untouched.
+            const eventIdsOn = async (store: "guest" | "user", userId: string) =>
+                (await merge.shards[store].run(async (context: any) => {
+                    const { page } = await context.db.mcpEvents.findMany({ limit: 100, where: { userId } });
+
+                    return page.map((row: { eventId: string }) => row.eventId);
+                })) as string[];
+
+            expect(await eventIdsOn("user", "user")).toStrictEqual(["run:mine"]);
+            expect(await eventIdsOn("guest", "stranger")).toStrictEqual(["run:theirs"]);
         } finally {
             merge.close();
         }

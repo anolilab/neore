@@ -16,6 +16,9 @@ const BATCH = 200;
  */
 export const MAX_EXPORT_EVENTS = 500;
 
+/** The bytes of event payloads the export carries, so the section stays well inside the 1 MiB step result and dispatch body. */
+export const EXPORT_EVENT_BYTES = 512 * 1024;
+
 /**
  * The user's newest Events, up to {@link MAX_EXPORT_EVENTS}, oldest first, for the export. The data is the event's stored payload,
  * as recorded: the thread it concerns and its outcome or request, never a secret.
@@ -42,13 +45,26 @@ export const collectMcpEventsForExport = internalQuery
             cursor = result.isDone ? undefined : (result.continueCursor ?? undefined);
         } while (cursor !== undefined && rows.length <= MAX_EXPORT_EVENTS);
 
-        const kept = rows.slice(0, MAX_EXPORT_EVENTS).toReversed();
+        // The newest that fit the byte budget: an event's payload can be large, and the cap on rows alone does not bound the bytes.
+        const encoder = new TextEncoder();
+        const newest: Doc<"mcpEvents">[] = [];
+        let bytes = 0;
+
+        for (const row of rows.slice(0, MAX_EXPORT_EVENTS)) {
+            bytes += encoder.encode(row.data).byteLength + encoder.encode(row.eventId).byteLength + encoder.encode(row.name).byteLength;
+
+            if (newest.length > 0 && bytes > EXPORT_EVENT_BYTES) {
+                break;
+            }
+
+            newest.push(row);
+        }
 
         return {
-            events: kept.map((row) => {
+            events: newest.toReversed().map((row) => {
                 return { createdAt: row.createdAt, data: row.data, eventId: row.eventId, name: row.name, seq: row.seq, timestamp: row.timestamp };
             }),
-            truncated: rows.length > MAX_EXPORT_EVENTS,
+            truncated: rows.length > newest.length,
         };
     });
 
