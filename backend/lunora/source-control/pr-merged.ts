@@ -40,6 +40,8 @@ interface MergeRecording {
     mergedBefore?: number;
     mergedBeforeIsHostBound?: boolean;
     number: number;
+    /** When the walk first saw the merge. Every page of the walk carries it, so a link stamped on a later page is still bounded by it. */
+    recordedAt?: number;
     repository: string;
     userId: string;
 }
@@ -77,6 +79,7 @@ const pageArgsOf = (merge: MergeRecording) => {
         ...(merge.mergedAt !== undefined && { mergedAt: merge.mergedAt }),
         ...(merge.mergedBefore !== undefined && { mergedBefore: merge.mergedBefore }),
         ...(merge.mergedBeforeIsHostBound !== undefined && { mergedBeforeIsHostBound: merge.mergedBeforeIsHostBound }),
+        ...(merge.recordedAt !== undefined && { recordedAt: merge.recordedAt }),
         number: merge.number,
         repository: merge.repository,
         userId: merge.userId,
@@ -191,6 +194,8 @@ export const recordMergedPullRequest = async (
                 ...(mergedBefore !== undefined && { mergedBefore }),
                 ...(mergedBeforeIsHostBound !== undefined && { mergedBeforeIsHostBound }),
                 number: address.number,
+                // The walk starts now: the merge was seen no later than this, so it bounds every page of the walk.
+                recordedAt: Date.now(),
                 repository: address.repository,
                 userId,
             },
@@ -219,6 +224,7 @@ export const continueMergedRecordingJob = internalAction
         mergedBefore: v.optional(v.number()),
         mergedBeforeIsHostBound: v.optional(v.boolean()),
         number: v.number(),
+        recordedAt: v.optional(v.number()),
         repository: v.string().max(MAX_LENGTH.short),
         userId: v.string().max(MAX_LENGTH.id),
     })

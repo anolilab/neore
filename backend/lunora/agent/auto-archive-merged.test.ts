@@ -1044,6 +1044,50 @@ describe("archiveMergedThread", () => {
         ).toBe("archived");
     });
 
+    it("declines a reopened chat for a link a later page marked after the archive, when the walk saw the merge before it", async () => {
+        const threadId = await setUp({ autoArchiveMergedChats: true, linked: false });
+        const linkId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 1,
+                    kind: "attached",
+                    number: NUMBER,
+                    repository: REPOSITORY,
+                    threadId,
+                    title: "Feature work",
+                    url: URL,
+                    userId: OWNER,
+                }),
+        );
+
+        // The chat is archived before the walk reaches this link, so the link is not yet marked and the archive does not settle it.
+        await harness.run(async (ctx: any) => await ctx.runMutation(archiveThread, { threadId }));
+        const archivedAt = await harness.run(async (ctx: any) => {
+            const row = await ctx.db.get("threads", threadId);
+
+            return row?.archivedAt;
+        });
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { status: "active" }));
+
+        // The walk began before the archive and saw the merge then; its later page marks the link after the archive. The host gave no
+        // merge time, so only the walk's start bounds the merge, and that start is before the archive.
+        await harness.run(
+            async (ctx: any) =>
+                await recordAllPages(ctx, {
+                    mergedBeforeIsHostBound: false,
+                    number: NUMBER,
+                    recordedAt: archivedAt - 500,
+                    repository: REPOSITORY,
+                    userId: OWNER,
+                }),
+        );
+
+        expect(
+            await harness.run(async (ctx: any) => await ctx.runMutation(archiveMergedThread, { linkId, number: NUMBER, repository: REPOSITORY, threadId })),
+        ).toBe("declined");
+    });
+
     it("keeps a merged chat that another open pull request keeps, as the idle archive does", async () => {
         const threadId = await setUp({ autoArchiveMergedChats: true });
 

@@ -41,6 +41,9 @@ const CHECK_LIMIT = 20;
 const THREAD_LOOKUP_FACTOR = 4;
 /** Links one sweep reads of a chat when it looks for an owed merge. A larger chat is scanned across sweeps, one page each. */
 const OWED_SCAN_ROWS = 500;
+
+/** Chats whose owed-merge scan a sweep runs. Each reads up to `OWED_SCAN_ROWS` link rows, so this bounds the sweep's reads across chats. */
+const OWED_SCANS_PER_SWEEP = 8;
 /** Auto-archive's idle rule alone. Its live-stream and pinned-project exclusions are left out, so a chat that is then kept still gets a read. */
 const NO_EXCLUSIONS = { liveThreadIds: new Set<string>(), pinnedProjectIds: new Set<string>() };
 
@@ -176,6 +179,7 @@ export const dispatchLinkedPullRequestChecks = internalMutation
 
         // A recorded merge is final, so an owed link is retried by the chat's archive job, with no host read.
         let scheduled = 0;
+        let owedScans = 0;
 
         for (const link of lookups) {
             if (due.length + scheduled >= CHECK_LIMIT) {
@@ -199,6 +203,15 @@ export const dispatchLinkedPullRequestChecks = internalMutation
                 // Only a chat flagged as owing a merge is read for one: the flag is set with every owed link (`pr-threads.ts`).
                 const key = String(link.threadId);
                 const known = owesMerge.get(key);
+
+                // A chat past this sweep's scan budget waits for a later sweep. Its link is left stale, so it keeps its place in the order.
+                if (known === undefined && owedScans >= OWED_SCANS_PER_SWEEP) {
+                    continue;
+                }
+
+                if (known === undefined) {
+                    owedScans += 1;
+                }
 
                 mergeOwed = known ?? (await ownsMergeTo(ctx, userId, thread));
                 owesMerge.set(key, mergeOwed);

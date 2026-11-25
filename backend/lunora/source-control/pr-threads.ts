@@ -434,6 +434,8 @@ const mergeArgsFields = {
     /** False when `mergedBefore` is not the host's bound (the host gave no merge time): it orders the links, but it is not stored. */
     mergedBeforeIsHostBound: v.optional(v.boolean()),
     number: v.number(),
+    /** When the recording walk first saw the merge. The merge came before that, so this bounds it from above on every page of the walk. */
+    recordedAt: v.optional(v.number()),
     repository: v.string().max(MAX_LENGTH.short),
     userId: v.string().max(MAX_LENGTH.id),
 };
@@ -442,6 +444,7 @@ const mergeArgsFields = {
 interface MergeMark {
     mergedAt: number;
     mergedBefore: number;
+    recordedAt: number;
     settingOn: boolean;
     since: number | undefined;
     storeBound: boolean;
@@ -449,7 +452,7 @@ interface MergeMark {
 
 const mergeMarkOf = async (
     ctx: MutationCtx,
-    args: { mergedAt?: number; mergedBefore?: number; mergedBeforeIsHostBound?: boolean; userId: string },
+    args: { mergedAt?: number; mergedBefore?: number; mergedBeforeIsHostBound?: boolean; recordedAt?: number; userId: string },
 ): Promise<MergeMark> => {
     const mergedAt = args.mergedAt ?? ctx.now;
     const mergedBefore = args.mergedBefore ?? mergedAt + MERGE_TIME_PRECISION_MS;
@@ -462,6 +465,7 @@ const mergeMarkOf = async (
     return {
         mergedAt,
         mergedBefore,
+        recordedAt: args.recordedAt ?? ctx.now,
         // A merge owes an archive only when the setting is on and the merge came after the owner turned it on.
         settingOn: settings?.autoArchiveMergedChats === true && since !== undefined,
         since,
@@ -488,7 +492,7 @@ const markLinkMerged = async (ctx: MutationCtx, link: Doc<"pullRequestThreads">,
 
         await ctx.db.patch("pullRequestThreads", link._id, {
             mergedAt: merge.mergedAt,
-            mergeRecordedAt: ctx.now,
+            mergeRecordedAt: merge.recordedAt,
             state: "merged",
             ...(merge.storeBound && { mergedBefore: merge.mergedBefore }),
         });
