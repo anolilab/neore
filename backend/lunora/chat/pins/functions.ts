@@ -5,7 +5,6 @@ import { internal } from "../../_generated/internal";
 import type { MutationCtx } from "../../_generated/server";
 import { admitPinWriteAs, isErasing, otherPinWritesInFlight, PIN_WRITE_LEASE_MS, refusesPinWrite, releasePinWrite } from "../../lib/account-moves";
 import { authMutation, authQuery, internalMutation, internalQuery, rateLimit } from "../../lib/crpc";
-import { enqueueJob } from "../../lib/job-queue";
 import { MAX_LENGTH } from "../../lib/validators";
 import { systemDb } from "../../lib/rls/scope";
 import { threadGateOutcome, throwUnlessGranted } from "../lib/thread-gate";
@@ -190,11 +189,20 @@ const recordSharedPinRoute = async (context: MutationCtx, threadId: Id<"threads"
 const ROUTE_CLEANUP_BATCH = 100;
 
 /**
+ * Schedules a route cleanup for after this mutation commits. `ctx.scheduler` is rolled back with the mutation, so a pin delete that fails
+ * schedules nothing and removes no route, and the job never reads a pin the commit has not yet removed. `enqueueJob` is sent at once and
+ * not undone, so it could run first and then fail the mutation after its routes were gone.
+ */
+const scheduleRouteCleanup = async (context: MutationCtx, threadId: Id<"threads">, userId: string, delayMs = 0): Promise<void> => {
+    await context.scheduler.runAfter(delayMs, internal.chat.pins.functions.finishPinRouteCleanup, { threadId, userId });
+};
+
+/**
  * Removes one batch of the caller's routes to a thread, once the caller holds no pin there: nothing is left to find through them. The
  * same rule runs when the last pin goes (`deletePin`). A full batch means more may remain, so a job on the thread owner's shard finishes
  * them (`finishPinRouteCleanup`); that job re-checks the pins and the in-flight writes, so it can run again safely.
  */
-export const dropRoutesWithoutPins = async (context: MutationCtx, threadId: Id<"threads">, userId: string): Promise<void> => {
+export const dropRoutesWithoutPins = async (context: MutationCtx, threadId: Id<"threads">, userId: string, writerId: string | null = null): Promise<void> => {
     const left = await context.db
         .query("threadPins")
         .withIndex("by_user_and_thread", (q) => q.eq("userId", userId).eq("threadId", threadId))
@@ -211,15 +219,45 @@ export const dropRoutesWithoutPins = async (context: MutationCtx, threadId: Id<"
         await context.db.delete("sharedPinRoutes", route._id);
     }
 
+    // A write admitted before the delete may have read its route and still be about to insert its pin, on a route that is now gone. So
+    // the batch goes back, and the job removes it once no write is in flight. A write admitted after the delete finds no route and
+    // writes its own. The clock is read here, not taken from the mutation's start: a lease that ran out during a slow mutation is out.
+    if (await otherPinWritesInFlight(context, userId, writerId, Date.now())) {
+        for (const route of page) {
+            await context.db.insert("sharedPinRoutes", { createdAt: route.createdAt, ownerId: route.ownerId, threadId, userId });
+        }
+
+        await scheduleRouteCleanup(context, threadId, userId, PIN_WRITE_LEASE_MS);
+
+        return;
+    }
+
     if (page.length < ROUTE_CLEANUP_BATCH) {
         return;
     }
 
+    await scheduleRouteCleanup(context, threadId, userId);
+};
+
+/**
+ * One pass of a route cleanup, on the shard the thread is on: it does nothing where the thread is no longer (a guest merge moved it). It
+ * waits while another admitted pin write of the account is in flight, then removes the routes it has no pin for (`dropRoutesWithoutPins`).
+ */
+export const finishRouteCleanup = async (context: MutationCtx, threadId: Id<"threads">, userId: string): Promise<void> => {
     const thread = await systemDb(context).get("threads", threadId);
 
-    if (thread?.userId !== undefined) {
-        await enqueueJob(internal.chat.pins.functions.finishPinRouteCleanup, { threadId, userId }, { shardKey: thread.userId });
+    // This shard cannot see the pins of a thread that moved off it, so it cannot tell whether any are left: the routes stay.
+    if (!thread) {
+        return;
     }
+
+    if (await otherPinWritesInFlight(context, userId, null, Date.now())) {
+        await scheduleRouteCleanup(context, threadId, userId, PIN_WRITE_LEASE_MS);
+
+        return;
+    }
+
+    await dropRoutesWithoutPins(context, threadId, userId);
 };
 
 /**
@@ -231,21 +269,7 @@ export const finishPinRouteCleanup = internalMutation
     .input({ threadId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.null())
     .mutation(async ({ args: { threadId, userId }, ctx: context }) => {
-        const thread = await systemDb(context).get("threads", threadId as Id<"threads">);
-
-        if (await otherPinWritesInFlight(context, userId, null, context.now)) {
-            if (thread?.userId !== undefined) {
-                await enqueueJob(
-                    internal.chat.pins.functions.finishPinRouteCleanup,
-                    { threadId, userId },
-                    { delayMs: PIN_WRITE_LEASE_MS, shardKey: thread.userId },
-                );
-            }
-
-            return null;
-        }
-
-        await dropRoutesWithoutPins(context, threadId as Id<"threads">, userId);
+        await finishRouteCleanup(context, threadId as Id<"threads">, userId);
 
         return null;
     });
@@ -280,9 +304,7 @@ export const withSharedPinRoute = async <T>(
                 await releasePinWrite(context, userId, writerId);
             }
 
-            if (!(await otherPinWritesInFlight(context, userId, writerId, now))) {
-                await dropRoutesWithoutPins(context, threadId, userId);
-            }
+            await dropRoutesWithoutPins(context, threadId, userId, writerId);
         }
 
         throw error;
@@ -587,7 +609,8 @@ export const deletePin = authMutation
 
         await context.db.delete("threadPins", pinId as Id<"threadPins">);
 
-        await dropRoutesWithoutPins(context, pin.threadId, userId);
+        // After this commits: the job finds the pin gone, or a pin a later write committed, and removes the routes only if none is left.
+        await scheduleRouteCleanup(context, pin.threadId, userId);
 
         context.log.event("chat.delete_pin", { deleted: true });
     });

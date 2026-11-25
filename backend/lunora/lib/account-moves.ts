@@ -28,6 +28,24 @@ export type AccountMoveKind = "erasing" | "importing" | "merging";
  */
 export const PIN_WRITE_LEASE_MS = 60_000;
 
+/**
+ * Every lease row of the account. Lunora returns a read one page at a time, so a lease past the first page is read too: a missed writer
+ * could let a refused write take back a route it still needs, or let an erasure sweep before that write commits.
+ */
+const leasesOf = async (context: Pick<QueryCtx, "db">, userId: string) => {
+    const leases = [];
+    let result = await context.db.pinWriteLeases.findMany({ consistency: "primary", where: { userId } });
+
+    leases.push(...result.page);
+
+    while (!result.isDone) {
+        result = await context.db.pinWriteLeases.findMany({ consistency: "primary", cursor: result.continueCursor ?? undefined, where: { userId } });
+        leases.push(...result.page);
+    }
+
+    return leases;
+};
+
 /** Whether the account's pins are being moved or erased right now. */
 export const isAccountMoving = async (context: Pick<QueryCtx, "db">, userId: string, now: number): Promise<boolean> => {
     const { page } = await context.db.accountMoves.findMany({ consistency: "primary", where: { userId } });
@@ -74,9 +92,9 @@ export const beginAccountMove = async (context: Pick<MutationCtx, "db">, userId:
  */
 export const admitPinWrite = async (context: Pick<MutationCtx, "db">, userId: string, now: number): Promise<string> => {
     const writerId = crypto.randomUUID();
-    const { page } = await context.db.pinWriteLeases.findMany({ consistency: "primary", where: { userId } });
+    const leases = await leasesOf(context, userId);
 
-    for (const lease of page) {
+    for (const lease of leases) {
         if (lease.expiresAt <= now) {
             await context.db.delete("pinWriteLeases", lease._id);
         }
@@ -102,27 +120,21 @@ export const admitPinWriteAs = async (context: MutationCtx, userId: string, now:
 
 /** Whether the account's refused write may take back a route: no other admitted pin write of the account can still be in flight. */
 export const otherPinWritesInFlight = async (context: Pick<QueryCtx, "db">, userId: string, writerId: string | null, now: number): Promise<boolean> => {
-    const { page } = await context.db.pinWriteLeases.findMany({ consistency: "primary", where: { userId } });
+    const leases = await leasesOf(context, userId);
 
-    return page.some((lease) => lease.expiresAt > now && lease.writerId !== writerId);
+    return leases.some((lease) => lease.expiresAt > now && lease.writerId !== writerId);
 };
 
 /** Removes one admitted write's own lease, so the refused write does not hold back its own cleanup. */
 export const releasePinWrite = async (context: Pick<MutationCtx, "db">, userId: string, writerId: string): Promise<void> => {
-    const { page } = await context.db.pinWriteLeases.findMany({ consistency: "primary", where: { userId } });
+    const leases = await leasesOf(context, userId);
 
-    for (const lease of page) {
+    for (const lease of leases) {
         if (lease.writerId === writerId) {
             await context.db.delete("pinWriteLeases", lease._id);
         }
     }
 };
-
-/**
- * Admits a pin write without its writer id: `true` when the account is moving and the write is refused (`admitPinWriteAs`).
- */
-export const admitPinWriteUnlessMoving = async (context: MutationCtx, userId: string, now: number): Promise<boolean> =>
-    (await admitPinWriteAs(context, userId, now)) === null;
 
 /**
  * Whether a pin write of the account must be refused on this shard: a move is marking it, or this shard is fenced by an erasure. A
@@ -136,10 +148,10 @@ export const refusesPinWrite = async (context: Pick<QueryCtx, "db">, userId: str
  * erasure) or re-enqueues itself for it (a guest merge).
  */
 export const pinWritesInFlightUntil = async (context: Pick<QueryCtx, "db">, userId: string, now: number): Promise<number | null> => {
-    const { page } = await context.db.pinWriteLeases.findMany({ consistency: "primary", where: { userId } });
+    const leases = await leasesOf(context, userId);
     let latest = 0;
 
-    for (const lease of page) {
+    for (const lease of leases) {
         latest = lease.expiresAt > now && lease.expiresAt > latest ? lease.expiresAt : latest;
     }
 
@@ -169,7 +181,7 @@ export const endAccountMove = async (context: Pick<MutationCtx, "db">, userId: s
         return;
     }
 
-    const { page: leases } = await context.db.pinWriteLeases.findMany({ consistency: "primary", where: { userId } });
+    const leases = await leasesOf(context, userId);
 
     for (const row of leases) {
         await context.db.delete("pinWriteLeases", row._id);

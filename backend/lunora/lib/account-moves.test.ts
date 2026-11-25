@@ -10,7 +10,7 @@ import schema from "../schema";
 import {
     PIN_WRITE_LEASE_MS,
     admitPinWrite,
-    admitPinWriteUnlessMoving,
+    admitPinWriteAs,
     beginAccountMove,
     endAccountMove,
     eraseWaitUntil,
@@ -150,9 +150,9 @@ describe("the pin-write lease", () => {
 
             // Repeated refused attempts: each is refused, and none renews a lease.
             for (let attempt = 0; attempt < 3; attempt += 1) {
-                const refused = await harness.run(async (context: any) => await admitPinWriteUnlessMoving(context, "user-guest", 1000 + attempt));
+                const refused = await harness.run(async (context: any) => await admitPinWriteAs(context, "user-guest", 1000 + attempt));
 
-                expect(refused).toBe(true);
+                expect(refused).toBeNull();
             }
 
             const rows = await harness.run(async (context: any) => await context.db.pinWriteLeases.findMany({ where: { userId: "user-guest" } }));
@@ -245,11 +245,11 @@ describe("the owner-shard fence", () => {
         try {
             await harness.run(async (context: any) => await fencePinsOnShard(context, "user-fenced", 1));
 
-            expect(await harness.run(async (context: any) => await admitPinWriteUnlessMoving(context, "user-fenced", 1))).toBe(true);
+            expect(await harness.run(async (context: any) => await admitPinWriteAs(context, "user-fenced", 1))).toBeNull();
 
             await harness.run(async (context: any) => await unfencePinsOnShard(context, "user-fenced"));
 
-            expect(await harness.run(async (context: any) => await admitPinWriteUnlessMoving(context, "user-fenced", 2))).toBe(false);
+            expect(await harness.run(async (context: any) => await admitPinWriteAs(context, "user-fenced", 2))).not.toBeNull();
         } finally {
             harness.close();
         }
