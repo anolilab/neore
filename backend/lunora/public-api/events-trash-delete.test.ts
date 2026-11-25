@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { registerModule } from "../../test/registered-api";
 import { runInShard } from "../lib/shard-context";
 import { schemaWithShardedTables } from "../lib/test-schema";
-import { deleteTrashedThreadEvents } from "./events";
+import { deleteEventsBeforeTrash, deleteTrashedThreadEvents } from "./events";
 import { recordMcpEvent } from "./events-log";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
@@ -15,7 +15,7 @@ vi.mock("../_generated/internal", async (importOriginal) => {
     return wire(await importOriginal(), registry);
 });
 
-registerModule(registry, "public_api_events", { deleteTrashedThreadEvents });
+registerModule(registry, "public_api_events", { deleteEventsBeforeTrash, deleteTrashedThreadEvents });
 
 const NOW = 1_700_000_000_000;
 /** Events one thread's removal deletes per batch (`THREAD_EVENT_BATCH`). */
@@ -83,6 +83,39 @@ describe("a trashed chat's events", () => {
             )) as number;
 
             expect(left).toBe(3);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("keeps a restored chat's leftover pre-trash events out of its log, and keeps the events recorded since", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const left = (await runInShard(
+                "user",
+                async () =>
+                    await harness.run(async (context: any) => {
+                        const id = (await context.db.insert("threads", { deleted: false, status: "active", title: "Restored", userId: "user" })) as string;
+
+                        await recordMcpEvent(
+                            { db: context.db, now: NOW - 1000, scheduler: context.scheduler },
+                            { data: { threadId: id }, eventId: "run:before", name: "run.completed", timestamp: NOW, userId: "user" },
+                        );
+                        await recordMcpEvent(
+                            { db: context.db, now: NOW + 1000, scheduler: context.scheduler },
+                            { data: { threadId: id }, eventId: "run:after", name: "run.completed", timestamp: NOW, userId: "user" },
+                        );
+
+                        await context.runMutation(deleteEventsBeforeTrash, { before: NOW, threadId: id, userId: "user" });
+
+                        const { page } = await context.db.mcpEvents.findMany({ limit: 10, where: { threadId: id, userId: "user" } });
+
+                        return page.map((row: { eventId: string }) => row.eventId);
+                    }),
+            )) as string[];
+
+            expect(left).toStrictEqual(["run:after"]);
         } finally {
             harness.close();
         }

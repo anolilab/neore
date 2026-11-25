@@ -132,11 +132,15 @@ const setWatermark = async (ctx: Pick<MutationCtx, "db">, userId: string, rowId:
 
 /**
  * Deletes up to a batch of `userId`'s events for `threadId`, and returns `true` once none are left. A deleted thread's events go
- * with it: the poll hides a locked thread's events only while the thread exists, so they must not outlive it.
+ * with it: the poll hides a locked thread's events only while the thread exists, so they must not outlive it. `before` limits it to
+ * the events recorded before that time.
  */
-export const deleteMcpEventsOfThread = async (ctx: Pick<MutationCtx, "db">, userId: string, threadId: string): Promise<boolean> => {
+export const deleteMcpEventsOfThread = async (ctx: Pick<MutationCtx, "db">, userId: string, threadId: string, before?: number): Promise<boolean> => {
     // One row past the batch says whether more follow: a batch that ends the thread's events is not reported as more.
-    const { page } = await ctx.db.mcpEvents.findMany({ limit: THREAD_EVENT_BATCH + 1, where: { threadId, userId } });
+    const { page } = await ctx.db.mcpEvents.findMany({
+        limit: THREAD_EVENT_BATCH + 1,
+        where: { threadId, userId, ...(before !== undefined && { createdAt: { lt: before } }) },
+    });
 
     for (const row of page.slice(0, THREAD_EVENT_BATCH)) {
         await ctx.db.delete("mcpEvents", row._id);

@@ -219,3 +219,18 @@ export const deleteTrashedThreadEvents = internalMutation
 
         return null;
     });
+
+/**
+ * A restored chat's events recorded before it was trashed, one batch per call. Restore schedules it (`restoreThread` in
+ * `agent/threads.ts`), so the trash's leftover batches cannot bring those events back. Events recorded since the trash are kept.
+ */
+export const deleteEventsBeforeTrash = internalMutation
+    .input({ before: v.number(), threadId: v.string(), userId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        if (!(await deleteMcpEventsOfThread(ctx, args.userId, args.threadId, args.before))) {
+            await runAfterOnShard(ctx.scheduler, 0, internal.public_api.events.deleteEventsBeforeTrash, args, args.userId);
+        }
+
+        return null;
+    });

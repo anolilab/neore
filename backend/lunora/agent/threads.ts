@@ -878,6 +878,18 @@ export const restoreThread = internalMutation
             deletedAt: undefined,
             updatedAt: ctx.now,
         });
+
+        // The events recorded before the trash are the trash's to remove, not the restored chat's: its leftover batches may not have run.
+        if (oldThread.userId !== undefined && oldThread.deletedAt !== undefined) {
+            await runAfterOnShard(
+                ctx.scheduler,
+                0,
+                internal.public_api.events.deleteEventsBeforeTrash,
+                { before: oldThread.deletedAt, threadId: args.threadId, userId: oldThread.userId },
+                oldThread.userId,
+            );
+        }
+
         await setLinksThreadDeleted(ctx, oldThread.userId, args.threadId, false);
 
         // The session the delete ended, if this is a coding agent's thread, can take turns again.
