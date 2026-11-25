@@ -21,6 +21,12 @@ export const POLL_SCAN_LIMIT = 1000;
  */
 export const POLL_BYTE_BUDGET = 512 * 1024;
 
+/**
+ * The bytes of event payloads one poll may read from the store, whether or not the event matches. It sits well inside the
+ * transaction's read budget, so a log of large payloads cannot fail a poll for unrelated events.
+ */
+export const POLL_READ_BUDGET = 8 * 1024 * 1024;
+
 const encoder = new TextEncoder();
 
 export interface StoredEvent {
@@ -99,6 +105,7 @@ export const pollEvents = async (store: EventLogStore, query: PollQuery): Promis
     const events: PollOutcome["events"] = [];
     let scanned = 0;
     let bytes = 0;
+    let readBytes = 0;
     let hasMore = false;
 
     let stopped = false;
@@ -118,6 +125,18 @@ export const pollEvents = async (store: EventLogStore, query: PollQuery): Promis
                 break;
             }
 
+            // The bytes a poll reads are bounded as well: a payload is not size-capped when recorded, so a scan of large rows stops
+            // within the transaction's read budget, and the client continues from the last row read (`nextSeq`). A poll always reads
+            // at least one row, so a single large row cannot stall it.
+            const rowBytes = encoder.encode(JSON.stringify(event.data)).byteLength;
+
+            if (readBytes > 0 && readBytes + rowBytes > POLL_READ_BUDGET) {
+                hasMore = true;
+                stopped = true;
+                break;
+            }
+
+            readBytes += rowBytes;
             scanned += 1;
 
             // The window is on `createdAt`, the same clock retention deletes by: an event recorded late (its upstream time long past) is

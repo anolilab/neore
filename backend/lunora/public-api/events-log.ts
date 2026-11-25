@@ -11,6 +11,9 @@ import type { MutationCtx } from "../_generated/server";
 import { noteRetentionWake } from "../lib/shard-housekeeping";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 
+/** What a write to the log takes: its db, its clock, and the scheduler that carries the expiry wake and its retry. */
+type LogWriteCtx = Pick<MutationCtx, "db" | "now" | "scheduler">;
+
 /** How long a poll can look back: a cursor older than this reads as truncated. */
 export const RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -53,14 +56,13 @@ export const EVENT_WAKE_MAX_ATTEMPTS = 10;
  * failed is retried by a job scheduled here, in the same transaction as the event: the event and its retry commit together, so a
  * shard is never left holding an expiring event with no wake for it.
  */
-const wakeForExpiry = async (ctx: Partial<Pick<MutationCtx, "scheduler">> & Pick<MutationCtx, "db" | "now">, userId: string, dueAt: number): Promise<void> => {
+const wakeForExpiry = async (ctx: LogWriteCtx, userId: string, dueAt: number): Promise<void> => {
     if (await noteRetentionWake(ctx, dueAt)) {
         return;
     }
 
-    if (ctx.scheduler !== undefined) {
-        await runAfterOnShard(ctx.scheduler, EVENT_WAKE_RETRY_MS, internal.public_api.events.retryEventWake, { attempt: 1, dueAt, userId }, userId);
-    }
+    // Always scheduled: the retry is what keeps a failed census write from leaving an expiring event with no wake.
+    await runAfterOnShard(ctx.scheduler, EVENT_WAKE_RETRY_MS, internal.public_api.events.retryEventWake, { attempt: 1, dueAt, userId }, userId);
 };
 
 /**
@@ -70,7 +72,7 @@ const wakeForExpiry = async (ctx: Partial<Pick<MutationCtx, "scheduler">> & Pick
  * serialized, so no two appends can take the same number. The watermark outlives the rows, so retention can delete every
  * event without the sequence restarting.
  */
-export const recordMcpEvent = async (ctx: Pick<MutationCtx, "db" | "now">, input: RecordEventInput): Promise<boolean> => {
+export const recordMcpEvent = async (ctx: LogWriteCtx, input: RecordEventInput): Promise<boolean> => {
     const existing = await ctx.db.mcpEvents.findFirst({ consistency: "primary", where: { eventId: input.eventId, userId: input.userId } });
 
     if (existing) {
@@ -131,7 +133,7 @@ export const deleteMcpEventsOfThread = async (ctx: Pick<MutationCtx, "db">, user
  * `createdAt` would expire a merged row before the older rows below it, leaving a hole the poll never reports. The event's
  * `timestamp` keeps the time it happened.
  */
-export const copyMergedMcpEvents = async (ctx: Pick<MutationCtx, "db" | "now">, rows: Record<string, unknown>[], to: string): Promise<number> => {
+export const copyMergedMcpEvents = async (ctx: LogWriteCtx, rows: Record<string, unknown>[], to: string): Promise<number> => {
     const watermark = await ctx.db.mcpEventWatermarks.findFirst({ consistency: "primary", where: { userId: to } });
     let seq = watermark?.seq ?? 0;
     let appended = 0;

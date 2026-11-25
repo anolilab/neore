@@ -16,13 +16,13 @@ describe("a deleted thread's Events", () => {
                 await harness.run(async (context: any) => {
                     for (const eventId of ["run:a1", "run:a2"]) {
                         await recordMcpEvent(
-                            { db: context.db, now: NOW },
+                            { db: context.db, now: NOW, scheduler: context.scheduler },
                             { data: { threadId: "thread-a" }, eventId, name: "run.completed", timestamp: NOW, userId: "user" },
                         );
                     }
 
                     await recordMcpEvent(
-                        { db: context.db, now: NOW },
+                        { db: context.db, now: NOW, scheduler: context.scheduler },
                         { data: { threadId: "thread-b" }, eventId: "run:b1", name: "run.completed", timestamp: NOW, userId: "user" },
                     );
                 });
@@ -58,7 +58,7 @@ describe("a deleted thread's Events", () => {
                 await harness.run(async (context: any) => {
                     for (let index = 0; index < total; index += 1) {
                         await recordMcpEvent(
-                            { db: context.db, now: NOW },
+                            { db: context.db, now: NOW, scheduler: context.scheduler },
                             { data: { threadId: "thread-a" }, eventId: `run:a${index}`, name: "run.completed", timestamp: NOW, userId: "user" },
                         );
                     }

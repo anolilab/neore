@@ -22,7 +22,7 @@ describe("a merged guest's expired Events", () => {
                     await harness.run(
                         async (context: any) =>
                             await copyMergedMcpEvents(
-                                { db: context.db, now: NOW },
+                                { db: context.db, now: NOW, scheduler: context.scheduler },
                                 [guestRow("run:expired", 1, NOW - RETENTION_MS - 1), guestRow("run:fresh", 2, NOW - 1000)],
                                 "to",
                             ),
