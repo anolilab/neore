@@ -930,6 +930,72 @@ describe("composer prompt queue", () => {
         expect(chat.sendMessage).not.toHaveBeenCalled();
     });
 
+    it("runs a send asked for while a call holds the flag once, when that call sent nothing", async () => {
+        chat.error = undefined;
+
+        let finish: (value: { outcome: "withdrawn" }) => void = () => {};
+
+        // The lib target has no `Promise.withResolvers` yet.
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const promise = new Promise<{ outcome: "withdrawn" }>((resolve: (value: PromiseLike<{ outcome: "withdrawn" }> | { outcome: "withdrawn" }) => void) => {
+            finish = resolve;
+        });
+
+        withdrawSteer.mockReturnValue(promise);
+
+        const view = render(<ComposerPromptQueue />);
+
+        // The arrival starts a send, which waits on the steer withdrawal: that call holds the flag.
+        await act(async () => {
+            usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], steer: { id: "steer-1", streamId: "stream-1" }, text: "steered" });
+        });
+
+        // The reply fails meanwhile, so the arrival's call may not send; Send next asks for one during that call.
+        chat.error = new Error("the reply failed");
+        view.rerender(<ComposerPromptQueue />);
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+
+        await act(async () => {
+            finish({ outcome: "withdrawn" });
+        });
+
+        // Send next is explicit: it goes despite the error, once.
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(1));
+        expect(chat.sendMessage).toHaveBeenCalledWith("steered", [], { draftFrom: undefined });
+    });
+
+    it("drops a send asked for while a call holds the flag when that call sends, so nothing goes twice", async () => {
+        chat.error = undefined;
+
+        let finish: (value: { outcome: "withdrawn" }) => void = () => {};
+
+        // The lib target has no `Promise.withResolvers` yet.
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const promise = new Promise<{ outcome: "withdrawn" }>((resolve: (value: PromiseLike<{ outcome: "withdrawn" }> | { outcome: "withdrawn" }) => void) => {
+            finish = resolve;
+        });
+
+        withdrawSteer.mockReturnValue(promise);
+
+        render(<ComposerPromptQueue />);
+
+        await act(async () => {
+            usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], steer: { id: "steer-1", streamId: "stream-1" }, text: "steered" });
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+
+        await act(async () => {
+            finish({ outcome: "withdrawn" });
+        });
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).toHaveBeenCalledTimes(1);
+    });
+
     it("moves a dropped message to where it lands in the queue", async () => {
         const { enqueue, setPaused } = usePromptQueueStore.getState();
 
