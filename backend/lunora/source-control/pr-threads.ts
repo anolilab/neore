@@ -22,7 +22,7 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import { GITHUB_WEB_ORIGIN, splitGithubRepo } from "./drivers/github";
-import { rereadRelinkedLink } from "./pr-state";
+import { rereadRelinkedLink, scheduleArchiveAfterClose } from "./pr-state";
 import { MERGE_TIME_PRECISION_MS, noteMergeAttemptRow, pullRequestLinksOf, settleMergedLinkRow, someLinkOfThread } from "./pr-thread-links";
 
 /** Threads kept per pull request: a list, not a history. The newest are the ones anyone is working in. */
@@ -391,9 +391,13 @@ export const noteLinksMerged = internalMutation
         const links = await pullRequestLinksOf(ctx, args.userId, args.repository, args.number);
 
         for (const link of links) {
-            if (link.state !== "merged") {
-                await ctx.db.patch("pullRequestThreads", link._id, { state: "merged" });
+            if (link.state === "merged") {
+                continue;
             }
+
+            await ctx.db.patch("pullRequestThreads", link._id, { state: "merged" });
+            // A link that just became closed or merged may let an idle chat archive, so its archive job runs now (as recordLinkState does).
+            await scheduleArchiveAfterClose(ctx, link);
         }
 
         return null;

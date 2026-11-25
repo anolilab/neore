@@ -243,11 +243,16 @@ export const getPullRequestStatus = authAction
             // Stored links carry the canonical (lowercase) repository, so the lookup uses it too.
             const address = requireAddress(ref.repository, ref.number);
 
-            await ctx.runMutation(internal.source_control.pr_threads.noteLinksMerged, {
-                number: address.number,
-                repository: address.repository,
-                userId: ctx.user.userId,
-            });
+            // Best-effort: a failed write must not fail the answer GitHub already gave.
+            try {
+                await ctx.runMutation(internal.source_control.pr_threads.noteLinksMerged, {
+                    number: address.number,
+                    repository: address.repository,
+                    userId: ctx.user.userId,
+                });
+            } catch (error) {
+                console.error("[source-control] could not mark a merged pull request's links", error);
+            }
         }
 
         return outcome;
