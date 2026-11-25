@@ -168,15 +168,18 @@ const FixesList = ({ chipRef, fixes, name, onFocusLost, onOpen, problems, refres
  */
 const PullRequestFixes = ({
     address,
+    readStatus = true,
     returnFocusTo,
     threadId,
 }: {
     address: PullRequestAddress;
+    /** False when this view does not read the host for the link: the chip then shows the status it already has, if any. */
+    readStatus?: boolean;
     returnFocusTo?: RefObject<HTMLElement | null>;
     threadId: string;
 }) => {
     const { t } = useLingui();
-    const status = usePullRequestStatus(address);
+    const status = usePullRequestStatus(address, threadId, readStatus);
     const { data } = status;
     const name = `${address.repository}#${String(address.number)}`;
     const chipRef = useRef<HTMLButtonElement>(null);

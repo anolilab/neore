@@ -4828,6 +4828,22 @@ msgstr "自動メディア補強"
 msgid "Auto pricing"
 msgstr "自動料金設定"
 
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:107
+msgid "Auto-archive merged chats"
+msgstr "マージ済みのチャットを自動アーカイブ"
+
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:111
+msgid "Archive a chat when its linked pull request is merged. Archived chats stay searchable."
+msgstr "リンクされたプルリクエストがマージされたら、そのチャットをアーカイブします。アーカイブされたチャットも検索できます。"
+
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:118
+msgid "Merged chats will be archived"
+msgstr "マージ済みのチャットはアーカイブされます"
+
+#: src/features/settings/components/chat/chat-lifecycle-settings.tsx:118
+msgid "Merged chats stay as they are"
+msgstr "マージ済みのチャットはそのままになります"
+
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:72
 msgid "Auto-archive inactive chats"
 msgstr "非アクティブなチャットを自動アーカイブ"

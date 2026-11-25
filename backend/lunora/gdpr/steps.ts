@@ -168,6 +168,7 @@ const projectThread = (
         Doc<"threads">,
         | "_creationTime"
         | "activeLeafMessageId"
+        | "archivedAt"
         | "category"
         | "lastViewedAt"
         | "model"
@@ -188,6 +189,8 @@ const projectThread = (
         // Where the user last pointed the branch switcher. Unset for a thread that never branched. A re-import
         // uses it to keep only the replies the user kept, rather than every alternative (`parsers/neore.ts`).
         activeLeafMessageId: thread.activeLeafMessageId,
+        // When the chat was last archived (set by any archive, kept on reopen). Unset for a chat never archived.
+        archivedAt: thread.archivedAt,
         category: thread.category,
         createdAt: thread._creationTime,
         lastViewedAt: thread.lastViewedAt,

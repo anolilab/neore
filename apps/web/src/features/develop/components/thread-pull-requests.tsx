@@ -20,16 +20,11 @@ import { useCRPC } from "@/lib/lunora/crpc";
 
 import { createDialogVisits } from "../lib/dialog-visit";
 import { MAX_PULL_REQUESTS_PER_ATTACH, parsePullRequestAddresses } from "../lib/pull-request-address";
+import { linkKey, MAX_STATUS_READS, pickStatusReads } from "../lib/status-reads";
 import type { PullRequestAddress } from "../lib/use-develop";
 import { useAttachPullRequests, useThreadPullRequests } from "../lib/use-develop";
 import PullRequestFixes from "./pull-request-fixes";
 import ThreadPullRequestCatchUp from "./thread-pull-request-catch-up";
-
-/**
- * Links whose state (checks, conflicts, reviews, being behind) is read from the host: the newest few, so a long list costs
- * no more. Each read is cached a minute and shared with Develop.
- */
-const MAX_STATUS_READS = 5;
 
 const pullRequestKey = (link: PullRequestAddress): string => `${link.repository}#${String(link.number)}`;
 
@@ -91,16 +86,19 @@ const LinkedPullRequest = ({ link, onFocusLost, readStatus, threadId }: LinkedPu
                     {link.repository}#{link.number}
                 </span>
             </Link>
-            {readStatus && (
-                <StatusControls
-                    onFocusLost={() => {
-                        controlsLostFocus.current = true;
-                    }}
-                >
-                    <PullRequestFixes address={{ number: link.number, repository: link.repository }} returnFocusTo={linkRef} threadId={threadId} />
-                    <ThreadPullRequestCatchUp link={link} returnFocusTo={linkRef} threadId={threadId} />
-                </StatusControls>
-            )}
+            <StatusControls
+                onFocusLost={() => {
+                    controlsLostFocus.current = true;
+                }}
+            >
+                <PullRequestFixes
+                    address={{ number: link.number, repository: link.repository }}
+                    readStatus={readStatus}
+                    returnFocusTo={linkRef}
+                    threadId={threadId}
+                />
+                {readStatus && <ThreadPullRequestCatchUp link={link} returnFocusTo={linkRef} threadId={threadId} />}
+            </StatusControls>
         </li>
     );
 };
@@ -116,10 +114,18 @@ export const LinkedPullRequestList = ({
     threadId,
 }: {
     fallbackFocus: RefObject<HTMLElement | null>;
-    links: ReadonlyArray<PullRequestAddress>;
+    links: ReadonlyArray<PullRequestAddress & { statusReadAt?: number }>;
     threadId: string;
 }) => {
     const listRef = useRef<HTMLUListElement>(null);
+    // The links that read the host when the view opens (the least recently read), and the links it already had: a link added while it
+    // is open is read too. A read that stamps its link does not move the reads of this view.
+    const [view] = useState(() => {
+        return {
+            known: new Set(links.map((link) => linkKey(link))),
+            reads: pickStatusReads(links, MAX_STATUS_READS),
+        };
+    });
     // The row that went away holding focus, and the rows of the last commit, in order, to find its neighbours.
     const lostRow = useRef<string | undefined>(undefined);
     const shownRows = useRef<ReadonlyArray<string>>([]);
@@ -150,17 +156,21 @@ export const LinkedPullRequestList = ({
 
     return (
         <ul className="flex flex-wrap items-center gap-2" ref={listRef}>
-            {links.map((link, index) => (
-                <LinkedPullRequest
-                    key={pullRequestKey(link)}
-                    link={link}
-                    onFocusLost={() => {
-                        lostRow.current = pullRequestKey(link);
-                    }}
-                    readStatus={index < MAX_STATUS_READS}
-                    threadId={threadId}
-                />
-            ))}
+            {links.map((link) => {
+                const key = linkKey(link);
+
+                return (
+                    <LinkedPullRequest
+                        key={pullRequestKey(link)}
+                        link={link}
+                        onFocusLost={() => {
+                            lostRow.current = pullRequestKey(link);
+                        }}
+                        readStatus={view.reads.has(key) || !view.known.has(key)}
+                        threadId={threadId}
+                    />
+                );
+            })}
         </ul>
     );
 };

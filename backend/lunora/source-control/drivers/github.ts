@@ -355,6 +355,7 @@ const pullSchema = z.object({
     html_url: z.string(),
     mergeable_state: z.string().optional(),
     merged: z.boolean().optional(),
+    merged_at: z.string().nullable().optional(),
     number: z.int(),
     state: z.string(),
     title: z.string(),
@@ -408,6 +409,8 @@ const getPullRequest = async (request: HostRequest, ref: PullRequestRef): Promis
         title: pull.title,
         updatedAt: toMs(pull.updated_at),
         url: webUrl(pull.html_url) ?? `${GITHUB_WEB_ORIGIN}/${ref.repository}/pull/${ref.number}`,
+        // A timestamp GitHub sent that does not parse is no merge time at all, never the epoch.
+        ...(pull.merged_at && Number.isFinite(Date.parse(pull.merged_at)) && { mergedAt: toMs(pull.merged_at) }),
     };
 };
 
