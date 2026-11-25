@@ -309,4 +309,74 @@ describe("AsidePanel", () => {
             Reflect.deleteProperty(Element.prototype, "scrollIntoView");
         }
     });
+
+    it("brings the current hit into view again when an earlier answer pushes it along the panel", async () => {
+        // jsdom has no layout: place the hit by hand, so that an answer above it can move it without changing its text.
+        let hitTop = 100;
+        const hitRect = () => {
+            return {
+                bottom: hitTop + 20,
+                height: 20,
+                left: 0,
+                right: 0,
+                toJSON: () => {
+                    return {};
+                },
+                top: hitTop,
+                width: 0,
+                x: 0,
+                y: hitTop,
+            };
+        };
+        const scroll = vi.fn();
+        const answered = { answer: "A cat.", id: "a", question: "Why?", status: "answered", token: "tok" } as const;
+
+        useAsideStore.setState({ byThread: { "thread-1": [answered] } });
+        render(<AsidePanel threadId="thread-1" />);
+
+        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
+        Object.defineProperty(Range.prototype, "getBoundingClientRect", { configurable: true, value: hitRect });
+
+        try {
+            act(() => {
+                globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+            });
+            fireEvent.change(screen.getByRole("textbox", { name: "Find in side questions" }), { target: { value: "cat" } });
+            await waitFor(() => expect(scroll).toHaveBeenCalled());
+            scroll.mockClear();
+
+            // An answer above the hit: the hit's text is untouched, but it has moved down the panel out of sight.
+            hitTop = 900;
+            act(() => {
+                useAsideStore.setState({
+                    byThread: { "thread-1": [{ answer: "Long.", id: "z", question: "Above?", status: "answered", token: "tok-z" }, answered] },
+                });
+            });
+            await waitFor(() => expect(scroll).toHaveBeenCalled());
+            scroll.mockClear();
+
+            // An answer below the hit leaves it where it was: nothing to bring into view.
+            act(() => {
+                useAsideStore.setState({
+                    byThread: {
+                        "thread-1": [
+                            { answer: "Long.", id: "z", question: "Above?", status: "answered", token: "tok-z" },
+                            answered,
+                            { id: "y", question: "Below?", status: "pending" },
+                        ],
+                    },
+                });
+            });
+            await act(
+                () =>
+                    new Promise<void>((resolve) => {
+                        setTimeout(resolve, 200);
+                    }),
+            );
+            expect(scroll).not.toHaveBeenCalled();
+        } finally {
+            Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+            Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
+        }
+    });
 });

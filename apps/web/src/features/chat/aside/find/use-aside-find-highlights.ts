@@ -28,6 +28,13 @@ export const isOutsideViewport = (rect: Pick<DOMRect, "bottom" | "top">, bounds:
 export const isSameHit = (a: Range | undefined, b: Range | undefined): boolean => a?.startContainer === b?.startContainer && a?.startOffset === b?.startOffset;
 
 /**
+ * Where a hit sits, measured from the panel's top edge. Scrolling the panel moves the hit and the panel together, so only
+ * a change in the content above the hit moves this offset. jsdom lays out no ranges, so it reports none there.
+ */
+const offsetWithin = (range: Range | undefined, host: Element): number | undefined =>
+    typeof range?.getBoundingClientRect === "function" ? range.getBoundingClientRect().top - host.getBoundingClientRect().top : undefined;
+
+/**
  * Every occurrence of `query` in the panel as it is rendered, in panel order (question, then answer, entry by entry).
  * Counting the rendered text rather than the Markdown source keeps the count, the highlights and the navigation in
  * step: image alt text, formatting marks and formula source the page does not show are not counted.
@@ -93,6 +100,7 @@ const useAsideFindHighlights = (
         let frame = 0;
         let revealTimer: ReturnType<typeof setTimeout> | undefined;
         let applied: Range | undefined;
+        let appliedOffset: number | undefined;
 
         const apply = (): Range | undefined => {
             const all = collectAsideRanges(host, query);
@@ -101,6 +109,7 @@ const useAsideFindHighlights = (
             setHighlights(all, current, ASIDE_HIGHLIGHTS);
             onCount(all.length);
             applied = current;
+            appliedOffset = offsetWithin(current, host);
 
             return current;
         };
@@ -121,9 +130,13 @@ const useAsideFindHighlights = (
             cancelAnimationFrame(frame);
             frame = requestAnimationFrame(() => {
                 const before = applied;
+                const beforeOffset = appliedOffset;
 
-                // A new answer can bring the current hit into existence, or move it: that hit is revealed too.
-                if (!isSameHit(before, apply())) {
+                apply();
+
+                // A new answer can bring the current hit into existence, or push it along the panel (its text unchanged):
+                // either way that hit is revealed too.
+                if (beforeOffset !== appliedOffset || !isSameHit(before, applied)) {
                     scheduleReveal();
                 }
             });

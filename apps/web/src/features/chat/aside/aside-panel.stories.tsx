@@ -84,7 +84,7 @@ export const Answered: Story = {
     },
 };
 
-/** The Find shortcut opened over the panel, a query with two hits in questions and answers, on the first. */
+/** The Find shortcut opened over the panel, a query with three hits (two in questions, one in an answer), on the first. */
 export const FindWithMatches: Story = {
     loaders: [seed(ENTRIES)],
     play: async ({ canvasElement }) => {
