@@ -22,6 +22,9 @@ export type CollectionId = Id<"knowledgeCollections">;
 /** How often one rate-limited batch is sent again before it counts as failed. */
 const MAX_BATCH_RETRIES = 3;
 
+/** Documents encoded and sized together before the page gets a turn; a few large files at once can take a long time. */
+const IMPORT_SLICE_DOCUMENTS = 5;
+
 /** The largest document one request takes, in KB, for the message that names it. */
 const REQUEST_DOCUMENT_KB = MAX_REQUEST_DOCUMENT_BYTES / 1024;
 
@@ -104,11 +107,14 @@ const useKnowledgeImport = (onChange: () => void) => {
             setProgress({ done: 0, total: limited.length });
 
             try {
-                // Encode in slices of one batch at most, so memory holds one batch at a time.
-                for (let start = 0; start < limited.length; start += 25) {
+                // Encode a few documents at a time, so memory holds little at once, and yield to the page between slices: sizing a
+                // document's JSON is synchronous work, and a slice of large files would otherwise freeze the tab.
+                for (let start = 0; start < limited.length; start += IMPORT_SLICE_DOCUMENTS) {
+                    await wait(0);
+
                     // A file that cannot be read counts as failed; the rest still go.
                     const slice = await Promise.all(
-                        limited.slice(start, start + 25).map(async (candidate) => {
+                        limited.slice(start, start + IMPORT_SLICE_DOCUMENTS).map(async (candidate) => {
                             try {
                                 return await encodeDocument(candidate);
                             } catch (error) {
