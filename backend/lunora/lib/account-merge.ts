@@ -121,6 +121,12 @@ export const AUDITED_MERGE_PAGE_SIZE = 16;
  */
 export const CLEAR_PAGE_BYTES = 512 * 1024;
 
+/**
+ * Events read per copy page. A page is read whole and then cut to {@link CLEAR_PAGE_BYTES}, so a page of large events would be read
+ * twice; a small page bounds that re-read to a few rows, where the default page would reread up to a hundred.
+ */
+export const EVENT_COPY_PAGE_SIZE = 10;
+
 const pageSizeFor = (table: string): number => (table in AUDIT_TABLES ? AUDITED_MERGE_PAGE_SIZE : MERGE_PAGE_SIZE);
 
 /** The column a user-sharded table is sharded on, which names the row's owner. Undefined for a table that is not user-sharded. */
@@ -349,7 +355,7 @@ export const listShardRowsPage = internalQuery
                     orderBy: [{ seq: "asc" }],
                     where: { userId: args.from },
                 });
-            const full = await readEvents(pageSizeFor(args.table));
+            const full = await readEvents(EVENT_COPY_PAGE_SIZE);
             const fits = withinClearBytes(full.page as unknown as Record<string, unknown>[]).length;
             const result = fits < full.page.length ? await readEvents(fits) : full;
 
