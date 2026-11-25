@@ -54,10 +54,12 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
     const lastError = useRef<AppError | null>(null);
     const approvals = useRef<{ ids: ReadonlySet<string>; threadId: string | undefined } | undefined>(undefined);
     // The newest inputs, for the settle timer, which fires outside any render.
-    const latest = useRef({ error, messages, settings, t, threadId });
+    // The toast texts are translated here, in render, and only the strings are kept: the settle step runs outside any render.
+    const copy = { failed: t`A chat reply failed`, finished: t`A chat reply finished` };
+    const latest = useRef({ copy, error, messages, settings, threadId });
 
     useEffect(() => {
-        latest.current = { error, messages, settings, t, threadId };
+        latest.current = { copy, error, messages, settings, threadId };
     });
 
     // Decides the outcome of an ended run and shows its toast. Runs once per run: it clears the run first.
@@ -82,7 +84,7 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
 
         if (pending.failed || errorDuringRun || lastReplyFailed(current.messages)) {
             if (isChatToastOn(current.settings, "failed")) {
-                toast.error(current.t`A chat reply failed`);
+                toast.error(current.copy.failed);
             }
 
             return;
@@ -95,7 +97,7 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
         }
 
         if (isChatToastOn(current.settings, "finished")) {
-            toast.success(current.t`A chat reply finished`);
+            toast.success(current.copy.finished);
         }
     }, []);
 
