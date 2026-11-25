@@ -663,7 +663,8 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     // stream, a browser-local reply, or a reply still streaming in the thread: an edit or a regenerate shows its reply before
     // its stream id is known.
     const localRunId = isLocalStreaming && localStreamingThreadId === threadId ? LOCAL_BROWSER_REPLY_RUN : null;
-    const runId = activeStreamId ?? (isThreadStreaming ? (localRunId ?? THREAD_REPLY_RUN) : null);
+    // A local reply in a chat without a thread yet has no thread id to be streaming in, so its marker is taken on its own.
+    const runId = activeStreamId ?? localRunId ?? (isThreadStreaming ? THREAD_REPLY_RUN : null);
 
     useChatRunToasts({ activeStreamId: runId, error, messages, messagesReady: isMessagesReady, settings: userSettings, threadId });
 

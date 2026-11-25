@@ -239,6 +239,7 @@ describe("useChatRunToasts: settling a run", () => {
         const { rerender } = setup({ ...idle, settings: {} });
 
         rerender({ ...idle, activeStreamId: THREAD_REPLY_RUN, messages: streamingReply, settings: {} });
+        rerender({ ...idle, activeStreamId: null, messages: [], settings: {}, threadId: "thread-2" });
         rerender({ ...idle, activeStreamId: "stream-b", messages: [], settings: {}, threadId: "thread-2" });
         rerender({
             ...idle,
@@ -400,6 +401,14 @@ describe("useChatRunToasts: the other toasts still show", () => {
 
         rerender({ ...idle, activeStreamId: "cached-stream", messagesReady: false, settings: {} });
         rerender({ ...idle, activeStreamId: null, messagesReady: true, settings: {} });
+
+        expect(toastSuccess).not.toHaveBeenCalled();
+    });
+
+    it("does not announce a stream already running when the thread opens", () => {
+        const { rerender } = setup({ ...idle, activeStreamId: "open-stream", settings: {} });
+
+        rerender({ ...idle, activeStreamId: null, settings: {} });
 
         expect(toastSuccess).not.toHaveBeenCalled();
     });

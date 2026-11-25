@@ -62,6 +62,8 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
     const approvals = useRef<{ newest: string | undefined; threadId: string | undefined } | undefined>(undefined);
     // Every call id seen waiting in this chat: a call is announced the first time it is seen, never again.
     const seenCalls = useRef(new Set<string>());
+    // The stream a thread had when it was first observed: already running (or cached) then, so not a run to announce.
+    const streamAtOpen = useRef<{ streamId: string | null; threadId: string | undefined } | undefined>(undefined);
     const renderedThread = useRef<{ messages: ReadonlyArray<ToastMessage>; threadId: string | undefined }>({ messages, threadId });
     const staleMessages = useRef<ReadonlyArray<ToastMessage> | undefined>(undefined);
     // The newest inputs, for the settle timer, which fires outside any render.
@@ -144,6 +146,17 @@ const useChatRunToasts = ({ activeStreamId, error, messages, messagesReady, sett
     useEffect(() => {
         // A stream seen before the thread's messages are ready may be stale cache from an earlier visit: it is not a run to announce.
         if (activeStreamId && !messagesReady && !run.current) {
+            return;
+        }
+
+        // The stream the thread already had when it opened (possibly stale cache) is not a run to announce; a stream that starts later is.
+        if (streamAtOpen.current?.threadId !== threadId) {
+            streamAtOpen.current = { streamId: activeStreamId, threadId };
+        }
+
+        const opened = streamAtOpen.current;
+
+        if (activeStreamId && opened?.streamId === activeStreamId && !run.current) {
             return;
         }
 
