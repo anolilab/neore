@@ -57,7 +57,9 @@ import {
     withoutAskToolsOnLastStep,
 } from "./agent-run";
 import { buildAgentTools } from "./agent-tools";
-import { collectApprovalRequestIds } from "./tool-approval-claim";
+import { collectApprovalRequestIds, collectAskUserApprovalIds } from "./tool-approval-claim";
+import { ASK_USER_TOOL_NAME } from "../tools/ask-user-constants";
+import { REQUEST_SECRET_TOOL_NAME } from "../tools/request-secret-constants";
 import type { ToolRunConfig } from "./tool-run-config";
 import { getMaxSteps } from "./auto-continue";
 import { gatewayFetch } from "../../lib/services";
@@ -481,6 +483,9 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         const { savedMessages } = result as { savedMessages?: { _id: string; message?: { content?: unknown; role?: string } }[] };
         // Only a run that may pause keeps `ask` tools, so only such a run can have stopped on a request.
         const approvalIds = options.pauseForApproval ? collectApprovalRequestIds(savedMessages) : [];
+        // The same subsets the interactive pause records (`agent-run.ts`): a question or a secret card is labelled as one, not as an approval.
+        const askUserApprovalIds = options.pauseForApproval ? collectAskUserApprovalIds(savedMessages, ASK_USER_TOOL_NAME) : [];
+        const secretApprovalIds = options.pauseForApproval ? collectAskUserApprovalIds(savedMessages, REQUEST_SECRET_TOOL_NAME) : [];
         // What is left of the run's budget. The last step offers no `ask` tool (`withoutAskToolsOnLastStep`); should a request
         // still come from it, it is not recorded: no step would be left to answer it, so the run ends unpaused.
         const stepsLeft = Math.max(0, (options.maxSteps ?? getMaxSteps(true)) - (result.steps?.length ?? 0));
@@ -544,8 +549,10 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             // The run's first pause (0: never resumed) moves it to `awaiting` before the owner is told, or ends it refused.
             await ctx.runMutation(internal.chat.tool_permissions.recordPendingToolApprovals, {
                 approvalIds,
+                ...(askUserApprovalIds.length > 0 && { askUserApprovalIds }),
                 awaitingInput: "approval",
                 config: snapshot,
+                ...(secretApprovalIds.length > 0 && { secretApprovalIds }),
                 subAgentResumedWith: 0,
                 threadId,
                 userId,
