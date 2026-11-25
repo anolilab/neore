@@ -1880,7 +1880,10 @@ export const firstTableWithGuestRows = async (ctx: { db: unknown }, guestId: str
         return null;
     }
 
-    const facades = ctx.db as Record<string, { findMany: (options: { limit: number; where: Record<string, string> }) => Promise<{ page: unknown[] }> }>;
+    const facades = ctx.db as Record<
+        string,
+        { findMany: (options: { consistency: "primary"; limit: number; where: Record<string, string> }) => Promise<{ page: unknown[] }> }
+    >;
     const globalUserTables = new Set([...Object.keys(GLOBAL_USER_COLUMNS), ...Object.keys(GLOBAL_USER_TABLES_NOT_REASSIGNED)]);
 
     for (const table of shardLocalTables()) {
@@ -1900,7 +1903,8 @@ export const firstTableWithGuestRows = async (ctx: { db: unknown }, guestId: str
                 continue;
             }
 
-            const { page } = await facades[table]!.findMany({ limit: 1, where: { [ownerField]: guestId } });
+            // From the primary: a replica that lags the copy could say the guest's rows are gone while they are still there.
+            const { page } = await facades[table]!.findMany({ consistency: "primary", limit: 1, where: { [ownerField]: guestId } });
 
             rows = page;
         } else {

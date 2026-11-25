@@ -53,7 +53,8 @@ export const collectMcpEventsForExport = internalQuery
         for (const row of rows.slice(0, MAX_EXPORT_EVENTS)) {
             bytes += encoder.encode(row.data).byteLength + encoder.encode(row.eventId).byteLength + encoder.encode(row.name).byteLength;
 
-            if (newest.length > 0 && bytes > EXPORT_EVENT_BYTES) {
+            // Strictly within the budget: an event too large for it is cut too, so the section never exceeds the budget, not even for its newest event.
+            if (bytes > EXPORT_EVENT_BYTES) {
                 break;
             }
 
