@@ -178,6 +178,44 @@ describe("dispatchLinkedPullRequestChecks", () => {
     });
 });
 
+describe("dispatchLinkedPullRequestChecks owed merges", () => {
+    it("leases a merged link whose merge is still owed, so a busy or failed archive is retried by a later sweep", async () => {
+        const { dispatched, stamped } = await harness.run(async (ctx: any) => {
+            await ctx.db.insert("userSettings", {
+                autoArchiveAfterDays: 30,
+                autoArchiveMergedChats: true,
+                autoArchiveMergedChatsSince: 0,
+                userId: OWNER,
+            });
+            const threadId = await ctx.db.insert("threads", {
+                mode: "text",
+                model: "gpt-4o",
+                status: "active",
+                title: "Busy",
+                updatedAt: Date.now(),
+                userId: OWNER,
+            });
+            const linkId = await ctx.db.insert("pullRequestThreads", {
+                ...NOW_LINK,
+                kind: "attached",
+                mergedAt: 1000,
+                number: 1,
+                repository: "acme/app",
+                state: "merged",
+                threadId,
+                userId: OWNER,
+            });
+            const result = await runInShard(OWNER, () => ctx.runMutation(dispatchLinkedPullRequestChecks, {}));
+            const row = await ctx.db.get("pullRequestThreads", linkId);
+
+            return { dispatched: [result.dispatched], stamped: [row?.stateCheckedAt] };
+        });
+
+        expect(dispatched).toEqual([1]);
+        expect(stamped[0]).toBeTypeOf("number");
+    });
+});
+
 describe("dispatchLinkedPullRequestChecks paging", () => {
     it("reaches the next page when the page before it has more open idle links than one sweep checks", async () => {
         // A link checked in one sweep is stale again ten minutes later, so page one never drains; the scan still moves on.

@@ -144,7 +144,8 @@ export const dispatchLinkedPullRequestChecks = internalMutation
             .filter(
                 (link) =>
                     link.threadDeleted !== true &&
-                    isOpenPullRequestForArchive(link) &&
+                    // An owed merge is a candidate too: its link reads merged, so only this lets a busy or failed archive retry in a later sweep.
+                    (isOpenPullRequestForArchive(link) || (link.mergedAt !== undefined && link.mergeSettledAt === undefined)) &&
                     (link.stateCheckedAt === undefined || now - link.stateCheckedAt >= PR_STATE_MAX_AGE_MS),
             )
             .toSorted((a, b) => (a.stateCheckedAt ?? 0) - (b.stateCheckedAt ?? 0));
