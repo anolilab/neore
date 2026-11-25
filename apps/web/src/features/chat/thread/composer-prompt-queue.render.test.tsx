@@ -782,6 +782,12 @@ describe("composer prompt queue", () => {
         fireEvent.change(screen.getByLabelText("Edit queued message 1"), { target: { value: "​" } });
 
         expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
+
+        // The keyboard save is refused the same way: the editor stays open, and the queued text is kept.
+        fireEvent.keyDown(screen.getByLabelText("Edit queued message 1"), { ctrlKey: true, key: "Enter" });
+
+        expect(screen.getByLabelText("Edit queued message 1")).toBeTruthy();
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.items.map((item) => item.text)).toEqual(["kept"]);
     });
 
     it("holds the head's send while its text is open, and sends the edited text once the edit closes", async () => {

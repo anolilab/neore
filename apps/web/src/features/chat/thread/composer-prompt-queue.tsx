@@ -468,13 +468,14 @@ const QueueChip: FC<{
     };
 
     const saveEdit = (): void => {
+        // Text that is only hidden characters is no message: the editor stays open, as the disabled Save button shows.
+        if (blank) {
+            return;
+        }
+
         // The stop comes first: a saved change hands the message a new id, and focus follows the id the message has then.
         onEditStop(prompt.id);
-
-        // Text that is only hidden characters is no message: the store keeps the old text, so the chip simply closes.
-        if (!blank) {
-            onEdit(prompt.id, draft);
-        }
+        onEdit(prompt.id, draft);
     };
 
     return (
