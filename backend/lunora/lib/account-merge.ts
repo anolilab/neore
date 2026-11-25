@@ -1885,8 +1885,9 @@ export const firstTableWithGuestRows = async (ctx: { db: unknown }, guestId: str
         let rows: unknown[];
 
         // On a store the new account shares, every other user's rows are there too: only the guest's own rows of an owned
-        // table count, and a table with no owner column holds none of the guest's.
-        if (sharedStore || KEEP_NEW_USERS.has(table)) {
+        // table count, and a table with no owner column holds none of the guest's. A table copied for the guest alone is
+        // the same on any store: another user's rows there are not the merge's to move, so they never hold up the deletion.
+        if (sharedStore || COPIED_FOR_GUEST_ONLY.has(table)) {
             const ownerField = shardOwnerField(table);
 
             if (ownerField === undefined) {
