@@ -133,6 +133,22 @@ describe("the owner's default for new chats is set only from their own live sess
         expect(await storedDefault()).toBeUndefined();
     });
 
+    it("a grant session cannot turn merged-chat archiving on, since that would archive the owner's chats", async () => {
+        await expect(
+            harness.withIdentity({ grantSessionId: "grant-1", userId: OWNER }).mutation(updateUserSettings as never, { autoArchiveMergedChats: true } as never),
+        ).rejects.toThrow();
+
+        const row = await harness.run(
+            async (ctx: any) =>
+                await ctx.db
+                    .query("userSettings")
+                    .withIndex("by_userId", (q: any) => q.eq("userId", OWNER))
+                    .unique(),
+        );
+
+        expect(row?.autoArchiveMergedChats).toBeUndefined();
+    });
+
     it("the guard does not block other settings from the ended-session token, and changes no default", async () => {
         // Resolves: the guard applies only when the default mode is sent.
         await harness

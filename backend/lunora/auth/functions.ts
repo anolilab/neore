@@ -998,6 +998,12 @@ export const updateUserSettings = authMutation
             throw new LunoraError("FORBIDDEN", "The default permission mode cannot be changed from an impersonated or grant session");
         }
 
+        // Turning merged-chat archiving on archives the owner's chats as their pull requests merge: only the owner may turn it on, as
+        // with the default mode. Turning it off is always allowed.
+        if (options.args.autoArchiveMergedChats === true && (await callerRestrictsFull(ctx))) {
+            throw new LunoraError("FORBIDDEN", "Merged-chat archiving cannot be turned on from an impersonated or grant session");
+        }
+
         const result = await settingsUpsert("userSettings", options);
 
         // Turning the merged-chat archive on stamps when: only merges from then on archive a chat (`agent/auto-archive.ts`).

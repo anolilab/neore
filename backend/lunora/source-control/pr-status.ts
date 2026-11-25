@@ -240,9 +240,12 @@ export const getPullRequestStatus = authAction
         } else if (outcome.status === "ok" && outcome.state === "merged" && owner) {
             // Merged without a merge time: the owner's links read merged, so they no longer block archiving. No merge is recorded
             // (it has no time to order against the owner's opt-in), so nothing archives for it.
+            // Stored links carry the canonical (lowercase) repository, so the lookup uses it too.
+            const address = requireAddress(ref.repository, ref.number);
+
             await ctx.runMutation(internal.source_control.pr_threads.noteLinksMerged, {
-                number: ref.number,
-                repository: ref.repository,
+                number: address.number,
+                repository: address.repository,
                 userId: ctx.user.userId,
             });
         }
