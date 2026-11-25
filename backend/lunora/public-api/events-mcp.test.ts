@@ -193,6 +193,29 @@ describe("an Events list's read allowance", () => {
     });
 });
 
+describe("an Events notification's read allowance", () => {
+    it("is drawn: a notification gets no answer, but it is still a call", async () => {
+        const charge = vi.fn(async () => undefined);
+        const request = modern("events/poll", { _meta: OFFER, cursor: null, name: "run.completed" }, "run.completed");
+        // The same message without its id: a notification, which the dispatcher answers with 202 and no body.
+        const notification = JSON.parse(request.body) as Record<string, unknown>;
+
+        delete notification["id"];
+        const body = JSON.stringify(notification);
+
+        const response = await serveMcp(body, {
+            ...dependenciesWith(
+                request,
+                pollingWith(async () => pollBody),
+            ),
+            chargeProtocolCall: charge,
+        });
+
+        expect(response.status).toBe(202);
+        expect(charge).toHaveBeenCalledTimes(1);
+    });
+});
+
 describe("events/poll", () => {
     it("starts from now with a null cursor and returns the complete result", async () => {
         const poll = pollingWith(async () => pollBody);

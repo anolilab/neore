@@ -430,8 +430,13 @@ export const serveMcp = async (rawBody: string, dependencies: McpDependencies): 
         await dependencies.chargeProtocolCall();
     }
 
-    // A notification (`notifications/initialized`) has no answer.
+    // A notification (`notifications/initialized`) has no answer. An Events notification is a call all the same: it draws on the read
+    // allowance here, since the Events branch below never answers it.
     if (message.id === undefined) {
+        if (message.method.startsWith("events/")) {
+            await dependencies.chargeProtocolCall();
+        }
+
         return new Response(null, { status: 202 });
     }
 
