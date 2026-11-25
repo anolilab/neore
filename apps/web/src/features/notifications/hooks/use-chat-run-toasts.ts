@@ -50,7 +50,7 @@ const useChatRunToasts = ({ activeStreamId, error, messages, settings, threadId 
     const ended = useRef<EndedRun | undefined>(undefined);
     const settleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const lastError = useRef<AppError | null>(null);
-    const approvals = useRef<{ ids: ReadonlySet<string>; threadId: string | undefined } | undefined>(undefined);
+    const approvals = useRef<{ count: number; ids: ReadonlySet<string>; threadId: string | undefined } | undefined>(undefined);
     // The newest inputs, for the settle timer, which fires outside any render.
     const latest = useRef({ error, messages, settings, t });
 
@@ -177,15 +177,15 @@ const useChatRunToasts = ({ activeStreamId, error, messages, settings, threadId 
         [],
     );
 
-    // A tool call that starts waiting for the person. The first snapshot of a thread only records what is already waiting.
-    // Every later arrival is announced: a repeated alert for an approval already on screen is harmless, a missed one is not.
+    // A tool call that starts waiting for the person. The baseline is the thread's first populated snapshot: a thread that
+    // opens already waiting shows its card on screen, so it is not announced. A call that arrives after that is.
     useEffect(() => {
         const ids = new Set(waitingApprovalIds(messages));
         const previous = approvals.current;
 
-        approvals.current = { ids, threadId };
+        approvals.current = { count: messages.length, ids, threadId };
 
-        if (!previous || previous.threadId !== threadId) {
+        if (!previous || previous.threadId !== threadId || previous.count === 0) {
             return;
         }
 
