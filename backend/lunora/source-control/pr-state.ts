@@ -38,9 +38,9 @@ const SCAN_LIMIT = 500;
 const CHECK_LIMIT = 20;
 /** Thread lookups per sweep, as a multiple of `CHECK_LIMIT`: links on chats that are still active are skipped, within that bound. */
 const THREAD_LOOKUP_FACTOR = 4;
-/** Auto-archive's idle rule alone. Its live-stream and pinned-project exclusions are left out, so a chat that is then kept still gets a read. */
 /** Links read per chat when the sweep asks whether it owes a merge; a chat past this bound is checked rather than read further. */
 const OWED_MERGE_LOOKUP_LIMIT = 100;
+/** Auto-archive's idle rule alone. Its live-stream and pinned-project exclusions are left out, so a chat that is then kept still gets a read. */
 const NO_EXCLUSIONS = { liveThreadIds: new Set<string>(), pinnedProjectIds: new Set<string>() };
 
 const candidateOf = (thread: {
