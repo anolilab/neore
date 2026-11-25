@@ -1,3 +1,4 @@
+import { canonicalEmail } from "@lunora/auth";
 import { defineMigration } from "lunorash/server";
 
 import { typedTextColumn } from "./agent/shared";
@@ -410,13 +411,21 @@ export const addProjectRunnerThreadId = defineMigration({
 
 /**
  * `user.emailCanonical` gained a unique index, the one `@lunora/auth` relies on to reject a concurrent sign-up that repeats
- * a folded address. Nothing to fill: a NULL value is refilled from `email` by the auth backfill. Rows that already share a
- * canonical address are not merged here; `lunora deploy` checks the stored rows against the new schema and names each row
- * that does not fit. A no-op, so `lunora prepare` records the index in the baseline.
+ * a folded address. The Worker never runs the auth backfill (`ensureMigrated` is not called, see `backend/src/server.ts`), so
+ * this fills the rows that predate the column: the same `canonicalEmail` the auth plugin computes for a new sign-up. A row that
+ * already has a value is left alone. Two rows that fold to one address make the write fail on the unique index, which stops
+ * the migration rather than picking one of them.
  */
 export const uniqueUserEmailCanonical = defineMigration({
     id: "unique-user-email-canonical",
     table: "user",
-    // `undefined` leaves every row untouched (`MigrationTransform`).
-    up: () => undefined,
+    up: (document) => {
+        if (document.emailCanonical !== undefined && document.emailCanonical !== null) {
+            return undefined;
+        }
+
+        const { email } = document as { email?: unknown };
+
+        return typeof email === "string" ? { ...document, emailCanonical: canonicalEmail(email) } : undefined;
+    },
 });
