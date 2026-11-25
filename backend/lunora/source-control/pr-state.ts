@@ -129,7 +129,10 @@ export const dispatchLinkedPullRequestChecks = internalMutation
         const idleDays = isAutoArchiveDays(days) && days !== 0 ? days : undefined;
         const mergedOn = settings?.autoArchiveMergedChats === true && settings.autoArchiveMergedChatsSince !== undefined;
 
-        if (!keepsOpenPullRequestChats(settings?.keepOpenPullRequestChats) || (idleDays === undefined && !mergedOn)) {
+        // With keep-open off, open links are not read (only the owed merges need the sweep then), so the keep setting is applied per link below.
+        const keepOpen = keepsOpenPullRequestChats(settings?.keepOpenPullRequestChats);
+
+        if (idleDays === undefined && !mergedOn) {
             return { dispatched: 0 };
         }
 
@@ -145,7 +148,7 @@ export const dispatchLinkedPullRequestChecks = internalMutation
                 (link) =>
                     link.threadDeleted !== true &&
                     // An owed merge is a candidate too: its link reads merged, so only this lets a busy or failed archive retry in a later sweep.
-                    (isOpenPullRequestForArchive(link) || (link.mergedAt !== undefined && link.mergeSettledAt === undefined)) &&
+                    ((keepOpen && isOpenPullRequestForArchive(link)) || (link.mergedAt !== undefined && link.mergeSettledAt === undefined)) &&
                     (link.stateCheckedAt === undefined || now - link.stateCheckedAt >= PR_STATE_MAX_AGE_MS),
             )
             .toSorted((a, b) => (a.stateCheckedAt ?? 0) - (b.stateCheckedAt ?? 0));

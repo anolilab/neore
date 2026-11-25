@@ -214,6 +214,52 @@ describe("dispatchLinkedPullRequestChecks owed merges", () => {
         expect(dispatched).toEqual([1]);
         expect(stamped[0]).toBeTypeOf("number");
     });
+
+    it("still retries an owed merge with keep-open off, while leaving open links unread", async () => {
+        const { dispatched } = await harness.run(async (ctx: any) => {
+            await ctx.db.insert("userSettings", {
+                autoArchiveAfterDays: 30,
+                autoArchiveMergedChats: true,
+                autoArchiveMergedChatsSince: 0,
+                keepOpenPullRequestChats: false,
+                userId: OWNER,
+            });
+            const threadId = await ctx.db.insert("threads", {
+                mode: "text",
+                model: "gpt-4o",
+                status: "active",
+                title: "Busy",
+                updatedAt: Date.now(),
+                userId: OWNER,
+            });
+
+            await ctx.db.insert("pullRequestThreads", {
+                ...NOW_LINK,
+                kind: "attached",
+                mergedAt: 1000,
+                number: 1,
+                repository: "acme/app",
+                state: "merged",
+                threadId,
+                userId: OWNER,
+            });
+            await ctx.db.insert("pullRequestThreads", {
+                ...NOW_LINK,
+                kind: "attached",
+                number: 2,
+                repository: "acme/app",
+                state: "open",
+                threadId,
+                userId: OWNER,
+            });
+            const result = await runInShard(OWNER, () => ctx.runMutation(dispatchLinkedPullRequestChecks, {}));
+
+            return { dispatched: [result.dispatched] };
+        });
+
+        // Only the owed merge is read; the open link is not, since keep-open is off.
+        expect(dispatched).toEqual([1]);
+    });
 });
 
 describe("dispatchLinkedPullRequestChecks paging", () => {
