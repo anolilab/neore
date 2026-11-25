@@ -9,8 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { internal } from "../_generated/internal";
 import schema from "../schema";
-import { recordMergedPullRequest } from "./pr-merged";
-import { linkOwnerOf, onOwnerShard, stampStatusRead } from "./pr-status";
+import { linkOwnerOf, stampStatusRead } from "./pr-status";
 import { archiveMergedThread } from "../agent/auto-archive";
 import { recordPullRequestMerged, recordStatusRead } from "./pr-threads";
 
@@ -117,19 +116,5 @@ describe("routed status read", () => {
         const link = await harness.run(async (ctx: any) => await ctx.db.get("pullRequestThreads", linkId));
 
         expect(link?.statusReadAt).toBeTypeOf("number");
-    });
-
-    it("writes the owner's merge onto the owner's link when the merge is seen through a shared chat", async () => {
-        const { linkId } = await setUpSharedChat();
-
-        mocks.owner = OWNER;
-
-        await recordMergedPullRequest(onOwnerShard(OWNER), OWNER, ref, 1000);
-
-        expect(mocks.calls.some((call) => call.shardKey === OWNER)).toBe(true);
-
-        const link = await harness.run(async (ctx: any) => await ctx.db.get("pullRequestThreads", linkId));
-
-        expect(link?.mergedAt).toBe(1000);
     });
 });

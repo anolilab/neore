@@ -129,15 +129,6 @@ const vOpen = v.object({
 export const linkOwnerOf = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, threadId: string | undefined): Promise<string> =>
     threadId === undefined ? userId : await threadShardFor(ctx, userId, threadId);
 
-/** The owner's shard as a mutation runner: the owner's rows are written where they live. */
-export const onOwnerShard = (ownerId: string): Pick<ActionCtx, "runMutation"> => {
-    const runMutation = async (reference: Parameters<ActionCtx["runMutation"]>[0], args: Parameters<ActionCtx["runMutation"]>[1]) =>
-        await callOnShard(reference, args, { shardKey: ownerId });
-
-    return { runMutation: runMutation as ActionCtx["runMutation"] };
-};
-
-/** Records that the links to this pull request were read now. Never throws: the read's answer is what the caller gets. */
 export const stampStatusRead = async (ownerId: string, ref: { number: number; repository: string }, threadId: string, readStartedAt: number): Promise<void> => {
     try {
         const address = requireAddress(ref.repository, ref.number);
@@ -229,8 +220,10 @@ export const getPullRequestStatus = authAction
         // A merge made outside the app is seen here, when the chat's pull request is read (`pr-merged.ts`).
         // Without the host's merge time the merge cannot be ordered against the owner's opt-in, so it is not recorded at the
         // sighting time (which could archive chats for a merge that came before the opt-in).
-        if (outcome.status === "ok" && outcome.state === "merged" && outcome.mergedAt !== undefined) {
-            await recordMergedPullRequest(onOwnerShard(ownerId), ownerId, ref, outcome.mergedAt);
+        // Only the owner's own read records a merge: that merge marks every chat the owner linked to the pull request, so a
+        // collaborator's read (which names the pull request, not the owner's chats) must not write or archive the owner's chats.
+        if (outcome.status === "ok" && outcome.state === "merged" && outcome.mergedAt !== undefined && ownerId === ctx.user.userId) {
+            await recordMergedPullRequest(ctx, ctx.user.userId, ref, outcome.mergedAt);
         }
 
         return outcome;
