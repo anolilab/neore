@@ -104,7 +104,7 @@ import { deleteShardRoute, setShardRoute } from "./shard-routes";
 import { SEARCH_INTERNAL_FIELDS } from "../agent/thread-search-plan";
 import { countUserTurns } from "../agent/thread-search-triggers";
 import { copyMergedRunWebhooks } from "../run-webhooks/table-writes";
-import { copyMergedMcpEvents } from "../public-api/events-log";
+import { copyMergedMcpEvents, deleteMcpEventsOfThread, storedThreadOf } from "../public-api/events-log";
 
 /** Rows moved per round trip. */
 export const MERGE_PAGE_SIZE = 100;
@@ -179,8 +179,29 @@ export const shardLocalTables = (source: unknown = schema): string[] => {
         .filter((name) => name !== "threads")
         .toSorted((a, b) => a.localeCompare(b));
     const messages = tables.indexOf("messages");
+    const withThreads = messages === -1 ? tables : tables.toSpliced(messages, 0, "threads");
+    const events = withThreads.indexOf("mcpEvents");
+    const threads = withThreads.indexOf("threads");
 
-    return messages === -1 ? tables : tables.toSpliced(messages, 0, "threads");
+    // `mcpEvents` right after `threads`: an Event is copied only once its thread is on the new shard (`threadOnNewShard`).
+    if (events === -1 || threads === -1) {
+        return withThreads;
+    }
+
+    const rest = withThreads.toSpliced(events, 1);
+
+    return rest.toSpliced(rest.indexOf("threads") + 1, 0, "mcpEvents");
+};
+
+/**
+ * Whether an Event's thread is on the new shard. A copied Event names its thread, and a thread the guest deleted before its copy
+ * leaves none, so the Event is not copied: the clear removes it from the guest's shard with the rest. An Event with no thread is
+ * copied. Thread ids are unique, so the thread here is the guest's own.
+ */
+const threadOnNewShard = async (db: ReturnType<typeof rawDb>, data: string): Promise<boolean> => {
+    const threadId = storedThreadOf(data);
+
+    return threadId === undefined || (await db.get("threads", threadId)) !== null;
 };
 
 /**
@@ -1461,7 +1482,9 @@ export const importShardRows = internalMutation
             const fresh: Record<string, unknown>[] = [];
 
             for (const row of guestRows) {
-                if ((await storedClaim(ctx.db, IMPORT_MARKER_SCOPE, markerKey(args.from, args.table, row._id as string))) === null) {
+                const marked = (await storedClaim(ctx.db, IMPORT_MARKER_SCOPE, markerKey(args.from, args.table, row._id as string))) !== null;
+
+                if (!marked && (await threadOnNewShard(db, row["data"] as string))) {
                     fresh.push(row);
                 }
             }
@@ -1839,6 +1862,14 @@ export const dropRowsGoneFromGuest = internalMutation
             if (marker !== null && marker.result === (await rowDigest(args.table, existing))) {
                 await db.delete(args.table, id);
                 dropped += 1;
+
+                // The thread's Events were copied with it. Its id is the guest's, so the new account holds those Events only as the
+                // merge's copies, and they go with the copy. One batch per call.
+                if (args.table === "threads") {
+                    while (!(await deleteMcpEventsOfThread(ctx, args.to, id))) {
+                        // Each call removes up to one batch; the loop ends once none are left.
+                    }
+                }
             }
         }
 

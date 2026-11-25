@@ -2683,6 +2683,101 @@ describe("mergeGuestInto across two real shards", () => {
         }
     });
 
+    it("does not copy a guest's Event whose thread the new account does not hold", async () => {
+        const merge = twoShards();
+
+        try {
+            // The guest deleted this thread before its copy, so the new account never receives the thread.
+            await merge.shards.guest.run(async (context: any) => {
+                await context.db.insert("mcpEvents", {
+                    createdAt: Date.now(),
+                    data: JSON.stringify({ threadId: "thread-gone" }),
+                    eventId: "run:orphan",
+                    name: "run.completed",
+                    seq: 1,
+                    timestamp: 1,
+                    userId: "guest",
+                });
+            });
+
+            const guestRow = (await merge.shards.guest.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10, where: { userId: "guest" } });
+
+                return page[0];
+            })) as Row;
+
+            const imported = (await merge.shards.user.run(
+                async (context: any) => await asLeaseHolder(context, importShardRows, { rows: [guestRow], table: "mcpEvents" }),
+            )) as { imported: number };
+            const onUser = (await merge.shards.user.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10, where: { userId: "user" } });
+
+                return page.length;
+            })) as number;
+
+            expect(imported.imported).toBe(0);
+            expect(onUser).toBe(0);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("takes a thread's copied Events back with the thread copy", async () => {
+        const merge = twoShards();
+
+        try {
+            const threadId = (await merge.shards.guest.run(
+                async (context: any) => await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "T", userId: "guest" }),
+            )) as string;
+
+            await merge.shards.guest.run(async (context: any) => {
+                await context.db.insert("mcpEvents", {
+                    createdAt: Date.now(),
+                    data: JSON.stringify({ threadId }),
+                    eventId: "run:in-thread",
+                    name: "run.completed",
+                    seq: 1,
+                    threadId,
+                    timestamp: 1,
+                    userId: "guest",
+                });
+            });
+
+            const guestThread = (await merge.shards.guest.run(async (context: any) => {
+                const { page } = await context.db.threads.findMany({ limit: 10, where: { userId: "guest" } });
+
+                return page[0];
+            })) as Row;
+            const guestEvent = (await merge.shards.guest.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10, where: { userId: "guest" } });
+
+                return page[0];
+            })) as Row;
+
+            await merge.shards.user.run(async (context: any) => await asLeaseHolder(context, importShardRows, { rows: [guestThread], table: "threads" }));
+            await merge.shards.user.run(async (context: any) => await asLeaseHolder(context, importShardRows, { rows: [guestEvent], table: "mcpEvents" }));
+
+            // The guest deletes the thread after the copy: its copy is taken back, and the Events copied with it go too.
+            await merge.shards.guest.run(async (context: any) => {
+                await context.db.delete("threads", threadId);
+            });
+
+            const reconciled = (await merge.shards.user.run(
+                async (context: any) => await asLeaseHolder(context, dropRowsGoneFromGuest, { ids: [threadId], table: "threads" }),
+            )) as { dropped: number };
+            const onUser = (await merge.shards.user.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10, where: { userId: "user" } });
+
+                return page.length;
+            })) as number;
+
+            expect(reconciled.dropped).toBe(1);
+            expect(onUser).toBe(0);
+        } finally {
+            merge.close();
+        }
+    });
+
     it("never takes back the account's own Event that shares a guest event's id", async () => {
         const merge = twoShards();
 

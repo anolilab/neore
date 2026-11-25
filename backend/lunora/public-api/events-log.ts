@@ -48,7 +48,7 @@ const THREAD_EVENT_BATCH = 200;
 const threadOf = (data: Record<string, unknown>): string | undefined => (typeof data["threadId"] === "string" ? data["threadId"] : undefined);
 
 /** The thread a stored payload (JSON text) names: a payload that is not a JSON object names none. */
-const storedThreadOf = (data: string): string | undefined => {
+export const storedThreadOf = (data: string): string | undefined => {
     let parsed: unknown;
 
     try {
