@@ -16,6 +16,7 @@ import { pollEvents as pollLog } from "./events-poll";
 import type { EventLogStore } from "./events-poll";
 import { deleteMcpEventsOfThread, EVENT_WAKE_MAX_ATTEMPTS, EVENT_WAKE_RETRY_MS, RETENTION_MS } from "./events-log";
 import { noteRetentionWake } from "../lib/shard-housekeeping";
+import { currentUserShard } from "../lib/shard-context";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { internal } from "../_generated/internal";
 
@@ -171,6 +172,25 @@ export const pruneMcpEvents = internalMutation.output(v.object({ hasMore: v.bool
 
     return { hasMore, removed: page.length };
 });
+
+/**
+ * The rest of an expired backlog, one batch per call. The shard's housekeeping tick takes the first batch and hands the rest here, so a
+ * backlog does not repeat the whole tick (its triggers, exports and sweeps) once per batch. Each call runs in its own transaction and
+ * schedules the next while a full batch was deleted.
+ */
+export const pruneMcpEventsBacklog = internalMutation
+    .input({})
+    .output(v.null())
+    .mutation(async ({ ctx }) => {
+        const { hasMore } = await ctx.runMutation(internal.public_api.events.pruneMcpEvents, {});
+        const shardKey = currentUserShard();
+
+        if (hasMore && shardKey !== undefined) {
+            await runAfterOnShard(ctx.scheduler, 0, internal.public_api.events.pruneMcpEventsBacklog, {}, shardKey);
+        }
+
+        return null;
+    });
 
 /**
  * The retry of a wake that failed (`wakeForExpiry` in `events-log.ts`), run on the owner's shard: it writes the wake again, or schedules the
