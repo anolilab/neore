@@ -8,10 +8,10 @@ import type { RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { prefillComposer } from "@/features/chat/thread/composer-prefill";
+import { focusIsLost, useReportFocusLoss } from "@/lib/focus-loss";
 
 import type { FixKind, PullRequestProblems } from "../lib/fix-prompts";
 import { buildFixPrompt, fixesFor } from "../lib/fix-prompts";
-import { focusIsLost, useReportFocusLoss } from "../lib/focus-loss";
 import type { PullRequestAddress } from "../lib/use-develop";
 import { usePullRequestStatus } from "../lib/use-develop";
 

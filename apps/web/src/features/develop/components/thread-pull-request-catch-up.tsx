@@ -8,9 +8,9 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { subscribeTurnEnded, turnEndedGeneration } from "@/features/chat/core/utils/turn-ended";
 import { prefillComposer, useComposerTakesPrefill } from "@/features/chat/thread/composer-prefill";
+import { focusIsLost, useReportFocusLoss } from "@/lib/focus-loss";
 
 import { catchUpPrompt, catchUpRunId, hostOfPullRequestUrl, isPlainBranchName, isPlainRepo } from "../lib/catch-up-prompt";
-import { focusIsLost, useReportFocusLoss } from "../lib/focus-loss";
 import { useBranchComparison, usePullRequest } from "../lib/use-develop";
 
 /**

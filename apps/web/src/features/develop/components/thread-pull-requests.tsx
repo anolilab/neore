@@ -11,9 +11,11 @@ import { Label } from "@neore/ui/components/label";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { GitPullRequestArrow } from "lucide-react";
-import { useId, useRef, useState } from "react";
+import type { ReactNode, RefObject } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
+import { focusIsLost, useReportFocusLossWithin } from "@/lib/focus-loss";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { createDialogVisits } from "../lib/dialog-visit";
@@ -29,13 +31,54 @@ import ThreadPullRequestCatchUp from "./thread-pull-request-catch-up";
  */
 const MAX_STATUS_READS = 5;
 
-/** One linked pull request: its link, and what blocks it. The link takes focus when a read removes the focused chip. */
-const LinkedPullRequest = ({ link, readStatus, threadId }: { link: PullRequestAddress; readStatus: boolean; threadId: string }) => {
-    const { t } = useLingui();
-    const linkRef = useRef<HTMLAnchorElement>(null);
+const pullRequestKey = (link: PullRequestAddress): string => `${link.repository}#${String(link.number)}`;
+
+/**
+ * A row's status controls (what blocks it, Catch up). A read that drops the row out of the newest few unmounts all of them at
+ * once, so none of their own effects can move focus: this reports it, a focused popover's item too.
+ */
+const StatusControls = ({ children, onFocusLost }: { children: ReactNode; onFocusLost: () => void }) => {
+    const within = useReportFocusLossWithin(onFocusLost);
 
     return (
-        <li className="inline-flex items-center gap-1">
+        <span className="contents" onFocus={within.onFocus}>
+            {children}
+        </span>
+    );
+};
+
+interface LinkedPullRequestProps {
+    link: PullRequestAddress;
+    /** The row went away while something in it held focus. */
+    onFocusLost: () => void;
+    readStatus: boolean;
+    threadId: string;
+}
+
+/**
+ * One linked pull request: its link, and what blocks it. The link takes focus when a read removes the focused chip, and when
+ * the row stops reading its status (a newer link pushed it out of the newest few) while one of its controls held focus.
+ */
+const LinkedPullRequest = ({ link, onFocusLost, readStatus, threadId }: LinkedPullRequestProps) => {
+    const { t } = useLingui();
+    const linkRef = useRef<HTMLAnchorElement>(null);
+    const controlsLostFocus = useRef(false);
+    const within = useReportFocusLossWithin(onFocusLost);
+
+    useEffect(() => {
+        if (!controlsLostFocus.current) {
+            return;
+        }
+
+        controlsLostFocus.current = false;
+
+        if (focusIsLost()) {
+            linkRef.current?.focus();
+        }
+    });
+
+    return (
+        <li className="inline-flex items-center gap-1" data-linked-pull-request={pullRequestKey(link)} onFocus={within.onFocus}>
             <Link
                 aria-label={t`Open the pull request ${link.repository}#${link.number}`}
                 className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs hover:underline"
@@ -48,9 +91,77 @@ const LinkedPullRequest = ({ link, readStatus, threadId }: { link: PullRequestAd
                     {link.repository}#{link.number}
                 </span>
             </Link>
-            {readStatus && <PullRequestFixes address={{ number: link.number, repository: link.repository }} returnFocusTo={linkRef} threadId={threadId} />}
-            {readStatus && <ThreadPullRequestCatchUp link={link} returnFocusTo={linkRef} threadId={threadId} />}
+            {readStatus && (
+                <StatusControls
+                    onFocusLost={() => {
+                        controlsLostFocus.current = true;
+                    }}
+                >
+                    <PullRequestFixes address={{ number: link.number, repository: link.repository }} returnFocusTo={linkRef} threadId={threadId} />
+                    <ThreadPullRequestCatchUp link={link} returnFocusTo={linkRef} threadId={threadId} />
+                </StatusControls>
+            )}
         </li>
+    );
+};
+
+/**
+ * The linked pull requests, the newest few reading their status. When a row goes away while it holds focus (it was unlinked),
+ * focus moves to the link of the next row that is still there, else the one before it, else to `fallbackFocus`; focus that is
+ * somewhere else is left where it is.
+ */
+export const LinkedPullRequestList = ({
+    fallbackFocus,
+    links,
+    threadId,
+}: {
+    fallbackFocus: RefObject<HTMLElement | null>;
+    links: ReadonlyArray<PullRequestAddress>;
+    threadId: string;
+}) => {
+    const listRef = useRef<HTMLUListElement>(null);
+    // The row that went away holding focus, and the rows of the last commit, in order, to find its neighbours.
+    const lostRow = useRef<string | undefined>(undefined);
+    const shownRows = useRef<ReadonlyArray<string>>([]);
+    const keys = links.map((link) => pullRequestKey(link));
+
+    useEffect(() => {
+        const lost = lostRow.current;
+        const before = shownRows.current;
+
+        lostRow.current = undefined;
+        shownRows.current = keys;
+
+        if (lost === undefined || !focusIsLost()) {
+            return;
+        }
+
+        const at = before.indexOf(lost);
+        const neighbours = [...before.slice(at + 1), ...before.slice(0, Math.max(at, 0)).toReversed()].filter((key) => keys.includes(key));
+        const rows = [...(listRef.current?.querySelectorAll<HTMLElement>("[data-linked-pull-request]") ?? [])];
+        const row = neighbours.map((key) => rows.find((node) => node.dataset.linkedPullRequest === key)).find((node) => node !== undefined);
+
+        (row?.querySelector<HTMLElement>("a") ?? fallbackFocus.current)?.focus();
+    });
+
+    if (links.length === 0) {
+        return null;
+    }
+
+    return (
+        <ul className="flex flex-wrap items-center gap-2" ref={listRef}>
+            {links.map((link, index) => (
+                <LinkedPullRequest
+                    key={pullRequestKey(link)}
+                    link={link}
+                    onFocusLost={() => {
+                        lostRow.current = pullRequestKey(link);
+                    }}
+                    readStatus={index < MAX_STATUS_READS}
+                    threadId={threadId}
+                />
+            ))}
+        </ul>
     );
 };
 
@@ -91,6 +202,7 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
     const [inputProblem, setInputProblem] = useState(false);
     const [busy, setBusy] = useState(false);
     const [visits] = useState(createDialogVisits);
+    const linkButtonRef = useRef<HTMLButtonElement>(null);
 
     // Only the owner can link: the attach action refuses anyone else, so the control is not shown to them.
     if (threadId === undefined || access.data?.isOwner !== true) {
@@ -204,14 +316,8 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
                     </Button>
                 </p>
             )}
-            {(links.data ?? []).length > 0 && (
-                <ul className="flex flex-wrap items-center gap-2">
-                    {(links.data ?? []).map((link, index) => (
-                        <LinkedPullRequest key={`${link.repository}#${link.number}`} link={link} readStatus={index < MAX_STATUS_READS} threadId={threadId} />
-                    ))}
-                </ul>
-            )}
-            <Button onClick={() => setOpen(true)} size="sm" variant="ghost">
+            <LinkedPullRequestList fallbackFocus={linkButtonRef} links={links.data ?? []} threadId={threadId} />
+            <Button onClick={() => setOpen(true)} ref={linkButtonRef} size="sm" variant="ghost">
                 {t`Link pull request`}
             </Button>
             <Dialog

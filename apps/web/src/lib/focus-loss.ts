@@ -1,5 +1,5 @@
-import type { RefObject } from "react";
-import { useLayoutEffect } from "react";
+import type { FocusEvent, RefObject } from "react";
+import { useLayoutEffect, useRef } from "react";
 
 /**
  * Calls `onLost` when the component unmounts while one of these elements holds focus, which the browser would drop to
@@ -25,3 +25,28 @@ export const useReportFocusLoss = (onLost: () => void, ...refs: ReadonlyArray<Re
 
 /** Focus went nowhere: nothing holds it, so moving it takes nothing from the person. */
 export const focusIsLost = (): boolean => document.activeElement === null || document.activeElement === document.body;
+
+/**
+ * Like `useReportFocusLoss`, for focus anywhere in a component's React subtree, a portal (a popover) too: spread the returned
+ * `onFocus` on its outer element. React's focus events bubble through portals, so the last element that took focus inside is
+ * known; `onLost` runs when the component unmounts while that element still holds focus. Only on unmount, as above.
+ */
+export const useReportFocusLossWithin = (onLost: () => void): { onFocus: (event: FocusEvent<HTMLElement>) => void } => {
+    const lastFocused = useRef<EventTarget | null>(null);
+
+    useLayoutEffect(
+        () => () => {
+            if (lastFocused.current !== null && lastFocused.current === document.activeElement) {
+                onLost();
+            }
+        },
+        // Unmount only, see above.
+        [],
+    );
+
+    return {
+        onFocus: (event: FocusEvent<HTMLElement>) => {
+            lastFocused.current = event.target;
+        },
+    };
+};

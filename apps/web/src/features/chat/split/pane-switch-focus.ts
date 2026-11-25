@@ -1,12 +1,12 @@
 import type { RefObject } from "react";
 import { useEffect, useLayoutEffect, useRef } from "react";
 
+import { focusIsLost } from "@/lib/focus-loss";
+
 import { focusComposerWhenMounted } from "./focus-composer";
 
 const paneOf = (container: HTMLElement | null, threadId: string): HTMLElement | null =>
     [...(container?.querySelectorAll<HTMLElement>("[data-pane-thread-id]") ?? [])].find((node) => node.dataset.paneThreadId === threadId) ?? null;
-
-const focusIsLost = (): boolean => document.activeElement === null || document.activeElement === document.body;
 
 /**
  * Keeps keyboard focus in the split view when focus moves to another pane. Only the focused pane renders the page's header
