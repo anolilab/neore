@@ -1424,7 +1424,41 @@ export const importShardRows = internalMutation
         // events appended. Every guest row is confirmed here, so the clear may delete it once it is on the new shard.
         if (args.table === "mcpEvents") {
             const guestRows = rows.filter((row) => row["userId"] === args.from);
-            const imported = await copyMergedMcpEvents(ctx, guestRows, args.to);
+            // A row with an import marker was copied by an earlier import. Its copy may since have left the new shard (retention
+            // prunes it), and a copy is not made again: that would restamp the event and make it readable for a further window. The
+            // marker never lapses, as the other import markers do.
+            const fresh: Record<string, unknown>[] = [];
+
+            for (const row of guestRows) {
+                if ((await storedClaim(ctx.db, IMPORT_MARKER_SCOPE, markerKey(args.from, args.table, row._id as string))) === null) {
+                    fresh.push(row);
+                }
+            }
+
+            const imported = await copyMergedMcpEvents(ctx, fresh, args.to);
+
+            for (const row of fresh) {
+                const key = markerKey(args.from, args.table, row._id as string);
+
+                await ctx.db.insert("idempotencyClaims", {
+                    claimedAt: now,
+                    expiresAt: IMPORT_MARKER_EXPIRES_AT,
+                    key,
+                    scope: IMPORT_MARKER_SCOPE,
+                    userId: args.to,
+                });
+
+                // The clear's own record, as the generic import writes it: the copy is on the new shard before the guest's row goes.
+                if (args.clearing === true && (await storedClaim(ctx.db, MERGE_CLEARED_SCOPE, key)) === null) {
+                    await ctx.db.insert("idempotencyClaims", {
+                        claimedAt: now,
+                        expiresAt: IMPORT_MARKER_EXPIRES_AT,
+                        key,
+                        scope: MERGE_CLEARED_SCOPE,
+                        userId: args.to,
+                    });
+                }
+            }
 
             return { fenced: false, held: 0, imported, present: guestRows.map((row) => row._id as string) };
         }
