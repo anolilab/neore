@@ -96,7 +96,7 @@ describe("a trashed chat's events", () => {
                 "user",
                 async () =>
                     await harness.run(async (context: any) => {
-                        // Restored already, with an event recorded since: a second undo must not remove it.
+                        // A live chat, as a repeated undo finds it: its events are not in the trash, so the drain must keep them.
                         const id = await chatWithEvents(context, false, 3);
 
                         expect(await context.runMutation(drainTrashedThreadEvents, { threadId: id, userId: "user" })).toBe(true);
