@@ -35,4 +35,12 @@ describe("hasAsideFindTarget", () => {
 
         expect(hasAsideFindTarget()).toBe(false);
     });
+
+    it("is false when the panel is hidden with focus still inside it", () => {
+        document.body.innerHTML = `<div style="display: none"><section data-aside-find-host="" tabindex="-1"><textarea id="inside"></textarea></section></div>`;
+
+        document.querySelector<HTMLElement>("#inside")?.focus();
+
+        expect(hasAsideFindTarget()).toBe(false);
+    });
 });

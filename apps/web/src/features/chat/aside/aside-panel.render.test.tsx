@@ -234,4 +234,44 @@ describe("AsidePanel", () => {
         fireEvent.click(screen.getByRole("button", { name: "Previous match" }));
         expect(screen.getByText("3 of 3")).toBeTruthy();
     });
+
+    it("brings the current hit into view once the layout has settled, and not for a query that changed first", () => {
+        vi.useFakeTimers();
+
+        try {
+            useAsideStore.setState({ byThread: { "thread-1": [{ answer: "A cat.", id: "a", question: "Why?", status: "answered", token: "tok" }] } });
+            render(<AsidePanel threadId="thread-1" />);
+            // jsdom has no layout, so it has no scrollIntoView to spy on: install one for this test.
+            const scroll = vi.fn();
+
+            Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
+
+            act(() => {
+                globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+            });
+            const input = screen.getByRole("textbox", { name: "Find in side questions" });
+
+            fireEvent.change(input, { target: { value: "cat" } });
+            act(() => {
+                vi.advanceTimersByTime(149);
+            });
+            expect(scroll).not.toHaveBeenCalled();
+
+            act(() => {
+                vi.advanceTimersByTime(1);
+            });
+            expect(scroll).toHaveBeenCalledTimes(1);
+
+            scroll.mockClear();
+            fireEvent.change(input, { target: { value: "cat" } });
+            fireEvent.change(input, { target: { value: "dog" } });
+            act(() => {
+                vi.advanceTimersByTime(150);
+            });
+            expect(scroll).not.toHaveBeenCalled();
+        } finally {
+            Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+            vi.useRealTimers();
+        }
+    });
 });

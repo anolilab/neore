@@ -4,39 +4,35 @@ import { useLingui } from "@lingui/react/macro";
 import { Input } from "@neore/ui/components/input";
 import { ChevronDownIcon, ChevronUpIcon, XIcon } from "lucide-react";
 import type { ChangeEvent, FC, FormEvent, KeyboardEvent } from "react";
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
 
 import TooltipIconButton from "@/features/chat/components/tooltip-icon-button";
-import { clampIndex, findMatches, MAX_FIND_QUERY_LENGTH, stepIndex } from "@/features/chat/thread/find/match";
+import { clampIndex, MAX_FIND_QUERY_LENGTH, stepIndex } from "@/features/chat/thread/find/match";
 import { ASIDE_FIND_EVENT } from "@/features/keyboard/lib/aside-find-target";
 
-import type { AsideEntry } from "../aside-store";
-import { asideFindMessages } from "./aside-find";
 import useAsideFindHighlights from "./use-aside-find-highlights";
 
 /**
- * Find in the side questions: a bar at the top of the panel that searches the questions and answers in it and
- * paints the hits. Opened by the Find shortcut while focus is in the panel (`keyboard-shortcuts-manager.tsx`).
- * The matching is the thread find's (`thread/find/match.ts`), run over the panel's own entries.
+ * Find in the side questions: a bar at the top of the panel that searches the questions and answers as they are shown,
+ * and paints the hits. Opened by the Find shortcut while focus is in the panel (`keyboard-shortcuts-manager.tsx`). The
+ * count and the highlights come from the rendered panel (`use-aside-find-highlights.ts`), so they always agree.
  */
-const AsideFindBar: FC<{ entries: ReadonlyArray<AsideEntry> }> = ({ entries }) => {
+const AsideFindBar: FC = () => {
     const { t } = useLingui();
     const [isOpen, setIsOpen] = useState(false);
     const [query, setQuery] = useState("");
     const [index, setIndex] = useState(0);
-    // Bumped by every navigation, so stepping onto the same entry scrolls back to it.
+    const [matchCount, setMatchCount] = useState(0);
+    // Bumped by every navigation, so stepping onto the same hit scrolls back to it.
     const [revealKey, setRevealKey] = useState(0);
     const inputRef = useRef<HTMLInputElement>(null);
     const barRef = useRef<HTMLFormElement>(null);
     const returnFocusRef = useRef<HTMLElement | null>(null);
 
     const deferredQuery = useDeferredValue(query);
-    const messages = useMemo(() => asideFindMessages(entries), [entries]);
-    const matches = useMemo(() => (isOpen ? findMatches(messages, deferredQuery) : []), [isOpen, messages, deferredQuery]);
-    const activeIndex = clampIndex(index, matches.length);
-    const current = matches[activeIndex];
+    const activeIndex = clampIndex(index, matchCount);
 
-    useAsideFindHighlights(barRef, isOpen, deferredQuery, current, revealKey);
+    useAsideFindHighlights(barRef, isOpen, deferredQuery, activeIndex, revealKey, setMatchCount);
 
     useEffect(() => {
         const open = () => {
@@ -96,10 +92,10 @@ const AsideFindBar: FC<{ entries: ReadonlyArray<AsideEntry> }> = ({ entries }) =
 
     const step = useCallback(
         (direction: -1 | 1) => {
-            setIndex(stepIndex(activeIndex, matches.length, direction));
+            setIndex(stepIndex(activeIndex, matchCount, direction));
             setRevealKey((key) => key + 1);
         },
-        [activeIndex, matches.length],
+        [activeIndex, matchCount],
     );
 
     if (!isOpen) {
@@ -131,7 +127,7 @@ const AsideFindBar: FC<{ entries: ReadonlyArray<AsideEntry> }> = ({ entries }) =
     let status = "";
 
     if (hasQuery) {
-        status = matches.length > 0 ? t`${activeIndex + 1} of ${matches.length}` : t`No matches`;
+        status = matchCount > 0 ? t`${activeIndex + 1} of ${matchCount}` : t`No matches`;
     }
 
     return (
@@ -160,10 +156,10 @@ const AsideFindBar: FC<{ entries: ReadonlyArray<AsideEntry> }> = ({ entries }) =
             <span aria-live="polite" className="text-muted-foreground min-w-16 px-1 text-center text-xs tabular-nums" role="status">
                 {status}
             </span>
-            <TooltipIconButton disabled={matches.length === 0} onClick={() => step(-1)} tooltip={t`Previous match`} type="button">
+            <TooltipIconButton disabled={matchCount === 0} onClick={() => step(-1)} tooltip={t`Previous match`} type="button">
                 <ChevronUpIcon aria-hidden="true" className="size-4" />
             </TooltipIconButton>
-            <TooltipIconButton disabled={matches.length === 0} onClick={() => step(1)} tooltip={t`Next match`} type="button">
+            <TooltipIconButton disabled={matchCount === 0} onClick={() => step(1)} tooltip={t`Next match`} type="button">
                 <ChevronDownIcon aria-hidden="true" className="size-4" />
             </TooltipIconButton>
             <TooltipIconButton onClick={close} tooltip={t`Close find`} type="button">

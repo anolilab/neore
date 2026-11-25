@@ -1,7 +1,19 @@
 import { occurrenceOffsets } from "./match";
 
-export const MATCH_HIGHLIGHT = "find-match";
-export const CURRENT_HIGHLIGHT = "find-current";
+/**
+ * The CSS Custom Highlight names one find bar paints under. The registry is document-wide, so each bar owns its own
+ * pair: a bar sets and clears only its names, and two open bars never overwrite or clear each other's highlights.
+ */
+export interface HighlightNames {
+    current: string;
+    match: string;
+}
+
+/** The thread's find bar. Its names are the defaults, so its calls are unchanged. */
+export const THREAD_HIGHLIGHTS: HighlightNames = { current: "find-current", match: "find-match" };
+
+/** The side-question find bar (`chat/aside/find`). */
+export const ASIDE_HIGHLIGHTS: HighlightNames = { current: "aside-find-current", match: "aside-find-match" };
 
 const SKIPPED_PARENTS = "script, style, textarea, input";
 
@@ -12,11 +24,12 @@ export const supportsHighlights = (): boolean => typeof CSS !== "undefined" && "
 export const FIND_TEXT_SELECTOR = "[data-find-text]";
 
 /**
- * A range per occurrence of `query` inside one text node of a text part under `root`, in part order, which is
- * the order `findMatches` counts them in. A match split across elements (`foo **bar**`) is not highlighted;
- * the bar still counts and scrolls to it.
+ * A range per occurrence of `query` inside one text node of a text part under `root`, in part order. Text under an
+ * element matching `skipped` is left out: a find that paints only what it counts passes the controls a part renders
+ * (`button`, for one) so their labels are neither counted nor painted. A match split across elements (`foo **bar**`)
+ * is not found, so it is neither counted nor painted.
  */
-export const collectRanges = (root: Node, query: string): Range[] => {
+export const collectRanges = (root: Node, query: string, skipped: string = SKIPPED_PARENTS): Range[] => {
     const ranges: Range[] = [];
 
     if (query.trim() === "") {
@@ -29,7 +42,7 @@ export const collectRanges = (root: Node, query: string): Range[] => {
         const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
 
         for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-            if (node.parentElement?.closest(SKIPPED_PARENTS)) {
+            if (node.parentElement?.closest(skipped)) {
                 continue;
             }
 
@@ -48,49 +61,49 @@ export const collectRanges = (root: Node, query: string): Range[] => {
     return ranges;
 };
 
-export const setHighlights = (matches: Range[], current: Range | undefined): void => {
+export const setHighlights = (matches: Range[], current: Range | undefined, names: HighlightNames = THREAD_HIGHLIGHTS): void => {
     if (!supportsHighlights()) {
         return;
     }
 
-    CSS.highlights.set(MATCH_HIGHLIGHT, new Highlight(...matches));
+    CSS.highlights.set(names.match, new Highlight(...matches));
 
     if (current) {
-        CSS.highlights.set(CURRENT_HIGHLIGHT, new Highlight(current));
+        CSS.highlights.set(names.current, new Highlight(current));
     } else {
-        CSS.highlights.delete(CURRENT_HIGHLIGHT);
+        CSS.highlights.delete(names.current);
     }
 };
 
-export const clearHighlights = (): void => {
+export const clearHighlights = (names: HighlightNames = THREAD_HIGHLIGHTS): void => {
     if (!supportsHighlights()) {
         return;
     }
 
-    CSS.highlights.delete(MATCH_HIGHLIGHT);
-    CSS.highlights.delete(CURRENT_HIGHLIGHT);
+    CSS.highlights.delete(names.match);
+    CSS.highlights.delete(names.current);
 };
 
-// Both colours keep text at 4.5:1 or better on their background. The current match is stronger than the rest.
-const HIGHLIGHT_CSS = `
-:root::highlight(${MATCH_HIGHLIGHT}) { background-color: oklch(0.9 0.12 95); color: oklch(0.2 0 0); }
-:root::highlight(${CURRENT_HIGHLIGHT}) { background-color: oklch(0.72 0.17 60); color: oklch(0.15 0 0); }
-:root.dark::highlight(${MATCH_HIGHLIGHT}) { background-color: oklch(0.42 0.09 90); color: oklch(0.98 0 0); }
-:root.dark::highlight(${CURRENT_HIGHLIGHT}) { background-color: oklch(0.82 0.16 85); color: oklch(0.15 0 0); }
+/** Both colours keep text at 4.5:1 or better on their background. The current match is stronger than the rest. */
+const highlightCss = ({ current, match }: HighlightNames): string => `
+:root::highlight(${match}) { background-color: oklch(0.9 0.12 95); color: oklch(0.2 0 0); }
+:root::highlight(${current}) { background-color: oklch(0.72 0.17 60); color: oklch(0.15 0 0); }
+:root.dark::highlight(${match}) { background-color: oklch(0.42 0.09 90); color: oklch(0.98 0 0); }
+:root.dark::highlight(${current}) { background-color: oklch(0.82 0.16 85); color: oklch(0.15 0 0); }
 `;
 
 /**
  * Installs the highlight styles as a constructed stylesheet, which an inline-style CSP does not
  * block, and returns the function that removes them.
  */
-export const installHighlightStyles = (): (() => void) => {
+export const installHighlightStyles = (names: HighlightNames = THREAD_HIGHLIGHTS): (() => void) => {
     if (!supportsHighlights() || typeof CSSStyleSheet === "undefined" || !("adoptedStyleSheets" in document)) {
         return () => {};
     }
 
     const sheet = new CSSStyleSheet();
 
-    sheet.replaceSync(HIGHLIGHT_CSS);
+    sheet.replaceSync(highlightCss(names));
     document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
 
     return () => {
