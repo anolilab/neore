@@ -100,7 +100,7 @@ describe("collectAsideRanges", () => {
 });
 
 describe("isClippedWithin", () => {
-    /** A hit at x 150 to 170 inside a code block whose own box spans `left` to `right`, in a panel with the given style. */
+    /** A hit at x 150 to 170 in a code block with the given inline style, whose own box spans `left` to `right`. */
     const clipped = (style: string, left: number, right: number): boolean => {
         document.body.innerHTML = panel(row("a", "Q", `<pre style="${style}"><code>wide cat</code></pre>`));
 

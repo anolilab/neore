@@ -78,6 +78,15 @@ const deferred = () => {
 
 const HIDE_NAME = /^Hide this side question/;
 
+/** The timers the reveal runs on: its settle delay, and the frame that rechecks the hit after a change. */
+const REVEAL_TIMERS = ["setTimeout", "clearTimeout", "requestAnimationFrame", "cancelAnimationFrame"] as const;
+
+/** Lets the frame and the settle delay after it run on the fake clock. */
+const settleReveal = (): Promise<void> =>
+    act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+    });
+
 /** The rectangle a selected hit reports in jsdom, which lays out nothing, with its top at `top`. */
 const rectAt = (top: number) => {
     return {
@@ -316,6 +325,7 @@ describe("AsidePanel", () => {
         }
     });
     it("brings a hit that arrives with a later answer into view", async () => {
+        vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
         useAsideStore.setState({ byThread: { "thread-1": [{ id: "a", question: "Why?", status: "pending" }] } });
         render(<AsidePanel threadId="thread-1" />);
 
@@ -331,12 +341,7 @@ describe("AsidePanel", () => {
             fireEvent.change(screen.getByRole("textbox", { name: "Find in side questions" }), { target: { value: "cat" } });
 
             // The first reveal runs with no hit yet: nothing to bring into view.
-            await act(
-                () =>
-                    new Promise<void>((resolve) => {
-                        setTimeout(resolve, 200);
-                    }),
-            );
+            await settleReveal();
             expect(scroll).not.toHaveBeenCalled();
 
             act(() => {
@@ -345,13 +350,17 @@ describe("AsidePanel", () => {
                 });
             });
 
-            await waitFor(() => expect(scroll).toHaveBeenCalled());
+            // The new row is rechecked a frame later, then the hit is revealed once the settle delay has passed.
+            await settleReveal();
+            expect(scroll).toHaveBeenCalled();
         } finally {
             Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+            vi.useRealTimers();
         }
     });
 
     it("brings the current hit into view again when an earlier answer pushes it along the panel", async () => {
+        vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
         // jsdom has no layout: place the hit by hand, so that an answer above it can move it without changing its text.
         let hitTop = 100;
         const hitRect = () => {
@@ -383,7 +392,8 @@ describe("AsidePanel", () => {
                 globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
             });
             fireEvent.change(screen.getByRole("textbox", { name: "Find in side questions" }), { target: { value: "cat" } });
-            await waitFor(() => expect(scroll).toHaveBeenCalled());
+            await settleReveal();
+            expect(scroll).toHaveBeenCalled();
             scroll.mockClear();
 
             // An answer above the hit: the hit's text is untouched, but it has moved down the panel out of sight.
@@ -393,7 +403,8 @@ describe("AsidePanel", () => {
                     byThread: { "thread-1": [{ answer: "Long.", id: "z", question: "Above?", status: "answered", token: "tok-z" }, answered] },
                 });
             });
-            await waitFor(() => expect(scroll).toHaveBeenCalled());
+            await settleReveal();
+            expect(scroll).toHaveBeenCalled();
             scroll.mockClear();
 
             // An answer below the hit leaves it where it was: nothing to bring into view.
@@ -408,16 +419,12 @@ describe("AsidePanel", () => {
                     },
                 });
             });
-            await act(
-                () =>
-                    new Promise<void>((resolve) => {
-                        setTimeout(resolve, 200);
-                    }),
-            );
+            await settleReveal();
             expect(scroll).not.toHaveBeenCalled();
         } finally {
             Reflect.deleteProperty(Element.prototype, "scrollIntoView");
             Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
+            vi.useRealTimers();
         }
     });
 
@@ -453,6 +460,54 @@ describe("AsidePanel", () => {
         } finally {
             Reflect.deleteProperty(Element.prototype, "scrollIntoView");
             Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
+        }
+    });
+
+    it("scrolls the panel the rest of the way when centring a block taller than the panel leaves the hit below it", async () => {
+        vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
+
+        let hitTop = 900;
+        // Centring the block moves the hit only part of the way: it is still below the panel's visible bottom.
+        const scroll = vi.fn(() => {
+            hitTop = 500;
+        });
+        const scrollBy = vi.fn();
+
+        useAsideStore.setState({ byThread: { "thread-1": [{ answer: "A cat.", id: "a", question: "Why?", status: "answered", token: "tok" }] } });
+        render(<AsidePanel threadId="thread-1" />);
+
+        // With no scroll container of its own, the panel scrolls the page: its viewport is the document element, which jsdom
+        // gives a zero-height box, so stub the box and the scroll.
+        const viewport = document.documentElement;
+
+        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
+        Object.defineProperty(Range.prototype, "getBoundingClientRect", { configurable: true, value: () => rectAt(hitTop) });
+        Object.defineProperties(viewport, {
+            getBoundingClientRect: {
+                configurable: true,
+                value: () => {
+                    return { bottom: 400, top: 0 };
+                },
+            },
+            scrollBy: { configurable: true, value: scrollBy },
+        });
+
+        try {
+            act(() => {
+                globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+            });
+            fireEvent.change(screen.getByRole("textbox", { name: "Find in side questions" }), { target: { value: "cat" } });
+            await settleReveal();
+
+            expect(scroll).toHaveBeenCalledTimes(1);
+            // The hit ends at 520, 120 below the panel's visible bottom at 400.
+            expect(scrollBy).toHaveBeenCalledWith({ behavior: "instant", top: 120 });
+        } finally {
+            Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+            Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
+            Reflect.deleteProperty(viewport, "getBoundingClientRect");
+            Reflect.deleteProperty(viewport, "scrollBy");
+            vi.useRealTimers();
         }
     });
 });

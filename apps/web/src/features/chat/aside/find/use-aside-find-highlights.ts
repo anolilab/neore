@@ -78,18 +78,35 @@ export const isClippedWithin = (rect: Pick<DOMRect, "bottom" | "left" | "right" 
  * carry the selected hit at its far edge while the block itself is partly on screen. jsdom lays out no ranges, so it
  * falls back to the block there.
  */
+/** The hit's own rectangle, or its block's where jsdom lays out no ranges. */
+const hitRect = (range: Range | undefined, target: Element): DOMRect =>
+    typeof range?.getBoundingClientRect === "function" ? range.getBoundingClientRect() : target.getBoundingClientRect();
+
 const revealIfOutOfSight = (range: Range | undefined, host: Element): void => {
     const target = range?.startContainer.parentElement;
-    const rect = typeof range?.getBoundingClientRect === "function" ? range.getBoundingClientRect() : target?.getBoundingClientRect();
 
-    if (!target || !rect) {
+    if (!target) {
         return;
     }
 
     const viewport = host.closest(".overflow-y-auto") ?? document.documentElement;
+    const rect = hitRect(range, target);
 
-    if (isOutsideViewport(rect, viewport.getBoundingClientRect()) || isClippedWithin(rect, target, viewport)) {
-        target.scrollIntoView({ block: "center" });
+    if (!isOutsideViewport(rect, viewport.getBoundingClientRect()) && !isClippedWithin(rect, target, viewport)) {
+        return;
+    }
+
+    // Instant, so the hit is measured where the scroll has left it.
+    target.scrollIntoView({ behavior: "instant", block: "center" });
+
+    // Centring a block taller than the panel can leave the hit past the panel's edge. Scroll the panel by what is still hidden.
+    const bounds = viewport.getBoundingClientRect();
+    const settled = hitRect(range, target);
+    const correction =
+        settled.top < bounds.top + STICKY_BAR_CLEARANCE_PX ? settled.top - (bounds.top + STICKY_BAR_CLEARANCE_PX) : Math.max(0, settled.bottom - bounds.bottom);
+
+    if (correction !== 0 && typeof viewport.scrollBy === "function") {
+        viewport.scrollBy({ behavior: "instant", top: correction });
     }
 };
 
