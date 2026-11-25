@@ -37,7 +37,7 @@ import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as v
 import { systemDb } from "../lib/rls/scope";
 import { readPasscodeRow } from "./thread-passcode";
 import { clearAwaitingInput, patchThread } from "./table-writes";
-import { deleteMcpEventsOfThread } from "../public-api/events-log";
+import { deleteMcpEventsOfThread, hasMcpEventsOfThread } from "../public-api/events-log";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { deletePullRequestLinksOfThread, setLinksThreadDeleted } from "../source-control/pr-thread-links";
 import { deleteThreadSummaries } from "./thread-summaries";
@@ -873,22 +873,18 @@ export const restoreThread = internalMutation
         const oldThread = await ctx.db.get("threads", args.threadId);
 
         assert(oldThread, `Thread ${args.threadId} not found`);
+
+        // A chat's events go with the trash, but the trash's leftover batches may not have run. A restored chat must not show them, so
+        // restore refuses while any remain: `undoDeleteThread` drains them first, in its own transaction. Events recorded since are kept.
+        if (oldThread.userId !== undefined && (await hasMcpEventsOfThread(ctx, oldThread.userId, args.threadId))) {
+            throw new LunoraError("CONFLICT", "This chat's activity is still being cleared from the trash. Try restoring it again in a moment.");
+        }
+
         await patchRow(ctx.db, "threads", oldThread, {
             deleted: false,
             deletedAt: undefined,
             updatedAt: ctx.now,
         });
-
-        // The events recorded before the trash are the trash's to remove, not the restored chat's: its leftover batches may not have run.
-        if (oldThread.userId !== undefined && oldThread.deletedAt !== undefined) {
-            await runAfterOnShard(
-                ctx.scheduler,
-                0,
-                internal.public_api.events.deleteEventsBeforeTrash,
-                { before: oldThread.deletedAt, threadId: args.threadId, userId: oldThread.userId },
-                oldThread.userId,
-            );
-        }
 
         await setLinksThreadDeleted(ctx, oldThread.userId, args.threadId, false);
 

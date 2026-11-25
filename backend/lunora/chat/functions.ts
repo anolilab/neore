@@ -4302,6 +4302,12 @@ export const undoDeleteThread = authMutation
             throwForbidden("Not allowed");
         }
 
+        // The trashed chat's leftover events go first, a batch per call, each in its own transaction, so restore can refuse while any
+        // remain (`agent/threads.ts`). A batch that is not the last loops; the last one returns `true`.
+        while (!(await context.runMutation(internal.public_api.events.drainTrashedThreadEvents, { threadId, userId }))) {
+            // Each call removes up to one batch; the loop ends once none are left.
+        }
+
         await context.runMutation(internal.agent.threads.restoreThread, {
             threadId: threadId as Id<"threads">,
         });

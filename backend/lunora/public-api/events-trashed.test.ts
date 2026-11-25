@@ -50,7 +50,7 @@ describe("a poll and a chat in the trash", () => {
         }
     });
 
-    it("returns a trashed chat's events again once it is restored", async () => {
+    it("shows a chat's events once it is no longer trashed, as the poll's trash check reads it", async () => {
         const harness = lunoraTest(schemaWithShardedTables([]) as never);
 
         try {
