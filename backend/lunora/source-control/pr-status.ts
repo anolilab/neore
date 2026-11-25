@@ -9,7 +9,6 @@ import { v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import type { ActionCtx } from "../_generated/server";
 import { resolveGithubToken } from "../connectors/lib/github-token";
-import { callOnShard } from "../lib/cross-shard";
 import { authAction, rateLimit } from "../lib/crpc";
 import { threadShardFor } from "../lib/thread-shard";
 import { MAX_LENGTH } from "../lib/validators";
@@ -122,29 +121,43 @@ const vOpen = v.object({
 });
 
 /**
- * The owner's shard and the owner's user id for a thread's links. A collaborator's status read runs on the caller's shard, but the
- * link rows are the owner's (only the owner attaches or opens a link): they live on the owner's shard, under the owner's id. A
- * thread with no grant resolves to the caller, exactly as before.
+ * Whether the caller is the thread's owner: only then may this read write the thread's link rows (the stamp and the merge). A
+ * collaborator's read names a pull request the owner's chats may link to, and it must not move or archive the owner's rows, so it
+ * writes nothing. A failed grant lookup answers "not the owner": the host answer is still returned, and nothing is written.
  */
-export const linkOwnerOf = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, threadId: string | undefined): Promise<string> =>
-    threadId === undefined ? userId : await threadShardFor(ctx, userId, threadId);
+export const ownsThread = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, threadId: string | undefined): Promise<boolean> => {
+    if (threadId === undefined) {
+        return false;
+    }
 
-export const stampStatusRead = async (ownerId: string, ref: { number: number; repository: string }, threadId: string, readStartedAt: number): Promise<void> => {
+    try {
+        return (await threadShardFor(ctx, userId, threadId)) === userId;
+    } catch (error) {
+        console.error("[source-control] could not read a thread's owner for a status read", error);
+
+        return false;
+    }
+};
+
+/** Records that the links to this pull request were read now, on the caller's own shard. Never throws: the answer is what the caller gets. */
+export const stampStatusRead = async (
+    ctx: Pick<ActionCtx, "runMutation">,
+    userId: string,
+    ref: { number: number; repository: string },
+    threadId: string,
+    readStartedAt: number,
+): Promise<void> => {
     try {
         const address = requireAddress(ref.repository, ref.number);
 
-        await callOnShard(
-            internal.source_control.pr_threads.recordStatusRead,
-            {
-                number: address.number,
-                // Only links that existed when the host was asked were part of this read: a link made since is left for the next one.
-                readStartedAt,
-                repository: address.repository,
-                threadId,
-                userId: ownerId,
-            },
-            { shardKey: ownerId },
-        );
+        await ctx.runMutation(internal.source_control.pr_threads.recordStatusRead, {
+            number: address.number,
+            // Only links that existed when the host was asked were part of this read: a link made since is left for the next one.
+            readStartedAt,
+            repository: address.repository,
+            threadId,
+            userId,
+        });
     } catch (error) {
         console.error("[source-control] could not record a status read", error);
     }
@@ -211,10 +224,10 @@ export const getPullRequestStatus = authAction
 
         // The links are the owner's: a stamp and a merge record for a shared chat go to the owner's shard (the host read above used
         // the caller's own token, and is unchanged).
-        const ownerId = await linkOwnerOf(ctx, ctx.user.userId, args.threadId);
+        const owner = await ownsThread(ctx, ctx.user.userId, args.threadId);
 
-        if ((outcome.status === "ok" || repeatableFailure) && args.threadId !== undefined) {
-            await stampStatusRead(ownerId, ref, args.threadId, readStartedAt);
+        if ((outcome.status === "ok" || repeatableFailure) && args.threadId !== undefined && owner) {
+            await stampStatusRead(ctx, ctx.user.userId, ref, args.threadId, readStartedAt);
         }
 
         // A merge made outside the app is seen here, when the chat's pull request is read (`pr-merged.ts`).
@@ -222,7 +235,7 @@ export const getPullRequestStatus = authAction
         // sighting time (which could archive chats for a merge that came before the opt-in).
         // Only the owner's own read records a merge: that merge marks every chat the owner linked to the pull request, so a
         // collaborator's read (which names the pull request, not the owner's chats) must not write or archive the owner's chats.
-        if (outcome.status === "ok" && outcome.state === "merged" && outcome.mergedAt !== undefined && ownerId === ctx.user.userId) {
+        if (outcome.status === "ok" && outcome.state === "merged" && outcome.mergedAt !== undefined && owner) {
             await recordMergedPullRequest(ctx, ctx.user.userId, ref, outcome.mergedAt);
         }
 

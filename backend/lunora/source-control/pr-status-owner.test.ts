@@ -1,48 +1,34 @@
 /**
- * A shared chat's status read writes the OWNER's link rows: the stamp and the merge record go to the owner's shard, under the
- * owner's id, while the host read keeps the caller's token. The harness runs every shard in one database, so the shard hop is
- * replaced by a recorder that runs the target mutation in the harness; what is checked is which shard and which owner id are
- * asked for, and that the owner's rows are the ones written.
+ * Only the thread's owner's status read writes the chat's link rows. A collaborator's read writes nothing (it names a pull request
+ * the owner's chats may link to), and a failed grant lookup counts as "not the owner", so the host answer still returns and nothing
+ * is written.
  */
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { internal } from "../_generated/internal";
 import schema from "../schema";
-import { linkOwnerOf, stampStatusRead } from "./pr-status";
-import { archiveMergedThread } from "../agent/auto-archive";
-import { recordPullRequestMerged, recordStatusRead } from "./pr-threads";
+import { ownsThread, stampStatusRead } from "./pr-status";
+import { recordStatusRead } from "./pr-threads";
 
 const mocks = vi.hoisted(() => {
     return {
-        calls: [] as { args: Record<string, unknown>; shardKey: string }[],
+        fail: false,
         owner: "",
-        run: null as null | ((reference: unknown, args: unknown) => Promise<unknown>),
-    };
-});
-
-vi.mock("../lib/cross-shard", () => {
-    return {
-        callOnShard: async (reference: unknown, args: Record<string, unknown>, options: { shardKey: string }) => {
-            mocks.calls.push({ args, shardKey: options.shardKey });
-
-            return await mocks.run?.(reference, args);
-        },
     };
 });
 
 vi.mock("../lib/thread-shard", () => {
     return {
-        threadShardFor: async () => mocks.owner,
+        threadShardFor: async () => {
+            if (mocks.fail) {
+                throw new Error("the grant lookup failed");
+            }
+
+            return mocks.owner;
+        },
     };
 });
-
-/** The mutations the routed calls name, mapped to the functions they stand for (the harness runs the functions themselves). */
-const REGISTERED = new Map<unknown, unknown>([
-    [internal.agent.auto_archive.archiveMergedThread, archiveMergedThread],
-    [internal.source_control.pr_threads.recordPullRequestMerged, recordPullRequestMerged],
-    [internal.source_control.pr_threads.recordStatusRead, recordStatusRead],
-]);
 
 const REPOSITORY = "octo/hello";
 const NUMBER = 7;
@@ -53,15 +39,14 @@ let harness: ReturnType<typeof lunoraTest>;
 
 beforeEach(() => {
     harness = lunoraTest(schema as never);
-    mocks.calls.length = 0;
-    mocks.run = (reference, args) => harness.run((ctx: any) => ctx.runMutation(REGISTERED.get(reference) ?? reference, args));
+    mocks.fail = false;
 });
 
 afterEach(() => {
     harness.close();
 });
 
-/** A chat of the owner with one link to the pull request (the owner's row, as only the owner attaches one). */
+/** A chat of the owner with one link to the pull request (only the owner attaches one, so the row is the owner's). */
 const setUpSharedChat = () =>
     harness.run(async (ctx: any) => {
         const threadId = await ctx.db.insert("threads", {
@@ -87,33 +72,45 @@ const setUpSharedChat = () =>
     });
 
 const ref = { number: NUMBER, repository: REPOSITORY };
-const dummyQuery = { runQuery: async () => null } as never;
+const queryRunner = { runQuery: async () => null } as never;
 
-describe("linkOwnerOf", () => {
-    it("resolves a shared chat to its owner, and an unshared one to the caller", async () => {
+describe("ownsThread", () => {
+    it("is true for the owner of the thread", async () => {
         mocks.owner = OWNER;
-        expect(await linkOwnerOf(dummyQuery, CALLER, "thread-1")).toBe(OWNER);
 
-        mocks.owner = CALLER;
-        expect(await linkOwnerOf(dummyQuery, CALLER, "thread-1")).toBe(CALLER);
+        expect(await ownsThread(queryRunner, OWNER, "thread-1")).toBe(true);
+    });
 
-        expect(await linkOwnerOf(dummyQuery, CALLER, undefined)).toBe(CALLER);
+    it("is false for a collaborator, whose grant names another owner", async () => {
+        mocks.owner = OWNER;
+
+        expect(await ownsThread(queryRunner, CALLER, "thread-1")).toBe(false);
+    });
+
+    it("is false when the grant lookup fails, so nothing is written", async () => {
+        mocks.fail = true;
+
+        expect(await ownsThread(queryRunner, OWNER, "thread-1")).toBe(false);
+    });
+
+    it("is false with no thread to read", async () => {
+        expect(await ownsThread(queryRunner, OWNER, undefined)).toBe(false);
     });
 });
 
-describe("routed status read", () => {
-    it("stamps a shared chat's link on the owner's shard, as the owner", async () => {
+describe("the owner's status stamp", () => {
+    it("stamps the owner's own link on the caller's shard", async () => {
         const { linkId, threadId } = await setUpSharedChat();
+        const ctx = {
+            runMutation: (reference: unknown, args: unknown) =>
+                harness.run((runCtx: any) =>
+                    runCtx.runMutation(reference === internal.source_control.pr_threads.recordStatusRead ? recordStatusRead : reference, args),
+                ),
+        };
 
-        mocks.owner = OWNER;
+        await stampStatusRead(ctx as never, OWNER, ref, threadId, Date.now() + 1000);
 
-        await stampStatusRead(OWNER, ref, threadId, Date.now() + 1000);
-
-        expect(mocks.calls).toHaveLength(1);
-        expect(mocks.calls[0]?.shardKey).toBe(OWNER);
-        expect(mocks.calls[0]?.args.userId).toBe(OWNER);
-
-        const link = await harness.run(async (ctx: any) => await ctx.db.get("pullRequestThreads", linkId));
+        const link = await harness.run(async (runCtx: any) => await runCtx.db.get("pullRequestThreads", linkId));
 
         expect(link?.statusReadAt).toBeTypeOf("number");
     });
