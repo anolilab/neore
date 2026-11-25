@@ -60,7 +60,7 @@ interface Walk {
 const MERGED_ARCHIVES_PER_READ = 25;
 
 /**
- * Recording pages one action records. A walk past this continues in a scheduled action from the cursor it stopped at, so no
+ * Recording pages one action records. A walk past this continues on the jobs queue from the cursor it stopped at, so no
  * single action records an unbounded number of pages.
  */
 const MAX_RECORD_PAGES_PER_ACTION = 10;
@@ -84,7 +84,7 @@ const pageArgsOf = (merge: MergeRecording) => {
 };
 
 /**
- * Records the links of one merge page by page, from `start`, for at most `MAX_RECORD_PAGES_PER_ACTION` pages. The owed links are
+ * Records the links of one merge page by page, from `start`, for at most `maxPages` pages. The owed links are
  * kept once each, even when a restart sees them again. A cursor the server no longer reads (`INVALID_CURSOR`: a write or a deploy
  * between pages) restarts the walk from the first page, as the state sweep does.
  */
