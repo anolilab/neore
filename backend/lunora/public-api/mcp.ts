@@ -424,7 +424,9 @@ export const serveMcp = async (rawBody: string, dependencies: McpDependencies): 
         return era.refusal;
     }
 
-    if (message.method !== "tools/call") {
+    // A tool call is charged by its route, and an `events/poll` by the router once its scope check passes: a poll the key may not
+    // make is refused without drawing on its read allowance.
+    if (message.method !== "tools/call" && message.method !== "events/poll") {
         await dependencies.chargeProtocolCall();
     }
 
@@ -455,6 +457,9 @@ export const serveMcp = async (rawBody: string, dependencies: McpDependencies): 
             const polled = parsePollParams(id, params);
 
             if ("refusal" in polled) {
+                // A malformed poll never reaches the router, so it is charged here, as every other protocol call is.
+                await dependencies.chargeProtocolCall();
+
                 return polled.refusal;
             }
 

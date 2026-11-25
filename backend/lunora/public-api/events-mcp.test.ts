@@ -110,6 +110,38 @@ describe("negotiation", () => {
     });
 });
 
+describe("the read allowance a poll draws on", () => {
+    it("is not drawn by the protocol layer for a valid poll: the router charges it once the key's scope passes", async () => {
+        const charge = vi.fn(async () => undefined);
+        const request = modern("events/poll", { _meta: OFFER, cursor: null, name: "run.completed" }, "run.completed");
+
+        await serveMcp(request.body, {
+            ...dependenciesWith(
+                request,
+                pollingWith(async () => pollBody),
+            ),
+            chargeProtocolCall: charge,
+        });
+
+        expect(charge).not.toHaveBeenCalled();
+    });
+
+    it("is drawn for a malformed poll, which never reaches the router", async () => {
+        const charge = vi.fn(async () => undefined);
+        const request = modern("events/poll", { _meta: OFFER, cursor: null }, "run.completed");
+
+        await serveMcp(request.body, {
+            ...dependenciesWith(
+                request,
+                pollingWith(async () => pollBody),
+            ),
+            chargeProtocolCall: charge,
+        });
+
+        expect(charge).toHaveBeenCalledTimes(1);
+    });
+});
+
 describe("events/poll", () => {
     it("starts from now with a null cursor and returns the complete result", async () => {
         const poll = pollingWith(async () => pollBody);
