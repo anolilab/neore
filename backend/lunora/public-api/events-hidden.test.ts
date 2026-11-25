@@ -38,4 +38,21 @@ describe("a poll that hides some events", () => {
         expect(outcome.truncated).toBe(false);
         expect(outcome.nextSeq).toBe(3);
     });
+
+    it("does not report a gap for an aged-out event on a locked thread", async () => {
+        const aged: StoredEvent = { ...event(1, "locked"), createdAt: NOW - 10_000 };
+        const log = logOf([aged, event(2, "open")]);
+        const outcome = await pollEvents(log, {
+            fromSeq: 0,
+            hidden: async (row) => row.data["threadId"] === "locked",
+            maxAgeMs: 1000,
+            maxEvents: 50,
+            name: "run.completed",
+            now: NOW,
+        });
+
+        expect(outcome.events.map((row) => row.eventId)).toStrictEqual(["run:2"]);
+        expect(outcome.truncated).toBe(false);
+        expect(outcome.nextSeq).toBe(2);
+    });
 });
