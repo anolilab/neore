@@ -765,6 +765,30 @@ describe("the route cleanup and the erasure's owner sweep", () => {
         expect(routes).toHaveLength(1);
     });
 
+    it("keeps the routes while a guest merge is moving the account, and takes them once the merge ends", async () => {
+        await harness.run(async (context: any) => {
+            await context.db.insert("sharedPinRoutes", { createdAt: 1, ownerId: OWNER, threadId, userId: "user-collaborator" });
+            await context.db.insert("accountMoves", { createdAt: Date.now(), kind: "merging", userId: "user-collaborator" });
+
+            await dropRoutesWithoutPins(context, threadId, "user-collaborator");
+        });
+
+        // The merge has not transferred the route yet, so it is still the only way to find the moved pins.
+        expect(await routesOf("user-collaborator")).toHaveLength(1);
+
+        await harness.run(async (context: any) => {
+            const { page } = await context.db.accountMoves.findMany({ where: { userId: "user-collaborator" } });
+
+            for (const row of page) {
+                await context.db.delete("accountMoves", row._id);
+            }
+        });
+
+        await harness.run(async (context: any) => await dropRoutesWithoutPins(context, threadId, "user-collaborator"));
+
+        expect(await routesOf("user-collaborator")).toHaveLength(0);
+    });
+
     it("refuses a collaborator's pin written after the owner sweep fenced the shard, and leaves no pin behind", async () => {
         await grantWrite();
 

@@ -28,6 +28,9 @@ export type AccountMoveKind = "erasing" | "importing" | "merging";
  */
 export const PIN_WRITE_LEASE_MS = 60_000;
 
+/** Expired lease rows one admission, or one move's end, deletes at most. The rest are reclaimed by later calls. */
+const LEASE_RECLAIM_BATCH = 20;
+
 /**
  * Every lease row of the account. Lunora returns a read one page at a time, so a lease past the first page is read too: a missed writer
  * could let a refused write take back a route it still needs, or let an erasure sweep before that write commits.
@@ -88,16 +91,20 @@ export const beginAccountMove = async (context: Pick<MutationCtx, "db">, userId:
 /**
  * Adds the lease of one admitted pin write, and returns its writer id. Each write has its own row, which the move's wait reads until it
  * expires, and which a refused write's route cleanup reads to see whether another write is still in flight. Rows the account's earlier
- * writes left past their expiry are removed here.
+ * writes left past their expiry are reclaimed here, a batch per admission, so one admission's writes stay within its budget.
  */
 export const admitPinWrite = async (context: Pick<MutationCtx, "db">, userId: string, now: number): Promise<string> => {
     const writerId = crypto.randomUUID();
     const leases = await leasesOf(context, userId);
+    let reclaimed = 0;
 
     for (const lease of leases) {
-        if (lease.expiresAt <= now) {
-            await context.db.delete("pinWriteLeases", lease._id);
+        if (lease.expiresAt > now || reclaimed >= LEASE_RECLAIM_BATCH) {
+            continue;
         }
+
+        await context.db.delete("pinWriteLeases", lease._id);
+        reclaimed += 1;
     }
 
     await context.db.insert("pinWriteLeases", { expiresAt: now + PIN_WRITE_LEASE_MS, userId, writerId });
@@ -181,9 +188,10 @@ export const endAccountMove = async (context: Pick<MutationCtx, "db">, userId: s
         return;
     }
 
+    // The move waited for every live lease, so what is left is expired: a batch goes now, and admissions reclaim the rest.
     const leases = await leasesOf(context, userId);
 
-    for (const row of leases) {
+    for (const row of leases.slice(0, LEASE_RECLAIM_BATCH)) {
         await context.db.delete("pinWriteLeases", row._id);
     }
 };

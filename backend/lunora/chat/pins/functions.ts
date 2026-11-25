@@ -3,8 +3,17 @@ import { LunoraError, v } from "lunorash/server";
 import type { Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
 import type { MutationCtx } from "../../_generated/server";
-import { admitPinWriteAs, isErasing, otherPinWritesInFlight, PIN_WRITE_LEASE_MS, refusesPinWrite, releasePinWrite } from "../../lib/account-moves";
+import {
+    admitPinWriteAs,
+    isAccountMoving,
+    isErasing,
+    otherPinWritesInFlight,
+    PIN_WRITE_LEASE_MS,
+    refusesPinWrite,
+    releasePinWrite,
+} from "../../lib/account-moves";
 import { authMutation, authQuery, internalMutation, internalQuery, rateLimit } from "../../lib/crpc";
+import { enqueueJob } from "../../lib/job-queue";
 import { MAX_LENGTH } from "../../lib/validators";
 import { systemDb } from "../../lib/rls/scope";
 import { threadGateOutcome, throwUnlessGranted } from "../lib/thread-gate";
@@ -193,8 +202,27 @@ const ROUTE_CLEANUP_BATCH = 100;
  * schedules nothing and removes no route, and the job never reads a pin the commit has not yet removed. `enqueueJob` is sent at once and
  * not undone, so it could run first and then fail the mutation after its routes were gone.
  */
-const scheduleRouteCleanup = async (context: MutationCtx, threadId: Id<"threads">, userId: string, delayMs = 0): Promise<void> => {
-    await context.scheduler.runAfter(delayMs, internal.chat.pins.functions.finishPinRouteCleanup, { threadId, userId });
+const scheduleRouteCleanup = async (
+    context: MutationCtx,
+    threadId: Id<"threads">,
+    userId: string,
+    options: { delayMs?: number; survivesRollback?: boolean } = {},
+): Promise<void> => {
+    const { delayMs = 0, survivesRollback = false } = options;
+
+    if (!survivesRollback) {
+        await context.scheduler.runAfter(delayMs, internal.chat.pins.functions.finishPinRouteCleanup, { threadId, userId });
+
+        return;
+    }
+
+    // A refused write rethrows, which rolls back a scheduled job while the route changes it made stay. So its cleanup goes by a queue
+    // send, which a rollback does not undo: the job runs whether or not the refusal does.
+    const thread = await systemDb(context).get("threads", threadId);
+
+    if (thread?.userId !== undefined) {
+        await enqueueJob(internal.chat.pins.functions.finishPinRouteCleanup, { threadId, userId }, { delayMs, shardKey: thread.userId });
+    }
 };
 
 /**
@@ -202,13 +230,27 @@ const scheduleRouteCleanup = async (context: MutationCtx, threadId: Id<"threads"
  * same rule runs when the last pin goes (`deletePin`). A full batch means more may remain, so a job on the thread owner's shard finishes
  * them (`finishPinRouteCleanup`); that job re-checks the pins and the in-flight writes, so it can run again safely.
  */
-export const dropRoutesWithoutPins = async (context: MutationCtx, threadId: Id<"threads">, userId: string, writerId: string | null = null): Promise<void> => {
+export const dropRoutesWithoutPins = async (
+    context: MutationCtx,
+    threadId: Id<"threads">,
+    userId: string,
+    writerId: string | null = null,
+    refusal = false,
+): Promise<void> => {
     const left = await context.db
         .query("threadPins")
         .withIndex("by_user_and_thread", (q) => q.eq("userId", userId).eq("threadId", threadId))
         .take(1);
 
     if (left.length > 0) {
+        return;
+    }
+
+    // A guest merge is moving this account's pins, and the route it has not transferred yet is still the only way to find them: none is
+    // taken until the merge ends. An erasure is not waited for: its drain removes every route, and a refused write takes back its own.
+    if ((await isAccountMoving(context, userId, Date.now())) && !(await isErasing(context, userId))) {
+        await scheduleRouteCleanup(context, threadId, userId, { delayMs: PIN_WRITE_LEASE_MS, survivesRollback: refusal });
+
         return;
     }
 
@@ -227,7 +269,7 @@ export const dropRoutesWithoutPins = async (context: MutationCtx, threadId: Id<"
             await context.db.insert("sharedPinRoutes", { createdAt: route.createdAt, ownerId: route.ownerId, threadId, userId });
         }
 
-        await scheduleRouteCleanup(context, threadId, userId, PIN_WRITE_LEASE_MS);
+        await scheduleRouteCleanup(context, threadId, userId, { delayMs: PIN_WRITE_LEASE_MS, survivesRollback: refusal });
 
         return;
     }
@@ -236,7 +278,7 @@ export const dropRoutesWithoutPins = async (context: MutationCtx, threadId: Id<"
         return;
     }
 
-    await scheduleRouteCleanup(context, threadId, userId);
+    await scheduleRouteCleanup(context, threadId, userId, { survivesRollback: refusal });
 };
 
 /**
@@ -252,7 +294,7 @@ export const finishRouteCleanup = async (context: MutationCtx, threadId: Id<"thr
     }
 
     if (await otherPinWritesInFlight(context, userId, null, Date.now())) {
-        await scheduleRouteCleanup(context, threadId, userId, PIN_WRITE_LEASE_MS);
+        await scheduleRouteCleanup(context, threadId, userId, { delayMs: PIN_WRITE_LEASE_MS });
 
         return;
     }
@@ -304,7 +346,7 @@ export const withSharedPinRoute = async <T>(
                 await releasePinWrite(context, userId, writerId);
             }
 
-            await dropRoutesWithoutPins(context, threadId, userId, writerId);
+            await dropRoutesWithoutPins(context, threadId, userId, writerId, true);
         }
 
         throw error;

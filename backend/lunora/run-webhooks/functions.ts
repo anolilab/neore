@@ -13,7 +13,7 @@ import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { internalQuery } from "../_generated/server";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
-import { admitPinWriteAs } from "../lib/account-moves";
+import { admitPinWriteAs, refusesPinWrite, releasePinWrite } from "../lib/account-moves";
 import { decryptKey, encryptKey } from "../lib/encryption";
 import { onOwnShard } from "../lib/own-shard";
 import { deliverRunWebhook } from "./delivery";
@@ -49,7 +49,15 @@ const refuseImpersonation = (impersonatedBy: string | null | undefined): void =>
  * merging or erased, and otherwise holding the account's lease, which the merge waits out before it copies.
  */
 const refuseWhileMoving = async (ctx: Parameters<typeof admitPinWriteAs>[0], userId: string, now: number): Promise<void> => {
-    if ((await admitPinWriteAs(ctx, userId, now)) === null) {
+    const writerId = await admitPinWriteAs(ctx, userId, now);
+
+    // A move that started after the first check is caught here, before the save: its wait sees the lease taken above, so the refused
+    // save gives the lease back and the move is not held up.
+    if (writerId === null || (await refusesPinWrite(ctx, userId, now))) {
+        if (writerId !== null) {
+            await releasePinWrite(ctx, userId, writerId);
+        }
+
         throw new LunoraError("FORBIDDEN", "The run webhook cannot be changed while this account is being moved or erased.");
     }
 };

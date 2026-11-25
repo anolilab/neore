@@ -95,6 +95,27 @@ describe("the pin-write lease", () => {
         }
     });
 
+    it("reclaims at most one batch of expired rows per admission, so a busy account's writes stay within budget", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < 50; index += 1) {
+                    await context.db.insert("pinWriteLeases", { expiresAt: 1, userId: "user-busy", writerId: `old-${String(index)}` });
+                }
+            });
+
+            await harness.run(async (context: any) => await admitPinWrite(context, "user-busy", 1000));
+
+            const rows = await harness.run(async (context: any) => await context.db.pinWriteLeases.findMany({ where: { userId: "user-busy" } }));
+
+            // Twenty of the fifty expired rows go, and the admitted write's own row is added.
+            expect(rows.page).toHaveLength(50 - 20 + 1);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("adds one row per admitted write, and removes a row once it has expired", async () => {
         const harness = lunoraTest(schema as never);
 
