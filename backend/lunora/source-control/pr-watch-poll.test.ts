@@ -342,6 +342,60 @@ describe("a poll that went stale before the host read", () => {
         expect(saved).toHaveBeenCalledWith(answer);
     });
 
+    it("retries only the record, with the same observation, when it throws once", async () => {
+        const failing = observation({ checks: "failing", failingCheckNames: ["build"] });
+        const readHost = vi.fn().mockResolvedValue({ observation: failing, status: "ok" });
+        const saved = vi.fn().mockRejectedValueOnce(new Error("write failed")).mockResolvedValue(null);
+
+        await runWatchPoll({ fail: vi.fn(), read: async () => TARGET, readHost, record: saved, token: async () => TOKEN });
+
+        expect(readHost).toHaveBeenCalledOnce();
+        expect(saved).toHaveBeenCalledTimes(2);
+        expect(saved).toHaveBeenNthCalledWith(2, failing);
+    });
+
+    it("gives up after the bound without a second host read, and does not take it for a failed read", async () => {
+        const readHost = vi.fn().mockResolvedValue({ observation: observation(), status: "ok" });
+        const saved = vi.fn().mockRejectedValue(new Error("write failed"));
+        const failed = vi.fn();
+
+        await expect(runWatchPoll({ fail: failed, read: async () => TARGET, readHost, record: saved, token: async () => TOKEN })).rejects.toThrow(
+            "write failed",
+        );
+
+        expect(saved).toHaveBeenCalledTimes(3);
+        expect(readHost).toHaveBeenCalledOnce();
+        expect(failed).not.toHaveBeenCalled();
+    });
+
+    it("stores the first read's failing checks when a retried record lands after the host turned green", async () => {
+        const linkId = await seedWatch({ watch: { baselined: true, headSha: "sha-1", startedAt: STARTED_AT } });
+        const failing = observation({ checks: "failing", failingCheckNames: ["build"] });
+        let tries = 0;
+
+        await runWatchPoll({
+            fail: vi.fn(),
+            read: async () => TARGET,
+            // A second host read would answer passing; the poll must not make one.
+            readHost: vi.fn().mockResolvedValueOnce({ observation: failing, status: "ok" }).mockResolvedValue({ observation: observation(), status: "ok" }),
+            record: async (observed) => {
+                tries += 1;
+
+                if (tries === 1) {
+                    throw new Error("write failed");
+                }
+
+                await record(linkId, { observation: observed });
+            },
+            token: async () => TOKEN,
+        });
+
+        const row = await rowOf(linkId);
+
+        expect(row.watchPending).toEqual(["checks"]);
+        expect(row.watch.checksHeadSha).toBe("sha-1");
+    });
+
     it("notes a failed host read and records nothing else", async () => {
         const saved = vi.fn();
         const failed = vi.fn();

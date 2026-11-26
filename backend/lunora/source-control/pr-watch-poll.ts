@@ -329,6 +329,29 @@ export interface WatchTarget {
     userId: string;
 }
 
+/** Extra tries of the record alone, with no delay. */
+const RECORD_RETRIES = 2;
+
+/**
+ * Records an observation already read. A record that throws (a transient write failure rolls back, so the lease is still the
+ * link's) is tried again with the SAME observation, never a new host read: a second read could show passing checks and lose the
+ * failing ones the first read saw. Every try keeps the mutation's lease and run checks. Past the bound the error stands, and the
+ * watchdog poll is the retry.
+ */
+const recordWithRetry = async (record: (observation: PullRequestObservation) => Promise<unknown>, observation: PullRequestObservation): Promise<void> => {
+    for (let attempt = 0; ; attempt += 1) {
+        try {
+            await record(observation);
+
+            return;
+        } catch (error) {
+            if (attempt >= RECORD_RETRIES) {
+                throw error;
+            }
+        }
+    }
+};
+
 /** The steps of one poll, apart from where they run, so their order is pinned by a test. */
 export interface WatchPollSteps {
     /** Notes a host read that failed: nothing else changes, and the retry is the one already armed. */
@@ -361,7 +384,7 @@ export const runWatchPoll = async (steps: WatchPollSteps): Promise<void> => {
     const outcome = await steps.readHost(target, token);
 
     if (outcome.status === "ok") {
-        await steps.record(outcome.observation);
+        await recordWithRetry(steps.record, outcome.observation);
     } else {
         await steps.fail(outcome.status);
     }
