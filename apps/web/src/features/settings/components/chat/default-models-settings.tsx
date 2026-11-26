@@ -146,6 +146,8 @@ export const ModelSelect = <Field extends string>({
  * The models a reply is retried on, in order, when the chosen model fails with an infrastructure error. A saved model
  * the list no longer offers (retired, or now outside the plan) stays listed as unavailable, so it can still be removed.
  */
+const controlKey = (id: string, control: "down" | "remove" | "up"): string => `${control}:${id}`;
+
 export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[]; providersWithKey: ReadonlySet<string> }> = ({
     disabled,
     models: allModels,
@@ -167,20 +169,23 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
         providersWithKey,
     );
     const usable = new Set(useFilteredModels(candidates).map((m) => m.id));
-    // Without the catalog or the plan answer, nothing is known to be unusable: no entry is marked until both are read.
-    const availabilityKnown = useGatewayModelsLoaded() && access !== undefined;
+    // The filters read as none until the preferences load (or when they fail to), so they must be read too.
+    const { data: aiPreferences } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
+    // Without the catalog, the plan answer or the filters, nothing is known to be unusable: no entry is marked until all are read.
+    const availabilityKnown = useGatewayModelsLoaded() && access !== undefined && aiPreferences !== undefined;
     const { data: userSettings } = useUserSettings();
-    // Edits queue behind each other (`updateLatest`), so the controls stay enabled while one saves and keep their focus.
-    const { updateLatest } = useUpdateUserSettings();
+    const { isPending, updateLatest } = useUpdateUserSettings();
     const chosen = storedBackupModels(userSettings);
-    // Until the settings load, the list only looks empty: an edit then would replace the saved one.
-    const locked = disabled === true || userSettings === undefined;
+    // Until the settings load, the list only looks empty: an edit then would replace the saved one. While a save runs,
+    // another edit would be built on its unconfirmed value and could save it even if it fails.
+    const locked = disabled === true || userSettings === undefined || isPending;
     const chosenKey = chosen.join("\n");
     const limit = MAX_BACKUP_MODELS;
-    const removeButtons = useRef(new Map<string, HTMLButtonElement>());
+    // Each entry's buttons by `controlKey`, so focus can be put back once the list has changed.
+    const controls = useRef(new Map<string, HTMLButtonElement>());
     const addRow = useRef<HTMLDivElement>(null);
-    // The entry whose remove button takes focus once the list changes, or "" for the add picker: set when the focused
-    // control is about to go (its entry is removed, or the add picker after the last model it may add).
+    // The control that takes focus once the save is over and the controls are enabled again, or "" for the add picker:
+    // a disabled control drops focus, and the one used may be gone (its entry removed, the picker after the last add).
     const focusAfter = useRef<string | null>(null);
     // Bumped to place focus after a refused save: its rollback changes the list before the refusal is seen.
     const [focusRequest, setFocusRequest] = useState(0);
@@ -188,17 +193,25 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
     useEffect(() => {
         const target = focusAfter.current;
 
-        if (target === null) {
+        if (target === null || locked) {
             return;
         }
 
-        const element = target === "" ? addRow.current?.querySelector("button") : removeButtons.current.get(target);
+        const element = target === "" ? addRow.current?.querySelector("button") : controls.current.get(target);
 
-        if (element) {
+        if (element && !element.disabled) {
             focusAfter.current = null;
             element.focus();
         }
-    }, [chosenKey, focusRequest]);
+    }, [chosenKey, focusRequest, locked]);
+
+    const register = (key: string) => (element: HTMLButtonElement | null) => {
+        if (element) {
+            controls.current.set(key, element);
+        } else {
+            controls.current.delete(key);
+        }
+    };
 
     // Built from the cached settings when its turn comes, so two quick edits never undo each other.
     const save = (edit: (backupModels: string[]) => string[], focusOnFailure?: string) => {
@@ -245,7 +258,12 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                                 <Button
                                     aria-label={t`Move ${name} up`}
                                     disabled={locked || index === 0}
-                                    onClick={() => save((list) => moveBackupModel(list, id, -1))}
+                                    onClick={() => {
+                                        // At the top, "up" is disabled: focus moves to "down".
+                                        focusAfter.current = controlKey(id, index === 1 ? "down" : "up");
+                                        save((list) => moveBackupModel(list, id, -1));
+                                    }}
+                                    ref={register(controlKey(id, "up"))}
                                     size="icon-sm"
                                     variant="ghost"
                                 >
@@ -254,7 +272,11 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                                 <Button
                                     aria-label={t`Move ${name} down`}
                                     disabled={locked || index === chosen.length - 1}
-                                    onClick={() => save((list) => moveBackupModel(list, id, 1))}
+                                    onClick={() => {
+                                        focusAfter.current = controlKey(id, index === chosen.length - 2 ? "up" : "down");
+                                        save((list) => moveBackupModel(list, id, 1));
+                                    }}
+                                    ref={register(controlKey(id, "down"))}
                                     size="icon-sm"
                                     variant="ghost"
                                 >
@@ -264,16 +286,12 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                                     aria-label={t`Remove ${name}`}
                                     disabled={locked}
                                     onClick={() => {
-                                        focusAfter.current = chosen[index + 1] ?? chosen[index - 1] ?? "";
+                                        const next = chosen[index + 1] ?? chosen[index - 1];
+
+                                        focusAfter.current = next === undefined ? "" : controlKey(next, "remove");
                                         save((list) => list.filter((entry) => entry !== id));
                                     }}
-                                    ref={(element) => {
-                                        if (element) {
-                                            removeButtons.current.set(id, element);
-                                        } else {
-                                            removeButtons.current.delete(id);
-                                        }
-                                    }}
+                                    ref={register(controlKey(id, "remove"))}
                                     size="icon-sm"
                                     variant="ghost"
                                 >
@@ -300,10 +318,8 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
 
                             const fills = chosen.length + 1 >= limit;
 
-                            if (fills) {
-                                focusAfter.current = modelId;
-                            }
-
+                            // The picker stays unless this add fills the list; then the new entry's remove button takes focus.
+                            focusAfter.current = fills ? controlKey(modelId, "remove") : "";
                             // A refused add that filled the list rolls its entry back and the add picker returns: focus goes back to it.
                             save((list) => (list.includes(modelId) || list.length >= limit ? list : [...list, modelId]), fills ? "" : undefined);
                         }}

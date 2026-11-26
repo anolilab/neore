@@ -11,6 +11,8 @@ const state = vi.hoisted(() => {
         catalog: [] as GatewayModel[],
         catalogLoaded: true,
         excluded: new Set<string>(),
+        pending: false,
+        preferencesRead: true,
         refuse: false,
         rerender: (() => undefined) as () => void,
         settings: {} as undefined | { backupModels?: string[] },
@@ -32,8 +34,8 @@ vi.mock("@lingui/react/macro", () => {
 vi.mock("@tanstack/react-query", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("@tanstack/react-query")>()),
-        useQuery: () => {
-            return { data: { canRunPaidModels: true } };
+        useQuery: (options: { query?: string }) => {
+            return { data: options.query === "preferences" && !state.preferencesRead ? undefined : { canRunPaidModels: true } };
         },
     };
 });
@@ -44,6 +46,11 @@ vi.mock("@/lib/lunora/crpc", () => {
             return {
                 auth: {
                     functions: {
+                        getAIUserPreferences: {
+                            queryOptions: () => {
+                                return { query: "preferences" };
+                            },
+                        },
                         getPaidModelAccess: {
                             queryOptions: () => {
                                 return {};
@@ -74,7 +81,7 @@ vi.mock("@/features/auth/hooks/use-user-settings", () => {
     return {
         useUpdateUserSettings: () => {
             return {
-                isPending: false,
+                isPending: state.pending,
                 updateLatest: async (build: (current: typeof state.settings) => typeof state.settings) => {
                     const before = state.settings;
 
@@ -110,6 +117,8 @@ const show = (offered: GatewayModel[] = MODELS) => {
 beforeEach(() => {
     state.catalog = MODELS;
     state.catalogLoaded = true;
+    state.pending = false;
+    state.preferencesRead = true;
     state.refuse = false;
     state.excluded = new Set();
     state.settings = {};
@@ -191,6 +200,41 @@ describe("BackupModelsSetting", () => {
 
         expect(state.settings.backupModels).toEqual(["openai/first", "openai/second"]);
         expect(document.activeElement).toBe(screen.getByRole("combobox", { name: "Add another backup model" }));
+    });
+
+    it("marks nothing unavailable while the user's filters cannot be read", () => {
+        state.settings = { backupModels: ["openai/first"] };
+        state.excluded = new Set(["openai/first"]);
+        state.preferencesRead = false;
+        show();
+
+        const [entry] = screen.getAllByRole("listitem");
+
+        expect(entry?.textContent).not.toContain("Unavailable");
+    });
+
+    it("cannot be edited while a save runs, so a later edit is never built on a value that may be refused", () => {
+        state.settings = { backupModels: ["openai/first", "openai/second"] };
+        state.pending = true;
+        show();
+
+        expect(screen.getByRole("button", { name: "Remove First" }).hasAttribute("disabled")).toBe(true);
+        expect(screen.getByRole("button", { name: "Move Second up" }).hasAttribute("disabled")).toBe(true);
+    });
+
+    it("keeps focus on the moved backup, on its other arrow when the one used is now disabled", async () => {
+        state.settings = { backupModels: ["openai/first", "openai/second", "openai/third"] };
+        show();
+
+        await userEvent.click(screen.getByRole("button", { name: "Move Third up" }));
+
+        expect(state.settings.backupModels).toEqual(["openai/first", "openai/third", "openai/second"]);
+        expect(document.activeElement).toBe(screen.getByRole("button", { name: "Move Third up" }));
+
+        await userEvent.click(screen.getByRole("button", { name: "Move Third up" }));
+
+        expect(state.settings.backupModels).toEqual(["openai/third", "openai/first", "openai/second"]);
+        expect(document.activeElement).toBe(screen.getByRole("button", { name: "Move Third down" }));
     });
 
     it("moves focus to the next backup's remove button when one is removed", async () => {
