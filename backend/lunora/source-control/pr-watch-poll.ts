@@ -49,6 +49,9 @@ const MAX_NAME_LENGTH = 200;
 /** Reviews kept when no seen review bounds the list. The host lists newest first and the cut keeps the head: only the oldest are dropped, which the decision never needs. */
 const MAX_REVIEWS = 100;
 
+/** A `watchCheckedAt` no poll carries: what a recorded poll leaves behind. */
+const CONSUMED_LEASE = -1;
+
 const NOT_PASSING = new Set<CheckState>(["cancelled", "failure"]);
 
 const vObservation = v.object({
@@ -211,7 +214,11 @@ export const recordWatchFailure = internalMutation
 
         const attempt = (link.watchReadFailure?.attempts ?? 0) + 1;
 
-        await ctx.db.patch("pullRequestThreads", link._id, { watchReadFailure: { at: ctx.now, attempts: attempt, status: args.status } });
+        // The lease is consumed (-1 is no poll's lease): a repeat of this poll is rejected, and the retry is the watchdog's.
+        await ctx.db.patch("pullRequestThreads", link._id, {
+            watchCheckedAt: CONSUMED_LEASE,
+            watchReadFailure: { at: ctx.now, attempts: attempt, status: args.status },
+        });
         ctx.log.event("develop.watch_poll_failed", { attempt, linkId: String(link._id), status: args.status });
 
         return null;
@@ -283,7 +290,8 @@ export const recordWatchObservation = internalMutation
 
         // A wake is not delivered yet: its reasons stay pending with the markers the decision set, but the count and the cooldown
         // keep their stored values, so an undelivered wake never uses up the cap. The delivery counts the wake when it happens.
-        const release = { watchLeaseUntil: ctx.now + PR_WATCH_POLL_INTERVAL_MS };
+        // The lease identity is consumed with the release, so a repeat of this poll (or a late one) no longer matches.
+        const release = { watchCheckedAt: CONSUMED_LEASE, watchLeaseUntil: ctx.now + PR_WATCH_POLL_INTERVAL_MS };
         const stored = storedWatchOf({
             ...decision.state,
             startedAt,

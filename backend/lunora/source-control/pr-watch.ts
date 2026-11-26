@@ -100,6 +100,8 @@ export const setPullRequestWatch = internalMutation
             watchLeaseUntil: 0,
             watchPending: stored.watchPending ?? [],
             watchRun: crypto.randomUUID(),
+            // A restarted watch counts its own failures from the first.
+            ...(link.watchReadFailure !== undefined && { watchReadFailure: { ...link.watchReadFailure, attempts: 0 } }),
         });
         await runAfterOnShard(ctx.scheduler, 0, internal.source_control.pr_watch_poll.pollWatchLink, { linkId: link._id }, args.userId);
 

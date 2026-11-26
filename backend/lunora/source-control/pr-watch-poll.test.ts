@@ -367,6 +367,7 @@ describe("a poll that went stale before the host read", () => {
         const fail = async (status: string) => {
             await harness.run(async (ctx: any) => {
                 ctx.log.event = event;
+                await ctx.db.patch("pullRequestThreads", linkId, { watchCheckedAt: LEASE });
                 await ctx.runMutation(recordWatchFailure, { ...key(linkId), status });
             });
         };
@@ -379,7 +380,7 @@ describe("a poll that went stale before the host read", () => {
         expect(row.watch).toEqual(watch);
         expect(row.watchPending).toEqual(["checks"]);
         expect(row.watchActive).toBe(true);
-        expect(row.watchCheckedAt).toBe(LEASE);
+        expect(row.watchCheckedAt).toBe(-1);
         expect(row.watchReadFailure).toMatchObject({ attempts: 2, status: "host_error" });
         expect(event).toHaveBeenCalledTimes(2);
         expect(event).toHaveBeenLastCalledWith("develop.watch_poll_failed", { attempt: 2, linkId, status: "host_error" });
@@ -544,6 +545,63 @@ describe("a poll taken before a stop and restart", () => {
         expect(after.watch.baselined).toBeUndefined();
         expect(after.watchReadFailure).toBeUndefined();
         expect(await harness.run(async (ctx: any) => await ctx.runQuery(readWatchForPoll, { ...stale, linkId, startedAt: STARTED_AT }))).toBeNull();
+    });
+});
+
+describe("a poll that runs twice", () => {
+    it("records once: the repeat carries a consumed lease and its older observation is dropped", async () => {
+        const linkId = await seedWatch({ watch: { baselined: true, headSha: "sha-0", reviewId: "r0", startedAt: STARTED_AT } });
+
+        await record(linkId, { observation: observation({ headSha: "sha-new", reviews: [{ authorLogin: "bob", id: "r1" }] }) });
+        await record(linkId, { observation: observation({ headSha: "sha-old", reviews: [] }) });
+
+        const row = await rowOf(linkId);
+
+        expect(row.watch).toMatchObject({ headSha: "sha-new", reviewId: "r1" });
+        expect(row.watchCheckedAt).not.toBe(LEASE);
+        expect(row.watchLeaseUntil).toBeGreaterThan(Date.now());
+    });
+
+    it("counts a failure once, and a restart counts its own from the first", async () => {
+        const linkId = await seedWatch({ watch: { baselined: true, startedAt: STARTED_AT } });
+        const { threadId: linkThread } = await rowOf(linkId);
+        const threadId = String(linkThread);
+        const fail = async () => {
+            await harness.run(async (ctx: any) => {
+                await ctx.runMutation(recordWatchFailure, { lease: LEASE, linkId, startedAt: STARTED_AT, status: "host_error" });
+            });
+        };
+
+        await fail();
+        await fail();
+
+        const failed = await rowOf(linkId);
+
+        expect(failed.watchReadFailure.attempts).toBe(1);
+
+        await harness.run(async (ctx: any) => {
+            for (const watching of [false, true]) {
+                await ctx.runMutation(setPullRequestWatch, { number: 7, repository: "octo/hello", threadId, userId: OWNER, watching });
+            }
+        });
+
+        const restarted = await rowOf(linkId);
+
+        expect(restarted.watchReadFailure.attempts).toBe(0);
+
+        await harness.run(async (ctx: any) => {
+            await ctx.runMutation(recordWatchFailure, {
+                lease: restarted.watchCheckedAt,
+                linkId,
+                run: restarted.watchRun,
+                startedAt: restarted.watch.startedAt,
+                status: "host_error",
+            });
+        });
+
+        const again = await rowOf(linkId);
+
+        expect(again.watchReadFailure.attempts).toBe(1);
     });
 });
 
