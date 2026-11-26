@@ -180,11 +180,7 @@ export const createSideChat = authAction
         };
 
         try {
-            // The child keeps the parent's stored mode and bot, so its runs keep the same rules and persona.
-            if (parent.permissionMode) {
-                await ctx.runMutation(internal.chat.thread_state.copyThreadPermissionMode, { mode: parent.permissionMode, threadId: newThreadId });
-            }
-
+            // The child keeps the parent's bot, so its runs keep the same persona. Its permission mode is copied after the re-read below.
             if (parent.botId) {
                 await ctx.runMutation(internal.agent.threads.updateThread, { patch: { botId: parent.botId }, threadId: newThreadId });
             }
@@ -206,6 +202,11 @@ export const createSideChat = authAction
                 await discard();
 
                 return { reason: nowRefused, status: "refused" as const };
+            }
+
+            // Read here, not at the start: a restriction the owner made while the child was being set up is the mode the child keeps.
+            if (current?.permissionMode) {
+                await ctx.runMutation(internal.chat.thread_state.copyThreadPermissionMode, { mode: current.permissionMode, threadId: newThreadId });
             }
 
             await ctx.runAction(internal.agent.messages.cloneThread, {

@@ -273,7 +273,8 @@ export const lastSettledMessageId = internalQuery
             const parts = rows
                 .filter((entry) => entry.row.status === "success")
                 .flatMap((entry) => {
-                    const { content } = entry.row.message as { content?: unknown };
+                    // A row with no message body has no tool parts, so it reads as empty rather than throwing.
+                    const content = (entry.row.message as { content?: unknown } | undefined)?.content;
 
                     return Array.isArray(content) ? (content as { toolCallId?: string; type?: string }[]) : [];
                 });
