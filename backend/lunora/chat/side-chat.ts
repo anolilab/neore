@@ -5,8 +5,8 @@
  * flight is not copied: only settled rows are).
  *
  * Refused, before anything is written: a parent that is not the caller's own, a parent that is locked, deleted, archived,
- * temporary, deleting, public, host-run, group or shared, a parent that is not a text chat, one with no model, an empty
- * parent, and a parent on a custom endpoint (its content is never sent to another model).
+ * temporary, deleting, public, host-run, group or shared, a parent that is not a text chat, one with no model, a parent
+ * with no settled message, and a parent on a custom endpoint (also when switched to one) (its content is never sent to another model).
  *
  * The copy mirrors `branchThread` (`chat/functions.ts`), which records a "branch" link; the two should share one helper
  * once this is in place. This one is an action because copying messages is one.
@@ -34,24 +34,24 @@ export type SideChatRefusal =
     | "not_text"
     | "shared_or_temporary";
 
+type SideChatParent = {
+    activeAgent?: { kind?: string; model?: string };
+    archivedAt?: number;
+    deleted?: boolean;
+    deletingAt?: number;
+    groupChat?: unknown;
+    isPublic?: boolean;
+    isTemporary?: boolean;
+    lockedAt?: number;
+    mode?: string;
+    model?: string;
+    multiChat?: boolean;
+    publicAccessToken?: string;
+    runner?: string;
+};
+
 /** The refusal for a parent thread, or `null` when a side chat may start beside it. Pure, so each rule is pinned by a table. */
-export const sideChatRefusalOf = (
-    parent: {
-        archivedAt?: number;
-        deleted?: boolean;
-        deletingAt?: number;
-        groupChat?: unknown;
-        isPublic?: boolean;
-        isTemporary?: boolean;
-        lockedAt?: number;
-        mode?: string;
-        model?: string;
-        multiChat?: boolean;
-        publicAccessToken?: string;
-        runner?: string;
-    } | null,
-    ownerOk: boolean,
-): SideChatRefusal | null => {
+export const sideChatRefusalOf = (parent: SideChatParent | null, ownerOk: boolean): SideChatRefusal | null => {
     if (parent === null || !ownerOk) {
         return "not_found";
     }
@@ -92,6 +92,11 @@ export const sideChatRefusalOf = (
         return "custom_endpoint";
     }
 
+    // A parent switched to a custom endpoint runs on it, whatever model the thread started on.
+    if (parent.activeAgent?.model !== undefined && parseCustomModelId(parent.activeAgent.model) !== null) {
+        return "custom_endpoint";
+    }
+
     return null;
 };
 
@@ -117,8 +122,11 @@ export const createSideChat = authAction
             return { reason: "host_run", status: "refused" as const };
         }
 
-        // Resolved along the active path, with neither index nor message: the whole settled path, as a branch of the thread is.
-        const forkEnd = await ctx.runQuery(internal.agent.branches.resolveForkEnd, { index: undefined, messageId: undefined, threadId });
+        // The last SETTLED row of the active path: a reply still in flight or one that failed is never copied, and a parent
+        // with no settled row has nothing to fork.
+        const settledId = await ctx.runQuery(internal.agent.branches.lastSettledMessageId, { threadId });
+        const forkEnd =
+            settledId === null ? null : await ctx.runQuery(internal.agent.branches.resolveForkEnd, { index: undefined, messageId: settledId, threadId });
 
         if (forkEnd === null) {
             return { reason: "empty", status: "refused" as const };
@@ -139,6 +147,12 @@ export const createSideChat = authAction
         });
         const newThreadId = created._id as Id<"threads">;
 
+        // The child is removed with its link, so a failed or refused copy leaves neither behind.
+        const discard = async (): Promise<void> => {
+            await ctx.runMutation(internal.agent.threads.deleteThreadRelationship, { threadId: newThreadId });
+            await ctx.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: newThreadId });
+        };
+
         try {
             // The child keeps the parent's stored mode and bot, so its runs keep the same rules and persona.
             if (parent.permissionMode) {
@@ -156,6 +170,17 @@ export const createSideChat = authAction
                 threadId: newThreadId,
             });
 
+            // Re-read just before the copy: a parent locked, deleted or archived meanwhile is not copied. This narrows the race with
+            // a delete or lock and does not remove it; a full fence would need a claim the delete and lock paths also honour.
+            const current = await ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId });
+            const nowRefused = sideChatRefusalOf(current, current?.userId === userId);
+
+            if (nowRefused !== null) {
+                await discard();
+
+                return { reason: nowRefused, status: "refused" as const };
+            }
+
             await ctx.runAction(internal.agent.messages.cloneThread, {
                 copyUserIdForVectorSearch: true,
                 sourceThreadId: threadId,
@@ -164,14 +189,39 @@ export const createSideChat = authAction
                 upToAndIncludingMessageId: forkEnd.endId,
             });
 
+            if ((await ctx.runQuery(internal.agent.branches.lastSettledMessageId, { threadId: newThreadId })) === null) {
+                await discard();
+
+                return { reason: "empty", status: "refused" as const };
+            }
+
             if (parent.activeAgent) {
                 await ctx.runMutation(internal.agent.agent_switch.adoptForkAgent, { threadId: newThreadId });
             }
+
+            // The copy carries any context reset (`/clear`): the child is cut at it as the parent is.
+            if (parent.hasContextReset) {
+                await ctx.runMutation(internal.chat.context_reset.markForkedContextReset, { threadId: newThreadId });
+            }
         } catch (error) {
             // A child left half-copied would be an empty chat the person never asked for.
-            await ctx.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: newThreadId });
+            await discard();
 
             throw error;
+        }
+
+        const createdThread = await ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId: newThreadId });
+
+        if (createdThread) {
+            await ctx.runMutation(internal.lib.document_history.recordHistory, {
+                attribution: { action: "insert", metadata: { branchPoint: forkEnd.index, sideChatOf: threadId }, source: "manual" },
+                doc: createdThread,
+                documentId: newThreadId,
+                isDeleted: false,
+                organizationId: createdThread.organizationId ?? undefined,
+                tableName: "threads",
+                userId,
+            });
         }
 
         return { status: "ok" as const, threadId: String(newThreadId) };

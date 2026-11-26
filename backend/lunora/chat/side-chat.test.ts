@@ -4,11 +4,13 @@
  * group, non-text, model-less, empty or custom-endpoint parent is refused, and a refusal writes nothing.
  */
 import { lunoraTest } from "@lunora/testing";
+import { v } from "lunorash/server";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { registeredApi, registerModule } from "../../test/registered-api";
 
+import { internalAction } from "../_generated/server";
 import { addMessagesHandler } from "../agent/messages";
-import { insertThread } from "../agent/table-writes";
+import { insertContextResetRow, insertThread } from "../agent/table-writes";
 import schema from "../schema";
 import { createSideChat, sideChatRefusalOf } from "./side-chat";
 
@@ -54,7 +56,9 @@ beforeAll(async () => {
     registerModule(registry, "agent_branches", await import("../agent/branches"));
     registerModule(registry, "agent_messages", await import("../agent/messages"));
     registerModule(registry, "agent_threads", await import("../agent/threads"));
+    registerModule(registry, "chat_context_reset", await import("./context-reset"));
     registerModule(registry, "chat_functions", await import("./functions"));
+    registerModule(registry, "lib_document_history", await import("../lib/document-history"));
     registerModule(registry, "chat_thread_state", await import("./thread-state"));
 });
 
@@ -138,6 +142,8 @@ describe("sideChatRefusalOf", () => {
         expect(sideChatRefusalOf({ model: "openai/gpt-5" }, true)).toBeNull();
         expect(sideChatRefusalOf({}, true)).toBe("no_model");
         expect(sideChatRefusalOf({ model: "custom:acme/model" }, true)).toBe("custom_endpoint");
+        expect(sideChatRefusalOf({ activeAgent: { kind: "model", model: "custom:acme/model" }, model: "openai/gpt-5" }, true)).toBe("custom_endpoint");
+        expect(sideChatRefusalOf({ activeAgent: { kind: "model", model: "openai/gpt-5" }, model: "openai/gpt-5" }, true)).toBeNull();
         expect(sideChatRefusalOf({ isTemporary: true, model: "openai/gpt-5" }, true)).toBe("shared_or_temporary");
         expect(sideChatRefusalOf({ deletingAt: 1, model: "openai/gpt-5" }, true)).toBe("shared_or_temporary");
         expect(sideChatRefusalOf({ isPublic: true, model: "openai/gpt-5" }, true)).toBe("shared_or_temporary");
@@ -218,5 +224,93 @@ describe("createSideChat", () => {
         const child = await threadRow(outcome.threadId);
 
         expect(child).toMatchObject({ capOrganizationId: "org-cap", organizationId: "org-1" });
+    });
+
+    it("copies up to the last settled reply, never a reply still in flight or one that failed", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await withMessages(parentId, OWNER, ["settled"]);
+        await harness.run(async (ctx: any) => {
+            await addMessagesHandler(ctx, {
+                messages: [
+                    { message: { content: "streaming", role: "assistant" }, status: "pending" },
+                    { message: { content: "broken", role: "assistant" }, status: "failed" },
+                ],
+                threadId: parentId as never,
+                userId: OWNER,
+            });
+        });
+
+        const outcome = (await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)) as { status: string; threadId: string };
+
+        expect(outcome.status).toBe("ok");
+        expect(await messageCount(outcome.threadId)).toBe(1);
+    });
+
+    it("refuses a parent whose only rows are unsettled, and writes nothing", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await harness.run(async (ctx: any) => {
+            await addMessagesHandler(ctx, {
+                messages: [{ message: { content: "streaming", role: "assistant" }, status: "pending" }],
+                threadId: parentId as never,
+                userId: OWNER,
+            });
+        });
+
+        expect(await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)).toStrictEqual({ reason: "empty", status: "refused" });
+        expect(await sideRelations()).toHaveLength(0);
+    });
+
+    it("honours a context reset of the parent in the child", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await withMessages(parentId, OWNER, ["before the clear"]);
+        await harness.run(async (ctx: any) => {
+            await insertContextResetRow(ctx.db, { order: 5, threadId: parentId as never, userId: OWNER });
+            await ctx.db.patch("threads", parentId, { hasContextReset: true });
+        });
+
+        const outcome = (await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)) as { status: string; threadId: string };
+        const child = await threadRow(outcome.threadId);
+
+        expect(outcome.status).toBe("ok");
+        expect(child.hasContextReset).toBe(true);
+        expect(child.contextResetMessageId).toBeDefined();
+    });
+
+    it("leaves no side relationship when the copy fails", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await withMessages(parentId, OWNER, ["hello"]);
+
+        const key = "agent_messages:cloneThread";
+        const original = registry.get(key);
+
+        registry.set(
+            key,
+            internalAction.input({ sourceThreadId: v.id("threads"), targetThreadId: v.id("threads") }).action(async () => {
+                throw new Error("copy failed");
+            }),
+        );
+
+        try {
+            await expect(as(OWNER).action(createSideChat as never, { threadId: parentId } as never)).rejects.toThrow("copy failed");
+        } finally {
+            registry.set(key, original);
+        }
+
+        expect(await sideRelations()).toHaveLength(0);
+    });
+
+    it("records the child's creation as a side chat of the parent", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await withMessages(parentId, OWNER, ["hello"]);
+
+        const outcome = (await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)) as { status: string; threadId: string };
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("documentHistory").collect());
+
+        expect(rows.some((row: any) => String(row.documentId) === outcome.threadId)).toBe(true);
     });
 });

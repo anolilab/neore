@@ -244,6 +244,25 @@ export const resolveForkEnd = internalQuery
     });
 
 /**
+ * The last row on the thread's active path whose status is "success", or `null` when none is: where a fork that must
+ * not carry a reply still in flight or one that failed ends (`createSideChat`).
+ */
+export const lastSettledMessageId = internalQuery
+    .input({ threadId: v.id("threads") })
+    .output(v.union(v.null(), v.string()))
+    .query(async ({ args, ctx }) => {
+        const thread = await ctx.db.get("threads", args.threadId);
+
+        if (!thread) {
+            return null;
+        }
+
+        const path = await loadActivePath(ctx, args.threadId, thread.activeLeafMessageId);
+
+        return path.findLast((row) => row.status === "success")?._id ?? null;
+    });
+
+/**
  * Every row a fork at `branchPoint` copied, top first — the parent's side of a
  * branch relationship, cut exactly where `branchThread` cut it.
  */
