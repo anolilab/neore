@@ -55,12 +55,21 @@ const pollingWith = (poll: (request: PollRequest) => Promise<PollResponse>) => {
 
 describe("discovery", () => {
     it("advertises the extension as a capability with empty settings, and no top-level events capability", async () => {
-        const { body } = await serve(modern("server/discover"));
+        const { body } = await serve(
+            modern("server/discover"),
+            pollingWith(async () => pollBody),
+        );
         const { capabilities } = body["result"];
 
         expect(capabilities.extensions).toStrictEqual({ [EVENT_EXTENSION_ID]: {} });
         expect(capabilities).not.toHaveProperty("events");
         expect(body["result"].resultType).toBe("complete");
+    });
+
+    it("does not advertise the extension where no Events poll is configured, since its methods are refused there", async () => {
+        const { body } = await serve(modern("server/discover"));
+
+        expect(body["result"].capabilities).not.toHaveProperty("extensions");
     });
 });
 

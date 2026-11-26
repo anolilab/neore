@@ -568,7 +568,8 @@ export const serveMcp = async (rawBody: string, dependencies: McpDependencies): 
                       _meta: { [META_SERVER_INFO]: serverInfo },
                       cacheScope: "public",
                       // Events is an extension (SEP-3415): settings `{}`, no `listChanged`, and no top-level `events` capability.
-                      capabilities: { extensions: { [EVENT_EXTENSION_ID]: {} }, tools: {} },
+                      // Advertised only where the Events extension is served: a configured endpoint answers its methods, an unconfigured one refuses them.
+                      capabilities: { ...(events !== undefined && { extensions: { [EVENT_EXTENSION_ID]: {} } }), tools: {} },
                       instructions: INSTRUCTIONS,
                       supportedVersions: SUPPORTED_VERSIONS,
                       ttlMs: 0,

@@ -417,6 +417,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             });
 
             threadId = created.threadId;
+            endedThread = threadId;
             thread = created.thread!;
 
             // As soon as the thread exists, so a failed bot patch below cannot leave it unrecorded.
@@ -437,10 +438,9 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             }
         } else {
             threadId = existingThreadId;
+            endedThread = threadId;
             ({ thread } = await agent.continueThread(ctx, { threadId, userId }));
         }
-
-        endedThread = threadId;
 
         await options.onGenerationStart?.();
 

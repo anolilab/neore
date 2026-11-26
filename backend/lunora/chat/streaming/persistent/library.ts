@@ -258,6 +258,11 @@ export const setStreamStatus = internalMutation
 
         assertCurrentRun(stream, args.runEpoch);
 
+        // The same refusal as `addChunk`: a paused stream stays live for its resume, so the run that paused it does not end it here.
+        if (args.runEpoch !== undefined && stream.pause !== undefined) {
+            throw new LunoraError(RUN_REPLACED, "The run is paused or being resumed");
+        }
+
         if (stream.status !== "pending" && stream.status !== "streaming") {
             console.log("Stream is already finalized; ignoring status change", stream);
 
