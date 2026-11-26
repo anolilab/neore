@@ -5,6 +5,7 @@
  */
 import { canonicalEmail, resolveAuthOptions } from "@lunora/auth";
 import { lunoraTest } from "@lunora/testing";
+import { LunoraError } from "lunorash/server";
 import { describe, expect, it, vi } from "vitest";
 
 import type { BackfillCall, BackfillRequest } from "../../../scripts/data-migrations";
@@ -70,8 +71,8 @@ interface CountOptions {
      * `user` rows as D1 holds the ones better-auth wrote: its Lunora adapter sets `supportsDates: false`, so a sign-up or
      * profile update stores `createdAt`/`updatedAt` as ISO strings, whatever the column's `v.number()` says. `iso` answers
      * them as those strings; `unreadable` as text no clock reads. The harness cannot hold such a row (it validates every
-     * column on a write, D1 only the patched ones), so the conditional patch compares the guard as D1 does, as stored
-     * text: the row's own string matches, a number never does.
+     * column on a write), so only reads present them; a conditional patch whose guard carries such a date is refused, as
+     * Lunora refused it on staging (`VALIDATION_ERROR`, the column being `v.number()`).
      */
     storedDates?: "iso" | "unreadable";
 }
@@ -159,17 +160,11 @@ const counted = (ctx: any, options: CountOptions = {}) => {
 
         await options.patchIf?.(ctx, id, spent.patches);
 
-        let guarded = args as { patch: Record<string, unknown>; where: Record<string, unknown> };
+        const guarded = args as { patch: Record<string, unknown>; where: Record<string, unknown> };
 
-        if (options.storedDates !== undefined && "updatedAt" in guarded.where) {
-            const stored = (await ctx.db.get("user", id)) as { updatedAt: number } | null;
-
-            // D1 binds the guard as given and compares it with the stored text.
-            if (stored === null || guarded.where.updatedAt !== present(stored).updatedAt) {
-                return { applied: false, doc: present(stored) };
-            }
-
-            guarded = { ...guarded, where: { ...guarded.where, updatedAt: stored.updatedAt } };
+        // Lunora validates every guard value against its column, as staging answered for a stored ISO `updatedAt`.
+        if (options.storedDates !== undefined && typeof guarded.where.updatedAt === "string") {
+            throw new LunoraError("VALIDATION_ERROR", "Expected number at <root>, received string");
         }
 
         const result = await ctx.db.patchIf(table, id, guarded);
@@ -887,6 +882,31 @@ describe("the user.emailCanonical backfill", () => {
         expect(run.exitCode).toBe(0);
         expect(run.output).not.toContain("changed during the fill");
         expect(rows).toStrictEqual([["Signed.Up@Example.com", "signed.up@example.com"]]);
+    });
+
+    it("skips a row whose email changes between the fill's read and its write, and fills nothing for it", async () => {
+        expect.assertions(2);
+
+        const { result, rows } = await withHarness(async (ctx) => {
+            await ctx.db.insert("user", userRow("Lena@example.com"));
+
+            const { ids, token } = await completedCheck(ctx);
+
+            return {
+                result: await fillEmailCanonicalBatch(
+                    counted(ctx, {
+                        patchIf: async (inner: any, id: string) => {
+                            await inner.db.patch("user", id, { email: "other@example.com" });
+                        },
+                    }).ctx,
+                    { ids, token },
+                ),
+                rows: await canonicals(ctx),
+            };
+        });
+
+        expect(result).toMatchObject({ filled: 0, skipped: 1, status: "progress" });
+        expect(rows).toStrictEqual([["other@example.com", undefined]]);
     });
 
     it("leaves an ISO-dated row changed inside the settle window, and one whose change time no clock reads", async () => {

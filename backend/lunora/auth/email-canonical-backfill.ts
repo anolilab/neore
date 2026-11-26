@@ -454,12 +454,12 @@ export const fillEmailCanonicalBatch = async (ctx: BackfillCtx, { ids, token }: 
         let applied: boolean;
 
         try {
-            // Only while the row is still unfilled and unchanged since this call read it: a write in between that moves
-            // `updatedAt` makes this miss after one read more, and the row waits for the next check. The guard is the
-            // value as stored (an ISO string on a row better-auth wrote), never the parsed time, so D1 compares like with like.
+            // Only while the row is still unfilled and holds the address this call folded: the fill derives from `email`
+            // alone, so an email change in between makes this miss after one read more, and the row waits for the next
+            // check. Not on `updatedAt`: better-auth stores it as an ISO string, which Lunora refuses in a `v.number()` guard.
             ({ applied } = await ctx.db.patchIf("user", id, {
                 patch: { emailCanonical: canonical },
-                where: { email: row.email, emailCanonical: null, updatedAt: row.updatedAt },
+                where: { email: row.email, emailCanonical: null },
             }));
         } catch (error) {
             // A sign-up that took this address since the check: the unique index refused the write. Anything else (the
