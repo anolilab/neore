@@ -72,7 +72,7 @@ const OWNER = "owner-a";
 const ANALYST = { description: "Analyst skill", instructions: "Be the analyst.", name: "analyst", slug: "analyst" };
 
 /** The plugin's body: one skill. The header is added after the hash is known, since it carries that hash. */
-const body = () => buildBundleMarkdown({ description: "", items: [{ kind: "skill", skill: ANALYST }], name: "Daily brief" });
+const body = () => buildBundleMarkdown({ description: "", items: [{ key: "analyst", kind: "skill", skill: ANALYST }], name: "Daily brief" });
 
 const pluginFile = (contentHash: string) => withPluginHeader(body(), { contentHash, slug: "daily-brief", version: "1.0.0" });
 
