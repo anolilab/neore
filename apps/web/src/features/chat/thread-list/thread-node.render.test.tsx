@@ -44,7 +44,7 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 vi.mock("@neore/backend/api", () => {
-    return { api: { chat: { functions: { regenerateThreadTitle: {}, updateThread: {} } } } };
+    return { api: { chat: { functions: { regenerateThreadTitle: {}, updateThread: {} }, side_chat: { createSideChat: {} } } } };
 });
 
 vi.mock("@/features/develop/components/pull-request-counts", () => {
@@ -73,6 +73,7 @@ vi.mock("@tanstack/react-router", () => {
 
             return options?.select ? options.select(location) : location;
         },
+        useNavigate: () => navigate,
         useRouter: () => {
             return { navigate, preloadRoute: async () => {}, state: { location: { pathname: "/chat" } } };
         },

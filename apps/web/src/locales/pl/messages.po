@@ -2011,6 +2011,10 @@ msgstr "Czat czeka na Twoją odpowiedź"
 msgid "A chat needs your input or approval"
 msgstr "Czat czeka na Twoją odpowiedź lub zatwierdzenie"
 
+#: src/features/chat/thread-list/thread-options-menu.tsx:63
+msgid "A chat on a custom endpoint cannot start a side chat."
+msgstr "Czat na niestandardowym punkcie końcowym nie może rozpocząć czatu bocznego."
+
 #: src/features/notifications/hooks/use-chat-run-toasts.ts:79
 msgid "A chat reply failed"
 msgstr "Odpowiedź w czacie się nie powiodła"
@@ -2018,6 +2022,10 @@ msgstr "Odpowiedź w czacie się nie powiodła"
 #: src/features/notifications/hooks/use-chat-run-toasts.ts:79
 msgid "A chat reply finished"
 msgstr "Odpowiedź w czacie została zakończona"
+
+#: src/features/chat/thread-list/thread-options-menu.tsx:74
+msgid "A chat that runs on your computer cannot start a side chat."
+msgstr "Czat uruchomiony na Twoim komputerze nie może rozpocząć czatu bocznego."
 
 #: src/features/tasks/components/task-form-dialog.tsx:98
 msgid "A coding agent needs a repository to work on"
@@ -2206,7 +2214,7 @@ msgstr "Film referencyjny może trwać maksymalnie {0} s."
 msgid "A regular expression the answer must match"
 msgstr "Wyrażenie regularne, do którego odpowiedź musi pasować"
 
-#: src/features/develop/components/review-thread.tsx:76
+#: src/features/develop/components/review-thread.tsx:82
 msgid "A reply is posted straight away, not with the rest of your review."
 msgstr "Odpowiedź jest publikowana od razu, a nie razem z resztą recenzji."
 
@@ -2242,6 +2250,10 @@ msgstr "Wątek uruchomienia trafia do tego projektu. Przeniesienie zadania do in
 #: src/features/settings/components/chat/bots-settings.tsx:438
 msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 msgstr "Piaskownica, którą bot zachowuje między czatami. Wstrzymywana, gdy jest bezczynna, w czasie wstrzymania nie jest rozliczana."
+
+#: src/features/chat/thread-list/thread-options-menu.tsx:71
+msgid "A shared or temporary chat cannot start a side chat."
+msgstr "Czat udostępniony lub tymczasowy nie może rozpocząć czatu bocznego."
 
 #: src/features/notifications/components/notification-settings.tsx:279
 msgid "A short summary each morning of what finished, what is running and what needs you. It counts toward your daily usage."
@@ -3841,6 +3853,10 @@ msgstr "Karta zatwierdzenia pyta o zgodę na narzędzie. Wskaźnik klika Zatwier
 msgid "An approved call to an external (MCP) server runs only if that tool's name, input schema and annotations are unchanged since you approved it. If they changed, the call does not run. The model is told, and a new call asks you again."
 msgstr "Zatwierdzone wywołanie zewnętrznego serwera (MCP) uruchamia się tylko wtedy, gdy nazwa narzędzia, schemat wejścia i adnotacje nie zmieniły się od zatwierdzenia. Jeśli się zmieniły, wywołanie się nie uruchamia. Model zostaje o tym poinformowany, a nowe wywołanie pyta Cię ponownie."
 
+#: src/features/chat/thread-list/thread-options-menu.tsx:60
+msgid "An archived chat cannot start a side chat."
+msgstr "Zarchiwizowany czat nie może rozpocząć czatu bocznego."
+
 #: src/features/feedback/components/send-feedback-dialog.tsx:227
 msgid "An attached image was not accepted. Remove it or attach a PNG, JPEG, WebP or GIF image."
 msgstr "Załączony obraz nie został zaakceptowany. Usuń go lub dołącz obraz PNG, JPEG, WebP lub GIF."
@@ -4404,7 +4420,7 @@ msgid "Archive thread"
 msgstr "Archiwizuj wątek"
 
 #: src/components/command-palette.tsx:961
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:644
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:635
 #: src/features/sub-agents/components/worker-list.tsx:107
 #: src/features/tasks/components/goal-form-dialog.tsx:47
 #: src/features/tasks/components/goal-list.tsx:26
@@ -9287,7 +9303,7 @@ msgstr "Nie udało się odczytać tego czatu. Jeśli jest zablokowany, najpierw 
 msgid "Could not read the pasted list"
 msgstr "Nie udało się odczytać wklejonej listy"
 
-#: src/features/develop/components/pull-request-fixes.tsx:208
+#: src/features/develop/components/pull-request-fixes.tsx:210
 msgid "Could not read what blocks {name}. Try again"
 msgstr "Nie udało się odczytać, co blokuje {name}. Spróbuj ponownie"
 
@@ -9488,7 +9504,7 @@ msgstr "Nie udało się zaktualizować komentarza"
 msgid "Could not update the participants"
 msgstr "Nie udało się zaktualizować uczestników"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:100
+#: src/features/chat/thread-list/thread-options-menu.tsx:160
 msgid "Couldn't load follow state"
 msgstr "Nie udało się wczytać stanu obserwowania"
 
@@ -15504,7 +15520,7 @@ msgstr "Zgodnie z systemem (domyślnie)"
 msgid "Follow these steps to connect your {platform} account."
 msgstr "Wykonaj te kroki, aby połączyć konto {platform}."
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:105
+#: src/features/chat/thread-list/thread-options-menu.tsx:165
 msgid "Follow thread"
 msgstr "Obserwuj wątek"
 
@@ -19248,7 +19264,7 @@ msgstr "Ostatnie 24 h"
 msgid "Last 30 days"
 msgstr "Ostatnie 30 dni"
 
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:641
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:632
 #: src/features/settings/components/chat/usage-settings.tsx:254
 #: src/routes/admin/gateway/index.tsx:234
 msgid "Last 7 days"
@@ -19302,7 +19318,7 @@ msgstr "Ostatnia wiadomość od klienta"
 msgid "Last message: {lastMessageAt}"
 msgstr "Ostatnia wiadomość: {lastMessageAt}"
 
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:642
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:633
 msgid "Last month"
 msgstr "Ostatni miesiąc"
 
@@ -22232,7 +22248,7 @@ msgstr "Muzyka"
 msgid "Mute"
 msgstr "Wycisz"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:115
+#: src/features/chat/thread-list/thread-options-menu.tsx:175
 msgid "Mute thread"
 msgstr "Wycisz wątek"
 
@@ -22478,7 +22494,7 @@ msgid "Needs review"
 msgstr "Do przejrzenia"
 
 #: src/features/chat/browser-live-view/browser-human-check.tsx:496
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:550
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:541
 #: src/features/home/components/home-page.tsx:165
 msgid "Needs you"
 msgstr "Wymaga twojej uwagi"
@@ -22702,7 +22718,7 @@ msgstr "Nowy czat"
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:113
 #: src/features/chat/header/chat-header.tsx:50
 #: src/features/chat/signed-out/signed-out-chat.tsx:306
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:285
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:276
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:159
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:161
 #: src/features/settings/lib/settings-keywords.ts:37
@@ -24167,7 +24183,7 @@ msgstr "stare wiersze {text}"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:45
 #: src/features/admin/components/feedback-admin-page.tsx:196
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:643
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:634
 msgid "Older"
 msgstr "Starsze"
 
@@ -24629,7 +24645,7 @@ msgid "Open in new window"
 msgstr "Otwórz w nowym oknie"
 
 #: src/features/chat/thread-list/thread-node.tsx:601
-#: src/features/chat/thread-list/thread-options-menu.tsx:79
+#: src/features/chat/thread-list/thread-options-menu.tsx:114
 msgid "Open in split view"
 msgstr "Otwórz w widoku podzielonym"
 
@@ -26308,7 +26324,7 @@ msgstr "Różowy"
 msgid "pinned"
 msgstr "przypięte"
 
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:638
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:629
 msgid "Pinned"
 msgstr "Przypięte"
 
@@ -27249,7 +27265,7 @@ msgstr "Projekt: {0}"
 
 #: src/components/command-palette.tsx:745
 #: src/components/command-palette.tsx:953
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:606
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:597
 msgid "Projects"
 msgstr "Projekty"
 
@@ -28432,12 +28448,12 @@ msgstr "Wygeneruj ponownie"
 msgid "Regenerate response"
 msgstr "Wygeneruj odpowiedź ponownie"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:97
+#: src/features/chat/thread-list/thread-options-menu.tsx:132
 msgid "Regenerate title"
 msgstr "Wygeneruj tytuł ponownie"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:91
-#: src/features/chat/thread-list/thread-options-menu.tsx:122
+#: src/features/chat/thread-list/thread-options-menu.tsx:126
+#: src/features/chat/thread-list/thread-options-menu.tsx:182
 msgid "Regenerating the title"
 msgstr "Ponowne generowanie tytułu"
 
@@ -28878,7 +28894,7 @@ msgstr "Usunięty serwer"
 msgid "Removed:"
 msgstr "Usunięto:"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:78
+#: src/features/chat/thread-list/thread-options-menu.tsx:113
 msgid "Rename"
 msgstr "Zmień nazwę"
 
@@ -28894,7 +28910,7 @@ msgstr "Zmieniono nazwę"
 msgid "Renames, lockfiles, snapshots and generated files. Read last, and only as far as you need to."
 msgstr "Zmiany nazw, pliki blokad, migawki i pliki wygenerowane. Czytaj na końcu i tylko tak daleko, jak potrzebujesz."
 
-#: src/features/develop/components/review-thread.tsx:104
+#: src/features/develop/components/review-thread.tsx:110
 #: src/features/pages/components/page-comments-panel.tsx:223
 msgid "Reopen"
 msgstr "Otwórz ponownie"
@@ -28991,9 +29007,9 @@ msgstr "Odpowiedzi, tokeny i wydatki na projekt w wybranym okresie"
 msgid "Replies, tokens and spend per skill or agent for the selected period"
 msgstr "Odpowiedzi, tokeny i wydatki według umiejętności lub agenta w wybranym okresie"
 
-#: src/features/develop/components/review-thread.tsx:61
-#: src/features/develop/components/review-thread.tsx:74
-#: src/features/develop/components/review-thread.tsx:82
+#: src/features/develop/components/review-thread.tsx:67
+#: src/features/develop/components/review-thread.tsx:80
+#: src/features/develop/components/review-thread.tsx:88
 #: src/features/pages/components/page-comments-panel.tsx:204
 #: src/features/pages/components/page-comments-panel.tsx:208
 msgid "Reply"
@@ -29229,7 +29245,7 @@ msgstr "Zmień rozmiar paneli"
 msgid "Resolution"
 msgstr "Rozdzielczość"
 
-#: src/features/develop/components/review-thread.tsx:104
+#: src/features/develop/components/review-thread.tsx:110
 #: src/features/pages/components/page-comments-panel.tsx:223
 msgid "Resolve"
 msgstr "Rozwiąż"
@@ -30497,7 +30513,7 @@ msgid "Search results"
 msgstr "Wyniki wyszukiwania"
 
 #. placeholder {0}: sortedThreads.length
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:471
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:462
 msgid "Search Results ({0})"
 msgstr "Wyniki wyszukiwania ({0})"
 
@@ -30959,6 +30975,10 @@ msgstr "Wyślij"
 msgid "Send <0>X-Hub-Signature-256: sha256=<hex></0>, the HMAC-SHA256 of the raw request body keyed with the secret (the format GitHub webhooks use). This signature has no timestamp, so each one is accepted only once, for as long as the trigger exists; a delivery that did not run can be redelivered. Requests with the neore headers are rejected."
 msgstr "Wyślij <0>X-Hub-Signature-256: sha256=<hex></0>, czyli HMAC-SHA256 surowej treści żądania z użyciem sekretu jako klucza (format używany przez webhooki GitHub). Ten podpis nie ma znacznika czasu, więc każdy jest akceptowany tylko raz, dopóki istnieje wyzwalacz; dostarczenie, które się nie uruchomiło, można dostarczyć ponownie. Żądania z nagłówkami neore są odrzucane."
 
+#: src/features/chat/thread-list/thread-options-menu.tsx:66
+msgid "Send a message and wait for the reply before starting a side chat."
+msgstr "Wyślij wiadomość i poczekaj na odpowiedź, zanim rozpoczniesz czat boczny."
+
 #: src/features/chat/thread/comparison-view.tsx:70
 msgid "Send a message below to start"
 msgstr "Wyślij wiadomość poniżej, aby zacząć"
@@ -31051,7 +31071,7 @@ msgstr "Wyślij teraz"
 msgid "Send queued message {0} now"
 msgstr "Wyślij teraz wiadomość {0} z kolejki"
 
-#: src/features/develop/components/review-thread.tsx:74
+#: src/features/develop/components/review-thread.tsx:80
 msgid "Send reply now"
 msgstr "Wyślij odpowiedź teraz"
 
@@ -31661,6 +31681,10 @@ msgstr "Wyświetlanie wierszy {firstShown}–{lastShown} z {totalRows}"
 msgid "Shown to the assistant so it knows when the skill applies."
 msgstr "Pokazywany asystentowi, aby wiedział, kiedy umiejętność ma zastosowanie."
 
+#: src/features/chat/thread-list/thread-options-menu.tsx:157
+msgid "Side chat"
+msgstr "Czat boczny"
+
 #: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:22
 msgid "Side panel"
 msgstr "Panel boczny"
@@ -32232,7 +32256,7 @@ msgstr "Odłóż do jutra 09:00"
 msgid "Snooze until…"
 msgstr "Odłóż do…"
 
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:650
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:641
 msgid "Snoozed"
 msgstr "Odłożone"
 
@@ -32996,7 +33020,7 @@ msgid "State:"
 msgstr "Stan:"
 
 #: src/features/chat/header/chat-header.tsx:174
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:639
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:630
 msgid "Stateless"
 msgstr "Bezstanowe"
 
@@ -34303,7 +34327,7 @@ msgstr "Szablon"
 msgid "Templates"
 msgstr "Szablony"
 
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:637
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:628
 msgid "Temporary"
 msgstr "Tymczasowe"
 
@@ -35961,6 +35985,10 @@ msgstr "Ten czat nie może mieć linku dla gości."
 msgid "This chat cannot start a new context."
 msgstr "W tym czacie nie można rozpocząć nowego kontekstu."
 
+#: src/features/chat/thread-list/thread-options-menu.tsx:80
+msgid "This chat cannot start a side chat."
+msgstr "Ten czat nie może rozpocząć czatu bocznego."
+
 #: src/features/chat/host/host-send-errors.ts:17
 msgid "This chat could not be found."
 msgstr "Nie znaleziono tego czatu."
@@ -36696,11 +36724,11 @@ msgstr "Zarządzanie wątkami"
 msgid "Thread not found or you don't have access to it"
 msgstr "Nie znaleziono wątku lub nie masz do niego dostępu"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:75
+#: src/features/chat/thread-list/thread-options-menu.tsx:110
 msgid "Thread options"
 msgstr "Opcje wątku"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:63
+#: src/features/chat/thread-list/thread-options-menu.tsx:98
 msgid "Thread options: {label}"
 msgstr "Opcje wątku: {label}"
 
@@ -36870,7 +36898,7 @@ msgid "To do"
 msgstr "Do zrobienia"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:47
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:640
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:631
 #: src/features/pages/components/page-version-panel.tsx:56
 msgid "Today"
 msgstr "Dzisiaj"
@@ -37832,7 +37860,7 @@ msgstr "Cofnij"
 msgid "Undo (Ctrl+Z)"
 msgstr "Cofnij (Ctrl+Z)"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:110
+#: src/features/chat/thread-list/thread-options-menu.tsx:170
 msgid "Unfollow thread"
 msgstr "Przestań obserwować wątek"
 
@@ -37941,6 +37969,10 @@ msgstr "Odblokuj ten czat, aby dodać to do wątku."
 #: src/features/chat/aside/aside-panel.tsx:94
 msgid "Unlock this chat to ask a side question."
 msgstr "Odblokuj ten czat, aby zadać pytanie poboczne."
+
+#: src/features/chat/thread-list/thread-options-menu.tsx:77
+msgid "Unlock this chat to start a side chat."
+msgstr "Odblokuj ten czat, aby rozpocząć czat boczny."
 
 #: ../../packages/ui/src/components/elevenlabs/mic-selector.tsx:139
 msgid "Unmute"
@@ -40143,7 +40175,7 @@ msgstr "Szablony przepływów pracy"
 msgid "Workflows"
 msgstr "Przepływy pracy"
 
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:551
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:542
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:64
 #: src/features/sub-agents/components/worker-list.tsx:104
 #: src/features/sub-agents/components/worker-run-log.tsx:29

@@ -16,15 +16,26 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 vi.mock("@neore/backend/api", () => {
-    return { api: { chat: { functions: { regenerateThreadTitle: {} } } } };
+    return { api: { chat: { functions: { regenerateThreadTitle: {} }, side_chat: { createSideChat: {} } } } };
+});
+
+const sideChat = vi.hoisted(() => {
+    return { navigate: vi.fn(), result: { reason: "locked", status: "refused" } as { reason?: string; status: string; threadId?: string }, showError: vi.fn() };
 });
 
 vi.mock("@tanstack/react-query", () => {
     return {
         useMutation: () => {
-            return { isPending: false, mutate: () => {} };
+            return {
+                isPending: false,
+                mutate: (_input: unknown, callbacks?: { onSuccess?: (result: unknown) => void }) => callbacks?.onSuccess?.(sideChat.result),
+            };
         },
     };
+});
+
+vi.mock("@tanstack/react-router", () => {
+    return { useNavigate: () => sideChat.navigate };
 });
 
 vi.mock("@/lib/lunora/crpc", () => {
@@ -36,7 +47,7 @@ vi.mock("@/lib/lunora/crpc", () => {
 });
 
 vi.mock("@/lib/toast", () => {
-    return { showError: () => {}, showSuccess: () => {} };
+    return { showError: sideChat.showError, showSuccess: () => {} };
 });
 
 const follow = vi.hoisted(() => {
@@ -122,6 +133,39 @@ describe("ThreadOptionsMenu", () => {
         fireEvent.click(screen.getByRole("menuitem", OPEN_IN_SPLIT_VIEW));
 
         expect(onOpenInSplitView).toHaveBeenCalledTimes(1);
+    });
+
+    describe("side chat", () => {
+        beforeEach(() => {
+            sideChat.navigate.mockReset();
+            sideChat.showError.mockReset();
+        });
+
+        it("opens the new thread when the side chat starts", () => {
+            sideChat.result = { status: "ok", threadId: "side1" };
+            renderMenu();
+            fireEvent.click(screen.getByRole("menuitem", { name: "Side chat" }));
+
+            expect(sideChat.navigate).toHaveBeenCalledWith({ params: { threadId: "side1" }, to: "/chat/$threadId" });
+            expect(sideChat.showError).not.toHaveBeenCalled();
+        });
+
+        it.each([
+            ["archived", "An archived chat cannot start a side chat."],
+            ["custom_endpoint", "A chat on a custom endpoint cannot start a side chat."],
+            ["empty", "Send a message and wait for the reply before starting a side chat."],
+            ["shared", "A shared or temporary chat cannot start a side chat."],
+            ["host_run", "A chat that runs on your computer cannot start a side chat."],
+            ["locked", "Unlock this chat to start a side chat."],
+            ["not_found", "This chat cannot start a side chat."],
+        ])("says why a %s chat is refused", (reason, message) => {
+            sideChat.result = { reason, status: "refused" };
+            renderMenu();
+            fireEvent.click(screen.getByRole("menuitem", { name: "Side chat" }));
+
+            expect(sideChat.showError).toHaveBeenCalledWith(message);
+            expect(sideChat.navigate).not.toHaveBeenCalled();
+        });
     });
 
     describe("follow items", () => {

@@ -87,7 +87,7 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 vi.mock("@neore/backend/api", () => {
-    return { api: { chat: { functions: {} } } };
+    return { api: { chat: { functions: {}, side_chat: { createSideChat: {} } } } };
 });
 
 vi.mock("@tanstack/react-router", () => {

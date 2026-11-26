@@ -2011,6 +2011,10 @@ msgstr "チャットがあなたの回答を待っています"
 msgid "A chat needs your input or approval"
 msgstr "チャットがあなたの入力または承認を待っています"
 
+#: src/features/chat/thread-list/thread-options-menu.tsx:63
+msgid "A chat on a custom endpoint cannot start a side chat."
+msgstr "カスタムエンドポイント上のチャットではサイドチャットを開始できません。"
+
 #: src/features/notifications/hooks/use-chat-run-toasts.ts:79
 msgid "A chat reply failed"
 msgstr "チャットの返信が失敗しました"
@@ -2018,6 +2022,10 @@ msgstr "チャットの返信が失敗しました"
 #: src/features/notifications/hooks/use-chat-run-toasts.ts:79
 msgid "A chat reply finished"
 msgstr "チャットの返信が完了しました"
+
+#: src/features/chat/thread-list/thread-options-menu.tsx:74
+msgid "A chat that runs on your computer cannot start a side chat."
+msgstr "お使いのコンピューターで実行されているチャットではサイドチャットを開始できません。"
 
 #: src/features/tasks/components/task-form-dialog.tsx:98
 msgid "A coding agent needs a repository to work on"
@@ -2206,7 +2214,7 @@ msgstr "参照動画の長さは最大 {0} 秒です。"
 msgid "A regular expression the answer must match"
 msgstr "回答が一致すべき正規表現"
 
-#: src/features/develop/components/review-thread.tsx:76
+#: src/features/develop/components/review-thread.tsx:82
 msgid "A reply is posted straight away, not with the rest of your review."
 msgstr "返信は、残りのレビューとは別に、すぐに投稿されます。"
 
@@ -2242,6 +2250,10 @@ msgstr "実行のスレッドはこのプロジェクトに保存されます。
 #: src/features/settings/components/chat/bots-settings.tsx:438
 msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 msgstr "チャット間でボットが保持するサンドボックス。アイドル時は一時停止され、一時停止中は課金されません。"
+
+#: src/features/chat/thread-list/thread-options-menu.tsx:71
+msgid "A shared or temporary chat cannot start a side chat."
+msgstr "共有チャットまたは一時チャットではサイドチャットを開始できません。"
 
 #: src/features/notifications/components/notification-settings.tsx:279
 msgid "A short summary each morning of what finished, what is running and what needs you. It counts toward your daily usage."
@@ -3841,6 +3853,10 @@ msgstr "承認カードがツールの許可を求めます。ポインタで「
 msgid "An approved call to an external (MCP) server runs only if that tool's name, input schema and annotations are unchanged since you approved it. If they changed, the call does not run. The model is told, and a new call asks you again."
 msgstr "外部（MCP）サーバーへの承認済みの呼び出しは、承認後にそのツールの名前、入力スキーマ、注釈が変わっていない場合にのみ実行されます。変更されていた場合、呼び出しは実行されません。モデルにその旨が伝えられ、新しい呼び出しでは改めて確認を求められます。"
 
+#: src/features/chat/thread-list/thread-options-menu.tsx:60
+msgid "An archived chat cannot start a side chat."
+msgstr "アーカイブ済みのチャットではサイドチャットを開始できません。"
+
 #: src/features/feedback/components/send-feedback-dialog.tsx:227
 msgid "An attached image was not accepted. Remove it or attach a PNG, JPEG, WebP or GIF image."
 msgstr "添付された画像は受け付けられませんでした。削除するか、PNG、JPEG、WebP、GIF の画像を添付してください。"
@@ -4404,7 +4420,7 @@ msgid "Archive thread"
 msgstr "スレッドをアーカイブ"
 
 #: src/components/command-palette.tsx:961
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:644
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:635
 #: src/features/sub-agents/components/worker-list.tsx:107
 #: src/features/tasks/components/goal-form-dialog.tsx:47
 #: src/features/tasks/components/goal-list.tsx:26
@@ -9287,7 +9303,7 @@ msgstr "そのチャットを読み込めませんでした。ロックされて
 msgid "Could not read the pasted list"
 msgstr "貼り付けられた一覧を読み取れませんでした"
 
-#: src/features/develop/components/pull-request-fixes.tsx:208
+#: src/features/develop/components/pull-request-fixes.tsx:210
 msgid "Could not read what blocks {name}. Try again"
 msgstr "{name} をブロックしている内容を読み取れませんでした。再試行"
 
@@ -9488,7 +9504,7 @@ msgstr "コメントを更新できませんでした"
 msgid "Could not update the participants"
 msgstr "参加者を更新できませんでした"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:100
+#: src/features/chat/thread-list/thread-options-menu.tsx:160
 msgid "Couldn't load follow state"
 msgstr "フォロー状態を読み込めませんでした"
 
@@ -15504,7 +15520,7 @@ msgstr "システムに従う（既定）"
 msgid "Follow these steps to connect your {platform} account."
 msgstr "次の手順に従って {platform} アカウントを接続してください。"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:105
+#: src/features/chat/thread-list/thread-options-menu.tsx:165
 msgid "Follow thread"
 msgstr "スレッドをフォロー"
 
@@ -19248,7 +19264,7 @@ msgstr "過去 24 時間"
 msgid "Last 30 days"
 msgstr "過去 30 日間"
 
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:641
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:632
 #: src/features/settings/components/chat/usage-settings.tsx:254
 #: src/routes/admin/gateway/index.tsx:234
 msgid "Last 7 days"
@@ -19302,7 +19318,7 @@ msgstr "顧客からの最後のメッセージ"
 msgid "Last message: {lastMessageAt}"
 msgstr "最後のメッセージ: {lastMessageAt}"
 
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:642
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:633
 msgid "Last month"
 msgstr "先月"
 
@@ -22232,7 +22248,7 @@ msgstr "音楽"
 msgid "Mute"
 msgstr "ミュート"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:115
+#: src/features/chat/thread-list/thread-options-menu.tsx:175
 msgid "Mute thread"
 msgstr "スレッドをミュート"
 
@@ -22478,7 +22494,7 @@ msgid "Needs review"
 msgstr "要レビュー"
 
 #: src/features/chat/browser-live-view/browser-human-check.tsx:496
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:550
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:541
 #: src/features/home/components/home-page.tsx:165
 msgid "Needs you"
 msgstr "対応が必要"
@@ -22702,7 +22718,7 @@ msgstr "新しいチャット"
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:113
 #: src/features/chat/header/chat-header.tsx:50
 #: src/features/chat/signed-out/signed-out-chat.tsx:306
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:285
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:276
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:159
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:161
 #: src/features/settings/lib/settings-keywords.ts:37
@@ -24167,7 +24183,7 @@ msgstr "旧 {text} 行目"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:45
 #: src/features/admin/components/feedback-admin-page.tsx:196
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:643
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:634
 msgid "Older"
 msgstr "それ以前"
 
@@ -24629,7 +24645,7 @@ msgid "Open in new window"
 msgstr "新しいウィンドウで開く"
 
 #: src/features/chat/thread-list/thread-node.tsx:601
-#: src/features/chat/thread-list/thread-options-menu.tsx:79
+#: src/features/chat/thread-list/thread-options-menu.tsx:114
 msgid "Open in split view"
 msgstr "分割ビューで開く"
 
@@ -26308,7 +26324,7 @@ msgstr "ピンク"
 msgid "pinned"
 msgstr "固定"
 
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:638
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:629
 msgid "Pinned"
 msgstr "ピン留め済み"
 
@@ -27249,7 +27265,7 @@ msgstr "プロジェクト: {0}"
 
 #: src/components/command-palette.tsx:745
 #: src/components/command-palette.tsx:953
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:606
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:597
 msgid "Projects"
 msgstr "プロジェクト"
 
@@ -28432,12 +28448,12 @@ msgstr "再生成"
 msgid "Regenerate response"
 msgstr "応答を再生成"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:97
+#: src/features/chat/thread-list/thread-options-menu.tsx:132
 msgid "Regenerate title"
 msgstr "タイトルを再生成"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:91
-#: src/features/chat/thread-list/thread-options-menu.tsx:122
+#: src/features/chat/thread-list/thread-options-menu.tsx:126
+#: src/features/chat/thread-list/thread-options-menu.tsx:182
 msgid "Regenerating the title"
 msgstr "タイトルを再生成中"
 
@@ -28878,7 +28894,7 @@ msgstr "削除されたサーバー"
 msgid "Removed:"
 msgstr "削除："
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:78
+#: src/features/chat/thread-list/thread-options-menu.tsx:113
 msgid "Rename"
 msgstr "名前を変更"
 
@@ -28894,7 +28910,7 @@ msgstr "名前を変更しました"
 msgid "Renames, lockfiles, snapshots and generated files. Read last, and only as far as you need to."
 msgstr "名前の変更、ロックファイル、スナップショット、生成されたファイル。最後に、必要な範囲でのみ読んでください。"
 
-#: src/features/develop/components/review-thread.tsx:104
+#: src/features/develop/components/review-thread.tsx:110
 #: src/features/pages/components/page-comments-panel.tsx:223
 msgid "Reopen"
 msgstr "未解決に戻す"
@@ -28991,9 +29007,9 @@ msgstr "選択した期間のプロジェクトごとの返信、トークン、
 msgid "Replies, tokens and spend per skill or agent for the selected period"
 msgstr "選択した期間のスキルまたはエージェントごとの返信数、トークン、支出"
 
-#: src/features/develop/components/review-thread.tsx:61
-#: src/features/develop/components/review-thread.tsx:74
-#: src/features/develop/components/review-thread.tsx:82
+#: src/features/develop/components/review-thread.tsx:67
+#: src/features/develop/components/review-thread.tsx:80
+#: src/features/develop/components/review-thread.tsx:88
 #: src/features/pages/components/page-comments-panel.tsx:204
 #: src/features/pages/components/page-comments-panel.tsx:208
 msgid "Reply"
@@ -29229,7 +29245,7 @@ msgstr "ペインのサイズを変更"
 msgid "Resolution"
 msgstr "解像度"
 
-#: src/features/develop/components/review-thread.tsx:104
+#: src/features/develop/components/review-thread.tsx:110
 #: src/features/pages/components/page-comments-panel.tsx:223
 msgid "Resolve"
 msgstr "解決"
@@ -30497,7 +30513,7 @@ msgid "Search results"
 msgstr "検索結果"
 
 #. placeholder {0}: sortedThreads.length
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:471
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:462
 msgid "Search Results ({0})"
 msgstr "検索結果（{0}）"
 
@@ -30959,6 +30975,10 @@ msgstr "送信"
 msgid "Send <0>X-Hub-Signature-256: sha256=<hex></0>, the HMAC-SHA256 of the raw request body keyed with the secret (the format GitHub webhooks use). This signature has no timestamp, so each one is accepted only once, for as long as the trigger exists; a delivery that did not run can be redelivered. Requests with the neore headers are rejected."
 msgstr "<0>X-Hub-Signature-256: sha256=<hex></0> を送信してください。これは、シークレットをキーとした生のリクエストボディの HMAC-SHA256 です（GitHub の Webhook と同じ形式）。この署名にはタイムスタンプがないため、トリガーが存在する間、それぞれ一度だけ受け付けられます。実行されなかった配信は再配信できます。neore ヘッダー付きのリクエストは拒否されます。"
 
+#: src/features/chat/thread-list/thread-options-menu.tsx:66
+msgid "Send a message and wait for the reply before starting a side chat."
+msgstr "サイドチャットを開始する前に、メッセージを送信して返信を待ってください。"
+
 #: src/features/chat/thread/comparison-view.tsx:70
 msgid "Send a message below to start"
 msgstr "下にメッセージを送信して始めましょう"
@@ -31051,7 +31071,7 @@ msgstr "今すぐ送信"
 msgid "Send queued message {0} now"
 msgstr "キュー内のメッセージ {0} を今すぐ送信"
 
-#: src/features/develop/components/review-thread.tsx:74
+#: src/features/develop/components/review-thread.tsx:80
 msgid "Send reply now"
 msgstr "今すぐ返信を送信"
 
@@ -31661,6 +31681,10 @@ msgstr "{totalRows} 行中 {firstShown}〜{lastShown} 行を表示"
 msgid "Shown to the assistant so it knows when the skill applies."
 msgstr "スキルをいつ適用するかを判断できるよう、アシスタントに表示されます。"
 
+#: src/features/chat/thread-list/thread-options-menu.tsx:157
+msgid "Side chat"
+msgstr "サイドチャット"
+
 #: src/features/settings/components/chat/sub-agent-open-place-settings.tsx:22
 msgid "Side panel"
 msgstr "サイドパネル"
@@ -32232,7 +32256,7 @@ msgstr "明日の 9:00 までスヌーズ"
 msgid "Snooze until…"
 msgstr "スヌーズ期限を指定…"
 
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:650
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:641
 msgid "Snoozed"
 msgstr "スヌーズ中"
 
@@ -32996,7 +33020,7 @@ msgid "State:"
 msgstr "状態:"
 
 #: src/features/chat/header/chat-header.tsx:174
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:639
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:630
 msgid "Stateless"
 msgstr "ステートレス"
 
@@ -34303,7 +34327,7 @@ msgstr "テンプレート"
 msgid "Templates"
 msgstr "テンプレート"
 
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:637
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:628
 msgid "Temporary"
 msgstr "一時"
 
@@ -35961,6 +35985,10 @@ msgstr "このチャットにはゲストリンクを作成できません。"
 msgid "This chat cannot start a new context."
 msgstr "このチャットでは新しいコンテキストを開始できません。"
 
+#: src/features/chat/thread-list/thread-options-menu.tsx:80
+msgid "This chat cannot start a side chat."
+msgstr "このチャットではサイドチャットを開始できません。"
+
 #: src/features/chat/host/host-send-errors.ts:17
 msgid "This chat could not be found."
 msgstr "このチャットが見つかりませんでした。"
@@ -36696,11 +36724,11 @@ msgstr "スレッド管理"
 msgid "Thread not found or you don't have access to it"
 msgstr "スレッドが見つからないか、アクセス権がありません"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:75
+#: src/features/chat/thread-list/thread-options-menu.tsx:110
 msgid "Thread options"
 msgstr "スレッドのオプション"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:63
+#: src/features/chat/thread-list/thread-options-menu.tsx:98
 msgid "Thread options: {label}"
 msgstr "スレッドのオプション: {label}"
 
@@ -36870,7 +36898,7 @@ msgid "To do"
 msgstr "未着手"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:47
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:640
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:631
 #: src/features/pages/components/page-version-panel.tsx:56
 msgid "Today"
 msgstr "今日"
@@ -37832,7 +37860,7 @@ msgstr "元に戻す"
 msgid "Undo (Ctrl+Z)"
 msgstr "元に戻す (Ctrl+Z)"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:110
+#: src/features/chat/thread-list/thread-options-menu.tsx:170
 msgid "Unfollow thread"
 msgstr "スレッドのフォローを解除"
 
@@ -37941,6 +37969,10 @@ msgstr "これをスレッドに追加するには、このチャットのロッ
 #: src/features/chat/aside/aside-panel.tsx:94
 msgid "Unlock this chat to ask a side question."
 msgstr "サイドクエスチョンをするには、このチャットのロックを解除してください。"
+
+#: src/features/chat/thread-list/thread-options-menu.tsx:77
+msgid "Unlock this chat to start a side chat."
+msgstr "サイドチャットを開始するには、このチャットのロックを解除してください。"
 
 #: ../../packages/ui/src/components/elevenlabs/mic-selector.tsx:139
 msgid "Unmute"
@@ -40143,7 +40175,7 @@ msgstr "ワークフローテンプレート"
 msgid "Workflows"
 msgstr "ワークフロー"
 
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:551
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:542
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:64
 #: src/features/sub-agents/components/worker-list.tsx:104
 #: src/features/sub-agents/components/worker-run-log.tsx:29
