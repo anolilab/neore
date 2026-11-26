@@ -5,7 +5,7 @@
  */
 import { canonicalEmail } from "@lunora/auth";
 import { lunoraTest } from "@lunora/testing";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { BackfillCall, BackfillRequest } from "../../../scripts/data-migrations";
 import { runEmailCanonicalBackfill } from "../../../scripts/data-migrations";
@@ -415,6 +415,51 @@ describe("the user.emailCanonical backfill", () => {
         expect(run.output).toContain("1 address(es) belong to more than one account");
         expect(run.requests.every((request) => request.phase === "check")).toBe(true);
         expect(rows.filter(([, canonical]) => canonical !== undefined)).toStrictEqual([]);
+    });
+
+    it("reads every row past a page boundary among rows that share one creation time, and refuses a pair split across it", async () => {
+        expect.assertions(4);
+
+        const ROWS = 7;
+        const { conflict, pagesRead, scanned, unfilled } = await withHarness(async (ctx) => {
+            // One creation time for every row, so the pages split inside a tie and only the id orders them.
+            const clock = vi.spyOn(Date, "now").mockReturnValue(NOW - 60_000);
+
+            try {
+                for (let index = 0; index < ROWS; index += 1) {
+                    await ctx.db.insert("user", userRow(`tied${String(index)}@example.com`));
+                }
+            } finally {
+                clock.mockRestore();
+            }
+
+            const run = counted(ctx);
+            const checked = await checkEmailCanonicalPage(run.ctx, { pageRows: 2, pages: ROWS });
+
+            if (checked.status !== "checked") {
+                throw new Error(`the check ended "${checked.status}"`);
+            }
+
+            // The 2nd and 3rd rows in id order: the last of the first page and the first of the next, tied with it.
+            const { page } = await ctx.db.user.findMany({});
+            const [, last, next] = (page as { _id: Id<"user"> }[]).map((row) => row._id).toSorted((a, b) => a.localeCompare(b));
+
+            await ctx.db.patch("user", last, { email: "Tied@Example.com" });
+            await ctx.db.patch("user", next, { email: "tied@example.com" });
+
+            return {
+                conflict: await checkEmailCanonicalPage(counted(ctx).ctx, { pageRows: 2, pages: ROWS }),
+                // Past the start's one-row probe for an unfilled row.
+                pagesRead: run.spent.queries.filter((query) => (query as { where?: unknown }).where === undefined).length,
+                scanned: checked.scanned,
+                unfilled: new Set(checked.unfilledIds).size,
+            };
+        });
+
+        expect(pagesRead).toBe(Math.ceil(ROWS / 2));
+        expect(scanned).toBe(ROWS);
+        expect(unfilled).toBe(ROWS);
+        expect(conflict).toStrictEqual({ conflicts: 1, status: "conflict" });
     });
 
     it("refuses a row whose address an existing account holds, also when the check reads them in different calls", async () => {
