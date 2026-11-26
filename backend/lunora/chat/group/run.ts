@@ -600,7 +600,8 @@ const runQueue = async (
     const spoken = [...start.spokenSkillIds];
     let queue = boundedQueue(start.plan, spoken);
     let continueFrom = start.continueFromMessageId;
-    // The end the closing chunk records: none for a stop (a stopped run writes no event), failed for a quota refusal.
+    // The end the closing chunk records: none for a stop (a stopped run writes no event). A quota that ends the turn after a reply was
+    // delivered still succeeds: that reply went out, and the stream closes as done.
     let runEnd: "succeeded" | "failed" | undefined = "succeeded";
 
     while (!isQueueEmpty(queue)) {
@@ -626,8 +627,6 @@ const runQueue = async (
 
         if (spoken.length > 0 && !(await takeFurtherSpeakerUnit(ctx, turn))) {
             streamLogger.debug("[GroupChat] Daily limit reached; ending the turn early", { spoken: spoken.length, threadId: turn.threadId });
-
-            runEnd = "failed";
 
             break;
         }

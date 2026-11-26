@@ -214,6 +214,26 @@ describe("an Events notification's read allowance", () => {
         expect(response.status).toBe(202);
         expect(charge).toHaveBeenCalledTimes(1);
     });
+
+    it("gets no body even when the allowance is spent, since a notification is never answered", async () => {
+        const request = modern("events/poll", { _meta: OFFER, cursor: null, name: "run.completed" }, "run.completed");
+        const notification = JSON.parse(request.body) as Record<string, unknown>;
+
+        delete notification["id"];
+
+        const response = await serveMcp(JSON.stringify(notification), {
+            ...dependenciesWith(
+                request,
+                pollingWith(async () => pollBody),
+            ),
+            chargeProtocolCall: async () => {
+                throw new PublicApiError("rate_limited", "Too many requests.", { details: { retryAfterSeconds: 30 } });
+            },
+        });
+
+        expect(response.status).toBe(202);
+        expect(await response.text()).toBe("");
+    });
 });
 
 describe("events/poll", () => {

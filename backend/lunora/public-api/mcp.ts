@@ -467,12 +467,9 @@ export const serveMcp = async (rawBody: string, dependencies: McpDependencies): 
     // A notification (`notifications/initialized`) has no answer. An Events notification is a call all the same: it draws on the read
     // allowance here, since the Events branch below never answers it.
     if (message.id === undefined) {
+        // A notification is never answered with a body, so a refused charge is not reported: the call is drawn all the same.
         if (message.method.startsWith("events/")) {
-            const refused = await chargeEvents(dependencies, undefined);
-
-            if (refused) {
-                return refused;
-            }
+            await chargeEvents(dependencies, undefined);
         }
 
         return new Response(null, { status: 202 });
