@@ -567,9 +567,9 @@ describe("the session hold every isolate shares", () => {
         });
 
         // It waits a moment for the other call (a person's frame lets go within a second or two), then refuses.
-        await vi.advanceTimersByTimeAsync(1000);
+        await vi.advanceTimersByTimeAsync(5000);
         expect(isAnswered).toBe(false);
-        await vi.advanceTimersByTimeAsync(3000);
+        await vi.advanceTimersByTimeAsync(10_000);
 
         const login = await answer;
 

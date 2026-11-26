@@ -20,7 +20,7 @@ import { MAX_LENGTH } from "../lib/validators";
 import { throwForbidden, throwThreadNotFound } from "../lib/error-helpers";
 import { hmacSha256Hex, timingSafeEqual } from "../lib/crypto";
 import { fetchWithDeadline } from "../lib/fetch-timeout";
-import { getRateLimitKey, getUserTier } from "../lib/rate-limiter";
+import { getRateLimitKey, getUserTier, rateLimitGuard } from "../lib/rate-limiter";
 import { systemDb } from "../lib/rls/scope";
 import { isServiceBound, serviceFetch } from "../lib/services";
 import { validateDomain } from "../chat/tools/utilities";
@@ -727,7 +727,6 @@ export const takeControl = authAction
         threadId: v.id("threads"),
         view: v.optional(v.string().max(MAX_LENGTH.short)),
     })
-    .use(rateLimit("browser/liveView"))
     .output(
         v.union(
             /**
@@ -752,6 +751,13 @@ export const takeControl = authAction
         const { impersonatedBy, userId } = ctx.user;
 
         refuseImpersonation(impersonatedBy);
+        // A view minted at the provider is charged to the live view budget; a lease alone (the phone) to control's, so a
+        // phone that takes control again and again never uses up the budget the web card's views need.
+        await rateLimitGuard({
+            ...ctx,
+            rateLimitKey: leaseOnly === true ? "browser/control" : "browser/liveView",
+            user: { plan: ctx.user.plan, userId },
+        } as never);
 
         const claim = await ctx.runMutation(internal.browser.live_view.claimControl, {
             threadId,

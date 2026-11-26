@@ -166,7 +166,7 @@ vi.mock("@neore/service-sdk/browser-renderer", async (importOriginal) => {
 // The release route crosses to the shard its token names as the system: here, straight into the harness, and the
 // shard it asked for is kept for the test to check.
 const { releaseLimit, releaseShards } = vi.hoisted(() => {
-    return { releaseLimit: { down: false, keys: [] as string[], limited: false }, releaseShards: [] as string[] };
+    return { releaseLimit: { down: false, guarded: [] as string[], keys: [] as string[], limited: false }, releaseShards: [] as string[] };
 });
 
 vi.mock("../lib/http-shard", async (importOriginal) => {
@@ -196,7 +196,9 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
 
             return { ok: !releaseLimit.limited };
         },
-        rateLimitGuard: async () => undefined,
+        rateLimitGuard: async (context: { rateLimitKey: string }) => {
+            releaseLimit.guarded.push(context.rateLimitKey);
+        },
     };
 });
 
@@ -284,6 +286,7 @@ afterEach(() => {
     releaseShards.length = 0;
     releaseLimit.down = false;
     releaseLimit.keys.length = 0;
+    releaseLimit.guarded.length = 0;
     releaseLimit.limited = false;
     delete replica.grant;
     delete replica.afterPrimary;
@@ -2005,6 +2008,8 @@ describe("a phone that takes control", () => {
         expect(phone).not.toHaveProperty("connectBy");
         expect(fetchMock).not.toHaveBeenCalled();
         await expect(statusFor(OWNER)).resolves.toMatchObject({ control: { byYou: true, claimIds: [phone.claimId] } });
+        // Charged to control's budget, never the live view budget the web card's views need.
+        expect(releaseLimit.guarded).toStrictEqual(["browser/control"]);
     });
 
     it("takes back a lease whose answer it lost by naming its own view, but never another view's", async () => {

@@ -413,7 +413,7 @@ const BUSY_IN_USE = "The browser session is busy with another call; try the sign
 const FITTING_QUALITIES = [40, 20];
 
 /** How long a sign-in waits for a session another call holds before it is refused, and how often it asks again. */
-const LOGIN_BUSY_WAIT_MS = 3000;
+const LOGIN_BUSY_WAIT_MS = 10_000;
 const LOGIN_BUSY_STEP_MS = 250;
 
 const LOCK_UNREACHABLE = "The browser session's lock did not answer in time, so nothing was run; try it again in a moment";
@@ -1164,8 +1164,8 @@ app.post("/login", async (c) => {
     // Taken before it connects, and refused while any other call holds the session: nothing is typed unheld.
     let refused = sessionId ? await holds.take(sessionId) : null;
 
-    // Another call holds the session: wait a moment for it (a person's frame of the page lets go within a second or
-    // two), within the sign-in's budget, then refuse as before.
+    // Another call holds the session: wait for it (a person's frame of the page, taken again at lower qualities on a
+    // large page, lets go within a few seconds), within the sign-in's budget, then refuse as before.
     for (const until = Math.min(Date.now() + LOGIN_BUSY_WAIT_MS, deadline); refused === "busy" && sessionId && Date.now() + LOGIN_BUSY_STEP_MS < until;) {
         await new Promise((resolve) => {
             setTimeout(resolve, LOGIN_BUSY_STEP_MS);
