@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { watchGrantEnd } from "./grant-end";
+import { readUntilAnswered, REREAD_RETRIES, REREAD_RETRY_MS, watchGrantEnd } from "./grant-end";
 
 const setup = (endsAt: number, rereadAt?: number) => {
     const scheduled: { ms: number; run: () => void }[] = [];
@@ -54,5 +54,67 @@ describe(watchGrantEnd, () => {
         stop();
 
         expect(cancel).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe(readUntilAnswered, () => {
+    it("tries a failed read again a bounded number of times, and hands the answer with its read's start", async () => {
+        const waits: { ms: number; run: () => void }[] = [];
+        const clock = { at: 1000 };
+        const read = vi.fn<() => Promise<string>>().mockRejectedValueOnce(new Error("server error")).mockResolvedValueOnce("renewed");
+        const onAnswer = vi.fn();
+
+        readUntilAnswered({
+            after: (ms, run) => {
+                waits.push({ ms, run });
+
+                return () => {};
+            },
+            now: () => clock.at,
+            onAnswer,
+            read,
+        });
+
+        await vi.waitFor(() => expect(waits).toHaveLength(1));
+        expect(waits[0]?.ms).toBe(REREAD_RETRY_MS);
+
+        clock.at = 6000;
+        waits[0]?.run();
+        await vi.waitFor(() => expect(onAnswer).toHaveBeenCalledWith("renewed", 6000));
+    });
+
+    it("gives up after its retries, and answers nothing once cancelled", async () => {
+        const waits: (() => void)[] = [];
+        const read = vi.fn(async () => {
+            throw new Error("down");
+        });
+        const onAnswer = vi.fn();
+        const stop = readUntilAnswered({
+            after: (_ms, run) => {
+                waits.push(run);
+
+                return () => {};
+            },
+            onAnswer,
+            read,
+        });
+
+        const retry = async (index: number): Promise<void> => {
+            if (index >= REREAD_RETRIES) {
+                return;
+            }
+
+            await vi.waitFor(() => expect(waits).toHaveLength(index + 1));
+            waits[index]?.();
+            await retry(index + 1);
+        };
+
+        await retry(0);
+
+        await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(REREAD_RETRIES + 1));
+        expect(waits).toHaveLength(REREAD_RETRIES);
+
+        stop();
+        expect(onAnswer).not.toHaveBeenCalled();
     });
 });

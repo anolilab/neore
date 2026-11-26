@@ -6,7 +6,6 @@ import { useIsAppActive } from "@/chat/use-app-active";
 import { getClient } from "@/lib/lunora";
 import { isNetworkFailure } from "@/offline/connectivity";
 import { useOffline } from "@/offline/offline-context";
-import { settleQuietly } from "@/offline/quietly";
 
 import type { BrowserFrame, BrowserStatus } from "./browser-api";
 import { handBackBrowser, keepBrowserControl, navigateBrowser, readBrowserStatus, readFrame, takeBrowserControl, watchBrowserStatus } from "./browser-api";
@@ -16,7 +15,7 @@ import type { ControlSession, ControlState } from "./control-session";
 import { createControlSession, forgetClaim, rememberClaim, rememberedClaim, viewNameFor } from "./control-session";
 import type { FrameReader } from "./frame-reader";
 import { startFrameReader } from "./frame-reader";
-import { watchGrantEnd } from "./grant-end";
+import { readUntilAnswered, watchGrantEnd } from "./grant-end";
 
 export interface ShownFrame {
     /** The browser the picture is of: one replaced since is not shown. */
@@ -50,7 +49,7 @@ const ACCESS_REFUSALS = new Set(["FORBIDDEN", "NOT_FOUND", "THREAD_LOCKED", "UNA
  * the background, or the phone goes offline. The screen is keyed by account and thread, so none of this outlives either.
  */
 export const useBrowserView = (threadId: string, userId: string): BrowserView => {
-    const { isOffline, reportRead } = useOffline();
+    const { isOffline, refreshTick, reportRead } = useOffline();
     const isActive = useIsAppActive();
     const isFocused = useIsFocused();
     const [seen, setSeen] = useState<Seen>({});
@@ -86,12 +85,9 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
 
     /** `startedAt`: when the read that brought `next` began; a live push is taken as it comes. */
     const accept = (next: BrowserStatus, startedAt = Date.now()): void => setSeen((current) => withAnswer(current, next, startedAt, Date.now()));
-    /** One status read past the subscription: a grant's end or a renewal pushes nothing to it. */
-    const reread = (): void => {
-        const startedAt = Date.now();
-
-        settleQuietly(async () => accept(await readBrowserStatus(getClient(), threadId), startedAt));
-    };
+    /** A status read past the subscription (a grant's end or a renewal pushes nothing to it), tried again on failure. */
+    const reread = (): () => void =>
+        readUntilAnswered({ onAnswer: (next, startedAt) => accept(next, startedAt), read: async () => await readBrowserStatus(getClient(), threadId) });
 
     // Only a refusal of the chat hides the page; any other subscription error (a lost connection resumes on its own,
     // a server hiccup) leaves the last page and its "Last synced" time on screen.
@@ -121,13 +117,21 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
             return undefined;
         }
 
-        return watchGrantEnd({
+        let stopRead: (() => void) | undefined;
+        const stopWait = watchGrantEnd({
             endsAt: grantEnd,
             onEnd: () => setExpiredAnswer(status),
-            reread,
+            reread: () => {
+                stopRead = reread();
+            },
             // The grant still holds until its real end: a read before it would answer it again, and loop.
             rereadAt: grantEnd + GRANT_END_MARGIN_MS,
         });
+
+        return () => {
+            stopWait();
+            stopRead?.();
+        };
     }, [grantEnd, status, threadId]);
 
     const otherLeaseEnd = otherLeaseEndOnDevice(status, answer?.receivedAt ?? 0);
@@ -137,8 +141,31 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
             return undefined;
         }
 
-        return watchGrantEnd({ endsAt: otherLeaseEnd, reread });
+        let stopRead: (() => void) | undefined;
+        const stopWait = watchGrantEnd({
+            endsAt: otherLeaseEnd,
+            reread: () => {
+                stopRead = reread();
+            },
+        });
+
+        return () => {
+            stopWait();
+            stopRead?.();
+        };
     }, [otherLeaseEnd, threadId]);
+
+    // Back online, or a retry due (the offline provider's tick): a page held off by a grant's end reads its status
+    // again, in case every read at the end failed.
+    const isExpired = status !== undefined && expiredAnswer === status;
+
+    useEffect(() => {
+        if (!isExpired) {
+            return undefined;
+        }
+
+        return reread();
+    }, [isExpired, refreshTick, threadId]);
 
     const view = viewStateOf(status, error, status !== undefined && expiredAnswer === status);
     const isHolding = control.kind === "holding";
