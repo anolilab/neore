@@ -247,18 +247,6 @@ describe("memory import procedures", () => {
             await expect(call(importMemoryFile, { content, format: "text" })).resolves.toMatchObject({ imported: count });
         });
 
-        it("refuses a file over the inline limit with a message about later support, and writes nothing", async () => {
-            expect.assertions(2);
-
-            const content = Array.from({ length: MEMORY_FILE_INLINE_MAX_ENTRIES + 1 }, (_, index) => `The user has hobby number ${String(index)}`).join("\n");
-
-            await expect(call(importMemoryFile, { content, format: "text" })).rejects.toMatchObject({
-                code: "BAD_REQUEST",
-                message: expect.stringContaining("later change"),
-            });
-            await expect(stored()).resolves.toStrictEqual([]);
-        });
-
         it("refuses a malformed or wrongly shaped file with a clear error", async () => {
             expect.assertions(3);
 
