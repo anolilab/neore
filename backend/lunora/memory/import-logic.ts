@@ -82,15 +82,6 @@ const WHITESPACE_RE = /\s+/g;
 export const LINE_BREAK_RE = /\r\n?|[\n\v\f\u{2028}\u{2029}]/u;
 
 /**
- * The text with every line ending as `\n` and its quoted multi-line secrets redacted. The redaction reads only `\n` and
- * `\r\n`, so a secret split on U+2028, a bare CR or a form feed would otherwise leave its later lines as plain facts.
- */
-export const redactMultilineImportSecrets = (text: string): string => redactMultilineSecrets(text.split(LINE_BREAK_RE).join("\n"));
-
-/** The text as lines, its quoted multi-line secrets redacted first. */
-export const splitImportLines = (text: string): string[] => redactMultilineImportSecrets(text).split("\n");
-
-/**
  * Shapes that are a secret or sensitive identifier whatever words surround them:
  * provider keys, private keys, tokens, card and account numbers, social security numbers,
  * and a password or key given as a value. Such a line is dropped whole.
@@ -186,7 +177,7 @@ export const splitImportedText = (text: string): { cut: number; dropped: number;
     let dropped = 0;
 
     // A quoted secret that spans lines is redacted before the split, or its later lines would read as facts.
-    const rawLines = splitImportLines(text.slice(0, IMPORT_MAX_INPUT_CHARS));
+    const rawLines = redactMultilineSecrets(text.slice(0, IMPORT_MAX_INPUT_CHARS)).split(LINE_BREAK_RE);
 
     for (const raw of rawLines) {
         const cleaned = cleanImportLine(raw);

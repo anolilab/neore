@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { containsSecret, REDACTED, redactMultilineSecrets, redactSecrets } from "./secret-redaction";
+import { containsSecret, REDACTED, redactSecrets } from "./secret-redaction";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 const ALPHANUMERIC = `${LETTERS}0123456789`;
@@ -318,75 +318,5 @@ describe("redactSecrets", () => {
 
     it("redacts an opaque 32-character token that has a single digit", () => {
         expect(redactSecrets("key vKqPzRtLmNvBwYhJdFgSaEcTuIoPlQr1")).toBe("key «redacted»");
-    });
-});
-
-describe("redactMultilineSecrets", () => {
-    const name = "DB_PASSWORD=";
-
-    it.each([
-        ["a newline", "\n"],
-        ["U+2028", "\u{2028}"],
-        ["a bare CR", "\r"],
-    ])("redacts a quoted value with spaces split on %s, whole", (_label, separator) => {
-        const value = join("alpha beta", separator, "the user keeps this tail");
-
-        expect(redactMultilineSecrets(`before\n${name}"${value}"\nafter`)).toBe(`before\n${name}${REDACTED}\nafter`);
-    });
-
-    it("redacts a value past the old match limit, and stops at its closing quote", () => {
-        const value = "abcdefghij\n".repeat(300).trimEnd();
-
-        expect(redactMultilineSecrets(`${name}"${value}" and then the user likes tea`)).toBe(`${name}${REDACTED} and then the user likes tea`);
-    });
-
-    it("redacts a value whose opening quote is on the line after the name", () => {
-        expect(redactMultilineSecrets('before\nDB_TOKEN=\n"alpha\nThe user keeps this private continuation"\nafter')).toBe(
-            `before\nDB_TOKEN=${REDACTED}\nafter`,
-        );
-    });
-
-    it("redacts a value on the line after its name even when it fits on one line", () => {
-        expect(redactMultilineSecrets('before\nDB_TOKEN=\n"alpha beta"\nafter')).toBe(`before\nDB_TOKEN=${REDACTED}\nafter`);
-    });
-
-    it("does not let a label reach a quote past a blank line, and keeps the text between", () => {
-        const text = 'DB_TOKEN=\n\n"The user likes green tea\nThe user owns a bike"\nThe user lives in Lisbon';
-
-        expect(redactMultilineSecrets(text)).toBe(text);
-    });
-
-    it("finishes a 500 KB file of overlapping openings within a fixed bound", () => {
-        // Each block holds 570 openings that all close on the same line, 4000 characters on. Rescanning for each opening
-        // took about 800 ms here; one pass takes about 30 ms. The bound is wide, as the guard is against the rescan.
-        const block = `${'TOKEN="'.repeat(570)}" `;
-        const text = block.repeat(Math.floor(500_000 / block.length));
-        const started = performance.now();
-
-        expect(redactMultilineSecrets(text)).toBe(text);
-        expect(performance.now() - started).toBeLessThan(400);
-    });
-
-    it("skips an escaped quote inside the value", () => {
-        expect(redactMultilineSecrets(`${name}"alpha \\" beta\ngamma" ok`)).toBe(`${name}${REDACTED} ok`);
-    });
-
-    it("takes the rest of the text when the quote is not closed within the bound", () => {
-        const value = "abcdefghij\n".repeat(500);
-
-        expect(redactMultilineSecrets(`before\n${name}"${value}The user likes green tea\n`)).toBe(`before\n${name}${REDACTED}`);
-    });
-
-    it("leaves the text after a closing quote that was found", () => {
-        const value = "abcdefghij\n".repeat(300).trimEnd();
-
-        expect(redactMultilineSecrets(`${name}"${value}"\nThe user likes green tea`)).toBe(`${name}${REDACTED}\nThe user likes green tea`);
-    });
-
-    it("leaves a value on one line to redactSecrets, and text without a secret name alone", () => {
-        const single = `${name}"alpha beta" and the user likes tea`;
-
-        expect(redactMultilineSecrets(single)).toBe(single);
-        expect(redactMultilineSecrets('The user said "hello\nthere" once')).toBe('The user said "hello\nthere" once');
     });
 });

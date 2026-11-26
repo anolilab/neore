@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { REDACTED } from "../lib/secret-redaction";
 import { importDedupKey } from "./import-logic";
 import {
     MEMORY_FILE_BATCH_SIZE,
@@ -26,6 +25,16 @@ const factOfLength = (length: number): string =>
 
 const fact = (index: number): string => `The user likes pattern number ${String(index)} a lot`;
 const lines = (count: number): string => Array.from({ length: count }, (_, index) => fact(index)).join("\n");
+
+const SECRET_WORDS = /amber|hunter|alpha|battery|horse/u;
+
+/** A secret whose value does not end on its line: an unclosed quote of either kind, a value on the next line, none. */
+const SECRET_CONTINUES = [
+    'DB_PASSWORD="first line\n"quoted phrase" \nThe continuation phrase is amber-orchid-9472',
+    "DB_PASSWORD='correct horse\nbattery staple in vault'",
+    'DB_TOKEN=\n"alpha beta"',
+    "DB_PASSWORD=\nhunter2",
+];
 
 const refusal = (content: string, format: "json" | "text"): MemoryFileError | undefined => {
     try {
@@ -65,31 +74,39 @@ describe("parseMemoryFile: text", () => {
         expect(parsed).toMatchObject({ entries: 1, invalid: 2, total: 3 });
     });
 
-    it.each([
-        ["U+2028", "\u{2028}"],
-        ["U+2029", "\u{2029}"],
-        ["a bare CR", "\r"],
-        ["a form feed", "\f"],
-    ])("redacts a quoted secret split on %s, and keeps no part of it", (_name, separator) => {
-        // The second line reads as an ordinary fact; only the redaction before the split keeps it out.
-        const continuation = "the user keeps this tail of the secret";
-        const parsed = parseMemoryFile(`The user lives in Lisbon\nDB_PASSWORD="alpha${separator}${continuation}"\nThe user likes green tea`, "text");
+    it.each(SECRET_CONTINUES)("refuses a file with a secret whose value continues past its line (%#), naming the line and never the text", (input) => {
+        const error = refusal(`The user lives in Lisbon\n${input}`, "text");
 
-        expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user lives in Lisbon", "The user likes green tea"]);
+        expect(error).toMatchObject({ code: "secret_continues", message: expect.stringContaining("Line 2 holds a password or key") });
+        expect(error?.message).not.toMatch(SECRET_WORDS);
     });
 
-    it("keeps no line of a quoted secret that runs past 1000 characters", () => {
-        const value = "abcdefghij\n".repeat(150).trimEnd();
-        const parsed = parseMemoryFile(`The user lives in Lisbon\nDB_PASSWORD="${value}"\nThe user likes green tea`, "text");
-
-        expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user lives in Lisbon", "The user likes green tea"]);
+    it("refuses on a line break other than a newline, and counts the lines before it", () => {
+        expect(refusal(`The user lives in Lisbon\u{2028}DB_PASSWORD=\r\nhunter2`, "text")).toMatchObject({ message: expect.stringContaining("Line 2") });
     });
 
-    it("keeps no line after a quoted secret that runs past 4000 characters without closing", () => {
-        const value = "abcdefghij\n".repeat(500);
-        const parsed = parseMemoryFile(`The user lives in Lisbon\nDB_PASSWORD="${value}The user likes green tea`, "text");
+    it("keeps a secret closed on its line, redacted as a paste redacts it, and the line after it", () => {
+        const parsed = parseMemoryFile('Wifi password: "guest"!\nThe user likes tea', "text");
 
-        expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user lives in Lisbon"]);
+        expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user likes tea"]);
+        expect(parsed).toMatchObject({ entries: 1, invalid: 1, total: 2 });
+    });
+
+    it("counts a line that is only wrapping as invalid, and still ignores a blank one", () => {
+        const parsed = parseMemoryFile("-\n**\n\n   \nThe user likes green tea", "text");
+
+        expect(parsed).toMatchObject({ entries: 1, invalid: 2, total: 3 });
+    });
+
+    it("finishes a 500 KB file of repeated secret labels within a fixed bound", () => {
+        // Each block holds 569 labels whose quoted values close on the same line: a hostile file must not cost more than
+        // one read of its text.
+        const block = `${'TOKEN="'.repeat(569)}" `;
+        const content = block.repeat(Math.floor(MEMORY_FILE_MAX_BYTES / block.length));
+        const started = performance.now();
+
+        expect(parseMemoryFile(content, "text")).toMatchObject({ entries: 0, tooLong: 1, total: 1 });
+        expect(performance.now() - started).toBeLessThan(400);
     });
 
     it("counts an entry that grows past the limit once its secret is redacted as too long, not cut", () => {
@@ -132,24 +149,17 @@ describe("parseMemoryFile: JSON", () => {
         ]);
     });
 
-    it("keeps no part of a quoted secret with spaces and a line break inside one item", () => {
-        const secret = ["correct horse", "\n", "battery staple"].join("");
-        const parsed = parseMemoryFile(JSON.stringify(["The user lives in Lisbon", `DB_PASSWORD="${secret}"`, { text: `API_TOKEN="${secret}"` }]), "json");
+    it.each(SECRET_CONTINUES)("skips, counted, an item whose secret continues past its line (%#)", (input) => {
+        const parsed = parseMemoryFile(JSON.stringify(["The user lives in Lisbon", input, { text: input }]), "json");
 
         expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user lives in Lisbon"]);
         expect(parsed).toMatchObject({ entries: 1, invalid: 2, total: 3 });
     });
 
-    it("keeps no part of a quoted secret inside a longer item, and none of one opened on the next line", () => {
-        const parsed = parseMemoryFile(
-            JSON.stringify([
-                'The user deploys the blog with DB_TOKEN="alpha beta\nprivate continuation" from CI',
-                'DB_TOKEN=\n"alpha\nThe user keeps this private continuation"',
-            ]),
-            "json",
-        );
+    it("counts an item that is only wrapping as invalid", () => {
+        const parsed = parseMemoryFile(JSON.stringify(["-", { text: "**" }, "The user likes green tea"]), "json");
 
-        expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual([`The user deploys the blog with DB_TOKEN=${REDACTED} from CI`]);
+        expect(parsed).toMatchObject({ entries: 1, invalid: 2, total: 3 });
     });
 
     it("counts an item of another shape as invalid", () => {

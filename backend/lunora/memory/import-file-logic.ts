@@ -11,15 +11,15 @@
  * JSON: an array whose items are strings, or objects with a text field (`content`, `text` or `memory`) and an
  * optional `type`. Any other top-level shape is refused; an item of another shape is counted as invalid.
  */
+import { SECRET_NAME } from "../lib/secret-redaction";
 import {
     capImportText,
     IMPORT_MAX_FACT_CHARS,
     importDedupKey,
     isLongEnoughFact,
+    LINE_BREAK_RE,
     looksSensitive,
     redactImportText,
-    redactMultilineImportSecrets,
-    splitImportLines,
     unwrapImportLine,
 } from "./import-logic";
 import { isMemoryType, type MemoryType } from "./taxonomy";
@@ -61,7 +61,7 @@ const BYTE_ORDER_MARK = "\u{FEFF}";
 
 export type MemoryFileFormat = "json" | "text";
 
-export type MemoryFileErrorCode = "bad_json" | "bad_shape" | "empty" | "too_large" | "too_many_entries";
+export type MemoryFileErrorCode = "bad_json" | "bad_shape" | "empty" | "secret_continues" | "too_large" | "too_many_entries";
 
 /** A file refused as a whole. The message is shown to the user as is. */
 export class MemoryFileError extends Error {
@@ -106,8 +106,12 @@ const MEMORY_FILE_ENTRY_PREPARE_MAX_CHARS = MEMORY_FILE_ENTRY_MAX_CHARS * 10;
 const prepareEntry = (raw: string): Prepared => {
     const unwrapped = unwrapImportLine(raw);
 
-    if (unwrapped === "") {
+    if (raw.trim() === "") {
         return { status: "blank" };
+    }
+
+    if (unwrapped === "") {
+        return { status: "invalid" };
     }
 
     if (unwrapped.length > MEMORY_FILE_ENTRY_PREPARE_MAX_CHARS) {
@@ -140,12 +144,75 @@ export const toBatches = <T>(items: ReadonlyArray<T>, size: number): T[][] => {
     return batches;
 };
 
+const SECRET_LABEL = new RegExp(String.raw`\b${SECRET_NAME}["']?[^\S\n]*[:=]`, "giu");
+
+/** Where the quote `quote` that opened a value at `from` is closed on this line (the index after it), or `-1`. */
+const closingQuoteOnLine = (line: string, from: number, quote: string): number => {
+    for (let index = from; index < line.length; index += 1) {
+        if (line[index] === "\\") {
+            index += 1;
+        } else if (line[index] === quote) {
+            return index + 1;
+        }
+    }
+
+    return -1;
+};
+
+/**
+ * True when one line names a secret (`DB_PASSWORD=`, `api_token:`) and its value does not end on that line: nothing
+ * follows the `=` or `:`, or a quote opened right after it has no matching one later on the line. Such a value goes on
+ * to the next line, and the redaction reads one line at a time, so its continuation would be read as a memory. The file
+ * is refused rather than guessing where the value ends. A label inside a quoted value already read is skipped.
+ */
+const secretContinues = (line: string): boolean => {
+    let readUntil = 0;
+
+    for (const match of line.matchAll(SECRET_LABEL)) {
+        if (match.index < readUntil) {
+            continue;
+        }
+
+        let start = match.index + match[0].length;
+
+        while (start < line.length && line[start]?.trim() === "") {
+            start += 1;
+        }
+
+        if (start === line.length) {
+            return true;
+        }
+
+        const quote = line[start];
+
+        if (quote === '"' || quote === "'") {
+            readUntil = closingQuoteOnLine(line, start + 1, quote);
+
+            if (readUntil === -1) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+};
+
+/** The one-based number of the first line of `lines` that {@link secretContinues}, or `undefined`. */
+const firstSecretContinuingLine = (lines: ReadonlyArray<string>): number | undefined => {
+    const index = lines.findIndex((line) => secretContinues(line));
+
+    return index === -1 ? undefined : index + 1;
+};
+
 /** A raw entry before preparing: its text (or `undefined` for a wrong shape) and the type it names. */
 type RawEntry = { text: string | undefined; type: MemoryType };
 
+/** An item's text, or `undefined` when a secret in it continues past its line: the item is skipped, the file is not. */
+const itemText = (text: string): string | undefined => (firstSecretContinuingLine(text.split(LINE_BREAK_RE)) === undefined ? text : undefined);
+
 const textOfJsonItem = (item: unknown): RawEntry => {
     if (typeof item === "string") {
-        return { text: redactMultilineImportSecrets(item), type: MEMORY_FILE_DEFAULT_TYPE };
+        return { text: itemText(item), type: MEMORY_FILE_DEFAULT_TYPE };
     }
 
     if (typeof item !== "object" || item === null || Array.isArray(item)) {
@@ -156,15 +223,24 @@ const textOfJsonItem = (item: unknown): RawEntry => {
     const field = TEXT_FIELDS.find((name) => typeof record[name] === "string" && (record[name] as string).trim() !== "");
     const type = isMemoryType(record.type) ? record.type : MEMORY_FILE_DEFAULT_TYPE;
 
-    return { text: field === undefined ? undefined : redactMultilineImportSecrets(record[field] as string), type };
+    return { text: field === undefined ? undefined : itemText(record[field] as string), type };
 };
 
 const rawEntriesOf = (content: string, format: MemoryFileFormat): RawEntry[] => {
     const body = content.startsWith(BYTE_ORDER_MARK) ? content.slice(1) : content;
 
     if (format === "text") {
-        // A quoted secret that spans lines is redacted before the split, or its later lines would read as memories.
-        return splitImportLines(body)
+        const lines = body.split(LINE_BREAK_RE);
+        const continuing = firstSecretContinuingLine(lines);
+
+        if (continuing !== undefined) {
+            throw new MemoryFileError(
+                "secret_continues",
+                `Line ${String(continuing)} holds a password or key whose value continues on the next line. Remove it and try again.`,
+            );
+        }
+
+        return lines
             .filter((line) => line.trim() !== "")
             .map((text) => {
                 return { text, type: MEMORY_FILE_DEFAULT_TYPE };
