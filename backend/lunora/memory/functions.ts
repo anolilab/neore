@@ -5,6 +5,7 @@ import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
+import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { memoryLogger } from "../lib/logger";
 import { isThreadLocked } from "../lib/thread-lock";
@@ -14,6 +15,7 @@ import { dateColumns, factDatesOf, hasFactDates, isExpired, normalizeFactDates, 
 import {
     type ImportApp,
     importDedupKey,
+    IMPORT_ACCOUNT_DELETING_MESSAGE,
     IMPORT_MEMORY_OFF_MESSAGE,
     IMPORT_WIDE_WINDOW_ROWS,
     IMPORTED_CONFIDENCE,
@@ -845,6 +847,8 @@ export const saveImportedMemoryBatch = internalMutation
                 type: vMemoryType,
             }),
         ),
+        // The background file import sets it: a batch claimed before an account deletion must write nothing once it is under way.
+        refuseDuringDeletion: v.optional(v.boolean()),
         userId: v.string(),
     })
     .output(
@@ -869,6 +873,11 @@ export const saveImportedMemoryBatch = internalMutation
 
         if (!(await readMemoryEnabled(ctx, args.userId))) {
             throw new LunoraError("FORBIDDEN", IMPORT_MEMORY_OFF_MESSAGE);
+        }
+
+        // In the writing mutation, so a save and the deletion sweep never interleave: nothing is written once deletion is under way.
+        if (args.refuseDuringDeletion === true && (await isAccountDeletionUnderway(ctx, args.userId))) {
+            throw new LunoraError("FORBIDDEN", IMPORT_ACCOUNT_DELETING_MESSAGE);
         }
 
         const today = localDayOf(now, await userTimeZone(ctx, args.userId));

@@ -16,6 +16,7 @@ import type { ActionCtx } from "../_generated/server";
 import { getUtilityModelForUser, loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { lowReasoningUtilityOptions } from "../chat/lib/reasoning-options";
 import { authAction, rateLimit } from "../lib/crpc";
+import { enqueueJob } from "../lib/job-queue";
 import { gatewayFetch } from "../lib/services";
 import {
     decideFact,
@@ -30,7 +31,6 @@ import { runBeliefRevision } from "./extract";
 import {
     MEMORY_FILE_INLINE_MAX_ENTRIES,
     MEMORY_FILE_MAX_BYTES,
-    MEMORY_FILE_TOO_LARGE_INLINE_MESSAGE,
     MEMORY_FILE_TOO_LARGE_MESSAGE,
     type MemoryFileEntry,
     MemoryFileError,
@@ -49,6 +49,7 @@ import {
     IMPORT_DEDUP_CALL_BUDGET,
     IMPORT_LOOKUP_CALL_SHARE,
     IMPORT_LOOKUP_CALLS,
+    IMPORT_ACCOUNT_DELETING_MESSAGE,
     IMPORT_MEMORY_OFF_MESSAGE,
     IMPORT_WIDE_WINDOW_ROWS,
     isLongEnoughFact,
@@ -104,7 +105,10 @@ interface PlannedFact {
  * already remembered is confirmed, not repeated, so importing the same list twice adds nothing.
  * Every count is taken from what the one write applied, never from what the planning expected.
  */
-export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts: ReadonlyArray<ImportedFact>; userId: string }): Promise<ImportResult> => {
+export const importFacts = async (
+    ctx: ActionCtx,
+    args: { app: ImportApp; facts: ReadonlyArray<ImportedFact>; refuseDuringDeletion?: boolean; userId: string },
+): Promise<ImportResult> => {
     await requireMemoryEnabled(ctx, args.userId);
 
     const facts = sanitizeImportedFacts(args.facts);
@@ -301,6 +305,7 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
         facts: writes.map(({ fact, merge, supersede }) => {
             return { memory: fact.memory, merge, supersede, type: fact.type };
         }),
+        ...(args.refuseDuringDeletion === true && { refuseDuringDeletion: true }),
         userId: args.userId,
     });
 
@@ -405,7 +410,7 @@ const askImportLabels = async (ctx: ActionCtx, userId: string, lines: ReadonlyAr
  * call for the whole batch (an inline file is one batch), plus the model lookup (about 3 queries): about 4 more
  * subrequests on top of `importFacts`' worst case (40 in `import.test.ts`), so an inline file stays under 50.
  */
-const keepLabelledEntries = async (ctx: ActionCtx, userId: string, entries: ReadonlyArray<MemoryFileEntry>): Promise<MemoryFileEntry[]> => {
+export const keepLabelledEntries = async (ctx: ActionCtx, userId: string, entries: ReadonlyArray<MemoryFileEntry>): Promise<MemoryFileEntry[]> => {
     const labels = await askImportLabels(
         ctx,
         userId,
@@ -434,10 +439,14 @@ export const previewMemoryImport = authAction
         return preview;
     });
 
+/** Batches stored per write of a background import, so one write stays far under the request body cap (a batch is at most 25 entries of 500 characters). */
+const STORE_BATCHES_PER_WRITE = 20;
+
 /**
- * Imports a small text or JSON file inline: parsed and bounded by `parseMemoryFile`, then written one batch at a time
- * through `importFacts`, so the embedding, redaction, dedup and per-user write rules are the paste import's. A file with
- * more than `MEMORY_FILE_INLINE_MAX_ENTRIES` entries is refused for now.
+ * Imports a text or JSON file: parsed and bounded by `parseMemoryFile` at once, a refusal returned before anything is
+ * stored. A file of at most `MEMORY_FILE_INLINE_MAX_ENTRIES` entries is written in this call, one batch, through
+ * `importFacts`, so the embedding, redaction, dedup and per-user write rules are the paste import's. A larger file is
+ * stored as parsed, redacted batches and imported by a background job (`./import-job.ts`); the answer is then the job.
  */
 export const importMemoryFile = authAction
     .input({
@@ -447,13 +456,16 @@ export const importMemoryFile = authAction
     })
     .use(rateLimit("memory/import"))
     .output(
-        v.object({
-            duplicates: v.number(),
-            imported: v.number(),
-            invalid: v.number(),
-            tooLong: v.number(),
-            updated: v.number(),
-        }),
+        v.union(
+            v.object({
+                duplicates: v.number(),
+                imported: v.number(),
+                invalid: v.number(),
+                tooLong: v.number(),
+                updated: v.number(),
+            }),
+            v.object({ jobId: v.id("memoryImportJobs"), queued: v.literal(true), total: v.number() }),
+        ),
     )
     .action(async ({ args, ctx }) => {
         const { userId } = ctx.user;
@@ -463,10 +475,7 @@ export const importMemoryFile = authAction
         let parsed: ParsedMemoryFile;
 
         try {
-            parsed = parseMemoryFile(args.content, args.format, {
-                maxEntries: MEMORY_FILE_INLINE_MAX_ENTRIES,
-                tooManyMessage: MEMORY_FILE_TOO_LARGE_INLINE_MESSAGE,
-            });
+            parsed = parseMemoryFile(args.content, args.format);
         } catch (error) {
             if (error instanceof MemoryFileError) {
                 throw new LunoraError("BAD_REQUEST", error.message);
@@ -476,7 +485,43 @@ export const importMemoryFile = authAction
         }
 
         if (parsed.entries > MEMORY_FILE_INLINE_MAX_ENTRIES) {
-            throw new LunoraError("BAD_REQUEST", MEMORY_FILE_TOO_LARGE_INLINE_MESSAGE);
+            const jobId = await ctx.runMutation(internal.memory.import_job.prepareImportJob, {
+                batchCount: parsed.batches.length,
+                duplicates: parsed.duplicates,
+                invalid: parsed.invalid,
+                tooLong: parsed.tooLong,
+                total: parsed.total,
+                userId,
+            });
+
+            try {
+                for (let first = 0; first < parsed.batches.length; first += STORE_BATCHES_PER_WRITE) {
+                    await ctx.runMutation(internal.memory.import_job.storeImportBatches, {
+                        batches: parsed.batches.slice(first, first + STORE_BATCHES_PER_WRITE),
+                        firstIndex: first,
+                        jobId,
+                        userId,
+                    });
+                }
+
+                if (!(await ctx.runMutation(internal.memory.import_job.beginImportJob, { jobId, userId }))) {
+                    throw new LunoraError("FORBIDDEN", IMPORT_ACCOUNT_DELETING_MESSAGE);
+                }
+
+                // After the start committed, so the delivery finds the job queued with batch 0 next.
+                await enqueueJob(internal.memory.import_job.runMemoryImportBatch, { index: 0, jobId }, { shardKey: userId });
+            } catch (error) {
+                // Ends the job, so it neither blocks the next import nor leaves entries behind.
+                await ctx
+                    .runMutation(internal.memory.import_job.failImportBatch, { index: 0, jobId, message: "The import could not be started." })
+                    .catch(() => undefined);
+
+                throw error;
+            }
+
+            ctx.log.event("memory.import_file", { entries: parsed.entries, format: args.format, queued: true, total: parsed.total, userId });
+
+            return { jobId, queued: true as const, total: parsed.total };
         }
 
         // Duplicates inside the file were left out by the parse; those against stored memories are counted by the write.
