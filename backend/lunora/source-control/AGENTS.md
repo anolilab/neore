@@ -47,3 +47,10 @@
   (`LOG_EXCERPT_MAX_CHARS`). Reads are Auto; reply and re-run are Ask by default; merge is in
   `BUILTIN_TOOLS_NEEDING_A_PERSON` with `needsApproval: true` hard-coded, so no override, grant or headless run skips
   the person, and it merges only the head the approved call names.
+
+- **PR watch wake** (`pr-watch-poll.ts` records, `pr-watch-wake.ts` delivers) — the poller only records owed reasons in
+  `watchPending`; `deliverWatchWake` claims a lease (`watchWakeLeaseUntil`), runs ONE headless turn in the linked thread
+  (nothing from the host in the prompt), and only `finishWatchWake` counts the wake (`wakes`, `lastWakeAt`) and clears the
+  delivered reasons. A failed turn leaves both as they were. The claim refuses a stale run or start, the cap of 5, the
+  10-minute cooldown, a locked or busy thread. The agent tools `watchPullRequest` (ask by default) and `unwatchPullRequest`
+  go through the same linked-pull-request gate as the other PR tools.

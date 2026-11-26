@@ -22,6 +22,7 @@ import {
     readPullRequestForAgent,
     replyForAgent,
     rerunFailedForAgent,
+    watchPullRequestForAgent,
 } from "../../source-control/pr-agent-host";
 import type { PullRequestAgentDependencies } from "../../source-control/pr-agent-host";
 import { MERGE_METHODS } from "../../source-control/types";
@@ -37,7 +38,9 @@ const target = {
 type Target = { number?: number; repository?: string };
 
 const MESSAGES: Record<string, string> = {
+    already: "The watch is already in that state.",
     bad_cursor: "That review cursor is not one an earlier read gave: read the pull request again without it.",
+    capped: "This pull request already used all its wakes; a watch cannot be started again.",
     choose: "Several pull requests are linked to this thread: name one by repository and number.",
     empty_reply: "A reply needs some text.",
     forbidden: "The connected account cannot see that pull request.",
@@ -55,6 +58,7 @@ const MESSAGES: Record<string, string> = {
     rate_limited: "The host is rate limiting requests. Try again in a few minutes.",
     rejected: "The host refused it.",
     signed_out: "Pull request tools work only in a chat of your own, in a turn you started.",
+    too_many: "Too many pull requests are watched already: stop one first.",
     unconfirmed: "The host's answer never came: it may have done it. Check the pull request before trying again.",
     unsupported: "This host does not offer that.",
 };
@@ -193,5 +197,29 @@ export const mergePullRequestTool = createTool<Target & { headSha: string; metho
         .strict(),
     needsApproval: true,
     title: "Merge Pull Request",
+    toModelOutput: (_context, { output }) => toonEncodeOutput(output),
+});
+
+export const watchPullRequestTool = createTool<Target, object, ToolContext>({
+    description: `Watch a linked pull request: this thread is woken, with a short note of what happened, when its checks fail, it conflicts with its base, or someone else reviews it. Watching costs a run each time, so at most five wakes happen per watch, at least ten minutes apart. Whatever is failing, conflicting or reviewed when the watch starts is not reported. The person is asked before it starts.`,
+    execute: async (context, input) => {
+        const dependencies = dependenciesOf(context);
+
+        return dependencies ? explain(await watchPullRequestForAgent(dependencies, wantedOf(input), true)) : signedOut;
+    },
+    inputSchema: z.object(target).strict(),
+    title: "Watch Pull Request",
+    toModelOutput: (_context, { output }) => toonEncodeOutput(output),
+});
+
+export const unwatchPullRequestTool = createTool<Target, object, ToolContext>({
+    description: `Stop watching a linked pull request: this thread is no longer woken for it.`,
+    execute: async (context, input) => {
+        const dependencies = dependenciesOf(context);
+
+        return dependencies ? explain(await watchPullRequestForAgent(dependencies, wantedOf(input), false)) : signedOut;
+    },
+    inputSchema: z.object(target).strict(),
+    title: "Stop Watching Pull Request",
     toModelOutput: (_context, { output }) => toonEncodeOutput(output),
 });

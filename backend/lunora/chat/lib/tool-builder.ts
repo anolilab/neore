@@ -37,6 +37,8 @@ import {
     readPullRequestTool,
     replyToReviewCommentTool,
     rerunFailedChecksTool,
+    unwatchPullRequestTool,
+    watchPullRequestTool,
     imageEditingTool,
     imageGenerationTool,
     imageSearchTool,
@@ -153,6 +155,8 @@ export const PULL_REQUEST_TOOLS: ReadonlyArray<string> = [
     ToolName.ReplyToReviewComment,
     ToolName.RerunFailedChecks,
     ToolName.MergePullRequest,
+    ToolName.WatchPullRequest,
+    ToolName.UnwatchPullRequest,
 ];
 // Delegating a self-contained piece of work to a headless sub-agent (`sub-agents/`)
 const SUB_AGENT_TOOLS = [ToolName.DelegateToSubAgent, ToolName.MessageWorker];
@@ -419,36 +423,38 @@ const ALL_TOOLS: Record<ToolName, unknown> = {
     // Content Tools
     [ToolName.Retrieve]: retrieveTool,
     [ToolName.SaveSecretAsProviderKey]: saveSecretAsProviderKeyTool,
-
     // Memory Tools
     [ToolName.SearchMemory]: searchMemoryTool,
     [ToolName.SetMcpServerSecret]: setMcpServerSecretTool,
+
     // Sandbox Tools
     [ToolName.ShellExecution]: shellExecutionTool,
     [ToolName.SignInWithSavedLogin]: signInWithSavedLoginTool,
-
     [ToolName.SpotifySearch]: spotifySearchTool,
     [ToolName.StockChart]: stockChartTool,
+
     // Task Management Tools
     [ToolName.TaskList]: taskListTool,
-
     // Language Tools
     [ToolName.TextTranslate]: textTranslateTool,
-
     [ToolName.TrendingMovies]: trendingMoviesTool,
+
     [ToolName.TrendingTv]: trendingTvTool,
 
+    [ToolName.UnwatchPullRequest]: unwatchPullRequestTool,
     [ToolName.UpdateDesign]: updateDesignTool,
 
     [ToolName.UpdateDocument]: updateDocumentTool,
 
     [ToolName.UpdateSlide]: updateSlideTool,
-    [ToolName.VideoGeneration]: videoGenerationTool,
 
+    [ToolName.VideoGeneration]: videoGenerationTool,
     [ToolName.VideoSearch]: videoSearchTool,
 
     // Vision / Analysis Tools
     [ToolName.VisionAnalysis]: visionAnalysisTool,
+
+    [ToolName.WatchPullRequest]: watchPullRequestTool,
     // Information Tools
     [ToolName.Weather]: weatherTool,
 
@@ -499,7 +505,15 @@ const TOOLS_BY_CATEGORY = {
     knowledge: [ToolName.KnowledgeSearch],
     location: [ToolName.FindPlace, ToolName.NearbyPlacesSearch, ToolName.Weather],
     memory: [ToolName.SearchMemory],
-    pullRequest: [ToolName.ReadPullRequest, ToolName.ReadFailingChecks, ToolName.ReplyToReviewComment, ToolName.RerunFailedChecks, ToolName.MergePullRequest],
+    pullRequest: [
+        ToolName.ReadPullRequest,
+        ToolName.ReadFailingChecks,
+        ToolName.ReplyToReviewComment,
+        ToolName.RerunFailedChecks,
+        ToolName.MergePullRequest,
+        ToolName.WatchPullRequest,
+        ToolName.UnwatchPullRequest,
+    ],
     research: [ToolName.DeepResearch],
     sandbox: [ToolName.ShellExecution, ToolName.FileOperations],
     search: [

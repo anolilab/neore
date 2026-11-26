@@ -25003,6 +25003,12 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "watchWakeLeaseUntil": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {

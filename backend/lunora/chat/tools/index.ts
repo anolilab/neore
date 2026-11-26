@@ -24,7 +24,15 @@ import deepfakeDetectionTool from "./deepfake-detection";
 import fileOperationsTool from "./file-operations";
 import flightTrackerTool from "./flight-tracker";
 import githubSearchTool from "./github-search";
-import { mergePullRequestTool, readFailingChecksTool, readPullRequestTool, replyToReviewCommentTool, rerunFailedChecksTool } from "./pull-request";
+import {
+    mergePullRequestTool,
+    readFailingChecksTool,
+    readPullRequestTool,
+    replyToReviewCommentTool,
+    rerunFailedChecksTool,
+    unwatchPullRequestTool,
+    watchPullRequestTool,
+} from "./pull-request";
 import imageEditingTool from "./image-editing";
 import imageGenerationTool from "./image-generation";
 import imageSearchTool from "./image-search";
@@ -105,7 +113,15 @@ export type { MediaDetails, MediaResult } from "./movie-tv-search";
 export { default as movieTvSearchTool } from "./movie-tv-search";
 export { default as musicGenerationTool } from "./music-generation";
 export { default as peopleSearchTool } from "./people-search";
-export { mergePullRequestTool, readFailingChecksTool, readPullRequestTool, replyToReviewCommentTool, rerunFailedChecksTool } from "./pull-request";
+export {
+    mergePullRequestTool,
+    readFailingChecksTool,
+    readPullRequestTool,
+    replyToReviewCommentTool,
+    rerunFailedChecksTool,
+    unwatchPullRequestTool,
+    watchPullRequestTool,
+} from "./pull-request";
 export type { RedditPost } from "./reddit-search";
 export { default as redditSearchTool } from "./reddit-search";
 export type { RenderUIOutput } from "./render-ui";
@@ -242,41 +258,43 @@ export enum ToolName {
     RequestSecret = "requestSecret",
 
     RerunFailedChecks = "rerunFailedChecks",
-
     // Content Tools
     Retrieve = "retrieve",
     SaveSecretAsProviderKey = "saveSecretAsProviderKey",
+
     // Memory Tools
     SearchMemory = "searchMemory",
     SetMcpServerSecret = "setMcpServerSecret",
-
     // Sandbox Tools
     ShellExecution = "shellExecution",
-
     // Signing the browser in with a saved login
     SignInWithSavedLogin = "signInWithSavedLogin",
 
     SpotifySearch = "spotifySearch",
+
     StockChart = "stockChart",
+
     // Task Management Tools
     TaskList = "taskList",
-
     // Language Tools
     TextTranslate = "textTranslate",
-
     TrendingMovies = "trendingMovies",
+
     TrendingTv = "trendingTv",
 
+    UnwatchPullRequest = "unwatchPullRequest",
     UpdateDesign = "updateDesign",
 
     UpdateDocument = "updateDocument",
-    UpdateSlide = "updateSlide",
 
+    UpdateSlide = "updateSlide",
     VideoGeneration = "videoGeneration",
 
     VideoSearch = "videoSearch",
+
     // Vision / Analysis Tools
     VisionAnalysis = "visionAnalysis",
+    WatchPullRequest = "watchPullRequest",
 
     // Information Tools
     Weather = "weather",
@@ -374,12 +392,14 @@ export const getAllTools = () => {
         [ToolName.TextTranslate]: textTranslateTool,
         [ToolName.TrendingMovies]: trendingMoviesTool,
         [ToolName.TrendingTv]: trendingTvTool,
+        [ToolName.UnwatchPullRequest]: unwatchPullRequestTool,
         [ToolName.UpdateDesign]: updateDesignTool,
         [ToolName.UpdateDocument]: updateDocumentTool,
         [ToolName.UpdateSlide]: updateSlideTool,
         [ToolName.VideoGeneration]: videoGenerationTool,
         [ToolName.VideoSearch]: videoSearchTool,
         [ToolName.VisionAnalysis]: visionAnalysisTool,
+        [ToolName.WatchPullRequest]: watchPullRequestTool,
         [ToolName.Weather]: weatherTool,
         [ToolName.WebSearch]: webSearchTool,
         [ToolName.WolframAlpha]: wolframAlphaTool,

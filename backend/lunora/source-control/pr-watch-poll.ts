@@ -351,6 +351,18 @@ export const recordWatchObservation = internalMutation
         });
         await runAfterOnShard(ctx.scheduler, PR_WATCH_POLL_INTERVAL_MS, internal.source_control.pr_watch_poll.pollWatchLink, { linkId: link._id }, link.userId);
 
+        // Owed reasons go to the thread as a wake turn, which claims, runs and then counts them (`pr-watch-wake.ts`). A repeat of
+        // this record, or a delivery already running, is a no-op there.
+        if (decision.action === "wake") {
+            await runAfterOnShard(
+                ctx.scheduler,
+                0,
+                internal.source_control.pr_watch_wake.deliverWatchWake,
+                { linkId: link._id, startedAt, ...(link.watchRun !== undefined && { run: link.watchRun }) },
+                link.userId,
+            );
+        }
+
         return null;
     });
 

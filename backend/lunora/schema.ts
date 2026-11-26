@@ -2761,6 +2761,9 @@ export const schema = defineSchema({
         ),
         // Names one start of the watch: fresh at every start and never the clock, so a poll leased before a stop and restart cannot match the restarted watch (`source-control/pr-watch-poll.ts`).
         watchRun: v.optional(v.string()),
+        // The lease a wake turn holds while it is delivered (`source-control/pr-watch-wake.ts`): until when no second delivery may start.
+        // Released when the delivery ends; a delivery that never ends frees itself when it lapses.
+        watchWakeLeaseUntil: v.optional(v.number()),
     })
         .shardBy("userId")
         .index("by_user_and_repository_number", ["userId", "repository", "number"])
