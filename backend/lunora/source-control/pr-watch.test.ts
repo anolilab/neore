@@ -118,6 +118,30 @@ describe("setPullRequestWatch", () => {
         expect(watch.startedAt).not.toBe(1);
     });
 
+    it("does not count a watch whose thread was deleted against the person's limit", async () => {
+        for (let number = 100; number < 100 + MAX_ACTIVE_PULL_REQUEST_WATCHES - 1; number += 1) {
+            await seedLink(OWNER, number, { watch: { startedAt: 1 } });
+        }
+
+        await seedLink(OWNER, 200, { threadDeleted: true, watch: { startedAt: 1 } });
+
+        const { linkId, threadId } = await seedLink(OWNER, 7);
+
+        expect(await call({ number: 7, threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "ok" });
+        expect(await watchOf(linkId)).toMatchObject({ startedAt: expect.any(Number) });
+    });
+
+    it("finds the live link of a thread even when other deleted links point at the same pull request", async () => {
+        const { linkId, threadId } = await seedLink(OWNER, 7);
+
+        for (let index = 0; index < 3; index += 1) {
+            await seedLink(OWNER, 7, { threadDeleted: true });
+        }
+
+        expect(await call({ number: 7, threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "ok" });
+        expect(await watchOf(linkId)).toMatchObject({ startedAt: expect.any(Number) });
+    });
+
     it("refuses a start once the person has the most active watches, and lets a stopped one through", async () => {
         for (let number = 100; number < 100 + MAX_ACTIVE_PULL_REQUEST_WATCHES; number += 1) {
             const seeded = await seedLink(OWNER, number, { watch: { startedAt: 1 } });

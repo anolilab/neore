@@ -21,7 +21,6 @@
     "backfill-message-typed-text",
     "drop-agent-option-fields",
     "session-options-to-session-state",
-    "unique-user-email-canonical",
     "widen-not-typed-steer-collaborator",
     "widen-not-typed-steer-drafts"
   ],
@@ -24873,6 +24872,41 @@
               "optional": true,
               "unique": false
             }
+          }
+        },
+        "watchPending": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "union",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "members": [
+              {
+                "kind": "literal",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "literal": "\"checks\""
+              },
+              {
+                "kind": "literal",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "literal": "\"conflict\""
+              },
+              {
+                "kind": "literal",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "literal": "\"review\""
+              }
+            ]
           }
         }
       },

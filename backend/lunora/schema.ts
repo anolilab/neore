@@ -2734,6 +2734,9 @@ export const schema = defineSchema({
                 wakes: v.optional(v.number()),
             }),
         ),
+        // Occurrences seen during a cooldown, delivered once the cooldown has passed (`source-control/pr-watch-logic.ts`).
+        // Cleared by a fresh start; a stopped watch keeps whatever it had.
+        watchPending: v.optional(v.array(v.union(v.literal("checks"), v.literal("conflict"), v.literal("review")))),
     })
         .shardBy("userId")
         .index("by_user_and_repository_number", ["userId", "repository", "number"])
