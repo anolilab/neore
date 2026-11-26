@@ -123,7 +123,8 @@ export const readWatchForPoll = internalQuery
  * read and the watch that was leased (`startedAt`) is still the one running.
  *
  * - none, baseline: the decision's state is stored.
- * - wake: stored with `lastWakeAt` and the count, and the reasons kept in `watchPending` for the delivery.
+ * - wake: the reasons and the markers the decision set are stored, with `watchPending` holding the reasons for the delivery.
+ *   `wakes` and `lastWakeAt` keep their stored values: the delivery counts the wake, so one never delivered cannot end the watch.
  * - end (closed or cap): stored, stamped `stoppedAt`, and `watchActive` is cleared so the person's slot is free.
  */
 export const recordWatchObservation = internalMutation
@@ -143,7 +144,8 @@ export const recordWatchObservation = internalMutation
             return null;
         }
 
-        const decision = decideWatch(stateOf(link), args.observation, ctx.now);
+        const previous = stateOf(link);
+        const decision = decideWatch(previous, args.observation, ctx.now);
         const { startedAt } = link.watch;
 
         if (decision.action === "end") {
@@ -154,7 +156,13 @@ export const recordWatchObservation = internalMutation
             return null;
         }
 
-        const stored = storedWatchOf({ ...decision.state, startedAt, ...(decision.action === "wake" && { pending: decision.reasons }) });
+        // A wake is not delivered yet: its reasons stay pending with the markers the decision set, but the count and the cooldown
+        // keep their stored values, so an undelivered wake never uses up the cap. The delivery counts the wake when it happens.
+        const stored = storedWatchOf({
+            ...decision.state,
+            startedAt,
+            ...(decision.action === "wake" && { lastWakeAt: previous.lastWakeAt, pending: decision.reasons, wakes: previous.wakes }),
+        });
 
         await ctx.db.patch("pullRequestThreads", link._id, { watch: stored.watch, watchPending: stored.watchPending ?? [] });
 

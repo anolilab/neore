@@ -186,17 +186,47 @@ describe("recordWatchObservation", () => {
         expect(row.watch.wakes).toBe(PR_WATCH_MAX_WAKES);
     });
 
-    it("records a wake with its reasons, the time and the count, and sends nothing", async () => {
-        const linkId = await seedWatch({ watch: { baselined: true, headSha: "sha-1", startedAt: STARTED_AT } });
+    it("records a wake's reasons and markers, and leaves the count and the cooldown as they were", async () => {
+        const linkId = await seedWatch({ watch: { baselined: true, headSha: "sha-1", startedAt: STARTED_AT, wakes: 2 } });
 
         await record(linkId, { observation: observation({ checks: "failing", failingCheckNames: ["build"], reviews: [{ authorLogin: "bob", id: "r1" }] }) });
 
         const row = await rowOf(linkId);
 
         expect(row.watchPending).toEqual(["checks", "review"]);
-        expect(row.watch).toMatchObject({ checksHeadSha: "sha-1", reviewId: "r1", wakes: 1 });
-        expect(row.watch.lastWakeAt).toBeGreaterThan(0);
+        expect(row.watch).toMatchObject({ checksHeadSha: "sha-1", reviewId: "r1", wakes: 2 });
+        expect(row.watch.lastWakeAt).toBeUndefined();
         expect(row.watchActive).toBe(true);
+    });
+
+    it("keeps the stored lastWakeAt on a wake", async () => {
+        const lastWakeAt = Date.now() - PR_WATCH_WAKE_COOLDOWN_MS - 1000;
+        const linkId = await seedWatch({ watch: { baselined: true, headSha: "sha-1", lastWakeAt, startedAt: STARTED_AT, wakes: 1 } });
+
+        await record(linkId, { observation: observation({ mergeable: "conflicting" }) });
+
+        const row = await rowOf(linkId);
+
+        expect(row.watchPending).toEqual(["conflict"]);
+        expect(row.watch).toMatchObject({ lastWakeAt, wakes: 1 });
+    });
+
+    it("does not end the watch on the cap however often an undelivered wake is read", async () => {
+        const linkId = await seedWatch({ watch: { baselined: true, headSha: "sha-1", startedAt: STARTED_AT } });
+
+        for (let read = 0; read < PR_WATCH_MAX_WAKES + 3; read += 1) {
+            await harness.run(async (ctx: any) => {
+                await ctx.db.patch("pullRequestThreads", linkId, { watchCheckedAt: LEASE });
+            });
+            await record(linkId, { observation: observation({ checks: "failing", headSha: "sha-1" }) });
+        }
+
+        const row = await rowOf(linkId);
+
+        expect(row.watchActive).toBe(true);
+        expect(row.watch.stoppedAt).toBeUndefined();
+        expect(row.watch.wakes).toBeUndefined();
+        expect(row.watchPending).toEqual(["checks"]);
     });
 
     it("keeps an occurrence seen during the cooldown as pending, without a wake", async () => {
