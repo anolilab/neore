@@ -28,7 +28,48 @@ export const eraseSharedPinRoutesBatch = async (ctx: MutationCtx, userId: string
         }
     }
 
+    // Owed restores name the user the same way. This drain runs after the owner-shard sweeps, so each write that could need one has passed:
+    // a row still here needs no route any more. It is never dropped before the sweeps, which turn it into a route (`materializePendingPinRoutesBatch`).
+    for (const where of [{ userId }, { ownerId: userId }]) {
+        const { page } = await ctx.db.pendingPinRestores.findMany({ consistency: "primary", limit: BATCH, where });
+
+        for (const row of page) {
+            await ctx.db.delete("pendingPinRestores", row._id);
+        }
+
+        if (page.length === BATCH) {
+            hasMore = true;
+        }
+    }
+
     return { hasMore };
+};
+
+/**
+ * One batch of the owed restores (`pendingPinRestores`) that name the user as the collaborator, each made into its route where the route is not
+ * already there. The owner-shard sweep that follows then finds the pins they lead to. The restore may not have run yet: the cron pass is a minute
+ * behind the queue. The route it would write exists now, so its row is settled here.
+ */
+export const materializePendingPinRoutesBatch = async (ctx: MutationCtx, userId: string): Promise<{ hasMore: boolean }> => {
+    const { page } = await ctx.db.pendingPinRestores.findMany({ consistency: "primary", limit: BATCH, where: { userId } });
+
+    for (const row of page) {
+        if (row.ownerId !== userId) {
+            const { page: routes } = await ctx.db.sharedPinRoutes.findMany({
+                consistency: "primary",
+                limit: BATCH,
+                where: { threadId: row.threadId, userId },
+            });
+
+            if (routes.every((route) => route.ownerId !== row.ownerId)) {
+                await ctx.db.insert("sharedPinRoutes", { createdAt: row.routeCreatedAt, ownerId: row.ownerId, threadId: row.threadId, userId });
+            }
+        }
+
+        await ctx.db.delete("pendingPinRestores", row._id);
+    }
+
+    return { hasMore: page.length === BATCH };
 };
 
 /**
@@ -212,5 +253,12 @@ export const eraseThreadPinsAndRoutesBatch = async (ctx: MutationCtx, threadId: 
         await ctx.db.delete("sharedPinRoutes", route._id);
     }
 
-    return { hasMore: pins.length >= BATCH || page.length >= BATCH };
+    // An owed restore names the thread, and so it goes with the thread: there is no route left for it to write.
+    const { page: owed } = await ctx.db.pendingPinRestores.findMany({ consistency: "primary", limit: BATCH, where: { threadId } });
+
+    for (const row of owed) {
+        await ctx.db.delete("pendingPinRestores", row._id);
+    }
+
+    return { hasMore: pins.length >= BATCH || page.length >= BATCH || owed.length >= BATCH };
 };

@@ -18,6 +18,7 @@ import {
     createDocumentPin,
     createPin,
     deletePin,
+    dispatchPendingPinRestores,
     dropRoutesWithoutPins,
     eraseUserPinsOnThread,
     finishRouteCleanup,
@@ -27,6 +28,7 @@ import {
     restoreSharedPinRoutes,
     withSharedPinRoute,
 } from "./functions";
+import { eraseSharedPinRoutesBatch, materializePendingPinRoutesBatch } from "../gdpr";
 
 const OWNER = "user-owner";
 const SHAPE_ERROR = /An image pin names the part it pins/;
@@ -689,6 +691,115 @@ describe("a pin write renews the writer's lease before its move check", () => {
         const leases = await harness.run(async (context: any) => await context.db.pinWriteLeases.findMany({ where: { userId: OWNER } }));
 
         expect(leases.page).toHaveLength(1);
+    });
+});
+
+describe("a refused write's owed route restore is durable", () => {
+    const owedRestore = (overrides: { until?: number; writtenAt?: number } = {}) => {
+        return {
+            ownerId: OWNER,
+            routeCreatedAt: 1,
+            threadId,
+            until: overrides.until ?? Date.now() + 60_000,
+            userId: "user-collaborator",
+            writtenAt: overrides.writtenAt ?? Date.now(),
+        };
+    };
+    const owedRows = async () => {
+        const { page } = await harness.run(async (context: any) => await context.db.pendingPinRestores.findMany({ where: { userId: "user-collaborator" } }));
+
+        return page;
+    };
+    const routesNow = async () => {
+        const { page } = await harness.run(async (context: any) => await context.db.sharedPinRoutes.findMany({ where: { userId: "user-collaborator" } }));
+
+        return page;
+    };
+
+    it("the cron pass dispatches a row a minute old to the owner it names, and leaves a fresh one for the queue", async () => {
+        await harness.run(async (context: any) => {
+            await context.db.insert("pendingPinRestores", owedRestore({ writtenAt: Date.now() - 120_000 }));
+            await context.db.insert("pendingPinRestores", owedRestore({ writtenAt: Date.now() }));
+        });
+
+        const scheduled: unknown[][] = [];
+
+        await harness.run(async (context: any) => {
+            const scheduler = {
+                runAfter: async (...args: unknown[]) => {
+                    scheduled.push(args);
+
+                    return "job";
+                },
+            };
+
+            await dispatchPendingPinRestores({ ...context, scheduler });
+        });
+
+        expect(scheduled).toHaveLength(1);
+        expect(scheduled[0]?.[2]).toStrictEqual({ createdAt: 1, threadId, until: expect.any(Number), userId: "user-collaborator" });
+        expect(scheduled[0]?.[3]).toMatchObject({ shardKey: OWNER });
+    });
+
+    it("a restore that puts the route back settles the row it covers", async () => {
+        await harness.run(async (context: any) => await context.db.insert("pendingPinRestores", owedRestore()));
+
+        await harness.run(
+            async (context: any) =>
+                await context.runMutation(restoreSharedPinRoutes, { createdAt: 1, threadId, until: Date.now() + 60_000, userId: "user-collaborator" }),
+        );
+
+        const routes = await routesNow();
+
+        expect(routes.map((route: any) => route.ownerId)).toStrictEqual([OWNER]);
+        expect(await owedRows()).toHaveLength(0);
+    });
+
+    it("a restore past the deadline with no pin settles the row, and adds no route", async () => {
+        await harness.run(async (context: any) => await context.db.insert("pendingPinRestores", owedRestore({ until: Date.now() - 1 })));
+
+        await harness.run(
+            async (context: any) =>
+                await context.runMutation(restoreSharedPinRoutes, { createdAt: 1, threadId, until: Date.now() - 1, userId: "user-collaborator" }),
+        );
+
+        expect(await routesNow()).toHaveLength(0);
+        expect(await owedRows()).toHaveLength(0);
+    });
+
+    it("a thread that is not on this shard keeps its row for the cron, which sends it to the owner it names", async () => {
+        await harness.run(async (context: any) => {
+            await context.db.insert("pendingPinRestores", owedRestore());
+            await context.db.delete("threads", threadId);
+        });
+
+        await harness.run(
+            async (context: any) =>
+                await context.runMutation(restoreSharedPinRoutes, { createdAt: 1, threadId, until: Date.now() + 60_000, userId: "user-collaborator" }),
+        );
+
+        expect(await owedRows()).toHaveLength(1);
+        expect(await routesNow()).toHaveLength(0);
+    });
+
+    it("the erasure turns the owed row into the collaborator's route before its second sweep, and removes the row", async () => {
+        await harness.run(async (context: any) => await context.db.insert("pendingPinRestores", owedRestore()));
+
+        const result = await harness.run(async (context: any) => await materializePendingPinRoutesBatch(context, "user-collaborator"));
+
+        expect(result).toStrictEqual({ hasMore: false });
+        const routes = await routesNow();
+
+        expect(routes.map((route: any) => route.ownerId)).toStrictEqual([OWNER]);
+        expect(await owedRows()).toHaveLength(0);
+    });
+
+    it("the erasure's route drain removes the owed rows that name the erased account", async () => {
+        await harness.run(async (context: any) => await context.db.insert("pendingPinRestores", owedRestore()));
+
+        await harness.run(async (context: any) => await eraseSharedPinRoutesBatch(context, "user-collaborator"));
+
+        expect(await owedRows()).toHaveLength(0);
     });
 });
 

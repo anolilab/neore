@@ -282,6 +282,18 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         // assumption (not a guarantee).
         await context.step.sleep("erase-pins-grace", "2 minutes");
 
+        // The owed restores of refused writes become routes before the second sweep: the cron pass may not have run them yet, and a pin their
+        // route leads to must be found here. Each is written before the sweep fences its owner shard, so the sweep reads it.
+        await drain(
+            "materialize-pending-pin-routes",
+            async (round) =>
+                await context.run(
+                    internal.gdpr.steps.deletion_steps.materializePendingPinRoutes,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "materialize-pending-pin-routes", round) },
+                ),
+        );
+
         const secondOwners = await sweepOwnerShards("erase-pins-on-owner-shards-again");
 
         // The owner shards are lifted now, from every owner both passes fenced, and before the routes go: the owners live only in those

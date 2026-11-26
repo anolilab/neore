@@ -209,6 +209,8 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     pageAccess: ["userId", "ownerId", "grantedBy"],
     pageInvites: ["userId", "ownerId", "acceptedBy"],
     passkey: ["userId"],
+    // A route restore still owed to the guest's pins (`chat/pins/functions.ts`): both columns follow the merge, as `sharedPinRoutes` does.
+    pendingPinRestores: ["ownerId", "userId"],
     projectRepositories: ["userId"],
     projectRuleFiles: ["userId"],
     projects: ["userId"],

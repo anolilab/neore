@@ -2156,6 +2156,28 @@ export const schema = defineSchema({
         .index("credentialID", ["credentialID"])
         .triggers((t) => auditTriggersFor(t, "passkey", AUDIT_TABLES["passkey"]!)),
 
+    /**
+     * A route restore a refused pin write still owes (`chat/pins/functions.ts#restoreRoutes`). It is written before the write's route cleanup
+     * returns. A refused write's rollback does not undo a global row, so the row survives the refusal. The restore settles it at its terminal
+     * outcome. The cron (`restorePendingPinRoutes`) dispatches it when the queue send does not run the restore, and the erasure turns it into
+     * a route before its second sweep (`chat/gdpr.ts#materializePendingPinRoutesBatch`). `ownerId` names the owner when it was written, and a
+     * guest merge re-points it like `sharedPinRoutes`.
+     */
+    pendingPinRestores: defineTable({
+        ownerId: v.string(),
+        routeCreatedAt: v.number(),
+        threadId: v.id("threads"),
+        until: v.number(),
+        userId: v.string(),
+        writtenAt: v.number(),
+    })
+        .global()
+        .index("by_owner", ["ownerId"])
+        .index("by_thread", ["threadId"])
+        .index("by_user", ["userId"])
+        .index("by_user_and_thread", ["userId", "threadId"])
+        .index("by_written", ["writtenAt"]),
+
     persistentChunks: defineTable({
         // A host stream's event that carries no text (a tool call, a permission request, the end of the
         // turn). It still takes its `seq`, so the host's `(turnId, seq)` claim covers every event.

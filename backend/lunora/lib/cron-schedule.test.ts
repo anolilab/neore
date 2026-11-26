@@ -152,13 +152,21 @@ describe("runCronTick", () => {
             "chat_streaming_persistent_crons:cleanupExpiredStreams",
             "workflow_presence:cleanupStalePresence",
             "lib_claim_once:reapLapsedClaims",
+            "chat_pins_functions:restorePendingPinRoutes",
             "lib_shard_housekeeping:dispatchDueShards",
             "crons:claimDueCronJobs",
             "crons:purgeActionCache",
         ]);
         expect(result).toStrictEqual({
             failed: ["cleanupStaleWorkflowPresence"],
-            ran: ["checkDueTriggers", "cleanupExpiredPersistentStreams", "reapLapsedClaims", "dispatchDueShards", "purgeActionCache"],
+            ran: [
+                "checkDueTriggers",
+                "cleanupExpiredPersistentStreams",
+                "reapLapsedClaims",
+                "restorePendingPinRoutes",
+                "dispatchDueShards",
+                "purgeActionCache",
+            ],
         });
     });
 });

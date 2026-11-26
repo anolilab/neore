@@ -14,6 +14,7 @@ import {
     releasePinWrite,
 } from "../../lib/account-moves";
 import { authMutation, authQuery, internalMutation, internalQuery, rateLimit } from "../../lib/crpc";
+import { chatLogger } from "../../lib/logger";
 import { enqueueJob } from "../../lib/job-queue";
 import { MAX_LENGTH } from "../../lib/validators";
 import { systemDb } from "../../lib/rls/scope";
@@ -256,7 +257,28 @@ const restoreRoutes = async (
     const args = { createdAt: first.createdAt, threadId, until, userId };
 
     if (survivesRollback) {
-        await enqueueJob(internal.chat.pins.functions.restoreSharedPinRoutes, args);
+        // The row is written first, and the queue send is only the fast path. A send that fails is logged, not thrown, so the refusal
+        // still surfaces; the cron dispatches the row, and the erasure turns it into a route before its second sweep.
+        const thread = await systemDb(context).get("threads", threadId);
+
+        if (thread?.userId === undefined || thread.userId === userId) {
+            return;
+        }
+
+        await context.db.insert("pendingPinRestores", {
+            ownerId: thread.userId,
+            routeCreatedAt: first.createdAt,
+            threadId,
+            until,
+            userId,
+            writtenAt: Date.now(),
+        });
+
+        try {
+            await enqueueJob(internal.chat.pins.functions.restoreSharedPinRoutes, args);
+        } catch (error) {
+            chatLogger.error("[pins] restore queue send failed; the cron will dispatch the owed restore", error);
+        }
 
         return;
     }
@@ -287,9 +309,27 @@ export const restoreSharedPinRoutes = internalMutation
     .mutation(async ({ args, ctx: context }) => {
         const thread = await systemDb(context).get("threads", args.threadId);
 
-        // An owner keeps no route to their own thread.
-        if (thread?.userId === undefined || thread.userId === args.userId) {
+        // Not on this shard: a merge moved it. The owed rows stay for the cron, which sends them to the owner they name now.
+        if (thread?.userId === undefined) {
             return null;
+        }
+
+        const { page: owed } = await context.db.pendingPinRestores.findMany({
+            consistency: "primary",
+            limit: ROUTE_CLEANUP_BATCH,
+            where: { threadId: args.threadId, userId: args.userId },
+        });
+        const settle = async (): Promise<null> => {
+            for (const row of owed) {
+                await context.db.delete("pendingPinRestores", row._id);
+            }
+
+            return null;
+        };
+
+        // An owner keeps no route to their own thread.
+        if (thread.userId === args.userId) {
+            return await settle();
         }
 
         if (Date.now() >= args.until) {
@@ -299,7 +339,7 @@ export const restoreSharedPinRoutes = internalMutation
                 .take(1);
 
             if (pins.length === 0) {
-                return null;
+                return await settle();
             }
         }
 
@@ -318,6 +358,43 @@ export const restoreSharedPinRoutes = internalMutation
                 userId: args.userId,
             });
         }
+
+        return await settle();
+    });
+
+/** A pending restore the queue has not run within this long is dispatched by the cron pass below. */
+const PENDING_RESTORE_GRACE_MS = 60 * 1000;
+/** Owed restores one cron pass dispatches. */
+const PENDING_RESTORE_BATCH = 50;
+
+/**
+ * The root cron's pass over the owed restores (`pendingPinRestores`). Each row written more than a minute ago is dispatched to the owner it
+ * names, where `restoreSharedPinRoutes` settles it. The restore is idempotent, so a row the queue already ran is dispatched once more at most.
+ */
+export const dispatchPendingPinRestores = async (context: MutationCtx): Promise<void> => {
+    const { page } = await context.db.pendingPinRestores.findMany({
+        consistency: "primary",
+        limit: PENDING_RESTORE_BATCH,
+        orderBy: [{ writtenAt: "asc" }],
+        where: { writtenAt: { lte: Date.now() - PENDING_RESTORE_GRACE_MS } },
+    });
+
+    for (const row of page) {
+        await runAfterOnShard(
+            context.scheduler,
+            0,
+            internal.chat.pins.functions.restoreSharedPinRoutes,
+            { createdAt: row.routeCreatedAt, threadId: row.threadId, until: row.until, userId: row.userId },
+            row.ownerId,
+        );
+    }
+};
+
+export const restorePendingPinRoutes = internalMutation
+    .input({})
+    .output(v.null())
+    .mutation(async ({ ctx: context }) => {
+        await dispatchPendingPinRestores(context);
 
         return null;
     });

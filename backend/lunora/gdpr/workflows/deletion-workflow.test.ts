@@ -619,11 +619,14 @@ describe("account deletion workflow: the owner-shard sweep", () => {
         const grace = names.indexOf("erase-pins-grace");
         const again = names.indexOf("erase-pins-on-owner-shards-again-0");
         const drain = names.indexOf("delete-user-shared-pin-routes");
+        const materialize = names.indexOf("materialize-pending-pin-routes");
 
         // Each step runs once, in this order: a pin that commits after the first sweep is found by the second, while its route still exists.
-        expect([first, grace, again, drain].every((index) => index >= 0)).toBe(true);
+        // The owed restores of refused writes become routes after the grace wait, so the second sweep finds the pins they lead to.
+        expect([first, grace, materialize, again, drain].every((index) => index >= 0)).toBe(true);
         expect(first).toBeLessThan(grace);
-        expect(grace).toBeLessThan(again);
+        expect(grace).toBeLessThan(materialize);
+        expect(materialize).toBeLessThan(again);
         expect(again).toBeLessThan(drain);
         expect(sleeps).toContain("2 minutes");
     });
