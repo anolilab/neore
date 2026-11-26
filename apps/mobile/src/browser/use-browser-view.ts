@@ -209,6 +209,19 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
     const isReading = shouldReadFrame(view, { isActive: isActive && isFocused, isOffline }) && browserId !== undefined;
     const trigger = frameTrigger(status, isHolding);
 
+    // An agent action, or a page the person opened, asks the running reader for a read; one still out is kept. Declared
+    // before the reader's effect, so a reader started in the same commit reads for the new key itself, and a reader
+    // restarted on the same key (back to the front, online again) still asks on the next change.
+    const readKey = `${trigger ?? ""}|${nudge}`;
+
+    useEffect(() => {
+        if (readFor.current !== undefined && readFor.current !== readKey) {
+            reader.current?.request();
+        }
+
+        readFor.current = readKey;
+    }, [readKey]);
+
     useEffect(() => {
         if (!isReading || browserId === undefined) {
             return undefined;
@@ -242,20 +255,8 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
         return () => {
             started.stop();
             reader.current = undefined;
-            readFor.current = undefined;
         };
     }, [browserId, isReading, reportRead, threadId]);
-
-    // An agent action, or a page the person opened, asks the running reader for a read; one still out is kept.
-    const readKey = `${trigger ?? ""}|${nudge}`;
-
-    useEffect(() => {
-        if (readFor.current !== undefined && readFor.current !== readKey) {
-            reader.current?.request();
-        }
-
-        readFor.current = readKey;
-    }, [readKey]);
 
     const isShown = view.kind === "ready" && frame !== undefined && frame.browserId === browserId;
 
