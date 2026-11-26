@@ -409,6 +409,9 @@ const BUSY_SIGNING_IN = "The browser session is signing in with a saved login; t
 
 const BUSY_IN_USE = "The browser session is busy with another call; try the sign-in again once it is done";
 
+/** The qualities a screenshot over the caller's `maxBytes` is taken again at, in turn. */
+const FITTING_QUALITIES = [40, 20];
+
 /** How long a sign-in waits for a session another call holds before it is refused, and how often it asks again. */
 const LOGIN_BUSY_WAIT_MS = 3000;
 const LOGIN_BUSY_STEP_MS = 250;
@@ -838,10 +841,22 @@ const actHeld = async (
                     screenshotBuffer.byteLength > 5 * 1024 * 1024
                         ? await page.screenshot({ fullPage: fullPage ?? false, quality: 60, type: "jpeg" })
                         : screenshotBuffer;
-                const fitted =
-                    maxBytes !== undefined && finalBuffer.byteLength > maxBytes
-                        ? await page.screenshot({ fullPage: fullPage ?? false, quality: 40, type: "jpeg" })
-                        : finalBuffer;
+                // Over the caller's cap: taken again at lower qualities, and refused (nothing sent) if even the lowest does not fit.
+                let fitted = finalBuffer;
+                const cap = maxBytes ?? Infinity;
+
+                for (const quality of FITTING_QUALITIES) {
+                    if (fitted.byteLength <= cap) {
+                        break;
+                    }
+
+                    fitted = await page.screenshot({ fullPage: fullPage ?? false, quality, type: "jpeg" });
+                }
+
+                if (fitted.byteLength > cap) {
+                    result = { error: "The screenshot is larger than the size asked for, even at the lowest quality", success: false };
+                    break;
+                }
 
                 const base64 = Buffer.from(fitted).toString("base64");
                 const title = await page.title();

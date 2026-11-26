@@ -741,6 +741,34 @@ describe("the session hold every isolate shares", () => {
         expect(page.screenshot).toHaveBeenLastCalledWith(expect.objectContaining({ quality: 40 }));
     });
 
+    it("refuses a screenshot that does not fit the caller's cap even at the lowest quality, and sends no image", async () => {
+        const { env, pending } = binding();
+        const page = {
+            context: () => {
+                return { route: async () => undefined };
+            },
+            evaluate: async () => {
+                return { height: 844, width: 390 };
+            },
+            screenshot: vi.fn(async () => new Uint8Array(100)),
+            setDefaultTimeout: () => undefined,
+            title: async () => "A page",
+            url: () => "https://example.com/",
+            viewportSize: () => null,
+        };
+        const answer = post(env, "/action", { action: "screenshot", maxBytes: 50, reconnectOnly: true, sessionId: "kept" });
+
+        await vi.advanceTimersByTimeAsync(0);
+        pending[0]?.({ close: async () => undefined, contexts: () => [{ pages: () => [page] }], sessionId: () => "kept" });
+
+        const response = await answer;
+        const body = await response.json();
+
+        expect(body).toMatchObject({ success: false });
+        expect(body).not.toHaveProperty("screenshot");
+        expect(page.screenshot).toHaveBeenLastCalledWith(expect.objectContaining({ quality: 20 }));
+    });
+
     it("opens no page for a reconnect-only action on a browser that has none, and runs nothing", async () => {
         const { env, pending } = binding();
         const newPage = vi.fn();
