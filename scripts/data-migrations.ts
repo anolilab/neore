@@ -21,6 +21,19 @@ const MIGRATION_PAUSE_MS = 15_000;
 /** A quoted string literal: Lunora's codegen reads no other form, not even a template literal without substitutions. */
 const literalText = (node: ts.Node | undefined): string | undefined => (node !== undefined && ts.isStringLiteral(node) ? node.text : undefined);
 
+/** A property's name as Lunora's codegen reads it (its `property-name` helper); `undefined` for a computed key it cannot read. */
+const propertyKey = (name: ts.PropertyName): string | undefined => {
+    if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNoSubstitutionTemplateLiteral(name) || ts.isNumericLiteral(name)) {
+        return name.text;
+    }
+
+    if (ts.isComputedPropertyName(name) && (ts.isStringLiteral(name.expression) || ts.isNoSubstitutionTemplateLiteral(name.expression))) {
+        return name.expression.text;
+    }
+
+    return undefined;
+};
+
 /** What a definition says about one property: not there, a literal string, or something else. */
 type PropertyValue = { kind: "absent" } | { kind: "string"; value: string } | { kind: "unresolved" };
 
@@ -29,8 +42,10 @@ const UNRESOLVED: PropertyValue = { kind: "unresolved" };
 /**
  * The value of the `name` property of `call`'s first argument, read the way Lunora's own migration discovery reads it: a
  * quoted string literal only. Lunora records any other value (a constant, a shorthand, a template, a call) as an empty
- * table, which `migrate up` refuses, so it is unresolved here too. A spread, a computed key, or a definition that is not
- * itself an object literal (Lunora does not look through parentheses or `as`) could hide the property: unresolved.
+ * table, which `migrate up` refuses, so it is unresolved here too. Keys are named as Lunora's codegen names them: an
+ * identifier, a string, template or numeric literal, or a computed key whose expression is a string or template literal
+ * (`["table"]`). A spread, any other computed key, a name given twice, or a definition that is not itself an object
+ * literal (Lunora does not look through parentheses or `as`) could hide the property: unresolved.
  */
 const definitionProperty = (call: ts.CallExpression, name: string): PropertyValue => {
     const [definition] = call.arguments;
@@ -46,16 +61,18 @@ const definitionProperty = (call: ts.CallExpression, name: string): PropertyValu
             return UNRESOLVED;
         }
 
-        const key =
-            member.name !== undefined && (ts.isIdentifier(member.name) || ts.isStringLiteral(member.name) || ts.isNoSubstitutionTemplateLiteral(member.name))
-                ? member.name.text
-                : undefined;
+        const key = member.name === undefined ? undefined : propertyKey(member.name);
 
         if (key === undefined) {
             return UNRESOLVED;
         }
 
         if (key === name) {
+            // Lunora's codegen takes the first of two properties under one name, an object literal the last.
+            if (found.kind !== "absent") {
+                return UNRESOLVED;
+            }
+
             const value = ts.isPropertyAssignment(member) ? literalText(member.initializer) : undefined;
 
             found = value === undefined ? UNRESOLVED : { kind: "string", value };
@@ -341,6 +358,8 @@ interface BackfillAnswer {
     scanned: number;
     skipped: number;
     status: string;
+    /** A check call another call under its token got ahead of: it moved nothing itself, the check did. */
+    superseded: boolean;
     token: string | undefined;
     unfilledIds: string[];
 }
@@ -357,6 +376,7 @@ const backfillAnswer = (body: unknown): BackfillAnswer => {
         scanned: count(record.scanned),
         skipped: count(record.skipped),
         status: typeof record.status === "string" ? record.status : "unknown",
+        superseded: record.superseded === true,
         token: typeof record.token === "string" && record.token !== "" ? record.token : undefined,
         unfilledIds: strings(record.unfilledIds),
     };
@@ -389,7 +409,7 @@ class BackfillStop extends Error {}
  * Drives the backfill: a check over every account, page by page under the token its first call answers (the server keeps
  * the cursor, and refuses any address two accounts fold to, also across calls), collecting the unfilled ids; only then a
  * fill of those ids under that token, a batch per call; then a check again, which answers `done` once nothing is left. A round that left rows behind (they changed meanwhile) is followed by another, up to {@link EMAIL_CANONICAL_ROUNDS}.
- * A 429 is waited out; {@link EMAIL_CANONICAL_STALLS} answers in a row that move nothing, a conflict, any other answer, or
+ * A 429 is waited out; {@link EMAIL_CANONICAL_STALLS} answers in a row that move nothing (a `superseded` check answer is not one), a conflict, any other answer, or
  * `maxCalls` stop it with an error, as does {@link EMAIL_CANONICAL_DEADLINE_MS}: no call starts and no wait begins that
  * would end past it. Prints counts only, never a token or an id. Returns the process exit code.
  */
@@ -499,7 +519,10 @@ export const runEmailCanonicalBackfill = async (options: RunBackfillOptions): Pr
                 break;
             }
 
-            moved(answer.scanned > 0, answer);
+            // A superseded answer means another call under the token moved the check on: the next call goes on from there.
+            if (!answer.superseded) {
+                moved(answer.scanned > 0, answer);
+            }
         }
 
         options.log(`${EMAIL_CANONICAL_BACKFILL}: checked ${String(scanned)} account(s), no address shared, ${String(unfilledIds.length)} to fill`);

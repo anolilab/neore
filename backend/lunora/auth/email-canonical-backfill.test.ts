@@ -3,7 +3,7 @@
  * per call from that completed check, never by picking one of two accounts that fold to one address. The deploy's runner
  * drives these calls here.
  */
-import { canonicalEmail } from "@lunora/auth";
+import { canonicalEmail, resolveAuthOptions } from "@lunora/auth";
 import { lunoraTest } from "@lunora/testing";
 import { describe, expect, it, vi } from "vitest";
 
@@ -16,6 +16,7 @@ import {
     checkEmailCanonicalPage,
     D1_RESULT_ROWS,
     EMAIL_CANONICAL_CHECK_PAGES,
+    EMAIL_CANONICAL_CHECK_ROWS,
     EMAIL_CANONICAL_CHECK_SCOPE,
     EMAIL_CANONICAL_FILL_WORST,
     EMAIL_CANONICAL_SETTLE_MS,
@@ -49,6 +50,10 @@ const userIdOf = async (ctx: any, email: string): Promise<Id<"user">> => ((await
 interface CountOptions {
     /** Runs after the real conditional patch; may throw. */
     afterPatchIf?: () => void;
+    /** Runs before each write to a check's claims (shard-local), with the write's method; may run other calls meanwhile. */
+    beforeClaimWrite?: (method: string) => Promise<void>;
+    /** Runs before each read of `user` rows, with its query; may run other calls meanwhile. */
+    beforeFindMany?: (query: { cursor?: unknown }) => Promise<void>;
     /** Emulates D1's cap on the rows one statement answers: Lunora asks for a page's `limit` plus one. */
     d1RowCap?: number;
     /** Makes the holder check see nothing, as when a sign-up takes an address between that check and the write. */
@@ -61,6 +66,14 @@ interface CountOptions {
     patchIf?: (ctx: any, id: string, call: number) => Promise<void>;
     /** Rounds the conditional patch goes before it applies, each charged a read and a write; at {@link PATCH_IF_ATTEMPTS} it throws `occ`. */
     patchRounds?: number;
+    /**
+     * `user` rows as D1 holds the ones better-auth wrote: its Lunora adapter sets `supportsDates: false`, so a sign-up or
+     * profile update stores `createdAt`/`updatedAt` as ISO strings, whatever the column's `v.number()` says. `iso` answers
+     * them as those strings; `unreadable` as text no clock reads. The harness cannot hold such a row (it validates every
+     * column on a write, D1 only the patched ones), so the conditional patch compares the guard as D1 does, as stored
+     * text: the row's own string matches, a number never does.
+     */
+    storedDates?: "iso" | "unreadable";
 }
 
 /**
@@ -70,6 +83,16 @@ interface CountOptions {
  */
 const counted = (ctx: any, options: CountOptions = {}) => {
     const spent = { patches: 0, queries: [] as unknown[], rowsRead: 0, statements: 0 };
+    const presentDates = (value: number): string => (options.storedDates === "iso" ? new Date(value).toISOString() : "not a date");
+    const present = <T>(row: T): T => {
+        if (options.storedDates === undefined || row === null || typeof row !== "object") {
+            return row;
+        }
+
+        const { createdAt, updatedAt } = row as unknown as { createdAt: number; updatedAt: number };
+
+        return { ...row, createdAt: presentDates(createdAt), updatedAt: presentDates(updatedAt) };
+    };
     const unpad = (cursor: unknown) => (typeof cursor === "string" && options.longCursors === true ? cursor.slice(LONG_CURSOR_PAD.length) : cursor);
     const user = {
         findFirst: async (query: unknown) => {
@@ -79,7 +102,7 @@ const counted = (ctx: any, options: CountOptions = {}) => {
 
             spent.rowsRead += row === null ? 0 : 1;
 
-            return row;
+            return present(row);
         },
         findMany: async (input: { cursor?: string; limit?: number; where?: { emailCanonical?: unknown } }) => {
             spent.statements += 1;
@@ -87,6 +110,7 @@ const counted = (ctx: any, options: CountOptions = {}) => {
             const query = { ...input, cursor: unpad(input.cursor) };
 
             spent.queries.push(query);
+            await options.beforeFindMany?.(query);
             const isHolderCheck = typeof query.where?.emailCanonical === "object" && query.where.emailCanonical !== null && "in" in query.where.emailCanonical;
             let result: { continueCursor?: string | null; isDone: boolean; page: unknown[] };
 
@@ -102,13 +126,28 @@ const counted = (ctx: any, options: CountOptions = {}) => {
             }
 
             spent.rowsRead += result.page.length;
+            result = { ...result, page: result.page.map((row) => present(row)) };
 
             return options.longCursors === true && typeof result.continueCursor === "string"
                 ? { ...result, continueCursor: `${LONG_CURSOR_PAD}${result.continueCursor}` }
                 : result;
         },
     };
+    const claimWrite =
+        (target: any, method: string) =>
+        async (table: string, ...rest: unknown[]): Promise<unknown> => {
+            if (table === "idempotencyClaims") {
+                await options.beforeClaimWrite?.(method);
+            }
+
+            return await target[method](table, ...rest);
+        };
     const patchIf = async (table: string, id: string, args: unknown) => {
+        if (table !== "user") {
+            // A check record's conditional write: the root shard's SQLite, not D1.
+            return await claimWrite(ctx.db, "patchIf")(table, id, args);
+        }
+
         const rounds = options.patchRounds ?? 1;
 
         spent.patches += 1;
@@ -120,7 +159,20 @@ const counted = (ctx: any, options: CountOptions = {}) => {
 
         await options.patchIf?.(ctx, id, spent.patches);
 
-        const result = await ctx.db.patchIf(table, id, args);
+        let guarded = args as { patch: Record<string, unknown>; where: Record<string, unknown> };
+
+        if (options.storedDates !== undefined && "updatedAt" in guarded.where) {
+            const stored = (await ctx.db.get("user", id)) as { updatedAt: number } | null;
+
+            // D1 binds the guard as given and compares it with the stored text.
+            if (stored === null || guarded.where.updatedAt !== present(stored).updatedAt) {
+                return { applied: false, doc: present(stored) };
+            }
+
+            guarded = { ...guarded, where: { ...guarded.where, updatedAt: stored.updatedAt } };
+        }
+
+        const result = await ctx.db.patchIf(table, id, guarded);
 
         // The audit trigger's `documentHistory` insert, charged before it can fail.
         spent.statements += result.applied ? 1 : 0;
@@ -136,6 +188,10 @@ const counted = (ctx: any, options: CountOptions = {}) => {
 
             if (key === "patchIf") {
                 return patchIf;
+            }
+
+            if (typeof key === "string" && ["delete", "insert", "patch"].includes(key)) {
+                return claimWrite(target, key);
             }
 
             const value = Reflect.get(target, key);
@@ -489,6 +545,139 @@ describe("the user.emailCanonical backfill", () => {
         expect(rows.filter(([email, canonical]) => email !== "eve@example.com" && canonical !== undefined)).toStrictEqual([]);
     });
 
+    it("refuses a later account once an account the check already read takes its address through the auth plugin", async () => {
+        expect.assertions(3);
+
+        // The plugin's own update hook, as `createAuth` wraps it: an email change writes the folded address with it.
+        const { databaseHooks } = resolveAuthOptions({ baseURL: "http://localhost:8788", secret: "s".repeat(40) });
+        const changeEmail = async (ctx: any, id: Id<"user">, email: string): Promise<void> => {
+            const hooked = (await databaseHooks!.user!.update!.before!({ email } as never, null)) as { data: Record<string, unknown> };
+
+            await ctx.db.patch("user", id, { ...hooked.data, email, updatedAt: NOW });
+        };
+
+        const { answers, rows, target } = await withHarness(async (ctx) => {
+            for (const email of ["Alpha@Example.com", "Bravo@Example.com", "Charlie@Example.com"]) {
+                await ctx.db.insert("user", userRow(email));
+            }
+
+            // One row per call: the account the first call reads then takes the address of one a later call reads.
+            const opened = await checkEmailCanonicalPage(counted(ctx).ctx, { pageRows: 1, pages: 1 });
+
+            if (opened.status !== "checking") {
+                throw new Error(`the check answered ${opened.status}`);
+            }
+
+            const [changed] = opened.unfilledIds;
+            const { page } = await ctx.db.user.findMany({});
+            const later = (page as { _id: Id<"user">; email: string }[]).find((row) => row._id !== changed)!;
+
+            await changeEmail(ctx, changed!, later.email.toLowerCase());
+
+            const ids = [...opened.unfilledIds];
+            let answer = opened;
+
+            while (answer.status === "checking") {
+                answer = (await checkEmailCanonicalPage(counted(ctx).ctx, { pageRows: 1, pages: 1, token: opened.token })) as typeof opened;
+                ids.push(...answer.unfilledIds);
+            }
+
+            const roles = new Map<string, string>([
+                [changed!, "changed"],
+                [later._id, "later"],
+            ]);
+            const fills = new Map<string, string>();
+
+            for (const id of ids) {
+                const { status } = await fillEmailCanonicalBatch(counted(ctx).ctx, { ids: [id], token: opened.token });
+
+                fills.set(roles.get(id) ?? "other", status);
+            }
+
+            return { answers: Object.fromEntries(fills), rows: await canonicals(ctx), target: later.email };
+        });
+
+        expect(answers).toStrictEqual({ changed: "progress", later: "conflict", other: "progress" });
+        // The changed account holds the address since its change; the later one stays unfilled.
+        expect(rows.filter(([email]) => email === target || email === target.toLowerCase())).toStrictEqual([
+            [target.toLowerCase(), target.toLowerCase()],
+            [target, undefined],
+        ]);
+        expect(new Set(rows.flatMap(([, canonical]) => (canonical === undefined ? [] : [canonical]))).size).toBe(2);
+    });
+
+    it.each([
+        ["before its reads", "beforeFindMany", undefined],
+        ["after its reads, before its first write", "beforeClaimWrite", undefined],
+        // Between the record swap's own read and its conditional write: the write's guard alone decides.
+        ["between its record swap's read and write", "beforeClaimWrite", "patchIf"],
+    ] as const)(
+        "lets a continuation that lost to a newer one under the same token (paused %s) save nothing, so the completed check still fills",
+        async (_, pausePoint, onlyMethod) => {
+            expect.assertions(4);
+
+            const { fill, paused, rows, stale } = await withHarness(async (ctx) => {
+                for (let index = 0; index < 3; index += 1) {
+                    await ctx.db.insert("user", userRow(`racer${String(index)}@example.com`));
+                }
+
+                const opened = await checkEmailCanonicalPage(counted(ctx).ctx, { pageRows: 1, pages: 1 });
+
+                if (opened.status !== "checking") {
+                    throw new Error(`the check answered ${opened.status}`);
+                }
+
+                const { token } = opened;
+                const ids = [...opened.unfilledIds];
+                // A retry of the same request: while the first continuation waits on its read, the retry and the calls after
+                // it run the check to its end.
+                const runAhead = async (): Promise<void> => {
+                    for (;;) {
+                        const answer = await checkEmailCanonicalPage(counted(ctx).ctx, { pageRows: 1, pages: 1, token });
+
+                        if (answer.status !== "checked" && answer.status !== "checking") {
+                            throw new Error(`the check answered ${answer.status}`);
+                        }
+
+                        ids.push(...answer.unfilledIds);
+
+                        if (answer.status === "checked") {
+                            return;
+                        }
+                    }
+                };
+                let ranAhead = false;
+                const late = await checkEmailCanonicalPage(
+                    counted(ctx, {
+                        [pausePoint]: async (method?: string) => {
+                            if (ranAhead || (onlyMethod !== undefined && method !== onlyMethod)) {
+                                return;
+                            }
+
+                            ranAhead = true;
+                            await runAhead();
+                        },
+                    }).ctx,
+                    { pageRows: 1, pages: 1, token },
+                );
+                const fills = [];
+
+                for (const id of ids) {
+                    const { filled } = await fillEmailCanonicalBatch(counted(ctx).ctx, { ids: [id], token });
+
+                    fills.push(filled);
+                }
+
+                return { fill: fills, paused: ranAhead, rows: await canonicals(ctx), stale: late };
+            });
+
+            expect(paused).toBe(true);
+            expect(stale).toStrictEqual({ scanned: 0, status: "checked", superseded: true, token: expect.any(String), unfilledIds: [] });
+            expect(fill).toStrictEqual([1, 1, 1]);
+            expect(rows.every(([email, canonical]) => canonical === canonicalEmail(email))).toBe(true);
+        },
+    );
+
     it("carries a cursor longer than 512 characters from one check call to the next", async () => {
         expect.assertions(2);
 
@@ -684,6 +873,53 @@ describe("the user.emailCanonical backfill", () => {
         ]);
     });
 
+    it("fills an account better-auth wrote, whose dates D1 holds as ISO strings, through the deploy's runner", async () => {
+        expect.assertions(3);
+
+        const { rows, run } = await withHarness(async (ctx) => {
+            await ctx.db.insert("user", userRow("Signed.Up@Example.com"));
+
+            const result = await runBackfill(ctx, { storedDates: "iso" });
+
+            return { rows: await canonicals(ctx), run: result };
+        });
+
+        expect(run.exitCode).toBe(0);
+        expect(run.output).not.toContain("changed during the fill");
+        expect(rows).toStrictEqual([["Signed.Up@Example.com", "signed.up@example.com"]]);
+    });
+
+    it("leaves an ISO-dated row changed inside the settle window, and one whose change time no clock reads", async () => {
+        expect.assertions(2);
+
+        const fillOne = async (storedDates: "iso" | "unreadable") =>
+            await withHarness(async (ctx) => {
+                await ctx.db.insert("user", userRow("old@example.com"));
+                await ctx.db.insert("user", userRow("fresh@example.com", { updatedAt: NOW - EMAIL_CANONICAL_SETTLE_MS + 1 }));
+
+                const { token } = await completedCheck(ctx, { storedDates });
+                const answers = [];
+
+                for (const email of ["old@example.com", "fresh@example.com"]) {
+                    answers.push(await fillEmailCanonicalBatch(counted(ctx, { storedDates }).ctx, { ids: [await userIdOf(ctx, email)], token }));
+                }
+
+                return answers.map(({ filled, skipped }) => {
+                    return { filled, skipped };
+                });
+            });
+
+        expect(await fillOne("iso")).toStrictEqual([
+            { filled: 1, skipped: 0 },
+            { filled: 0, skipped: 1 },
+        ]);
+        // A stored time that does not parse is never taken for settled.
+        expect(await fillOne("unreadable")).toStrictEqual([
+            { filled: 0, skipped: 1 },
+            { filled: 0, skipped: 1 },
+        ]);
+    });
+
     it("charges every round of a contended conditional patch, and a fill call still fits the 50 statements", async () => {
         expect.assertions(3);
 
@@ -847,6 +1083,29 @@ describe("the user.emailCanonical backfill", () => {
         // A keyset seek on the creation index, and a primary-key search whose sort covers the batch alone.
         expect(plans.check).toMatch(CREATION_INDEX_SEEK);
         expect(plans.fill).toMatch(PRIMARY_KEY_SEARCH);
+    });
+
+    it("answers one of two continuations run side by side through the registered mutation as superseded, with no ids", async () => {
+        expect.assertions(2);
+
+        const answers = await withHarness(async (ctx) => {
+            // More rows than one call reads, so the check is still open after its first call.
+            for (let index = 0; index <= EMAIL_CANONICAL_CHECK_PAGES * EMAIL_CANONICAL_CHECK_ROWS; index += 1) {
+                await ctx.db.insert("user", userRow(`side${String(index)}@example.com`));
+            }
+
+            const opened = await ctx.runMutation(checkEmailCanonical, {});
+
+            return await Promise.all([
+                ctx.runMutation(checkEmailCanonical, { token: opened.token }),
+                ctx.runMutation(checkEmailCanonical, { token: opened.token }),
+            ]);
+        });
+
+        expect(answers.filter((answer: { superseded?: boolean }) => answer.superseded === true)).toStrictEqual([
+            { scanned: 0, status: "checked", superseded: true, token: expect.any(String), unfilledIds: [] },
+        ]);
+        expect(answers.find((answer: { superseded?: boolean }) => answer.superseded !== true)).toMatchObject({ scanned: 1, status: "checked" });
     });
 
     it("runs through the registered mutations, whose output validators take every answer", async () => {

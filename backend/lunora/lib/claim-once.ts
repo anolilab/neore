@@ -54,8 +54,8 @@
  * | `guest-merge-progress` | `<guestId>`          | never lapses (`IMPORT_MARKER_EXPIRES_AT`), saved by each run; dropped once the merge and its end are over, an erasure stops it or it reaches `MAX_MERGE_RUNS`, or with the new account's erasure (tagged with it); a lapsed one still counts | `lib/account-merge.ts` (`releaseMergeLease` saves where a run stopped, only from a later run than the record's; `acquireMergeLease` hands it to a delivery whose payload is behind it; `resumeStalledGuestMerges` restarts a merge from it; each save arms the shard's minute tick for its stall, so the tick (`resumeStalledGuestMergesOnTick`) reaches it however many shards are more active) |
  * | `guest-merge-sweep` | `cursor`                | 30 days (`IMPORT_MARKER_TTL_MS`); dropped when a pass reaches the last progress record; tagged with that record's new account | `lib/account-merge.ts` (`resumeStalledGuestMerges`: its `result` is the guest id of the last progress record a pass looked at; the next pass reads on after it) |
  * | `guest-merge-probe` | `<guestId>:<newUserId>:<uuid>` (a fresh UUID per attempt) | 1 h, released once read; tagged with the new account | `lib/account-merge.ts` (`probeSharedStore`: written on the new account's shard, looked for on the guest's, to tell whether both serve one store; a marker left by an earlier attempt is never read) |
- * | `email-canonical-check` | a server-made token | 6 h (`EMAIL_CANONICAL_CHECK_TTL_MS`); dropped when the check finds a shared address | `auth/email-canonical-backfill.ts`: its `result` is the check record (start, next cursor, done); a fill needs a completed one, at its start time |
- * | `email-canonical-check-folds` | the check's token | as the record, taken under its `claimedAt`; dropped with it on a shared address | `auth/email-canonical-backfill.ts`: its `result` is the digests of the folded addresses the check has read; only the check reads it |
+ * | `email-canonical-check` | a server-made token | 6 h (`EMAIL_CANONICAL_CHECK_TTL_MS`); dropped when the check finds a shared address | `auth/email-canonical-backfill.ts`: its `result` is the check record (start, next cursor, done, the current digests' generation); a fill needs a completed one, at its start time. A continuation moves it on only by `swapClaimResult` from the record it read |
+ * | `email-canonical-check-folds` | `<token>:<generation>` (`<token>` for a record without one) | as the record, taken under its `claimedAt`; the one the record names stays, the one it replaced is dropped; dropped with it on a shared address | `auth/email-canonical-backfill.ts`: its `result` is the digests of the folded addresses the check has read; only the check reads it |
  * | `email-canonical-check-id` | `<token>:<user id>` | as the record, taken under its `claimedAt` | `auth/email-canonical-backfill.ts`: an unfilled id the check read; a fill takes an id only when its claim matches the record's `claimedAt` |
  * | `gdpr-deletion-confirmed-email` | `<requestId>`  | 14 days; kept when the send throws | `gdpr/posthog-retry.ts`, `gdpr/workflows/deletion-workflow.ts` (one scope: whichever path sends first wins) |
  *
@@ -283,6 +283,35 @@ export const recordClaimResult = async (ctx: ClaimCtx, scope: string, key: strin
     await patchRow(ctx.db, "idempotencyClaims", existing, { result });
 
     return true;
+};
+
+/**
+ * Replaces the `result` of the claim `claimedAt` with `next` only while it still reads `expected`, in one conditional write,
+ * so of two callers that read the same `result` exactly one moves it on. `next: null` lapses the claim instead: every read
+ * ignores it from then on, and a fenced {@link releaseClaim} removes it. `false` when the claim is gone, lapsed, or its
+ * `result` has moved on.
+ */
+export const swapClaimResult = async (
+    ctx: ClaimCtx,
+    scope: string,
+    key: string,
+    claimedAt: number,
+    expected: string,
+    next: string | null,
+): Promise<boolean> => {
+    const existing = await claimRow(ctx, scope, key);
+
+    if (existing?.claimedAt !== claimedAt || existing.result !== expected) {
+        return false;
+    }
+
+    const { applied } = await ctx.db.patchIf("idempotencyClaims", existing._id, {
+        patch: next === null ? { expiresAt: 0 } : { result: next },
+        // The expiry it read too: a lapse (`expiresAt: 0`) by another caller makes this write miss, so nothing moves a lapsed claim on.
+        where: { claimedAt, expiresAt: existing.expiresAt, result: expected },
+    });
+
+    return applied;
 };
 
 /** `true` for the first claim of `(scope, key)` within `ttlMs`, `false` for every later one. */

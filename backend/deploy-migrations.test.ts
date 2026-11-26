@@ -173,12 +173,31 @@ describe("the post-deploy data migrations", () => {
             ['{ id: "fill", table: pick() }', ""],
             ['{ id: "fill", table: "us" + "er" }', ""],
             ['{ id: "fill", table: "messages", ...override }', 'const override = { table: "user" };'],
-            ['{ id: "fill", ["table"]: "messages" }', ""],
+            ['{ id: "fill", [TABLE]: "messages" }', 'const TABLE = "table";'],
+            [`{ id: "fill", [\`ta\${"ble"}\`]: "messages" }`, ""],
+            ['{ id: "fill", table: "messages", ["table"]: "user" }', ""],
             ['{ id: "fill" }', ""],
             ["definition", 'const definition = { id: "fill", table: "user" };'],
         ]) {
             expect(() => declaredMigrationIds(declare(definition!, prelude), global), definition).toThrow(UNREADABLE_DEFINITION);
         }
+    });
+
+    it("read a computed key with a literal name as Lunora's codegen does, and still refuse a .global() table under one", () => {
+        const global = new Set(["user"]);
+
+        expect(
+            declaredMigrationIds(
+                [
+                    'export const a = defineMigration({ ["id"]: "computed-string", ["table"]: "messages" });',
+                    'export const b = defineMigration({ [`id`]: "computed-template", [`table`]: "messages", 1: "numeric key" });',
+                ].join("\n"),
+                global,
+            ),
+        ).toStrictEqual(["computed-string", "computed-template"]);
+        expect(() => declaredMigrationIds('export const c = defineMigration({ id: "fill-user", ["table"]: "user" });', global)).toThrow(
+            `${MIGRATIONS_MODULE}:1: migration "fill-user" targets the .global() table "user"`,
+        );
     });
 
     it("are all declared in the one module the runner reads", () => {
@@ -531,6 +550,27 @@ describe("the user.emailCanonical backfill in the deploy", () => {
         expect(stuck.output).toContain(`made no progress over ${String(EMAIL_CANONICAL_STALLS)} call(s)`);
         expect(stuck.calls).toBe(1 + EMAIL_CANONICAL_STALLS);
         expect(stuckCheck.output).toContain("made no progress");
+    });
+
+    it("goes on past check answers another call under the token got ahead of, which are not stalls", async () => {
+        const superseded = (): BackfillCall => {
+            return { body: { scanned: 0, status: "checking", superseded: true, token: "t1", unfilledIds: [] }, status: 200 };
+        };
+        const { exitCode, requests } = await backfillWith([
+            checking(1, ["u0"]),
+            // One more than the stalls that would stop the run.
+            ...Array.from({ length: EMAIL_CANONICAL_STALLS + 1 }, superseded),
+            checked(1, ["u1"]),
+            filledBatch(1),
+            filledBatch(1),
+            done,
+        ]);
+
+        expect(exitCode).toBe(0);
+        expect(requests.filter((request) => request.phase === "fill")).toStrictEqual([
+            { ids: ["u0"], phase: "fill", token: "t1" },
+            { ids: ["u1"], phase: "fill", token: "t1" },
+        ]);
     });
 
     it("checks again after a fill that left changed rows behind, pausing past the settle window, and gives up after its rounds", async () => {
