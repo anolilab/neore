@@ -159,7 +159,7 @@ export const capImportText = (cleaned: string): string | null =>
     recheckCutMemoryText(cleaned, stripDataTags(capMemoryText(cleaned, IMPORT_MAX_FACT_CHARS)).trim());
 
 /** One line as stored: redacted, then cut to length. `null` when it was only a secret. */
-export const redactImportLine = (raw: string): string | null => {
+const redactImportLine = (raw: string): string | null => {
     const cleaned = redactImportText(raw);
 
     return cleaned === null ? null : capImportText(cleaned);

@@ -46,8 +46,7 @@ const BASIC_PAIR = /^[\u{21}-\u{39}\u{3B}-\u{7E}]+:[\u{20}-\u{7E}]+$/u;
 
 /** A name that ends in a secret's word (`DB_PASSWORD`, `client-secret`), not one that only contains it (`max_tokens`, `passwordless`). */
 const PASSWORD_NAME = String.raw`[\w-]{0,40}?(?:passw(?:or)?d|passphrase|pwd)`;
-
-export const SECRET_NAME = String.raw`[\w-]{0,40}?(?:passw(?:or)?d|passphrase|secret|token|(?:api|access|private|secret)[_-]?key|authorization|credentials?)`;
+const SECRET_NAME = String.raw`[\w-]{0,40}?(?:passw(?:or)?d|passphrase|secret|token|(?:api|access|private|secret)[_-]?key|authorization|credentials?)`;
 /**
  * A quoted value of at least `min` characters. A backslash escapes the next character, so `"prefix\"rest"` is one value.
  * On one line it may be of any length: its scan stops at the next quote, and every value starts at one, so the scans
