@@ -1989,6 +1989,16 @@ describe("a phone that takes control", () => {
         });
     });
 
+    it("takes back a lease whose answer it lost by naming its own view, but never another view's", async () => {
+        await addSession();
+        const viewTake = async (view: string): Promise<any> => await as(OWNER).action(takeControl as never, { exclusive: true, threadId, view } as never);
+
+        // The first answer never arrived: the phone holds no claim, only its view's name.
+        await expect(viewTake("phone-1")).resolves.toMatchObject({ status: "ok" });
+        await expect(viewTake("phone-1")).resolves.toMatchObject({ status: "ok" });
+        await expect(viewTake("phone-2")).resolves.toStrictEqual({ status: "held" });
+    });
+
     it("gives the claim back when it leaves, or within one lease interval when it sends nothing", async () => {
         await addSession();
         const phone = await take(OWNER, true);

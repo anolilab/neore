@@ -4837,6 +4837,12 @@
           "optional": true,
           "unique": false
         },
+        "controlView": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "currentUrl": {
           "kind": "string",
           "nullable": false,

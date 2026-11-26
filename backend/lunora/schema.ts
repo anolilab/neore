@@ -544,6 +544,12 @@ export const schema = defineSchema({
          * read that sees it change knows a person took control while its shot ran, even once the lease ended and was cleared.
          */
         controlClaims: v.optional(v.number()),
+        /**
+         * The client's own name for the view that holds the current lease (the phone's screen), written by every claim (a
+         * claim naming none clears it), so a take whose answer was lost is not refused as another view's when that view asks
+         * again. Not a credential: it only lifts `exclusive` (`browser/live-view.ts#claimControl`).
+         */
+        controlView: v.optional(v.string()),
         currentUrl: v.optional(v.string()),
         /** When the action that wrote `currentUrl` started, so an older action finishing later does not overwrite it. */
         currentUrlStartedAt: v.optional(v.number()),

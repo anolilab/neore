@@ -465,8 +465,15 @@ export const claimControl = internalMutation
     /**
      * `exclusive`: another view of the caller's that holds the lease is not taken over (`held`), as another person's is
      * not. `mine`: the claim the asking view holds, so its own lease (one it lost track of) is never `held` from it.
+     * `view`: the asking view's own name, kept beside the lease (`controlView`), which lifts `held` the same way when it matches.
      */
-    .input({ exclusive: v.optional(v.boolean()), mine: v.optional(v.string()), threadId: v.id("threads"), userId: v.string() })
+    .input({
+        exclusive: v.optional(v.boolean()),
+        mine: v.optional(v.string()),
+        threadId: v.id("threads"),
+        userId: v.string(),
+        view: v.optional(v.string()),
+    })
     .output(
         v.union(
             v.object({
@@ -499,7 +506,7 @@ export const claimControl = internalMutation
             }),
         ),
     )
-    .mutation(async ({ args: { exclusive, mine, threadId, userId }, ctx }) => {
+    .mutation(async ({ args: { exclusive, mine, threadId, userId, view }, ctx }) => {
         const browser = await readerBrowser(ctx, threadId, userId, ctx.now, { primary: true });
 
         if (browser.kind !== "watchable") {
@@ -519,7 +526,8 @@ export const claimControl = internalMutation
             exclusive === true &&
             browser.control !== undefined &&
             browser.session.control?.ended === undefined &&
-            (mine === undefined || !claimNames(browser.session.control, mine))
+            (mine === undefined || !claimNames(browser.session.control, mine)) &&
+            (view === undefined || browser.session.controlView !== view)
         ) {
             return { kind: "held" as const };
         }
@@ -554,6 +562,7 @@ export const claimControl = internalMutation
                     since: current.since,
                     until,
                 },
+                ...(view !== undefined && { controlView: view }),
             });
 
             return {
@@ -574,6 +583,7 @@ export const claimControl = internalMutation
             ...activeNow(browser.session, ctx.now),
             control: { by, claim, since: ctx.now, until },
             controlClaims: (browser.session.controlClaims ?? 0) + 1,
+            controlView: view,
         });
 
         return {
@@ -697,9 +707,15 @@ export const takeControl = authAction
      * `renews`: the claim of the view this refreshes (its URL expired unconnected), so a renewal is told from a takeover.
      * `exclusive`: never take the lease over from another of the caller's views (`held`), for a client (the phone) that
      * must not pull control out from under a tab the person is driving; the view's own lease (`renews` names it) is not
-     * another view's.
+     * another view's. `view`: the client's own name for the view (the phone's screen), kept beside the lease, so a take
+     * whose answer was lost is not refused as another view's when that view asks again.
      */
-    .input({ exclusive: v.optional(v.boolean()), renews: v.optional(v.string().max(MAX_LENGTH.short)), threadId: v.id("threads") })
+    .input({
+        exclusive: v.optional(v.boolean()),
+        renews: v.optional(v.string().max(MAX_LENGTH.short)),
+        threadId: v.id("threads"),
+        view: v.optional(v.string().max(MAX_LENGTH.short)),
+    })
     .use(rateLimit("browser/liveView"))
     .output(
         v.union(
@@ -721,7 +737,7 @@ export const takeControl = authAction
             v.object({ status: v.union(v.literal("busy"), v.literal("ended"), v.literal("held"), v.literal("taken"), v.literal("unavailable")) }),
         ),
     )
-    .action(async ({ args: { exclusive, renews, threadId }, ctx }) => {
+    .action(async ({ args: { exclusive, renews, threadId, view }, ctx }) => {
         const { impersonatedBy, userId } = ctx.user;
 
         refuseImpersonation(impersonatedBy);
@@ -731,6 +747,7 @@ export const takeControl = authAction
             userId,
             ...(exclusive === true && { exclusive }),
             ...(renews !== undefined && { mine: renews }),
+            ...(view !== undefined && { view }),
         });
 
         if (claim.kind === "denied") {
