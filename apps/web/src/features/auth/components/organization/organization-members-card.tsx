@@ -66,7 +66,7 @@ const OrganizationMembersContent = ({ className, classNames, ...properties }: Se
                 {!isPending && members && members.length > 0 && (
                     <CardContent className={cn("grid gap-4", classNames?.content)}>
                         {members
-                            .toSorted((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+                            .toSorted((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
                             .map((member) => (
                                 <MemberCell classNames={classNames} hideActions={!hasPermissionUpdateMember?.success} key={member.id} member={member} />
                             ))}
