@@ -2694,10 +2694,13 @@ export const schema = defineSchema({
         kind: v.union(v.literal("attached"), v.literal("linked"), v.literal("opened")),
         // The last archive attempt for this merge that found the chat busy. The next read tries the least recently attempted links first.
         mergeAttemptedAt: v.optional(v.number()),
-        // Set once the pull request is seen merged (`source-control/pr-threads.ts#recordPullRequestMerged`). Written once: a merge is terminal.
+        // Set once the pull request is seen merged (`source-control/pr-merged.ts#recordMergedPullRequest`). Written once: a merge is terminal.
         mergedAt: v.optional(v.number()),
         // The exclusive upper bound of the merge's time, as the recorder was given it. Unset: the merge is bounded by `mergedAt` plus a second.
         mergedBefore: v.optional(v.number()),
+        // When this link first recorded the merge. A merge is seen only after it happened, so this bounds the merge from above even
+        // without a host time; the reopen guard reads it (`agent/auto-archive.ts`).
+        mergeRecordedAt: v.optional(v.number()),
         // Set once this merge's archive attempt for the link finished: archived, or declined by a guard or the setting. Until then a read retries it.
         mergeSettledAt: v.optional(v.number()),
         number: v.number(),
@@ -3845,6 +3848,12 @@ export const schema = defineSchema({
         // Set while the thread has a passcode (locked). Content is refused
         // without a proof; `lib/thread-lock.ts`. The hash lives in `threadPasscodes`.
         lockedAt: v.optional(v.number()),
+        // Set while a merge owes this chat an archive (`source-control/pr-thread-links.ts#setThreadMergeOwed`), cleared once its owed
+        // links settle. The sweep reads a chat's links for an owed merge only while this is set, so a chat with none is never read.
+        mergeOwed: v.optional(v.boolean()),
+        // Where the sweep's scan for an owed merge stands in this chat's links, saved between sweeps for a chat too large to scan in
+        // one mutation. Empty: the scan starts from the first link. Any new owed merge empties it, so a scan cannot pass that link.
+        mergeOwedScan: v.optional(v.string()),
         messengerConnectionId: v.optional(v.id("messengerConnections")),
         mode: v.optional(v.string()),
         model: v.optional(v.string()),

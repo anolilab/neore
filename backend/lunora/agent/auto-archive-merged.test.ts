@@ -10,7 +10,7 @@ import { internal } from "../_generated/internal";
 import schema from "../schema";
 import { recordMergedPullRequest } from "../source-control/pr-merged";
 import { recordLinkState } from "../source-control/pr-state";
-import { noteMergeAttempt, recordPullRequestMerged } from "../source-control/pr-threads";
+import { noteMergeAttempt, recordPullRequestMergedPage } from "../source-control/pr-threads";
 import { archiveClosedLinkChat, archiveMergedThread } from "./auto-archive";
 import { archiveThread } from "./threads";
 
@@ -21,8 +21,36 @@ import { archiveThread } from "./threads";
 const REGISTERED = new Map<unknown, unknown>([
     [internal.agent.auto_archive.archiveMergedThread, archiveMergedThread],
     [internal.source_control.pr_threads.noteMergeAttempt, noteMergeAttempt],
-    [internal.source_control.pr_threads.recordPullRequestMerged, recordPullRequestMerged],
+    [internal.source_control.pr_threads.recordPullRequestMergedPage, recordPullRequestMergedPage],
 ]);
+
+/**
+ * Records a merge on every link of the pull request, one page at a time, as `recordMergedPullRequest` walks them. Returns the owed
+ * links the walk collected.
+ */
+const recordAllPages = async (ctx: any, args: Record<string, unknown>): Promise<any[]> => {
+    const owed: any[] = [];
+    let cursor: string | null = null;
+
+    for (;;) {
+        const page: { continueCursor: string | null; isDone: boolean; owed: { linkId: string; threadId: string }[] } = await ctx.runMutation(
+            recordPullRequestMergedPage,
+            { ...args, cursor },
+        );
+
+        owed.push(
+            ...page.owed.map(({ linkId, threadId }) => {
+                return { linkId, threadId };
+            }),
+        );
+
+        if (page.isDone) {
+            return owed;
+        }
+
+        cursor = page.continueCursor;
+    }
+};
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -211,9 +239,7 @@ describe("archiveMergedThread", () => {
                 }),
         );
 
-        const owed = await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { number: NUMBER, repository: REPOSITORY, userId: OWNER }),
-        );
+        const owed = await harness.run(async (ctx: any) => await recordAllPages(ctx, { number: NUMBER, repository: REPOSITORY, userId: OWNER }));
         const [first, other] = [owed.find((row: { linkId: string }) => row.linkId !== second), owed.find((row: { linkId: string }) => row.linkId === second)];
 
         expect(owed).toHaveLength(2);
@@ -275,9 +301,7 @@ describe("archiveMergedThread", () => {
             });
         });
 
-        const owed = await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { number: NUMBER, repository: REPOSITORY, userId: OWNER }),
-        );
+        const owed = await harness.run(async (ctx: any) => await recordAllPages(ctx, { number: NUMBER, repository: REPOSITORY, userId: OWNER }));
         const first = owed.find((row: { linkId: string }) => row.linkId !== second);
 
         expect(owed).toHaveLength(2);
@@ -290,6 +314,124 @@ describe("archiveMergedThread", () => {
         const sibling = await harness.run(async (ctx: any) => await ctx.db.get("pullRequestThreads", second));
 
         expect(sibling?.mergeSettledAt).toBeTypeOf("number");
+    });
+
+    it("declines a reopened chat for an owed merge past the settlement bound, recorded without a host time", async () => {
+        const threadId = await setUp({ autoArchiveMergedChats: true });
+        const mergedAt = Date.now() - 60_000;
+
+        // The chat's first link (from setUp) archives it. Then 499 links to other pull requests, and a second link to the merged
+        // request as the 501st row: past the settlement's 500-row read, so its merge stays owed after the archive.
+        // Rows made in one millisecond have no fixed order, so the inserts are spaced: the row order is the creation order.
+        const pause = () =>
+            new Promise((resolve) => {
+                setTimeout(resolve, 5);
+            });
+
+        await pause();
+        await harness.run(async (ctx: any) => {
+            const settings = await ctx.db
+                .query("userSettings")
+                .withIndex("by_userId", (q: any) => q.eq("userId", OWNER))
+                .unique();
+
+            await ctx.db.patch("userSettings", settings._id, { keepOpenPullRequestChats: false });
+
+            for (let index = 0; index < 499; index += 1) {
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 1,
+                    kind: "linked",
+                    number: 2000 + index,
+                    repository: "octo/other",
+                    state: "closed",
+                    threadId,
+                    title: "Other",
+                    url: `https://github.com/octo/other/pull/${String(2000 + index)}`,
+                    userId: OWNER,
+                });
+            }
+        });
+
+        await pause();
+        const late = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 1,
+                    kind: "linked",
+                    number: NUMBER,
+                    repository: REPOSITORY,
+                    threadId,
+                    title: "Feature work",
+                    url: URL,
+                    userId: OWNER,
+                }),
+        );
+
+        // The host gave no merge time: the merge is recorded with the request's time and no stored bound.
+        await harness.run(
+            async (ctx: any) =>
+                await recordAllPages(ctx, {
+                    mergedAt,
+                    mergedBefore: mergedAt + 1000,
+                    mergedBeforeIsHostBound: false,
+                    number: NUMBER,
+                    repository: REPOSITORY,
+                    userId: OWNER,
+                }),
+        );
+
+        const first = await linkIdOf(threadId);
+
+        expect(
+            await harness.run(
+                async (ctx: any) => await ctx.runMutation(archiveMergedThread, { linkId: first, number: NUMBER, repository: REPOSITORY, threadId }),
+            ),
+        ).toBe("archived");
+
+        // The archive's bounded settlement read the first 500 rows: the late link is past them and still owed.
+        const lateRow = await harness.run(async (ctx: any) => await ctx.db.get("pullRequestThreads", late));
+
+        expect(lateRow?.mergeSettledAt).toBeUndefined();
+
+        // The owner reopens the chat. The retry for the late link must not archive it again for the merge its archive covered.
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { status: "active" }));
+
+        expect(
+            await harness.run(
+                async (ctx: any) => await ctx.runMutation(archiveMergedThread, { linkId: late, number: NUMBER, repository: REPOSITORY, threadId }),
+            ),
+        ).toBe("declined");
+        expect(await statusOf(threadId)).toBe("active");
+    });
+
+    it("archives a reopened chat for a merge recorded in the same millisecond as its archive, since that merge may come after it", async () => {
+        const threadId = await setUp({ autoArchiveMergedChats: true });
+        const linkId = await linkIdOf(threadId);
+        const archivedAt = Date.now();
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", threadId, { archivedAt, status: "active" });
+            await ctx.db.patch("pullRequestThreads", linkId, { mergedAt: 1000, mergeRecordedAt: archivedAt, state: "merged" });
+        });
+
+        expect(
+            await harness.run(async (ctx: any) => await ctx.runMutation(archiveMergedThread, { linkId, number: NUMBER, repository: REPOSITORY, threadId })),
+        ).toBe("archived");
+    });
+
+    it("declines a reopened chat for a merge recorded before its archive", async () => {
+        const threadId = await setUp({ autoArchiveMergedChats: true });
+        const linkId = await linkIdOf(threadId);
+        const archivedAt = Date.now();
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", threadId, { archivedAt, status: "active" });
+            await ctx.db.patch("pullRequestThreads", linkId, { mergedAt: 1000, mergeRecordedAt: archivedAt - 1, state: "merged" });
+        });
+
+        expect(
+            await harness.run(async (ctx: any) => await ctx.runMutation(archiveMergedThread, { linkId, number: NUMBER, repository: REPOSITORY, threadId })),
+        ).toBe("declined");
     });
 
     it("with the setting off, settles every link of a merge, so turning it on later archives none of those chats", async () => {
@@ -320,9 +462,7 @@ describe("archiveMergedThread", () => {
         });
 
         expect(
-            await harness.run(
-                async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { mergedAt: 1000, number: NUMBER, repository: REPOSITORY, userId: OWNER }),
-            ),
+            await harness.run(async (ctx: any) => await recordAllPages(ctx, { mergedAt: 1000, number: NUMBER, repository: REPOSITORY, userId: OWNER })),
         ).toHaveLength(0);
 
         // The owner turns the setting on before any later read of the merged pull request.
@@ -336,9 +476,7 @@ describe("archiveMergedThread", () => {
         });
 
         expect(
-            await harness.run(
-                async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { mergedAt: 1000, number: NUMBER, repository: REPOSITORY, userId: OWNER }),
-            ),
+            await harness.run(async (ctx: any) => await recordAllPages(ctx, { mergedAt: 1000, number: NUMBER, repository: REPOSITORY, userId: OWNER })),
         ).toHaveLength(0);
 
         const archived = await harness.run(async (ctx: any) => {
@@ -381,9 +519,7 @@ describe("archiveMergedThread", () => {
                     userId: OWNER,
                 }),
         );
-        const owed = await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { number: NUMBER, repository: REPOSITORY, userId: OWNER }),
-        );
+        const owed = await harness.run(async (ctx: any) => await recordAllPages(ctx, { number: NUMBER, repository: REPOSITORY, userId: OWNER }));
         const first = owed.find((row: { linkId: string }) => row.linkId !== second);
 
         expect(
@@ -498,9 +634,7 @@ describe("archiveMergedThread", () => {
         });
 
         // The second request merges after the opt-in and is recorded; the first merge predates the opt-in.
-        await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { mergedAt: 6000, number: 8, repository: REPOSITORY, userId: OWNER }),
-        );
+        await harness.run(async (ctx: any) => await recordAllPages(ctx, { mergedAt: 6000, number: 8, repository: REPOSITORY, userId: OWNER }));
 
         expect(
             await harness.run(
@@ -534,7 +668,7 @@ describe("archiveMergedThread", () => {
         );
 
         const owed = await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { mergedAt: 1000, number: NUMBER, repository: REPOSITORY, userId: OWNER }),
+            async (ctx: any) => await recordAllPages(ctx, { mergedAt: 1000, number: NUMBER, repository: REPOSITORY, userId: OWNER }),
         );
 
         expect(owed.map((row: { linkId: string }) => row.linkId)).toEqual([linkId]);
@@ -563,7 +697,7 @@ describe("archiveMergedThread", () => {
         );
 
         const owed = await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { mergedAt: 1000, number: NUMBER, repository: REPOSITORY, userId: OWNER }),
+            async (ctx: any) => await recordAllPages(ctx, { mergedAt: 1000, number: NUMBER, repository: REPOSITORY, userId: OWNER }),
         );
 
         expect(owed.map((row: { linkId: string }) => row.linkId)).toEqual([linkId]);
@@ -615,10 +749,10 @@ describe("archiveMergedThread", () => {
         );
 
         const owedFirst = await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { mergedAt: 1000, number: NUMBER, repository: REPOSITORY, userId: OWNER }),
+            async (ctx: any) => await recordAllPages(ctx, { mergedAt: 1000, number: NUMBER, repository: REPOSITORY, userId: OWNER }),
         );
         const owedSecond = await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { mergedAt: 1000, number: 8, repository: REPOSITORY, userId: OWNER }),
+            async (ctx: any) => await recordAllPages(ctx, { mergedAt: 1000, number: 8, repository: REPOSITORY, userId: OWNER }),
         );
 
         expect(owedSecond.map((row: { linkId: string }) => row.linkId)).toEqual([otherLink]);
@@ -698,8 +832,7 @@ describe("archiveMergedThread", () => {
             return row?.archivedAt;
         });
         const owedSecond = await harness.run(
-            async (ctx: any) =>
-                await ctx.runMutation(recordPullRequestMerged, { mergedAt: archivedAt + 1000, number: 8, repository: REPOSITORY, userId: OWNER }),
+            async (ctx: any) => await recordAllPages(ctx, { mergedAt: archivedAt + 1000, number: 8, repository: REPOSITORY, userId: OWNER }),
         );
 
         expect(owedSecond.map((row: { linkId: string }) => row.linkId)).toEqual([secondLink]);
@@ -896,7 +1029,7 @@ describe("archiveMergedThread", () => {
         // does not cover it: the merge may have come after it.
         await harness.run(
             async (ctx: any) =>
-                await ctx.runMutation(recordPullRequestMerged, {
+                await recordAllPages(ctx, {
                     mergedAt: archivedAt - 500,
                     mergedBefore: archivedAt - 500,
                     mergedBeforeIsHostBound: false,
@@ -909,6 +1042,50 @@ describe("archiveMergedThread", () => {
         expect(
             await harness.run(async (ctx: any) => await ctx.runMutation(archiveMergedThread, { linkId, number: NUMBER, repository: REPOSITORY, threadId })),
         ).toBe("archived");
+    });
+
+    it("declines a reopened chat for a link a later page marked after the archive, when the walk saw the merge before it", async () => {
+        const threadId = await setUp({ autoArchiveMergedChats: true, linked: false });
+        const linkId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 1,
+                    kind: "attached",
+                    number: NUMBER,
+                    repository: REPOSITORY,
+                    threadId,
+                    title: "Feature work",
+                    url: URL,
+                    userId: OWNER,
+                }),
+        );
+
+        // The chat is archived before the walk reaches this link, so the link is not yet marked and the archive does not settle it.
+        await harness.run(async (ctx: any) => await ctx.runMutation(archiveThread, { threadId }));
+        const archivedAt = await harness.run(async (ctx: any) => {
+            const row = await ctx.db.get("threads", threadId);
+
+            return row?.archivedAt;
+        });
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { status: "active" }));
+
+        // The walk began before the archive and saw the merge then; its later page marks the link after the archive. The host gave no
+        // merge time, so only the walk's start bounds the merge, and that start is before the archive.
+        await harness.run(
+            async (ctx: any) =>
+                await recordAllPages(ctx, {
+                    mergedBeforeIsHostBound: false,
+                    number: NUMBER,
+                    recordedAt: archivedAt - 500,
+                    repository: REPOSITORY,
+                    userId: OWNER,
+                }),
+        );
+
+        expect(
+            await harness.run(async (ctx: any) => await ctx.runMutation(archiveMergedThread, { linkId, number: NUMBER, repository: REPOSITORY, threadId })),
+        ).toBe("declined");
     });
 
     it("keeps a merged chat that another open pull request keeps, as the idle archive does", async () => {
@@ -953,16 +1130,12 @@ describe("archiveMergedThread", () => {
     it("keeps an attempt owed until it settles, so a failed archive is retried", async () => {
         const threadId = await setUp({ autoArchiveMergedChats: true });
 
-        const owed = await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { number: NUMBER, repository: REPOSITORY, userId: OWNER }),
-        );
+        const owed = await harness.run(async (ctx: any) => await recordAllPages(ctx, { number: NUMBER, repository: REPOSITORY, userId: OWNER }));
 
         expect(owed).toHaveLength(1);
 
         // The archive never ran (or failed), so nothing settled: the next read owes the same link again.
-        const again = await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { number: NUMBER, repository: REPOSITORY, userId: OWNER }),
-        );
+        const again = await harness.run(async (ctx: any) => await recordAllPages(ctx, { number: NUMBER, repository: REPOSITORY, userId: OWNER }));
 
         expect(again).toStrictEqual(owed);
         expect(await statusOf(threadId)).toBe("active");
@@ -993,6 +1166,38 @@ describe("archiveMergedThread", () => {
         await seeMerge();
 
         expect(await statusOf(threadId)).toBe("archived");
+    });
+
+    it("flags a busy chat as owing a merge, and clears the flag once its archive settles", async () => {
+        const threadId = await setUp({ autoArchiveMergedChats: true });
+        const streamId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    messageId: "m-1",
+                    status: "streaming",
+                    streamingConfig: { contentType: "text", model: "gpt-4o" },
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+        const mergeOwed = () =>
+            harness.run(async (ctx: any) => {
+                const thread = await ctx.db.get("threads", threadId);
+
+                return thread?.mergeOwed;
+            });
+
+        await seeMerge();
+        expect(await mergeOwed()).toBe(true);
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("persistentStreams", streamId, { status: "done" });
+        });
+        await seeMerge();
+
+        expect(await statusOf(threadId)).toBe("archived");
+        expect(await mergeOwed()).toBe(false);
     });
 
     it("declines a chat pinned during a run at merge time, so unpinning it once the run is over archives nothing", async () => {
@@ -1197,9 +1402,7 @@ describe("archiveMergedThread", () => {
 
         await seeMerge();
 
-        const owedAfter = await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordPullRequestMerged, { number: NUMBER, repository: REPOSITORY, userId: OWNER }),
-        );
+        const owedAfter = await harness.run(async (ctx: any) => await recordAllPages(ctx, { number: NUMBER, repository: REPOSITORY, userId: OWNER }));
 
         expect(owedAfter).toStrictEqual([]);
     });

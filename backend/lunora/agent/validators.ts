@@ -755,6 +755,9 @@ export const vThreadDocFields = {
     lastViewedAt: v.optional(v.number()),
     // Written only by `agent/thread-passcode.ts` (set on lock, cleared on removal).
     lockedAt: v.optional(v.number()),
+    // Written only by `source-control/pr-thread-links.ts` (set when a merge owes an archive, cleared once it settles); never a client field.
+    mergeOwed: v.optional(v.boolean()),
+    mergeOwedScan: v.optional(v.string()),
     order: v.optional(v.number()),
     // Written by `chat/thread-state.ts#setThreadPermissionMode` (the owner, for a cloud thread), by its internal
     // `copyThreadPermissionMode` (a branch of the owner's own thread, or a new chat of the owner's bot taking the bot's mode, after the
