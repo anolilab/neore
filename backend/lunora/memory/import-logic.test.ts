@@ -211,6 +211,15 @@ describe("a secret in the paste", () => {
         ]);
     });
 
+    it("is redacted whole when its quoted value is on the line after the name, and fits on one line", () => {
+        expect.assertions(1);
+
+        expect(splitImportedText('The user lives in Lisbon\nDB_PASSWORD=\n"correct horse battery staple"\nThe user likes green tea').lines).toStrictEqual([
+            "The user lives in Lisbon",
+            "The user likes green tea",
+        ]);
+    });
+
     it("is redacted when emphasis joins a token across the cut to length", () => {
         expect.assertions(1);
 

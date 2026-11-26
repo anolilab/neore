@@ -669,8 +669,14 @@ export const redactSecrets = (text: string): string => {
         });
 };
 
-/** A secret's name, then `:` or `=`, then the quote that opens its value, on the same line or the next: `DB_PASSWORD="`. */
-const MULTILINE_OPENING = new RegExp(String.raw`(?<name>\b${SECRET_NAME}["']?[^\S\n]*[:=])\s*"`, "giu");
+const HORIZONTAL_SPACE = String.raw`[^\S\n\r\v\f\u{2028}\u{2029}]`;
+const LINE_BREAK = String.raw`(?:\r\n|[\n\r\v\f\u{2028}\u{2029}])`;
+
+/**
+ * A secret's name, then `:` or `=`, then the quote that opens its value: `DB_PASSWORD="`. The quote may sit on the next
+ * line, after at most one line break; a label with facts between it and a later quote is not an opening.
+ */
+const MULTILINE_OPENING = new RegExp(String.raw`(?<name>\b${SECRET_NAME}["']?[^\S\n]*[:=])${HORIZONTAL_SPACE}*(?:${LINE_BREAK}${HORIZONTAL_SPACE}*)?"`, "giu");
 
 /** Most characters scanned for the quote that closes a value read across lines. */
 const MULTILINE_VALUE_MAX = 4000;
@@ -678,18 +684,28 @@ const MULTILINE_VALUE_MAX = 4000;
 const ANY_LINE_BREAK = /[\n\r\v\f\u{2028}\u{2029}]/u;
 const AFTER_CLOSING_QUOTE = /[\s,.;:)\]}]/u;
 
+/** True when the quote at `index` follows an odd run of backslashes, back to `from`: it is escaped. */
+const isEscaped = (text: string, index: number, from: number): boolean => {
+    let start = index;
+
+    while (start > from && text[start - 1] === "\\") {
+        start -= 1;
+    }
+
+    return (index - start) % 2 === 1;
+};
+
 /** Where the quote that closes a value starting at `from` ends (after it), or `-1` when none does within the bound. */
 const closingQuoteEnd = (text: string, from: number): number => {
     const limit = Math.min(text.length, from + MULTILINE_VALUE_MAX);
+    let quote = text.indexOf('"', from);
 
-    for (let index = from; index < limit; index += 1) {
-        const char = text[index];
-
-        if (char === "\\") {
-            index += 1;
-        } else if (char === '"' && (index + 1 === text.length || AFTER_CLOSING_QUOTE.test(text[index + 1] ?? ""))) {
-            return index + 1;
+    while (quote !== -1 && quote < limit) {
+        if (!isEscaped(text, quote, from) && (quote + 1 === text.length || AFTER_CLOSING_QUOTE.test(text[quote + 1] ?? ""))) {
+            return quote + 1;
         }
+
+        quote = text.indexOf('"', quote + 1);
     }
 
     return -1;
@@ -699,23 +715,28 @@ const closingQuoteEnd = (text: string, from: number): number => {
  * `text` with each quoted secret value that spans lines redacted, for a caller that reads `text` line by line next:
  * split first, a value's later lines would read as ordinary text. A value on one line is left to `redactSecrets`. The
  * value may hold spaces. A quote not closed within {@link MULTILINE_VALUE_MAX} characters takes the rest of the text:
- * dropping the lines after it is the safe side of not knowing where the secret ends.
+ * dropping the lines after it is the safe side of not knowing where the secret ends. One forward pass: an opening
+ * inside a value already read is skipped, since its own scan would end at the same quote with no more line breaks.
  */
 export const redactMultilineSecrets = (text: string): string => {
     let result = "";
     let kept = 0;
+    let scanned = 0;
 
     for (const match of text.matchAll(MULTILINE_OPENING)) {
-        if (match.index < kept) {
+        if (match.index < scanned) {
             continue;
         }
 
         const valueStart = match.index + match[0].length;
         const end = closingQuoteEnd(text, valueStart);
         const stop = end === -1 ? text.length : end;
+        const name = match.groups?.name ?? "";
 
-        if (end === -1 || ANY_LINE_BREAK.test(text.slice(valueStart, stop))) {
-            result += `${text.slice(kept, match.index)}${match.groups?.name ?? ""}${REDACTED}`;
+        scanned = stop;
+
+        if (end === -1 || ANY_LINE_BREAK.test(text.slice(match.index + name.length, stop))) {
+            result += `${text.slice(kept, match.index)}${name}${REDACTED}`;
             kept = stop;
         }
     }

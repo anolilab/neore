@@ -92,6 +92,14 @@ describe("parseMemoryFile: text", () => {
         expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user lives in Lisbon"]);
     });
 
+    it("counts an entry that grows past the limit once its secret is redacted as too long, not cut", () => {
+        // A marker is two characters longer than this secret: 499 characters in, 501 out.
+        const line = `${factOfLength(480)} password: abc12xyz`;
+
+        expect(line).toHaveLength(MEMORY_FILE_ENTRY_MAX_CHARS - 1);
+        expect(parseMemoryFile(`${line}\nThe user likes green tea`, "text")).toMatchObject({ entries: 1, tooLong: 1, total: 2 });
+    });
+
     it("refuses a file with only blank lines", () => {
         expect(refusal("\n  \n\t\n", "text")).toMatchObject({ code: "empty" });
         expect(refusal("", "text")).toMatchObject({ code: "empty" });

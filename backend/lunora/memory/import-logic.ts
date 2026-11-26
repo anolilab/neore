@@ -150,17 +150,28 @@ export const unwrapImportLine = (raw: string): string =>
 export const cleanImportLine = (raw: string): string => stripDataTags(unwrapImportLine(raw).slice(0, IMPORT_MAX_FACT_CHARS)).trim();
 
 /**
- * A raw line cleaned with its secrets redacted, or `null` when it was only a secret. Redacted as pasted and again once
- * unwrapped, since removing emphasis can join a token split by it (`github_**pat_…`), and only then cut to length, so
- * a cut never leaves the head of a token too short to be recognised.
+ * A raw line cleaned with its secrets redacted, not yet cut to length, or `null` when it was only a secret. Redacted as
+ * pasted and again once unwrapped, since removing emphasis can join a token split by it (`github_**pat_…`).
  */
-export const redactImportLine = (raw: string): string | null => {
+export const redactImportText = (raw: string): string | null => {
     const redacted = redactMemoryText(raw);
-    const cleaned = redacted === null ? null : redactMemoryText(unwrapImportLine(redacted));
 
-    // Checked again after the cut: when the fact sits past the limit, the cut can leave only a label and its marker, or
-    // only the filler before a marker it removed, and a preview must not offer a line its save would drop.
-    return cleaned === null ? null : recheckCutMemoryText(cleaned, stripDataTags(capMemoryText(cleaned, IMPORT_MAX_FACT_CHARS)).trim());
+    return redacted === null ? null : redactMemoryText(unwrapImportLine(redacted));
+};
+
+/**
+ * Redacted text cut to length, never before its secrets are redacted, so a cut never leaves the head of a token too
+ * short to be recognised. Checked again after the cut: when the fact sits past the limit, the cut can leave only a label
+ * and its marker, or only the filler before a marker it removed, and a preview must not offer a line its save would drop.
+ */
+export const capImportText = (cleaned: string): string | null =>
+    recheckCutMemoryText(cleaned, stripDataTags(capMemoryText(cleaned, IMPORT_MAX_FACT_CHARS)).trim());
+
+/** One line as stored: redacted, then cut to length. `null` when it was only a secret. */
+export const redactImportLine = (raw: string): string | null => {
+    const cleaned = redactImportText(raw);
+
+    return cleaned === null ? null : capImportText(cleaned);
 };
 
 /**

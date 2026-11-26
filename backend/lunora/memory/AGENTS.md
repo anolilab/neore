@@ -50,7 +50,7 @@
   facts (`redactMemoryFacts`, before embedding), extraction revisions (planned redacted, and `reviseExtractedMemory`
   again), reflection ops (`redactReflectionOps`), import lines (redacted before the cut to length, again after
   cleaning and after the cut, so preview and save agree; a quoted value that spans lines, spaces or not, is redacted whole before the
-  split, after every line ending became `\n`; a quote not closed within 4000 characters takes the rest of the text; a JSON item gets the same step) and merged texts, the manual edit (a text that is only a secret is refused),
+  split, after every line ending became `\n`; a quote not closed within 4000 characters takes the rest of the text; the quote may follow its name after one line break; a JSON item gets the same step) and merged texts, the manual edit (a text that is only a secret is refused),
   and `insertMemory` / `saveImportedMemoryBatch` / `updateMemoryInternal` / `applyReflectionOps` as the backstop.
   Confirmations write no memory text; one may add a quote that passed `evidenceQuote` to a row that has none. A fact
   that is nothing but a secret is dropped (`redactMemoryText` returns `null`), never saved as `«redacted»`:

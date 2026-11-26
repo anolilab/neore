@@ -346,6 +346,27 @@ describe("redactMultilineSecrets", () => {
         );
     });
 
+    it("redacts a value on the line after its name even when it fits on one line", () => {
+        expect(redactMultilineSecrets('before\nDB_TOKEN=\n"alpha beta"\nafter')).toBe(`before\nDB_TOKEN=${REDACTED}\nafter`);
+    });
+
+    it("does not let a label reach a quote past a blank line, and keeps the text between", () => {
+        const text = 'DB_TOKEN=\n\n"The user likes green tea\nThe user owns a bike"\nThe user lives in Lisbon';
+
+        expect(redactMultilineSecrets(text)).toBe(text);
+    });
+
+    it("finishes a 500 KB file of overlapping openings within a fixed bound", () => {
+        // Each block holds 570 openings that all close on the same line, 4000 characters on. Rescanning for each opening
+        // took about 800 ms here; one pass takes about 30 ms. The bound is wide, as the guard is against the rescan.
+        const block = `${'TOKEN="'.repeat(570)}" `;
+        const text = block.repeat(Math.floor(500_000 / block.length));
+        const started = performance.now();
+
+        expect(redactMultilineSecrets(text)).toBe(text);
+        expect(performance.now() - started).toBeLessThan(400);
+    });
+
     it("skips an escaped quote inside the value", () => {
         expect(redactMultilineSecrets(`${name}"alpha \\" beta\ngamma" ok`)).toBe(`${name}${REDACTED} ok`);
     });

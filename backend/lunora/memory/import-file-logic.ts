@@ -12,11 +12,12 @@
  * optional `type`. Any other top-level shape is refused; an item of another shape is counted as invalid.
  */
 import {
+    capImportText,
     IMPORT_MAX_FACT_CHARS,
     importDedupKey,
     isLongEnoughFact,
     looksSensitive,
-    redactImportLine,
+    redactImportText,
     redactMultilineImportSecrets,
     splitImportLines,
     unwrapImportLine,
@@ -95,7 +96,13 @@ export interface ParsedMemoryFile {
 
 type Prepared = { memory: string; status: "ok" } | { status: "blank" } | { status: "invalid" } | { status: "tooLong" };
 
-/** One raw entry as a memory: wrapping removed, whitespace collapsed, length checked, secrets redacted. */
+/**
+ * The longest raw entry worth redacting. A marker is longer than the shortest secret it replaces, so an entry past the
+ * limit can shrink below it, but not from beyond ten times as long.
+ */
+const MEMORY_FILE_ENTRY_PREPARE_MAX_CHARS = MEMORY_FILE_ENTRY_MAX_CHARS * 10;
+
+/** One raw entry as a memory: wrapping removed, whitespace collapsed, secrets redacted, then its length checked. */
 const prepareEntry = (raw: string): Prepared => {
     const unwrapped = unwrapImportLine(raw);
 
@@ -103,11 +110,21 @@ const prepareEntry = (raw: string): Prepared => {
         return { status: "blank" };
     }
 
-    if (unwrapped.length > MEMORY_FILE_ENTRY_MAX_CHARS) {
+    if (unwrapped.length > MEMORY_FILE_ENTRY_PREPARE_MAX_CHARS) {
         return { status: "tooLong" };
     }
 
-    const memory = redactImportLine(raw);
+    const cleaned = redactImportText(raw);
+
+    if (cleaned === null) {
+        return { status: "invalid" };
+    }
+
+    if (cleaned.length > MEMORY_FILE_ENTRY_MAX_CHARS) {
+        return { status: "tooLong" };
+    }
+
+    const memory = capImportText(cleaned);
 
     return memory !== null && isLongEnoughFact(memory) && !looksSensitive(memory) ? { memory, status: "ok" } : { status: "invalid" };
 };
