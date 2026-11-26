@@ -13,6 +13,13 @@ import { ASIDE_FIND_EVENT } from "@/features/keyboard/lib/aside-find-target";
 import useAsideFindHighlights from "./use-aside-find-highlights";
 
 /**
+ * Whether a key press belongs to an input method. Safari fires the key that ends a composition after `compositionend`, when
+ * `isComposing` is already false, and marks it with keyCode 229 instead.
+ */
+// eslint-disable-next-line no-restricted-syntax -- Safari reports that key as `Enter` or `Escape` too, so keyCode is the only signal
+const isImeKey = (event: globalThis.KeyboardEvent): boolean => event.isComposing || event.keyCode === 229;
+
+/**
  * Find in the side questions: a bar at the top of the panel that searches the questions and answers as they are shown,
  * and paints the hits. Opened by the Find shortcut while focus is in the panel (`keyboard-shortcuts-manager.tsx`). The
  * count and the highlights come from the rendered panel (`use-aside-find-highlights.ts`), so they always agree.
@@ -83,7 +90,7 @@ const AsideFindBar: FC = () => {
 
         const handleEscape = (event: globalThis.KeyboardEvent) => {
             // An Escape that cancels an IME candidate belongs to the input method, not to the bar.
-            if (event.key !== "Escape" || event.isComposing) {
+            if (event.key !== "Escape" || isImeKey(event)) {
                 return;
             }
 
@@ -126,7 +133,7 @@ const AsideFindBar: FC = () => {
             return;
         }
 
-        if (event.nativeEvent.isComposing) {
+        if (isImeKey(event.nativeEvent)) {
             event.preventDefault();
 
             return;

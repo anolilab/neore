@@ -289,6 +289,11 @@ describe("AsidePanel", () => {
         fireEvent.keyDown(input, { isComposing: true, key: "Enter" });
         expect(screen.getByText("1 of 2")).toBeTruthy();
 
+        // Safari marks the Enter that ends a composition with keyCode 229, though isComposing is already false. Shift+Enter is the
+        // one Enter that steps, so it is the key that shows the guard.
+        fireEvent.keyDown(input, { key: "Enter", keyCode: 229, shiftKey: true });
+        expect(screen.getByText("1 of 2")).toBeTruthy();
+
         // Shift+Enter still steps, so the no-step above is not just a dead handler.
         fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
         expect(screen.getByText("2 of 2")).toBeTruthy();
@@ -308,6 +313,10 @@ describe("AsidePanel", () => {
         const input = screen.getByRole("textbox", { name: "Find in side questions" });
 
         fireEvent.keyDown(input, { isComposing: true, key: "Escape" });
+        expect(screen.getByRole("textbox", { name: "Find in side questions" })).toBeTruthy();
+
+        // Safari marks the Escape that cancels a candidate with keyCode 229, though isComposing is already false.
+        fireEvent.keyDown(input, { key: "Escape", keyCode: 229 });
         expect(screen.getByRole("textbox", { name: "Find in side questions" })).toBeTruthy();
 
         // A plain Escape still closes the bar, so the no-close above is not just a dead handler.
