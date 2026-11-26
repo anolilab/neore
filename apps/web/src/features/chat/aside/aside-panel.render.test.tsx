@@ -591,4 +591,56 @@ describe("AsidePanel", () => {
             vi.useRealTimers();
         }
     });
+
+    it("brings the current hit into view again when an image above it loads and moves it sideways out of a box", async () => {
+        vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
+        // A hit that starts well inside a box which scrolls sideways.
+        let hit = { bottom: 120, left: 10, right: 30, top: 100 };
+        const scroll = vi.fn();
+
+        useAsideStore.setState({ byThread: { "thread-1": [{ answer: "A cat.", id: "a", question: "Why?", status: "answered", token: "tok" }] } });
+        render(
+            <div data-testid="sideways-box" style={{ overflowX: "auto" }}>
+                <AsidePanel threadId="thread-1" />
+            </div>,
+        );
+        const box = screen.getByTestId("sideways-box");
+
+        Object.defineProperties(box, {
+            getBoundingClientRect: {
+                configurable: true,
+                value: () => {
+                    return { bottom: 1000, left: 0, right: 100, top: 0 };
+                },
+            },
+            scrollBy: { configurable: true, value: vi.fn() },
+        });
+        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
+        Object.defineProperty(Range.prototype, "getBoundingClientRect", { configurable: true, value: () => hit });
+
+        try {
+            act(() => {
+                globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+            });
+            fireEvent.change(screen.getByRole("textbox", { name: "Find in side questions" }), { target: { value: "cat" } });
+            await settleReveal();
+            expect(scroll).not.toHaveBeenCalled();
+
+            // An image above the hit loads: the hit moves past the box's far edge sideways, with no vertical change.
+            const image = document.createElement("img");
+            const region = screen.getByRole("region", { name: "Side question" });
+
+            region.insertBefore(image, screen.getByRole("heading", { name: "Side question" }));
+            hit = { bottom: 120, left: 150, right: 170, top: 100 };
+            act(() => {
+                image.dispatchEvent(new Event("load"));
+            });
+            await settleReveal();
+            expect(scroll).toHaveBeenCalled();
+        } finally {
+            Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+            Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
+            vi.useRealTimers();
+        }
+    });
 });
