@@ -159,13 +159,27 @@ const closingQuoteOnLine = (line: string, from: number, quote: string): number =
     return -1;
 };
 
+/** True when the line ends in an unescaped backslash: an odd run of them, ignoring trailing whitespace. One scan from the end. */
+const endsInLineContinuation = (line: string): boolean => {
+    const trimmed = line.trimEnd();
+    let backslashes = 0;
+
+    while (trimmed[trimmed.length - backslashes - 1] === "\\") {
+        backslashes += 1;
+    }
+
+    return backslashes % 2 === 1;
+};
+
 /**
  * True when one line names a secret (`DB_PASSWORD=`, `api_token:`) and its value does not end on that line: nothing
- * follows the `=` or `:`, or a quote opened right after it has no matching one later on the line. Such a value goes on
- * to the next line, and the redaction reads one line at a time, so its continuation would be read as a memory. The file
- * is refused rather than guessing where the value ends. A label inside a quoted value already read is skipped.
+ * follows the `=` or `:`, a quote opened right after it has no matching one later on the line, or the line ends in an
+ * unescaped backslash (a line continuation). Such a value goes on to the next line, and the redaction reads one line at
+ * a time, so its continuation would be read as a memory. The file is refused rather than guessing where the value ends.
+ * A label inside a quoted value already read is skipped.
  */
 const secretContinues = (line: string): boolean => {
+    let named = false;
     let readUntil = 0;
 
     for (const match of line.matchAll(SECRET_LABEL)) {
@@ -192,9 +206,11 @@ const secretContinues = (line: string): boolean => {
                 return true;
             }
         }
+
+        named = true;
     }
 
-    return false;
+    return named && endsInLineContinuation(line);
 };
 
 /** The one-based number of the first line of `lines` that {@link secretContinues}, or `undefined`. */

@@ -28,13 +28,20 @@ const lines = (count: number): string => Array.from({ length: count }, (_, index
 
 const SECRET_WORDS = /amber|hunter|alpha|battery|horse/u;
 
+const LABEL = "DB_PASSWORD=";
+const VALUE = "hunter2";
+
 /** A secret whose value does not end on its line: an unclosed quote of either kind, a value on the next line, none. */
 const SECRET_CONTINUES = [
     'DB_PASSWORD="first line\n"quoted phrase" \nThe continuation phrase is amber-orchid-9472',
     "DB_PASSWORD='correct horse\nbattery staple in vault'",
     'DB_TOKEN=\n"alpha beta"',
     "DB_PASSWORD=\nhunter2",
+    [`${LABEL}${VALUE}\\`, "battery-staple-in-vault"].join("\n"),
 ];
+
+/** A secret whose value ends in a doubled backslash: the backslash is escaped, so the value ends on its line. */
+const ESCAPED_BACKSLASH = `${LABEL}${VALUE}\\\\`;
 
 const refusal = (content: string, format: "json" | "text"): MemoryFileError | undefined => {
     try {
@@ -79,6 +86,17 @@ describe("parseMemoryFile: text", () => {
 
         expect(error).toMatchObject({ code: "secret_continues", message: expect.stringContaining("Line 2 holds a password or key") });
         expect(error?.message).not.toMatch(SECRET_WORDS);
+    });
+
+    it("does not refuse a secret that ends in an escaped (doubled) backslash, and stores nothing of it", () => {
+        const content = `The user lives in Lisbon\n${ESCAPED_BACKSLASH}`;
+
+        expect(refusal(content, "text")).toBeUndefined();
+        expect(
+            parseMemoryFile(content, "text")
+                .batches.flat()
+                .map((entry) => entry.memory),
+        ).toStrictEqual(["The user lives in Lisbon"]);
     });
 
     it("refuses on a line break other than a newline, and counts the lines before it", () => {
@@ -166,6 +184,13 @@ describe("parseMemoryFile: JSON", () => {
         const parsed = parseMemoryFile(JSON.stringify(["The user is a nurse in Hamburg", 42, null, { note: "no text field" }, [], { text: "  " }]), "json");
 
         expect(parsed).toMatchObject({ entries: 1, invalid: 5, total: 6 });
+    });
+
+    it("keeps an item whose secret ends in an escaped (doubled) backslash out of the list without skipping the file", () => {
+        const parsed = parseMemoryFile(JSON.stringify(["The user lives in Lisbon", ESCAPED_BACKSLASH]), "json");
+
+        expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user lives in Lisbon"]);
+        expect(parsed).toMatchObject({ entries: 1, invalid: 1, total: 2 });
     });
 
     it("refuses text that is not JSON", () => {
