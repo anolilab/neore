@@ -181,7 +181,8 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
     const chosen = storedBackupModels(userSettings);
     // Until the settings load, the list only looks empty: an edit then would replace the saved one. While a save runs,
     // another edit would be built on its unconfirmed value and could save it even if it fails.
-    const locked = disabled === true || userSettings === undefined || saving;
+    const editable = disabled !== true && userSettings !== undefined;
+    const locked = !editable || saving;
     const chosenKey = chosen.join("\n");
     const limit = MAX_BACKUP_MODELS;
     // Each entry's buttons by `controlKey`, so focus can be put back once the list has changed.
@@ -330,7 +331,7 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                     <ModelSelect
                         description={t`Up to ${limit}, tried in the order listed`}
                         // Not disabled while a save runs, so it keeps focus; a pick made then is ignored below.
-                        disabled={disabled === true || userSettings === undefined}
+                        disabled={!editable}
                         emptyLabel={t`Choose a model`}
                         field="backupModels"
                         label={chosen.length === 0 ? t`Add a backup model` : t`Add another backup model`}

@@ -300,13 +300,13 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
             toStore.searchDomainBlocklist = domains;
         }
 
-        // The backup list and the single value saved before it are kept in step: a write of either sets both, so a reader
-        // of either sees the same first backup. An older client writes `backupModel` alone, and that edits only the first
-        // entry: a model replaces it (and leaves its later place), "" removes it, and the rest of the list stays.
         const backupModelsBase = toStore.backupModelsBase as string[] | undefined;
 
         delete toStore.backupModelsBase;
 
+        // The backup list and the single value saved before it are kept in step: a write of either sets both, so a reader
+        // of either sees the same first backup. An older client writes `backupModel` alone, and that edits only the first
+        // entry: a model replaces it (and leaves its later place), "" removes it, and the rest of the list stays.
         if (Array.isArray(toStore.backupModels) || typeof toStore.backupModel === "string") {
             const saved = storedBackupModels(settings as Doc<"userSettings"> | null);
 
