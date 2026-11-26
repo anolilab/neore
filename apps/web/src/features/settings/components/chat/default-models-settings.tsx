@@ -195,21 +195,41 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
     // Bumped to place focus after a refused save: its rollback changes the list before the refusal is seen.
     const [focusRequest, setFocusRequest] = useState(0);
 
-    useEffect(() => {
-        const target = focusAfter.current;
+    // Whether focus is inside the section, from its focus and blur events. A removed element may not fire a blur, so
+    // this is only cleared by a move of focus to somewhere else, never by an unmount.
+    const holdsFocus = useRef(false);
 
-        if (target === null || locked) {
+    useEffect(() => {
+        if (locked) {
             return;
         }
 
+        const target = focusAfter.current;
         // The add picker is disabled when nothing can be added: the section then holds focus.
         const picker = addRow.current?.querySelector("button");
         const pickerOrSection = picker && !picker.disabled ? picker : section.current;
-        const element = target === "" ? pickerOrSection : controls.current.get(target);
+        let element: HTMLElement | null | undefined = null;
+
+        if (target !== null) {
+            element = target === "" ? pickerOrSection : controls.current.get(target);
+        }
 
         if (element && !(element instanceof HTMLButtonElement && element.disabled)) {
             focusAfter.current = null;
             element.focus();
+
+            return;
+        }
+
+        // The list changed under the focused control (a re-read after another tab's edit removed its entry), or the
+        // control to focus is gone: focus fell to the page, so it goes to the add picker, or the section, rather than
+        // being lost. A target that is only missing so far (a rollback not yet shown) stays pending. Only focus on the
+        // page counts as lost: an open picker popup sits outside the section and keeps its own.
+        const focusLost = document.activeElement === null || document.activeElement === document.body;
+        const targetGone = target !== null && element === undefined;
+
+        if (focusLost && (targetGone || (target === null && holdsFocus.current))) {
+            pickerOrSection?.focus();
         }
     }, [chosenKey, focusRequest, locked]);
 
@@ -247,7 +267,31 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
     };
 
     return (
-        <div aria-labelledby={labelId} className="space-y-3 outline-none" ref={section} role="group" tabIndex={-1}>
+        <div
+            aria-labelledby={labelId}
+            // Takes focus from script when nothing can be added; `focus:`, not `focus-visible:`, so the ring shows then too.
+            // The padding and negative margin leave room for the ring without moving the layout.
+            className="focus:border-ring focus:ring-ring/30 -m-1 space-y-3 rounded-md border border-transparent p-[3px] outline-none focus:ring-[2px]"
+            onBlur={(event) => {
+                const next = event.relatedTarget;
+
+                // A move to another control inside the section keeps it. With no target, a removed element is not a move.
+                if (next instanceof Node ? !event.currentTarget.contains(next) : event.target instanceof Node && event.target.isConnected) {
+                    holdsFocus.current = false;
+                }
+
+                // The user chose somewhere else: a control still waiting for focus must not take it back later.
+                if (next instanceof Node && !event.currentTarget.contains(next)) {
+                    focusAfter.current = null;
+                }
+            }}
+            onFocus={() => {
+                holdsFocus.current = true;
+            }}
+            ref={section}
+            role="group"
+            tabIndex={-1}
+        >
             <div className="space-y-0.5">
                 <Label className="text-sm font-medium" id={labelId}>
                     {t`Backup models`}

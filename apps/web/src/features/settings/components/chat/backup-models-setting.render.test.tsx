@@ -10,12 +10,15 @@ const state = vi.hoisted(() => {
     return {
         catalog: [] as GatewayModel[],
         catalogLoaded: true,
+        conflict: false,
         excluded: new Set<string>(),
         hold: false,
         lastPatch: undefined as unknown,
         release: () => undefined as void,
         preferencesRead: true,
         refuse: false,
+        /** When set, the stored list is shown in place of the rollback: the re-read lands before the refusal is handled. */
+        reread: undefined as undefined | { backupModels?: string[] },
         rerender: (() => undefined) as () => void,
         settings: {} as undefined | { backupModels?: string[] },
     };
@@ -97,10 +100,11 @@ vi.mock("@/features/auth/hooks/use-user-settings", () => {
                     }
 
                     if (state.refuse) {
-                        state.settings = before;
+                        state.settings = state.reread ?? before;
                         state.rerender();
 
-                        throw new Error("refused");
+                        // The stored list changed in another tab: the re-read (the test swaps `state.settings`) follows the refusal.
+                        throw Object.assign(new Error("refused"), state.conflict ? { code: "CONFLICT" } : {});
                     }
                 },
             };
@@ -125,10 +129,12 @@ const show = (offered: GatewayModel[] = MODELS) => {
 beforeEach(() => {
     state.catalog = MODELS;
     state.catalogLoaded = true;
+    state.conflict = false;
     state.hold = false;
     state.lastPatch = undefined;
     state.preferencesRead = true;
     state.refuse = false;
+    state.reread = undefined;
     state.excluded = new Set();
     state.settings = {};
     // The select positions its popup with a ResizeObserver, which jsdom lacks.
@@ -289,6 +295,78 @@ describe("BackupModelsSetting", () => {
         await userEvent.click(screen.getByRole("button", { name: "Remove First" }));
 
         expect(document.activeElement).toBe(screen.getByRole("group", { name: "Backup models" }));
+    });
+
+    it("shows a focus ring on the section, which takes focus from script", () => {
+        show();
+
+        expect(screen.getByRole("group", { name: "Backup models" }).className).toContain("focus:ring-[2px]");
+    });
+
+    it("moves focus to the add picker when a re-read after a conflict removes the entry whose button had focus", async () => {
+        state.settings = { backupModels: ["openai/first", "openai/second"] };
+        state.refuse = true;
+        state.conflict = true;
+        show();
+
+        await userEvent.click(screen.getByRole("button", { name: "Remove First" }));
+
+        // The refusal put the old list back and focus on the control used; the stored list has not arrived yet.
+        expect(document.activeElement).toBe(screen.getByRole("button", { name: "Remove First" }));
+
+        state.settings = { backupModels: ["openai/second"] };
+        state.rerender();
+
+        expect(screen.queryByRole("button", { name: "Remove First" })).toBeNull();
+        expect(document.activeElement).not.toBe(document.body);
+        expect(document.activeElement).toBe(screen.getByRole("combobox", { name: "Add another backup model" }));
+    });
+
+    it("moves focus to the section when a re-read after a conflict leaves nothing to add", async () => {
+        state.settings = { backupModels: ["openai/first"] };
+        state.excluded = new Set(MODELS.map((m) => m.id));
+        state.refuse = true;
+        state.conflict = true;
+        show();
+
+        await userEvent.click(screen.getByRole("button", { name: "Remove First" }));
+
+        state.settings = { backupModels: [] };
+        state.rerender();
+
+        expect(screen.queryByRole("button", { name: "Remove First" })).toBeNull();
+        expect(document.activeElement).toBe(screen.getByRole("group", { name: "Backup models" }));
+    });
+
+    it("moves focus to the add picker when the stored list arrives before the conflict is handled and lacks the entry", async () => {
+        state.settings = { backupModels: ["openai/first", "openai/second"] };
+        state.refuse = true;
+        state.conflict = true;
+        state.reread = { backupModels: ["openai/second"] };
+        show();
+
+        await userEvent.click(screen.getByRole("button", { name: "Remove First" }));
+
+        await waitFor(() => expect(screen.getByRole("combobox", { name: "Add another backup model" }).hasAttribute("disabled")).toBe(false));
+        expect(screen.queryByRole("button", { name: "Remove First" })).toBeNull();
+        expect(document.activeElement).not.toBe(document.body);
+        expect(document.activeElement).toBe(screen.getByRole("combobox", { name: "Add another backup model" }));
+    });
+
+    it("leaves focus alone when a re-read changes the list and focus was elsewhere", () => {
+        state.settings = { backupModels: ["openai/first", "openai/second"] };
+        show();
+
+        const outside = document.createElement("button");
+
+        document.body.appendChild(outside);
+        outside.focus();
+
+        state.settings = { backupModels: ["openai/second"] };
+        state.rerender();
+
+        expect(document.activeElement).toBe(outside);
+        outside.remove();
     });
 
     it("sends the list an edit was built on, so the server can refuse it when another tab changed the list", async () => {
