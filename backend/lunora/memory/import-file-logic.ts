@@ -11,7 +11,16 @@
  * JSON: an array whose items are strings, or objects with a text field (`content`, `text` or `memory`) and an
  * optional `type`. Any other top-level shape is refused; an item of another shape is counted as invalid.
  */
-import { IMPORT_MAX_FACT_CHARS, importDedupKey, isLongEnoughFact, looksSensitive, redactImportLine, splitImportLines, unwrapImportLine } from "./import-logic";
+import {
+    IMPORT_MAX_FACT_CHARS,
+    importDedupKey,
+    isLongEnoughFact,
+    looksSensitive,
+    redactImportLine,
+    redactMultilineImportSecrets,
+    splitImportLines,
+    unwrapImportLine,
+} from "./import-logic";
 import { isMemoryType, type MemoryType } from "./taxonomy";
 
 /**
@@ -119,7 +128,7 @@ type RawEntry = { text: string | undefined; type: MemoryType };
 
 const textOfJsonItem = (item: unknown): RawEntry => {
     if (typeof item === "string") {
-        return { text: item, type: MEMORY_FILE_DEFAULT_TYPE };
+        return { text: redactMultilineImportSecrets(item), type: MEMORY_FILE_DEFAULT_TYPE };
     }
 
     if (typeof item !== "object" || item === null || Array.isArray(item)) {
@@ -130,7 +139,7 @@ const textOfJsonItem = (item: unknown): RawEntry => {
     const field = TEXT_FIELDS.find((name) => typeof record[name] === "string" && (record[name] as string).trim() !== "");
     const type = isMemoryType(record.type) ? record.type : MEMORY_FILE_DEFAULT_TYPE;
 
-    return { text: field === undefined ? undefined : (record[field] as string), type };
+    return { text: field === undefined ? undefined : redactMultilineImportSecrets(record[field] as string), type };
 };
 
 const rawEntriesOf = (content: string, format: MemoryFileFormat): RawEntry[] => {

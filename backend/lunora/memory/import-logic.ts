@@ -82,10 +82,13 @@ const WHITESPACE_RE = /\s+/g;
 export const LINE_BREAK_RE = /\r\n?|[\n\v\f\u{2028}\u{2029}]/u;
 
 /**
- * The text as lines. Every line ending becomes `\n` first because the multiline-secret redaction reads only `\n` and
- * `\r\n`: a quoted secret split on U+2028, a bare CR or a form feed would otherwise leave its later lines as plain facts.
+ * The text with every line ending as `\n` and its quoted multi-line secrets redacted. The redaction reads only `\n` and
+ * `\r\n`, so a secret split on U+2028, a bare CR or a form feed would otherwise leave its later lines as plain facts.
  */
-export const splitImportLines = (text: string): string[] => redactMultilineSecrets(text.split(LINE_BREAK_RE).join("\n")).split("\n");
+export const redactMultilineImportSecrets = (text: string): string => redactMultilineSecrets(text.split(LINE_BREAK_RE).join("\n"));
+
+/** The text as lines, its quoted multi-line secrets redacted first. */
+export const splitImportLines = (text: string): string[] => redactMultilineImportSecrets(text).split("\n");
 
 /**
  * Shapes that are a secret or sensitive identifier whatever words surround them:

@@ -340,17 +340,26 @@ describe("redactMultilineSecrets", () => {
         expect(redactMultilineSecrets(`${name}"${value}" and then the user likes tea`)).toBe(`${name}${REDACTED} and then the user likes tea`);
     });
 
+    it("redacts a value whose opening quote is on the line after the name", () => {
+        expect(redactMultilineSecrets('before\nDB_TOKEN=\n"alpha\nThe user keeps this private continuation"\nafter')).toBe(
+            `before\nDB_TOKEN=${REDACTED}\nafter`,
+        );
+    });
+
     it("skips an escaped quote inside the value", () => {
         expect(redactMultilineSecrets(`${name}"alpha \\" beta\ngamma" ok`)).toBe(`${name}${REDACTED} ok`);
     });
 
-    it("takes a bounded stretch when the quote is never closed, and no more", () => {
-        const tail = `\n${"The user likes green tea. ".repeat(400)}`;
-        const result = redactMultilineSecrets(`${name}"alpha${tail}`);
+    it("takes the rest of the text when the quote is not closed within the bound", () => {
+        const value = "abcdefghij\n".repeat(500);
 
-        expect(result.startsWith(`${name}${REDACTED}`)).toBe(true);
-        expect(result.length).toBeLessThan(tail.length);
-        expect(result.endsWith("tea. ")).toBe(true);
+        expect(redactMultilineSecrets(`before\n${name}"${value}The user likes green tea\n`)).toBe(`before\n${name}${REDACTED}`);
+    });
+
+    it("leaves the text after a closing quote that was found", () => {
+        const value = "abcdefghij\n".repeat(300).trimEnd();
+
+        expect(redactMultilineSecrets(`${name}"${value}"\nThe user likes green tea`)).toBe(`${name}${REDACTED}\nThe user likes green tea`);
     });
 
     it("leaves a value on one line to redactSecrets, and text without a secret name alone", () => {

@@ -669,10 +669,10 @@ export const redactSecrets = (text: string): string => {
         });
 };
 
-/** A secret's name, then `:` or `=`, then the quote that opens its value: `DB_PASSWORD="`. */
-const MULTILINE_OPENING = new RegExp(String.raw`(?<name>\b${SECRET_NAME}["']?[^\S\n]*[:=][^\S\n]*)"`, "giu");
+/** A secret's name, then `:` or `=`, then the quote that opens its value, on the same line or the next: `DB_PASSWORD="`. */
+const MULTILINE_OPENING = new RegExp(String.raw`(?<name>\b${SECRET_NAME}["']?[^\S\n]*[:=])\s*"`, "giu");
 
-/** Most characters of a quoted value that is read across lines, and the most a quote left open takes. */
+/** Most characters scanned for the quote that closes a value read across lines. */
 const MULTILINE_VALUE_MAX = 4000;
 
 const ANY_LINE_BREAK = /[\n\r\v\f\u{2028}\u{2029}]/u;
@@ -698,8 +698,8 @@ const closingQuoteEnd = (text: string, from: number): number => {
 /**
  * `text` with each quoted secret value that spans lines redacted, for a caller that reads `text` line by line next:
  * split first, a value's later lines would read as ordinary text. A value on one line is left to `redactSecrets`. The
- * value may hold spaces. A quote that is never closed within {@link MULTILINE_VALUE_MAX} characters takes that many:
- * dropping some following lines is the safe side of not knowing where the secret ends.
+ * value may hold spaces. A quote not closed within {@link MULTILINE_VALUE_MAX} characters takes the rest of the text:
+ * dropping the lines after it is the safe side of not knowing where the secret ends.
  */
 export const redactMultilineSecrets = (text: string): string => {
     let result = "";
@@ -712,7 +712,7 @@ export const redactMultilineSecrets = (text: string): string => {
 
         const valueStart = match.index + match[0].length;
         const end = closingQuoteEnd(text, valueStart);
-        const stop = end === -1 ? Math.min(text.length, valueStart + MULTILINE_VALUE_MAX) : end;
+        const stop = end === -1 ? text.length : end;
 
         if (end === -1 || ANY_LINE_BREAK.test(text.slice(valueStart, stop))) {
             result += `${text.slice(kept, match.index)}${match.groups?.name ?? ""}${REDACTED}`;

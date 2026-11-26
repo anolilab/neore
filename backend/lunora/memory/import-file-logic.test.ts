@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { REDACTED } from "../lib/secret-redaction";
 import { importDedupKey } from "./import-logic";
 import {
     MEMORY_FILE_BATCH_SIZE,
@@ -84,6 +85,13 @@ describe("parseMemoryFile: text", () => {
         expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user lives in Lisbon", "The user likes green tea"]);
     });
 
+    it("keeps no line after a quoted secret that runs past 4000 characters without closing", () => {
+        const value = "abcdefghij\n".repeat(500);
+        const parsed = parseMemoryFile(`The user lives in Lisbon\nDB_PASSWORD="${value}The user likes green tea`, "text");
+
+        expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user lives in Lisbon"]);
+    });
+
     it("refuses a file with only blank lines", () => {
         expect(refusal("\n  \n\t\n", "text")).toMatchObject({ code: "empty" });
         expect(refusal("", "text")).toMatchObject({ code: "empty" });
@@ -114,6 +122,26 @@ describe("parseMemoryFile: JSON", () => {
             { memory: "The user owns a red bike", type: MEMORY_FILE_DEFAULT_TYPE },
             { memory: "The user prefers content first", type: MEMORY_FILE_DEFAULT_TYPE },
         ]);
+    });
+
+    it("keeps no part of a quoted secret with spaces and a line break inside one item", () => {
+        const secret = ["correct horse", "\n", "battery staple"].join("");
+        const parsed = parseMemoryFile(JSON.stringify(["The user lives in Lisbon", `DB_PASSWORD="${secret}"`, { text: `API_TOKEN="${secret}"` }]), "json");
+
+        expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user lives in Lisbon"]);
+        expect(parsed).toMatchObject({ entries: 1, invalid: 2, total: 3 });
+    });
+
+    it("keeps no part of a quoted secret inside a longer item, and none of one opened on the next line", () => {
+        const parsed = parseMemoryFile(
+            JSON.stringify([
+                'The user deploys the blog with DB_TOKEN="alpha beta\nprivate continuation" from CI',
+                'DB_TOKEN=\n"alpha\nThe user keeps this private continuation"',
+            ]),
+            "json",
+        );
+
+        expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual([`The user deploys the blog with DB_TOKEN=${REDACTED} from CI`]);
     });
 
     it("counts an item of another shape as invalid", () => {
