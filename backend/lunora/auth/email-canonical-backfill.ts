@@ -156,39 +156,11 @@ const digestOf = async (token: string, canonical: string): Promise<string> => {
     return toHex(new Uint8Array(hash).slice(0, DIGEST_BYTES));
 };
 
-const isRecord = (value: unknown): value is CheckRecord => {
-    if (typeof value !== "object" || value === null) {
-        return false;
-    }
-
-    const record = value as Record<string, unknown>;
-
-    return (
-        typeof record.startedAt === "number" &&
-        typeof record.done === "boolean" &&
-        Array.isArray(record.folds) &&
-        Array.isArray(record.ids) &&
-        (record.cursor === undefined || typeof record.cursor === "string")
-    );
-};
-
 /** The unexpired check record under `token`, with the claim's `claimedAt` for a fenced update; `null` when there is none. */
 const readRecord = async (ctx: BackfillCtx, token: string): Promise<{ claimedAt: number; record: CheckRecord } | null> => {
     const row = await claimRow(ctx, EMAIL_CANONICAL_CHECK_SCOPE, token);
 
-    if (row?.result === undefined) {
-        return null;
-    }
-
-    let parsed: unknown;
-
-    try {
-        parsed = JSON.parse(row.result);
-    } catch {
-        return null;
-    }
-
-    return isRecord(parsed) ? { claimedAt: row.claimedAt, record: parsed } : null;
+    return row?.result === undefined ? null : { claimedAt: row.claimedAt, record: JSON.parse(row.result) as CheckRecord };
 };
 
 const saveRecord = async (ctx: BackfillCtx, token: string, claimedAt: number, record: CheckRecord): Promise<void> => {
