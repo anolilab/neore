@@ -49,7 +49,7 @@ import {
     readResumeInterruptedRuns,
     readRunPlan,
     readUsageLimitPreferences,
-    resolveBackupModelId,
+    resolveBackupModelIds,
     resolveRunModel,
     resumeApprovedRun,
     setDispatchOrigin,
@@ -592,10 +592,10 @@ export const runStreamingAgent = internalAction
                 // The step cap is for the whole reply: a run resumed after a pause gets what the earlier steps left.
                 const maxSteps = Math.max(1, getMaxSteps(isAutoContinue) - before.stepsUsed);
 
-                const backupModelId = await resolveBackupModelId(ctx, userId, prefs.backupModel, model, agentModulePrefs.modelFilterRules ?? {});
+                const backupModelIds = await resolveBackupModelIds(ctx, userId, prefs.backupModels, model, agentModulePrefs.modelFilterRules ?? {});
                 const agent = await getAgent(model, {
                     agentMode,
-                    backupModelId,
+                    backupModelIds,
                     customProvider,
                     enabledSkills: skillRun.enabledSkills.length > 0 ? skillRun.enabledSkills : undefined,
                     gateway: gatewayFetch(ctx),
@@ -636,7 +636,7 @@ export const runStreamingAgent = internalAction
 
                 // Reasoning provider options and, for auto-continue, step compression.
                 const streamTextArgs: any = buildRunStreamArgs({
-                    backupModelId,
+                    backupModelIds,
                     hasTools: Object.keys(tools).length > 0,
                     model,
                     reasoningEffort: threadReasoningEffort,
@@ -938,9 +938,9 @@ export const runStreamingAgent = internalAction
                     let wrapUpPlaceholderId: string | undefined;
 
                     try {
-                        // Sized for the call as it is: no tools, so the backup model and compression are chosen for a tool-less call.
+                        // Sized for the call as it is: no tools, so the backup models and compression are chosen for a tool-less call.
                         const wrapUpArgs: any = buildRunStreamArgs({
-                            backupModelId,
+                            backupModelIds,
                             hasTools: false,
                             model,
                             reasoningEffort: threadReasoningEffort,

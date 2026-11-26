@@ -51,7 +51,7 @@ import {
     AgentRunError,
     buildRunStreamArgs,
     loadModelFilterRules,
-    resolveBackupModelId,
+    resolveBackupModelIds,
     endStoppedRun,
     finishRun,
     loadRunContext,
@@ -312,9 +312,9 @@ const runSpeaker = async (
         setRunReplyKey(ctx, turn.replyKey);
         setRunOrganizationId(ctx, turn.permissionOrganizationId);
 
-        const backupModelId = await resolveBackupModelId(ctx, turn.userId, turn.prefs.backupModel, model, modelFilterRules);
+        const backupModelIds = await resolveBackupModelIds(ctx, turn.userId, turn.prefs.backupModels, model, modelFilterRules);
         const agent = await getAgent(model, {
-            backupModelId,
+            backupModelIds,
             customProvider,
             gateway: gatewayFetch(ctx),
             language: turn.prefs.language,
@@ -367,7 +367,7 @@ const runSpeaker = async (
         });
         const streamTextArgs: Record<string, unknown> = {
             ...buildRunStreamArgs({
-                backupModelId,
+                backupModelIds,
                 hasTools: Object.keys(toolResult.tools).length > 0,
                 model,
                 reasoningEffort,

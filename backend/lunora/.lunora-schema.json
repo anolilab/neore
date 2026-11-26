@@ -21,7 +21,6 @@
     "backfill-message-typed-text",
     "drop-agent-option-fields",
     "session-options-to-session-state",
-    "unique-user-email-canonical",
     "widen-not-typed-steer-collaborator",
     "widen-not-typed-steer-drafts"
   ],
@@ -33990,6 +33989,18 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "backupModels": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
         },
         "capLongCodeBlocks": {
           "kind": "boolean",

@@ -1,5 +1,6 @@
 /**
- * The backup model is checked against the model registry when it is saved, and "" clears it.
+ * The backup models are checked against the model registry when they are saved. The list and the single value saved
+ * before it are kept in step, and "" or an empty list clears them.
  */
 import { lunoraTest } from "@lunora/testing";
 import { MODEL_REGISTRY, requiresPaidPlan } from "@neore/ai/models";
@@ -61,13 +62,22 @@ let harness: Harness;
 
 const asUser = () => harness.withIdentity({ userId: USER } as never);
 const save = async (backupModel: string) => await asUser().mutation(updateUserSettings as never, { backupModel } as never);
+const saveList = async (backupModels: string[]) => await asUser().mutation(updateUserSettings as never, { backupModels } as never);
+const read = async () => (await asUser().query(getUserSettings as never, {} as never)) as { backupModel?: string; backupModels?: string[] } | null;
 const reload = async () => {
-    const settings = (await asUser().query(getUserSettings as never, {} as never)) as { backupModel?: string } | null;
+    const settings = await read();
 
     return settings?.backupModel;
 };
+const savedList = async () => {
+    const settings = await read();
 
-const BACKUP = MODEL_REGISTRY.find((m) => m.enabled !== false && m.provider !== "external" && (m.mode ?? "text") === "text" && !requiresPaidPlan(m))!.id;
+    return settings?.backupModels;
+};
+
+const [BACKUP, SECOND, THIRD, FOURTH] = MODEL_REGISTRY.filter(
+    (m) => m.enabled !== false && m.provider !== "external" && (m.mode ?? "text") === "text" && !requiresPaidPlan(m),
+).map((m) => m.id) as [string, string, string, string];
 
 beforeEach(() => {
     harness = lunoraTest(schemaWithShardedTables([]) as never);
@@ -127,5 +137,48 @@ describe("saved backup model", () => {
         await save("");
 
         expect(await reload()).toBe("");
+    });
+});
+
+describe("saved backup model list", () => {
+    it("keeps up to three in order, with the first one as the single value too", async () => {
+        await saveList([SECOND, BACKUP, THIRD]);
+
+        expect(await read()).toMatchObject({ backupModel: SECOND, backupModels: [SECOND, BACKUP, THIRD] });
+    });
+
+    it("refuses a fourth backup and a repeated one", async () => {
+        await expect(saveList([BACKUP, SECOND, THIRD, FOURTH])).rejects.toThrow("At most 3");
+        await expect(saveList([BACKUP, BACKUP])).rejects.toThrow("listed twice");
+    });
+
+    it("refuses an unknown id among the new entries and keeps the stored list", async () => {
+        await saveList([BACKUP]);
+
+        await expect(saveList([BACKUP, "no-such-model"])).rejects.toThrow("backup");
+
+        expect(await savedList()).toEqual([BACKUP]);
+    });
+
+    it("is set from a single value an older client writes", async () => {
+        await saveList([BACKUP, SECOND]);
+        await save(THIRD);
+
+        expect(await read()).toMatchObject({ backupModel: THIRD, backupModels: [THIRD] });
+
+        await save("");
+
+        expect(await savedList()).toEqual([]);
+    });
+
+    it("lets a saved entry that has since become unusable be reordered or removed", async () => {
+        await saveList([BACKUP, SECOND]);
+        await asUser().mutation(updateAIUserPreferences as never, { modelFilterRules: { blockedModels: [SECOND] } } as never);
+
+        await saveList([SECOND, BACKUP]);
+        expect(await savedList()).toEqual([SECOND, BACKUP]);
+
+        await saveList([BACKUP]);
+        expect(await savedList()).toEqual([BACKUP]);
     });
 });

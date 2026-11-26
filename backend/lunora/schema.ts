@@ -4432,8 +4432,10 @@ export const schema = defineSchema({
         autoCompactThreshold: v.optional(v.number()),
         // Opt-in: speak every finished reply aloud (`features/chat/voice-mode`). Absent = off.
         autoReadReplies: v.optional(v.boolean()),
-        // Model a reply is retried on once when the chosen model fails with an infrastructure error (`chat/lib/backup-model.ts`). Blank or absent = none.
+        // The single backup model saved before `backupModels`, read only while that list is absent (`chat/lib/backup-model.ts#storedBackupModels`).
         backupModel: v.optional(v.string()),
+        // Models a reply is retried on, in order, when the chosen model fails with an infrastructure error (`chat/lib/backup-model.ts`). Empty = none; absent = `backupModel`.
+        backupModels: v.optional(v.array(v.string())),
         // Appearance: cap long chat code blocks (absent = on). Accepted values: `auth/fields.ts`.
         capLongCodeBlocks: v.optional(v.boolean()),
         // In-app toasts for chat events (`features/notifications/lib/chat-toasts.ts`). Absent = on.

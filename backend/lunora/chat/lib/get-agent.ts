@@ -8,7 +8,7 @@ import type { ToolSet } from "ai";
 import { api } from "../../_generated/api";
 import { Agent } from "../../agent/client";
 import type { ServiceFetch } from "../../lib/services.js";
-import { backupCapabilities, eligibleBackupModel, supportsBackupFallback } from "./backup-model.js";
+import { backupCapabilities, eligibleBackupModels, supportsBackupFallback } from "./backup-model.js";
 import { FallbackLanguageModel } from "./fallback-language-model.js";
 import { type GatewayCustomProviderConfig, GatewayLanguageModel } from "./gateway-language-model.js";
 import { defaultModelUnderRules, readsImagesAndCallsTools } from "../../lib/utility-model.js";
@@ -36,12 +36,12 @@ export interface GetAgentOptions {
     agentMode?: AgentModeConfig;
 
     /**
-     * The user's backup model. When the chosen model fails with an infrastructure
-     * error, the call is retried once on it (`FallbackLanguageModel`). Ignored for
-     * a custom endpoint, for an id the registry cannot serve, and when it is the
-     * chosen model itself. The caller has already checked the user may run it.
+     * The user's backup models, in order. When the chosen model fails with an
+     * infrastructure error, the call is retried on each in turn (`FallbackLanguageModel`).
+     * Ignored for a custom endpoint; an id the registry cannot serve, or the chosen
+     * model itself, is skipped. The caller has already checked the user may run them.
      */
-    backupModelId?: string;
+    backupModelIds?: ReadonlyArray<string>;
 
     /**
      * Resolved (decrypted) user endpoint for a `custom:<providerId>/<modelId>`
@@ -277,16 +277,26 @@ const getAgent = async (model: AgentModel | string, options: GetAgentOptions): P
 
             chat = gatewayModel(modelDefinition);
 
-            const backup = supportsBackupFallback(effectiveModel) ? eligibleBackupModel(options.backupModelId, effectiveModel) : undefined;
+            const backups = supportsBackupFallback(effectiveModel) ? eligibleBackupModels(options.backupModelIds ?? [], effectiveModel) : [];
 
-            if (backup) {
-                chat = new FallbackLanguageModel(chat, gatewayModel(backup), {
-                    backupProviderKey: backup.provider.replace(INTERNAL_PREFIX, ""),
-                    backupSupportsFiles: backupCapabilities(backup).files,
-                    backupSupportsImages: backupCapabilities(backup).images,
-                    backupSupportsReasoning: Boolean(backup.filterCapabilities?.includes("effort_control") || backup.filterCapabilities?.includes("reasoning")),
-                    backupSupportsTools: backupCapabilities(backup).tools,
-                });
+            if (backups.length > 0) {
+                chat = new FallbackLanguageModel(
+                    chat,
+                    backups.map((backup) => {
+                        const capabilities = backupCapabilities(backup);
+
+                        return {
+                            model: gatewayModel(backup),
+                            providerKey: backup.provider.replace(INTERNAL_PREFIX, ""),
+                            supportsFiles: capabilities.files,
+                            supportsImages: capabilities.images,
+                            supportsReasoning: Boolean(
+                                backup.filterCapabilities?.includes("effort_control") || backup.filterCapabilities?.includes("reasoning"),
+                            ),
+                            supportsTools: capabilities.tools,
+                        };
+                    }),
+                );
             }
         }
     }
