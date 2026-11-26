@@ -9,7 +9,7 @@ import { regenerateParentOf, syncActiveAgent } from "./agent-switch";
 import { agentSwitchOf } from "./agent-switch-logic";
 import { childrenOf, contextPathIds, descendFrom, getThreadRow, loadActivePath, parentOf, resolveLeafRow, walkPath } from "./branch-rows";
 import type { MessageBranch } from "./branch-tree";
-import { BRANCH_ROOT, forkEnd, messageRowsOf } from "./branch-tree";
+import { BRANCH_ROOT, forkEnd, groupPathRows, messageRowsOf } from "./branch-tree";
 import { endActiveGoals } from "../chat/goals/rows";
 import { addMessagesHandler, getMaxMessage } from "./messages";
 import { deleteVectorRow } from "./table-writes";
@@ -17,7 +17,7 @@ import { requireOwnedThread } from "./thread-read-access";
 import type { VectorTableName } from "./vector/tables";
 import { isLockedWithoutProof } from "./thread-passcode";
 import { type ReplyContent, rewriteReplyText } from "./reply-edit";
-import { extractText } from "./shared";
+import { extractText, isTool } from "./shared";
 import type { Message } from "./validators";
 import { vMessage } from "./validators";
 import { patchRow } from "../lib/patch";
@@ -244,8 +244,11 @@ export const resolveForkEnd = internalQuery
     });
 
 /**
- * The last row on the thread's active path whose status is "success", or `null` when none is: where a fork that must
- * not carry a reply still in flight or one that failed ends (`createSideChat`).
+ * The last finished reply on the thread's active path, or `null` when there is none: where a fork that must not carry a
+ * reply in flight or one that failed ends (`createSideChat`). The unit is the displayed message (`groupPathRows`),
+ * because a fork at a row keeps the whole message it belongs to. A message is finished when its last row succeeded and
+ * is a user message or an assistant message with no tool call; a tool result, or an assistant row that still holds a
+ * tool call, means the reply is mid-way, so the fork ends at the message before it.
  */
 export const lastSettledMessageId = internalQuery
     .input({ threadId: v.id("threads") })
@@ -258,8 +261,18 @@ export const lastSettledMessageId = internalQuery
         }
 
         const path = await loadActivePath(ctx, args.threadId, thread.activeLeafMessageId);
+        const groups = groupPathRows(
+            path.map((row) => {
+                return { _id: row._id as string, order: row.order, role: (row.message as { role?: string } | undefined)?.role, row };
+            }),
+        );
+        const settled = groups.findLast((rows) => {
+            const last = rows.at(-1)?.row;
 
-        return path.findLast((row) => row.status === "success")?._id ?? null;
+            return last !== undefined && last.status === "success" && !last.tool && !isTool(last.message as Message);
+        });
+
+        return settled?.at(-1)?._id ?? null;
     });
 
 /**

@@ -9,7 +9,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { registeredApi, registerModule } from "../../test/registered-api";
 
 import { internalAction } from "../_generated/server";
-import { addMessagesHandler } from "../agent/messages";
+import { addMessagesHandler, cloneMessageBatch } from "../agent/messages";
+import { lastSettledMessageId } from "../agent/branches";
 import { insertContextResetRow, insertThread } from "../agent/table-writes";
 import schema from "../schema";
 import { createSideChat, sideChatRefusalOf } from "./side-chat";
@@ -312,5 +313,110 @@ describe("createSideChat", () => {
         const rows = await harness.run(async (ctx: any) => await ctx.db.query("documentHistory").collect());
 
         expect(rows.some((row: any) => String(row.documentId) === outcome.threadId)).toBe(true);
+    });
+
+    it("ends before a reply that is still mid tool call, at the last finished message", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await withMessages(parentId, OWNER, ["first question"]);
+        await harness.run(async (ctx: any) => {
+            await addMessagesHandler(ctx, {
+                messages: [{ message: { content: [{ text: "settled answer", type: "text" }], role: "assistant" }, status: "success" }],
+                threadId: parentId as never,
+                userId: OWNER,
+            });
+        });
+        await withMessages(parentId, OWNER, ["second question"]);
+        await harness.run(async (ctx: any) => {
+            await addMessagesHandler(ctx, {
+                messages: [
+                    {
+                        message: { content: [{ input: {}, toolCallId: "c1", toolName: "search", type: "tool-call" }], role: "assistant" },
+                        status: "success",
+                    },
+                    {
+                        message: {
+                            content: [{ output: { type: "text", value: "hits" }, toolCallId: "c1", toolName: "search", type: "tool-result" }],
+                            role: "tool",
+                        },
+                        status: "success",
+                    },
+                ],
+                threadId: parentId as never,
+                userId: OWNER,
+            });
+        });
+
+        const parentRows = await harness.run(async (ctx: any) => await ctx.db.query("messages").collect());
+        const secondQuestion = parentRows.find((row: any) => JSON.stringify(row.message).includes("second question"));
+        const outcome = (await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)) as { status: string; threadId: string };
+
+        expect(outcome.status).toBe("ok");
+        expect(await harness.run(async (ctx: any) => await ctx.runQuery(lastSettledMessageId, { threadId: parentId }))).toBe(secondQuestion._id);
+
+        const allRows = await harness.run(async (ctx: any) => await ctx.db.query("messages").collect());
+        const childRows = allRows.filter((row: any) => String(row.threadId) === outcome.threadId);
+        const copied = JSON.stringify(childRows.map((row: any) => row.message));
+
+        expect(childRows).toHaveLength(3);
+        expect(copied).toContain("settled answer");
+        expect(copied).not.toContain("tool-");
+    });
+
+    it("ends at the last finished reply when a later reply in the same turn is a tool result", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await withMessages(parentId, OWNER, ["question"]);
+        await harness.run(async (ctx: any) => {
+            await addMessagesHandler(ctx, {
+                messages: [
+                    {
+                        message: { content: [{ input: {}, toolCallId: "c1", toolName: "search", type: "tool-call" }], role: "assistant" },
+                        status: "success",
+                    },
+                    {
+                        message: {
+                            content: [{ output: { type: "text", value: "hits" }, toolCallId: "c1", toolName: "search", type: "tool-result" }],
+                            role: "tool",
+                        },
+                        status: "success",
+                    },
+                ],
+                threadId: parentId as never,
+                userId: OWNER,
+            });
+        });
+
+        const parentRows = await harness.run(async (ctx: any) => await ctx.db.query("messages").collect());
+        const question = parentRows.find((row: any) => JSON.stringify(row.message).includes("question"));
+
+        expect(await harness.run(async (ctx: any) => await ctx.runQuery(lastSettledMessageId, { threadId: parentId }))).toBe(question._id);
+    });
+
+    it("refuses a parent that no longer exists, and writes no child or relationship", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await withMessages(parentId, OWNER, ["hello"]);
+
+        const targetId = await parentWith(OWNER, { title: "copy" });
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.delete("threads", parentId);
+        });
+
+        await expect(
+            harness.run(
+                async (ctx: any) =>
+                    await ctx.runMutation(cloneMessageBatch, {
+                        paginationOpts: { cursor: null, numItems: 100 },
+                        sourceThreadId: parentId,
+                        targetThreadId: targetId,
+                    }),
+            ),
+        ).rejects.toThrow();
+        expect(await messageCount(targetId)).toBe(0);
+        expect(await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)).toStrictEqual({ reason: "not_found", status: "refused" });
+        expect(await sideRelations()).toHaveLength(0);
+        expect(await harness.run(async (ctx: any) => await ctx.db.query("threads").collect())).toHaveLength(1);
     });
 });

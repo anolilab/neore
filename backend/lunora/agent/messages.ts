@@ -700,7 +700,7 @@ export const cloneMessageBatch = internalMutation
         // A source that starts deletion mid-copy fails the copy, so the caller removes the half-copied fork.
         const source = await ctx.db.get("threads", args.sourceThreadId);
 
-        if (source?.deletingAt !== undefined) {
+        if (source === null || source.deletingAt !== undefined) {
             throwThreadNotFound();
         }
 
