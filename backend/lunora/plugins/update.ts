@@ -10,10 +10,13 @@ import { LunoraError, v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import { internalQuery } from "../_generated/server";
 import { authAction, rateLimit } from "../lib/crpc";
+import { childOps } from "./install-ops";
+import { runBundleImport } from "../skills/bundle-plan";
 import { MAX_LENGTH } from "../lib/validators";
 import { planFor } from "../skills/bundle";
 import { assertNoToolConfig, checkPluginFile } from "./install-action";
-import { entryHash, skillContent, skillRowHash, triggerRowHash } from "./entry-hash";
+import { entryHash, skillContent } from "./entry-hash";
+import { liveHashOf } from "./live-hash";
 import { diffUpdate, isDowngrade, markerFor } from "./logic";
 import type { UpdateAction } from "./logic";
 import { vPluginItemKind } from "./validators";
@@ -44,6 +47,7 @@ export const loadInstalledForUpdate = internalQuery
                     }),
                 ),
                 installId: v.string(),
+                ownSlugs: v.array(v.object({ entryKey: v.string(), slug: v.string() })),
                 status: v.string(),
                 version: v.string(),
             }),
@@ -59,27 +63,23 @@ export const loadInstalledForUpdate = internalQuery
         const installId = install._id as string;
         const { page } = await ctx.db.pluginItems.findMany({ where: { installId } });
         const children: Array<{ contentHash: string; currentHash: string; entryKey: string; kind: "group" | "skill" | "trigger" }> = [];
+        const ownSlugs: Array<{ entryKey: string; slug: string }> = [];
 
         for (const link of page) {
-            let currentHash = "unknown";
+            const currentHash = await liveHashOf(ctx, installId, link);
+
+            children.push({ contentHash: link.contentHash, currentHash, entryKey: link.entryKey, kind: link.kind });
 
             if (link.kind === "skill") {
                 const skill = await ctx.db.skills.findFirst({ where: { pluginMarker: markerFor(installId, link.entryKey) } });
 
-                currentHash = skill ? await skillRowHash(skill) : "missing";
-            } else if (link.kind === "trigger") {
-                const trigger = await ctx.db
-                    .query("triggers")
-                    .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", markerFor(installId, link.entryKey)))
-                    .first();
-
-                currentHash = trigger ? await triggerRowHash(trigger) : "missing";
+                if (skill) {
+                    ownSlugs.push({ entryKey: link.entryKey, slug: skill.slug });
+                }
             }
-
-            children.push({ contentHash: link.contentHash, currentHash, entryKey: link.entryKey, kind: link.kind });
         }
 
-        return { children, installId, status: install.status, version: install.version };
+        return { children, installId, ownSlugs, status: install.status, version: install.version };
     });
 
 export const previewUpdate = authAction
@@ -111,7 +111,7 @@ export const previewUpdate = authAction
             throw new LunoraError("CONFLICT", `The plugin "${header.slug}" is ${installed.status}, not installed. Repair it first.`);
         }
 
-        const { entries } = await planFor(ctx, args.markdown, undefined);
+        const { entries } = await planFor(ctx, args.markdown, undefined, { ownSlugs: installed.ownSlugs });
         assertNoToolConfig(entries);
         const incoming = await Promise.all(entries.map(async (entry) => ({ contentHash: await entryHash(entry), entryKey: entry.key, kind: entry.kind })));
         const plan: Array<{ action: UpdateAction; entryKey: string }> = diffUpdate(installed.children, incoming);
@@ -168,7 +168,7 @@ export const updatePlugin = authAction
             );
         }
 
-        const { entries } = await planFor(ctx, args.markdown, undefined);
+        const { entries } = await planFor(ctx, args.markdown, undefined, { ownSlugs: installed.ownSlugs });
         assertNoToolConfig(entries);
         const incoming = await Promise.all(entries.map(async (entry) => ({ contentHash: await entryHash(entry), entryKey: entry.key, kind: entry.kind })));
         const plan = diffUpdate(installed.children, incoming);
@@ -181,6 +181,7 @@ export const updatePlugin = authAction
 
         const applied: string[] = [];
         const skipped: Array<{ action: UpdateAction; entryKey: string }> = [];
+        const createKeys = new Set<string>();
 
         for (const step of plan) {
             if (step.action === "same") {
@@ -188,6 +189,57 @@ export const updatePlugin = authAction
             }
 
             const entry = entries.find((candidate) => candidate.key === step.entryKey);
+            const child = installed.children.find((row) => row.entryKey === step.entryKey);
+
+            if (step.action === "create") {
+                // A new group chat needs its participants in the same selection; it is reported until that is handled.
+                if (entry?.plan?.kind === "group") {
+                    skipped.push(step);
+                } else {
+                    createKeys.add(step.entryKey);
+                }
+                continue;
+            }
+
+            if (step.action === "delete" || step.action === "detach") {
+                if (child?.kind === "group") {
+                    skipped.push(step);
+                    continue;
+                }
+
+                const args = { entryKey: step.entryKey, generation, installId: installed.installId, userId };
+
+                if (step.action === "delete") {
+                    await ctx.runMutation(internal.plugins.update_apply.removeChild, args);
+                } else {
+                    await ctx.runMutation(internal.plugins.update_apply.detachChild, args);
+                }
+
+                applied.push(step.entryKey);
+                continue;
+            }
+
+            if (step.action === "update" && entry?.plan?.kind === "trigger" && entry.plan.create.type === "schedule") {
+                const create = entry.plan.create;
+
+                await ctx.runMutation(internal.plugins.update_apply.updateTriggerChild, {
+                    contentHash: await entryHash(entry),
+                    cronExpression: create.cronExpression,
+                    description: create.description,
+                    entryKey: step.entryKey,
+                    generation,
+                    inputTemplate: create.inputTemplate,
+                    installId: installed.installId,
+                    model: create.model,
+                    name: create.name,
+                    searchMode: create.searchMode,
+                    systemPrompt: create.systemPrompt,
+                    timezone: create.timezone,
+                    userId,
+                });
+                applied.push(step.entryKey);
+                continue;
+            }
 
             if (step.action !== "update" || entry?.plan?.kind !== "skill") {
                 skipped.push(step);
@@ -207,12 +259,42 @@ export const updatePlugin = authAction
                 installId: installed.installId,
                 instructions: content.instructions,
                 name: content.name,
+                slug: content.slug,
                 tags: content.tags,
                 userId,
                 variables: content.variables,
                 version: content.version,
             });
             applied.push(step.entryKey);
+        }
+
+        if (createKeys.size > 0) {
+            // New skills and triggers are created the way install creates them: intent first, then the create, then the link.
+            const hashByKey = new Map(await Promise.all(entries.map(async (entry) => [entry.key, await entryHash(entry)] as const)));
+            const created = await runBundleImport(
+                entries,
+                createKeys,
+                childOps(ctx, {
+                    generation,
+                    installId: installed.installId,
+                    intentFor: async (key, kind) =>
+                        await ctx.runMutation(internal.plugins.install_steps.recordIntent, {
+                            contentHash: hashByKey.get(key) ?? "",
+                            entryKey: key,
+                            generation,
+                            installId: installed.installId,
+                            kind,
+                            userId,
+                        }),
+                    isPremium: ctx.user.plan === "premium" || ctx.user.isAdmin === true,
+                    plan: ctx.user.plan ?? undefined,
+                    userId,
+                    version: header.version,
+                }),
+                { keepOnRateLimit: true },
+            );
+
+            applied.push(...created.map((item) => item.key));
         }
 
         await ctx.runMutation(internal.plugins.update_apply.finishUpdate, {
