@@ -221,7 +221,9 @@ export const getThreadPaneState = liteAuthQuery
                     v.object({
                         ...vThreadDocumentFields,
                         branchPoint: v.optional(v.number()),
-                        branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("subagent"))),
+                        branchType: v.optional(
+                            v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("side"), v.literal("subagent")),
+                        ),
                         createdAt: v.number(),
                     }),
                 ),
@@ -246,7 +248,9 @@ export const getThreadPaneState = liteAuthQuery
                         _creationTime: v.number(),
                         _id: v.id("threadRelationships"),
                         branchPoint: v.optional(v.number()),
-                        branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("subagent"))),
+                        branchType: v.optional(
+                            v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("side"), v.literal("subagent")),
+                        ),
                         createdAt: v.number(),
                         parentThreadId: v.id("threads"),
                         threadId: v.id("threads"),

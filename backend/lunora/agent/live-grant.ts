@@ -41,3 +41,17 @@ export const threadHasLiveGrant = async (ctx: Pick<QueryCtx, "db">, threadId: Id
     // Past a page of tombstones, taken as shared: the callers refuse what a shared chat may not do.
     return page.length === GRANT_COPIES_SCANNED || storedRows(page).some((grant) => !isTombstonedGrant(grant));
 };
+
+/**
+ * Whether someone other than `ownerId` holds a grant on `threadId` that is still in force: not being deleted and not past its
+ * `expiresAt`. Read on the primary, since a replica may not yet hold an invitation that was just accepted.
+ */
+export const threadSharedWithOthers = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"threads">, ownerId: string, now: number): Promise<boolean> => {
+    const { page } = await ctx.db.threadAccess.findMany({ consistency: "primary", limit: GRANT_COPIES_SCANNED, where: { threadId } });
+
+    // Past a page of copies, taken as shared: the callers refuse what a shared chat may not do.
+    return (
+        page.length === GRANT_COPIES_SCANNED ||
+        storedRows(page).some((grant) => !isTombstonedGrant(grant) && grant.userId !== ownerId && (grant.expiresAt === undefined || grant.expiresAt > now))
+    );
+};

@@ -2736,7 +2736,7 @@ export const generateSummary = authAction
 export const createThreadRelationship = internalMutation
     .input({
         branchPoint: v.optional(v.number()),
-        branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"))),
+        branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("side"))),
         parentThreadId: v.string(),
         threadId: v.string(),
     })
@@ -2806,7 +2806,9 @@ export const getChildThreads = authQuery
             v.object({
                 ...vThreadDocumentFields,
                 branchPoint: v.optional(v.number()),
-                branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("subagent"))),
+                branchType: v.optional(
+                    v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("side"), v.literal("subagent")),
+                ),
                 createdAt: v.number(),
             }),
         ),
@@ -3621,7 +3623,8 @@ export const searchSentPrompts = authQuery
                     .withIndex("by_thread", (q) => q.eq("threadId", current as Id<"threads">))
                     .take(1);
 
-                if (!link || link.branchType === "subagent" || (link.userId ?? userId) !== userId) {
+                // A side chat is its own chat: its prompts are not a copy of the parent's family to deduplicate against.
+                if (!link || link.branchType === "subagent" || link.branchType === "side" || (link.userId ?? userId) !== userId) {
                     break;
                 }
 
@@ -3990,8 +3993,9 @@ export const getFullThreadForExport = authQuery
             ? await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadRelationship.parentThreadId as Id<"threads"> })
             : null;
 
-        // A locked parent is not exported: the proof covers this thread only.
-        if (threadRelationship && parentThread?.userId === userId && !isThreadLocked(parentThread)) {
+        // A locked parent is not exported: the proof covers this thread only. A side chat already holds its own copy of the
+        // parent's settled history (`side-chat.ts`), so its parent is not prefixed again.
+        if (threadRelationship && threadRelationship.branchType !== "side" && parentThread?.userId === userId && !isThreadLocked(parentThread)) {
             const parentMessages = await agent.listMessages(context, {
                 paginationOpts: { cursor: null, numItems: 10_000 },
                 threadId: threadRelationship.parentThreadId,

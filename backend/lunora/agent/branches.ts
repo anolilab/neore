@@ -9,7 +9,7 @@ import { regenerateParentOf, syncActiveAgent } from "./agent-switch";
 import { agentSwitchOf } from "./agent-switch-logic";
 import { childrenOf, contextPathIds, descendFrom, getThreadRow, loadActivePath, parentOf, resolveLeafRow, walkPath } from "./branch-rows";
 import type { MessageBranch } from "./branch-tree";
-import { BRANCH_ROOT, forkEnd, messageRowsOf } from "./branch-tree";
+import { BRANCH_ROOT, forkEnd, groupPathRows, messageRowsOf } from "./branch-tree";
 import { endActiveGoals } from "../chat/goals/rows";
 import { addMessagesHandler, getMaxMessage } from "./messages";
 import { deleteVectorRow } from "./table-writes";
@@ -17,7 +17,7 @@ import { requireOwnedThread } from "./thread-read-access";
 import type { VectorTableName } from "./vector/tables";
 import { isLockedWithoutProof } from "./thread-passcode";
 import { type ReplyContent, rewriteReplyText } from "./reply-edit";
-import { extractText } from "./shared";
+import { extractText, isTool } from "./shared";
 import type { Message } from "./validators";
 import { vMessage } from "./validators";
 import { patchRow } from "../lib/patch";
@@ -241,6 +241,62 @@ export const resolveForkEnd = internalQuery
         const last = rows.at(-1);
 
         return last ? { endId: last._id, index } : null;
+    });
+
+/**
+ * The last finished reply on the thread's active path, or `null` when there is none: where a fork that must not carry a
+ * reply in flight or one that failed ends (`createSideChat`). The unit is the displayed message (`groupPathRows`),
+ * because a fork at a row keeps the whole message it belongs to. A message is finished when its last row succeeded and
+ * is a user message or an assistant message with no tool call; a tool result, or an assistant row that still holds a
+ * tool call, means the reply is mid-way, so the fork ends at the message before it. A message earlier on the path whose
+ * tool call never got a settled result (an interrupted run) is never copied either: the fork ends before it.
+ */
+export const lastSettledMessageId = internalQuery
+    .input({ threadId: v.id("threads") })
+    .output(v.union(v.null(), v.string()))
+    .query(async ({ args, ctx }) => {
+        const thread = await ctx.db.get("threads", args.threadId);
+
+        if (!thread) {
+            return null;
+        }
+
+        // A row with no message body is not a reply and is read by nothing below: dropped before any scan touches its message.
+        const fullPath = await loadActivePath(ctx, args.threadId, thread.activeLeafMessageId);
+        const path = fullPath.filter((row) => row.message !== undefined);
+        const groups = groupPathRows(
+            path.map((row) => {
+                return { _id: row._id as string, order: row.order, role: (row.message as { role?: string } | undefined)?.role, row };
+            }),
+        );
+        // The first displayed message holding a tool call that never reached a settled result (an interrupted run): a fork ends
+        // before it, whatever finished message follows, so the child carries no unfinished tool call.
+        // A call is answered by a settled result anywhere on the path: an approved call's result is stored after it, in a
+        // message of its own, so the answer is searched for across every message, not only the call's own.
+        const partsOf = (rows: ReadonlyArray<(typeof groups)[number][number]>) =>
+            rows
+                .filter((entry) => entry.row.status === "success")
+                .flatMap((entry) => {
+                    // A row with no message body has no tool parts, so it reads as empty rather than throwing.
+                    const content = (entry.row.message as { content?: unknown } | undefined)?.content;
+
+                    return Array.isArray(content) ? (content as { toolCallId?: string; type?: string }[]) : [];
+                });
+        const answered = new Set(
+            partsOf(groups.flat())
+                .filter((part) => part.type === "tool-result")
+                .map((part) => part.toolCallId),
+        );
+        const interrupted = groups.findIndex((rows) => partsOf(rows).some((part) => part.type === "tool-call" && !answered.has(part.toolCallId)));
+        const candidates = interrupted === -1 ? groups : groups.slice(0, interrupted);
+        const settled = candidates.findLast((rows) => {
+            const last = rows.at(-1)?.row;
+
+            // A row with no message body is not a prompt or a finished reply, so it is skipped rather than read as one.
+            return last !== undefined && last.status === "success" && !last.tool && last.message !== undefined && !isTool(last.message as Message);
+        });
+
+        return settled?.at(-1)?._id ?? null;
     });
 
 /**

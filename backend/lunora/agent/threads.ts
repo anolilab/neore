@@ -949,7 +949,7 @@ export const updateThreadSettings = internalMutation
 export const createThreadRelationship = internalMutation
     .input({
         branchPoint: v.optional(v.number()),
-        branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"))),
+        branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("side"))),
         parentThreadId: v.id("threads"),
         threadId: v.id("threads"),
         userId: v.optional(v.string()),
@@ -1021,7 +1021,9 @@ export const getThreadRelationship = query
                 _creationTime: v.number(),
                 _id: v.id("threadRelationships"),
                 branchPoint: v.optional(v.number()),
-                branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("subagent"))),
+                branchType: v.optional(
+                    v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("side"), v.literal("subagent")),
+                ),
                 createdAt: v.number(),
                 parentThreadId: v.id("threads"),
                 threadId: v.id("threads"),
@@ -1044,7 +1046,9 @@ export const getChildThreads = query
                 _creationTime: v.number(),
                 _id: v.id("threadRelationships"),
                 branchPoint: v.optional(v.number()),
-                branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("subagent"))),
+                branchType: v.optional(
+                    v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("side"), v.literal("subagent")),
+                ),
                 createdAt: v.number(),
                 parentThreadId: v.id("threads"),
                 threadId: v.id("threads"),
@@ -1097,7 +1101,9 @@ export const listAllThreadRelationships = internalQuery
                 _creationTime: v.number(),
                 _id: v.id("threadRelationships"),
                 branchPoint: v.optional(v.number()),
-                branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("subagent"))),
+                branchType: v.optional(
+                    v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("side"), v.literal("subagent")),
+                ),
                 createdAt: v.number(),
                 parentThreadId: v.id("threads"),
                 threadId: v.id("threads"),

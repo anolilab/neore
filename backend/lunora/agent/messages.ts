@@ -15,7 +15,7 @@ import { omit } from "../lib/collections";
  *
  * NOTE: fileIds reference 'chatFiles' table (renamed from 'files')
  */
-import { assert } from "../lib/error-helpers";
+import { assert, throwThreadNotFound } from "../lib/error-helpers";
 import { MAX_LENGTH, paginationOptionsValidator } from "../lib/validators";
 import { throwThreadLocked, isThreadLocked } from "../lib/thread-lock";
 import { systemDb } from "../lib/rls/scope";
@@ -680,6 +680,8 @@ export const cloneMessageBatch = internalMutation
         excludeToolMessages: v.optional(v.boolean()),
         insertAtOrder: v.optional(v.number()),
         paginationOpts: paginationOptionsValidator,
+        // Set by a caller that must not copy from a trashed chat (`createSideChat`), checked in every batch.
+        refuseTrashedSource: v.optional(v.boolean()),
         sourceThreadId: v.id("threads"),
         statuses: v.optional(v.array(vMessageStatus)),
         targetThreadId: v.id("threads"),
@@ -695,6 +697,13 @@ export const cloneMessageBatch = internalMutation
         // NEW thread and gets no lock of its own.
         if (await isLockedWithoutProof(ctx, args.sourceThreadId, args.unlockProof)) {
             throwThreadLocked();
+        }
+
+        // A source that starts deletion mid-copy fails the copy (and a trashed one, for a caller that asks: `refuseTrashedSource`), so the caller removes the half-copied fork.
+        const source = await ctx.db.get("threads", args.sourceThreadId);
+
+        if (source === null || source.deletingAt !== undefined || (args.refuseTrashedSource === true && source.deleted === true)) {
+            throwThreadNotFound();
         }
 
         const orderOffset = args.insertAtOrder ?? 0;
@@ -746,6 +755,10 @@ export const cloneMessageBatch = internalMutation
                       ["order", "stepOrder"],
                   ).collect();
 
+        // Each file's count is read, then written back one higher: two copied messages sharing a file would both read the
+        // same count and lose an increment, so the file links of a batch are taken one after another.
+        let fileLinks: Promise<void> = Promise.resolve();
+
         await Promise.all(
             result.page
                 .filter((m) => !activePath || activePath.has(m._id))
@@ -753,7 +766,10 @@ export const cloneMessageBatch = internalMutation
                 .filter((m) => existing.every((existingMessage) => !(existingMessage.order === m.order && existingMessage.stepOrder === m.stepOrder)))
                 .map(async (m) => {
                     if (m.fileIds) {
-                        await changeMessageFiles(ctx, args.targetThreadId, [], m.fileIds);
+                        const { fileIds } = m;
+
+                        fileLinks = fileLinks.then(async () => await changeMessageFiles(ctx, args.targetThreadId, [], fileIds));
+                        await fileLinks;
                     }
 
                     let embeddingId: VectorTableId | undefined;
@@ -806,6 +822,7 @@ export const cloneThread = internalAction
         excludeToolMessages: v.optional(v.boolean()),
         insertAtOrder: v.optional(v.number()),
         limit: v.optional(v.number()),
+        refuseTrashedSource: v.optional(v.boolean()),
         sourceThreadId: v.id("threads"),
         statuses: v.optional(v.array(vMessageStatus)),
         targetThreadId: v.id("threads"),
