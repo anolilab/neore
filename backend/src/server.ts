@@ -742,7 +742,7 @@ export default {
         const auth = await authFor(env);
 
         // Lunora's own `ensureMigrated` converts the ISO dates older `@lunora/auth` versions stored; this Worker never
-        // calls it (below), so the conversion runs here, once per isolate. It never rejects.
+        // calls it (below), so the conversion runs here, re-checked through the rollout window. It never rejects.
         await ensureAuthDatesConverted(exec, auth.options);
 
         // `ensureMigrated(auth)` used to run here, on EVERY request. It is both

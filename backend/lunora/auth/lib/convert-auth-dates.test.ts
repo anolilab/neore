@@ -2,8 +2,9 @@
  * `ensureAuthDatesConverted` against the real tables: the schema's `.global()` tables are provisioned into a plain
  * SQLite the way D1 gets them, rows are written with ISO-string dates the way `@lunora/auth` up to alpha.275 wrote
  * them, and the conversion has to leave epoch-ms numbers. The schema is the real one, not the harness's copy that
- * `test/setup-harness.ts` turns into `.shardBy()` tables, so the `.global()` auth tables are provisioned here. Running it against every better-auth table also pins that
- * each one the auth options name is provisioned (a missing table would make the whole conversion fail).
+ * `test/setup-harness.ts` turns into `.shardBy()` tables, so the `.global()` auth tables are provisioned here. Running
+ * it against every better-auth table also pins that each one the auth options name is provisioned (a missing table
+ * would make the whole conversion fail).
  */
 import { DatabaseSync } from "node:sqlite";
 
@@ -11,7 +12,7 @@ import { runD1GlobalTableMigrations } from "@lunora/d1";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildAuthOptions } from "../../auth";
-import { ensureAuthDatesConverted, resetAuthDateConversionForTests, RETRY_AFTER_MS } from "./convert-auth-dates";
+import { ensureAuthDatesConverted, RECHECK_AFTER_MS, resetAuthDateConversionForTests, RETRY_AFTER_MS, ROLLOUT_WINDOW_MS } from "./convert-auth-dates";
 
 const { default: schema } = await vi.importActual<typeof import("../../schema")>("../../schema");
 
@@ -66,17 +67,48 @@ describe(ensureAuthDatesConverted, () => {
         expect(session.createdAt).toBe(Date.parse(CREATED));
     });
 
-    it("runs once per isolate after a success", async () => {
-        expect.assertions(1);
+    it("converts dates written during the rollout window, then stops for every isolate", async () => {
+        expect.assertions(5);
 
+        let clock = 1_000_000;
+        const now = (): number => clock;
+        const insertUser = (id: string): void => {
+            database
+                .prepare(`INSERT INTO "user" ("_creationTime", "id", "name", "email", "emailVerified", "createdAt", "updatedAt") VALUES (?, ?, ?, ?, ?, ?, ?)`)
+                .run(1, id, id, `${id}@example.com`, 1, CREATED, CREATED);
+        };
+        const createdAt = (id: string): unknown =>
+            (database.prepare(`SELECT "createdAt" FROM "user" WHERE "id" = ?`).get(id) as { createdAt: unknown }).createdAt;
+
+        await ensureAuthDatesConverted(exec, buildAuthOptions(), now);
+
+        // An isolate still on the previous version writes a text date after this one's first pass.
+        insertUser("late");
+        clock += RECHECK_AFTER_MS - 1;
+        await ensureAuthDatesConverted(exec, buildAuthOptions(), now);
+
+        expect(createdAt("late")).toBe(CREATED);
+
+        clock += 1;
+        await ensureAuthDatesConverted(exec, buildAuthOptions(), now);
+
+        expect(createdAt("late")).toBe(Date.parse(CREATED));
+
+        // A pass a full window after the first success is the last one.
+        clock += ROLLOUT_WINDOW_MS;
+        await ensureAuthDatesConverted(exec, buildAuthOptions(), now);
+
+        expect((database.prepare(`SELECT "final" FROM "authDateConversionMarker"`).get() as { final: unknown }).final).toBe(1);
+
+        // A fresh isolate reads the marker and converts nothing more.
+        resetAuthDateConversionForTests();
+        insertUser("after");
         const all = vi.spyOn(exec, "all");
 
-        await ensureAuthDatesConverted(exec, buildAuthOptions());
-        const afterFirst = all.mock.calls.length;
+        await ensureAuthDatesConverted(exec, buildAuthOptions(), now);
 
-        await ensureAuthDatesConverted(exec, buildAuthOptions());
-
-        expect(all.mock.calls).toHaveLength(afterFirst);
+        expect(createdAt("after")).toBe(CREATED);
+        expect(all).toHaveBeenCalledOnce();
     });
 
     it("never rejects, and retries a failure only after the back-off", async () => {
