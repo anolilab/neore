@@ -4327,7 +4327,7 @@ export const undoDeleteThread = authAction
             });
         }
 
-        context.log.event("chat.undo_delete_thread", { restored: true });
+        context.log.event("chat.undo_delete_thread", { restored: restore.restored });
     });
 
 // Tag functions removed — replaced by auto-categorization.
