@@ -418,10 +418,10 @@ describe("the user.emailCanonical backfill", () => {
     });
 
     it("reads every row past a page boundary among rows that share one creation time, and refuses a pair split across it", async () => {
-        expect.assertions(4);
+        expect.assertions(5);
 
         const ROWS = 7;
-        const { conflict, pagesRead, scanned, unfilled } = await withHarness(async (ctx) => {
+        const { boundary, conflict, pagesRead, scanned, unfilled } = await withHarness(async (ctx) => {
             // One creation time for every row, so the pages split inside a tie and only the id orders them.
             const clock = vi.spyOn(Date, "now").mockReturnValue(NOW - 60_000);
 
@@ -440,14 +440,18 @@ describe("the user.emailCanonical backfill", () => {
                 throw new Error(`the check ended "${checked.status}"`);
             }
 
-            // The 2nd and 3rd rows in id order: the last of the first page and the first of the next, tied with it.
-            const { page } = await ctx.db.user.findMany({});
-            const [, last, next] = (page as { _id: Id<"user"> }[]).map((row) => row._id).toSorted((a, b) => a.localeCompare(b));
+            // The last row of the first page and the first of the next, read in the check's own cursor order.
+            const first = await ctx.db.user.findMany({ consistency: "primary", limit: 2 });
+            const second = await ctx.db.user.findMany({ consistency: "primary", cursor: first.continueCursor ?? undefined, limit: 2 });
+            const last = (first.page as { _id: Id<"user"> }[]).at(-1)!._id;
+            const next = (second.page as { _id: Id<"user"> }[])[0]!._id;
 
             await ctx.db.patch("user", last, { email: "Tied@Example.com" });
             await ctx.db.patch("user", next, { email: "tied@example.com" });
 
             return {
+                // Two full pages and two different rows, so the pair the check must refuse straddles the boundary.
+                boundary: [first.page.length, second.page.length, last === next],
                 conflict: await checkEmailCanonicalPage(counted(ctx).ctx, { pageRows: 2, pages: ROWS }),
                 // Past the start's one-row probe for an unfilled row.
                 pagesRead: run.spent.queries.filter((query) => (query as { where?: unknown }).where === undefined).length,
@@ -459,6 +463,7 @@ describe("the user.emailCanonical backfill", () => {
         expect(pagesRead).toBe(Math.ceil(ROWS / 2));
         expect(scanned).toBe(ROWS);
         expect(unfilled).toBe(ROWS);
+        expect(boundary).toStrictEqual([2, 2, false]);
         expect(conflict).toStrictEqual({ conflicts: 1, status: "conflict" });
     });
 
