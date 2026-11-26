@@ -1,4 +1,4 @@
-import type { BranchNode, GroupType, ThreadGroup } from "../types";
+import type { BranchNode, ThreadGroup } from "../types";
 import { getGroupType } from "../utilities";
 
 /** The sections the section bar offers. "active" is the normal list: everything that is not working, snoozed or archived. */
@@ -41,8 +41,9 @@ export const nextSectionFilter = (current: ReadonlyArray<SectionKey>, key: Secti
     return remaining.length > 0 ? [...remaining] : [...current];
 };
 
-const sectionOfGroupType = (groupType: GroupType): SectionKey => {
-    switch (groupType) {
+/** The section a group belongs to. Project groups hold only active threads, so they count as Active. */
+export const sectionOfGroup = (group: ThreadGroup): SectionKey => {
+    switch (getGroupType(group)) {
         case "archived": {
             return "archived";
         }
@@ -60,9 +61,6 @@ const sectionOfGroupType = (groupType: GroupType): SectionKey => {
         }
     }
 };
-
-/** The section a group belongs to. Project groups hold only active threads, so they count as Active. */
-export const sectionOfGroup = (group: ThreadGroup): SectionKey => sectionOfGroupType(getGroupType(group));
 
 /** Thread counts per section from the built groups. Needs you is part of Active too, as the list shows it there. */
 export const countSections = (groups: ReadonlyArray<ThreadGroup>): SectionCounts => {

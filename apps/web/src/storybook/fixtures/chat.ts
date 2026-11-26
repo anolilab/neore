@@ -109,13 +109,16 @@ export interface ThreadRelationship {
 }
 
 /** The sidebar's thread list: pinned, today, yesterday and older, plus one project thread. */
-export const threadList = (threads: Thread[] = Object.values(THREADS), relationships: ThreadRelationship[] = []): ThreadList => {
+export const threadList = (threads: Thread[] = Object.values(THREADS), relationships: ThreadRelationship[] = [], tags: ThreadList["tags"] = []): ThreadList => {
+    // A thread that expires is a temporary chat: the list reads those from their own page.
+    const isTemporary = (item: Thread): boolean => (item as { expiresAt?: number }).expiresAt !== undefined;
+
     return {
         pinnedThreads: threads.filter((item) => item.pinnedAt !== undefined).map(listItem),
         relationships,
-        tags: [],
-        temporaryThreads: pageOf([]),
-        threads: pageOf(threads.map(listItem)),
+        tags,
+        temporaryThreads: pageOf(threads.filter(isTemporary).map(listItem)),
+        threads: pageOf(threads.filter((item) => !isTemporary(item)).map(listItem)),
     } as unknown as ThreadList;
 };
 
@@ -153,6 +156,8 @@ interface ChatFixtureOptions {
     suggestions?: string[];
     /** Branches, nested under their parent in the sidebar. */
     relationships?: ThreadRelationship[];
+    /** The user's tags, which threads name in `tagIds`. */
+    tags?: ThreadList["tags"];
     thread?: Thread;
     threads?: Thread[];
 }
@@ -168,7 +173,7 @@ export const chatFixtures = (options: ChatFixtureOptions = {}): LunoraFixture[] 
     const messages = options.messages ?? CONVERSATION;
 
     return [
-        lunora(api.chat.composite.getThreadListData, () => threadList(options.threads, options.relationships)),
+        lunora(api.chat.composite.getThreadListData, () => threadList(options.threads, options.relationships, options.tags)),
         lunora(api.projects.functions.listProjects, () => pageOf([]) as ReturnOf<typeof api.projects.functions.listProjects>),
         lunora(api.chat.functions.getThread, () => ownedBy(current)),
         lunora(api.chat.composite.getThreadWithData, () => {

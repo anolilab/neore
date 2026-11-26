@@ -194,6 +194,7 @@ interface SidebarShortcutProps {
 
 const SidebarShortcut: FC<SidebarShortcutProps> = ({ userDropdown = false }) => {
     const location = useLocation();
+    const isAdminActive = location.pathname.startsWith("/admin");
     const { t } = useLingui();
     const { isAnonymous } = useIsAnonymous();
     const { hidePersonalInfo } = useUserPreferences();
@@ -261,9 +262,9 @@ const SidebarShortcut: FC<SidebarShortcutProps> = ({ userDropdown = false }) => 
                 <div className="mt-auto mb-3 flex flex-col items-center gap-1">
                     {isAdmin && (
                         <Link
-                            aria-current={location.pathname.startsWith("/admin") ? "page" : undefined}
+                            aria-current={isAdminActive ? "page" : undefined}
                             aria-label={t`Admin`}
-                            className={cn(RAIL_ITEM, location.pathname.startsWith("/admin") ? RAIL_ITEM_CURRENT : RAIL_ITEM_IDLE)}
+                            className={cn(RAIL_ITEM, isAdminActive ? RAIL_ITEM_CURRENT : RAIL_ITEM_IDLE)}
                             to="/admin"
                         >
                             <ShieldCheck className="size-5" strokeWidth={1.5} />

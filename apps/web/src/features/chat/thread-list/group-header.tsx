@@ -101,8 +101,9 @@ const GroupHeader: FC<GroupHeaderProperties> = ({
         >
             {isSelectionMode && (
                 <Checkbox
+                    aria-label={t`Select all in ${group.title}`}
                     checked={isAllSelected}
-                    className="border-sidebar-border data-checked:border-sidebar-foreground data-checked:bg-sidebar-foreground"
+                    className="border-foreground/40 data-checked:border-foreground data-checked:bg-foreground"
                     onClick={onToggleSelection}
                 />
             )}

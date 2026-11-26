@@ -35,14 +35,12 @@ const CATEGORY_IDS = Object.keys(THREAD_CATEGORY_LABELS);
 const isSearchType = (value: unknown): value is "threads" | "messages" => value === "threads" || value === "messages";
 
 interface ThreadListFilterMenuProperties {
-    /** The shown shortcut for the keyboard help, when the user has one set. */
-    helpShortcut?: string;
     /** Opens the "New group chat" dialog. The dialog lives outside this menu, which unmounts its content on close. */
     onNewGroupChat: () => void;
 }
 
 /** The dock's filter menu: what to search in, the category and tag filters, and the list-wide actions. */
-const ThreadListFilterMenu: FC<ThreadListFilterMenuProperties> = ({ helpShortcut = "?", onNewGroupChat }) => {
+const ThreadListFilterMenu: FC<ThreadListFilterMenuProperties> = ({ onNewGroupChat }) => {
     const { i18n, t } = useLingui();
     const tags = useThreadTags() ?? [];
     const {
@@ -191,7 +189,7 @@ const ThreadListFilterMenu: FC<ThreadListFilterMenuProperties> = ({ helpShortcut
                 <DropdownMenuItem onClick={toggleShowKeyboardHelp}>
                     <Keyboard aria-hidden="true" />
                     {t`Keyboard shortcuts`}
-                    <DropdownMenuShortcut>{helpShortcut}</DropdownMenuShortcut>
+                    <DropdownMenuShortcut>?</DropdownMenuShortcut>
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

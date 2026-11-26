@@ -62,8 +62,8 @@ const THREAD_MAX_WIDTH = { "--thread-max-width": "65ch" } as CSSProperties;
 const SIGNED_OUT_MODEL = enabledModelOf(ANONYMOUS_FREE_MODEL, { mode: "text" });
 const SIGNED_OUT_CONTEXT = "128K";
 
-const RAIL_ITEM = "group relative flex size-10 items-center justify-center rounded-md transition-colors duration-150";
-const RAIL_IDLE = "text-brand-black dark:text-brand-white hover:bg-sidebar-accent/50";
+const RAIL_ITEM = "group relative flex size-10 items-center justify-center rounded-[10px] transition-colors duration-150";
+const RAIL_IDLE = "text-muted-foreground hover:bg-surface-row-hover hover:text-foreground";
 const DOCK_ICON = "text-muted-foreground hover:text-foreground size-[30px] p-0";
 const TOOLBAR_BUTTON =
     "bg-sidebar border-border dark:border-sidebar-border/15 hover:bg-accent/50 dark:hover:bg-sidebar-accent/30 hover:border-border dark:hover:border-sidebar-border/50 text-foreground h-7 dark:text-white";
@@ -82,8 +82,8 @@ const SignedOutRail: FC = () => {
     const links = NAV_LINK_DEFS.filter((definition) => !definition.requiresAuth && !definition.featureFlag);
 
     return (
-        <div className="z-20 hidden h-dvh w-16 shrink-0 py-1 pl-1 md:block">
-            <div className="bg-sidebar dark:bg-brand-obsidian ring-sidebar-border flex h-full flex-col items-center rounded-lg ring-1">
+        <div className="z-20 hidden h-dvh w-16 shrink-0 md:block">
+            <div className="bg-surface-rail text-foreground flex h-full flex-col items-center shadow-[inset_-1px_0_0_var(--surface-edge)]">
                 <Neore
                     className="fill-brand-black dark:fill-brand-white mt-3 mb-4 size-7 opacity-90 transition-opacity hover:opacity-70"
                     title={t`Neore - AI Text & Video & Audio & Image & Documents Generation Platform`}
@@ -97,7 +97,7 @@ const SignedOutRail: FC = () => {
                             <button
                                 aria-current={isChat ? "page" : undefined}
                                 aria-label={t(labelKey)}
-                                className={cn(RAIL_ITEM, isChat ? "bg-sidebar-accent text-sidebar-accent-foreground" : RAIL_IDLE)}
+                                className={cn(RAIL_ITEM, isChat ? "bg-surface-row-active surface-edge text-foreground" : RAIL_IDLE)}
                                 key={to}
                                 onClick={isChat ? undefined : askToSignIn}
                                 type="button"
@@ -115,7 +115,7 @@ const SignedOutRail: FC = () => {
                     <button aria-label={t`Help`} className={cn(RAIL_ITEM, RAIL_IDLE)} onClick={askToSignIn} type="button">
                         <HelpCircle className="size-5" strokeWidth={1.5} />
                     </button>
-                    <button aria-label={t`Open user menu`} className={cn(RAIL_ITEM, "hover:bg-sidebar-accent/50")} onClick={askToSignIn} type="button">
+                    <button aria-label={t`Open user menu`} className={cn(RAIL_ITEM, "hover:bg-surface-row-hover")} onClick={askToSignIn} type="button">
                         <UserRound className="text-brand-black dark:text-brand-white size-5" strokeWidth={1.5} />
                     </button>
                 </div>
@@ -277,7 +277,7 @@ const SignedOutChat: FC = () => {
                         </SidebarFooter>
                     </div>
                 </Sidebar>
-                <SidebarInset className="dark:bg-brand-obsidian md:peer-data-[variant=inset]:m-1">
+                <SidebarInset className="md:peer-data-[variant=inset]:m-1">
                     <SiteHeader
                         menu={
                             <Button onClick={askToSignIn} size="icon" variant="ghost">

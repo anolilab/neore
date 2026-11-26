@@ -47,6 +47,14 @@ export interface ComposerBaseProps {
     viewTransitionName?: string;
 }
 
+/** A faint wash of the mode's colour from the top-left corner: the composer's cue for which mode it is in. */
+const MODE_TINT = {
+    audio: "from-rose-500/[0.03] dark:from-rose-400/[0.05]",
+    image: "from-violet-500/[0.03] dark:from-violet-400/[0.05]",
+    text: "from-lime-500/[0.03] dark:from-lime-400/[0.04]",
+    video: "from-sky-500/[0.03] dark:from-sky-400/[0.05]",
+} as const;
+
 /**
  * Container component that provides the composer structure.
  */
@@ -116,7 +124,8 @@ const ComposerBase = ({
                 data-mode={mode}
                 data-view-transition={viewTransitionName}
             >
-                {/* Content wrapper */}
+                <div aria-hidden="true" className={clsx("pointer-events-none absolute inset-0 bg-gradient-to-br to-transparent", MODE_TINT[mode])} />
+                {/* Content wrapper, above the tint */}
                 <div className="relative z-10">
                     {/* Mode settings row (image/video/audio options) */}
                     <AnimatePresence mode="popLayout">

@@ -665,7 +665,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
         threadId: node.threadId,
     };
 
-    const timeLabel = formatElapsed(describeElapsed(node.updatedAt ?? node.lastReplyAt ?? node.createdAt, clock));
+    const lastActiveAt = node.updatedAt ?? node.lastReplyAt ?? node.createdAt;
+    const timeLabel = formatElapsed(describeElapsed(lastActiveAt, clock));
     const isArchived = node.status === "archived";
     const hasTags = node.tags !== undefined && node.tags.length > 0;
     const hasCategory = node.category !== undefined && node.category !== "" && node.category !== "general";
@@ -765,6 +766,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
             <div className="flex h-5 min-w-0 items-center gap-1.5">
                 {isSelectionMode && (
                     <Checkbox
+                        aria-label={named(t`Select`)}
                         checked={isSelected}
                         className="border-foreground/40 data-checked:border-foreground data-checked:bg-foreground"
                         onCheckedChange={() => {
@@ -835,10 +837,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     {needsYou !== undefined && (
                         <span className={cn("text-[11.5px] font-medium", NEEDS_YOU_TEXT_CLASS)}>{needsYou === "approval" ? t`Approval` : t`Question`}</span>
                     )}
-                    <time
-                        className="text-muted-foreground text-xs tabular-nums"
-                        dateTime={new Date(node.updatedAt ?? node.lastReplyAt ?? node.createdAt).toISOString()}
-                    >
+                    <time className="text-muted-foreground text-xs tabular-nums" dateTime={new Date(lastActiveAt).toISOString()}>
                         {timeLabel}
                     </time>
                     {isUnread && (
@@ -898,7 +897,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                         <Tooltip>
                             <TooltipTrigger
                                 render={
-                                    <div className="flex shrink-0 items-center gap-1 text-amber-600 dark:text-amber-400">
+                                    <div className="text-attention flex shrink-0 items-center gap-1">
                                         <HourglassIcon className="size-3 shrink-0" />
                                         {remainingTime && <span>{remainingTime}</span>}
                                     </div>

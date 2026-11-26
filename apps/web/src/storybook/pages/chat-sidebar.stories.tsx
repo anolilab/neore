@@ -5,6 +5,7 @@ import { expect, userEvent, waitFor, within } from "storybook/test";
 
 import { useThreadListUIStore } from "@/features/chat/thread-list/stores/thread-list-ui-store";
 import { Route as ThreadRoute } from "@/routes/(chat)/chat/$threadId";
+import { Route as ChatIndexRoute } from "@/routes/(chat)/chat/index";
 import { Route as ChatLayoutRoute } from "@/routes/(chat)/route";
 import { ago, DAY, HOUR, MINUTE } from "@/storybook/clock";
 import { chatFixtures, pageOf, thread, THREAD_IDS, THREADS } from "@/storybook/fixtures/chat";
@@ -194,5 +195,128 @@ export const RowActions: Story = {
         await expect(root.getByRole("button", { name: "Snooze thread: Pricing page copy" })).toBeInTheDocument();
         await expect(root.getByRole("button", { name: "Archive thread: Pricing page copy" })).toBeInTheDocument();
         await expect(root.getByRole("button", { name: "Thread options: Pricing page copy" })).toBeInTheDocument();
+    },
+};
+
+const TAGS = [
+    { _id: "tag_team", color: "blue", name: "team", order: 0 },
+    { _id: "tag_marketing", color: "green", name: "marketing", order: 1 },
+];
+
+/** One card for each second-line state: tags, a chat on the user's computer, a temporary chat, a locked chat, a long title. */
+const ROW_STATE_THREADS = [
+    THREADS.main,
+    thread({ _id: "0193c1b2-7d1e-7a3c-9f00-000000000021", tagIds: ["tag_team", "tag_marketing"], title: "Weekly team update draft" }),
+    thread({ _id: "0193c1b2-7d1e-7a3c-9f00-000000000022", runner: "host", title: "Refactor the billing worker" }),
+    // A temporary chat: its expiry is on the list row, not on the stored thread type.
+    { ...thread({ _id: "0193c1b2-7d1e-7a3c-9f00-000000000023", title: "Brainstorm names" }), expiresAt: ago(-3 * HOUR) },
+    thread({ _id: "0193c1b2-7d1e-7a3c-9f00-000000000024", lockedAt: ago(DAY), title: "Salary review notes" }),
+    thread({
+        _id: "0193c1b2-7d1e-7a3c-9f00-000000000025",
+        title: "A very long thread title that keeps going well past the width of the sidebar card so it has to be cut",
+    }),
+];
+
+/** The second line of each card says what is true of its thread; a locked chat shows nothing about itself. */
+export const CardStates: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(...userFixtures(), ...shellFixtures(), ...chatFixtures({ tags: TAGS as never, threads: ROW_STATE_THREADS })),
+            },
+        },
+    },
+    play: async ({ canvasElement }) => {
+        const root = await sidebar(canvasElement);
+
+        await expect(await root.findByText("team", undefined, PAGE_WAIT)).toBeInTheDocument();
+        await expect(root.getByText("Runs on your computer")).toBeInTheDocument();
+        await expect(root.getByRole("link", { name: "Locked chat" })).toBeInTheDocument();
+        await expect(root.getByRole("link", { name: /^A very long thread title/ })).toBeInTheDocument();
+    },
+};
+
+/** Thirty threads: past fifteen rows the list renders virtually, and the taller cards must still be measured right. */
+export const LongList: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(
+                    ...userFixtures(),
+                    ...shellFixtures(),
+                    ...chatFixtures({
+                        threads: [
+                            THREADS.main,
+                            ...Array.from({ length: 30 }, (_, index) =>
+                                thread({
+                                    _id: `0193c1b2-7d1e-7a3c-9f00-0000000001${String(index).padStart(2, "0")}`,
+                                    lastReplyAt: ago((index + 2) * HOUR),
+                                    title: `Research note ${String(index + 1)}`,
+                                    updatedAt: ago((index + 2) * HOUR),
+                                }),
+                            ),
+                        ],
+                    }),
+                ),
+            },
+        },
+    },
+    play: async ({ canvasElement }) => {
+        const root = await sidebar(canvasElement);
+
+        const first = await root.findByRole("link", { name: "Research note 1" }, PAGE_WAIT);
+        // The virtual list scrolls its own container: the last card is reached by scrolling it to the end.
+        const scroller = first.closest<HTMLElement>("[data-sidebar='content']") ?? first.closest<HTMLElement>(".overflow-auto");
+
+        scroller?.scrollTo({ top: scroller.scrollHeight });
+        await expect(await root.findByRole("link", { name: "Research note 30" }, PAGE_WAIT)).toBeInTheDocument();
+    },
+};
+
+/** Selection mode (from the filter menu's Select multiple threads, covered by the dock's tests): every card gets a checkbox. */
+export const SelectionMode: Story = {
+    beforeEach: () => {
+        useThreadListUIStore.setState({ isSelectionMode: true });
+    },
+    play: async ({ canvasElement }) => {
+        const root = within(canvasElement);
+
+        // A selected list shows titles as text, not links: a row selects rather than opens.
+        await root.findByText("Pricing page copy", undefined, PAGE_WAIT);
+        await lunoraIdle();
+        await waitFor(() => expect(root.getAllByRole("checkbox").length).toBeGreaterThan(3), PAGE_WAIT);
+    },
+};
+
+/** A section with nothing in it says so (on a new chat: an open thread would stay in the list). */
+export const EmptySection: Story = {
+    args: {
+        levels: [
+            { id: "/(chat)", route: ChatLayoutRoute },
+            { path: "chat/", route: ChatIndexRoute },
+        ],
+        url: "/chat",
+    },
+    parameters: {
+        msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ...shellFixtures(), ...chatFixtures()) } },
+    },
+    play: async ({ canvasElement }) => {
+        const bar = await within(canvasElement).findByRole("group", { name: "Thread sections (shift-click to show several)" }, PAGE_WAIT);
+
+        await userEvent.click(await within(bar).findByRole("button", { name: /^Archived, 0$/ }, PAGE_WAIT));
+
+        await expect(await within(canvasElement).findByText("No threads in this section", undefined, PAGE_WAIT)).toBeInTheDocument();
+    },
+};
+
+/** The thread's details as a raised panel beside the chat: tabs in a well, the summary and the system prompt below. */
+export const DetailsPanel: Story = {
+    play: async ({ canvasElement }) => {
+        const root = await sidebar(canvasElement);
+        const toggles = await root.findAllByRole("button", { name: "Toggle Sidebar" }, PAGE_WAIT);
+
+        await userEvent.click(toggles.at(-1) as HTMLElement);
+        await expect(await root.findByRole("tab", { name: "Thread" }, PAGE_WAIT)).toHaveAttribute("aria-selected", "true");
+        await expect(root.getByText("Thread summary")).toBeVisible();
     },
 };

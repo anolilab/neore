@@ -359,7 +359,7 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
                         )}
 
                         {/* Footer with composer */}
-                        <div className="sticky bottom-0 mx-auto flex w-full max-w-(--thread-max-width) flex-col items-center justify-end rounded-t-lg bg-inherit pb-3">
+                        <div className="sticky bottom-0 mx-auto flex w-full max-w-(--thread-max-width) flex-col items-center justify-end rounded-t-lg bg-inherit pb-7">
                             <ScrollToBottomButton canJumpToPrompt={composerMode === "text"} className="z-10" onClick={handleScrollToBottom} />
                             {/* Error display. In split view the focused pane shows the same failed read, so it is not announced twice. */}
                             {paneReadFailed && !splitPane && (

@@ -65,7 +65,7 @@ const ChatLoadingSkeleton: FC = () => {
                         </SidebarFooter>
                     </div>
                 </Sidebar>
-                <SidebarInset className="dark:bg-brand-obsidian md:peer-data-[variant=inset]:m-1">
+                <SidebarInset className="md:peer-data-[variant=inset]:m-1">
                     <SiteHeader>
                         <Skeleton className="h-7 w-48" />
                     </SiteHeader>
