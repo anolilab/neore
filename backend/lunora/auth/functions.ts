@@ -308,7 +308,7 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
             const single = toStore.backupModel as string;
             const backupModels = Array.isArray(toStore.backupModels)
                 ? (toStore.backupModels as string[])
-                : [single, ...saved.slice(1).filter((id) => id !== single)].filter(Boolean).slice(0, MAX_BACKUP_MODELS);
+                : [single, ...saved.slice(1).filter((id) => id !== single)].filter(Boolean);
 
             await assertBackupModelsAllowed(context, userId, backupModels, saved);
             toStore.backupModels = backupModels;
