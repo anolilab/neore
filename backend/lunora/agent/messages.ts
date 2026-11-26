@@ -15,7 +15,7 @@ import { omit } from "../lib/collections";
  *
  * NOTE: fileIds reference 'chatFiles' table (renamed from 'files')
  */
-import { assert } from "../lib/error-helpers";
+import { assert, throwThreadNotFound } from "../lib/error-helpers";
 import { MAX_LENGTH, paginationOptionsValidator } from "../lib/validators";
 import { throwThreadLocked, isThreadLocked } from "../lib/thread-lock";
 import { systemDb } from "../lib/rls/scope";
@@ -695,6 +695,13 @@ export const cloneMessageBatch = internalMutation
         // NEW thread and gets no lock of its own.
         if (await isLockedWithoutProof(ctx, args.sourceThreadId, args.unlockProof)) {
             throwThreadLocked();
+        }
+
+        // A source that starts deletion mid-copy fails the copy, so the caller removes the half-copied fork.
+        const source = await ctx.db.get("threads", args.sourceThreadId);
+
+        if (source?.deletingAt !== undefined) {
+            throwThreadNotFound();
         }
 
         const orderOffset = args.insertAtOrder ?? 0;
