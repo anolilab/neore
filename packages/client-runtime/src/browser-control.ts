@@ -34,7 +34,6 @@ export const leaseHolder = (lease: BrowserLease | undefined, claimId: string | u
         return "other-person";
     }
 
-    // A view that holds no claim cannot be the one the lease is under.
     if (claimId === undefined) {
         return "other-view";
     }
