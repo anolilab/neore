@@ -19,6 +19,7 @@
     "add-steer-text-length",
     "backfill-approval-organization",
     "backfill-message-typed-text",
+    "backfill-pull-request-watch-active",
     "drop-agent-option-fields",
     "session-options-to-session-state",
     "widen-not-typed-steer-collaborator",
@@ -24922,6 +24923,15 @@
             "userId",
             "repository",
             "number"
+          ],
+          "unique": false
+        },
+        "by_user_and_repository_number_threadId": {
+          "fields": [
+            "userId",
+            "repository",
+            "number",
+            "threadId"
           ],
           "unique": false
         },

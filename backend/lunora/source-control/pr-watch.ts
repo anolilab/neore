@@ -20,9 +20,6 @@ import { PR_WATCH_MAX_WAKES, storedWatchOf } from "./pr-watch-logic";
 /** Watches one person may have running at once. Each one is a host read every few minutes. */
 export const MAX_ACTIVE_PULL_REQUEST_WATCHES = 10;
 
-/** Links read per page when looking a link up by its pull request. */
-export const LINK_LOOKUP_PAGE_SIZE = 100;
-
 export const setPullRequestWatch = internalMutation
     .input({
         number: v.number(),
@@ -33,26 +30,20 @@ export const setPullRequestWatch = internalMutation
     })
     .output(v.object({ status: v.union(v.literal("already"), v.literal("capped"), v.literal("not_linked"), v.literal("ok"), v.literal("too_many")) }))
     .mutation(async ({ args, ctx }) => {
-        // Looked up by the pull request's index and paged until this thread's live link is found, so no number of other links
-        // to the same pull request (or older links) can hide it.
+        // One exact, bounded read: the person's link of this thread to this pull request. A second live match should not
+        // exist; it is refused rather than guessed at.
         const threadId = ctx.db.normalizeId("threads", args.threadId);
-        let link: Doc<"pullRequestThreads"> | undefined;
-        let cursor: string | null = null;
-
-        while (threadId !== null && link === undefined) {
-            const read = await ctx.db
-                .query("pullRequestThreads")
-                .withIndex("by_user_and_repository_number", (q) => q.eq("userId", args.userId).eq("repository", args.repository).eq("number", args.number))
-                .paginate({ cursor, numItems: LINK_LOOKUP_PAGE_SIZE });
-
-            link = read.page.find((row) => row.threadId === threadId && row.threadDeleted !== true);
-
-            if (read.isDone) {
-                break;
-            }
-
-            cursor = read.continueCursor;
-        }
+        const rows =
+            threadId === null
+                ? []
+                : await ctx.db
+                      .query("pullRequestThreads")
+                      .withIndex("by_user_and_repository_number_threadId", (q) =>
+                          q.eq("userId", args.userId).eq("repository", args.repository).eq("number", args.number).eq("threadId", threadId),
+                      )
+                      .take(2);
+        const live = rows.filter((row) => row.threadDeleted !== true);
+        const link: Doc<"pullRequestThreads"> | undefined = live.length === 1 ? live[0] : undefined;
 
         if (link === undefined) {
             return { status: "not_linked" as const };

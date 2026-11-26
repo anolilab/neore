@@ -129,7 +129,9 @@ describe("decideWatch", () => {
     });
 
     it("wakes on a review newer than a seen one that lies deep in the list, past the first page", () => {
-        const listed = Array.from({ length: 250 }, (_, index) => ({ authorLogin: "reviewer", id: `r${String(250 - index)}` }));
+        const listed = Array.from({ length: 250 }, (_, index) => {
+            return { authorLogin: "reviewer", id: `r${String(250 - index)}` };
+        });
 
         expect(decideWatch({ ...baselined, reviewId: "r100" }, { ...quiet, reviews: listed }, NOW)).toMatchObject({
             action: "wake",

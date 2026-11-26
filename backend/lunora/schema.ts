@@ -2742,6 +2742,7 @@ export const schema = defineSchema({
     })
         .shardBy("userId")
         .index("by_user_and_repository_number", ["userId", "repository", "number"])
+        .index("by_user_and_repository_number_threadId", ["userId", "repository", "number", "threadId"])
         .index("by_user_and_threadId", ["userId", "threadId"])
         .index("by_user_and_watchActive", ["userId", "watchActive"]),
 

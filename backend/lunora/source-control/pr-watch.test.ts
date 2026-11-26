@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { insertThread } from "../agent/table-writes";
 import schema from "../schema";
-import { LINK_LOOKUP_PAGE_SIZE, MAX_ACTIVE_PULL_REQUEST_WATCHES, setPullRequestWatch } from "./pr-watch";
+import { MAX_ACTIVE_PULL_REQUEST_WATCHES, setPullRequestWatch } from "./pr-watch";
 import { backfillPullRequestWatchActive } from "../migrations";
 import { setLinksThreadDeleted } from "./pr-thread-links";
 
@@ -155,51 +155,35 @@ describe("setPullRequestWatch", () => {
         expect(await watchOf(linkId)).toBeUndefined();
     });
 
-    it("finds a link that lies beyond the first page of links to the same pull request", async () => {
-        for (let index = 0; index < LINK_LOOKUP_PAGE_SIZE + 20; index += 1) {
-            await seedLink(OWNER, 7);
+    it("finds a link with one exact read, however many other links point at the same pull request", async () => {
+        for (let index = 0; index < 150; index += 1) {
+            await seedLink(OWNER, 7, index % 2 === 0 ? { threadDeleted: true } : {});
         }
-
-        // The link read last by the index: not on the first page.
-        const { linkId, threadId } = await harness.run(async (ctx: any) => {
-            const rows = await ctx.db
-                .query("pullRequestThreads")
-                .withIndex("by_user_and_repository_number", (q: any) => q.eq("userId", OWNER).eq("repository", REPOSITORY).eq("number", 7))
-                .collect();
-            const last = rows.at(-1);
-
-            return { linkId: String(last._id), threadId: String(last.threadId) };
-        });
-
-        expect(await call({ number: 7, threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "ok" });
-        expect(await watchOf(linkId)).toMatchObject({ startedAt: expect.any(Number) });
-    });
-
-    it("finds a link that lies past 50 pages of links to the same pull request", async () => {
-        const pages = 50;
-        const { threadId: otherThread } = await seedLink(OWNER, 7);
-
-        await harness.run(async (ctx: any) => {
-            for (let index = 0; index < pages * LINK_LOOKUP_PAGE_SIZE; index += 1) {
-                await ctx.db.insert("pullRequestThreads", {
-                    createdAt: 1,
-                    kind: "linked",
-                    number: 7,
-                    repository: REPOSITORY,
-                    threadDeleted: true,
-                    threadId: otherThread,
-                    title: "old",
-                    url: "https://github.com/octo/hello/pull/7",
-                    userId: OWNER,
-                });
-            }
-        });
 
         const { linkId, threadId } = await seedLink(OWNER, 7);
 
         expect(await call({ number: 7, threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "ok" });
         expect(await watchOf(linkId)).toMatchObject({ startedAt: expect.any(Number) });
-    }, 120_000);
+    });
+
+    it("refuses with not_linked when two live links of the thread match, instead of guessing", async () => {
+        const { threadId } = await seedLink(OWNER, 7);
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("pullRequestThreads", {
+                createdAt: 1,
+                kind: "linked",
+                number: 7,
+                repository: REPOSITORY,
+                threadId,
+                title: "twin",
+                url: "https://github.com/octo/hello/pull/7",
+                userId: OWNER,
+            });
+        });
+
+        expect(await call({ number: 7, threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "not_linked" });
+    });
 
     it("counts legacy running watches, once the backfill has flagged them, against the limit", async () => {
         for (let number = 100; number < 100 + MAX_ACTIVE_PULL_REQUEST_WATCHES; number += 1) {
