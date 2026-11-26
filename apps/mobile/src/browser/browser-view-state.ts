@@ -88,6 +88,25 @@ export const isOlderStatus = (current: BrowserStatus | undefined, next: BrowserS
  */
 export const GRANT_END_MARGIN_MS = 2000;
 
+/** The newest status the screen took, and a refusal of the chat the status subscription reported since. */
+export interface Seen {
+    answer?: { receivedAt: number; status: BrowserStatus };
+    refusal?: { at: number; message: string };
+}
+
+/**
+ * Takes a status answer from a read that began at `startedAt` (a live push: when it came), at `now`. A read that began
+ * before a refusal never undoes it, and an answer older than the one on screen never replaces it; any other answer
+ * replaces both, a refusal included.
+ */
+export const withAnswer = (seen: Seen, next: BrowserStatus, startedAt: number, now: number): Seen => {
+    if ((seen.refusal !== undefined && startedAt < seen.refusal.at) || isOlderStatus(seen.answer?.status, next)) {
+        return seen;
+    }
+
+    return { answer: { receivedAt: now, status: next } };
+};
+
 /** When the grant `status` was read under ends, on this device's clock (it came at `receivedAt`); none for the owner. */
 export const grantEndOnDevice = (status: BrowserStatus | undefined, receivedAt: number): number | undefined => {
     if (status === undefined || status.kind === "denied" || status.accessUntil === undefined) {

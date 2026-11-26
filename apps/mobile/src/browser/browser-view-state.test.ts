@@ -13,6 +13,7 @@ import {
     otherLeaseEndOnDevice,
     shouldReadFrame,
     viewStateOf,
+    withAnswer,
 } from "./browser-view-state";
 
 const running = (fields: Partial<Extract<BrowserStatus, { kind: "running" }>> = {}): BrowserStatus => {
@@ -108,5 +109,22 @@ describe(otherLeaseEndOnDevice, () => {
         expect(otherLeaseEndOnDevice(running({ control: { byYou: true, until: 160 }, now: 100 }), 5000)).toBeUndefined();
         expect(otherLeaseEndOnDevice(running({ control: { byYou: false, until: 100 }, now: 100 }), 5000)).toBeUndefined();
         expect(otherLeaseEndOnDevice(running(), 5000)).toBeUndefined();
+    });
+});
+
+describe(withAnswer, () => {
+    it("never lets a read begun before a refusal undo it, but a later answer clears it", () => {
+        const refused = { answer: { receivedAt: 10, status: running() }, refusal: { at: 50, message: "NOT_FOUND" } };
+
+        // A one-shot read that began before the refusal answers after it: the refusal stands.
+        expect(withAnswer(refused, running({ now: 200 }), 40, 60)).toBe(refused);
+        // A push after the refusal says the chat reads again.
+        expect(withAnswer(refused, running({ now: 200 }), 60, 60)).toStrictEqual({ answer: { receivedAt: 60, status: running({ now: 200 }) } });
+    });
+
+    it("keeps the answer on screen over an older one", () => {
+        const seen = { answer: { receivedAt: 10, status: running({ now: 300 }) } };
+
+        expect(withAnswer(seen, running({ now: 200 }), 20, 20)).toBe(seen);
     });
 });

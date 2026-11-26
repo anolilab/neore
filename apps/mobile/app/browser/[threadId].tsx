@@ -26,7 +26,7 @@ const controlText = (control: ControlState): string | undefined => {
 
 /** The picture's shape: the page's own viewport when the renderer named it. */
 const aspectOf = (frame: ShownFrame): number => {
-    if (frame.viewport === undefined) {
+    if (frame.viewport === undefined || !(frame.viewport.width > 0 && frame.viewport.height > 0)) {
         return 16 / 10;
     }
 

@@ -10,8 +10,8 @@ import { settleQuietly } from "@/offline/quietly";
 
 import type { BrowserFrame, BrowserStatus } from "./browser-api";
 import { handBackBrowser, keepBrowserControl, navigateBrowser, readBrowserStatus, readFrame, takeBrowserControl, watchBrowserStatus } from "./browser-api";
-import type { ViewState } from "./browser-view-state";
-import { frameMessage, frameTrigger, GRANT_END_MARGIN_MS, grantEndOnDevice, isOlderStatus, otherLeaseEndOnDevice, shouldReadFrame, viewStateOf } from "./browser-view-state";
+import type { Seen, ViewState } from "./browser-view-state";
+import { frameMessage, frameTrigger, GRANT_END_MARGIN_MS, grantEndOnDevice, otherLeaseEndOnDevice, shouldReadFrame, viewStateOf, withAnswer } from "./browser-view-state";
 import type { ControlSession, ControlState } from "./control-session";
 import { createControlSession, forgetClaim, rememberClaim, rememberedClaim, viewNameFor } from "./control-session";
 import type { FrameReader } from "./frame-reader";
@@ -44,22 +44,6 @@ const NOT_SHOWN = "The page could not be shown right now.";
 /** The subscription errors that say the caller no longer reads the chat, as `offline/message-read.ts` reads them. */
 const ACCESS_REFUSALS = new Set(["FORBIDDEN", "NOT_FOUND", "THREAD_LOCKED", "UNAUTHORIZED"]);
 
-type Answer = { receivedAt: number; status: BrowserStatus } | undefined;
-
-/** An answer older than the one on screen (a lagging read of a grant since removed) never replaces it. */
-const accepting
-    = (setAnswer: (update: (current: Answer) => Answer) => void, setError: (error: string | undefined) => void) =>
-        (next: BrowserStatus): void => {
-            setError(undefined);
-            setAnswer((current) => {
-                if (isOlderStatus(current?.status, next)) {
-                    return current;
-                }
-
-                return { receivedAt: Date.now(), status: next };
-            });
-        };
-
 /**
  * The thread's cloud browser on the phone: the live status, a frame read on every agent action and on a timer while the
  * screen is in front and online, and the phone's control session, given back when the screen is left, the app goes to
@@ -69,8 +53,7 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
     const { isOffline, reportRead } = useOffline();
     const isActive = useIsAppActive();
     const isFocused = useIsFocused();
-    const [answer, setAnswer] = useState<Answer>(undefined);
-    const [error, setError] = useState<string | undefined>(undefined);
+    const [seen, setSeen] = useState<Seen>({});
     /** The answer whose grant ran out on this device's clock. */
     const [expiredAnswer, setExpiredAnswer] = useState<BrowserStatus | undefined>(undefined);
     const [frame, setFrame] = useState<ShownFrame | undefined>(undefined);
@@ -97,19 +80,35 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
     /** The trigger the running reader last read for: a change is an agent action or a page the person opened. */
     const readFor = useRef<string | undefined>(undefined);
     const [nudge, setNudge] = useState(0);
+    const { answer } = seen;
     const status = answer?.status;
+    const error = seen.refusal?.message;
 
-    const accept = accepting(setAnswer, setError);
+    /** `startedAt`: when the read that brought `next` began; a live push is taken as it comes. */
+    const accept = (next: BrowserStatus, startedAt = Date.now()): void => setSeen((current) => withAnswer(current, next, startedAt, Date.now()));
+    /** One status read past the subscription: a grant's end or a renewal pushes nothing to it. */
+    const reread = (): void => {
+        const startedAt = Date.now();
+
+        settleQuietly(async () => accept(await readBrowserStatus(getClient(), threadId), startedAt));
+    };
 
     // Only a refusal of the chat hides the page; any other subscription error (a lost connection resumes on its own,
     // a server hiccup) leaves the last page and its "Last synced" time on screen.
     useEffect(
         () =>
-            watchBrowserStatus(getClient(), threadId, accept, (failure) => {
-                if (failure.code !== undefined && ACCESS_REFUSALS.has(failure.code)) {
-                    setError(failure.message);
-                }
-            }),
+            watchBrowserStatus(
+                getClient(),
+                threadId,
+                (next) => accept(next),
+                (failure) => {
+                    if (failure.code !== undefined && ACCESS_REFUSALS.has(failure.code)) {
+                        setSeen((current) => {
+                            return { ...current, refusal: { at: Date.now(), message: failure.message } };
+                        });
+                    }
+                },
+            ),
         [threadId],
     );
 
@@ -125,7 +124,7 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
         return watchGrantEnd({
             endsAt: grantEnd,
             onEnd: () => setExpiredAnswer(status),
-            reread: () => settleQuietly(async () => accept(await readBrowserStatus(getClient(), threadId))),
+            reread,
             // The grant still holds until its real end: a read before it would answer it again, and loop.
             rereadAt: grantEnd + GRANT_END_MARGIN_MS,
         });
@@ -138,7 +137,7 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
             return undefined;
         }
 
-        return watchGrantEnd({ endsAt: otherLeaseEnd, reread: () => settleQuietly(async () => accept(await readBrowserStatus(getClient(), threadId))) });
+        return watchGrantEnd({ endsAt: otherLeaseEnd, reread });
     }, [otherLeaseEnd, threadId]);
 
     const view = viewStateOf(status, error, status !== undefined && expiredAnswer === status);
