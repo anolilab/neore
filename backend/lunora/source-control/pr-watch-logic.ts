@@ -106,8 +106,10 @@ const newerReviewsByOthers = (
         return { left: true, newer: [] };
     }
 
-    // By position the reviews before the seen one are newer, but position is the host's order: where both carry a submission time it
-    // must be strictly later, as on the beyond-read path, so an equal time neither wakes nor moves the marker.
+    // The list is sorted by submission time, so a review above the seen one was submitted at or after it. Host times have one-second
+    // resolution, so an EQUAL time counts as newer (a spurious wake is accepted over a missed review); only a time before the seen
+    // one's, which a sorted list does not show, rules a review out. This differs on purpose from the beyond-read path, which has no
+    // such order against the marker and compares strictly.
     const seenAt = observed.reviews[at]?.submittedAt ?? 0;
 
     return {
@@ -116,7 +118,7 @@ const newerReviewsByOthers = (
             .slice(0, at)
             .filter(
                 (review) =>
-                    !isByWatcher(review, observed.watcherLogin.trim()) && (seenAt === 0 || review.submittedAt === undefined || review.submittedAt > seenAt),
+                    !isByWatcher(review, observed.watcherLogin.trim()) && (seenAt === 0 || review.submittedAt === undefined || review.submittedAt >= seenAt),
             ),
     };
 };

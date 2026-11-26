@@ -292,12 +292,18 @@ describe("a seen review beyond a truncated read", () => {
     });
 });
 
-describe("a listed seen review ordered by submission time", () => {
+describe("a listed seen review in a list sorted by submission time", () => {
     const seen = { authorLogin: "bob", id: "5", submittedAt: 5000 };
     const marked = { ...baselined, reviewId: "5" };
 
-    it("does not wake, or move the marker, for a review listed before it with an equal time", () => {
+    it("wakes, and moves the marker, for a review above it with an equal time (one-second resolution)", () => {
         const decision = decideWatch(marked, { ...quiet, reviews: [{ authorLogin: "amy", id: "6", submittedAt: 5000 }, seen] }, NOW);
+
+        expect(decision).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "6" } });
+    });
+
+    it("does not wake for a review below it, whatever its time", () => {
+        const decision = decideWatch(marked, { ...quiet, reviews: [seen, { authorLogin: "amy", id: "4", submittedAt: 5000 }] }, NOW);
 
         expect(decision).toMatchObject({ action: "none", state: { reviewId: "5" } });
     });
