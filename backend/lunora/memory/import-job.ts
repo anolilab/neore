@@ -327,8 +327,8 @@ export const runMemoryImportBatch = internalAction
 
 /** Stops the caller's active import. A batch already running finishes without counting. */
 export const cancelMemoryImport = authMutation
-    .use(rateLimit("memory/import"))
     .input({ jobId: v.id("memoryImportJobs") })
+    .use(rateLimit("memory/update"))
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const job = await ctx.db.get("memoryImportJobs", args.jobId);
