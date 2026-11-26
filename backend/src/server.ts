@@ -23,6 +23,7 @@ import { routedShardNamespace } from "../lunora/lib/shard-namespace.js";
 import { posthogErrorSink } from "./posthog-sink.js";
 import { defineApp } from "../lunora/_generated/app.js";
 import { ensureGlobalTables } from "../lunora/auth/lib/ensure-global-tables.js";
+import { ensureAuthDatesConverted } from "../lunora/auth/lib/convert-auth-dates.js";
 import httpApp, { getAllowedOrigins } from "../lunora/http.js";
 import type { ApiKeyAuthApi } from "../lunora/public-api/identity.js";
 import { isPublicApiPath, resolveApiKeyIdentity } from "../lunora/public-api/identity.js";
@@ -734,9 +735,15 @@ export default {
         // even though this call then created the tables.
         const { d1Executor, handleAuthRequest } = await import("@lunora/auth");
 
-        await ensureGlobalTables(d1Executor(env.DB));
+        const exec = d1Executor(env.DB);
+
+        await ensureGlobalTables(exec);
 
         const auth = await authFor(env);
+
+        // Lunora's own `ensureMigrated` converts the ISO dates older `@lunora/auth` versions stored; this Worker never
+        // calls it (below), so the conversion runs here, once per isolate. It never rejects.
+        await ensureAuthDatesConverted(exec, auth.options);
 
         // `ensureMigrated(auth)` used to run here, on EVERY request. It is both
         // redundant and fatal:
