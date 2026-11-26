@@ -142,11 +142,9 @@ describe("setPullRequestWatch", () => {
         expect(await watchOf(linkId)).toMatchObject({ startedAt: expect.any(Number) });
     });
 
-    it("refuses a start once the person has the most active watches, and lets a stopped one through", async () => {
+    it("refuses a start once the person has the most active watches, and writes nothing", async () => {
         for (let number = 100; number < 100 + MAX_ACTIVE_PULL_REQUEST_WATCHES; number += 1) {
-            const seeded = await seedLink(OWNER, number, { watch: { startedAt: 1 } });
-
-            expect(seeded.linkId).toBeTruthy();
+            await seedLink(OWNER, number, { watch: { startedAt: 1 } });
         }
 
         const { linkId, threadId } = await seedLink(OWNER, 7);

@@ -18,10 +18,6 @@ export const MAX_ACTIVE_PULL_REQUEST_WATCHES = 10;
 const WATCH_COUNT_PAGE_SIZE = 100;
 const WATCH_COUNT_MAX_PAGES = 50;
 
-type LinkRow = { number: number; repository: string; threadDeleted?: boolean; threadId: unknown; watch?: { stoppedAt?: number } };
-
-const isRunning = (row: LinkRow): boolean => row.watch !== undefined && row.watch.stoppedAt === undefined && row.threadDeleted !== true;
-
 export const setPullRequestWatch = internalMutation
     .input({
         number: v.number(),
@@ -73,7 +69,7 @@ export const setPullRequestWatch = internalMutation
                 .withIndex("by_user_and_repository_number", (q) => q.eq("userId", args.userId))
                 .paginate({ cursor, numItems: WATCH_COUNT_PAGE_SIZE });
 
-            running += read.page.filter((row) => isRunning(row)).length;
+            running += read.page.filter((row) => row.watch !== undefined && row.watch.stoppedAt === undefined && row.threadDeleted !== true).length;
 
             if (read.isDone) {
                 break;

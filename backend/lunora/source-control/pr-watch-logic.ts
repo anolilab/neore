@@ -68,8 +68,8 @@ const newestReviewByOthers = (observed: PullRequestObservation): { authorLogin: 
 
 /**
  * The reviews by others that are newer than the one the watch last saw. The host lists reviews newest first, so those are
- * the entries before the seen one. A seen review that is no longer listed proves nothing new, and neither does a first
- * sight of a review-free watch: with no seen review, every review by others is new.
+ * the entries before the seen one. With no seen review, every review by others is new. A seen review that is no longer
+ * listed proves nothing new.
  */
 const newerReviewsByOthers = (observed: PullRequestObservation, seenId: string | undefined): { authorLogin: string; id: string }[] => {
     if (seenId === undefined) {

@@ -205,12 +205,12 @@ export const deleteUserGuides = internalMutation
 /** Links per export step: each row is small, so a page is generous and a long history still takes few steps. */
 const PULL_REQUEST_LINKS_EXPORT_PAGE = 100;
 
+const vWatchWakeReason = v.union(v.literal("checks"), v.literal("conflict"), v.literal("review"));
+
 /**
  * The user's links between threads and the pull requests they work on. `title` is a copy of the thread's title when
  * the link was made (the user's own words, and it outlives a rename or a deletion), so the links travel with the export.
  */
-const vWatchWakeReason = v.union(v.literal("checks"), v.literal("conflict"), v.literal("review"));
-
 export const collectPullRequestThreadsForExport = internalQuery
     .input({ cursor: v.optional(v.union(v.string().max(MAX_LENGTH.cursor), v.null())), userId: v.string().max(MAX_LENGTH.id) })
     .output(
