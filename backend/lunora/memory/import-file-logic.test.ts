@@ -223,6 +223,27 @@ describe("parseMemoryFile: text", () => {
         expect(parsed).toMatchObject({ entries: 1, invalid: 1, total: 2 });
     });
 
+    it("does not refuse a name that only starts with a secret's word, and imports both lines", () => {
+        const input = "Login methods: passwordless:\nThe user likes green tea";
+        const parsed = parseMemoryFile(input, "text");
+
+        expect(refusal(input, "text")).toBeUndefined();
+        expect(parsed.batches.flat()).toHaveLength(2);
+        expect(refusal("The user lives in Lisbon\nmax_tokens:", "text")).toBeUndefined();
+    });
+
+    it("still refuses a secret label that ends its name with the value on the next line", () => {
+        expect(refusal("DB_PASSWORD=\nThe user likes green tea", "text")).toMatchObject({ code: "secret_continues" }); // secret-scanner:allow
+    });
+
+    it("refuses a text file and skips a JSON item whose label hides a zero-width character", () => {
+        const input = `pass\u{200B}word=\nThe user likes green tea`; // secret-scanner:allow
+        const parsed = parseMemoryFile(JSON.stringify(["The user lives in Lisbon", input]), "json");
+
+        expect(refusal(`The user lives in Lisbon\n${input}`, "text")).toMatchObject({ code: "secret_continues" });
+        expect(parsed).toMatchObject({ entries: 1, invalid: 1, total: 2 });
+    });
+
     it("still reads a long-named label whose value closes on its line as complete", () => {
         const input = `${"a_very_long_service_name_for_the_database".repeat(2)}_PASSWORD="value"`; // secret-scanner:allow
 

@@ -146,21 +146,26 @@ export const toBatches = <T>(items: ReadonlyArray<T>, size: number): T[][] => {
 };
 
 /**
- * A secret's word, the rest of its name, and its separator: `password=`, `DB_PASSWORD_PROD :`, `"token":`. Run on
+ * A secret's word, an optional suffix, and its separator: `password=`, `DB_PASSWORD_PROD :`, `"token":`. Run on
  * {@link detectionView} (lower case, no emphasis), so it has no `i` flag, no left boundary and no cap on the name in
  * front of the word (`DB_PASSWORD`, or forty characters and more before `_password`): matching the word and the
- * separator is what makes that name irrelevant. The name after the word is capped at 40 characters, so a line of
- * `passwordpassword…` with no separator costs a bounded read at each word, never a rescan of the rest of the line.
+ * separator is what makes that name irrelevant. The word ends the identifier, as in the shared redactor (a name that
+ * ends in a secret's word, not one that only contains it): `passwordless:` and `max_tokens:` are not labels. Only a
+ * suffix set off by `_` or `-` (`_PROD`, the closing `__` of `__DB_PASSWORD__`) is let through, and it is capped at 40
+ * characters, so a line of `passwordpassword…` with no separator costs a bounded read at each word, never a rescan of
+ * the rest of the line.
  */
 const SECRET_LABEL_WORDS = `passw(?:or)?d|pwd|passphrase|secret|token|(?:api|access|private|secret)[ _-]?key|authorization|credentials?`;
-const SECRET_LABEL = new RegExp(String.raw`(?:${SECRET_LABEL_WORDS})[\w-]{0,40}["']?[^\S\n]*[:=]`, "gu");
+const SECRET_LABEL = new RegExp(String.raw`(?:${SECRET_LABEL_WORDS})(?:[_-][\w-]{0,40})?["']?[^\S\n]*[:=]`, "gu");
 
 /**
  * The line as the label test reads it: lower case, with the emphasis the unwrapping removes (`**`, `__`, code ticks) taken
- * out, so `DB_**PASSWORD**="` reads `db_password="`. One non-recursive pass, no tag stripping: it is safe on a line of
- * any length, which the full unwrapping is not.
+ * out, so `DB_**PASSWORD**="` reads `db_password="`, and with invisible format characters (`Cf`: zero-width spaces and
+ * joiners, soft hyphens) removed, so `pass<U+200B>word=` reads `password=`. One non-recursive pass, no tag stripping: it
+ * is safe on a line of any length, which the full unwrapping is not. Only the detection reads this view, never the
+ * stored text.
  */
-const detectionView = (line: string): string => line.replaceAll(/\*|__|`/gu, "").toLowerCase();
+const detectionView = (line: string): string => line.replaceAll(/__|[*`\p{Cf}]/gu, "").toLowerCase();
 
 /** True when the line holds a secret label anywhere: used on a line past the raw-length guard, which is never unwrapped. */
 const carriesSecretLabel = (line: string): boolean => {
