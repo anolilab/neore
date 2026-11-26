@@ -64,6 +64,26 @@ describe("parseMemoryFile: text", () => {
         expect(parsed).toMatchObject({ entries: 1, invalid: 2, total: 3 });
     });
 
+    it.each([
+        ["U+2028", "\u{2028}"],
+        ["U+2029", "\u{2029}"],
+        ["a bare CR", "\r"],
+        ["a form feed", "\f"],
+    ])("redacts a quoted secret split on %s, and keeps no part of it", (_name, separator) => {
+        // The second line reads as an ordinary fact; only the redaction before the split keeps it out.
+        const continuation = "the user keeps this tail of the secret";
+        const parsed = parseMemoryFile(`The user lives in Lisbon\nDB_PASSWORD="alpha${separator}${continuation}"\nThe user likes green tea`, "text");
+
+        expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user lives in Lisbon", "The user likes green tea"]);
+    });
+
+    it("keeps no line of a quoted secret that runs past 1000 characters", () => {
+        const value = "abcdefghij\n".repeat(150).trimEnd();
+        const parsed = parseMemoryFile(`The user lives in Lisbon\nDB_PASSWORD="${value}"\nThe user likes green tea`, "text");
+
+        expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user lives in Lisbon", "The user likes green tea"]);
+    });
+
     it("refuses a file with only blank lines", () => {
         expect(refusal("\n  \n\t\n", "text")).toMatchObject({ code: "empty" });
         expect(refusal("", "text")).toMatchObject({ code: "empty" });
@@ -142,6 +162,13 @@ describe("limits", () => {
         expect(atLimit).toHaveLength(MEMORY_FILE_MAX_BYTES);
         expect(refusal(atLimit, "text")?.code).not.toBe("too_large");
         expect(refusal(`${atLimit}\n`, "text")).toMatchObject({ code: "too_large" });
+    });
+
+    it("leaves room for the JSON escaping of quotes, backslashes and line breaks in the request that carries it", () => {
+        // The runtime refuses a request body over 1,048,576 bytes with a 413; each of these escapes to two bytes.
+        const escapedWorstCase = JSON.stringify({ content: '"'.repeat(MEMORY_FILE_MAX_BYTES), format: "text" });
+
+        expect(new TextEncoder().encode(escapedWorstCase).length).toBeLessThan(1_048_576);
     });
 
     it("counts bytes, not characters, against the size limit", () => {
@@ -233,12 +260,13 @@ describe(importDedupKey, () => {
         ["é", "é"],
         ["é", "é"],
         ["a　b", "a b"],
-        ["Ⅳ ½", "iv 1⁄2"],
+        ["Ⅳ ½ ①", "ⅳ ½ ①"],
     ])("normalises %j to %j", (input, expected) => {
         expect(importDedupKey(input)).toBe(expected);
     });
 
-    it("keeps different texts apart", () => {
+    it("keeps different texts apart, symbols that only look alike included", () => {
         expect(importDedupKey("tea")).not.toBe(importDedupKey("tee"));
+        expect(importDedupKey("The user means ① by the circled one")).not.toBe(importDedupKey("The user means 1 by the circled one"));
     });
 });

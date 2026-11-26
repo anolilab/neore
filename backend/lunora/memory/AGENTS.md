@@ -31,7 +31,7 @@
   of the same save. A merge whose text another own row holds confirms that row. Vector lookups (2 calls each, at most
   half) and belief revisions (1 each) share `IMPORT_DEDUP_CALL_BUDGET`, so a save stays under the Free plan's 50
   subrequests (`import.test.ts` counts a worst case). The 1000-row window widens to 5000 once, on the first fact
-  matched by words. A file import (`importMemoryFile`, `import-file-logic.ts`) is bounded, batched, keyed by `importDedupKey`.
+  matched by words. A file import (`importMemoryFile`, `import-file-logic.ts`) is bounded, batched, keyed by `importDedupKey` (full-width and ligature folds, not NFKC: `①` stays apart from `1`). Every line ending becomes `\n` before the multiline-secret redaction (`splitImportLines`, paste and file alike). The file limit is 500 KB, half the runtime's 1 MiB request body, for the JSON escaping of quotes, backslashes and line breaks.
 - **One decision per fact** for extraction and the import: `decideFact` (`dedup.ts`) confirms a match at 0.95 or more,
   revises only when the caller passes `revise` (extraction passes none for a pinned or other-day match), and saves the
   fact as new when a revision fails, is refused (`acceptMerge`) or carries no merged text.
@@ -49,8 +49,8 @@
 - **No secrets in `memories`.** Every write redacts with `lib/secret-redaction.ts` first: extraction and compression
   facts (`redactMemoryFacts`, before embedding), extraction revisions (planned redacted, and `reviseExtractedMemory`
   again), reflection ops (`redactReflectionOps`), import lines (redacted before the cut to length, again after
-  cleaning and after the cut, so preview and save agree; a quoted value the detector reads across lines, one without
-  spaces, is redacted before the split) and merged texts, the manual edit (a text that is only a secret is refused),
+  cleaning and after the cut, so preview and save agree; a quoted value that spans lines, spaces or not, is redacted whole before the
+  split, after every line ending became `\n`; a quote left open takes at most 4000 characters) and merged texts, the manual edit (a text that is only a secret is refused),
   and `insertMemory` / `saveImportedMemoryBatch` / `updateMemoryInternal` / `applyReflectionOps` as the backstop.
   Confirmations write no memory text; one may add a quote that passed `evidenceQuote` to a row that has none. A fact
   that is nothing but a secret is dropped (`redactMemoryText` returns `null`), never saved as `«redacted»`:

@@ -11,12 +11,16 @@
  * JSON: an array whose items are strings, or objects with a text field (`content`, `text` or `memory`) and an
  * optional `type`. Any other top-level shape is refused; an item of another shape is counted as invalid.
  */
-import { redactMultilineSecrets } from "../lib/secret-redaction";
-import { IMPORT_MAX_FACT_CHARS, importDedupKey, isLongEnoughFact, LINE_BREAK_RE, looksSensitive, redactImportLine, unwrapImportLine } from "./import-logic";
+import { IMPORT_MAX_FACT_CHARS, importDedupKey, isLongEnoughFact, looksSensitive, redactImportLine, splitImportLines, unwrapImportLine } from "./import-logic";
 import { isMemoryType, type MemoryType } from "./taxonomy";
 
-/** Largest file accepted, in UTF-8 bytes. */
-export const MEMORY_FILE_MAX_BYTES = 1_048_576;
+/**
+ * Largest file accepted, in UTF-8 bytes. The file travels as a JSON string in a request body the runtime reads with a
+ * 1,048,576-byte cap (a 413 before the action runs). JSON escaping grows a quote, a backslash or a line break to two
+ * bytes, so a file near the runtime's own size can be refused by the transport; half of it leaves room for those. A
+ * file made mostly of control characters (six bytes each once escaped) can still exceed the cap and be refused there.
+ */
+export const MEMORY_FILE_MAX_BYTES = 500_000;
 
 /** Most entries (non-empty lines, or array items) one file may hold; a file with more is refused, not cut. */
 export const MEMORY_FILE_MAX_ENTRIES = 5000;
@@ -38,7 +42,7 @@ export const MEMORY_FILE_INLINE_MAX_ENTRIES = MEMORY_FILE_BATCH_SIZE;
 export const MEMORY_FILE_DEFAULT_TYPE: MemoryType = "context";
 
 /** Shown for a file over {@link MEMORY_FILE_MAX_BYTES}, whether the length or the byte count is what refuses it. */
-export const MEMORY_FILE_TOO_LARGE_MESSAGE = `The file is larger than ${String(MEMORY_FILE_MAX_BYTES / 1_048_576)} MB.`;
+export const MEMORY_FILE_TOO_LARGE_MESSAGE = `The file is larger than ${String(MEMORY_FILE_MAX_BYTES / 1000)} KB.`;
 
 export const MEMORY_FILE_TOO_LARGE_INLINE_MESSAGE = `This file has more than ${String(MEMORY_FILE_INLINE_MAX_ENTRIES)} memories. Importing larger files is not available yet; it will come in a later change.`;
 
@@ -134,8 +138,7 @@ const rawEntriesOf = (content: string, format: MemoryFileFormat): RawEntry[] => 
 
     if (format === "text") {
         // A quoted secret that spans lines is redacted before the split, or its later lines would read as memories.
-        return redactMultilineSecrets(body)
-            .split(LINE_BREAK_RE)
+        return splitImportLines(body)
             .filter((line) => line.trim() !== "")
             .map((text) => {
                 return { text, type: MEMORY_FILE_DEFAULT_TYPE };

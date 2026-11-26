@@ -211,7 +211,7 @@ describe("memory import procedures", () => {
 
             await expect(call(importMemoryFile, { content: "x".repeat(MEMORY_FILE_MAX_BYTES + 1), format: "text" })).rejects.toMatchObject({
                 code: "VALIDATION_ERROR",
-                message: expect.stringContaining("larger than 1 MB"),
+                message: expect.stringContaining("larger than 500 KB"),
             });
             await expect(call(importMemoryFile, { content: "The user likes tea", format: "csv" })).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
         });

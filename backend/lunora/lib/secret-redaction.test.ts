@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { containsSecret, REDACTED, redactSecrets } from "./secret-redaction";
+import { containsSecret, REDACTED, redactMultilineSecrets, redactSecrets } from "./secret-redaction";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 const ALPHANUMERIC = `${LETTERS}0123456789`;
@@ -318,5 +318,45 @@ describe("redactSecrets", () => {
 
     it("redacts an opaque 32-character token that has a single digit", () => {
         expect(redactSecrets("key vKqPzRtLmNvBwYhJdFgSaEcTuIoPlQr1")).toBe("key «redacted»");
+    });
+});
+
+describe("redactMultilineSecrets", () => {
+    const name = "DB_PASSWORD=";
+
+    it.each([
+        ["a newline", "\n"],
+        ["U+2028", "\u{2028}"],
+        ["a bare CR", "\r"],
+    ])("redacts a quoted value with spaces split on %s, whole", (_label, separator) => {
+        const value = join("alpha beta", separator, "the user keeps this tail");
+
+        expect(redactMultilineSecrets(`before\n${name}"${value}"\nafter`)).toBe(`before\n${name}${REDACTED}\nafter`);
+    });
+
+    it("redacts a value past the old match limit, and stops at its closing quote", () => {
+        const value = "abcdefghij\n".repeat(300).trimEnd();
+
+        expect(redactMultilineSecrets(`${name}"${value}" and then the user likes tea`)).toBe(`${name}${REDACTED} and then the user likes tea`);
+    });
+
+    it("skips an escaped quote inside the value", () => {
+        expect(redactMultilineSecrets(`${name}"alpha \\" beta\ngamma" ok`)).toBe(`${name}${REDACTED} ok`);
+    });
+
+    it("takes a bounded stretch when the quote is never closed, and no more", () => {
+        const tail = `\n${"The user likes green tea. ".repeat(400)}`;
+        const result = redactMultilineSecrets(`${name}"alpha${tail}`);
+
+        expect(result.startsWith(`${name}${REDACTED}`)).toBe(true);
+        expect(result.length).toBeLessThan(tail.length);
+        expect(result.endsWith("tea. ")).toBe(true);
+    });
+
+    it("leaves a value on one line to redactSecrets, and text without a secret name alone", () => {
+        const single = `${name}"alpha beta" and the user likes tea`;
+
+        expect(redactMultilineSecrets(single)).toBe(single);
+        expect(redactMultilineSecrets('The user said "hello\nthere" once')).toBe('The user said "hello\nthere" once');
     });
 });

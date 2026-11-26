@@ -82,6 +82,12 @@ const WHITESPACE_RE = /\s+/g;
 export const LINE_BREAK_RE = /\r\n?|[\n\v\f\u{2028}\u{2029}]/u;
 
 /**
+ * The text as lines. Every line ending becomes `\n` first because the multiline-secret redaction reads only `\n` and
+ * `\r\n`: a quoted secret split on U+2028, a bare CR or a form feed would otherwise leave its later lines as plain facts.
+ */
+export const splitImportLines = (text: string): string[] => redactMultilineSecrets(text.split(LINE_BREAK_RE).join("\n")).split("\n");
+
+/**
  * Shapes that are a secret or sensitive identifier whatever words surround them:
  * provider keys, private keys, tokens, card and account numbers, social security numbers,
  * and a password or key given as a value. Such a line is dropped whole.
@@ -108,12 +114,23 @@ const SENSITIVE_RES: ReadonlyArray<RegExp> = [
 
 export const looksSensitive = (line: string): boolean => SENSITIVE_RES.some((re) => re.test(line));
 
+const FULL_WIDTH_RE = /[\u{FF01}-\u{FF5E}]/gu;
+const LIGATURE_RE = /[\u{FB00}-\u{FB06}]/gu;
+
 /**
- * The one text normalisation for exact-match dedup: Unicode compatibility forms (NFKC: full-width letters, ligatures),
- * then case, then whitespace. Two lines with the same key are the same fact; the save's exact-text check and the file
- * import both use it, so they never disagree.
+ * The one text normalisation for exact-match dedup: full-width ASCII and Latin ligatures folded to the letters they
+ * spell, then case, then whitespace. Two lines with the same key are the same fact; the save's exact-text check and the
+ * file import both use it, so they never disagree. Whole-string NFKC is not used: it also folds symbols that are
+ * different on purpose (`①` into `1`, `½` into `1⁄2`), and a fact about one would be dropped as a repeat of the other.
  */
-export const importDedupKey = (line: string): string => line.normalize("NFKC").toLowerCase().replaceAll(WHITESPACE_RE, " ").trim();
+export const importDedupKey = (line: string): string =>
+    line
+        .replaceAll(FULL_WIDTH_RE, (char) => String.fromCodePoint((char.codePointAt(0) ?? 0) - 0xfe_e0))
+        .replaceAll(LIGATURE_RE, (char) => char.normalize("NFKC"))
+        .normalize("NFC")
+        .toLowerCase()
+        .replaceAll(WHITESPACE_RE, " ")
+        .trim();
 
 /** Prompt tags removed until none is left: one removal can join the text around it into a new tag. */
 const stripDataTags = (text: string): string => {
@@ -155,7 +172,7 @@ export const splitImportedText = (text: string): { cut: number; dropped: number;
     let dropped = 0;
 
     // A quoted secret that spans lines is redacted before the split, or its later lines would read as facts.
-    const rawLines = redactMultilineSecrets(text.slice(0, IMPORT_MAX_INPUT_CHARS)).split(LINE_BREAK_RE);
+    const rawLines = splitImportLines(text.slice(0, IMPORT_MAX_INPUT_CHARS));
 
     for (const raw of rawLines) {
         const cleaned = cleanImportLine(raw);

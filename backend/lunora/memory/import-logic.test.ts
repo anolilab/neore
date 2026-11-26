@@ -200,6 +200,17 @@ describe("a secret in the paste", () => {
         ]);
     });
 
+    it("is redacted whole when its quoted value spans lines on a line separator other than a newline", () => {
+        expect.assertions(1);
+
+        const value = ["alpha", "\u{2028}", "the user keeps this tail of the secret"].join("");
+
+        expect(splitImportedText(`The user lives in Lisbon\nDB_PASSWORD="${value}"\nThe user likes green tea`).lines).toStrictEqual([
+            "The user lives in Lisbon",
+            "The user likes green tea",
+        ]);
+    });
+
     it("is redacted when emphasis joins a token across the cut to length", () => {
         expect.assertions(1);
 
