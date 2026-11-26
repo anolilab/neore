@@ -8,7 +8,7 @@ import { v } from "lunorash/server";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { registeredApi, registerModule } from "../../test/registered-api";
 
-import { internalAction, internalMutation } from "../_generated/server";
+import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { addMessagesHandler, cloneMessageBatch } from "../agent/messages";
 import { lastSettledMessageId } from "../agent/branches";
 import { insertContextResetRow, insertThread } from "../agent/table-writes";
@@ -18,7 +18,7 @@ import { getLowRiskApprovalContext } from "./tool-permissions";
 import { agentSwitchRowContent } from "../agent/agent-switch-logic";
 import { threadHandoffTaint, threadSummaryTaint } from "../agent/thread-summary-taint";
 import { computeTaint } from "../devices/lib/taint";
-import { createSideChat, sideChatRefusalOf } from "./side-chat";
+import { createSideChat, refusedOutcome, sideChatRefusalOf } from "./side-chat";
 
 const { sessionFrom } = vi.hoisted(() => {
     return {
@@ -403,7 +403,13 @@ describe("createSideChat", () => {
     });
 
     it("gives the child the parent's run settings", async () => {
-        const parentId = await parentWith(OWNER, { autoModel: true, customSystemPrompt: "answer in haiku", reasoningEffort: 3, statelessMode: true });
+        const parentId = await parentWith(OWNER, {
+            autoModel: true,
+            customSystemPrompt: "answer in haiku",
+            enabledFeatures: ["web-search", "canvas"],
+            reasoningEffort: 3,
+            statelessMode: true,
+        });
 
         await withMessages(parentId, OWNER, ["hello"]);
 
@@ -412,6 +418,7 @@ describe("createSideChat", () => {
         expect(await threadRow(outcome.threadId)).toMatchObject({
             autoModel: true,
             customSystemPrompt: "answer in haiku",
+            enabledFeatures: ["web-search", "canvas"],
             model: "openai/gpt-5",
             reasoningEffort: 3,
             statelessMode: true,
@@ -508,32 +515,6 @@ describe("createSideChat", () => {
         expect(copied.some((text: string) => text.includes("tool-call") || text.includes("later question"))).toBe(false);
     });
 
-    it("copies only the prompt when the first reply stopped mid tool call", async () => {
-        const parentId = await parentWith(OWNER);
-
-        await harness.run(async (ctx: any) => {
-            await addMessagesHandler(ctx, {
-                fromUser: true,
-                messages: [{ message: { content: "question", role: "user" }, status: "success" }],
-                threadId: parentId as never,
-                userId: OWNER,
-            });
-            await addMessagesHandler(ctx, {
-                messages: [
-                    { message: { content: [{ input: {}, toolCallId: "lost", toolName: "search", type: "tool-call" }], role: "assistant" }, status: "success" },
-                ],
-                threadId: parentId as never,
-                userId: OWNER,
-            });
-        });
-        await withMessages(parentId, OWNER, ["follow up"]);
-
-        const outcome = (await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)) as { status: string; threadId: string };
-
-        expect(outcome.status).toBe("ok");
-        expect(await messageCount(outcome.threadId)).toBe(1);
-    });
-
     it("gives the child the device-call taint of the parent: the takeover and the tool results it copied", async () => {
         const parentId = await parentWith(OWNER, { hasHandoff: true });
         const host = { agentKey: "agent", agentLabel: "Agent", folderId: "folder", folderLabel: "Folder", hostId: "host-1", kind: "host" as const };
@@ -612,17 +593,6 @@ describe("createSideChat", () => {
         expect(await harness.run(async (ctx: any) => await ctx.db.query("threads").collect())).toHaveLength(1);
     });
 
-    it("gives the side chat the parent's run settings", async () => {
-        const parentId = await parentWith(OWNER, { customSystemPrompt: "Answer briefly.", reasoningEffort: 2, statelessMode: true });
-
-        await withMessages(parentId, OWNER, ["hello"]);
-
-        const outcome = (await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)) as { status: string; threadId: string };
-        const child = await threadRow(outcome.threadId);
-
-        expect(child).toMatchObject({ customSystemPrompt: "Answer briefly.", reasoningEffort: 2, statelessMode: true });
-    });
-
     it("refuses a parent that someone else holds a grant on, and writes nothing", async () => {
         const parentId = await parentWith(OWNER);
 
@@ -636,6 +606,187 @@ describe("createSideChat", () => {
             status: "refused",
         });
         expect(await sideRelations()).toHaveLength(0);
+    });
+
+    it("places the side chat in the parent's team for a caller who is still a member", async () => {
+        const parentId = await parentWith(OWNER, { teamId: "team-1" });
+
+        await withMessages(parentId, OWNER, ["hello"]);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("teamMember", { teamId: "team-1", userId: OWNER });
+        });
+
+        const outcome = (await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)) as { status: string; threadId: string };
+
+        expect(outcome.status).toBe("ok");
+        expect(await threadRow(outcome.threadId)).toMatchObject({ teamId: "team-1" });
+    });
+
+    it("refuses a parent in a team the caller has left, and writes nothing", async () => {
+        const parentId = await parentWith(OWNER, { teamId: "team-1" });
+
+        await withMessages(parentId, OWNER, ["hello"]);
+
+        expect(await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)).toStrictEqual({ reason: "team", status: "refused" });
+        expect(await sideRelations()).toHaveLength(0);
+        expect(await harness.run(async (ctx: any) => await ctx.db.query("threads").collect())).toHaveLength(1);
+    });
+
+    it("refuses a caller removed from the team after the first membership read, and creates no child", async () => {
+        const parentId = await parentWith(OWNER, { teamId: "team-1" });
+
+        await withMessages(parentId, OWNER, ["hello"]);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("teamMember", { teamId: "team-1", userId: OWNER });
+        });
+
+        // The sharing read runs after the parent was read and before the child is written: the member is removed there.
+        const key = "chat_side_chat:sharedWithOthers";
+        const original = registry.get(key);
+
+        registry.set(
+            key,
+            internalQuery.input({ threadId: v.id("threads") }).query(async () => {
+                await harness.run(async (ctx: any) => {
+                    const members = await ctx.db.query("teamMember").collect();
+
+                    for (const row of members) {
+                        await ctx.db.delete("teamMember", row._id);
+                    }
+                });
+
+                return false;
+            }),
+        );
+
+        try {
+            expect(await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)).toStrictEqual({ reason: "team", status: "refused" });
+        } finally {
+            registry.set(key, original);
+        }
+
+        expect(await sideRelations()).toHaveLength(0);
+        expect(await harness.run(async (ctx: any) => await ctx.db.query("threads").collect())).toHaveLength(1);
+    });
+
+    it("refuses and discards the child when a grant is accepted while the history is being copied", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await withMessages(parentId, OWNER, ["hello"]);
+
+        const key = "agent_messages:cloneThread";
+        const original = registry.get(key);
+
+        registry.set(
+            key,
+            internalAction.input({ sourceThreadId: v.id("threads"), targetThreadId: v.id("threads") }).action(async () => {
+                await harness.run(async (ctx: any) => {
+                    await ctx.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "read", threadId: parentId, userId: "user-c" });
+                });
+            }),
+        );
+
+        try {
+            expect(await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)).toStrictEqual({
+                reason: "shared_or_temporary",
+                status: "refused",
+            });
+        } finally {
+            registry.set(key, original);
+        }
+
+        expect(await sideRelations()).toHaveLength(0);
+        expect(await harness.run(async (ctx: any) => await ctx.db.query("threads").collect())).toHaveLength(1);
+    });
+
+    it("logs a refusal as its status and reason only", () => {
+        const event = vi.fn();
+
+        expect(refusedOutcome({ event }, "locked")).toStrictEqual({ reason: "locked", status: "refused" });
+        expect(event).toHaveBeenCalledExactlyOnceWith("chat.create_side_chat", { reason: "locked", status: "refused" });
+    });
+
+    it("finds the fork end of a path longer than one scan page, with a message that straddles a page boundary", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await withMessages(parentId, OWNER, ["question"]);
+        // One displayed message of three rows: text, a tool call and its result. It ends on the result, so it is not finished.
+        await harness.run(async (ctx: any) => {
+            await addMessagesHandler(ctx, {
+                messages: [
+                    { message: { content: [{ text: "partial", type: "text" }], role: "assistant" }, status: "success" },
+                    { message: { content: [{ input: {}, toolCallId: "c1", toolName: "search", type: "tool-call" }], role: "assistant" }, status: "success" },
+                    {
+                        message: {
+                            content: [{ output: { type: "text", value: "hits" }, toolCallId: "c1", toolName: "search", type: "tool-result" }],
+                            role: "tool",
+                        },
+                        status: "success",
+                    },
+                ],
+                threadId: parentId as never,
+                userId: OWNER,
+            });
+        });
+
+        // 198 newer failed replies fill the first page of 200 up to the middle of that message.
+        for (let reply = 0; reply < 198; reply += 1) {
+            await harness.run(async (ctx: any) => {
+                await addMessagesHandler(ctx, {
+                    messages: [{ message: { content: [{ text: "x", type: "text" }], role: "assistant" }, status: "failed" }],
+                    threadId: parentId as never,
+                    userId: OWNER,
+                });
+            });
+        }
+
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("messages").collect());
+        const question = rows.find((row: any) => row.message?.content === "question");
+
+        expect(await harness.run(async (ctx: any) => await ctx.runQuery(lastSettledMessageId, { threadId: parentId }))).toBe(question._id);
+    });
+
+    it("reads a bounded number of pages: a path longer than the budget gives no fork end, one inside it is found", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await withMessages(
+            parentId,
+            OWNER,
+            Array.from({ length: 12 }, (_, index) => `message ${index}`),
+        );
+
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("messages").collect());
+        const last = rows.find((row: any) => row.message?.content === "message 11");
+        const scan = async (maxPages: number) =>
+            await harness.run(async (ctx: any) => await ctx.runQuery(lastSettledMessageId, { maxPages, pageSize: 5, threadId: parentId }));
+
+        expect(await scan(3)).toBe(last._id);
+        expect(await scan(2)).toBeNull();
+    });
+
+    it("still ends before an interrupted run that is more than one page behind the newest reply", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await withMessages(parentId, OWNER, ["first question"]);
+        await harness.run(async (ctx: any) => {
+            await addMessagesHandler(ctx, {
+                messages: [
+                    { message: { content: [{ input: {}, toolCallId: "lost", toolName: "search", type: "tool-call" }], role: "assistant" }, status: "success" },
+                ],
+                threadId: parentId as never,
+                userId: OWNER,
+            });
+        });
+        await withMessages(
+            parentId,
+            OWNER,
+            Array.from({ length: 450 }, (_, index) => `later ${index}`),
+        );
+
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("messages").collect());
+        const first = rows.find((row: any) => row.message?.content === "first question");
+
+        expect(await harness.run(async (ctx: any) => await ctx.runQuery(lastSettledMessageId, { threadId: parentId }))).toBe(first._id);
     });
 
     it("keeps a completed tool turn whose result is stored in a later message than its call", async () => {

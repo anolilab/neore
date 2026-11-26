@@ -6,7 +6,8 @@
  *
  * Refused, before anything is written: a parent that is not the caller's own, a parent that is locked, deleted, archived,
  * temporary, deleting, public, host-run, group or shared, a parent that is not a text chat, one with no model, a parent
- * with no settled message, and a parent on a custom endpoint (also when switched to one) (its content is never sent to another model).
+ * with no settled message, a parent on a custom endpoint (also when switched to one) (its content is never sent to another model),
+ * and a parent in a team the caller has left. Every refusal and every success is logged as metadata: status and reason.
  *
  * The copy mirrors `branchThread` (`chat/functions.ts`), which records a "branch" link; the two should share one helper
  * once this is in place. This one is an action because copying messages is one.
@@ -17,7 +18,10 @@ import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { threadSharedWithOthers } from "../agent/live-grant";
-import { patchThread } from "../agent/table-writes";
+import { isTeamMember } from "../auth/lib/team-helpers";
+import { publicThread } from "../agent/threads";
+import { insertThread, patchThread } from "../agent/table-writes";
+import { vThreadCreateFields, vThreadDoc as vThreadDocument } from "../agent/validators";
 import { vWorkerPolicy } from "../sub-agents/validators";
 import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
@@ -39,7 +43,8 @@ export type SideChatRefusal =
     | "no_model"
     | "not_found"
     | "not_text"
-    | "shared_or_temporary";
+    | "shared_or_temporary"
+    | "team";
 
 type SideChatParent = {
     activeAgent?: { kind?: string; model?: string };
@@ -121,7 +126,25 @@ export const sharedWithOthers = internalQuery
     .query(async ({ args, ctx }) => {
         const thread = await ctx.db.get("threads", args.threadId);
 
-        return thread?.userId !== undefined && (await threadSharedWithOthers(ctx, args.threadId, thread.userId, Date.now()));
+        return thread?.userId !== undefined && (await threadSharedWithOthers(ctx, args.threadId, thread.userId, ctx.now));
+    });
+
+/**
+ * Creates the side chat's thread, and for a team parent checks in the same transaction that the owner is still a member. A
+ * membership read in another call could be stale by the time the thread is written, so the check and the insert are one
+ * decision; `null` means the caller left the team and nothing was written.
+ */
+export const createSideChatThread = internalMutation
+    .input(vThreadCreateFields)
+    .output(v.from(v.union(vThreadDocument, v.null())))
+    .mutation(async ({ args, ctx }) => {
+        if (args.teamId !== undefined && (args.userId === undefined || !(await isTeamMember(ctx, args.teamId, args.userId)))) {
+            return null;
+        }
+
+        const insertedId = await insertThread(ctx.db, { createdAt: ctx.now, ...args, status: "active" } as Parameters<typeof insertThread>[1]);
+
+        return publicThread((await ctx.db.get("threads", insertedId as Id<"threads">))!);
     });
 
 /** The worker-dispatch policy the parent carries, copied onto the side chat. It is not a thread-creation field, so it is set here. */
@@ -134,6 +157,13 @@ export const copyWorkerPolicy = internalMutation
         return null;
     });
 
+/** The refusal result, logged as metadata only: the reason and the status, never a title or any message content. */
+export const refusedOutcome = (log: { event: (name: string, fields: { reason: string; status: string }) => void }, reason: SideChatRefusal) => {
+    log.event("chat.create_side_chat", { reason, status: "refused" });
+
+    return { reason, status: "refused" as const };
+};
+
 export const createSideChat = authAction
     .use(rateLimit("chat/create"))
     .input({ threadId: v.string().max(MAX_LENGTH.id) })
@@ -142,10 +172,11 @@ export const createSideChat = authAction
         const { userId } = ctx.user;
         const threadId = args.threadId as Id<"threads">;
         const parent = await ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId });
+        const refuse = (reason: SideChatRefusal) => refusedOutcome(ctx.log, reason);
         const refusal = sideChatRefusalOf(parent, parent?.userId === userId);
 
         if (refusal !== null || parent === null) {
-            return { reason: refusal ?? "not_found", status: "refused" as const };
+            return refuse(refusal ?? "not_found");
         }
 
         const gate = await ctx.runQuery(internal.chat.functions.gateThreadAction, { level: "admin", threadId, userId });
@@ -153,18 +184,18 @@ export const createSideChat = authAction
         throwUnlessGranted(gate.outcome, "Admin access denied to this thread");
 
         if (gate.hostRun) {
-            return { reason: "host_run", status: "refused" as const };
+            return refuse("host_run");
         }
 
         if (await ctx.runQuery(internal.chat.side_chat.sharedWithOthers, { threadId })) {
-            return { reason: "shared_or_temporary", status: "refused" as const };
+            return refuse("shared_or_temporary");
         }
 
         // A bot's run model is the bot's, not the thread's: a bot now on a custom endpoint would carry the child there.
         const bot = parent.botId ? await ctx.runQuery(internal.bots.functions.getBotForRun, { botId: parent.botId, userId }) : null;
 
         if (bot !== null && parseCustomModelId(bot.model) !== null) {
-            return { reason: "custom_endpoint", status: "refused" as const };
+            return refuse("custom_endpoint");
         }
 
         // The last SETTLED row of the active path: a reply still in flight or one that failed is never copied, and a parent
@@ -174,13 +205,13 @@ export const createSideChat = authAction
             settledId === null ? null : await ctx.runQuery(internal.agent.branches.resolveForkEnd, { index: undefined, messageId: settledId, threadId });
 
         if (forkEnd === null) {
-            return { reason: "empty", status: "refused" as const };
+            return refuse("empty");
         }
 
         // Placed as a branch is (a temporary parent's lasting placement), else in the parent's own organization, cap and project,
         // so the child stays under the same policy and caps as the parent.
         const placement = await ctx.runQuery(internal.agent.threads.lastingChatPlacement, { threadId });
-        const created = await ctx.runMutation(internal.agent.threads.createThread, {
+        const created = await ctx.runMutation(internal.chat.side_chat.createSideChatThread, {
             language: parent.language,
             ...placement,
             ...(placement.organizationId === undefined && parent.organizationId !== undefined && { organizationId: parent.organizationId }),
@@ -200,6 +231,12 @@ export const createSideChat = authAction
             title: parent.title ?? "",
             userId,
         });
+
+        // The caller left the parent's team after the read above: the check ran inside the insert, so nothing was written.
+        if (created === null) {
+            return refuse("team");
+        }
+
         const newThreadId = created._id as Id<"threads">;
 
         // The child is removed with its link, so a failed or refused copy leaves neither behind.
@@ -246,7 +283,7 @@ export const createSideChat = authAction
             if (nowRefused !== null) {
                 await discard();
 
-                return { reason: nowRefused, status: "refused" as const };
+                return refuse(nowRefused);
             }
 
             // Read here, not at the start: a restriction the owner made while the child was being set up is the mode the child keeps.
@@ -263,10 +300,18 @@ export const createSideChat = authAction
                 upToAndIncludingMessageId: forkEnd.endId,
             });
 
+            // A grant accepted while the copy ran would otherwise leave the invitee able to read a chat made from the history they
+            // were not given. This narrows that window and does not close it: closing it needs a fence on accepting an invitation.
+            if (await ctx.runQuery(internal.chat.side_chat.sharedWithOthers, { threadId })) {
+                await discard();
+
+                return refuse("shared_or_temporary");
+            }
+
             if ((await ctx.runQuery(internal.agent.branches.lastSettledMessageId, { threadId: newThreadId })) === null) {
                 await discard();
 
-                return { reason: "empty", status: "refused" as const };
+                return refuse("empty");
             }
 
             if (parent.activeAgent) {
@@ -308,7 +353,7 @@ export const createSideChat = authAction
             throw error;
         }
 
-        ctx.log.event("chat.create_side_chat", { branchPoint: forkEnd.index });
+        ctx.log.event("chat.create_side_chat", { branchPoint: forkEnd.index, status: "ok" });
 
         return { status: "ok" as const, threadId: String(newThreadId) };
     });

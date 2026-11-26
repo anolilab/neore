@@ -30,6 +30,12 @@ import { MAX_LENGTH } from "../lib/validators";
  * through is `branch-rows.ts`.
  */
 
+/** The rows `lastSettledMessageId` reads at a time, newest first. */
+const SETTLED_SCAN_PAGE = 200;
+
+/** The most pages one `lastSettledMessageId` call reads (5000 rows): the total work of the scan is bounded, not only each page. */
+const SETTLED_SCAN_MAX_PAGES = 25;
+
 const BRANCH_CURSOR_PREFIX = "branch:";
 
 /** A page that runs up to a pinned `endCursor` stops here if that row has left the path. */
@@ -250,9 +256,12 @@ export const resolveForkEnd = internalQuery
  * is a user message or an assistant message with no tool call; a tool result, or an assistant row that still holds a
  * tool call, means the reply is mid-way, so the fork ends at the message before it. A message earlier on the path whose
  * tool call never got a settled result (an interrupted run) is never copied either: the fork ends before it.
+ * The scan reads at most `SETTLED_SCAN_MAX_PAGES` pages: a path longer than that gives `null` (no fork end), so one call never
+ * does unbounded work.
  */
 export const lastSettledMessageId = internalQuery
-    .input({ threadId: v.id("threads") })
+    // `pageSize` and `maxPages` are the scan's bounds; the defaults are the constants above, and a test passes smaller ones.
+    .input({ maxPages: v.optional(v.number()), pageSize: v.optional(v.number()), threadId: v.id("threads") })
     .output(v.union(v.null(), v.string()))
     .query(async ({ args, ctx }) => {
         const thread = await ctx.db.get("threads", args.threadId);
@@ -261,42 +270,88 @@ export const lastSettledMessageId = internalQuery
             return null;
         }
 
-        // A row with no message body is not a reply and is read by nothing below: dropped before any scan touches its message.
-        const fullPath = await loadActivePath(ctx, args.threadId, thread.activeLeafMessageId);
-        const path = fullPath.filter((row) => row.message !== undefined);
-        const groups = groupPathRows(
-            path.map((row) => {
-                return { _id: row._id as string, order: row.order, role: (row.message as { role?: string } | undefined)?.role, row };
-            }),
-        );
-        // The first displayed message holding a tool call that never reached a settled result (an interrupted run): a fork ends
-        // before it, whatever finished message follows, so the child carries no unfinished tool call.
-        // A call is answered by a settled result anywhere on the path: an approved call's result is stored after it, in a
-        // message of its own, so the answer is searched for across every message, not only the call's own.
-        const partsOf = (rows: ReadonlyArray<(typeof groups)[number][number]>) =>
-            rows
-                .filter((entry) => entry.row.status === "success")
-                .flatMap((entry) => {
-                    // A row with no message body has no tool parts, so it reads as empty rather than throwing.
-                    const content = (entry.row.message as { content?: unknown } | undefined)?.content;
+        const leaf = thread.activeLeafMessageId
+            ? await resolveLeafRow(ctx, args.threadId, thread.activeLeafMessageId)
+            : await getMaxMessage(ctx, args.threadId);
 
-                    return Array.isArray(content) ? (content as { toolCallId?: string; type?: string }[]) : [];
-                });
-        const answered = new Set(
-            partsOf(groups.flat())
-                .filter((part) => part.type === "tool-result")
-                .map((part) => part.toolCallId),
-        );
-        const interrupted = groups.findIndex((rows) => partsOf(rows).some((part) => part.type === "tool-call" && !answered.has(part.toolCallId)));
-        const candidates = interrupted === -1 ? groups : groups.slice(0, interrupted);
-        const settled = candidates.findLast((rows) => {
-            const last = rows.at(-1)?.row;
+        // Newest first, one bounded page at a time: only the ids below are kept between pages, never the rows.
+        // A call is answered by a settled result anywhere on the path: an approved call's result is stored after it, in a message
+        // of its own. A result is never older than its call, so by the time a call is read every result that answers it was read.
+        const answered = new Set<string | undefined>();
+        let settledId: string | null = null;
+        // The oldest displayed message of a page may continue on the next one: held back (newest row first) until the rest arrives.
+        let held: Doc<"messages">[] = [];
+        let from = leaf;
+        let pages = 0;
 
-            // A row with no message body is not a prompt or a finished reply, so it is skipped rather than read as one.
-            return last !== undefined && last.status === "success" && !last.tool && last.message !== undefined && !isTool(last.message as Message);
-        });
+        while (from !== null) {
+            // The whole path is read, because an older unanswered call cuts the fork below a newer settled reply. When the budget runs
+            // out first the answer is unknown, and no fork end is better than one that might carry an unfinished call: `null`.
+            if (pages >= (args.maxPages ?? SETTLED_SCAN_MAX_PAGES)) {
+                return null;
+            }
 
-        return settled?.at(-1)?._id ?? null;
+            pages += 1;
+
+            const { next, rows } = await walkPath(ctx, args.threadId, from, { limit: args.pageSize ?? SETTLED_SCAN_PAGE });
+            // A row with no message body is not a reply and is read by nothing below: dropped before any scan touches its message.
+            const chunk = [...held, ...rows.filter((row) => row.message !== undefined)].toReversed();
+            const groups = groupPathRows(
+                chunk.map((row) => {
+                    return { _id: row._id as string, order: row.order, role: (row.message as { role?: string } | undefined)?.role, row };
+                }),
+            );
+
+            held =
+                next === null
+                    ? []
+                    : (groups
+                          .shift()
+                          ?.map((entry) => entry.row)
+                          .toReversed() ?? []);
+
+            for (const group of groups.toReversed()) {
+                const parts = group
+                    .filter((entry) => entry.row.status === "success")
+                    .flatMap((entry) => {
+                        // A row with no message body has no tool parts, so it reads as empty rather than throwing.
+                        const content = (entry.row.message as { content?: unknown } | undefined)?.content;
+
+                        return Array.isArray(content) ? (content as { toolCallId?: string; type?: string }[]) : [];
+                    });
+
+                for (const part of parts) {
+                    if (part.type === "tool-result") {
+                        answered.add(part.toolCallId);
+                    }
+                }
+
+                // A message holding a tool call that never reached a settled result (an interrupted run): a fork ends before it,
+                // whatever finished message follows, so what was found newer than it is dropped and the scan goes on below it.
+                if (parts.some((part) => part.type === "tool-call" && !answered.has(part.toolCallId))) {
+                    settledId = null;
+                    continue;
+                }
+
+                const last = group.at(-1)?.row;
+
+                // A row with no message body is not a prompt or a finished reply, so it is skipped rather than read as one.
+                if (
+                    settledId === null &&
+                    last !== undefined &&
+                    last.status === "success" &&
+                    !last.tool &&
+                    last.message !== undefined &&
+                    !isTool(last.message as Message)
+                ) {
+                    settledId = last._id as string;
+                }
+            }
+
+            from = next;
+        }
+
+        return settledId;
     });
 
 /**
