@@ -5,6 +5,7 @@ import {
     MEMORY_FILE_BATCH_SIZE,
     MEMORY_FILE_DEFAULT_TYPE,
     MEMORY_FILE_ENTRY_MAX_CHARS,
+    MEMORY_FILE_INLINE_MAX_ENTRIES,
     MEMORY_FILE_MAX_BYTES,
     MEMORY_FILE_MAX_ENTRIES,
     type MemoryFileError,
@@ -340,9 +341,93 @@ describe("parseMemoryFile: text", () => {
         const parsed = parseMemoryFile(`${crafted}\nThe user likes green tea`, "text");
 
         expect(parsed).toMatchObject({ entries: 1, tooLong: 1, total: 2 });
-        // Only the short line reached the unwrapping step: once for its continuation check, once to prepare it.
-        expect(unwrap).toHaveBeenCalledTimes(2);
+        // Only the short line reached the unwrapping step, once, to prepare it: the continuation check never unwraps.
+        expect(unwrap).toHaveBeenCalledTimes(1);
         expect(unwrap.mock.calls.every(([line]) => line === "The user likes green tea")).toBe(true);
+    });
+
+    describe("a 500 KB file of lines of nested tag fragments just under the raw-length guard", () => {
+        const FRAGMENT = "<pasted_<pasted_memories>memories>";
+        const line = FRAGMENT.repeat(Math.floor((MEMORY_FILE_ENTRY_MAX_CHARS * 10 - 1) / FRAGMENT.length));
+        const crafted = `${line}\n`.repeat(Math.floor(MEMORY_FILE_MAX_BYTES / (line.length + 1))).trimEnd();
+
+        it("is a crafted file: many lines, each under the guard, the whole near the size limit", () => {
+            expect(line.length).toBeLessThanOrEqual(MEMORY_FILE_ENTRY_MAX_CHARS * 10);
+            expect(line.length).toBeGreaterThan(MEMORY_FILE_ENTRY_MAX_CHARS * 9);
+            expect(crafted.length).toBeGreaterThan(MEMORY_FILE_MAX_BYTES - line.length - 1);
+            expect(crafted.length).toBeLessThanOrEqual(MEMORY_FILE_MAX_BYTES);
+        });
+
+        it("is refused for a caller's entry limit before any entry is unwrapped", () => {
+            const unwrap = vi.mocked(unwrapImportLine);
+
+            unwrap.mockClear();
+
+            expect(() => parseMemoryFile(crafted, "text", { maxEntries: MEMORY_FILE_INLINE_MAX_ENTRIES })).toThrow(
+                expect.objectContaining({ code: "too_many_entries" }) as unknown as Error,
+            );
+            expect(unwrap).not.toHaveBeenCalled();
+        });
+
+        it("unwraps at most the entry limit's number of times when it holds that many lines", () => {
+            const unwrap = vi.mocked(unwrapImportLine);
+            const lineCount = MEMORY_FILE_INLINE_MAX_ENTRIES;
+
+            unwrap.mockClear();
+
+            const parsed = parseMemoryFile(`${line}\n`.repeat(lineCount).trimEnd(), "text", { maxEntries: MEMORY_FILE_INLINE_MAX_ENTRIES });
+
+            expect(parsed.total).toBe(lineCount);
+            expect(unwrap.mock.calls.length).toBeLessThanOrEqual(MEMORY_FILE_INLINE_MAX_ENTRIES);
+        });
+
+        it("is checked for a continuing secret without unwrapping a line under the default entry limit", () => {
+            const unwrap = vi.mocked(unwrapImportLine);
+            const lineCount = crafted.split("\n").length;
+
+            unwrap.mockClear();
+
+            // Each line is unwrapped once, to prepare it; the continuation check adds none.
+            expect(parseMemoryFile(crafted, "text").total).toBe(lineCount);
+            expect(unwrap).toHaveBeenCalledTimes(lineCount);
+        });
+    });
+
+    it("refuses a secret whose label has a data tag inside it, and a continuation line after it", () => {
+        const error = refusal(
+            'The user lives in Lisbon\nDB_<pasted_memories>PASSWORD</pasted_memories>="x\nThe continuation phrase is amber-orchid-9472',
+            "text",
+        ); // secret-scanner:allow
+
+        expect(error).toMatchObject({ code: "secret_continues", message: expect.stringContaining("Line 2 holds a password or key") });
+        expect(error?.message).not.toMatch(SECRET_WORDS);
+    });
+
+    it("refuses a label split by emphasis inside a data tag", () => {
+        expect(refusal('PASS<new_**fact>WORD="x\nThe continuation phrase is amber-orchid-9472', "text")).toMatchObject({ code: "secret_continues" }); // secret-scanner:allow
+    });
+
+    it("refuses a line past the raw-length guard whose label sits inside an unclosed data tag", () => {
+        const long = `<pasted_memories DB_PASSWORD="${"x".repeat(MEMORY_FILE_ENTRY_MAX_CHARS * 10)}`; // secret-scanner:allow
+
+        expect(refusal(`${long}\nThe continuation phrase is amber-orchid-9472`, "text")).toMatchObject({ code: "secret_continues" }); // secret-scanner:allow
+    });
+
+    it("skips, counted, a JSON item whose label has a data tag inside it and a continuation line after it", () => {
+        const input = 'DB_<pasted_memories>PASSWORD</pasted_memories>="x\nThe continuation phrase is amber-orchid-9472'; // secret-scanner:allow
+        const parsed = parseMemoryFile(JSON.stringify(["The user lives in Lisbon", input]), "json");
+
+        expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user lives in Lisbon"]);
+        expect(parsed).toMatchObject({ entries: 1, invalid: 1, total: 2 });
+    });
+
+    it("refuses a file with more entries than the limit a caller passes", () => {
+        expect(() => parseMemoryFile(lines(MEMORY_FILE_INLINE_MAX_ENTRIES + 1), "text", { maxEntries: MEMORY_FILE_INLINE_MAX_ENTRIES })).toThrow(
+            expect.objectContaining({ code: "too_many_entries" }) as unknown as Error,
+        );
+        expect(parseMemoryFile(lines(MEMORY_FILE_INLINE_MAX_ENTRIES), "text", { maxEntries: MEMORY_FILE_INLINE_MAX_ENTRIES }).entries).toBe(
+            MEMORY_FILE_INLINE_MAX_ENTRIES,
+        );
     });
 
     it("still imports a normal entry just under the raw-length guard that shrinks through redaction", () => {

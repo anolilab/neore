@@ -158,24 +158,41 @@ export const toBatches = <T>(items: ReadonlyArray<T>, size: number): T[][] => {
 const SECRET_LABEL_WORDS = `passw(?:or)?d|pwd|passphrase|secret|token|(?:api|access|private|secret)[ _-]?key|authorization|credentials?`;
 const SECRET_LABEL = new RegExp(String.raw`(?:${SECRET_LABEL_WORDS})(?:[_-][\w-]{0,40})?["']?[^\S\n]*[:=]`, "gu");
 
+/** What the label test ignores apart from tags: emphasis (`**`, `__`, code ticks) and invisible format characters (`Cf`: zero-width spaces and joiners, soft hyphens). */
+const EMPHASIS_AND_INVISIBLE_RE = /__|[*`\p{Cf}]/gu;
+
+/** A data tag's marker, with the tag names of `DATA_TAG_RE` in `import-logic.ts`. An unclosed one runs to the end of the line, so it is never rescanned from each `<`. */
+const DATA_TAG_MARKER_RE = /<\/?(?:pasted_memories|existing_memory|new_fact)\b[^>]*>?/giu;
+
+/** The line lower case, with emphasis and invisible characters removed (`DB_**PASSWORD**="` reads `db_password="`, `pass<U+200B>word=` reads `password=`), tags left in. */
+const emphasisFreeView = (line: string): string => line.replaceAll(EMPHASIS_AND_INVISIBLE_RE, "").toLowerCase();
+
 /**
- * The line as the label test reads it: lower case, with the emphasis the unwrapping removes (`**`, `__`, code ticks) taken
- * out, so `DB_**PASSWORD**="` reads `db_password="`, and with invisible format characters (`Cf`: zero-width spaces and
- * joiners, soft hyphens) removed, so `pass<U+200B>word=` reads `password=`. One non-recursive pass, no tag stripping: it
- * is safe on a line of any length, which the full unwrapping is not. Only the detection reads this view, never the
- * stored text.
+ * The line as the label test reads it: {@link emphasisFreeView} with the data-tag markers then removed, so
+ * `DB_<pasted_memories>PASSWORD</pasted_memories>=` and `PASS<new_**fact>WORD=` both read as their label. Two fixed
+ * `replaceAll` passes, never a loop: a tag fragment that only forms once another is removed
+ * (`<pasted_<pasted_memories>memories>`) survives, which detection accepts. It is linear, so it is safe on a line of any
+ * length, which the full unwrapping is not. Only the detection reads this view, never the stored text.
  */
-const detectionView = (line: string): string => line.replaceAll(/__|[*`\p{Cf}]/gu, "").toLowerCase();
+const detectionView = (line: string): string => emphasisFreeView(line).replaceAll(DATA_TAG_MARKER_RE, "");
 
-/** True when the line holds a secret label anywhere: used on a line past the raw-length guard, which is never unwrapped. */
+/**
+ * True when the line holds a secret label anywhere: used on a line past the raw-length guard, which is never unwrapped.
+ * Read both with and without the tags removed: an unclosed tag (`<pasted_memories DB_PASSWORD="`) swallows the rest of
+ * the line when removed, label included, and refusing is the safe side.
+ */
 const carriesSecretLabel = (line: string): boolean => {
-    SECRET_LABEL.lastIndex = 0;
+    const withTags = emphasisFreeView(line);
 
-    const found = SECRET_LABEL.test(detectionView(line));
+    return [withTags, withTags.replaceAll(DATA_TAG_MARKER_RE, "")].some((view) => {
+        SECRET_LABEL.lastIndex = 0;
 
-    SECRET_LABEL.lastIndex = 0;
+        const found = SECRET_LABEL.test(view);
 
-    return found;
+        SECRET_LABEL.lastIndex = 0;
+
+        return found;
+    });
 };
 
 /**
@@ -289,16 +306,15 @@ const secretContinues = (raw: string): boolean => {
 };
 
 /**
- * The one-based number of the first line of `lines` that {@link secretContinues}, or `undefined`. A line is read as
- * preparation will see it: with emphasis and tags removed, `DB_**PASSWORD**="alpha` names its secret. A line past the
- * raw-length guard is never unwrapped (that costs more than a line of any length can be allowed), and is counted too
- * long and never stored; but it may start a secret whose value goes on to the next line. It is read through
- * {@link detectionView} alone, and a label anywhere on it counts as continuing: refusing is the safe side.
+ * The one-based number of the first line of `lines` that {@link secretContinues}, or `undefined`. Every line is read
+ * through {@link detectionView} alone, never unwrapped: the unwrapping rescans a line each time a removal forms a new tag,
+ * so a file of lines made of nested tag fragments would stall the check. The view has emphasis, tags and invisible
+ * characters removed in one pass, so `DB_**PASSWORD**="alpha` names its secret. A line past the raw-length guard is counted
+ * too long and never stored; but it may start a secret whose value goes on to the next line, so a label anywhere on it
+ * counts as continuing: refusing is the safe side.
  */
 const firstSecretContinuingLine = (lines: ReadonlyArray<string>): number | undefined => {
-    const index = lines.findIndex((line) =>
-        line.length > MEMORY_FILE_ENTRY_PREPARE_MAX_CHARS ? carriesSecretLabel(line) : secretContinues(unwrapImportLine(line)),
-    );
+    const index = lines.findIndex((line) => (line.length > MEMORY_FILE_ENTRY_PREPARE_MAX_CHARS ? carriesSecretLabel(line) : secretContinues(line)));
 
     return index === -1 ? undefined : index + 1;
 };
@@ -367,9 +383,15 @@ const rawEntriesOf = (content: string, format: MemoryFileFormat): RawEntry[] => 
 /**
  * The file as batches of memories to write, with a count of everything left out. Refuses the file as a whole (a
  * {@link MemoryFileError}) when it is over the size limit, is not valid for its format, holds more than
- * {@link MEMORY_FILE_MAX_ENTRIES} entries, or holds no entry at all. Entries are prepared a batch at a time.
+ * `maxEntries` (default {@link MEMORY_FILE_MAX_ENTRIES}) entries (refused with `tooManyMessage` when given), or holds no entry at all. Entries are prepared a batch
+ * at a time, and only after the count is checked: a caller that can use no more than {@link MEMORY_FILE_INLINE_MAX_ENTRIES}
+ * passes it as `maxEntries`, so a larger file is refused before any entry is unwrapped.
  */
-export const parseMemoryFile = (content: string, format: MemoryFileFormat): ParsedMemoryFile => {
+export const parseMemoryFile = (
+    content: string,
+    format: MemoryFileFormat,
+    { maxEntries = MEMORY_FILE_MAX_ENTRIES, tooManyMessage }: { maxEntries?: number; tooManyMessage?: string } = {},
+): ParsedMemoryFile => {
     // UTF-16 length is at most the byte length: a string over the byte limit by length is over it by bytes too.
     if (content.length > MEMORY_FILE_MAX_BYTES || new TextEncoder().encode(content).length > MEMORY_FILE_MAX_BYTES) {
         throw new MemoryFileError("too_large", MEMORY_FILE_TOO_LARGE_MESSAGE);
@@ -377,8 +399,8 @@ export const parseMemoryFile = (content: string, format: MemoryFileFormat): Pars
 
     const raw = rawEntriesOf(content, format);
 
-    if (raw.length > MEMORY_FILE_MAX_ENTRIES) {
-        throw new MemoryFileError("too_many_entries", `The file has more than ${String(MEMORY_FILE_MAX_ENTRIES)} memories.`);
+    if (raw.length > maxEntries) {
+        throw new MemoryFileError("too_many_entries", tooManyMessage ?? `The file has more than ${String(maxEntries)} memories.`);
     }
 
     const seen = new Set<string>();
