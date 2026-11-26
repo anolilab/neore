@@ -638,7 +638,7 @@ export const Route = createRootRouteWithContext<AppContext>()({
             ],
             meta: [
                 ...metaTags,
-                { content: "#191919", name: "theme-color" },
+                { content: "#0e0f11", name: "theme-color" },
                 { content: "yes", name: "mobile-web-app-capable" },
                 { content: "yes", name: "apple-mobile-web-app-capable" },
                 { content: "default", name: "apple-mobile-web-app-status-bar-style" },
