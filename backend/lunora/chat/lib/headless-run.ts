@@ -636,7 +636,10 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
 
         extract(outcome.result.text);
 
-        if (!(await options.shouldStop?.())) {
+        // A stop writes no run event. A reviewer that failed leaves the goal unconfirmed, so that run failed; the limits and `met` finished it.
+        if (outcome.ended === "review_failed") {
+            await recordEnd("failed");
+        } else if (outcome.ended !== "user") {
             await recordEnd("succeeded");
         }
 

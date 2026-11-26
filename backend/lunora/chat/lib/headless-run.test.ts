@@ -38,6 +38,8 @@ const seen = vi.hoisted(() => {
         replies: [] as string[],
         // Extra fields of the next generation's result (its prompt's order, its steps).
         result: {} as Record<string, unknown>,
+        /** The reviewer's call fails: the goal is left unconfirmed. */
+        reviewFails: false,
         saved: [] as unknown[][],
         system: [] as string[],
         tools: [] as string[][],
@@ -106,6 +108,10 @@ vi.mock("./get-agent", () => {
 vi.mock("../goals/review", () => {
     return {
         reviewRound: vi.fn(async () => {
+            if (seen.reviewFails) {
+                throw new Error("reviewer unavailable");
+            }
+
             return { costMicrodollars: 0, met: seen.met.shift() ?? true, reason: "Add more." };
         }),
     };
@@ -256,6 +262,39 @@ describe("runHeadlessAgent personalization", () => {
                 .map((args) => args.outcome),
         ).toStrictEqual(["failed"]);
         seen.failAt = undefined;
+    });
+
+    it("records a failure, not a completion, for a goal whose reviewer failed", async () => {
+        seen.reviewFails = true;
+
+        try {
+            const ctx = fakeCtx() as unknown as Parameters<typeof runHeadlessAgent>[0] & { runMutation: ReturnType<typeof vi.fn> };
+
+            await runHeadlessAgent(ctx, {
+                goal: { text: "Ship it" },
+                maxSteps: 3,
+                memory: false,
+                model: "test-model",
+                organizationId: null,
+                origin: "lead",
+                personalization: "none",
+                prompt: "Run the report",
+                thread: { threadId: "thread-1" },
+                tools: "none",
+                userId: "owner",
+            });
+
+            const calls = ctx.runMutation.mock.calls as unknown as [string, { outcome?: string }][];
+
+            expect(
+                calls
+                    .map(([, args]) => args)
+                    .filter((args) => args.outcome !== undefined)
+                    .map((args) => args.outcome),
+            ).toStrictEqual(["failed"]);
+        } finally {
+            seen.reviewFails = false;
+        }
     });
 
     it("records no success for a headless run that was stopped, since a stop writes no run event", async () => {
