@@ -27,7 +27,7 @@ import { signedInLogin } from "./drivers/github";
 import type { PullRequestObservation } from "./pr-watch-logic";
 import { decideWatch, stateOf, storedWatchOf } from "./pr-watch-logic";
 import type { HostRequest } from "./origin-fetch";
-import { readFromHost, type ReadOutcome } from "./read-host";
+import { readFromHost, type ReadFailure, type ReadOutcome } from "./read-host";
 import type { CheckRun, CheckState, CheckSummary, MergeState } from "./types";
 
 /** A running watch is read again once its last read is this old. */
@@ -177,6 +177,45 @@ export const pollWatchLink = internalMutation
         return null;
     });
 
+const vReadFailure = v.union(
+    v.literal("forbidden"),
+    v.literal("host_error"),
+    v.literal("needs_reconnect"),
+    v.literal("not_connected"),
+    v.literal("not_found"),
+    v.literal("rate_limited"),
+);
+
+/**
+ * Notes a host read that failed, only while `lease` is still the link's current read: one metadata-only event (the link, the
+ * status and the attempt) and the status on the link, so a watch whose reads keep failing shows it. The watch's decision state,
+ * its wake count and its lease are untouched: the retry is the watchdog already armed with the lease.
+ */
+export const recordWatchFailure = internalMutation
+    .input({ lease: v.number(), linkId: v.id("pullRequestThreads"), startedAt: v.number(), status: vReadFailure })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const link = await ctx.db.get("pullRequestThreads", args.linkId);
+
+        if (
+            link === null ||
+            link.watchActive !== true ||
+            link.watch === undefined ||
+            link.watch.stoppedAt !== undefined ||
+            link.watch.startedAt !== args.startedAt ||
+            link.watchCheckedAt !== args.lease
+        ) {
+            return null;
+        }
+
+        const attempt = (link.watchReadFailure?.attempts ?? 0) + 1;
+
+        await ctx.db.patch("pullRequestThreads", link._id, { watchReadFailure: { at: ctx.now, attempts: attempt, status: args.status } });
+        ctx.log.event("develop.watch_poll_failed", { attempt, linkId: String(link._id), status: args.status });
+
+        return null;
+    });
+
 /**
  * What the host read needs from a running watch, on the user's shard. Null when the watch is gone or over, or when `lease` or
  * `startedAt` is no longer the link's own: the poll is stale and must not reach the host.
@@ -249,7 +288,12 @@ export const recordWatchObservation = internalMutation
         });
 
         // The lease ends with the record, whenever the read took: the next poll is armed from here, one interval later.
-        await ctx.db.patch("pullRequestThreads", link._id, { ...release, watch: stored.watch, watchPending: stored.watchPending ?? [] });
+        await ctx.db.patch("pullRequestThreads", link._id, {
+            ...release,
+            watch: stored.watch,
+            watchPending: stored.watchPending ?? [],
+            ...(link.watchReadFailure !== undefined && { watchReadFailure: { ...link.watchReadFailure, attempts: 0 } }),
+        });
         await runAfterOnShard(ctx.scheduler, PR_WATCH_POLL_INTERVAL_MS, internal.source_control.pr_watch_poll.pollWatchLink, { linkId: link._id }, link.userId);
 
         return null;
@@ -264,6 +308,8 @@ export interface WatchTarget {
 
 /** The steps of one poll, apart from where they run, so their order is pinned by a test. */
 export interface WatchPollSteps {
+    /** Notes a host read that failed: nothing else changes, and the retry is the one already armed. */
+    fail: (status: ReadFailure) => Promise<unknown>;
     /** The watch's target while this poll's lease and watch are still the link's own; null once they are not. */
     read: () => Promise<WatchTarget | null>;
     readHost: (target: WatchTarget, token: GithubTokenOutcome) => Promise<ReadOutcome<{ observation: PullRequestObservation }>>;
@@ -293,6 +339,8 @@ export const runWatchPoll = async (steps: WatchPollSteps): Promise<void> => {
 
     if (outcome.status === "ok") {
         await steps.record(outcome.observation);
+    } else {
+        await steps.fail(outcome.status);
     }
 };
 
@@ -364,6 +412,7 @@ export const pollWatchedPullRequest = internalAction
         const key = { lease: args.lease, linkId: args.linkId, startedAt: args.startedAt };
 
         await runWatchPoll({
+            fail: async (status) => await ctx.runMutation(internal.source_control.pr_watch_poll.recordWatchFailure, { ...key, status }),
             read: async () => await ctx.runQuery(internal.source_control.pr_watch_poll.readWatchForPoll, key),
             readHost: readObservation,
             record: async (observation) => await ctx.runMutation(internal.source_control.pr_watch_poll.recordWatchObservation, { ...key, observation }),

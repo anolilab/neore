@@ -16,6 +16,7 @@ import {
     observeWatched,
     pollWatchLink,
     readWatchForPoll,
+    recordWatchFailure,
     recordWatchObservation,
     runWatchPoll,
 } from "./pr-watch-poll";
@@ -227,12 +228,9 @@ describe("a poll that takes longer than the interval", () => {
         vi.useRealTimers();
     });
 
-    const jobs = (): { functionPath?: string; scheduledFor: number }[] => harness.scheduler.list() as never;
+    const jobs = (): { enqueuedAt: number; functionPath?: string; scheduledFor: number }[] => harness.scheduler.list() as never;
 
     it("keeps its lease, records its observation, and the next poll waits for the lease to end", async () => {
-        // The fake scheduler stamps jobs with the real clock; only the mutations see the faked one.
-        const realNow = Date.now();
-
         vi.useFakeTimers({ now: START, toFake: ["Date"] });
 
         const linkId = await seedWatch({ watchCheckedAt: undefined, watchLeaseUntil: undefined });
@@ -261,16 +259,17 @@ describe("a poll that takes longer than the interval", () => {
         await record(linkId, { lease, observation: observation({ headSha: "sha-slow" }) });
 
         const row = await rowOf(linkId);
-        // Within a minute of the interval: the fake scheduler stamps with the real clock, a little apart from this test's.
-        const armed = jobs().filter((job) => Math.abs(job.scheduledFor - (realNow + PR_WATCH_POLL_INTERVAL_MS)) < 60_000);
+        // Each job's delay is its own scheduledFor minus its own enqueuedAt, so no clock is compared with another.
+        const delays = (list: { enqueuedAt: number; scheduledFor: number }[]) => list.map((job) => job.scheduledFor - job.enqueuedAt);
+        const armed = delays(jobs().slice(afterLease) as never);
 
         expect(row.watch).toMatchObject({ baselined: true, headSha: "sha-slow" });
         expect(row.watchLeaseUntil).toBe(recordedAt + PR_WATCH_POLL_INTERVAL_MS);
         expect(jobs()).toHaveLength(afterLease + 1);
-        expect(armed).toHaveLength(1);
+        expect(armed).toEqual([PR_WATCH_POLL_INTERVAL_MS]);
 
         // The watchdog armed with the lease sits a whole lease away, so it cannot start a poll inside the read.
-        expect(jobs().some((job) => Math.abs(job.scheduledFor - (realNow + PR_WATCH_LEASE_MS)) < 60_000)).toBe(true);
+        expect(delays(jobs().slice(0, afterLease) as never)).toContain(PR_WATCH_LEASE_MS);
 
         // Before that interval ends nothing is leased; after it, the watch is polled again.
         await run();
@@ -314,7 +313,7 @@ describe("a poll that went stale before the host read", () => {
         const saved = vi.fn();
         const read = vi.fn().mockResolvedValueOnce(TARGET).mockResolvedValueOnce(null);
 
-        await runWatchPoll({ read, readHost, record: saved, token: async () => TOKEN });
+        await runWatchPoll({ fail: vi.fn(), read, readHost, record: saved, token: async () => TOKEN });
 
         expect(read).toHaveBeenCalledTimes(2);
         expect(readHost).not.toHaveBeenCalled();
@@ -325,7 +324,7 @@ describe("a poll that went stale before the host read", () => {
         const readHost = vi.fn();
         const token = vi.fn();
 
-        await runWatchPoll({ read: async () => null, readHost, record: vi.fn(), token });
+        await runWatchPoll({ fail: vi.fn(), read: async () => null, readHost, record: vi.fn(), token });
 
         expect(token).not.toHaveBeenCalled();
         expect(readHost).not.toHaveBeenCalled();
@@ -336,16 +335,18 @@ describe("a poll that went stale before the host read", () => {
         const readHost = vi.fn().mockResolvedValue({ observation: answer, status: "ok" });
         const saved = vi.fn();
 
-        await runWatchPoll({ read: async () => TARGET, readHost, record: saved, token: async () => TOKEN });
+        await runWatchPoll({ fail: vi.fn(), read: async () => TARGET, readHost, record: saved, token: async () => TOKEN });
 
         expect(readHost).toHaveBeenCalledOnce();
         expect(saved).toHaveBeenCalledWith(answer);
     });
 
-    it("records nothing when the host read failed", async () => {
+    it("notes a failed host read and records nothing else", async () => {
         const saved = vi.fn();
+        const failed = vi.fn();
 
         await runWatchPoll({
+            fail: failed,
             read: async () => TARGET,
             readHost: async () => {
                 return { status: "rate_limited" };
@@ -355,6 +356,48 @@ describe("a poll that went stale before the host read", () => {
         });
 
         expect(saved).not.toHaveBeenCalled();
+        expect(failed).toHaveBeenCalledExactlyOnceWith("rate_limited");
+    });
+
+    it("logs one event for a failed read, counts the attempts and leaves the watch state unchanged", async () => {
+        const watch = { baselined: true, headSha: "sha-1", startedAt: STARTED_AT, wakes: 2 };
+        const linkId = await seedWatch({ watch, watchPending: ["checks"] });
+        const event = vi.fn();
+        const fail = async (status: string) => {
+            await harness.run(async (ctx: any) => {
+                ctx.log.event = event;
+                await ctx.runMutation(recordWatchFailure, { ...key(linkId), status });
+            });
+        };
+
+        await fail("rate_limited");
+        await fail("host_error");
+
+        const row = await rowOf(linkId);
+
+        expect(row.watch).toEqual(watch);
+        expect(row.watchPending).toEqual(["checks"]);
+        expect(row.watchActive).toBe(true);
+        expect(row.watchCheckedAt).toBe(LEASE);
+        expect(row.watchReadFailure).toMatchObject({ attempts: 2, status: "host_error" });
+        expect(event).toHaveBeenCalledTimes(2);
+        expect(event).toHaveBeenLastCalledWith("develop.watch_poll_failed", { attempt: 2, linkId, status: "host_error" });
+    });
+
+    it("ignores a failure for a stale lease, and a landed read clears the failure", async () => {
+        const linkId = await seedWatch({ watch: { baselined: true, startedAt: STARTED_AT }, watchReadFailure: { at: 1, attempts: 3, status: "host_error" } });
+
+        await harness.run(async (ctx: any) => {
+            await ctx.runMutation(recordWatchFailure, { ...key(linkId), lease: LEASE + 1, status: "not_found" });
+        });
+        const stale = await rowOf(linkId);
+
+        expect(stale.watchReadFailure.attempts).toBe(3);
+
+        await record(linkId, { observation: observation() });
+        const cleared = await rowOf(linkId);
+
+        expect(cleared.watchReadFailure.attempts).toBe(0);
     });
 });
 

@@ -2743,6 +2743,22 @@ export const schema = defineSchema({
         // Occurrences seen during a cooldown, delivered once the cooldown has passed (`source-control/pr-watch-logic.ts`).
         // Cleared by a fresh start; a stopped watch keeps whatever it had.
         watchPending: v.optional(v.array(v.union(v.literal("checks"), v.literal("conflict"), v.literal("review")))),
+        // How the poller's host reads are failing, so a watch that cannot be read is not invisible (`source-control/pr-watch-poll.ts`): the last failure's
+        // status and time, and how many reads in a row failed. Reset to zero attempts by the next read that lands. Never changes the watch's decision state.
+        watchReadFailure: v.optional(
+            v.object({
+                at: v.number(),
+                attempts: v.number(),
+                status: v.union(
+                    v.literal("forbidden"),
+                    v.literal("host_error"),
+                    v.literal("needs_reconnect"),
+                    v.literal("not_connected"),
+                    v.literal("not_found"),
+                    v.literal("rate_limited"),
+                ),
+            }),
+        ),
     })
         .shardBy("userId")
         .index("by_user_and_repository_number", ["userId", "repository", "number"])
