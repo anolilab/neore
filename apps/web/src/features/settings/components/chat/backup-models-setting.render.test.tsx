@@ -11,7 +11,7 @@ const state = vi.hoisted(() => {
         catalog: [] as GatewayModel[],
         excluded: new Set<string>(),
         rerender: (() => undefined) as () => void,
-        settings: {} as { backupModels?: string[] },
+        settings: {} as undefined | { backupModels?: string[] },
     };
 });
 
@@ -123,6 +123,15 @@ describe("BackupModelsSetting", () => {
 
         expect(first?.textContent).not.toContain("Unavailable");
         expect(second?.textContent).toContain("Unavailable");
+    });
+
+    it("cannot be edited until the settings load, so an early add cannot replace the saved list", () => {
+        state.settings = undefined;
+        show();
+
+        const picker = screen.getByRole("combobox", { name: "Add a backup model" });
+
+        expect(picker.hasAttribute("disabled") || picker.dataset.disabled !== undefined).toBe(true);
     });
 
     it("does not mark a saved backup a feature flag hides from the picker as unavailable", () => {

@@ -173,6 +173,8 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
     // Edits queue behind each other (`updateLatest`), so the controls stay enabled while one saves and keep their focus.
     const { updateLatest } = useUpdateUserSettings();
     const chosen = storedBackupModels(userSettings);
+    // Until the settings load, the list only looks empty: an edit then would replace the saved one.
+    const locked = disabled === true || userSettings === undefined;
     const chosenKey = chosen.join("\n");
     const limit = MAX_BACKUP_MODELS;
     const removeButtons = useRef(new Map<string, HTMLButtonElement>());
@@ -233,7 +235,7 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                                 </span>
                                 <Button
                                     aria-label={t`Move ${name} up`}
-                                    disabled={disabled || index === 0}
+                                    disabled={locked || index === 0}
                                     onClick={() => save((list) => moveBackupModel(list, id, -1))}
                                     size="icon-sm"
                                     variant="ghost"
@@ -242,7 +244,7 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                                 </Button>
                                 <Button
                                     aria-label={t`Move ${name} down`}
-                                    disabled={disabled || index === chosen.length - 1}
+                                    disabled={locked || index === chosen.length - 1}
                                     onClick={() => save((list) => moveBackupModel(list, id, 1))}
                                     size="icon-sm"
                                     variant="ghost"
@@ -251,7 +253,7 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                                 </Button>
                                 <Button
                                     aria-label={t`Remove ${name}`}
-                                    disabled={disabled}
+                                    disabled={locked}
                                     onClick={() => {
                                         focusAfter.current = chosen[index + 1] ?? chosen[index - 1] ?? "";
                                         save((list) => list.filter((entry) => entry !== id));
@@ -277,7 +279,7 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                 <div ref={addRow}>
                     <ModelSelect
                         description={t`Up to ${limit}, tried in the order listed`}
-                        disabled={disabled}
+                        disabled={locked}
                         emptyLabel={t`Choose a model`}
                         field="backupModels"
                         label={chosen.length === 0 ? t`Add a backup model` : t`Add another backup model`}
