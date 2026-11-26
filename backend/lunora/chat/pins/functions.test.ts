@@ -1470,3 +1470,46 @@ describe("the owed restore reads its row, and each drain stays inside the statem
         expect(await routesFor(COLLABORATOR)).toHaveLength(rows);
     });
 });
+
+describe("a deleted thread's routes and owed restores drain within one budget per call", () => {
+    it("clears more routes and owed restores than one call takes, and reports more until the last one is gone", async () => {
+        const { eraseThreadPinsAndRoutesBatch } = await import("../gdpr");
+
+        const rows = ERASE_DRAIN_ROWS + 5;
+
+        await harness.run(async (context: any) => {
+            for (let index = 0; index < rows; index += 1) {
+                await context.db.insert("sharedPinRoutes", { createdAt: 1, ownerId: OWNER, threadId, userId: `user-thread-${index}` });
+                await context.db.insert("pendingPinRestores", {
+                    dispatchedAt: 1,
+                    ownerId: OWNER,
+                    routeCreatedAt: 1,
+                    threadId,
+                    until: 1,
+                    userId: `user-owed-thread-${index}`,
+                });
+            }
+        });
+
+        let calls = 0;
+        let hasMore = true;
+
+        while (hasMore && calls < 50) {
+            const result = await harness.run(async (context: any) => await eraseThreadPinsAndRoutesBatch(context, threadId));
+
+            hasMore = result.hasMore;
+            calls += 1;
+        }
+
+        const left = await harness.run(async (context: any) => {
+            const routes = await context.db.sharedPinRoutes.findMany({ consistency: "primary", where: { threadId } });
+            const owed = await context.db.pendingPinRestores.findMany({ consistency: "primary", where: { threadId } });
+
+            return routes.page.length + owed.page.length;
+        });
+
+        expect(hasMore).toBe(false);
+        expect(calls).toBeGreaterThan(1);
+        expect(left).toBe(0);
+    });
+});

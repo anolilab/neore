@@ -276,18 +276,28 @@ export const eraseThreadPinsAndRoutesBatch = async (ctx: MutationCtx, threadId: 
         await ctx.db.delete("threadPins", pin._id);
     }
 
-    const { page } = await ctx.db.sharedPinRoutes.findMany({ consistency: "primary", limit: BATCH, where: { threadId } });
+    // The routes and the owed restores are global statements, so they share the erasure drain's budget (`ERASE_DRAIN_ROWS`, one call's
+    // reads and writes stay under the Worker's 50-statement limit). The owed restores take what the routes leave.
+    const { page } = await ctx.db.sharedPinRoutes.findMany({ consistency: "primary", limit: ERASE_DRAIN_ROWS, where: { threadId } });
 
     for (const route of page) {
         await ctx.db.delete("sharedPinRoutes", route._id);
     }
 
     // An owed restore names the thread, and so it goes with the thread: there is no route left for it to write.
-    const { page: owed } = await ctx.db.pendingPinRestores.findMany({ consistency: "primary", limit: BATCH, where: { threadId } });
+    const left = ERASE_DRAIN_ROWS - page.length;
+    let owedFull = false;
 
-    for (const row of owed) {
-        await ctx.db.delete("pendingPinRestores", row._id);
+    if (left > 0) {
+        const { page: owed } = await ctx.db.pendingPinRestores.findMany({ consistency: "primary", limit: left, where: { threadId } });
+
+        for (const row of owed) {
+            await ctx.db.delete("pendingPinRestores", row._id);
+        }
+
+        owedFull = owed.length === left;
     }
 
-    return { hasMore: pins.length >= BATCH || page.length >= BATCH || owed.length >= BATCH };
+    // A full routes page means the budget went to routes and more may remain; the owed restores are read only if the budget was not spent.
+    return { hasMore: pins.length >= BATCH || page.length === ERASE_DRAIN_ROWS || owedFull };
 };
