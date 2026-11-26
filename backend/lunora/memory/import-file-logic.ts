@@ -219,12 +219,36 @@ const endsInLineContinuation = (line: string): boolean => {
     return backslashes % 2 === 1;
 };
 
+/** The chomping (`-`, `+`) and indentation (a digit) modifiers of a YAML block header, in either order, at most one of each. */
+const BLOCK_MODIFIERS = /^(?:[+-]\d?|\d[+-]?)?/u;
+
+/**
+ * True when the value starting at `start` is only a YAML block scalar header: `|` or `>`, the optional modifiers,
+ * trailing whitespace and an optional `#` comment set off by whitespace. The value of such a key is the indented lines
+ * that follow. Linear: the modifiers are read from a two-character window, then one forward scan over whitespace that
+ * the next label cannot overlap.
+ */
+const startsBlockScalar = (line: string, start: number): boolean => {
+    if (line[start] !== "|" && line[start] !== ">") {
+        return false;
+    }
+
+    const afterModifiers = start + 1 + (BLOCK_MODIFIERS.exec(line.slice(start + 1, start + 3))?.[0].length ?? 0);
+    let end = afterModifiers;
+
+    while (end < line.length && line[end]?.trim() === "") {
+        end += 1;
+    }
+
+    return end === line.length || (line[end] === "#" && end > afterModifiers);
+};
+
 /**
  * True when one line names a secret (`DB_PASSWORD=`, `api_token:`) and its value does not end on that line: nothing
- * follows the `=` or `:`, a quote opened right after it has no matching one later on the line, or the line ends in an
- * unescaped backslash (a line continuation). Such a value goes on to the next line, and the redaction reads one line at
- * a time, so its continuation would be read as a memory. The file is refused rather than guessing where the value ends.
- * A label inside a quoted value already read is skipped.
+ * follows the `=` or `:`, a quote opened right after it has no matching one later on the line, the value is only a YAML
+ * block header (`DB_PASSWORD: |`, `>-`), or the line ends in an unescaped backslash (a line continuation). Such a value
+ * goes on to the next line, and the redaction reads one line at a time, so its continuation would be read as a memory.
+ * The file is refused rather than guessing where the value ends. A label inside a quoted value already read is skipped.
  */
 const secretContinues = (raw: string): boolean => {
     const line = detectionView(raw);
@@ -254,6 +278,8 @@ const secretContinues = (raw: string): boolean => {
             if (readUntil === -1) {
                 return true;
             }
+        } else if (startsBlockScalar(line, start)) {
+            return true;
         }
 
         named = true;

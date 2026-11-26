@@ -230,6 +230,34 @@ describe("parseMemoryFile: text", () => {
         expect(refusal("DB_PASSWORD=\nThe user likes green tea", "text")).toMatchObject({ code: "secret_continues" }); // secret-scanner:allow
     });
 
+    it.each([
+        "DB_PASSWORD: |\n  hunter2", // secret-scanner:allow
+        "DB_PASSWORD: >\n  hunter2", // secret-scanner:allow
+        "DB_PASSWORD: >-\n  hunter2", // secret-scanner:allow
+        "DB_PASSWORD: |2+\n  hunter2", // secret-scanner:allow
+        "DB_PASSWORD: >+1  # the vault value\n  hunter2", // secret-scanner:allow
+        "DB_PASSWORD=|\n  hunter2", // secret-scanner:allow
+    ])("refuses a text file and skips a JSON item whose secret value is a YAML block (%#)", (input) => {
+        const error = refusal(`The user lives in Lisbon\n${input}`, "text");
+
+        expect(error).toMatchObject({ code: "secret_continues", message: expect.stringContaining("Line 2") });
+        expect(error?.message).not.toMatch(SECRET_WORDS);
+        expect(parseMemoryFile(JSON.stringify(["The user lives in Lisbon", input]), "json")).toMatchObject({ entries: 1, invalid: 1, total: 2 });
+    });
+
+    it("still imports an ordinary fact that holds a pipe or an arrow and no secret label", () => {
+        const input = "The user likes tea | coffee\nThe user's shortcut is Ctrl > Alt\nTo-do: | is the pipe key";
+        const parsed = parseMemoryFile(input, "text");
+
+        expect(refusal(input, "text")).toBeUndefined();
+        expect(parsed.batches.flat()).toHaveLength(3);
+    });
+
+    it("does not read a secret label followed by more than a block header as a block", () => {
+        expect(refusal("DB_PASSWORD: | not a block\nThe user likes green tea", "text")).toBeUndefined(); // secret-scanner:allow
+        expect(refusal("DB_PASSWORD: |x\nThe user likes green tea", "text")).toBeUndefined(); // secret-scanner:allow
+    });
+
     it("refuses a text file and skips a JSON item whose label hides a zero-width character", () => {
         const input = `pass\u{200B}word=\nThe user likes green tea`; // secret-scanner:allow
         const parsed = parseMemoryFile(JSON.stringify(["The user lives in Lisbon", input]), "json");
