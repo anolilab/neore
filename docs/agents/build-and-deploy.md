@@ -127,7 +127,7 @@ Write`; without them the deploy fails, hence the switch.
   `backend/lunora/migrations.ts`), every declared one in declaration order, through
   `scripts/run-data-migrations.ts` (`lunora migrate up <id> --prod --yes`, which takes one id). A new
   backfill needs no workflow edit: declare it after any migration it depends on, in that file (the
-  runner reads no other), with a literal string `id`: one it cannot read fails the step. `up` is idempotent and resumable: a shard that completed a migration
+  runner reads no other), with a quoted string literal `id` and `table` (Lunora's codegen reads no constant or template): any other fails the step. `up` is idempotent and resumable: a shard that completed a migration
   answers at once, so a deploy only pays one fan-out per migration. The admin token reaches the CLI only as `LUNORA_ADMIN_TOKEN` in the step's environment;
   the log shows ids and counts only, and production no error detail. A failed or unfinished
   migration fails the job. `backend/deploy-migrations.test.ts` pins it.
@@ -135,9 +135,25 @@ Write`; without them the deploy fails, hence the switch.
   it fails on the root shard (staging: `shard "__root__" returned 500`) and stops every migration after it. The runner
   refuses one, reading the shard modes from `backend/lunora/.lunora-schema.json`, and a test fails first. Backfill a
   D1 table through an internal mutation behind an admin route the same step calls: `user.emailCanonical` is filled by
-  `POST /admin/backfill-email-canonical` (`backend/lunora/auth/email-canonical-backfill.ts`), one batch per call until
-  `done`, before the shard migrations; each runs whether the other fails, and either failing fails the job. Two
-  accounts whose addresses fold to one stop it with a count (409), with neither filled: merge or rename one.
+  `POST /admin/backfill-email-canonical` (`backend/lunora/auth/email-canonical-backfill.ts`), before the shard
+  migrations; each runs whether the other fails, and either failing fails the job. `.global()` writes are not
+  transactional, so the runner first checks EVERY account and writes nothing until no address is shared. The server
+  keeps the check: its first call opens a record (an `idempotencyClaims` row on the root shard, outside D1's budget,
+  keyed by a token the server makes) with the check's start and the next cursor; beside it, under the same token and
+  acquisition, a claim with a digest of every folded address read and one claim per unfilled id, so a fill reads the
+  small record and its one id's claim, never the whole scan; each later call names the token and goes on from the record's cursor, and an address two rows fold
+  to, in one call or across calls, drops the record and answers 409. A row's key is the fold of its `email` as it is
+  now, never its stored `emailCanonical` (a stored value is the fill's holder check's). Pages are 500 rows: Lunora fetches `limit + 1` rows to tell a last page,
+  and a D1 statement answers at most 1,000. Only then the fill: one id per call, under the token of a COMPLETED
+  check and only among its ids, with the start time from the record (a body with `checkedAt` or `cursor` is refused,
+  and a record whose start lies ahead of the clock too); a row is filled only while it is unchanged since a minute
+  before the check began; rows changed since wait for another round (up to 3), which starts with a new check. One id
+  per call because `patchIf` makes up to 16 rounds of a read and a guarded write with no lower cap: worst case 36 of
+  the 50 statements (`EMAIL_CANONICAL_FILL_WORST`). Two accounts whose addresses fold to one stop it with a count
+  (409), with neither filled: merge or rename one. Three answers in a row that move nothing fail it; a fill whose row
+  changed is not one. A run makes at most 5,000 calls (inside the step's 30 minutes at the route's 3,000 per 15 minutes); one that stops
+  there fails the step, and the next deploy goes on. The log prints counts only, never a token or an id; a refused call prints its code, and outside production its
+  message with URLs replaced.
 - **A Worker that passes the size cap can still fail Cloudflare's startup check** ("Script startup
   exceeded CPU time limit", error 10021): the module-level code of the whole bundle may take 1 s of
   CPU, and it is checked at upload, so it first shows on a deploy. `cd backend && pnpm exec wrangler
