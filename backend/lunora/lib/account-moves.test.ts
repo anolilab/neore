@@ -21,6 +21,7 @@ import {
     isAccountMoving,
     pinWritesInFlightUntil,
     reclaimPinWriteLeases,
+    refusesPinWrite,
 } from "./account-moves";
 
 describe("the account move marker", () => {
@@ -306,6 +307,24 @@ describe("the owner-shard fence", () => {
             await harness.run(async (context: any) => await unfencePinsOnShard(context, "user-fenced"));
 
             expect(await harness.run(async (context: any) => await admitPinWriteAs(context, "user-fenced", 2))).not.toBeNull();
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("refuses a write admitted before the sweep at its last check, once the fence is on the shard", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            // The write is admitted while the shard is open, so its lease is in flight when the sweep fences the shard.
+            const writerId = await harness.run(async (context: any) => await admitPinWriteAs(context, "user-window", 1));
+
+            expect(writerId).not.toBeNull();
+
+            await harness.run(async (context: any) => await fencePinsOnShard(context, "user-window", 2));
+
+            // The write's insert follows this check in the same transaction, so the pin it would commit after the sweep is refused.
+            expect(await harness.run(async (context: any) => await refusesPinWrite(context, "user-window", 3))).toBe(true);
         } finally {
             harness.close();
         }
