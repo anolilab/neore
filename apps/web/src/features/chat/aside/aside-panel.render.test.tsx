@@ -545,8 +545,8 @@ describe("AsidePanel", () => {
         useAsideStore.setState({ byThread: { "thread-1": [{ answer: "A cat.", id: "a", question: "Why?", status: "answered", token: "tok" }] } });
         render(<AsidePanel threadId="thread-1" />);
 
-        // The answer is a scroll box of its own that ends at 250, so the hit at 300 lies below it. Scrolling the box by the 70 px
-        // it needs moves the hit past the box's own range, to 40: under the sticky bar, where the panel itself does not see it.
+        // The answer is a scroll box of its own, ending at 250, so the hit at 300 lies below it. Scrolling the box by the 70 px
+        // that brings the hit back moves it to 40: under the sticky bar, where the panel does not see it.
         const answer = screen.getByText("A cat.");
         const scrollBox = vi.fn(() => {
             hitTop = 40;
