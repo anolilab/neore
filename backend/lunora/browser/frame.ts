@@ -138,6 +138,8 @@ export const readBrowserFrame = authAction
             return { status: "unavailable" as const };
         }
 
+        ctx.log.event("browser.frame_read", { ok: true });
+
         return {
             image: result.screenshot,
             status: "ok" as const,
