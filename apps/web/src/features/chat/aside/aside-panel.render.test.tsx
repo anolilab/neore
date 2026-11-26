@@ -643,4 +643,34 @@ describe("AsidePanel", () => {
             vi.useRealTimers();
         }
     });
+
+    it("brings a hit that runs past the panel's right edge into view", async () => {
+        vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
+        const scroll = vi.fn();
+
+        useAsideStore.setState({ byThread: { "thread-1": [{ answer: "A cat.", id: "a", question: "Why?", status: "answered", token: "tok" }] } });
+        render(<AsidePanel threadId="thread-1" />);
+
+        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
+        // jsdom's window is 1024 px wide; the hit starts inside it and its unbroken token runs past its right edge.
+        Object.defineProperty(Range.prototype, "getBoundingClientRect", {
+            configurable: true,
+            value: () => {
+                return { bottom: 120, left: 1000, right: 1200, top: 100 };
+            },
+        });
+
+        try {
+            act(() => {
+                globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+            });
+            fireEvent.change(screen.getByRole("textbox", { name: "Find in side questions" }), { target: { value: "cat" } });
+            await settleReveal();
+            expect(scroll).toHaveBeenCalled();
+        } finally {
+            Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+            Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
+            vi.useRealTimers();
+        }
+    });
 });

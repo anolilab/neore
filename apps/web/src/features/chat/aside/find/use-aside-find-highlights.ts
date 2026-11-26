@@ -149,9 +149,11 @@ const revealIfOutOfSight = (range: Range | undefined, host: Element): void => {
     const scroller = scrollerOf(host);
     const rect = hitRect(range, target);
     // Without a scroll container of its own, the panel is read against the visible window.
-    const bounds = scroller?.getBoundingClientRect() ?? { bottom: window.innerHeight, top: 0 };
+    const bounds = scroller?.getBoundingClientRect() ?? { bottom: window.innerHeight, left: 0, right: window.innerWidth, top: 0 };
+    // A token too wide for the panel runs past its right edge, which the vertical check alone does not see.
+    const beyondSides = rect.left < bounds.left || rect.right > bounds.right;
 
-    if (!isOutsideViewport(rect, bounds) && !isClippedWithin(rect, target, scroller ?? document.documentElement)) {
+    if (!isOutsideViewport(rect, bounds) && !beyondSides && !isClippedWithin(rect, target, scroller ?? document.documentElement)) {
         return;
     }
 
