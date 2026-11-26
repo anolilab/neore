@@ -16,7 +16,7 @@ import schema from "../schema";
 import { getFullThreadForExport } from "./functions";
 import { getLowRiskApprovalContext } from "./tool-permissions";
 import { agentSwitchRowContent } from "../agent/agent-switch-logic";
-import { threadHandoffTaint } from "../agent/thread-summary-taint";
+import { threadHandoffTaint, threadSummaryTaint } from "../agent/thread-summary-taint";
 import { computeTaint } from "../devices/lib/taint";
 import { createSideChat, sideChatRefusalOf } from "./side-chat";
 
@@ -852,5 +852,29 @@ describe("createSideChat", () => {
 
         expect(outcome.status).toBe("ok");
         expect(child.workerPolicy).toMatchObject({ allowedSources: [], hostDispatch: "ask", maxDispatchesPerHour: 5 });
+    });
+
+    it("keeps the summary taint the parent's context summaries carry, for device calls from the side chat", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await withMessages(parentId, OWNER, ["hello"]);
+        await harness.run(async (ctx: any) => {
+            const [message] = await ctx.db.query("messages").collect();
+
+            await ctx.db.insert("threadContextSummaries", {
+                coveredCount: 1,
+                coveredUpToMessageId: message._id,
+                createdAt: 1,
+                summary: "notes from a web page",
+                taintedBy: ["web"],
+                threadId: parentId,
+                userId: OWNER,
+            });
+        });
+
+        const outcome = (await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)) as { status: string; threadId: string };
+
+        expect(outcome.status).toBe("ok");
+        expect(await harness.run(async (ctx: any) => await threadSummaryTaint(ctx, outcome.threadId as never))).toStrictEqual(["web"]);
     });
 });
