@@ -6,11 +6,13 @@
  * One row per upstream event, keyed by `(userId, eventId)`. A recorder that runs twice for the same event writes once, so a
  * redelivered job cannot double a run's event.
  */
+import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import type { MutationCtx } from "../_generated/server";
 import { chatLogger } from "../lib/logger";
 import { noteRetentionWake } from "../lib/shard-housekeeping";
 import { runAfterOnShard } from "../lib/shard-scheduler";
+import { RUN_COMPLETED_EVENT, RUN_FAILED_EVENT } from "./events-catalog";
 
 /** What a write to the log takes: its db, its clock, and the scheduler that carries the expiry wake and its retry. */
 type LogWriteCtx = Pick<MutationCtx, "db" | "now" | "scheduler">;
@@ -120,6 +122,37 @@ export const recordMcpEvent = async (ctx: LogWriteCtx, input: RecordEventInput):
     await wakeForExpiry(ctx, input.userId, ctx.now + RETENTION_MS);
 
     return true;
+};
+
+/**
+ * Records how a reply's run ended, for the thread's owner. Keyed by the stream, so one reply has one end event however often
+ * the end is written: the final chunk, a live stream set to error, and a timed-out stream all go through here.
+ *
+ */
+export const recordRunEnd = async (ctx: LogWriteCtx, input: { outcome: "succeeded" | "failed"; streamId: string; threadId: string }): Promise<void> => {
+    const thread = await ctx.db.get("threads", input.threadId as Id<"threads">);
+
+    // A thread row that is gone was deleted: its run's log is not reachable from this shard, so nothing is recorded here. A trashed
+    // chat records nothing either: its events are removed with the trash, and one recorded behind that removal would be found by restore.
+    if (!thread || thread.deleted === true) {
+        return;
+    }
+
+    // A chat with no owner records no run end: nothing deletes its events with the chat (`agent/threads.ts` removes an owned chat's
+    // events only), so they would outlive it. Approval requests for it record nothing for the same reason.
+    const owner = thread.userId;
+
+    if (owner === undefined) {
+        return;
+    }
+
+    await recordMcpEvent(ctx, {
+        data: { finishedAt: ctx.now, outcome: input.outcome, threadId: input.threadId },
+        eventId: `run:${input.streamId}`,
+        name: input.outcome === "succeeded" ? RUN_COMPLETED_EVENT : RUN_FAILED_EVENT,
+        timestamp: ctx.now,
+        userId: owner,
+    });
 };
 
 const setWatermark = async (ctx: Pick<MutationCtx, "db">, userId: string, rowId: string | undefined, seq: number): Promise<void> => {

@@ -1249,6 +1249,8 @@ export const finishRun = async (
     try {
         await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
             final: paused || keepOpenUnlessPaused !== true,
+            // A run that ends here (not paused, not a group turn going on) is recorded in the Events log by the chunk that ends it.
+            ...(!paused && keepOpenUnlessPaused !== true && { runEnd: "succeeded" as const }),
             reasoning: pending.reasoning || undefined,
             ...(runEpoch !== undefined && { runEpoch }),
             streamId: streamId as Id<"persistentStreams">,
@@ -1942,6 +1944,7 @@ export const failRun = async (
         try {
             await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
                 final: true,
+                runEnd: "failed",
                 ...(runEpoch !== undefined && { runEpoch }),
                 streamId: streamId as Id<"persistentStreams">,
                 text: `\n\nError: ${safeMessage}`,
@@ -1957,10 +1960,20 @@ export const failRun = async (
             endedElsewhere = (await readStatus()) === "done";
 
             if (!endedElsewhere) {
-                await ctx.runMutation(internal.chat.streaming.persistent.library.setStreamStatus, {
-                    status: "error",
-                    streamId: streamId as Id<"persistentStreams">,
-                });
+                try {
+                    await ctx.runMutation(internal.chat.streaming.persistent.library.setStreamStatus, {
+                        status: "error",
+                        ...(runEpoch !== undefined && { runEpoch }),
+                        streamId: streamId as Id<"persistentStreams">,
+                    });
+                } catch (statusError) {
+                    // A newer run took the stream between the refused write and this one: it is not this run's to fail.
+                    if (isRunReplaced(statusError)) {
+                        return { replaced: true };
+                    }
+
+                    throw statusError;
+                }
             }
         }
     }

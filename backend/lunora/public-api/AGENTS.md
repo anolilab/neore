@@ -4,8 +4,11 @@
 
 - **Public v1 API + `neore` CLI** (`backend/lunora/public-api/`, `apps/cli`) —
   one route table (`routes.ts`) feeds both the hono router and
-  `/api/v1/openapi.json`; every handler calls an EXISTING public procedure
-  through `ctx.runQuery(api.…)`. That works because `server.ts`'s
+  `/api/v1/openapi.json`; most handlers call an EXISTING public procedure
+  through `ctx.runQuery(api.…)`. The exception is `events/poll`, which calls
+  `internal.public_api.events.pollEvents` (the Events log has no public
+  procedure), so the router, not a procedure, enforces its scope and limit.
+  The `api.…` path works because `server.ts`'s
   `resolveIdentity` resolves an API key to the key owner's `userId` on
   `/api/v1/*` ONLY (and nothing but a key there — no JWT, no cookie), so the
   procedure's own auth, access checks and limits run unchanged; scopes and the

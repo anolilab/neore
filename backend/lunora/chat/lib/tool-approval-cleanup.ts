@@ -24,6 +24,7 @@
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { clearAwaitingInput } from "../../agent/table-writes";
+import { recordRunEnd } from "../../public-api/events-log";
 
 /**
  * Closes an unanswered request that nothing will answer now (its run ended, or the person walked away): denied, with who
@@ -64,6 +65,34 @@ const releaseExpiredPauses = async (ctx: Pick<MutationCtx, "db">, expired: Reado
     }
 };
 
+type PurgeCtx = Pick<MutationCtx, "db" | "now" | "scheduler">;
+
+type ExpiredRequest = { config: { replyKey?: string }; status: string; threadId: string };
+
+/**
+ * A headless pause has no stream for the timeout to close, so an expired pending request ends its run here, as an interactive pause's
+ * stream does (`cleanupExpiredStreams`). The run is failed only once no other request of it is left in the thread: while one remains
+ * (answered, or still open), the run may have resumed, so it is not reported as failed. The end is keyed by the run's reply key.
+ */
+const failExpiredHeadlessPauses = async (ctx: PurgeCtx, expired: ReadonlyArray<ExpiredRequest>): Promise<void> => {
+    for (const row of expired) {
+        const { replyKey } = row.config;
+
+        if (row.status !== "pending" || replyKey?.startsWith("headless:") !== true) {
+            continue;
+        }
+
+        const remaining = await ctx.db
+            .query("toolApprovalRuns")
+            .withIndex("by_threadId", (q) => q.eq("threadId", row.threadId))
+            .collect();
+
+        if (remaining.every((other) => other.config.replyKey !== replyKey)) {
+            await recordRunEnd(ctx, { outcome: "failed", streamId: replyKey, threadId: row.threadId });
+        }
+    }
+};
+
 export const deleteToolApprovalRunsForThread = async (ctx: Pick<MutationCtx, "db">, threadId: string): Promise<number> => {
     const rows = await ctx.db
         .query("toolApprovalRuns")
@@ -75,7 +104,7 @@ export const deleteToolApprovalRunsForThread = async (ctx: Pick<MutationCtx, "db
     return rows.length;
 };
 
-export const purgeExpiredToolApprovalRuns = async (ctx: Pick<MutationCtx, "db">, now: number): Promise<number> => {
+export const purgeExpiredToolApprovalRuns = async (ctx: PurgeCtx, now: number): Promise<number> => {
     const [pending, approved, denied] = await Promise.all([
         ctx.db
             .query("toolApprovalRuns")
@@ -95,6 +124,7 @@ export const purgeExpiredToolApprovalRuns = async (ctx: Pick<MutationCtx, "db">,
 
     await Promise.all(expired.map((row) => ctx.db.delete("toolApprovalRuns", row._id)));
     await releaseExpiredPauses(ctx, expired);
+    await failExpiredHeadlessPauses(ctx, expired);
 
     return expired.length;
 };
@@ -111,7 +141,7 @@ export const isToolApprovalRunExpired = (row: { createdAt: number; resolvedAt?: 
  * `userId` shard key, the root-shard cron would stop seeing these rows and this
  * sweep would keep working.
  */
-export const purgeExpiredToolApprovalRunsForUser = async (ctx: Pick<MutationCtx, "db">, userId: string, now: number): Promise<number> => {
+export const purgeExpiredToolApprovalRunsForUser = async (ctx: PurgeCtx, userId: string, now: number): Promise<number> => {
     const rows = await ctx.db
         .query("toolApprovalRuns")
         .withIndex("by_userId_status_createdAt", (q) => q.eq("userId", userId))
@@ -120,6 +150,7 @@ export const purgeExpiredToolApprovalRunsForUser = async (ctx: Pick<MutationCtx,
 
     await Promise.all(expired.map((row) => ctx.db.delete("toolApprovalRuns", row._id)));
     await releaseExpiredPauses(ctx, expired);
+    await failExpiredHeadlessPauses(ctx, expired);
 
     return expired.length;
 };

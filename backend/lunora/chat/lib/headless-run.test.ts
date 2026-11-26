@@ -38,6 +38,8 @@ const seen = vi.hoisted(() => {
         replies: [] as string[],
         // Extra fields of the next generation's result (its prompt's order, its steps).
         result: {} as Record<string, unknown>,
+        /** The reviewer's call fails: the goal is left unconfirmed. */
+        reviewFails: false,
         saved: [] as unknown[][],
         system: [] as string[],
         tools: [] as string[][],
@@ -106,6 +108,10 @@ vi.mock("./get-agent", () => {
 vi.mock("../goals/review", () => {
     return {
         reviewRound: vi.fn(async () => {
+            if (seen.reviewFails) {
+                throw new Error("reviewer unavailable");
+            }
+
             return { costMicrodollars: 0, met: seen.met.shift() ?? true, reason: "Add more." };
         }),
     };
@@ -155,6 +161,8 @@ const PREFS = {
     profession: "SECRET-PROFESSION",
 };
 
+const HEADLESS_RUN_KEY = /^headless:/;
+
 const fakeCtx = (prefs: typeof PREFS = PREFS) =>
     ({
         runAction: vi.fn(),
@@ -200,6 +208,143 @@ const SECRETS = ["SECRET-ABOUT-ME", "SECRET-NICKNAME", "SECRET-PROFESSION", "SEC
 describe("runHeadlessAgent personalization", () => {
     beforeEach(() => {
         seen.system = [];
+    });
+
+    it("records a headless run's end in the Events log once it finishes, keyed by its own reply key", async () => {
+        const ctx = fakeCtx() as unknown as Parameters<typeof runHeadlessAgent>[0] & { runMutation: ReturnType<typeof vi.fn> };
+
+        await runHeadlessAgent(ctx, {
+            maxSteps: 3,
+            memory: false,
+            model: "test-model",
+            organizationId: null,
+            origin: "lead",
+            personalization: "none",
+            thread: { threadId: "thread-1" },
+            tools: "none",
+            userId: "owner",
+        });
+
+        const calls = ctx.runMutation.mock.calls as unknown as [string, { outcome?: string; runKey?: string; threadId?: string }][];
+        const ends = calls.map(([, args]) => args).filter((args) => args.outcome !== undefined);
+
+        expect(ends).toHaveLength(1);
+        expect(ends[0]).toMatchObject({ outcome: "succeeded", threadId: "thread-1" });
+        expect(ends[0]?.runKey).toMatch(HEADLESS_RUN_KEY);
+    });
+
+    it("records one failure for a run that fails on a thread it set up, once, whichever step threw", async () => {
+        seen.failAt = "round";
+        seen.met = [false];
+        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
+        await expect(
+            runHeadlessAgent(ctx as never, {
+                goal: { text: "Ship it" },
+                memory: false,
+                model: "test-model",
+                organizationId: null,
+                origin: "lead",
+                personalization: "none",
+                prompt: "Run the report",
+                thread: { threadId: "thread-1" },
+                tools: "none",
+                userId: "owner",
+            }),
+        ).rejects.toThrow("model call failed");
+
+        const calls = ctx.runMutation.mock.calls as unknown as [string, { outcome?: string }][];
+
+        expect(
+            calls
+                .map(([, args]) => args)
+                .filter((args) => args.outcome !== undefined)
+                .map((args) => args.outcome),
+        ).toStrictEqual(["failed"]);
+        seen.failAt = undefined;
+    });
+
+    it("records a failure, not a completion, for a goal whose reviewer failed", async () => {
+        seen.reviewFails = true;
+
+        try {
+            const ctx = fakeCtx() as unknown as Parameters<typeof runHeadlessAgent>[0] & { runMutation: ReturnType<typeof vi.fn> };
+
+            await runHeadlessAgent(ctx, {
+                goal: { text: "Ship it" },
+                maxSteps: 3,
+                memory: false,
+                model: "test-model",
+                organizationId: null,
+                origin: "lead",
+                personalization: "none",
+                prompt: "Run the report",
+                thread: { threadId: "thread-1" },
+                tools: "none",
+                userId: "owner",
+            });
+
+            const calls = ctx.runMutation.mock.calls as unknown as [string, { outcome?: string }][];
+
+            expect(
+                calls
+                    .map(([, args]) => args)
+                    .filter((args) => args.outcome !== undefined)
+                    .map((args) => args.outcome),
+            ).toStrictEqual(["failed"]);
+        } finally {
+            seen.reviewFails = false;
+        }
+    });
+
+    it("records no success for a headless run that was stopped, since a stop writes no run event", async () => {
+        const ctx = fakeCtx() as unknown as Parameters<typeof runHeadlessAgent>[0] & { runMutation: ReturnType<typeof vi.fn> };
+
+        await runHeadlessAgent(ctx, {
+            maxSteps: 3,
+            memory: false,
+            model: "test-model",
+            organizationId: null,
+            origin: "lead",
+            personalization: "none",
+            shouldStop: async () => true,
+            thread: { threadId: "thread-1" },
+            tools: "none",
+            userId: "owner",
+        });
+
+        const calls = ctx.runMutation.mock.calls as unknown as [string, { outcome?: string }][];
+
+        expect(calls.map(([, args]) => args).filter((args) => args.outcome !== undefined)).toStrictEqual([]);
+    });
+
+    it("records a headless run's failure in the Events log before the failure is raised", async () => {
+        const ctx = fakeCtx() as unknown as Parameters<typeof runHeadlessAgent>[0] & { runMutation: ReturnType<typeof vi.fn> };
+
+        seen.failAt = "generate";
+
+        try {
+            await expect(
+                runHeadlessAgent(ctx, {
+                    maxSteps: 3,
+                    memory: false,
+                    model: "test-model",
+                    organizationId: null,
+                    origin: "lead",
+                    personalization: "none",
+                    thread: { threadId: "thread-1" },
+                    tools: "none",
+                    userId: "owner",
+                }),
+            ).rejects.toThrow();
+        } finally {
+            seen.failAt = undefined;
+        }
+
+        const calls = ctx.runMutation.mock.calls as unknown as [string, { outcome?: string }][];
+        const ends = calls.map(([, args]) => args).filter((args) => args.outcome !== undefined);
+
+        expect(ends.map((args) => args.outcome)).toStrictEqual(["failed"]);
     });
 
     it("keeps the owner's personalization out of a messenger reply", async () => {

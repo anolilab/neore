@@ -66,6 +66,9 @@ import { REQUEST_SECRET_TOOL_NAME } from "./tools/request-secret-constants";
 import { assertRunHeld, vRunHold } from "./lib/run-epoch";
 import { APPROVAL_REMINDER_SCHEDULE_DELAY_MS } from "./lib/approval-reminder";
 import { runAfterOnShard } from "../lib/shard-scheduler";
+import { APPROVAL_REQUESTED_EVENT } from "../public-api/events-catalog";
+import type { ApprovalKind } from "../public-api/events-catalog";
+import { recordMcpEvent } from "../public-api/events-log";
 import { chainStarterLabel } from "../sub-agents/logic";
 import { markRunAwaiting } from "../sub-agents/functions";
 import { threadHasLiveGrant } from "../agent/live-grant";
@@ -808,6 +811,38 @@ export const recordPendingToolApprovals = internalMutation
                 return false;
             }
 
+            // One `approval.requested` per request, in this mutation: a refused pause (above) records none. The kind is what the
+            // person is asked for: a requestSecret card, an askUser question, or a plain tool approval.
+            const questionIds = new Set(askUserApprovalIds);
+            const kindOf = (approvalId: string): ApprovalKind => {
+                if (secretIds.has(approvalId)) {
+                    return "secret";
+                }
+
+                return questionIds.has(approvalId) ? "question" : "approval";
+            };
+
+            // A thread that is gone, or has no owner, gets no event: nobody can answer its requests, and a deleted thread's events go
+            // with it, which only an owned thread's delete does (`agent/threads.ts`). None is recorded for it. Nor for a trashed chat: its
+            // events are removed with the trash, and one recorded behind that removal would be found by its restore.
+            if (thread?.userId !== undefined && thread.deleted !== true) {
+                // Keyed by the request's own row, not its approval id: a tool call id can repeat in a later turn, and a repeat is a new
+                // request that must still reach the log. `recordedIds` is in the order of `uniqueIds`.
+                for (const [index, approvalId] of [...uniqueIds].entries()) {
+                    if (approvalId.length > MAX_APPROVAL_ID_LENGTH) {
+                        continue;
+                    }
+
+                    await recordMcpEvent(ctx, {
+                        data: { kind: kindOf(approvalId), requestId: approvalId, threadId },
+                        eventId: `${APPROVAL_REQUESTED_EVENT}:${recordedIds[index]!}`,
+                        name: APPROVAL_REQUESTED_EVENT,
+                        timestamp: createdAt,
+                        userId: ownerId,
+                    });
+                }
+            }
+
             // A question the owner was asked in this thread stays the thing it waits on: an approval does not overwrite it.
             if (awaitingInput && thread && thread.awaitingInput !== "question") {
                 await patchThread(ctx.db, thread._id, { awaitingInput });
@@ -910,6 +945,9 @@ export const recordApprovalPreference = async (ctx: PreferenceCtx, decision: Too
     }
 };
 
+/** The longest approval id an answer accepts. A longer request is recorded as no event: a poll could not carry its id, so it is not kept. */
+export const MAX_APPROVAL_ID_LENGTH = 256;
+
 /**
  * Answer a pending tool-approval request and resume the agent run.
  *
@@ -926,7 +964,7 @@ export const recordApprovalPreference = async (ctx: PreferenceCtx, decision: Too
 export const respondToToolApproval = authMutation
     .use(rateLimit("chat/stream"))
     .input({
-        approvalId: v.string().check((value) => value.length > 0 && value.length <= 256, { message: "Invalid approval id" }),
+        approvalId: v.string().check((value) => value.length > 0 && value.length <= MAX_APPROVAL_ID_LENGTH, { message: "Invalid approval id" }),
         decision: v.union(v.literal("approve"), v.literal("deny"), v.literal("always"), v.literal("hour"), v.literal("today")),
         threadId: v.id("threads"),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
