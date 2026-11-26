@@ -493,7 +493,11 @@ describe("dismissing", () => {
         }
 
         const seeded = await rowsOf("taskSuggestions", A);
-        const pendingIds = seeded.filter((row) => row.status === "pending").map((row) => row._id as string);
+        // `collect()` returns rows in id order; decide them oldest-first so the newest decided are the newest created.
+        const pendingIds = seeded
+            .filter((row) => row.status === "pending")
+            .toSorted((a, b) => (a.createdAt as number) - (b.createdAt as number))
+            .map((row) => row._id as string);
 
         for (const suggestionId of pendingIds) {
             await as(A).mutation(dismissTaskSuggestion as never, { suggestionId } as never);

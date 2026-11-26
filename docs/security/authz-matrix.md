@@ -524,6 +524,7 @@ for a schema table that is neither policed nor listed:
 | `memory_functions.setMemoryPinned` | mutation | authMutation + RL | — | owner helper | ok |
 | `memory_functions.updateMemory` | mutation | authMutation + RL | — | owner helper | ok |
 | `memory_import.previewMemoryImport` | action | authAction + RL | userSettings (`isMemoryEnabled`) | caller-scoped (ctx.user); refused while memory is off; the paste goes to a utility model the caller's filter rules allow, wrapped as data; stores nothing | ok — new |
+| `memory_import.importMemoryFile` | action | authAction + RL | memories, embeddings_1024 | caller-scoped (ctx.user): `userId`, `source` and the app are stamped server-side; refused while memory is off; the file is bounded (bytes, entries, entry length) and parsed before anything is embedded, over the inline entry limit it is refused; every entry goes through the paste import's secret filter and dedup | ok — new |
 | `memory_import.saveImportedMemories` | action | authAction + RL | memories, embeddings_1024 | caller-scoped (ctx.user): `userId`, `source` and the app are stamped server-side; refused while memory is off; the client's facts are re-checked against the preview's caps and secret filter before dedup | ok — new |
 | `memory_reflection.dismissMemoryDigest` | mutation | authMutation + RL | — | row.userId == caller | ok |
 | `memory_reflection.getLatestMemoryDigest` | query | authQuery | — | caller-scoped (ctx.user) | ok |
