@@ -606,7 +606,11 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
 
         if (!options.goal) {
             extract(text);
-            await recordEnd("succeeded");
+            // A stop writes no run event (as a chat's stop does not): the run ended, but was not finished.
+
+            if (!(await options.shouldStop?.())) {
+                await recordEnd("succeeded");
+            }
 
             return { costMicrodollars: first.priced, text, threadId, totalTokens: result.totalUsage?.totalTokens };
         }
@@ -625,7 +629,10 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         });
 
         extract(outcome.result.text);
-        await recordEnd("succeeded");
+
+        if (!(await options.shouldStop?.())) {
+            await recordEnd("succeeded");
+        }
 
         return {
             costMicrodollars: outcome.costMicrodollars || undefined,

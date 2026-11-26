@@ -227,6 +227,27 @@ describe("runHeadlessAgent personalization", () => {
         expect(ends[0]?.runKey).toMatch(HEADLESS_RUN_KEY);
     });
 
+    it("records no success for a headless run that was stopped, since a stop writes no run event", async () => {
+        const ctx = fakeCtx() as unknown as Parameters<typeof runHeadlessAgent>[0] & { runMutation: ReturnType<typeof vi.fn> };
+
+        await runHeadlessAgent(ctx, {
+            maxSteps: 3,
+            memory: false,
+            model: "test-model",
+            organizationId: null,
+            origin: "lead",
+            personalization: "none",
+            shouldStop: async () => true,
+            thread: { threadId: "thread-1" },
+            tools: "none",
+            userId: "owner",
+        });
+
+        const calls = ctx.runMutation.mock.calls as unknown as [string, { outcome?: string }][];
+
+        expect(calls.map(([, args]) => args).filter((args) => args.outcome !== undefined)).toStrictEqual([]);
+    });
+
     it("records a headless run's failure in the Events log before the failure is raised", async () => {
         const ctx = fakeCtx() as unknown as Parameters<typeof runHeadlessAgent>[0] & { runMutation: ReturnType<typeof vi.fn> };
 
