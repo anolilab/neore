@@ -20,9 +20,8 @@ import { PR_WATCH_MAX_WAKES, storedWatchOf } from "./pr-watch-logic";
 /** Watches one person may have running at once. Each one is a host read every few minutes. */
 export const MAX_ACTIVE_PULL_REQUEST_WATCHES = 10;
 
-/** Links read per page when looking a link up by its pull request, and the most pages read before giving up. */
+/** Links read per page when looking a link up by its pull request. */
 export const LINK_LOOKUP_PAGE_SIZE = 100;
-const LINK_LOOKUP_MAX_PAGES = 50;
 
 export const setPullRequestWatch = internalMutation
     .input({
@@ -40,7 +39,7 @@ export const setPullRequestWatch = internalMutation
         let link: Doc<"pullRequestThreads"> | undefined;
         let cursor: string | null = null;
 
-        for (let page = 0; threadId !== null && link === undefined && page < LINK_LOOKUP_MAX_PAGES; page += 1) {
+        while (threadId !== null && link === undefined) {
             const read = await ctx.db
                 .query("pullRequestThreads")
                 .withIndex("by_user_and_repository_number", (q) => q.eq("userId", args.userId).eq("repository", args.repository).eq("number", args.number))

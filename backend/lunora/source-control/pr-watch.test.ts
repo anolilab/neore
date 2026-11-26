@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { insertThread } from "../agent/table-writes";
 import schema from "../schema";
 import { LINK_LOOKUP_PAGE_SIZE, MAX_ACTIVE_PULL_REQUEST_WATCHES, setPullRequestWatch } from "./pr-watch";
+import { backfillPullRequestWatchActive } from "../migrations";
 import { setLinksThreadDeleted } from "./pr-thread-links";
 
 const OWNER = "user-a";
@@ -172,6 +173,58 @@ describe("setPullRequestWatch", () => {
 
         expect(await call({ number: 7, threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "ok" });
         expect(await watchOf(linkId)).toMatchObject({ startedAt: expect.any(Number) });
+    });
+
+    it("finds a link that lies past 50 pages of links to the same pull request", async () => {
+        const pages = 50;
+        const { threadId: otherThread } = await seedLink(OWNER, 7);
+
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < pages * LINK_LOOKUP_PAGE_SIZE; index += 1) {
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 1,
+                    kind: "linked",
+                    number: 7,
+                    repository: REPOSITORY,
+                    threadDeleted: true,
+                    threadId: otherThread,
+                    title: "old",
+                    url: "https://github.com/octo/hello/pull/7",
+                    userId: OWNER,
+                });
+            }
+        });
+
+        const { linkId, threadId } = await seedLink(OWNER, 7);
+
+        expect(await call({ number: 7, threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "ok" });
+        expect(await watchOf(linkId)).toMatchObject({ startedAt: expect.any(Number) });
+    }, 120_000);
+
+    it("counts legacy running watches, once the backfill has flagged them, against the limit", async () => {
+        for (let number = 100; number < 100 + MAX_ACTIVE_PULL_REQUEST_WATCHES; number += 1) {
+            await seedLink(OWNER, number, { watch: { startedAt: 1 } });
+        }
+
+        const { linkId, threadId } = await seedLink(OWNER, 7);
+
+        // Unflagged, they are invisible to the count: the start goes through.
+        expect(await call({ number: 7, threadId, userId: OWNER, watching: false })).toStrictEqual({ status: "already" });
+
+        await harness.run(async (ctx: any) => {
+            const rows = await ctx.db.query("pullRequestThreads").collect();
+
+            for (const row of rows) {
+                const migrated = (backfillPullRequestWatchActive.up as any)(row);
+
+                if (migrated !== undefined) {
+                    await ctx.db.patch("pullRequestThreads", row._id, { watchActive: migrated.watchActive });
+                }
+            }
+        });
+
+        expect(await call({ number: 7, threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "too_many" });
+        expect(await watchOf(linkId)).toBeUndefined();
     });
 
     it("keeps the flag in step: a start sets it, a stop clears it", async () => {

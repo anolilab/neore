@@ -141,10 +141,10 @@ export const decideWatch = (previous: PullRequestWatchState, observed: PullReque
     const { left, newer } = newerReviewsByOthers(observed, previous.reviewId);
 
     if (left) {
-        // The seen review left the host's list: re-baseline silently on the newest one listed, so a later real review is still recognised.
-        if (review !== undefined) {
-            next.reviewId = review.id;
-        }
+        // The seen review left the host's list (deleted, or older than the pages the read went back through: its bound is the limit
+        // of what this can tell). Nothing can be said about what is new, so re-baseline silently on the newest review by someone
+        // else, or clear the marker when there is none: the next review by someone else then wakes the thread.
+        next.reviewId = review?.id;
     } else if (newer.length > 0) {
         next.reviewId = newer[0]?.id;
 

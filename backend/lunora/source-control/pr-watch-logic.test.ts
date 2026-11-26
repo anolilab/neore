@@ -110,10 +110,53 @@ describe("decideWatch", () => {
     });
 
     it("does not wake on the watcher's own review, and does not move the seen review", () => {
-        expect(decideWatch({ ...baselined, reviewId: "r1" }, { ...quiet, reviews: [{ authorLogin: "dev", id: "r3" }] }, NOW)).toStrictEqual({
+        expect(
+            decideWatch(
+                { ...baselined, reviewId: "r1" },
+                {
+                    ...quiet,
+                    reviews: [
+                        { authorLogin: "dev", id: "r3" },
+                        { authorLogin: "reviewer", id: "r1" },
+                    ],
+                },
+                NOW,
+            ),
+        ).toStrictEqual({
             action: "none",
             state: { ...baselined, headSha: "aaa", reviewId: "r1" },
         });
+    });
+
+    it("wakes on a review newer than a seen one that lies deep in the list, past the first page", () => {
+        const listed = Array.from({ length: 250 }, (_, index) => ({ authorLogin: "reviewer", id: `r${String(250 - index)}` }));
+
+        expect(decideWatch({ ...baselined, reviewId: "r100" }, { ...quiet, reviews: listed }, NOW)).toMatchObject({
+            action: "wake",
+            reasons: ["review"],
+            state: { reviewId: "r250" },
+        });
+    });
+
+    it("clears the seen review when it was deleted and nobody else's review is listed, so the next review by someone else wakes", () => {
+        const cleared = decideWatch({ ...baselined, reviewId: "r5" }, { ...quiet, reviews: [{ authorLogin: "dev", id: "r6" }] }, NOW);
+
+        expect(cleared.action).toBe("none");
+        expect(cleared.state.reviewId).toBeUndefined();
+
+        expect(
+            decideWatch(
+                cleared.state,
+                {
+                    ...quiet,
+                    reviews: [
+                        { authorLogin: "reviewer", id: "r7" },
+                        { authorLogin: "dev", id: "r6" },
+                    ],
+                },
+                NOW,
+            ),
+        ).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "r7" } });
     });
 
     it("re-baselines silently when the seen review left the list, so a later review still wakes", () => {
