@@ -921,6 +921,30 @@ describe("the user.emailCanonical backfill", () => {
         expect(stored).toMatchObject({ updatedAt: "2026-11-05T10:00:56.180Z" });
     });
 
+    it("skips a row whose numeric updatedAt better-auth turns into an ISO string between the fill's read and its write", async () => {
+        expect.assertions(2);
+
+        const { result, stored } = await withHarness(async (ctx) => {
+            const id = await ctx.db.insert("user", userRow("Mira@example.com"));
+            const { ids, token } = await completedCheck(ctx);
+
+            return {
+                result: await fillEmailCanonicalBatch(
+                    counted(ctx, {
+                        patchIf: async () => {
+                            storeDatesAsText("Mira@example.com", { updatedAt: "2026-11-05T10:00:56.180Z" });
+                        },
+                    }).ctx,
+                    { ids, token },
+                ),
+                stored: await ctx.db.get("user", id),
+            };
+        });
+
+        expect(result).toMatchObject({ filled: 0, skipped: 1, status: "progress" });
+        expect(stored).toMatchObject({ updatedAt: "2026-11-05T10:00:56.180Z" });
+    });
+
     it("skips a row whose email changes between the fill's read and its write, and fills nothing for it", async () => {
         expect.assertions(2);
 

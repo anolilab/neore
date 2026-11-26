@@ -192,18 +192,19 @@ const USER_DATE_COLUMNS = ["banExpires", "createdAt", "updatedAt"] as const;
 
 type UserDateColumn = (typeof USER_DATE_COLUMNS)[number];
 
-/** A fill's conditional patch: the dates it converts as numbers, guarded on the strings it read. */
+/** A fill's conditional patch: the dates it converts as numbers, and every date guarded on the value it read. */
 interface FillPatch {
     patch: Partial<Record<UserDateColumn, number>> & { emailCanonical: string };
-    where: Partial<Record<UserDateColumn, string>> & { email: string; emailCanonical: null };
+    where: Partial<Record<UserDateColumn, number | string | null>> & { email: string; emailCanonical: null };
 }
 
 /**
  * The conditional patch that fills one row: `emailCanonical`, only while the row is unfilled and holds the address the
  * fill folded. Lunora's writer validates every column of the row a patch leaves, not only the patched ones, so a row
  * better-auth wrote (ISO dates in `v.number()` columns) refuses any patch with `VALIDATION_ERROR`. Each date column that
- * holds a string is therefore rewritten as the epoch milliseconds it names, guarded on the string read: a write in
- * between makes the patch miss rather than put back an older time. better-auth's adapter hands a stored number back
+ * holds a string is therefore rewritten as the epoch milliseconds it names. Every date column is guarded on the value
+ * read (a number, a string, or none): a write in between, also one that turns a number into a string, makes the patch
+ * miss rather than put back an older time or leave a row the writer refuses. better-auth's adapter hands a stored number back
  * unchanged, not as a `Date`; its own reads and the web app wrap it in `new Date(...)`. A string no clock reads is refused,
  * never stored as some other time.
  */
@@ -216,6 +217,8 @@ const fillPatchOf = (row: Pick<Doc<"user">, "email" | UserDateColumn>, canonical
         const stored: unknown = row[column];
 
         if (typeof stored !== "string") {
+            where[column] = typeof stored === "number" ? stored : null;
+
             continue;
         }
 
