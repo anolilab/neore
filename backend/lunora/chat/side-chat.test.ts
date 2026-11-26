@@ -14,6 +14,7 @@ import { lastSettledMessageId } from "../agent/branches";
 import { insertContextResetRow, insertThread } from "../agent/table-writes";
 import schema from "../schema";
 import { getFullThreadForExport } from "./functions";
+import { getLowRiskApprovalContext } from "./tool-permissions";
 import { createSideChat, sideChatRefusalOf } from "./side-chat";
 
 const { sessionFrom } = vi.hoisted(() => {
@@ -55,6 +56,7 @@ let harness: ReturnType<typeof lunoraTest>;
 // The action reads other modules through `internal.*`: each one it reaches is registered by its path, as the guide tests do.
 beforeAll(async () => {
     registerModule(registry, "agent_agent_switch", await import("../agent/agent-switch"));
+    registerModule(registry, "bots_functions", await import("../bots/functions"));
     registerModule(registry, "agent_branches", await import("../agent/branches"));
     registerModule(registry, "agent_messages", await import("../agent/messages"));
     registerModule(registry, "agent_threads", await import("../agent/threads"));
@@ -658,5 +660,131 @@ describe("createSideChat", () => {
 
         expect(outcome.status).toBe("ok");
         expect(child).toMatchObject({ createdBy: "import:chat-export", hasHandoff: true });
+    });
+
+    it("carries an imported parent's marker to the child, which keeps low-risk auto-approval off", async () => {
+        const importedId = await parentWith(OWNER, { createdBy: "import:chatgpt" });
+        const plainId = await parentWith(OWNER);
+
+        await withMessages(importedId, OWNER, ["hello"]);
+        await withMessages(plainId, OWNER, ["hello"]);
+        await harness.run(async (ctx: any) => await ctx.db.insert("aiUserPreferences", { autoApproveLowRisk: true, userId: OWNER }));
+
+        const imported = (await as(OWNER).action(createSideChat as never, { threadId: importedId } as never)) as { threadId: string };
+        const plain = (await as(OWNER).action(createSideChat as never, { threadId: plainId } as never)) as { threadId: string };
+        const allowed = async (threadId: string): Promise<boolean> =>
+            await harness.run(async (ctx: any) => await ctx.runQuery(getLowRiskApprovalContext, { threadId, userId: OWNER }));
+
+        const importedChild = await threadRow(imported.threadId);
+
+        expect(importedChild.createdBy).toBe("import:chatgpt");
+        expect(await allowed(imported.threadId)).toBe(false);
+        expect(await allowed(plain.threadId)).toBe(true);
+    });
+
+    it("refuses a parent whose bot now runs on a custom endpoint, and writes nothing", async () => {
+        const botId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("bots", {
+                    computerEnabled: false,
+                    createdAt: 1,
+                    instructions: "",
+                    model: "custom:acme/model",
+                    name: "bot",
+                    updatedAt: 1,
+                    userId: OWNER,
+                }),
+        );
+        const parentId = await parentWith(OWNER, { botId: String(botId) });
+
+        await withMessages(parentId, OWNER, ["hello"]);
+
+        expect(await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)).toStrictEqual({
+            reason: "custom_endpoint",
+            status: "refused",
+        });
+        expect(await sideRelations()).toHaveLength(0);
+        expect(await harness.run(async (ctx: any) => await ctx.db.query("threads").collect())).toHaveLength(1);
+    });
+
+    it("leaves no readable child when the copy fails after more than one page was written", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await withMessages(parentId, OWNER, ["hello"]);
+
+        const parentMessages = await messageCount(parentId);
+        const key = "agent_messages:cloneThread";
+        const original = registry.get(key);
+
+        registry.set(
+            key,
+            internalAction.input({ sourceThreadId: v.id("threads"), targetThreadId: v.id("threads") }).action(async ({ args }) => {
+                await harness.run(async (ctx: any) => {
+                    for (let order = 0; order < 230; order += 1) {
+                        await ctx.db.insert("messages", {
+                            message: { content: `row ${order}`, role: "user" },
+                            order,
+                            status: "success",
+                            stepOrder: 0,
+                            threadId: args.targetThreadId,
+                            tool: false,
+                            userId: OWNER,
+                        });
+                    }
+                });
+
+                throw new Error("copy failed late");
+            }),
+        );
+
+        try {
+            await expect(as(OWNER).action(createSideChat as never, { threadId: parentId } as never)).rejects.toThrow("copy failed late");
+        } finally {
+            registry.set(key, original);
+        }
+
+        const threads = await harness.run(async (ctx: any) => await ctx.db.query("threads").collect());
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("messages").collect());
+
+        expect(threads).toHaveLength(1);
+        expect(rows).toHaveLength(parentMessages);
+        expect(await sideRelations()).toHaveLength(0);
+    });
+
+    it("refuses a parent trashed before the copy, and leaves no child or side link", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await withMessages(parentId, OWNER, ["hello"]);
+
+        const targetId = await parentWith(OWNER, { title: "copy" });
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", parentId, { deleted: true }));
+
+        await expect(
+            harness.run(
+                async (ctx: any) =>
+                    await ctx.runMutation(cloneMessageBatch, {
+                        paginationOpts: { cursor: null, numItems: 100 },
+                        refuseTrashedSource: true,
+                        sourceThreadId: parentId,
+                        targetThreadId: targetId,
+                    }),
+            ),
+        ).rejects.toThrow();
+        expect(await messageCount(targetId)).toBe(0);
+
+        // Without the option the copy is unchanged for every other caller.
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(cloneMessageBatch, {
+                    paginationOpts: { cursor: null, numItems: 100 },
+                    sourceThreadId: parentId,
+                    targetThreadId: targetId,
+                }),
+        );
+        expect(await messageCount(targetId)).toBe(1);
+        expect(await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)).toStrictEqual({ reason: "deleted", status: "refused" });
+        expect(await sideRelations()).toHaveLength(0);
+        expect(await harness.run(async (ctx: any) => await ctx.db.query("threads").collect())).toHaveLength(2);
     });
 });

@@ -261,7 +261,9 @@ export const lastSettledMessageId = internalQuery
             return null;
         }
 
-        const path = await loadActivePath(ctx, args.threadId, thread.activeLeafMessageId);
+        // A row with no message body is not a reply and is read by nothing below: dropped before any scan touches its message.
+        const fullPath = await loadActivePath(ctx, args.threadId, thread.activeLeafMessageId);
+        const path = fullPath.filter((row) => row.message !== undefined);
         const groups = groupPathRows(
             path.map((row) => {
                 return { _id: row._id as string, order: row.order, role: (row.message as { role?: string } | undefined)?.role, row };

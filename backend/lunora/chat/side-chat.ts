@@ -22,6 +22,9 @@ import { MAX_LENGTH } from "../lib/validators";
 import { parseCustomModelId } from "@neore/ai/models";
 import { throwUnlessGranted } from "./lib/thread-gate";
 
+/** The most pages `discard` deletes in one action; a child holds at most the parent's settled rows. */
+const MAX_DISCARD_PAGES = 1000;
+
 /** Why a parent cannot be the start of a side chat. Each is a refusal the caller can show. */
 export type SideChatRefusal =
     | "archived"
@@ -145,6 +148,13 @@ export const createSideChat = authAction
             return { reason: "shared_or_temporary", status: "refused" as const };
         }
 
+        // A bot's run model is the bot's, not the thread's: a bot now on a custom endpoint would carry the child there.
+        const bot = parent.botId ? await ctx.runQuery(internal.bots.functions.getBotForRun, { botId: parent.botId, userId }) : null;
+
+        if (bot !== null && parseCustomModelId(bot.model) !== null) {
+            return { reason: "custom_endpoint", status: "refused" as const };
+        }
+
         // The last SETTLED row of the active path: a reply still in flight or one that failed is never copied, and a parent
         // with no settled row has nothing to fork.
         const settledId = await ctx.runQuery(internal.agent.branches.lastSettledMessageId, { threadId });
@@ -183,6 +193,22 @@ export const createSideChat = authAction
         // The child is removed with its link, so a failed or refused copy leaves neither behind.
         const discard = async (): Promise<void> => {
             await ctx.runMutation(internal.agent.threads.deleteThreadRelationship, { threadId: newThreadId });
+
+            // The paged delete removes the thread row last and schedules its own later pages, so it would leave the partial
+            // child readable meanwhile. Run the pages here, one after another, until the row is gone, then the usual delete
+            // clears what is left (streams, pins, routes).
+            let cursor: string | undefined;
+
+            for (let page = 0; page < MAX_DISCARD_PAGES; page += 1) {
+                const result = await ctx.runMutation(internal.agent.threads._deletePageForThreadId, { cursor, threadId: newThreadId });
+
+                if (result.isDone) {
+                    break;
+                }
+
+                cursor = result.cursor ?? undefined;
+            }
+
             await ctx.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: newThreadId });
         };
 
@@ -218,6 +244,7 @@ export const createSideChat = authAction
 
             await ctx.runAction(internal.agent.messages.cloneThread, {
                 copyUserIdForVectorSearch: true,
+                refuseTrashedSource: true,
                 sourceThreadId: threadId,
                 statuses: ["success"],
                 targetThreadId: newThreadId,
@@ -263,6 +290,8 @@ export const createSideChat = authAction
 
             throw error;
         }
+
+        ctx.log.event("chat.create_side_chat", { branchPoint: forkEnd.index });
 
         return { status: "ok" as const, threadId: String(newThreadId) };
     });

@@ -680,6 +680,8 @@ export const cloneMessageBatch = internalMutation
         excludeToolMessages: v.optional(v.boolean()),
         insertAtOrder: v.optional(v.number()),
         paginationOpts: paginationOptionsValidator,
+        // Set by a caller that must not copy from a trashed chat (`createSideChat`), checked in every batch.
+        refuseTrashedSource: v.optional(v.boolean()),
         sourceThreadId: v.id("threads"),
         statuses: v.optional(v.array(vMessageStatus)),
         targetThreadId: v.id("threads"),
@@ -697,10 +699,10 @@ export const cloneMessageBatch = internalMutation
             throwThreadLocked();
         }
 
-        // A source that starts deletion mid-copy fails the copy, so the caller removes the half-copied fork.
+        // A source that starts deletion mid-copy fails the copy (and a trashed one, for a caller that asks: `refuseTrashedSource`), so the caller removes the half-copied fork.
         const source = await ctx.db.get("threads", args.sourceThreadId);
 
-        if (source === null || source.deletingAt !== undefined) {
+        if (source === null || source.deletingAt !== undefined || (args.refuseTrashedSource === true && source.deleted === true)) {
             throwThreadNotFound();
         }
 
@@ -820,6 +822,7 @@ export const cloneThread = internalAction
         excludeToolMessages: v.optional(v.boolean()),
         insertAtOrder: v.optional(v.number()),
         limit: v.optional(v.number()),
+        refuseTrashedSource: v.optional(v.boolean()),
         sourceThreadId: v.id("threads"),
         statuses: v.optional(v.array(vMessageStatus)),
         targetThreadId: v.id("threads"),
