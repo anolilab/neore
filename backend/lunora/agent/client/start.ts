@@ -256,9 +256,6 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
         // A call that may fall back must fit the smallest window among the models that could take it.
         const fallback = model instanceof FallbackLanguageModel ? model : undefined;
         const modelId = fallback ? fallback.primaryModelId : getModelName(model);
-        // A backup that would be skipped for this call (tools, images or documents it cannot take) does not size this prompt.
-        const hasTools = Object.keys(args.tools ?? {}).length > 0;
-        const sizedForBackups = fallback?.backupsServing({ hasTools, messages: context.messages });
         // An approved call's saved result reaches the model as its tool's view, as a step's own result does.
         const approvedMessages = context.approvedToolCallIds
             ? await withApprovedToolModelOutputs(context.messages, wrapped, context.approvedToolCallIds, options.builtInToolFormatter)
@@ -269,6 +266,10 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
             approvedMessages !== undefined && isLocalOrigin(process.env.PUBLIC_ORIGIN)
                 ? await inlineToolResultImages(approvedMessages)
                 : (approvedMessages ?? context.messages);
+        // A backup that would be skipped for this call (tools, images or documents it cannot take, including an approved
+        // result's screenshot) does not size this prompt.
+        const hasTools = Object.keys(args.tools ?? {}).length > 0;
+        const sizedForBackups = fallback?.backupsServing({ hasTools, messages: modelMessages });
 
         return { messages: applyLateCompression(modelMessages, modelId, sizedForBackups), tools: wrapped };
     })().catch(async (error: unknown) => {

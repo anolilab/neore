@@ -160,15 +160,19 @@ describe("saved backup model list", () => {
         expect(await savedList()).toEqual([BACKUP]);
     });
 
-    it("is set from a single value an older client writes", async () => {
-        await saveList([BACKUP, SECOND]);
+    it("has only its first entry changed by a single value an older client writes", async () => {
+        await saveList([BACKUP, SECOND, THIRD]);
+        await save(FOURTH);
+
+        expect(await read()).toMatchObject({ backupModel: FOURTH, backupModels: [FOURTH, SECOND, THIRD] });
+
         await save(THIRD);
 
-        expect(await read()).toMatchObject({ backupModel: THIRD, backupModels: [THIRD] });
+        expect(await savedList()).toEqual([THIRD, SECOND]);
 
         await save("");
 
-        expect(await savedList()).toEqual([]);
+        expect(await read()).toMatchObject({ backupModel: SECOND, backupModels: [SECOND] });
     });
 
     it("lets a saved entry that has since become unusable be reordered or removed", async () => {
