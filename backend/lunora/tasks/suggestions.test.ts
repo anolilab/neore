@@ -17,7 +17,7 @@ import {
     taskSuggestionsExportPageKey,
 } from "./export-pages";
 import { collectTaskSuggestionsForExport, deleteUserTasks, storeTaskSuggestionsExportPage } from "./gdpr";
-import { MAX_PENDING_SUGGESTIONS, TASK_INSTRUCTIONS_MAX, TASK_SCHEDULE_MAX, TASK_TITLE_MAX } from "./logic";
+import { MAX_DECIDED_SUGGESTIONS_PER_STATUS, MAX_PENDING_SUGGESTIONS, TASK_INSTRUCTIONS_MAX, TASK_SCHEDULE_MAX, TASK_TITLE_MAX } from "./logic";
 import { acceptTaskSuggestion, dismissTaskSuggestion, eraseUserTaskSuggestions, insertTaskSuggestions, listTaskSuggestions } from "./suggestions";
 
 const { sessionFrom, users } = vi.hoisted(() => {
@@ -399,6 +399,28 @@ describe("accepting", () => {
         expect(row.decidedAt).toEqual(expect.any(Number));
     });
 
+    it("keeps only the newest cap of accepted rows when one more is accepted, and leaves dismissed rows alone", async () => {
+        await setSwitch(A, true);
+
+        for (let index = 1; index <= MAX_DECIDED_SUGGESTIONS_PER_STATUS; index += 1) {
+            await seedSuggestion(A, { createdAt: index, status: "accepted", title: `Accepted ${String(index)}` });
+        }
+
+        await seedSuggestion(A, { createdAt: 500, status: "dismissed", title: "Dismissed" });
+        await insert(A, [proposal()]);
+        const suggestionId = await pendingId(A);
+
+        await as(A).mutation(acceptTaskSuggestion as never, { suggestionId } as never);
+
+        const rows = await rowsOf("taskSuggestions", A);
+        const accepted = rows.filter((row) => row.status === "accepted");
+
+        expect(accepted).toHaveLength(MAX_DECIDED_SUGGESTIONS_PER_STATUS);
+        expect(accepted.some((row) => row.title === "Accepted 1")).toBe(false);
+        expect(accepted.some((row) => row.title === "Weekly notes")).toBe(true);
+        expect(rows.filter((row) => row.status === "dismissed")).toHaveLength(1);
+    });
+
     it("creates no second task when accepted again, or when dismissed afterwards", async () => {
         await setSwitch(A, true);
         await insert(A, [proposal()]);
@@ -456,6 +478,54 @@ describe("dismissing", () => {
         expect(await firstRow("taskSuggestions", A)).toMatchObject({ status: "dismissed" });
         expect(await rowsOf("tasks", A)).toHaveLength(0);
         await expect(as(A).query(listTaskSuggestions as never, {} as never)).resolves.toEqual([]);
+    });
+
+    it("keeps only the newest cap of each decided status, and leaves the other status and pending rows alone", async () => {
+        const over = MAX_DECIDED_SUGGESTIONS_PER_STATUS + 5;
+
+        await setSwitch(A, true);
+        await setSwitch(B, true);
+
+        for (let index = 1; index <= over; index += 1) {
+            await seedSuggestion(A, { createdAt: index, status: "pending", title: `Dismiss ${String(index)}` });
+            await seedSuggestion(A, { createdAt: index, status: "accepted", title: `Accepted ${String(index)}` });
+            await seedSuggestion(B, { createdAt: index, status: "dismissed", title: `Other ${String(index)}` });
+        }
+
+        const seeded = await rowsOf("taskSuggestions", A);
+        const pendingIds = seeded.filter((row) => row.status === "pending").map((row) => row._id as string);
+
+        for (const suggestionId of pendingIds) {
+            await as(A).mutation(dismissTaskSuggestion as never, { suggestionId } as never);
+        }
+
+        const rows = await rowsOf("taskSuggestions", A);
+        const dismissed = rows.filter((row) => row.status === "dismissed");
+
+        expect(dismissed).toHaveLength(MAX_DECIDED_SUGGESTIONS_PER_STATUS);
+        expect(Math.min(...dismissed.map((row) => row.createdAt as number))).toBe(over - MAX_DECIDED_SUGGESTIONS_PER_STATUS + 1);
+        expect(rows.filter((row) => row.status === "accepted")).toHaveLength(over);
+        expect(rows.filter((row) => row.status === "pending")).toHaveLength(0);
+        expect(await rowsOf("taskSuggestions", B)).toHaveLength(over);
+    });
+
+    it("holds the cap even when the row dismissed is older than the rows kept", async () => {
+        await setSwitch(A, true);
+        await seedSuggestion(A, { createdAt: 1, status: "pending", title: "Old idea" });
+
+        for (let index = 2; index <= MAX_DECIDED_SUGGESTIONS_PER_STATUS + 1; index += 1) {
+            await seedSuggestion(A, { createdAt: index, status: "dismissed", title: `Dismissed ${String(index)}` });
+        }
+
+        const suggestionId = await pendingId(A);
+
+        await as(A).mutation(dismissTaskSuggestion as never, { suggestionId } as never);
+
+        const rows = await rowsOf("taskSuggestions", A);
+        const dismissed = rows.filter((row) => row.status === "dismissed");
+
+        expect(dismissed).toHaveLength(MAX_DECIDED_SUGGESTIONS_PER_STATUS);
+        expect(dismissed.some((row) => row.title === "Old idea")).toBe(false);
     });
 
     it("answers NOT_FOUND for another user's suggestion and leaves it pending", async () => {

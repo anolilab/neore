@@ -6,23 +6,55 @@
  * owns while the switch is on. Turning the switch off erases the rows (`eraseUserTaskSuggestions`).
  *
  * A row holds the proposed task in its own shape and the ids of the chats it came from — never message text.
+ *
+ * Rows are bounded. Pending ones stay within {@link MAX_PENDING_SUGGESTIONS}. A decided row is kept for the history
+ * (and the export) only up to {@link MAX_DECIDED_SUGGESTIONS_PER_STATUS} per user and per status: deciding one more
+ * deletes that user's oldest rows (by `createdAt`) of the same status above the cap, in the same transaction
+ * (`trimDecidedSuggestions`). `taskSuggestions` is not an audited table (`AUDIT_TABLES`), so a plain delete is right.
  */
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
-import type { QueryCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { containsSecret } from "../lib/secret-redaction";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { findNextCronTime, isValidCronExpression } from "../triggers/schedule";
 import { insertTask, normalizeTaskText } from "./functions";
-import { MAX_PENDING_SUGGESTIONS, MAX_SUGGESTION_SOURCES, TASK_INSTRUCTIONS_MAX, TASK_SCHEDULE_MAX, TASK_TITLE_MAX } from "./logic";
+import {
+    MAX_DECIDED_SUGGESTIONS_PER_STATUS,
+    MAX_PENDING_SUGGESTIONS,
+    MAX_SUGGESTION_SOURCES,
+    TASK_INSTRUCTIONS_MAX,
+    TASK_SCHEDULE_MAX,
+    TASK_TITLE_MAX,
+} from "./logic";
 
 /** Rows removed per erase call; a full batch queues the next. */
 const ERASE_BATCH = 100;
 
+/** Rows over the decided cap removed by one decision. Each decision adds one row, so one is the usual number; the rest lets a lowered cap drain. */
+const TRIM_EXTRA = 10;
+
 const SUGGESTION_STATUSES = ["pending", "accepted", "dismissed"] as const;
+
+/**
+ * Keeps the user's newest {@link MAX_DECIDED_SUGGESTIONS_PER_STATUS} rows of a decided status and deletes the oldest
+ * above it, at most {@link TRIM_EXTRA} per call. Reads the newest `cap + TRIM_EXTRA` rows only, never the whole history.
+ * Deletes one at a time, as every deletion in this module does.
+ */
+const trimDecidedSuggestions = async (ctx: Pick<MutationCtx, "db">, userId: string, status: "accepted" | "dismissed"): Promise<void> => {
+    const rows = await ctx.db
+        .query("taskSuggestions")
+        .withIndex("by_user_and_status_and_createdAt", (q) => q.eq("userId", userId).eq("status", status))
+        .order("desc")
+        .take(MAX_DECIDED_SUGGESTIONS_PER_STATUS + TRIM_EXTRA);
+
+    for (const row of rows.slice(MAX_DECIDED_SUGGESTIONS_PER_STATUS)) {
+        await ctx.db.delete("taskSuggestions", row._id);
+    }
+};
 
 const vSuggestionView = v.object({
     _id: v.id("taskSuggestions"),
@@ -105,6 +137,7 @@ export const acceptTaskSuggestion = authMutation
         );
 
         await ctx.db.patch("taskSuggestions", row._id, { decidedAt: now, status: "accepted", taskId });
+        await trimDecidedSuggestions(ctx, userId, "accepted");
 
         ctx.log.event("tasks.accept_suggestion", { recurring, suggestionId: row._id, taskId });
 
@@ -128,6 +161,7 @@ export const dismissTaskSuggestion = authMutation
         }
 
         await ctx.db.patch("taskSuggestions", row._id, { decidedAt: ctx.now, status: "dismissed" });
+        await trimDecidedSuggestions(ctx, ctx.user.userId, "dismissed");
 
         ctx.log.event("tasks.dismiss_suggestion", { suggestionId: row._id });
 

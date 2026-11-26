@@ -45,6 +45,9 @@ export const MAX_GOALS_PER_USER = 100;
 /** Suggestions listed (and kept pending) per user; a decided row is not listed. */
 export const MAX_PENDING_SUGGESTIONS = 20;
 
+/** Decided suggestions kept per user and per status (accepted, dismissed); deciding one more removes the oldest above it. */
+export const MAX_DECIDED_SUGGESTIONS_PER_STATUS = 100;
+
 /** Chats one suggestion names as its source. */
 export const MAX_SUGGESTION_SOURCES = 5;
 

@@ -71,8 +71,8 @@ export const collectTasksForExport = internalQuery
     });
 
 /**
- * One page of the user's suggestions, every status (decided ones stay until the switch is turned off, so a long
- * history is more than one page), in descending status order: pending, then dismissed, then accepted, newest first
+ * One page of the user's suggestions, every status (decided ones stay until the switch is turned off, but only the
+ * newest `MAX_DECIDED_SUGGESTIONS_PER_STATUS` accepted and as many dismissed ones per user, so the history is bounded and still more than one page), in descending status order: pending, then dismissed, then accepted, newest first
  * within each, so a history cut for its size loses accepted rows first and never the live ones. `cursor` is `null` on
  * the last page. A page is few rows ({@link TASK_SUGGESTIONS_EXPORT_PAGE}) because each can hold 20,000 characters of
  * instructions and a query result must stay under 1 MiB.
