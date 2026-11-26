@@ -525,11 +525,14 @@ describe("the user.emailCanonical backfill in the deploy", () => {
         const production = await backfillWith([thrown], undefined, true);
         const nested = await backfillWith([{ body: { error: { code: "VALIDATION_ERROR", message: "bad output" } }, status: 400 }]);
         const plain = await backfillWith([{ body: { message: "Bad Request" }, status: 400 }]);
+        // How the Worker answers an error a mutation threw.
+        const coded = await backfillWith([{ body: { code: "INVALID_CURSOR", error: "invalid cursor" }, status: 400 }]);
 
         expect(staging.output).toBe("::error::backfill-email-canonical: answered HTTP 400 (BAD_REQUEST: findMany failed at <url>) (filled 0 over 1 call(s))");
         expect(production.output).toBe("::error::backfill-email-canonical: answered HTTP 400 (BAD_REQUEST) (filled 0 over 1 call(s))");
         expect(nested.output).toContain("answered HTTP 400 (VALIDATION_ERROR: bad output)");
         expect(plain.output).toContain("answered HTTP 400 (Bad Request)");
+        expect(coded.output).toContain("answered HTTP 400 (INVALID_CURSOR: invalid cursor)");
         expect(runner).toContain('production: process.env.STAGE === "production"');
     });
 

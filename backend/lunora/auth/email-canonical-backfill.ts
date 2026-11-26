@@ -27,6 +27,7 @@ import { LunoraError, v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
+import { MAX_LENGTH } from "../lib/validators";
 
 /** D1 statements one Worker invocation may send on the Free plan. */
 const INVOCATION_D1_QUERIES = 50;
@@ -266,7 +267,7 @@ export const fillEmailCanonicalBatch = async (
 };
 
 export const checkEmailCanonical = internalMutation
-    .input({ cursor: v.optional(v.string()), salt: v.string() })
+    .input({ cursor: v.optional(v.string().max(MAX_LENGTH.cursor)), salt: v.string().max(MAX_LENGTH.id) })
     .output(
         v.union(
             v.object({ conflicts: v.number(), status: v.literal("conflict") }),
@@ -284,7 +285,7 @@ export const checkEmailCanonical = internalMutation
     .mutation(async ({ args, ctx }) => await checkEmailCanonicalPage(ctx, { cursor: args.cursor, salt: args.salt }));
 
 export const fillEmailCanonical = internalMutation
-    .input({ checkedAt: v.number(), ids: v.array(v.id("user")) })
+    .input({ checkedAt: v.number(), ids: v.array(v.id("user")).max(EMAIL_CANONICAL_BATCH) })
     .output(
         v.object({
             conflicts: v.number(),
