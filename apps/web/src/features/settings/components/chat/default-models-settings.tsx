@@ -59,6 +59,8 @@ interface ModelSelectProps<Field extends string> {
     emptyLabel?: string;
     field: Field;
     label: string;
+    /** The list is still being read: an empty `models` then means "not known yet", not "none". */
+    loading?: boolean;
     models: GatewayModel[];
     onChange: (field: Field, modelId: string | null) => void;
     /** The system fallback model ID shown in the "System default" option */
@@ -72,6 +74,7 @@ export const ModelSelect = <Field extends string>({
     emptyLabel,
     field,
     label,
+    loading,
     models,
     onChange,
     systemDefaultId,
@@ -84,6 +87,9 @@ export const ModelSelect = <Field extends string>({
     const systemDefaultModel = systemDefaultId ? allModels.find((m) => m.id === systemDefaultId) : undefined;
 
     const systemDefaultLabel = systemDefaultModel ? systemDefaultModel.name : (emptyLabel ?? t`System default`);
+    // A list still being read offers nothing yet, whatever it holds so far.
+    const empty = loading === true || models.length === 0;
+    const emptyListLabel = loading === true ? t`Loading models…` : t`No models available`;
 
     return (
         <div className="flex items-start justify-between gap-4">
@@ -93,9 +99,9 @@ export const ModelSelect = <Field extends string>({
                 </Label>
                 <p className="text-muted-foreground text-xs">{description}</p>
             </div>
-            <Select<string> disabled={disabled || models.length === 0} onValueChange={(v) => onChange(field, v)} value={value ?? null}>
+            <Select<string> disabled={disabled || empty} onValueChange={(v) => onChange(field, v)} value={value ?? null}>
                 <SelectTrigger aria-labelledby={labelId} className="w-48 shrink-0">
-                    <SelectValue placeholder={models.length === 0 ? t`No models available` : systemDefaultLabel}>
+                    <SelectValue placeholder={empty ? emptyListLabel : systemDefaultLabel}>
                         {selectedModel && (
                             <span className="flex items-center gap-1.5 truncate">
                                 <ProviderIcon
@@ -383,9 +389,12 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                     {t`Your backup models were changed in another tab. The saved list is shown again.`}
                 </p>
             )}
-            {chosen.length < limit && readFailed && (
+            {readFailed && (
                 <div className="flex flex-wrap items-center gap-2" ref={addRow} role="alert">
-                    <p className="text-destructive text-xs">{t`Couldn't load the models you can add.`}</p>
+                    {/* A full list offers no add, but its entries still need the catalog for their names and availability. */}
+                    <p className="text-destructive text-xs">
+                        {chosen.length < limit ? t`Couldn't load the models you can add.` : t`Couldn't load the model list.`}
+                    </p>
                     <Button
                         onClick={() => {
                             if (filtersFailed && !filtersRead) {
@@ -413,6 +422,8 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                         emptyLabel={t`Choose a model`}
                         field="backupModels"
                         label={chosen.length === 0 ? t`Add a backup model` : t`Add another backup model`}
+                        // No failed read here, so an empty list is one still being read until both reads are in.
+                        loading={!filtersRead || !catalogLoaded}
                         // Unread filters look like none, so nothing is offered until they are read.
                         models={filtersRead ? allModels.filter((m) => usable.has(m.id) && !chosen.includes(m.id)) : []}
                         onChange={(_field, modelId) => {

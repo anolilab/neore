@@ -471,6 +471,21 @@ describe("BackupModelsSetting", () => {
         expect(state.refetchPreferences).not.toHaveBeenCalled();
     });
 
+    it("still says the catalog could not be loaded, and retries it, when the list is full", async () => {
+        state.settings = { backupModels: MODELS.map((m) => m.id) };
+        state.catalog = [];
+        state.catalogLoaded = false;
+        state.catalogFailed = true;
+        show();
+
+        expect(screen.getByRole("alert").textContent).toContain("Couldn't load the model list.");
+        expect(screen.queryByRole("combobox")).toBeNull();
+
+        await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+        expect(state.refetchCatalog).toHaveBeenCalledTimes(1);
+    });
+
     it("keeps the empty picker, with no error, while the catalog is still loading", () => {
         state.catalog = [];
         state.catalogLoaded = false;
@@ -478,6 +493,34 @@ describe("BackupModelsSetting", () => {
 
         expect(screen.queryByRole("alert")).toBeNull();
         expect(screen.getByRole("combobox", { name: "Add a backup model" })).toBeDefined();
+    });
+
+    it("labels the empty picker as loading while the catalog or the filters are being read", () => {
+        state.catalog = [];
+        state.catalogLoaded = false;
+        state.preferencesRead = false;
+        show();
+
+        expect(screen.getByRole("combobox", { name: "Add a backup model" }).textContent).toContain("Loading models…");
+        expect(screen.queryByText("No models available")).toBeNull();
+    });
+
+    it("keeps the picker disabled and labelled as loading while the catalog is read, even if it already lists models", () => {
+        state.catalogLoaded = false;
+        show();
+
+        const picker = screen.getByRole("combobox", { name: "Add a backup model" });
+
+        expect(picker.textContent).toContain("Loading models…");
+        expect(picker.hasAttribute("disabled") || picker.dataset.disabled !== undefined).toBe(true);
+    });
+
+    it("labels the empty picker as having no models once both reads are in and nothing qualifies", () => {
+        state.excluded = new Set(MODELS.map((m) => m.id));
+        show();
+
+        expect(screen.getByRole("combobox", { name: "Add a backup model" }).textContent).toContain("No models available");
+        expect(screen.queryByText("Loading models…")).toBeNull();
     });
 
     it("explains a conflict at the list until the next edit starts", async () => {
