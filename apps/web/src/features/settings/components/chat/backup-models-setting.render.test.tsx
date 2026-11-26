@@ -237,6 +237,17 @@ describe("BackupModelsSetting", () => {
         expect(document.activeElement).toBe(screen.getByRole("button", { name: "Move Third down" }));
     });
 
+    it("puts focus back on the arrow used when a move that disabled it is refused", async () => {
+        state.settings = { backupModels: ["openai/first", "openai/second"] };
+        state.refuse = true;
+        show();
+
+        await userEvent.click(screen.getByRole("button", { name: "Move Second up" }));
+
+        expect(state.settings.backupModels).toEqual(["openai/first", "openai/second"]);
+        expect(document.activeElement).toBe(screen.getByRole("button", { name: "Move Second up" }));
+    });
+
     it("moves focus to the next backup's remove button when one is removed", async () => {
         state.settings = { backupModels: ["openai/first", "openai/second", "openai/third"] };
         show();

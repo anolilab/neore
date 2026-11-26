@@ -213,17 +213,18 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
         }
     };
 
-    // Built from the cached settings when its turn comes, so two quick edits never undo each other.
-    const save = (edit: (backupModels: string[]) => string[], focusOnFailure?: string) => {
+    /**
+     * Saves `edit`, built from the cached settings when its turn comes. Focus then goes to `focusOnSuccess`, or to
+     * `focusOnFailure` when the save is refused and its rollback has put the old list back.
+     */
+    const save = (edit: (backupModels: string[]) => string[], focusOnSuccess: string, focusOnFailure: string) => {
+        focusAfter.current = focusOnSuccess;
         updateLatest((current) => {
             return { backupModels: edit(storedBackupModels(current)) };
         }).catch(() => {
             toast.error(t`Failed to update backup models`);
-
-            if (focusOnFailure !== undefined) {
-                focusAfter.current = focusOnFailure;
-                setFocusRequest((count) => count + 1);
-            }
+            focusAfter.current = focusOnFailure;
+            setFocusRequest((count) => count + 1);
         });
     };
 
@@ -258,11 +259,10 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                                 <Button
                                     aria-label={t`Move ${name} up`}
                                     disabled={locked || index === 0}
-                                    onClick={() => {
-                                        // At the top, "up" is disabled: focus moves to "down".
-                                        focusAfter.current = controlKey(id, index === 1 ? "down" : "up");
-                                        save((list) => moveBackupModel(list, id, -1));
-                                    }}
+                                    onClick={() =>
+                                        // At the top, "up" is disabled: focus moves to "down". A refused move puts the entry back, and "up" with it.
+                                        save((list) => moveBackupModel(list, id, -1), controlKey(id, index === 1 ? "down" : "up"), controlKey(id, "up"))
+                                    }
                                     ref={register(controlKey(id, "up"))}
                                     size="icon-sm"
                                     variant="ghost"
@@ -272,10 +272,13 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                                 <Button
                                     aria-label={t`Move ${name} down`}
                                     disabled={locked || index === chosen.length - 1}
-                                    onClick={() => {
-                                        focusAfter.current = controlKey(id, index === chosen.length - 2 ? "up" : "down");
-                                        save((list) => moveBackupModel(list, id, 1));
-                                    }}
+                                    onClick={() =>
+                                        save(
+                                            (list) => moveBackupModel(list, id, 1),
+                                            controlKey(id, index === chosen.length - 2 ? "up" : "down"),
+                                            controlKey(id, "down"),
+                                        )
+                                    }
                                     ref={register(controlKey(id, "down"))}
                                     size="icon-sm"
                                     variant="ghost"
@@ -288,8 +291,11 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                                     onClick={() => {
                                         const next = chosen[index + 1] ?? chosen[index - 1];
 
-                                        focusAfter.current = next === undefined ? "" : controlKey(next, "remove");
-                                        save((list) => list.filter((entry) => entry !== id));
+                                        save(
+                                            (list) => list.filter((entry) => entry !== id),
+                                            next === undefined ? "" : controlKey(next, "remove"),
+                                            controlKey(id, "remove"),
+                                        );
                                     }}
                                     ref={register(controlKey(id, "remove"))}
                                     size="icon-sm"
@@ -318,10 +324,13 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
 
                             const fills = chosen.length + 1 >= limit;
 
-                            // The picker stays unless this add fills the list; then the new entry's remove button takes focus.
-                            focusAfter.current = fills ? controlKey(modelId, "remove") : "";
-                            // A refused add that filled the list rolls its entry back and the add picker returns: focus goes back to it.
-                            save((list) => (list.includes(modelId) || list.length >= limit ? list : [...list, modelId]), fills ? "" : undefined);
+                            // The picker stays unless this add fills the list; then the new entry's remove button takes focus. A refused
+                            // add rolls its entry back and brings the picker back, so focus returns to it.
+                            save(
+                                (list) => (list.includes(modelId) || list.length >= limit ? list : [...list, modelId]),
+                                fills ? controlKey(modelId, "remove") : "",
+                                "",
+                            );
                         }}
                         value={undefined}
                     />
