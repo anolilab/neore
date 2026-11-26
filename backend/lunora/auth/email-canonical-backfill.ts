@@ -174,6 +174,19 @@ interface HeldRecord {
 
 type BackfillCtx = Pick<MutationCtx, "db" | "now">;
 
+/**
+ * A row's last change as epoch milliseconds; `NaN` when it does not read as a time. Our own writes store `Date.now()`, but
+ * better-auth writes through Lunora's adapter with `supportsDates: false`, so an account it created or updated holds an ISO
+ * string, whatever the column's `v.number()` says. Unreadable never reads as settled.
+ */
+const changedAt = (value: unknown): number => {
+    if (typeof value === "number") {
+        return value;
+    }
+
+    return typeof value === "string" ? Date.parse(value) : NaN;
+};
+
 const toHex = (bytes: Uint8Array): string => [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 
 const randomHex = (bytes: number): string => toHex(crypto.getRandomValues(new Uint8Array(bytes)));
@@ -415,7 +428,7 @@ export const fillEmailCanonicalBatch = async (ctx: BackfillCtx, { ids, token }: 
 
         return row === undefined || (row.emailCanonical ?? undefined) !== undefined ? [] : [{ canonical: canonicalEmail(row.email), id, row }];
     });
-    const settled = unfilled.filter(({ row }) => row.updatedAt <= settledBefore);
+    const settled = unfilled.filter(({ row }) => changedAt(row.updatedAt) <= settledBefore);
 
     if (new Set(settled.map(({ canonical }) => canonical)).size < settled.length) {
         return { conflicts: 1, filled: 0, processed: 0, skipped: 0, status: "conflict" };
@@ -442,7 +455,8 @@ export const fillEmailCanonicalBatch = async (ctx: BackfillCtx, { ids, token }: 
 
         try {
             // Only while the row is still unfilled and unchanged since this call read it: a write in between that moves
-            // `updatedAt` makes this miss after one read more, and the row waits for the next check.
+            // `updatedAt` makes this miss after one read more, and the row waits for the next check. The guard is the
+            // value as stored (an ISO string on a row better-auth wrote), never the parsed time, so D1 compares like with like.
             ({ applied } = await ctx.db.patchIf("user", id, {
                 patch: { emailCanonical: canonical },
                 where: { email: row.email, emailCanonical: null, updatedAt: row.updatedAt },
