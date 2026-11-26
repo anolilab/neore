@@ -135,10 +135,6 @@ export class FallbackLanguageModel implements LanguageModelV3 {
         return this.backups.filter((slot) => backupCanServe(slot.capabilities, call)).map((slot) => slot.model.modelId);
     }
 
-    get backupModelIds(): string[] {
-        return this.backups.map((slot) => slot.model.modelId);
-    }
-
     get provider(): string {
         return this.active.provider;
     }
@@ -242,13 +238,12 @@ export class FallbackLanguageModel implements LanguageModelV3 {
         return index < 0 ? this.primary : this.backups[index]!.model;
     }
 
-    /** Where a call starts: the backup an earlier step landed on, or the next one after it that can take this call, else the primary. */
+    /**
+     * Where a call starts: the backup an earlier step landed on, when it can take this call; otherwise the primary, so a
+     * step that backup cannot take still gets the whole chain after the primary, earlier backups included.
+     */
     private firstAttempt(options: LanguageModelV3CallOptions): number {
-        if (this.onBackup === undefined) {
-            return -1;
-        }
-
-        return this.canTakeCall(this.onBackup, options) ? this.onBackup : (this.nextServing(this.onBackup, options) ?? -1);
+        return this.onBackup !== undefined && this.canTakeCall(this.onBackup, options) ? this.onBackup : -1;
     }
 
     /**

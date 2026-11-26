@@ -13,11 +13,11 @@ export const MAX_BACKUP_MODELS = 3;
 
 /**
  * The user's backup models in order: `backupModels` once it has been saved (an empty list is "none"), otherwise the
- * single `backupModel` saved before the list existed. Blank ids are dropped.
+ * single `backupModel` saved before the list existed ("" is none).
  */
 export const storedBackupModels = (settings: { backupModel?: string | null; backupModels?: ReadonlyArray<string> | null } | null | undefined): string[] => {
     if (Array.isArray(settings?.backupModels)) {
-        return settings.backupModels.filter((id) => typeof id === "string" && id !== "").slice(0, MAX_BACKUP_MODELS);
+        return [...settings.backupModels];
     }
 
     return settings?.backupModel ? [settings.backupModel] : [];

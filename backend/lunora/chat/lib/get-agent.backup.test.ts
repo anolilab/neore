@@ -42,6 +42,6 @@ describe("getAgent backup model", () => {
         const model = await languageModelOf(["no-such-model", third!.id, primary!.id, other!.id, third!.id]);
 
         expect(model).toBeInstanceOf(FallbackLanguageModel);
-        expect((model as FallbackLanguageModel).backupModelIds).toEqual([third!.id, other!.id]);
+        expect((model as FallbackLanguageModel).backupsServing({ hasTools: false, messages: [] })).toEqual([third!.id, other!.id]);
     });
 });

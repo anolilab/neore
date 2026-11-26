@@ -420,6 +420,24 @@ describe("FallbackLanguageModel", () => {
             expect(second.doGenerate).toHaveBeenCalledTimes(2);
         });
 
+        it("tries the primary first for a step the backup it landed on cannot take", async () => {
+            const primary = fakeModel("primary", gatewayError("infra"));
+            const blind = fakeModel("blind");
+            const sighted = fakeModel("sighted");
+            const model = new FallbackLanguageModel(primary, [{ model: blind, supportsImages: false }, { model: sighted }]);
+            const image = {
+                ...OPTIONS,
+                prompt: [{ content: [{ data: "x", mediaType: "image/png", type: "file" }], role: "user" }],
+            } as unknown as LanguageModelV3CallOptions;
+
+            await model.doGenerate(OPTIONS);
+            await model.doGenerate(image);
+
+            expect(primary.doGenerate).toHaveBeenCalledTimes(2);
+            expect(blind.doGenerate).toHaveBeenCalledTimes(1);
+            expect(sighted.doGenerate).toHaveBeenCalledTimes(1);
+        });
+
         it("moves on when a backup's stream errors before its first content part", async () => {
             const first = fakeModel("first");
 

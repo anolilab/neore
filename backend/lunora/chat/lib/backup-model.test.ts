@@ -13,10 +13,9 @@ describe("storedBackupModels", () => {
         expect(storedBackupModels({ backupModel: "a", backupModels: [] })).toEqual([]);
     });
 
-    it("is empty for no settings or a blank value, and never longer than the limit", () => {
+    it("is empty for no settings or a blank single value", () => {
         expect(storedBackupModels(null)).toEqual([]);
         expect(storedBackupModels({ backupModel: "" })).toEqual([]);
-        expect(storedBackupModels({ backupModels: ["a", "", "b", "c", "d"] })).toEqual(["a", "b", "c"]);
     });
 });
 
