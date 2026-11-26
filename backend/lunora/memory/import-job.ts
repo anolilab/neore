@@ -76,11 +76,6 @@ const armQueuedReaper = async (ctx: MutationCtx, job: Doc<"memoryImportJobs">, i
     await runAfterOnShard(ctx.scheduler, STALE_IMPORT_BATCH_MS, internal.memory.import_job.reapMemoryImportJob, { batch: index, jobId: job._id }, job.userId);
 };
 
-/** Puts a batch on the jobs queue. Only after the mutation that made it the job's next batch has committed. */
-const enqueueBatch = async (userId: string, jobId: Id<"memoryImportJobs">, index: number): Promise<void> => {
-    await enqueueJob(internal.memory.import_job.runMemoryImportBatch, { index, jobId }, { shardKey: userId });
-};
-
 /**
  * Creates the job in `preparing`, with the counts the parse already settled: its duplicates, too long and invalid
  * entries are done work. Refused while another import of the user is active.
@@ -386,7 +381,7 @@ export const runMemoryImportBatch = internalAction
         if (next !== null) {
             // After the completion committed: the next batch is already the job's `nextBatch`, so its delivery finds it claimable.
             try {
-                await enqueueBatch(claim.userId, args.jobId, next);
+                await enqueueJob(internal.memory.import_job.runMemoryImportBatch, { index: next, jobId: args.jobId }, { shardKey: claim.userId });
             } catch (error) {
                 console.error(`[memory/import-job] Batch ${String(next)} of job ${args.jobId} was not queued:`, error);
                 await ctx.runMutation(internal.memory.import_job.failImportBatch, { index: next, jobId: args.jobId, message: FAILED_MESSAGE });
