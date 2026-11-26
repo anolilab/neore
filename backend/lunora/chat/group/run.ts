@@ -663,7 +663,7 @@ const runQueue = async (
     }
 
     // Every way past the speaker loop that is not a pause lands here and closes the stream. The end it records is `runEnd`: a stop
-    // records none, a quota refusal records a failure, and the rest (the repeated-call guard's included) succeeded.
+    // records none, and the rest (a quota refusal after a delivered reply, and the repeated-call guard's stop included) succeed.
     await closeGroupTurnStream(ctx, turn, runEnd);
 
     await setThreadStatus(ctx, turn.threadId, "active", { replied: true });
