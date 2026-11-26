@@ -98,3 +98,9 @@ recurring tasks. State machine and idempotency are explained at the top of `inte
   project leaves the thread unfiled rather than failing the run.
 - `tasks.reasoningEffort` is on the chat's 0-100 scale (the effort slider) and wins over the skill's. A coding-agent
   task takes none.
+
+## SCHEDULE IDEAS (DAILY SUGGESTIONS)
+
+- Opt-in twice: `scheduleIdeasEnabled` and `memoryEnabled`, both absent = off. `dispatchScheduleIdeas` (a `shardSweeps()` entry, no cron) queues `generateScheduleIdeas` `once` while the user's UTC day is not taken; `prepareScheduleIdeas` takes the day (`schedule-ideas` claim) in the same mutation that reads. A failed model call spends the day.
+- The model sees only the person's typed words: user rows' `typedText`, from chats tagged `chat` or untagged and with no messenger, external, bot or host marker (`readable`). Never a run, sub-agent, eval, trigger or messenger thread. Bounds are in `schedule-ideas-logic.ts`; a message with a privacy marker or secret is left out whole before it is cut.
+- Proposals go through `insertTaskSuggestions` (validation, secrets, the pending cap). Logs carry counts only.

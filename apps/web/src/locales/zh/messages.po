@@ -693,7 +693,7 @@ msgid "{0} lines"
 msgstr "{0} 行"
 
 #. placeholder {0}: stats.total
-#: src/features/settings/components/personalization/memory-settings.tsx:186
+#: src/features/settings/components/personalization/memory-settings.tsx:225
 msgid "{0} memories"
 msgstr "{0} 条记忆"
 
@@ -783,7 +783,7 @@ msgid "{0} on {1}, in {2}"
 msgstr "{0}，位于 {1}，目录 {2}"
 
 #. placeholder {0}: stats.pinned
-#: src/features/settings/components/personalization/memory-settings.tsx:187
+#: src/features/settings/components/personalization/memory-settings.tsx:226
 msgid "{0} pinned"
 msgstr "{0} 条已置顶"
 
@@ -3511,7 +3511,7 @@ msgid "All"
 msgstr "全部"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:208
+#: src/features/settings/components/personalization/memory-settings.tsx:247
 msgid "All ({0})"
 msgstr "全部（{0}）"
 
@@ -6163,7 +6163,7 @@ msgstr "加拿大"
 #: src/features/settings/components/chat/usage-settings.tsx:581
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:416
 #: src/features/settings/components/personalization/memory-item.tsx:351
-#: src/features/settings/components/personalization/memory-settings.tsx:257
+#: src/features/settings/components/personalization/memory-settings.tsx:296
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
@@ -7064,11 +7064,11 @@ msgstr "全部清除"
 msgid "Clear All"
 msgstr "全部清除"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:247
+#: src/features/settings/components/personalization/memory-settings.tsx:286
 msgid "Clear All Memories"
 msgstr "清除所有记忆"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:251
+#: src/features/settings/components/personalization/memory-settings.tsx:290
 msgid "Clear all memories?"
 msgstr "清除所有记忆？"
 
@@ -7119,7 +7119,7 @@ msgstr "清除标签筛选"
 msgid "Clear the queue"
 msgstr "清空队列"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:137
+#: src/features/settings/components/personalization/memory-settings.tsx:139
 msgid "Cleared {count} memories"
 msgstr "已清除 {count} 条记忆"
 
@@ -10693,7 +10693,7 @@ msgstr "删除账号"
 msgid "Delete alert \"{ruleName}\""
 msgstr "删除提醒“{ruleName}”"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:258
+#: src/features/settings/components/personalization/memory-settings.tsx:297
 msgid "Delete All"
 msgstr "全部删除"
 
@@ -12648,7 +12648,7 @@ msgstr "启用后续建议"
 msgid "Enable for Next Chat"
 msgstr "为下一个聊天启用"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:171
+#: src/features/settings/components/personalization/memory-settings.tsx:186
 msgid "Enable memory"
 msgstr "启用记忆"
 
@@ -13946,7 +13946,7 @@ msgstr "更改标签颜色失败"
 msgid "Failed to clear filter rules"
 msgstr "清除筛选规则失败"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:133
+#: src/features/settings/components/personalization/memory-settings.tsx:135
 msgid "Failed to clear memories"
 msgstr "清除记忆失败"
 
@@ -14039,7 +14039,7 @@ msgstr "删除文件失败，请重试。"
 msgid "Failed to delete files"
 msgstr "删除文件失败"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:105
+#: src/features/settings/components/personalization/memory-settings.tsx:107
 msgid "Failed to delete memory"
 msgstr "删除记忆失败"
 
@@ -14560,8 +14560,8 @@ msgstr "更新键盘快捷键失败"
 msgid "Failed to update MCP server"
 msgstr "更新 MCP 服务器失败"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:116
-#: src/features/settings/components/personalization/memory-settings.tsx:124
+#: src/features/settings/components/personalization/memory-settings.tsx:118
+#: src/features/settings/components/personalization/memory-settings.tsx:126
 msgid "Failed to update memory"
 msgstr "更新记忆失败"
 
@@ -14589,7 +14589,8 @@ msgstr "无法更新拉取请求设置"
 msgid "Failed to update reply tools"
 msgstr "无法更新回复工具"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:148
+#: src/features/settings/components/personalization/memory-settings.tsx:150
+#: src/features/settings/components/personalization/memory-settings.tsx:162
 msgid "Failed to update setting"
 msgstr "更新设置失败"
 
@@ -15283,7 +15284,7 @@ msgstr "按类型筛选"
 msgid "Filter condition"
 msgstr "筛选条件"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:194
+#: src/features/settings/components/personalization/memory-settings.tsx:233
 msgid "Filter memories by type"
 msgstr "按类型筛选记忆"
 
@@ -21191,7 +21192,7 @@ msgid "memories"
 msgstr "记忆"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/settings/components/personalization/memory-settings.tsx:220
+#: src/features/settings/components/personalization/memory-settings.tsx:259
 msgid "Memories"
 msgstr "记忆"
 
@@ -21209,7 +21210,7 @@ msgid "Memories used for this reply ({0})"
 msgstr "此回复使用的记忆（{0}）"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
-#: src/features/settings/components/personalization/memory-settings.tsx:164
+#: src/features/settings/components/personalization/memory-settings.tsx:179
 #: src/features/settings/lib/settings-keywords.ts:96
 msgid "Memory"
 msgstr "记忆"
@@ -21218,15 +21219,15 @@ msgstr "记忆"
 msgid "Memory — what the agent keeps across chats"
 msgstr "记忆——智能体跨聊天保留的内容"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:109
+#: src/features/settings/components/personalization/memory-settings.tsx:111
 msgid "Memory deleted"
 msgstr "记忆已删除"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:146
+#: src/features/settings/components/personalization/memory-settings.tsx:148
 msgid "Memory disabled"
 msgstr "记忆已关闭"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:146
+#: src/features/settings/components/personalization/memory-settings.tsx:148
 msgid "Memory enabled"
 msgstr "记忆已开启"
 
@@ -23293,6 +23294,10 @@ msgstr "还没有历史记录"
 msgid "No icon found"
 msgstr "未找到图标"
 
+#: src/features/settings/components/personalization/memory-settings.tsx:210
+msgid "No ideas are made while memory is off."
+msgstr "记忆关闭时不会生成想法。"
+
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:171
 #: src/features/chat/thread/media-gallery-view.tsx:353
 msgid "No images yet"
@@ -23354,11 +23359,11 @@ msgstr "未配置 MCP 服务器。添加服务器以扩展 AI 能力。"
 msgid "No members in this team yet"
 msgstr "此团队还没有成员"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:236
+#: src/features/settings/components/personalization/memory-settings.tsx:275
 msgid "No memories of this type."
 msgstr "没有此类型的记忆。"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:237
+#: src/features/settings/components/personalization/memory-settings.tsx:276
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "还没有记忆。AI 会自动从你的对话中开始学习。"
 
@@ -24284,6 +24289,10 @@ msgstr "下次访问聊天时将重新开始新手引导。"
 #: src/features/onboarding/components/onboarding-dialog.tsx:312
 msgid "Onboarding wizard"
 msgstr "新手引导向导"
+
+#: src/features/settings/components/personalization/memory-settings.tsx:206
+msgid "Once a day, suggest recurring tasks based only on your own recent messages. Nothing is created until you accept a suggestion. Turning this off deletes the suggestions waiting for you."
+msgstr "每天根据你自己最近的消息建议一次重复任务。在你接受建议之前不会创建任何内容。关闭此项会删除等待处理的建议。"
 
 #: src/features/marketing/use-cases/use-case-data.ts:123
 msgid "Once a night, for users active that day, a reflection pass merges duplicates and promotes repeated facts."
@@ -30275,6 +30284,14 @@ msgstr "计划"
 msgid "Schedule {0}"
 msgstr "计划 {0}"
 
+#: src/features/settings/components/personalization/memory-settings.tsx:160
+msgid "Schedule ideas disabled"
+msgstr "已关闭计划任务建议"
+
+#: src/features/settings/components/personalization/memory-settings.tsx:160
+msgid "Schedule ideas enabled"
+msgstr "已开启计划任务建议"
+
 #: src/features/skills/components/bundle-import-dialog.tsx:55
 msgid "Schedule or webhook"
 msgstr "计划任务或 webhook"
@@ -33672,6 +33689,10 @@ msgstr "已成功从 {0} 导入 {imported} 个对话"
 msgid "Suggest innovative solutions to reduce plastic waste"
 msgstr "提出减少塑料垃圾的创新方案"
 
+#: src/features/settings/components/personalization/memory-settings.tsx:196
+msgid "Suggest scheduled tasks"
+msgstr "建议计划任务"
+
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:108
 msgid "Suggest video ideas for a tech YouTube channel"
 msgstr "为科技类 YouTube 频道提供视频创意"
@@ -34867,7 +34888,7 @@ msgstr "智能体的计划"
 msgid "The agent's tool calls"
 msgstr "智能体的工具调用"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:163
+#: src/features/settings/components/personalization/memory-settings.tsx:178
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 msgstr "AI 会从你的对话中学习以个性化回复，并在每晚反思所学内容。它记住的一切都列在这里——你可以编辑、修改类型、置顶或删除其中任何一条。"
 
@@ -36624,7 +36645,7 @@ msgid "This will permanently delete {0} anonymous user accounts and all their da
 msgstr "这将永久删除 {0} 个匿名用户账号及其所有数据。此操作无法撤销。"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:253
+#: src/features/settings/components/personalization/memory-settings.tsx:292
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "这将永久删除全部 {0} 条记忆及其每日摘要。AI 将从你的下一次对话开始重新学习。"
 
