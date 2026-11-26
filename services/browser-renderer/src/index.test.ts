@@ -728,6 +728,7 @@ describe("the session hold every isolate shares", () => {
             setDefaultTimeout: () => undefined,
             title: async () => "A page",
             url: () => "https://example.com/",
+            viewportSize: () => null,
         };
         const answer = post(env, "/action", { action: "screenshot", maxBytes: 50, reconnectOnly: true, sessionId: "kept" });
 
@@ -753,6 +754,33 @@ describe("the session hold every isolate shares", () => {
         expect(response.status).toBe(422);
         expect(response.headers.get("x-browser-action")).toBe("not-run");
         expect(newPage).not.toHaveBeenCalled();
+    });
+
+    it("drops a viewport a page script overwrote with something other than a number", async () => {
+        const { env, pending } = binding();
+        const page = {
+            context: () => {
+                return { route: async () => undefined };
+            },
+            evaluate: async () => {
+                return { height: 844, width: "x" };
+            },
+            screenshot: vi.fn(async () => new Uint8Array([1, 2, 3])),
+            setDefaultTimeout: () => undefined,
+            title: async () => "A page",
+            url: () => "https://example.com/",
+            viewportSize: () => null,
+        };
+        const answer = post(env, "/action", { action: "screenshot", reconnectOnly: true, sessionId: "kept" });
+
+        await vi.advanceTimersByTimeAsync(0);
+        pending[0]?.({ close: async () => undefined, contexts: () => [{ pages: () => [page] }], sessionId: () => "kept" });
+
+        const response = await answer;
+        const body = await response.json();
+
+        expect(body).toMatchObject({ success: true });
+        expect(body).not.toHaveProperty("viewport");
     });
 
     it("refuses a reconnect-only action that names no session, before any browser opens", async () => {

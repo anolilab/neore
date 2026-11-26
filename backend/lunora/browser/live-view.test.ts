@@ -1929,6 +1929,13 @@ describe("a still frame of the browser", () => {
         await expect(frame(READER)).resolves.toStrictEqual({ status: "unavailable" });
     });
 
+    it("answers the picture without a viewport the page made into something other than numbers", async () => {
+        await addSession();
+        renderer.mockResolvedValueOnce(shot({ viewport: { height: 720, width: "x" } }));
+
+        await expect(frame(OWNER)).resolves.toStrictEqual({ image: "aGVsbG8=", status: "ok", takenAt: NOW });
+    });
+
     it("refuses a frame too large for the answer, and a renderer that failed", async () => {
         await addSession();
         renderer.mockResolvedValueOnce(shot({ screenshot: "a".repeat(MAX_FRAME_BASE64 + 1) }));

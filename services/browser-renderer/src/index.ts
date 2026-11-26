@@ -381,6 +381,13 @@ const reconnectOnlyTo = async (
     }
 };
 
+/** `size` as a viewport, or `null` unless both sides are finite positive numbers. */
+const viewportOf = (size: { height: unknown; width: unknown } | null): { height: number; width: number } | null => {
+    const isSide = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value > 0;
+
+    return size !== null && isSide(size.height) && isSide(size.width) ? { height: size.height, width: size.width } : null;
+};
+
 /** The session's page as {@link pageOf} sets it up, or `undefined` when it has none: none is opened. */
 const existingPageOf = async (browser: import("@cloudflare/playwright").Browser): Promise<import("@cloudflare/playwright").Page | undefined> => {
     const page = browser.contexts()[0]?.pages()[0];
@@ -840,12 +847,16 @@ const actHeld = async (
                 const title = await page.title();
                 const currentUrl = page.url();
 
-                // Read from the page: a reconnected session may carry no viewport size of Playwright's own.
-                const viewport = await page
-                    .evaluate(() => {
-                        return { height: window.innerHeight, width: window.innerWidth };
-                    })
-                    .catch(() => null);
+                // Playwright's own size first; a reconnected session may carry none, so then the page's, which page script can
+                // overwrite: kept only as two finite positive numbers.
+                const viewport = viewportOf(
+                    page.viewportSize() ??
+                        (await page
+                            .evaluate(() => {
+                                return { height: window.innerHeight as unknown, width: window.innerWidth as unknown };
+                            })
+                            .catch(() => null)),
+                );
 
                 result = { screenshot: base64, screenshotFormat: "jpeg", success: true, title, url: currentUrl, ...(viewport !== null && { viewport }) };
                 break;

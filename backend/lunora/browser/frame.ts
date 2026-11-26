@@ -22,6 +22,8 @@ import { isServiceBound, serviceFetch } from "../lib/services";
  */
 export const MAX_FRAME_BASE64 = 700_000;
 
+const isSide = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value > 0;
+
 /** The JPEG size the renderer is asked to stay under: a larger shot is taken again at a lower quality. */
 const MAX_FRAME_BYTES = Math.floor((MAX_FRAME_BASE64 * 3) / 4);
 
@@ -140,6 +142,8 @@ export const readBrowserFrame = authAction
             image: result.screenshot,
             status: "ok" as const,
             takenAt: Date.now(),
-            ...(result.viewport !== undefined && { viewport: { height: result.viewport.height, width: result.viewport.width } }),
+            // Only two finite positive numbers: anything else would fail the answer's validation for one odd page.
+            ...(isSide(result.viewport?.height) &&
+                isSide(result.viewport?.width) && { viewport: { height: result.viewport.height, width: result.viewport.width } }),
         };
     });
