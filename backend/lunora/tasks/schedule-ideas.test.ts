@@ -8,6 +8,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 import { claimKey, completeKey, releaseKey } from "../lib/claim-once";
+import { JOB_CLAIM_TTL_MS } from "../lib/claim-once";
 import { runJobOnce } from "../lib/job-once";
 import { runInShard } from "../lib/shard-context";
 import schema from "../schema";
@@ -19,6 +20,7 @@ import {
     MAX_IDEA_SOURCE_CHARS,
     MAX_IDEA_SOURCE_MESSAGES,
     MAX_IDEA_SOURCE_THREADS,
+    scheduleIdeasDay,
     scheduleIdeasDayKey,
     SCHEDULE_IDEAS_WINDOW_MS,
     takeIdeaSources,
@@ -101,15 +103,17 @@ const row = async (threadId: string, role: "assistant" | "user", text: string, f
     );
 };
 
-const run = async (userId = USER) => await harness.action(async (ctx: any) => await ctx.runAction(generateScheduleIdeas, { userId }));
+const today = (): string => scheduleIdeasDay(Date.now());
 
-const prepare = async (userId = USER) => await harness.run(async (ctx: any) => await ctx.runMutation(prepareScheduleIdeas, { userId }));
+const run = async (userId = USER, day = today()) => await harness.action(async (ctx: any) => await ctx.runAction(generateScheduleIdeas, { day, userId }));
+
+const prepare = async (userId = USER, day = today()) => await harness.run(async (ctx: any) => await ctx.runMutation(prepareScheduleIdeas, { day, userId }));
 
 /**
  * Delivers the job the way the queue does: through `runJobOnce`, which claims the `jobId`, adds it to the target's
  * arguments and completes or releases the claim. The target is the REAL registered action, input validation included.
  */
-const deliver = async (jobId: string, userId = USER) =>
+const deliver = async (jobId: string, userId = USER, day = today()) =>
     await harness.action(async (ctx: any) => {
         const wrapped = {
             runAction: async (reference: { __lunoraRef: string }, args: unknown) => await ctx.runAction(registry.get(reference.__lunoraRef) as never, args),
@@ -121,7 +125,7 @@ const deliver = async (jobId: string, userId = USER) =>
         };
 
         return await (runJobOnce as unknown as { handler: (context: unknown, args: unknown) => Promise<unknown> }).handler(wrapped, {
-            args: { userId },
+            args: { day, userId },
             jobId,
             target: "tasks_schedule_ideas:generateScheduleIdeas",
             userId,
@@ -348,7 +352,7 @@ describe("the queued job", () => {
         // The runtime refuses an argument the action does not declare, and the harness does not: the declaration is checked itself.
         const input = (generateScheduleIdeas as unknown as { args: Record<string, { isOptional?: boolean; kind: string }> }).args;
 
-        expect(Object.keys(input).toSorted((a, b) => a.localeCompare(b))).toEqual(["jobId", "userId"]);
+        expect(Object.keys(input).toSorted((a, b) => a.localeCompare(b))).toEqual(["day", "jobId", "userId"]);
         expect(input.userId!.kind).not.toBe("optional");
         expect(input.jobId!.kind).toBe("optional");
     });
@@ -507,13 +511,135 @@ describe("the day", () => {
         await runInShard(USER, async () => await harness.run(async (ctx: any) => await ctx.runMutation(dispatchScheduleIdeas, {})));
 
         expect(enqueued).toHaveLength(1);
-        expect(enqueued[0]!.args).toEqual({ userId: USER });
+        expect(enqueued[0]!.args).toEqual({ day: today(), userId: USER });
         expect(enqueued[0]!.options).toMatchObject({ once: { jobId: `schedule-ideas:${scheduleIdeasDayKey(USER, Date.now())}`, userId: USER } });
 
         await run();
         await runInShard(USER, async () => await harness.run(async (ctx: any) => await ctx.runMutation(dispatchScheduleIdeas, {})));
 
         expect(enqueued).toHaveLength(1);
+    });
+});
+
+describe("a source chat locked while the model is being chosen", () => {
+    const lockMeanwhile = (threadId: string, fields: Record<string, unknown>) =>
+        getUtilityModel.mockImplementation(async () => {
+            await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, fields));
+
+            return {};
+        });
+
+    it("is not sent, while a chat still readable is", async () => {
+        await settings();
+        const locked = await thread();
+        const open = await thread();
+
+        await row(locked, "user", "WORDS-OF-THE-LOCKED-CHAT");
+        await row(open, "user", "words of the open chat");
+        lockMeanwhile(locked, { lockedAt: Date.now() });
+
+        await run();
+
+        expect(generateText).toHaveBeenCalledOnce();
+        expect(promptSent()).toContain("words of the open chat");
+        expect(promptSent()).not.toContain("WORDS-OF-THE-LOCKED-CHAT");
+    });
+
+    it("makes no model call when it was the only source, whether it was locked or deleted", async () => {
+        for (const fields of [{ lockedAt: Date.now() }, { deleted: true }, { deletingAt: Date.now() }]) {
+            generateText.mockClear();
+            harness = lunoraTest(schema as never);
+            await settings();
+            const only = await thread();
+
+            await row(only, "user", "words of the only chat");
+            lockMeanwhile(only, fields);
+
+            await run();
+
+            expect(generateText).not.toHaveBeenCalled();
+            expect(await suggestions()).toHaveLength(0);
+        }
+    });
+});
+
+describe("the day a job was queued for", () => {
+    it("is the day it claims when it is delivered after midnight, leaving the next day free", async () => {
+        await settings();
+        await row(await thread(), "user", "remind me to water the plants every morning");
+        const queuedFor = scheduleIdeasDay(Date.now() - DAY);
+
+        await deliver(`schedule-ideas:${USER}:${queuedFor}`, USER, queuedFor);
+
+        expect(generateText).toHaveBeenCalledOnce();
+
+        const claims = await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect());
+        const taken = claims.filter((claim: any) => claim.scope === "schedule-ideas").map((claim: any) => claim.key);
+
+        expect(taken).toEqual([`${USER}:${queuedFor}`]);
+
+        // The sweep of the day the job was delivered on still queues its own job.
+        await runInShard(USER, async () => await harness.run(async (ctx: any) => await ctx.runMutation(dispatchScheduleIdeas, {})));
+
+        expect(enqueued).toHaveLength(1);
+        expect(enqueued[0]!.args).toEqual({ day: today(), userId: USER });
+    });
+
+    it("refuses a day that is not a calendar day, without calling the model or taking a day", async () => {
+        await settings();
+        await row(await thread(), "user", "a message");
+
+        await expect(run(USER, "not-a-day")).resolves.toBeNull();
+
+        expect(generateText).not.toHaveBeenCalled();
+        const afterwards = await prepare();
+
+        expect(afterwards.messages).toHaveLength(1);
+    });
+});
+
+describe("a skipped delivery", () => {
+    const sweep = async () => await runInShard(USER, async () => await harness.run(async (ctx: any) => await ctx.runMutation(dispatchScheduleIdeas, {})));
+    const setSwitch = async (on: boolean) =>
+        await harness.run(async (ctx: any) => {
+            const [existing] = await ctx.db.query("userSettings").collect();
+
+            await ctx.db.patch("userSettings", existing._id, { scheduleIdeasEnabled: on });
+        });
+
+    it("does not let a sweep queue a replacement while its job claim is still held, and exactly one job runs once it is back", async () => {
+        const jobId = `schedule-ideas:${scheduleIdeasDayKey(USER, Date.now())}`;
+
+        await settings({ scheduleIdeasEnabled: false });
+        await row(await thread(), "user", "remind me to water the plants every morning");
+        // The sweep queued the day's job while the switch was on.
+        await setSwitch(true);
+        await sweep();
+        expect(enqueued).toHaveLength(1);
+        await setSwitch(false);
+
+        // The delivery holds the job claim, as `runJobOnce` does until its target has returned.
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(claimKey, { key: jobId, leaseMs: 1000, scope: "job", ttlMs: JOB_CLAIM_TTL_MS, userId: USER }),
+        );
+        await expect(run()).resolves.toEqual({ skipped: true });
+        await setSwitch(true);
+
+        // A sweep between the skip and the claim's release must send nothing: it would be dropped, and its mark would strand the day.
+        await sweep();
+        expect(enqueued).toHaveLength(1);
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(releaseKey, { key: jobId, scope: "job" }));
+        await sweep();
+        await sweep();
+        expect(enqueued).toHaveLength(2);
+
+        await deliver(jobId);
+        await deliver(jobId);
+        await sweep();
+
+        expect(generateText).toHaveBeenCalledOnce();
+        expect(enqueued).toHaveLength(2);
     });
 });
 

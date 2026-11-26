@@ -40,7 +40,8 @@ import { JOB_DISPATCH_TIMEOUT_MS } from "./job-queue-config";
 /** Longer than any single delivery may run, so a live delivery is never reaped. */
 export const JOB_LEASE_MS = JOB_DISPATCH_TIMEOUT_MS + 60 * 1000;
 
-const JOB_SCOPE = "job";
+/** The scope of a job's claim; a caller that must know whether a job is still held (`tasks/schedule-ideas.ts`) reads it. */
+export const JOB_SCOPE = "job";
 
 /** Claim `jobId`, run the `target` action with `args`, then complete the claim. A refused claim runs nothing. */
 export const runJobOnce = internalAction

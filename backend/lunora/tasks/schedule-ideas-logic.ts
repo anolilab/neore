@@ -45,8 +45,25 @@ export const SCHEDULE_IDEAS_CLAIM_TTL_MS = 2 * DAY_MS;
  */
 export const SCHEDULE_IDEAS_QUEUED_SCOPE = "schedule-ideas-queued";
 
+/**
+ * What the queued-day mark holds once its job was skipped (a switch off): the day is free again, but only after the job's own
+ * claim is given back (`dispatchScheduleIdeas` checks both), so a replacement is never sent into a claim that would drop it.
+ */
+export const SCHEDULE_IDEAS_SKIPPED = "skipped";
+
+/** The UTC day of a time, `YYYY-MM-DD`: the day a job is queued for, and the one it keeps however late it is delivered. */
+export const scheduleIdeasDay = (now: number): string => new Date(now).toISOString().slice(0, 10);
+
+const DAY_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Whether `day` is a calendar day as {@link scheduleIdeasDay} writes it. */
+export const isScheduleIdeasDay = (day: string): boolean => DAY_SHAPE.test(day) && scheduleIdeasDay(Date.parse(`${day}T00:00:00Z`)) === day;
+
 /** One key per user per UTC day. */
-export const scheduleIdeasDayKey = (userId: string, now: number): string => `${userId}:${new Date(now).toISOString().slice(0, 10)}`;
+export const scheduleIdeasDayKeyFor = (userId: string, day: string): string => `${userId}:${day}`;
+
+/** One key per user per UTC day, for the day `now` falls in. */
+export const scheduleIdeasDayKey = (userId: string, now: number): string => scheduleIdeasDayKeyFor(userId, scheduleIdeasDay(now));
 
 /**
  * Every text of a stored user turn: its `text` column (quotes and attachment text included) and the text of each part of
@@ -76,9 +93,9 @@ export const turnTexts = (row: { message?: unknown; text?: string }): string[] =
 };
 
 /** A message the person typed, and the chat it is in. */
-export interface IdeaSource {
+export interface IdeaSource<TId extends string = string> {
     text: string;
-    threadId: string;
+    threadId: TId;
 }
 
 /**
@@ -87,8 +104,8 @@ export interface IdeaSource {
  * {@link MAX_IDEA_SOURCE_CHARS} characters in all. The secret check runs on the whole message, before the cut: a key
  * that straddles the cut would leave a part the detector misses.
  */
-export const takeIdeaSources = (candidates: ReadonlyArray<IdeaSource>): IdeaSource[] => {
-    const taken: IdeaSource[] = [];
+export const takeIdeaSources = <TId extends string>(candidates: ReadonlyArray<IdeaSource<TId>>): IdeaSource<TId>[] => {
+    const taken: IdeaSource<TId>[] = [];
     let chars = 0;
 
     for (const candidate of candidates) {

@@ -7,10 +7,16 @@
  *   job when the user's day is not yet taken; no cron of its own.
  * - **A skipped run does not spend the day**: when a switch is off at delivery, the action answers `{ skipped: true }`,
  *   `runJobOnce` gives its claim back, and the day's own claim is released, so turning the feature back on the same UTC
- *   day runs the job.
+ *   day runs the job. The queued-day mark is NOT deleted by the action: `runJobOnce` gives its job claim back only after
+ *   the action returned, and a replacement sent in between would be dropped by that claim while its own fresh mark
+ *   blocked every later sweep. The action marks the queued-day mark `skipped` instead, and the sweep replaces a
+ *   `skipped` mark only once the job claim is gone (`dispatchScheduleIdeas`).
  * - **Once a day**: `prepareScheduleIdeas` takes the day's claim (`idempotencyClaims`) in the same mutation that reads the
  *   messages, so a redelivery, or a sweep that enqueued twice before the job ran, does nothing a second time. The job is
  *   also queued `once`, a paid call that is never made twice. A day whose model call fails is not retried until tomorrow.
+ * - **The day is the queued day**: the sweep puts its UTC day in the job's arguments, and every step (claim, queued mark,
+ *   release) uses that day, never the delivery time: a job queued before midnight and delivered after it spends its own
+ *   day and leaves the next one to the next sweep.
  * - **Input**: the person's typed words only (`messages.typedText` of user rows), from the chats `readable` allows;
  *   never an assistant reply, tool output, file or attachment.
  *   Bounded in `schedule-ideas-logic.ts`. A message with a privacy marker or a secret is left out.
@@ -20,12 +26,13 @@ import { generateText, Output } from "ai";
 import { v } from "lunorash/server";
 import z from "zod/v4";
 
-import type { Doc } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalAction, internalMutation } from "../_generated/server";
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
-import { claimOnce, hasClaim, releaseClaim } from "../lib/claim-once";
+import { claimOnce, claimRow, hasClaim, recordClaimResult, releaseClaim } from "../lib/claim-once";
 import { enqueueJob } from "../lib/job-queue";
+import { JOB_SCOPE } from "../lib/job-once";
 import { gatewayFetch } from "../lib/services";
 import { currentUserShard } from "../lib/shard-context";
 import { isThreadLocked } from "../lib/thread-lock";
@@ -37,14 +44,17 @@ import {
     IDEA_ROWS_READ_PER_THREAD,
     IDEA_THREADS_SCANNED,
     type IdeaSource,
+    isScheduleIdeasDay,
     MAX_IDEA_SOURCE_MESSAGES,
     MAX_IDEA_SOURCE_THREADS,
     SCHEDULE_IDEAS_CLAIM_SCOPE,
     SCHEDULE_IDEAS_CLAIM_TTL_MS,
     SCHEDULE_IDEAS_QUEUED_SCOPE,
+    SCHEDULE_IDEAS_SKIPPED,
     SCHEDULE_IDEAS_SYSTEM_PROMPT,
     SCHEDULE_IDEAS_WINDOW_MS,
-    scheduleIdeasDayKey,
+    scheduleIdeasDay,
+    scheduleIdeasDayKeyFor,
     takeIdeaSources,
     toSuggestions,
     turnTexts,
@@ -90,10 +100,25 @@ const readable = (thread: Doc<"threads">): boolean => {
 };
 
 /**
+ * Gives a skipped job's queued-day mark its `skipped` state (see the header): the sweep may replace it once the job claim
+ * is gone. Not a delete, because `runJobOnce` is still holding that claim while the action runs.
+ */
+const markQueuedSkipped = async (ctx: Parameters<typeof claimOnce>[0], key: string): Promise<void> => {
+    const queued = await claimRow(ctx, SCHEDULE_IDEAS_QUEUED_SCOPE, key);
+
+    if (queued) {
+        await recordClaimResult(ctx, SCHEDULE_IDEAS_QUEUED_SCOPE, key, queued.claimedAt, SCHEDULE_IDEAS_SKIPPED);
+    }
+};
+
+/**
  * Housekeeping sweep (`shardSweeps()`): queues the day's job for the shard's own user when the feature and memory are on
  * and the day is not taken yet, once: a queued-day mark is taken in the same step, so passes before delivery send
- * nothing. Cheap to run every pass: it reads two settings and two claims. A failed enqueue gives the mark back, so the
+ * nothing. Cheap to run every pass: it reads two settings and three claims. A failed enqueue gives the mark back, so the
  * next pass tries again.
+ *
+ * Nothing is sent while the day's job claim (`runJobOnce`) is held, in flight or done: the copy would be dropped by it.
+ * A mark a skipped job left (`skipped`) is replaced once that claim is back, which is what lets a replacement run.
  */
 export const dispatchScheduleIdeas = internalMutation
     .input({})
@@ -105,10 +130,21 @@ export const dispatchScheduleIdeas = internalMutation
             return null;
         }
 
-        const key = scheduleIdeasDayKey(userId, ctx.now);
+        const day = scheduleIdeasDay(ctx.now);
+        const key = scheduleIdeasDayKeyFor(userId, day);
 
-        if (await hasClaim(ctx, SCHEDULE_IDEAS_CLAIM_SCOPE, key)) {
+        if ((await hasClaim(ctx, SCHEDULE_IDEAS_CLAIM_SCOPE, key)) || (await hasClaim(ctx, JOB_SCOPE, `schedule-ideas:${key}`))) {
             return null;
+        }
+
+        const queued = await claimRow(ctx, SCHEDULE_IDEAS_QUEUED_SCOPE, key);
+
+        if (queued) {
+            if (queued.result !== SCHEDULE_IDEAS_SKIPPED) {
+                return null;
+            }
+
+            await releaseClaim(ctx, SCHEDULE_IDEAS_QUEUED_SCOPE, key, queued.claimedAt);
         }
 
         // Marked queued BEFORE the send: a queue that is slow to deliver would otherwise get one more copy from every pass.
@@ -117,7 +153,7 @@ export const dispatchScheduleIdeas = internalMutation
         }
 
         try {
-            await enqueueJob(internal.tasks.schedule_ideas.generateScheduleIdeas, { userId }, { once: { jobId: `schedule-ideas:${key}`, userId } });
+            await enqueueJob(internal.tasks.schedule_ideas.generateScheduleIdeas, { day, userId }, { once: { jobId: `schedule-ideas:${key}`, userId } });
         } catch (error) {
             console.warn("[tasks/schedule-ideas] The job could not be queued; the next pass tries again:", error);
             await releaseClaim(ctx, SCHEDULE_IDEAS_QUEUED_SCOPE, key);
@@ -127,22 +163,24 @@ export const dispatchScheduleIdeas = internalMutation
     });
 
 /**
- * Takes the user's day and reads what the model may see. Empty when a switch is off (then `skipped`, and the day's
- * queued mark is given back so the sweep can queue it again once the switch is on), the day was
+ * Takes the user's `day` (the one the job was queued for) and reads what the model may see. Empty when a switch is off (then
+ * `skipped`, and the day's queued mark is marked `skipped` so the sweep can queue it again once the switch is on), the day was
  * already taken, or there is nothing typed to read. The claim comes first, in this transaction: a second call gets no messages.
  */
 export const prepareScheduleIdeas = internalMutation
-    .input({ userId: v.string() })
-    .output(v.object({ messages: v.array(v.object({ text: v.string(), threadId: v.string() })), skipped: v.optional(v.boolean()) }))
-    .mutation(async ({ args: { userId }, ctx }) => {
+    .input({ day: v.string(), userId: v.string() })
+    .output(v.object({ messages: v.array(v.object({ text: v.string(), threadId: v.id("threads") })), skipped: v.optional(v.boolean()) }))
+    .mutation(async ({ args: { day, userId }, ctx }) => {
+        const key = scheduleIdeasDayKeyFor(userId, day);
+
         // Nothing is claimed while a switch is off: the caller is told, so the job's own claim is given back too.
         if (!(await jobsAllowed(ctx, userId))) {
-            await releaseClaim(ctx, SCHEDULE_IDEAS_QUEUED_SCOPE, scheduleIdeasDayKey(userId, ctx.now));
+            await markQueuedSkipped(ctx, key);
 
             return { messages: [], skipped: true };
         }
 
-        if (!(await claimOnce(ctx, SCHEDULE_IDEAS_CLAIM_SCOPE, scheduleIdeasDayKey(userId, ctx.now), SCHEDULE_IDEAS_CLAIM_TTL_MS, userId))) {
+        if (!(await claimOnce(ctx, SCHEDULE_IDEAS_CLAIM_SCOPE, key, SCHEDULE_IDEAS_CLAIM_TTL_MS, userId))) {
             return { messages: [] };
         }
 
@@ -155,7 +193,7 @@ export const prepareScheduleIdeas = internalMutation
             .order("desc")
             .take(IDEA_THREADS_SCANNED);
         const threads = scanned.filter((thread) => readable(thread)).slice(0, MAX_IDEA_SOURCE_THREADS);
-        const candidates: IdeaSource[] = [];
+        const candidates: IdeaSource<Id<"threads">>[] = [];
 
         for (const thread of threads) {
             if (candidates.length >= MAX_IDEA_SOURCE_MESSAGES) {
@@ -198,25 +236,38 @@ export const prepareScheduleIdeas = internalMutation
     });
 
 /**
- * Right before the model call: whether both switches are still on. When one went off since {@link prepareScheduleIdeas},
- * the day's claim is released (nothing was sent, so nothing is spent) and the answer is false. The switch can still go off
- * between this check and the gateway call; what was already sent cannot be taken back, and the insert re-checks the
- * switch, so nothing is stored.
+ * Right before the model call: whether both switches are still on, and which of the chats the messages came from are still
+ * readable (`readable`: a chat locked, deleted or being deleted meanwhile is not). When a switch went off since
+ * {@link prepareScheduleIdeas}, the day's claim is released (nothing was sent, so nothing is spent), the queued mark is
+ * marked `skipped`, and `confirmed` is false. Otherwise `threadIds` are the chats whose messages may still be sent; the
+ * caller drops the rest, and sends nothing when none is left. One bounded read of at most
+ * {@link MAX_IDEA_SOURCE_THREADS} chats, in the same transaction as the switch check. A chat can still be locked between this
+ * answer and the gateway call; what was already sent cannot be taken back, and the insert re-checks the switches.
  */
 export const confirmScheduleIdeas = internalMutation
-    .input({ userId: v.string() })
-    .output(v.boolean())
-    .mutation(async ({ args: { userId }, ctx }) => {
-        if (await jobsAllowed(ctx, userId)) {
-            return true;
+    .input({ day: v.string(), threadIds: v.array(v.id("threads")), userId: v.string() })
+    .output(v.object({ confirmed: v.boolean(), threadIds: v.array(v.id("threads")) }))
+    .mutation(async ({ args: { day, threadIds, userId }, ctx }) => {
+        if (!(await jobsAllowed(ctx, userId))) {
+            const key = scheduleIdeasDayKeyFor(userId, day);
+
+            await releaseClaim(ctx, SCHEDULE_IDEAS_CLAIM_SCOPE, key);
+            await markQueuedSkipped(ctx, key);
+
+            return { confirmed: false, threadIds: [] };
         }
 
-        const key = scheduleIdeasDayKey(userId, ctx.now);
+        const stillReadable: Id<"threads">[] = [];
 
-        await releaseClaim(ctx, SCHEDULE_IDEAS_CLAIM_SCOPE, key);
-        await releaseClaim(ctx, SCHEDULE_IDEAS_QUEUED_SCOPE, key);
+        for (const threadId of [...new Set(threadIds)].slice(0, MAX_IDEA_SOURCE_THREADS)) {
+            const row = await ctx.db.get("threads", threadId);
 
-        return false;
+            if (row && row.userId === userId && readable(row)) {
+                stillReadable.push(threadId);
+            }
+        }
+
+        return { confirmed: true, threadIds: stillReadable };
     });
 
 const ideasSchema = z.object({
@@ -236,19 +287,28 @@ const ideasSchema = z.object({
  * whose model filter rules allow no utility model, or whose rules cannot be read, is skipped like every other
  * background job; the day stays taken.
  *
- * `jobId` is the claim key `runJobOnce` adds to every target's arguments; it is not read. A switch that is off, before
+ * `jobId` is the claim key `runJobOnce` adds to every target's arguments; it is not read. `day` is the UTC day the sweep
+ * queued the job for; it is used for every claim, whenever the job is delivered. A switch that is off, before
  * or after the messages are read, answers `{ skipped: true }`: `runJobOnce` then gives its own claim back instead of
  * completing it, so the same day can run once the person turns the feature on again.
  */
 export const generateScheduleIdeas = internalAction
-    .input({ jobId: v.optional(v.string()), userId: v.string() })
+    .input({ day: v.string(), jobId: v.optional(v.string()), userId: v.string() })
     .output(v.union(v.null(), v.object({ skipped: v.literal(true) })))
-    .action(async ({ args: { userId }, ctx }) => {
-        const { messages, skipped } = await ctx.runMutation(internal.tasks.schedule_ideas.prepareScheduleIdeas, { userId });
+    .action(async ({ args: { day, userId }, ctx }) => {
+        if (!isScheduleIdeasDay(day)) {
+            ctx.log.event("tasks.schedule_ideas_failed", { error: "bad_day", messages: 0 });
+
+            return null;
+        }
+
+        const { messages: prepared, skipped } = await ctx.runMutation(internal.tasks.schedule_ideas.prepareScheduleIdeas, { day, userId });
 
         if (skipped) {
             return { skipped: true as const };
         }
+
+        let messages = prepared;
 
         if (messages.length === 0) {
             return null;
@@ -257,9 +317,26 @@ export const generateScheduleIdeas = internalAction
         try {
             const model = await getUtilityModel(gatewayFetch(ctx), { rules: await loadModelFilterRules(ctx, userId), userId });
 
-            // Model selection takes time: a switch turned off meanwhile must stop the prepared text before it is sent.
-            if (!(await ctx.runMutation(internal.tasks.schedule_ideas.confirmScheduleIdeas, { userId }))) {
+            // Model selection takes time: a switch turned off, or a source chat locked or deleted, meanwhile must stop that
+            // text before it is sent.
+            const confirmation = await ctx.runMutation(internal.tasks.schedule_ideas.confirmScheduleIdeas, {
+                day,
+                threadIds: [...new Set(messages.map((message) => message.threadId))],
+                userId,
+            });
+
+            if (!confirmation.confirmed) {
                 return { skipped: true as const };
+            }
+
+            const readableNow = new Set<string>(confirmation.threadIds);
+
+            messages = messages.filter((message) => readableNow.has(message.threadId));
+
+            if (messages.length === 0) {
+                ctx.log.event("tasks.schedule_ideas_done", { inserted: 0, messages: 0, proposed: 0 });
+
+                return null;
             }
 
             const result = await generateText({
