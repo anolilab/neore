@@ -716,6 +716,13 @@ const replyToThread = async (request: HostRequest, ref: PullRequestRef, commentI
 const REVIEW_PAGE_SIZE = 100;
 /** Pages a read for a seen review goes back through before giving up (`listReviews`), the pages already read included. */
 const REVIEW_SEEN_MAX_PAGES = 5;
+/**
+ * Pages a full read of reviews (`readAll`, the watch poll's) goes through: 1000 reviews. Reviews are paged in creation order but the
+ * ones a watch needs are those submitted after the seen one, which can sit on any page (a review is created before it is
+ * submitted), so the poll reads them all; this bound caps the cost of that. A PR with more pages falls back to the newest pages and
+ * the seen-review lookup, in the same page budget as before (`REVIEW_SEEN_MAX_PAGES`).
+ */
+const REVIEW_ALL_MAX_PAGES = 10;
 const REVIEW_BODY_MAX_CHARS = 20_000;
 
 const submittedReviewSchema = z.object({
@@ -773,7 +780,16 @@ const listReviews = async (request: HostRequest, ref: PullRequestRef, options?: 
     let earliest = 1;
     let pagesRead = 1;
 
-    if (first.last !== undefined && first.last > 1) {
+    if (options?.readAll === true && first.last !== undefined && first.last > 1 && first.last <= REVIEW_ALL_MAX_PAGES) {
+        // The whole list fits under the bound: every page, in order, so the decision sees all of it. One request when there is one page.
+        for (let page = 2; page <= first.last; page += 1) {
+            const next = await readPage(page);
+
+            values = [...values, ...next.values];
+        }
+
+        total = values.length;
+    } else if (first.last !== undefined && first.last > 1) {
         const last = await readPage(first.last);
 
         values = last.values;
@@ -935,9 +951,14 @@ const setViewed = async (request: HostRequest, ref: PullRequestRef, path: string
     );
 };
 
-/** One review by id: a 404 (a deleted review) rejects like any other read, and the caller tells it from a failure by its status. */
-const reviewExists = async (request: HostRequest, ref: PullRequestRef, reviewId: string): Promise<void> => {
-    await request(`${repoPath(ref)}/pulls/${ref.number}/reviews/${encodeURIComponent(reviewId)}`);
+/** One review by id: when it was submitted. A 404 (a deleted review) rejects like any other read; the caller tells it from a failure by its status. */
+const reviewSubmittedAt = async (request: HostRequest, ref: PullRequestRef, reviewId: string): Promise<number> => {
+    const review = parse(
+        z.object({ submitted_at: z.string().nullable().optional() }),
+        await readJson(await request(`${repoPath(ref)}/pulls/${ref.number}/reviews/${encodeURIComponent(reviewId)}`)),
+    );
+
+    return toMs(review.submitted_at);
 };
 
 const reviewSchema = z.object({ html_url: z.string().optional(), id: z.number(), state: z.string() });
@@ -1825,7 +1846,7 @@ export const githubDriver: HostDriver = {
     rerunGroupOf,
     rerunnableOfGroup,
     revertPullRequest,
-    reviewExists,
+    reviewSubmittedAt,
     setAutoMerge,
     setThreadResolved,
     setViewed,

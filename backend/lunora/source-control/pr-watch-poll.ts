@@ -66,8 +66,9 @@ const vObservation = v.object({
     failingCheckNames: v.array(v.string()),
     headSha: v.string(),
     mergeable: v.union(v.literal("clean"), v.literal("conflicting"), v.literal("unknown")),
-    reviews: v.array(v.object({ authorLogin: v.string(), id: v.string() })),
+    reviews: v.array(v.object({ authorLogin: v.string(), id: v.string(), submittedAt: v.optional(v.number()) })),
     seenReviewBeyondRead: v.optional(v.union(v.literal("gone"), v.literal("present"), v.literal("unknown"))),
+    seenReviewSubmittedAt: v.optional(v.number()),
     state: v.union(v.literal("closed"), v.literal("merged"), v.literal("open")),
     watcherLogin: v.string(),
 });
@@ -416,7 +417,7 @@ export const runWatchPoll = async (steps: WatchPollSteps): Promise<void> => {
 
 /** What `observeWatched` calls out to, so a test can count the calls. */
 export interface ObserveDependencies {
-    driver: Pick<HostDriver, "getPullRequest" | "listChecks" | "listReviews" | "reviewExists">;
+    driver: Pick<HostDriver, "getPullRequest" | "listChecks" | "listReviews" | "reviewSubmittedAt">;
     login: (request: HostRequest) => Promise<string>;
 }
 
@@ -444,21 +445,22 @@ const seenReviewState = async (
     request: HostRequest,
     ref: { number: number; repository: string },
     reviewId: string | undefined,
-): Promise<"gone" | "present" | "unknown"> => {
+): Promise<{ state: "gone" | "present" | "unknown"; submittedAt?: number }> => {
     if (reviewId === undefined) {
-        return "unknown";
+        return { state: "unknown" };
     }
 
     try {
-        await dependencies.driver.reviewExists(request, ref, reviewId);
+        const submittedAt = await dependencies.driver.reviewSubmittedAt(request, ref, reviewId);
 
-        return "present";
+        // A review the host gives no time for cannot be ordered against the listed ones: nothing can be said, so nothing moves.
+        return submittedAt > 0 ? { state: "present", submittedAt } : { state: "unknown" };
     } catch (error) {
         if (!(error instanceof HostApiError) || error.status === 401) {
             throw error;
         }
 
-        return failureOf(error) === "not_found" ? "gone" : "unknown";
+        return { state: failureOf(error) === "not_found" ? "gone" : "unknown" };
     }
 };
 
@@ -496,7 +498,9 @@ export const observeWatched = async (
     const [login, summary, reviews] = await Promise.all([
         readLogin(dependencies, request),
         dependencies.driver.listChecks(request, ref, detail.headSha),
-        dependencies.driver.listReviews(request, ref, target.reviewId === undefined ? undefined : { seenId: target.reviewId }),
+        // Every review, up to the driver's page bound: the host pages by creation, so a review submitted after the seen one can sit on
+        // any page. With more pages than the bound the read keeps the newest pages and looks the seen review up directly (below).
+        dependencies.driver.listReviews(request, ref, { readAll: true, ...(target.reviewId !== undefined && { seenId: target.reviewId }) }),
     ]);
     const watcherLogin = login.name;
     const { failing, status } = checksOf(summary);
@@ -505,6 +509,9 @@ export const observeWatched = async (
     // Through the seen review, however many are newer (those are what the decision needs); with none seen, the newest bound.
     const kept = seenAt === -1 ? items.slice(0, MAX_REVIEWS) : items.slice(0, seenAt + 1);
     const markerBeyondRead = target.reviewId !== undefined && seenAt === -1 && items.length < total;
+    const found = markerBeyondRead ? await seenReviewState(dependencies, request, ref, target.reviewId) : undefined;
+    const seenReview =
+        found === undefined ? {} : { seenReviewBeyondRead: found.state, ...(found.submittedAt !== undefined && { seenReviewSubmittedAt: found.submittedAt }) };
 
     return {
         ...(login.failure !== undefined && { loginFailure: login.failure }),
@@ -514,12 +521,13 @@ export const observeWatched = async (
             headSha: detail.headSha,
             mergeable: mergeableOf(detail.mergeState),
             reviews: kept.map((review) => {
-                return { authorLogin: review.authorLogin, id: review.id };
+                // A review with no submission time (0) carries none: it is never taken for newer than the seen one.
+                return { authorLogin: review.authorLogin, id: review.id, ...(review.submittedAt > 0 && { submittedAt: review.submittedAt }) };
             }),
             state: detail.state,
             watcherLogin,
             // The marker lies beyond the pages the host read: what a direct read of it found decides what the list means (`decideWatch`).
-            ...(markerBeyondRead && { seenReviewBeyondRead: await seenReviewState(dependencies, request, ref, target.reviewId) }),
+            ...seenReview,
         },
     };
 };

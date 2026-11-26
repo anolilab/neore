@@ -45,13 +45,15 @@ export interface PullRequestObservation {
     /** Whether the host can merge the head. `unknown` while the host has not computed it. */
     mergeable: "clean" | "conflicting" | "unknown";
     /** Every submitted review, newest first, as the host lists them now. */
-    reviews: ReadonlyArray<{ authorLogin: string; id: string }>;
+    reviews: ReadonlyArray<{ authorLogin: string; id: string; submittedAt?: number }>;
     /**
      * Set only when the host holds more reviews than were listed and the list does not reach the seen review: what a direct read of
      * the seen review found. `present`: it exists beyond the read, so every listed review is newer. `gone`: it was deleted. `unknown`:
      * the read failed, so nothing can be said and the marker stays where it is.
      */
     seenReviewBeyondRead?: "gone" | "present" | "unknown";
+    /** When the seen review was submitted (epoch ms), with `present`: the listed reviews are ordered against it. */
+    seenReviewSubmittedAt?: number;
     /** The host's state of the pull request now. */
     state: "closed" | "merged" | "open";
     /** The person's own login. Their reviews never wake them. */
@@ -79,7 +81,7 @@ const isByWatcher = (review: { authorLogin: string }, watcherLogin: string): boo
  * The reviews by someone other than the watcher. With a missing login all of them: a review of the watcher's own may then wake
  * the watch, which is accepted, because a real review that goes unnoticed is worse than a spurious wake.
  */
-const reviewsByOthers = (observed: PullRequestObservation): { authorLogin: string; id: string }[] =>
+const reviewsByOthers = (observed: PullRequestObservation): { authorLogin: string; id: string; submittedAt?: number }[] =>
     observed.reviews.filter((review) => !isByWatcher(review, observed.watcherLogin.trim()));
 
 /** The review a read leaves as the watch's marker: the newest by someone other than the watcher. */
@@ -93,7 +95,7 @@ const newestReviewByOthers = (observed: PullRequestObservation): { authorLogin: 
 const newerReviewsByOthers = (
     observed: PullRequestObservation,
     seenId: string | undefined,
-): { left: boolean; newer: { authorLogin: string; id: string }[] } => {
+): { left: boolean; newer: { authorLogin: string; id: string; submittedAt?: number }[] } => {
     if (seenId === undefined) {
         return { left: false, newer: reviewsByOthers(observed) };
     }
@@ -161,15 +163,26 @@ export const decideWatch = (previous: PullRequestWatchState, observed: PullReque
 
     if (left && observed.seenReviewBeyondRead === "unknown") {
         // The seen review could not be looked up: it neither wakes nor moves, so the next read decides with it still in place.
+    } else if (left && observed.seenReviewBeyondRead === "present") {
+        // The seen review exists beyond the read, and the list is in host order, not submission order: only a review by someone else
+        // submitted AFTER it is new (a review with no time, or the same time, is not), and the marker moves to the newest of those.
+        const seenAt = observed.seenReviewSubmittedAt ?? 0;
+        const later = reviewsByOthers(observed)
+            .filter((other) => (other.submittedAt ?? 0) > seenAt)
+            .toSorted((a, b) => (b.submittedAt ?? 0) - (a.submittedAt ?? 0));
+
+        if (later[0] !== undefined) {
+            next.reviewId = later[0].id;
+
+            if (!owed.includes("review")) {
+                owed.push("review");
+            }
+        }
     } else if (left) {
         // The seen review is not in the list. Complete list, or the review was found deleted: nothing newer can be told by position, so
         // re-baseline silently on the newest review by someone else, or clear the marker when there is none (the next review by someone
-        // else then wakes the thread). `present`: it exists beyond the read, so every listed review by someone else is newer.
+        // else then wakes the thread).
         next.reviewId = review?.id;
-
-        if (observed.seenReviewBeyondRead === "present" && review !== undefined && !owed.includes("review")) {
-            owed.push("review");
-        }
     } else if (newer.length > 0) {
         next.reviewId = newer[0]?.id;
 

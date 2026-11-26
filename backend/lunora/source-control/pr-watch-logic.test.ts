@@ -240,16 +240,31 @@ describe("decideWatch", () => {
 
 describe("a seen review beyond a truncated read", () => {
     const listed = [
-        { authorLogin: "dev", id: "109" },
-        { authorLogin: "bob", id: "108" },
-        { authorLogin: "amy", id: "107" },
+        { authorLogin: "dev", id: "109", submittedAt: 9000 },
+        { authorLogin: "bob", id: "108", submittedAt: 6000 },
+        { authorLogin: "amy", id: "107", submittedAt: 8000 },
     ];
     const marked = { ...baselined, reviewId: "50" };
+    const present = { seenReviewBeyondRead: "present", seenReviewSubmittedAt: 5000 } as const;
 
-    it("wakes for a review and marks the newest one by someone else when the seen review is proven to exist", () => {
-        const decision = decideWatch(marked, { ...quiet, reviews: listed, seenReviewBeyondRead: "present" }, NOW);
+    it("wakes for a review submitted after the seen one and marks the newest by submission time, not list position", () => {
+        const decision = decideWatch(marked, { ...quiet, reviews: listed, ...present }, NOW);
 
-        expect(decision).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "108" } });
+        expect(decision).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "107" } });
+    });
+
+    it("does not wake for a review submitted before, or at the same time as, the seen one", () => {
+        for (const submittedAt of [4000, 5000]) {
+            const decision = decideWatch(marked, { ...quiet, reviews: [{ authorLogin: "bob", id: "1", submittedAt }], ...present }, NOW);
+
+            expect(decision).toMatchObject({ action: "none", state: { reviewId: "50" } });
+        }
+    });
+
+    it("does not take a review with no submission time for newer", () => {
+        const decision = decideWatch(marked, { ...quiet, reviews: [{ authorLogin: "bob", id: "1" }], ...present }, NOW);
+
+        expect(decision).toMatchObject({ action: "none", state: { reviewId: "50" } });
     });
 
     it("re-baselines silently when the seen review was found deleted", () => {
@@ -265,7 +280,7 @@ describe("a seen review beyond a truncated read", () => {
     });
 
     it("does not wake for the watcher's own reviews alone, even when the seen review exists", () => {
-        const decision = decideWatch(marked, { ...quiet, reviews: [listed[0]!], seenReviewBeyondRead: "present" }, NOW);
+        const decision = decideWatch(marked, { ...quiet, reviews: [listed[0]!], ...present }, NOW);
 
         expect(decision.action).toBe("none");
     });

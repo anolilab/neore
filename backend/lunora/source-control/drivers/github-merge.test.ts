@@ -645,6 +645,68 @@ describe("reading past the first page", () => {
         expect(reviews.items.at(-1)?.body).toBe("r101");
     });
 
+    describe("a full read for a watch (readAll)", () => {
+        const at = (id: number, seconds: number) => {
+            return {
+                body: `r${String(id)}`,
+                id,
+                state: "COMMENTED",
+                submitted_at: new Date(Date.UTC(2026, 0, 1, 0, 0, seconds)).toISOString(),
+                user: { login: "x" },
+            };
+        };
+        const pageOf = (from: number, count: number, submittedAt = (id: number) => id) =>
+            Array.from({ length: count }, (_, index) => at(from + index, submittedAt(from + index)));
+        const linkTo = (last: number) =>
+            `<https://api.github.com/repositories/1/pulls/7/reviews?page=2&per_page=100>; rel="next", <https://api.github.com/repositories/1/pulls/7/reviews?page=${String(last)}&per_page=100>; rel="last"`;
+        const counted = (pages: { body: unknown; link?: string }[]) => {
+            const requests: number[] = [];
+            const request: HostRequest = async (_path, options: HostRequestOptions = {}) => {
+                const page = Number(options.query?.page ?? 1);
+
+                requests.push(page);
+
+                return Response.json(pages[page - 1]?.body, { headers: page === 1 && pages[0]?.link !== undefined ? { link: pages[0].link } : {} });
+            };
+
+            return { request, requests };
+        };
+
+        it("makes exactly one request for a PR with less than a page of reviews", async () => {
+            const { request, requests } = counted([{ body: pageOf(1, 30) }]);
+            const reviews = await githubDriver.listReviews(request, REF, { readAll: true });
+
+            expect(requests).toEqual([1]);
+            expect(reviews.items).toHaveLength(30);
+        });
+
+        it("reads every page when the list fits under the bound, so a review created early and submitted late is listed first", async () => {
+            // Review 40 sits on page 1 (created early) but was submitted after everything else.
+            const pages = [{ body: pageOf(1, 100, (id) => (id === 40 ? 9999 : id)), link: linkTo(3) }, { body: pageOf(101, 100) }, { body: pageOf(201, 20) }];
+            const { request, requests } = counted(pages);
+            const reviews = await githubDriver.listReviews(request, REF, { readAll: true, seenId: "150" });
+
+            expect(requests).toEqual([1, 2, 3]);
+            expect(reviews.total).toBe(220);
+            expect(reviews.items[0]?.id).toBe("40");
+        });
+
+        it("falls back to the newest pages without an error when there are more pages than the bound", async () => {
+            const last = 12;
+            const pages = Array.from({ length: last }, (_, index) => {
+                return { body: pageOf(index * 100 + 1, 100), ...(index === 0 && { link: linkTo(last) }) };
+            });
+            const { request, requests } = counted(pages);
+            const reviews = await githubDriver.listReviews(request, REF, { readAll: true, seenId: "50" });
+
+            // Never the whole list: the first page, the last, the one before, then back to the seen one within the usual budget.
+            expect(requests.length).toBeLessThanOrEqual(5);
+            expect(requests).toContain(last);
+            expect(reviews.total).toBe(1200);
+            expect(reviews.items[0]?.id).toBe("1200");
+        });
+    });
+
     it("goes back through earlier pages until the seen review is listed, within a bound", async () => {
         const page = (from: number, count: number) =>
             Array.from({ length: count }, (_, index) => {

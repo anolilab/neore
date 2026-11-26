@@ -508,13 +508,17 @@ describe("observeWatched", () => {
         expect(decision).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "r120" } });
     });
 
-    const dependencies = (items: { authorLogin: string; id: string }[], total: number, reviewExists: Mock = vi.fn().mockResolvedValue(undefined)) => {
+    const dependencies = (
+        items: { authorLogin: string; id: string; submittedAt?: number }[],
+        total: number,
+        reviewSubmittedAt: Mock = vi.fn().mockResolvedValue(5000),
+    ) => {
         return {
             driver: {
                 getPullRequest: vi.fn().mockResolvedValue(detail("open")),
                 listChecks: vi.fn().mockResolvedValue({ checks: [], required: { complete: true, patterns: [] }, total: 0 }),
                 listReviews: vi.fn().mockResolvedValue({ items, total }),
-                reviewExists,
+                reviewSubmittedAt,
             } as never,
             login: async () => "me",
         };
@@ -538,39 +542,88 @@ describe("observeWatched", () => {
         expect(row.watch.reviewId).toBe("150");
     });
 
+    it("wakes for a review created early on a middle page and submitted after the seen one, when the full list is read", async () => {
+        // As the driver hands them over (all pages read, newest submission first): review 40 was created early but submitted last.
+        const items = [
+            { authorLogin: "bob", id: "40", submittedAt: 9000 },
+            { authorLogin: "amy", id: "150", submittedAt: 5000 },
+            { authorLogin: "amy", id: "10", submittedAt: 1000 },
+        ];
+        const reviewSubmittedAt = vi.fn();
+        const linkId = await seedWatch({ watch: { baselined: true, headSha: "sha-1", reviewId: "150", startedAt: STARTED_AT } });
+        const { observation: observed } = await observeWatched(request, { ...TARGET, reviewId: "150" }, dependencies(items, 3, reviewSubmittedAt));
+
+        await record(linkId, { observation: observed });
+
+        const row = await rowOf(linkId);
+
+        // The marker is in the list, so no direct lookup is made and list order is the submission order.
+        expect(reviewSubmittedAt).not.toHaveBeenCalled();
+        expect(row.watchPending).toEqual(["review"]);
+        expect(row.watch.reviewId).toBe("40");
+    });
+
     describe("when the seen review lies beyond what the host read", () => {
-        const items = Array.from({ length: 150 }, (_, index) => {
-            return { authorLogin: "bob", id: String(400 - index) };
-        });
-        const run = async (reviewExists: Mock) => {
+        // Host order, not submission order: id 400 was created last but the times below say which was submitted when.
+        const listedAt = (times: number[]) =>
+            times.map((submittedAt, index) => {
+                return { authorLogin: "bob", id: String(400 - index), submittedAt };
+            });
+        const run = async (items: { authorLogin: string; id: string; submittedAt?: number }[], reviewSubmittedAt: Mock) => {
             const linkId = await seedWatch({ watch: { baselined: true, headSha: "sha-1", reviewId: "50", startedAt: STARTED_AT } });
-            const { observation: observed } = await observeWatched(request, { ...TARGET, reviewId: "50" }, dependencies(items, 400, reviewExists));
+            const { observation: observed } = await observeWatched(request, { ...TARGET, reviewId: "50" }, dependencies(items, 400, reviewSubmittedAt));
 
             await record(linkId, { observation: observed });
 
-            return { observed, reviewExists, row: await rowOf(linkId) };
+            return { observed, row: await rowOf(linkId) };
         };
 
-        it("wakes for a review when the seen review is proven to exist, even if its id is higher than a listed review's", async () => {
-            const { observed, reviewExists, row } = await run(vi.fn().mockResolvedValue(undefined));
+        it("wakes for a review submitted after the seen one, and marks the newest by submission time", async () => {
+            const reviewSubmittedAt = vi.fn().mockResolvedValue(5000);
+            const { observed, row } = await run(listedAt([6000, 9000, 4000]), reviewSubmittedAt);
 
-            expect(reviewExists).toHaveBeenCalledExactlyOnceWith(expect.anything(), { number: 7, repository: "octo/hello" }, "50");
-            expect(observed.seenReviewBeyondRead).toBe("present");
-            expect(row.watch.reviewId).toBe("400");
+            expect(reviewSubmittedAt).toHaveBeenCalledExactlyOnceWith(expect.anything(), { number: 7, repository: "octo/hello" }, "50");
+            expect(observed).toMatchObject({ seenReviewBeyondRead: "present", seenReviewSubmittedAt: 5000 });
             expect(row.watchPending).toEqual(["review"]);
+            expect(row.watch.reviewId).toBe("399");
+        });
+
+        it("does not wake for reviews submitted before the seen one, and keeps the marker", async () => {
+            const { row } = await run(listedAt([4000, 3000, 2000]), vi.fn().mockResolvedValue(5000));
+
+            expect(row.watchPending).toEqual([]);
+            expect(row.watch.reviewId).toBe("50");
+        });
+
+        it("does not wake for a review submitted at the same time as the seen one", async () => {
+            const { row } = await run(listedAt([5000]), vi.fn().mockResolvedValue(5000));
+
+            expect(row.watchPending).toEqual([]);
+            expect(row.watch.reviewId).toBe("50");
+        });
+
+        it("does not take a listed review with no submission time for newer", async () => {
+            const { row } = await run([{ authorLogin: "bob", id: "400" }], vi.fn().mockResolvedValue(5000));
+
+            expect(row.watchPending).toEqual([]);
+            expect(row.watch.reviewId).toBe("50");
         });
 
         it("re-baselines silently when the seen review was deleted", async () => {
-            const { observed, row } = await run(vi.fn().mockRejectedValue(new HostApiError("not found", 404)));
+            const { observed, row } = await run(listedAt([9000, 8000]), vi.fn().mockRejectedValue(new HostApiError("not found", 404)));
 
             expect(observed.seenReviewBeyondRead).toBe("gone");
             expect(row.watch.reviewId).toBe("400");
             expect(row.watchPending).toEqual([]);
         });
 
-        it("neither wakes nor moves the marker when the lookup fails for another reason", async () => {
-            for (const error of [new HostApiError("slow down", 403, true), new HostApiError("boom", 500)]) {
-                const { observed, row } = await run(vi.fn().mockRejectedValue(error));
+        it("neither wakes nor moves the marker when the lookup fails or names no time", async () => {
+            for (const lookup of [
+                vi.fn().mockRejectedValue(new HostApiError("slow down", 403, true)),
+                vi.fn().mockRejectedValue(new HostApiError("boom", 500)),
+                vi.fn().mockResolvedValue(0),
+            ]) {
+                const { observed, row } = await run(listedAt([9000]), lookup);
 
                 expect(observed.seenReviewBeyondRead).toBe("unknown");
                 expect(row.watch.reviewId).toBe("50");
@@ -580,7 +633,11 @@ describe("observeWatched", () => {
 
         it("lets a 401 on the lookup go up so the token is renewed", async () => {
             await expect(
-                observeWatched(request, { ...TARGET, reviewId: "50" }, dependencies(items, 400, vi.fn().mockRejectedValue(new HostApiError("no", 401)))),
+                observeWatched(
+                    request,
+                    { ...TARGET, reviewId: "50" },
+                    dependencies(listedAt([9000]), 400, vi.fn().mockRejectedValue(new HostApiError("no", 401))),
+                ),
             ).rejects.toBeInstanceOf(HostApiError);
         });
     });
