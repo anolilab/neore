@@ -19,12 +19,12 @@ import type { MutationCtx } from "../_generated/server";
 import type { Defined } from "./patch";
 
 /** The date columns better-auth writes, per table this file may convert. */
-export const BETTER_AUTH_DATE_COLUMNS = {
+const BETTER_AUTH_DATE_COLUMNS = {
     organization: ["createdAt"],
     user: ["banExpires", "createdAt", "updatedAt"],
 } as const;
 
-export type BetterAuthDatedTable = keyof typeof BETTER_AUTH_DATE_COLUMNS;
+type BetterAuthDatedTable = keyof typeof BETTER_AUTH_DATE_COLUMNS;
 
 type BetterAuthDateColumn = (typeof BETTER_AUTH_DATE_COLUMNS)[BetterAuthDatedTable][number];
 
