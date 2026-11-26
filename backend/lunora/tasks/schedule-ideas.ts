@@ -18,7 +18,8 @@
  *   release) uses that day, never the delivery time: a job queued before midnight and delivered after it spends its own
  *   day and leaves the next one to the next sweep.
  * - **Input**: the person's typed words only (`messages.typedText` of user rows), from the chats `readable` allows;
- *   never an assistant reply, tool output, file or attachment.
+ *   never an assistant reply, tool output, file or attachment. A branched chat is read along its active path only
+ *   (`loadActivePathTail`), never a prompt that was edited away.
  *   Bounded in `schedule-ideas-logic.ts`. A message with a privacy marker or a secret is left out.
  * - **Logs** carry counts only, never message text.
  */
@@ -29,6 +30,7 @@ import z from "zod/v4";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalAction, internalMutation } from "../_generated/server";
+import { loadActivePathTail } from "../agent/branch-rows";
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { claimOnce, claimRow, hasClaim, recordClaimResult, releaseClaim } from "../lib/claim-once";
 import { enqueueJob } from "../lib/job-queue";
@@ -41,6 +43,7 @@ import { readMemoryEnabled } from "../memory/functions";
 import { hasPrivacyMarker } from "../memory/gate";
 import {
     buildIdeasPrompt,
+    ideaMessageText,
     IDEA_ROWS_READ_PER_THREAD,
     IDEA_THREADS_SCANNED,
     type IdeaSource,
@@ -200,11 +203,15 @@ export const prepareScheduleIdeas = internalMutation
                 break;
             }
 
-            const rows = await ctx.db
-                .query("messages")
-                .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", thread._id))
-                .order("desc")
-                .take(IDEA_ROWS_READ_PER_THREAD);
+            // A branched chat is read along its active path only: a prompt edited away stays in storage as a hidden sibling.
+            // Never branched (no stored leaf) is one line, so the plain newest-first read is the same rows.
+            const rows = thread.activeLeafMessageId
+                ? await loadActivePathTail(ctx, thread._id, thread.activeLeafMessageId, IDEA_ROWS_READ_PER_THREAD)
+                : await ctx.db
+                      .query("messages")
+                      .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", thread._id))
+                      .order("desc")
+                      .take(IDEA_ROWS_READ_PER_THREAD);
 
             for (const row of rows) {
                 const typed = row.typedText;
@@ -218,7 +225,14 @@ export const prepareScheduleIdeas = internalMutation
                     isUserRole(row.message) &&
                     (row.createdAt ?? row._creationTime) >= since
                 ) {
-                    candidates.push({ text: typed, threadId: thread._id });
+                    // Only a message that can really be sent counts toward the cap, so chats full of secrets or empty
+                    // turns do not stop the scan before a clean one. The rows read stay bounded: at most
+                    // MAX_IDEA_SOURCE_THREADS chats of IDEA_ROWS_READ_PER_THREAD rows.
+                    const text = ideaMessageText(typed);
+
+                    if (text !== null) {
+                        candidates.push({ text, threadId: thread._id });
+                    }
                 }
             }
         }
@@ -302,19 +316,22 @@ export const generateScheduleIdeas = internalAction
             return null;
         }
 
-        const { messages: prepared, skipped } = await ctx.runMutation(internal.tasks.schedule_ideas.prepareScheduleIdeas, { day, userId });
-
-        if (skipped) {
-            return { skipped: true as const };
-        }
-
-        let messages = prepared;
-
-        if (messages.length === 0) {
-            return null;
-        }
+        let messages: IdeaSource<Id<"threads">>[] = [];
 
         try {
+            const prepared = await ctx.runMutation(internal.tasks.schedule_ideas.prepareScheduleIdeas, { day, userId });
+
+            // A switch off is an answer, not a failure: only it hands the job claim back.
+            if (prepared.skipped) {
+                return { skipped: true as const };
+            }
+
+            messages = prepared.messages;
+
+            if (messages.length === 0) {
+                return null;
+            }
+
             const model = await getUtilityModel(gatewayFetch(ctx), { rules: await loadModelFilterRules(ctx, userId), userId });
 
             // Model selection takes time: a switch turned off, or a source chat locked or deleted, meanwhile must stop that

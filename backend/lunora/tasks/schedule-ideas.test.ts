@@ -14,6 +14,7 @@ import schema from "../schema";
 import {
     IDEA_ROWS_READ_PER_THREAD,
     IDEA_THREADS_SCANNED,
+    isScheduleIdeasDay,
     MAX_IDEA_MESSAGE_CHARS,
     MAX_IDEA_PROPOSALS,
     MAX_IDEA_SOURCE_CHARS,
@@ -27,9 +28,10 @@ import {
 } from "./schedule-ideas-logic";
 import { dispatchScheduleIdeas, generateScheduleIdeas, prepareScheduleIdeas } from "./schedule-ideas";
 
-const { enqueued, generateText, getUtilityModel, registry } = vi.hoisted(() => {
+const { enqueued, failSettingsRead, generateText, getUtilityModel, registry } = vi.hoisted(() => {
     return {
         enqueued: [] as { args: unknown; options: unknown }[],
+        failSettingsRead: { on: false },
         generateText: vi.fn(),
         getUtilityModel: vi.fn(),
         registry: new Map<string, unknown>(),
@@ -40,6 +42,21 @@ vi.mock("../_generated/api", async (importOriginal) => registeredApi(await impor
 vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
 vi.mock("ai", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("ai")>()), generateText };
+});
+// Lets one test make the preparation mutation fail, the way a storage error would.
+vi.mock("../memory/functions", async (importOriginal) => {
+    const original = await importOriginal<typeof import("../memory/functions")>();
+
+    return {
+        ...original,
+        readMemoryEnabled: async (...args: Parameters<typeof original.readMemoryEnabled>) => {
+            if (failSettingsRead.on) {
+                throw new Error("storage unavailable");
+            }
+
+            return await original.readMemoryEnabled(...args);
+        },
+    };
 });
 vi.mock("../chat/lib/model-filter-rules", () => {
     return {
@@ -82,9 +99,10 @@ const thread = async (fields: Record<string, unknown> = {}, userId = USER): Prom
 
 let order = 0;
 
-const row = async (threadId: string, role: "assistant" | "user", text: string, fields: Record<string, unknown> = {}): Promise<void> => {
+const row = async (threadId: string, role: "assistant" | "user", text: string, fields: Record<string, unknown> = {}): Promise<string> => {
     order += 1;
-    await harness.run(
+
+    return await harness.run(
         async (ctx: any) =>
             await ctx.db.insert("messages", {
                 message: { content: text, role },
@@ -161,6 +179,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    failSettingsRead.on = false;
     vi.useRealTimers();
     generateText.mockReset();
     getUtilityModel.mockReset();
@@ -295,6 +314,57 @@ describe("what the model is sent", () => {
         expect(promptSent()).toContain("keep this plain message");
         expect(promptSent()).not.toContain("TYPED-AFTER-QUOTE");
         expect(promptSent()).not.toContain("TYPED-NEXT-TO-ATTACHMENT");
+    });
+
+    it("reads a branched chat along its active path: a prompt edited away is not sent, a never-branched chat is read in full", async () => {
+        await settings();
+        const branched = await thread();
+
+        await row(branched, "user", "KEPT-FIRST-PROMPT");
+
+        const reply = await row(branched, "assistant", "first reply");
+
+        // The second prompt was edited: the original stays in storage as a hidden sibling under the same reply.
+        await row(branched, "user", "EDITED-AWAY-PROMPT", { parentMessageId: reply });
+
+        const edited = await row(branched, "user", "KEPT-EDITED-PROMPT", { parentMessageId: reply });
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", branched, { activeLeafMessageId: edited }));
+
+        const linear = await thread();
+
+        await row(linear, "user", "NEVER-BRANCHED-PROMPT");
+
+        await run();
+
+        expect(generateText).toHaveBeenCalledOnce();
+
+        for (const shown of ["KEPT-FIRST-PROMPT", "KEPT-EDITED-PROMPT", "NEVER-BRANCHED-PROMPT"]) {
+            expect(promptSent()).toContain(shown);
+        }
+
+        expect(promptSent()).not.toContain("EDITED-AWAY-PROMPT");
+    });
+
+    it("counts only messages it can send toward the cap, so chats full of secrets do not hide a clean one", async () => {
+        await settings();
+
+        // Two newer chats of secret-bearing messages would fill the 50-message cap if they were counted; the clean chat is older.
+        for (const [index, age] of [1, 2].entries()) {
+            const secretChat = await thread({ updatedAt: NOW - age });
+
+            for (let message = 0; message < IDEA_ROWS_READ_PER_THREAD; message += 1) {
+                await row(secretChat, "user", `${KEY} chat ${index} message ${message}`);
+            }
+        }
+
+        await row(await thread({ updatedAt: NOW - 3 }), "user", "CLEAN-MESSAGE-IN-THE-THIRD-CHAT");
+
+        await run();
+
+        expect(generateText).toHaveBeenCalledOnce();
+        expect(promptSent()).toContain("CLEAN-MESSAGE-IN-THE-THIRD-CHAT");
+        expect(promptSent()).not.toContain(KEY);
     });
 
     it("looks at no more than the scan bound of recent chats", async () => {
@@ -605,6 +675,38 @@ describe("the day a job was queued for", () => {
         const afterwards = await prepare();
 
         expect(afterwards.messages).toHaveLength(1);
+    });
+
+    it("refuses a day that has the shape of a date but is not one, without throwing", async () => {
+        await settings();
+        await row(await thread(), "user", "a message");
+
+        for (const day of ["2026-13-01", "2026-00-10", "2026-02-30", "2026-04-31", "2026-01-32"]) {
+            expect(isScheduleIdeasDay(day)).toBe(false);
+            await expect(run(USER, day)).resolves.toBeNull();
+        }
+
+        expect(isScheduleIdeasDay("2026-02-28")).toBe(true);
+        expect(generateText).not.toHaveBeenCalled();
+    });
+});
+
+describe("a failed preparation", () => {
+    it("is handled like any other failure: the action answers null, sends nothing and does not throw", async () => {
+        await settings();
+        await row(await thread(), "user", "every monday I need a summary of my notes");
+        failSettingsRead.on = true;
+
+        await expect(run()).resolves.toBeNull();
+
+        expect(generateText).not.toHaveBeenCalled();
+
+        // The failed mutation rolled back, so the day's own claim was not taken. (Delivered through `runJobOnce`, a `null`
+        // answer still completes the job claim, as for a failed model call: this calls the action directly.)
+        failSettingsRead.on = false;
+        await expect(run()).resolves.toBeNull();
+
+        expect(generateText).toHaveBeenCalledOnce();
     });
 });
 

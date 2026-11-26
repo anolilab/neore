@@ -57,7 +57,16 @@ export const scheduleIdeasDay = (now: number): string => new Date(now).toISOStri
 const DAY_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Whether `day` is a calendar day as {@link scheduleIdeasDay} writes it. */
-export const isScheduleIdeasDay = (day: string): boolean => DAY_SHAPE.test(day) && scheduleIdeasDay(Date.parse(`${day}T00:00:00Z`)) === day;
+export const isScheduleIdeasDay = (day: string): boolean => {
+    if (!DAY_SHAPE.test(day)) {
+        return false;
+    }
+
+    // `2026-13-01` has the shape but parses to NaN, which `toISOString` throws on; `2026-02-30` parses by rolling over, and the round trip rejects it.
+    const time = Date.parse(`${day}T00:00:00Z`);
+
+    return Number.isFinite(time) && scheduleIdeasDay(time) === day;
+};
 
 /** One key per user per UTC day. */
 export const scheduleIdeasDayKeyFor = (userId: string, day: string): string => `${userId}:${day}`;
@@ -99,10 +108,20 @@ export interface IdeaSource<TId extends string = string> {
 }
 
 /**
- * The messages to send, from `candidates` (newest first): one line each, a message with a privacy marker or a secret
- * left out whole, the rest cut to {@link MAX_IDEA_MESSAGE_CHARS}, at most {@link MAX_IDEA_SOURCE_MESSAGES} of them and
- * {@link MAX_IDEA_SOURCE_CHARS} characters in all. The secret check runs on the whole message, before the cut: a key
- * that straddles the cut would leave a part the detector misses.
+ * The line of one message that may be sent: whitespace folded and cut to {@link MAX_IDEA_MESSAGE_CHARS}; `null` for an empty
+ * message or one with a privacy marker or a secret. The checks run on the whole message, before the cut: a key that
+ * straddles the cut would leave a part the detector misses.
+ */
+export const ideaMessageText = (text: string): string | null => {
+    const whole = text.replaceAll(/\s+/g, " ").trim();
+
+    return whole === "" || hasPrivacyMarker(whole) || containsSecret(whole) ? null : whole.slice(0, MAX_IDEA_MESSAGE_CHARS);
+};
+
+/**
+ * The messages to send, from `candidates` (newest first): one line each ({@link ideaMessageText}, which leaves a message
+ * with a privacy marker or a secret out whole), at most {@link MAX_IDEA_SOURCE_MESSAGES} of them and
+ * {@link MAX_IDEA_SOURCE_CHARS} characters in all.
  */
 export const takeIdeaSources = <TId extends string>(candidates: ReadonlyArray<IdeaSource<TId>>): IdeaSource<TId>[] => {
     const taken: IdeaSource<TId>[] = [];
@@ -113,13 +132,11 @@ export const takeIdeaSources = <TId extends string>(candidates: ReadonlyArray<Id
             break;
         }
 
-        const whole = candidate.text.replaceAll(/\s+/g, " ").trim();
+        const text = ideaMessageText(candidate.text);
 
-        if (whole === "" || hasPrivacyMarker(whole) || containsSecret(whole)) {
+        if (text === null) {
             continue;
         }
-
-        const text = whole.slice(0, MAX_IDEA_MESSAGE_CHARS);
 
         if (chars + text.length > MAX_IDEA_SOURCE_CHARS) {
             break;

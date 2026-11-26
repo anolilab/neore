@@ -1,7 +1,8 @@
 # TASKS — AGENT NOTES
 
 The rules for working in `backend/lunora/tasks/`: agent-run tasks with a verifier, their repair rounds, and
-recurring tasks. State machine and idempotency are explained at the top of `internal.ts`.
+recurring tasks. State machine and idempotency are explained at the top of `internal.ts`. The daily schedule
+ideas job (`schedule-ideas*.ts`): read `docs/agents/tasks-schedule-ideas.md` before touching it.
 
 ## RUNNING A ROUND
 
@@ -94,16 +95,5 @@ recurring tasks. State machine and idempotency are explained at the top of `inte
   before the run, and the run passes `contextOptions: { recentMessages: 0 }` (`runHeadlessAgent`'s
   `freshContext`), which also skips the thread summary. Do not use `statelessMode` for this: it skips the order
   bookkeeping.
-- A new run thread is filed in `tasks.projectId` from `onThread`, so a run that fails is filed too. A deleted
-  project leaves the thread unfiled rather than failing the run.
-- `tasks.reasoningEffort` is on the chat's 0-100 scale (the effort slider) and wins over the skill's. A coding-agent
-  task takes none.
-
-## SCHEDULE IDEAS (DAILY SUGGESTIONS)
-
-- Opt-in twice: `scheduleIdeasEnabled` and `memoryEnabled`, both absent = off. `dispatchScheduleIdeas` (a `shardSweeps()` entry, no cron) queues `generateScheduleIdeas` `once` while the user's UTC day is not taken, after taking the `schedule-ideas-queued` mark (later passes send nothing); `prepareScheduleIdeas` takes the day (`schedule-ideas` claim) in the same mutation that reads. A failed model call spends the day.
-- **A skipped run spends nothing.** A switch off at delivery, or turned off before the model call (`confirmScheduleIdeas`, which also gives the day back), answers `{ skipped: true }`: `runJobOnce` releases its own claim and the queued mark is marked `skipped` (never deleted by the action, since `runJobOnce` still holds the job claim until the action returns); the sweep sends nothing while the job claim is held and replaces a `skipped` mark once it is gone, so turning the feature back on the same day runs it, once. Only a target that did nothing may answer so.
-- **The job carries its day.** The sweep puts the UTC day in the job's args; the claims use it, never the delivery time, so a job delivered after midnight spends its own day. Right before the model call `confirmScheduleIdeas` re-reads the source chats with `readable`, and the messages of a chat locked or deleted meanwhile are dropped; with none left, no call.
-- The model sees only the person's typed words: user rows' `typedText`, from chats tagged `chat` alone, not being deleted, and with no messenger, external, bot or host marker (`readable`). Never a run, sub-agent, eval, trigger or messenger thread: they are filtered BEFORE the chat cap, within a scan bound (`IDEA_THREADS_SCANNED`). A privacy marker anywhere in a turn (text, quote, attachment text) drops the whole turn; bounds are in `schedule-ideas-logic.ts`; a message with a secret is left out whole before it is cut.
-- Proposals go through `insertTaskSuggestions` (validation, secrets, at most hourly schedules, the pending cap, both switches re-read). Logs carry counts only.
-- The switch in the settings page ships with the suggestions list, not before: with no switch, nobody can turn the job on.
+- A new run thread is filed in `tasks.projectId` from `onThread` (so a failed run is filed too); a deleted project leaves it unfiled.
+- `tasks.reasoningEffort` is on the chat's 0-100 scale (the effort slider) and wins over the skill's; a coding-agent task takes none.
