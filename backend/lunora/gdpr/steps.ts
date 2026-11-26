@@ -988,7 +988,7 @@ export const generateExportFile = internalAction
             settings: args.settings,
             sharedThreadPins: args.sharedThreadPins ?? [],
             subAgentRuns: activity?.subAgentRuns ?? [],
-            // `taskSuggestionsCut`: the suggestion history passed its share of the file, and the oldest decided ones are left out.
+            // `taskSuggestionsCut`: the suggestion history passed its share of the file, and the rows after the last stored page (accepted ones first) are left out.
             tasks: { ...(args.tasks ?? { goals: [], tasks: [] }), taskSuggestions: suggestions.taskSuggestions, taskSuggestionsCut: suggestions.cut },
             threadFollows: threadFollows.section,
             threadTags: args.threadTags ?? [],

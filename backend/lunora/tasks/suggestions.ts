@@ -215,7 +215,7 @@ export const insertTaskSuggestions = internalMutation
  * The cutoff is inclusive (`lte`) on purpose: a suggestion stored in the same millisecond as the opt-out was stored
  * before it, and a strict bound would leave it behind after the person switched the feature off. The opposite case
  * (a suggestion stored after a re-enable in that same millisecond) needs a save, a second save and a generation job
- * to all commit within one millisecond, and costs one idea, which the next run proposes again.
+ * to all commit within one millisecond, and costs one idea.
  */
 export const eraseUserTaskSuggestions = internalMutation
     .input({ before: v.number(), userId: v.string() })

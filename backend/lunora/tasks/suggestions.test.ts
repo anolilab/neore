@@ -501,6 +501,30 @@ describe("GDPR", () => {
         expect(JSON.stringify(results).length).toBeLessThan(10_000);
     });
 
+    it("exports a long history of short rows whole: its cut is by bytes, never by a row count", async () => {
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 2000; index += 1) {
+                await ctx.db.insert("taskSuggestions", {
+                    createdAt: index,
+                    cronExpression: "0 9 * * 1",
+                    instructions: "Short",
+                    sourceThreadIds: [],
+                    status: index % 2 === 0 ? "dismissed" : "accepted",
+                    title: `Idea ${String(index)}`,
+                    userId: A,
+                });
+            }
+        });
+
+        const { cut, results, rows } = await exportThroughStorage(A);
+
+        expect(rows).toHaveLength(2000);
+        expect(new Set(rows.map((row) => row._id)).size).toBe(2000);
+        expect(cut).toBe(false);
+        // Pages are filled to a byte target, so a short history is a few steps, not one per 8 rows.
+        expect(results.length).toBeLessThan(10);
+    });
+
     it("cuts a history that passes its share of the file or its page cap, and says so", async () => {
         const never = async () => {
             return { next: "more" };

@@ -4,15 +4,16 @@
  * reads them back (`gdpr/steps.ts#generateExportFile`), so no step result or dispatch body (Lunora's 1 MiB) carries the history.
  */
 
-/** Suggestions one stored page holds. A row can hold 20,000 characters of instructions, which JSON writes in up to 6 bytes each: 8 rows stay under 1 MiB even then. */
+/** Suggestions one query reads. A row can hold 20,000 characters of instructions, which JSON writes in up to 6 bytes each: 8 rows stay under 1 MiB even then. */
 export const TASK_SUGGESTIONS_EXPORT_PAGE = 8;
 
 /** The share of the export file the suggestion history may take; past it the rest is left out and the section says so. */
 export const TASK_SUGGESTIONS_EXPORT_BYTES = 8 * 1024 * 1024;
 
 /**
- * The most suggestion pages (a workflow step each) one export stores. With the browser and grant-revision pages at their own caps and
- * the export's other steps, a run stays under 1,024 steps (the lowest workflow step limit); past it the section is cut, as past its bytes.
+ * The most suggestion pages (a workflow step each) one export stores. A stored page holds up to 512 KiB, or 100 queries of rows, so
+ * the bytes share is reached long before this; it only bounds the steps (the lowest workflow step limit is 1,024, shared with the
+ * browser and grant-revision pages and the export's other steps).
  */
 export const TASK_SUGGESTIONS_EXPORT_PAGES = 160;
 

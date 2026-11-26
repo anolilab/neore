@@ -23,8 +23,14 @@ const BATCH = 100;
 /** Runs per task in the export — the newest; older ones are history, not the task. */
 const EXPORT_RUNS_PER_TASK = 50;
 
-/** The most a stored suggestion page can be: {@link TASK_SUGGESTIONS_EXPORT_PAGE} rows of at most 20,000 characters each, in the worst JSON escaping, with room. */
-const SUGGESTIONS_PAGE_MAX_BYTES = 2 * 1024 * 1024;
+/** A stored page is filled with query pages until it holds this many bytes in the file, so a long history of short rows is few steps, not one per 8 rows. */
+const SUGGESTIONS_PAGE_TARGET_BYTES = 512 * 1024;
+
+/** The queries one stored page may take: a bound on the action's work whatever the rows weigh. */
+const SUGGESTIONS_PAGE_MAX_QUERIES = 100;
+
+/** The most a stored suggestion page can be: the target plus one more query page ({@link TASK_SUGGESTIONS_EXPORT_PAGE} rows of 20,000 characters, in the worst JSON escaping), with room. */
+const SUGGESTIONS_PAGE_MAX_BYTES = 4 * 1024 * 1024;
 
 export const collectTasksForExport = internalQuery
     .input({ userId: v.string() })
@@ -66,9 +72,10 @@ export const collectTasksForExport = internalQuery
 
 /**
  * One page of the user's suggestions, every status (decided ones stay until the switch is turned off, so a long
- * history is more than one page), the pending ones first: the index sorts by status, and a history cut for its size
- * loses its oldest rows, never the live ones. `cursor` is `null` on the last page. A page is few rows
- * ({@link TASK_SUGGESTIONS_EXPORT_PAGE}) because each can hold 20,000 characters of instructions.
+ * history is more than one page), in descending status order: pending, then dismissed, then accepted, newest first
+ * within each, so a history cut for its size loses accepted rows first and never the live ones. `cursor` is `null` on
+ * the last page. A page is few rows ({@link TASK_SUGGESTIONS_EXPORT_PAGE}) because each can hold 20,000 characters of
+ * instructions and a query result must stay under 1 MiB.
  */
 export const collectTaskSuggestionsForExport = internalQuery
     .input({ cursor: v.optional(v.union(v.string(), v.null())), userId: v.string() })
@@ -84,9 +91,10 @@ export const collectTaskSuggestionsForExport = internalQuery
     });
 
 /**
- * One page of the suggestions ({@link collectTaskSuggestionsForExport}), read in this action's own query and stored at `key`
- * (`export-pages.ts#taskSuggestionsExportPageKey`); only its size in the file and its `next` cursor go back to the workflow, so no
- * step result or dispatch body carries the rows. As `agent/gdpr.ts#storeGrantRevisionsExportPage`: nothing is stored once the run
+ * One stored page of the suggestions: query pages ({@link collectTaskSuggestionsForExport}) read in this action and joined until
+ * the page holds {@link SUGGESTIONS_PAGE_TARGET_BYTES}, the history ends or {@link SUGGESTIONS_PAGE_MAX_QUERIES} are spent, stored at
+ * `key` (`export-pages.ts#taskSuggestionsExportPageKey`). Only its size in the file and its `next` cursor go back to the workflow,
+ * so no step result or dispatch body carries the rows, and the walk is cut by bytes, never by a row count. As `agent/gdpr.ts#storeGrantRevisionsExportPage`: nothing is stored once the run
  * has stopped (`usage/gdpr.ts#exportRunStopped`), and a page whose write ends after it stopped is deleted again.
  */
 export const storeTaskSuggestionsExportPage = internalAction
@@ -115,11 +123,26 @@ export const storeTaskSuggestionsExportPage = internalAction
 
         await stopIfRunStopped();
 
-        const page = (await ctx.runQuery(internal.tasks.gdpr.collectTaskSuggestionsForExport, { ...(cursor !== undefined && { cursor }), userId })) as {
-            cursor: string | null;
-            taskSuggestions: unknown[];
-        };
-        const blob = new Blob([JSON.stringify({ taskSuggestions: page.taskSuggestions })], { type: "application/json" });
+        const taskSuggestions: unknown[] = [];
+        let bytes = 0;
+        let next: string | undefined = cursor;
+
+        for (let queries = 0; queries < SUGGESTIONS_PAGE_MAX_QUERIES && bytes < SUGGESTIONS_PAGE_TARGET_BYTES; queries += 1) {
+            const page = (await ctx.runQuery(internal.tasks.gdpr.collectTaskSuggestionsForExport, { ...(next !== undefined && { cursor: next }), userId })) as {
+                cursor: string | null;
+                taskSuggestions: unknown[];
+            };
+
+            taskSuggestions.push(...page.taskSuggestions);
+            bytes += taskSuggestionsPageFileBytes(page.taskSuggestions);
+            next = page.cursor ?? undefined;
+
+            if (next === undefined) {
+                break;
+            }
+        }
+
+        const blob = new Blob([JSON.stringify({ taskSuggestions })], { type: "application/json" });
 
         await withDependency("file storage", () =>
             ctx.storage.store(key, blob, { allowedContentTypes: ["application/json"], contentType: "application/json", maxSize: SUGGESTIONS_PAGE_MAX_BYTES }),
@@ -127,9 +150,7 @@ export const storeTaskSuggestionsExportPage = internalAction
 
         await stopIfRunStopped();
 
-        const bytes = taskSuggestionsPageFileBytes(page.taskSuggestions);
-
-        return page.cursor === null ? { bytes } : { bytes, next: page.cursor };
+        return next === undefined ? { bytes } : { bytes, next };
     });
 
 export const deleteUserTasks = internalMutation
