@@ -1,0 +1,127 @@
+import { CONTROL_KEEP_INTERVAL_MS, CONTROL_LEASE_MS } from "@neore/client-runtime";
+import { describe, expect, it, vi } from "vitest";
+
+import type { ControlApi, ControlState } from "./control-session";
+import { CONTROL_ELSEWHERE, CONTROL_ENDED, CONTROL_OFFLINE, createControlSession } from "./control-session";
+
+const NOW = 1_000_000;
+const OK = { claim: "c-1", claimId: "id-1", connectBy: NOW, status: "ok" as const, until: NOW + CONTROL_LEASE_MS, url: "https://live.test/v" };
+
+const setup = (overrides: Partial<ControlApi> = {}) => {
+    const ticks: (() => void)[] = [];
+    const stopped = vi.fn();
+    const states: ControlState[] = [];
+    const api: ControlApi = {
+        handBack: vi.fn(async () => true),
+        keep: vi.fn(async () => {
+            return { until: NOW + 2 * CONTROL_LEASE_MS };
+        }),
+        navigate: vi.fn(async () => {
+            return { status: "ok" as const };
+        }),
+        take: vi.fn(async () => OK),
+        ...overrides,
+    };
+    const session = createControlSession({
+        api,
+        every: (ms, run) => {
+            expect(ms).toBe(CONTROL_KEEP_INTERVAL_MS);
+            ticks.push(run);
+
+            return stopped;
+        },
+        onChange: (state) => {
+            states.push(state);
+        },
+    });
+
+    return { api, session, states, stopped, tick: () => ticks.at(-1)?.() };
+};
+
+describe(createControlSession, () => {
+    it("takes control exclusively, renews it on each interval, and opens a page under its claim", async () => {
+        const { api, session, tick } = setup();
+
+        await session.take();
+        expect(session.state()).toStrictEqual({ claim: "c-1", claimId: "id-1", kind: "holding", until: OK.until });
+
+        tick();
+        await vi.waitFor(() => expect(session.state()).toMatchObject({ until: NOW + 2 * CONTROL_LEASE_MS }));
+        expect(api.keep).toHaveBeenCalledWith("c-1");
+
+        await expect(session.navigate("https://example.com")).resolves.toBeUndefined();
+        expect(api.navigate).toHaveBeenCalledWith("c-1", "https://example.com");
+    });
+
+    it("says why control was refused while the web holds it, and holds nothing", async () => {
+        const held = vi.fn(async () => {
+            return { status: "held" as const };
+        });
+        const { session } = setup({ take: held });
+
+        await session.take();
+
+        expect(session.state()).toStrictEqual({ kind: "idle", message: expect.stringContaining("Hand it back there first") });
+    });
+
+    it("hands the claim back when the screen goes, and stops renewing", async () => {
+        const { api, session, stopped } = setup();
+
+        await session.take();
+        session.release("left");
+
+        expect(api.handBack).toHaveBeenCalledWith("c-1", "left");
+        expect(stopped).toHaveBeenCalled();
+        expect(session.state()).toStrictEqual({ kind: "idle" });
+    });
+
+    it("gives back a claim whose answer came after the screen went", async () => {
+        const late = Promise.withResolvers<typeof OK>();
+        const { api, session } = setup({ take: vi.fn(async () => await late.promise) });
+        const taking = session.take();
+
+        session.release("left");
+        late.resolve(OK);
+        await taking;
+
+        expect(api.handBack).toHaveBeenCalledWith("c-1", "left");
+        expect(session.state()).toStrictEqual({ kind: "idle" });
+    });
+
+    it("stops when a renewal says the lease is gone", async () => {
+        const { session, tick } = setup({ keep: vi.fn(async () => null) });
+
+        await session.take();
+        tick();
+
+        await vi.waitFor(() => expect(session.state()).toStrictEqual({ kind: "idle", message: CONTROL_ENDED }));
+    });
+
+    it("stops at once when another of the person's views took the lease, but not on a status from before its claim", async () => {
+        const { session } = setup();
+
+        await session.take();
+        // A status read before the claim was written names no lease: it says nothing about this claim.
+        session.noteLease(undefined, NOW - 1);
+        expect(session.state().kind).toBe("holding");
+
+        session.noteLease({ byYou: true, claimIds: ["id-1"], until: OK.until }, NOW);
+        expect(session.state().kind).toBe("holding");
+
+        session.noteLease({ byYou: true, claimIds: ["id-web"], until: OK.until }, NOW + 1);
+        expect(session.state()).toStrictEqual({ kind: "idle", message: CONTROL_ELSEWHERE });
+    });
+
+    it("gives up control offline without sending anything, and asks for its own lease back on the next take", async () => {
+        const { api, session } = setup();
+
+        await session.take();
+        session.suspend();
+
+        expect(session.state()).toStrictEqual({ kind: "idle", message: CONTROL_OFFLINE });
+        expect(api.handBack).not.toHaveBeenCalled();
+
+        await session.take();
+        expect(api.take).toHaveBeenLastCalledWith("c-1");
+    });
+});

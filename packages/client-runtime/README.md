@@ -13,7 +13,7 @@ the better-auth client, `crpc`) stay in `apps/web/src/lib`. Depends on
 peer.
 
 Used by `apps/web` (`crpc`, the router, chat hooks) and `apps/mobile`
-(`tokenRefreshDelayMs`).
+(`tokenRefreshDelayMs`, the browser lease helpers).
 
 ## Exports
 
