@@ -28,8 +28,8 @@ import type { HostDriver } from "./driver";
 import { signedInLogin } from "./drivers/github";
 import type { PullRequestObservation } from "./pr-watch-logic";
 import { decideWatch, stateOf, storedWatchOf } from "./pr-watch-logic";
-import type { HostRequest } from "./origin-fetch";
-import { readFromHost, type ReadFailure, type ReadOutcome } from "./read-host";
+import { HostApiError, type HostRequest } from "./origin-fetch";
+import { failureOf, readFromHost, type ReadFailure, type ReadOutcome } from "./read-host";
 import type { CheckRun, CheckState, CheckSummary, MergeState } from "./types";
 
 /** A running watch is read again once its last read is this old. */
@@ -277,7 +277,14 @@ export const readWatchForPoll = internalQuery
  * - end (closed or cap): stored, stamped `stoppedAt`, and `watchActive` is cleared so the person's slot is free.
  */
 export const recordWatchObservation = internalMutation
-    .input({ lease: v.number(), linkId: v.id("pullRequestThreads"), observation: vObservation, run: v.optional(v.string()), startedAt: v.number() })
+    .input({
+        lease: v.number(),
+        linkId: v.id("pullRequestThreads"),
+        loginFailure: v.optional(vReadFailure),
+        observation: vObservation,
+        run: v.optional(v.string()),
+        startedAt: v.number(),
+    })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const link = await ctx.db.get("pullRequestThreads", args.linkId);
@@ -296,12 +303,19 @@ export const recordWatchObservation = internalMutation
 
         const previous = stateOf(link);
         const decision = decideWatch(previous, args.observation, ctx.now);
+
+        // The signed-in login could not be read; the rest of the read stands and counts as no failure of the watch.
+        if (args.loginFailure !== undefined) {
+            ctx.log.event("develop.watch_login_failed", { linkId: String(link._id), status: args.loginFailure });
+        }
+
         const { startedAt } = link.watch;
 
         if (decision.action === "end") {
             const stored = storedWatchOf({ ...decision.state, startedAt, stoppedAt: ctx.now });
 
             await ctx.db.patch("pullRequestThreads", link._id, { watch: stored.watch, watchActive: false, watchPending: stored.watchPending ?? [] });
+            ctx.log.event("develop.watch_ended", { linkId: String(link._id), reason: decision.reason });
 
             return null;
         }
@@ -344,10 +358,14 @@ const RECORD_RETRIES = 2;
  * failing ones the first read saw. Every try keeps the mutation's lease and run checks. Past the bound the error stands, and the
  * watchdog poll is the retry.
  */
-const recordWithRetry = async (record: (observation: PullRequestObservation) => Promise<unknown>, observation: PullRequestObservation): Promise<void> => {
+const recordWithRetry = async (
+    record: (observation: PullRequestObservation, loginFailure?: ReadFailure) => Promise<unknown>,
+    observation: PullRequestObservation,
+    loginFailure?: ReadFailure,
+): Promise<void> => {
     for (let attempt = 0; ; attempt += 1) {
         try {
-            await record(observation);
+            await (loginFailure === undefined ? record(observation) : record(observation, loginFailure));
 
             return;
         } catch (error) {
@@ -364,8 +382,8 @@ export interface WatchPollSteps {
     fail: (status: ReadFailure) => Promise<unknown>;
     /** The watch's target while this poll's lease and watch are still the link's own; null once they are not. */
     read: () => Promise<WatchTarget | null>;
-    readHost: (target: WatchTarget, token: GithubTokenOutcome) => Promise<ReadOutcome<{ observation: PullRequestObservation }>>;
-    record: (observation: PullRequestObservation) => Promise<unknown>;
+    readHost: (target: WatchTarget, token: GithubTokenOutcome) => Promise<ReadOutcome<{ loginFailure?: ReadFailure; observation: PullRequestObservation }>>;
+    record: (observation: PullRequestObservation, loginFailure?: ReadFailure) => Promise<unknown>;
     token: (userId: string) => Promise<GithubTokenOutcome>;
 }
 
@@ -390,7 +408,7 @@ export const runWatchPoll = async (steps: WatchPollSteps): Promise<void> => {
     const outcome = await steps.readHost(target, token);
 
     if (outcome.status === "ok") {
-        await recordWithRetry(steps.record, outcome.observation);
+        await recordWithRetry(steps.record, outcome.observation, outcome.loginFailure);
     } else {
         await steps.fail(outcome.status);
     }
@@ -404,6 +422,19 @@ export interface ObserveDependencies {
 
 const LIVE: ObserveDependencies = { driver: DEVELOP_DRIVER, login: signedInLogin };
 
+/** The signed-in login, or why it could not be read. Only a refusal other than 401 is told apart; anything else goes up. */
+const readLogin = async (dependencies: ObserveDependencies, request: HostRequest): Promise<{ failure?: ReadFailure; name: string }> => {
+    try {
+        return { name: await dependencies.login(request) };
+    } catch (error) {
+        if (!(error instanceof HostApiError) || error.status === 401) {
+            throw error;
+        }
+
+        return { failure: failureOf(error), name: "" };
+    }
+};
+
 /**
  * One watched pull request as the host says it now. The pull request is read first: one that is closed or merged ends the
  * watch, which needs nothing else, so the signed-in login (only needed to leave the watcher's own reviews out) is read only
@@ -413,7 +444,7 @@ export const observeWatched = async (
     request: HostRequest,
     target: WatchTarget,
     dependencies: ObserveDependencies = LIVE,
-): Promise<{ observation: PullRequestObservation }> => {
+): Promise<{ loginFailure?: ReadFailure; observation: PullRequestObservation }> => {
     const ref = { number: target.number, repository: target.repository };
     const detail = await dependencies.driver.getPullRequest(request, ref);
 
@@ -431,11 +462,15 @@ export const observeWatched = async (
         };
     }
 
-    const [watcherLogin, summary, reviews] = await Promise.all([
-        dependencies.login(request),
+    // The login is its own read: a refusal of `/user` says nothing about the pull request, so it must not count against the watch.
+    // An empty login skips review handling and keeps the review marker (`decideWatch`), which is smaller and safer than guessing
+    // whose reviews are the watcher's. A 401 still goes up, so the token is renewed once like any other read.
+    const [login, summary, reviews] = await Promise.all([
+        readLogin(dependencies, request),
         dependencies.driver.listChecks(request, ref, detail.headSha),
         dependencies.driver.listReviews(request, ref, target.reviewId === undefined ? undefined : { seenId: target.reviewId }),
     ]);
+    const watcherLogin = login.name;
     const { failing, status } = checksOf(summary);
     const { items, total } = reviews;
     const seenAt = target.reviewId === undefined ? -1 : items.findIndex((review) => review.id === target.reviewId);
@@ -444,6 +479,7 @@ export const observeWatched = async (
     const markerBeyondRead = target.reviewId !== undefined && seenAt === -1 && items.length < total;
 
     return {
+        ...(login.failure !== undefined && { loginFailure: login.failure }),
         observation: {
             checks: status,
             failingCheckNames: failing.slice(0, MAX_FAILING_NAMES).map((check) => check.name.slice(0, MAX_NAME_LENGTH)),
@@ -460,7 +496,10 @@ export const observeWatched = async (
     };
 };
 
-const readObservation = async (target: WatchTarget, token: GithubTokenOutcome): Promise<ReadOutcome<{ observation: PullRequestObservation }>> =>
+const readObservation = async (
+    target: WatchTarget,
+    token: GithubTokenOutcome,
+): Promise<ReadOutcome<{ loginFailure?: ReadFailure; observation: PullRequestObservation }>> =>
     await readFromHost(DEVELOP_DRIVER, token, async (request) => await observeWatched(request, target));
 
 /** One host read for one watched link, with the person's own token. */
@@ -474,7 +513,12 @@ export const pollWatchedPullRequest = internalAction
             fail: async (status) => await ctx.runMutation(internal.source_control.pr_watch_poll.recordWatchFailure, { ...key, status }),
             read: async () => await ctx.runQuery(internal.source_control.pr_watch_poll.readWatchForPoll, key),
             readHost: readObservation,
-            record: async (observation) => await ctx.runMutation(internal.source_control.pr_watch_poll.recordWatchObservation, { ...key, observation }),
+            record: async (observation, loginFailure) =>
+                await ctx.runMutation(internal.source_control.pr_watch_poll.recordWatchObservation, {
+                    ...key,
+                    observation,
+                    ...(loginFailure !== undefined && { loginFailure }),
+                }),
             token: async (userId) => await resolveGithubToken(ctx, userId),
         });
 

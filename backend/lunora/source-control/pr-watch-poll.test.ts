@@ -6,6 +6,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { setPullRequestWatch } from "./pr-watch";
+import { HostApiError } from "./origin-fetch";
 import { insertThread } from "../agent/table-writes";
 import { runInShard } from "../lib/shard-context";
 import schema from "../schema";
@@ -552,6 +553,72 @@ describe("observeWatched", () => {
         expect(row.watchPending).toEqual(["review"]);
     });
 
+    it("records a readable pull request when only the login lookup is refused, and counts no read failure", async () => {
+        const linkId = await seedWatch({ watch: { baselined: true, headSha: "sha-0", reviewId: "5", startedAt: STARTED_AT } });
+        const failing = {
+            checks: [{ id: null, name: "build", required: true, state: "failure", url: null }],
+            required: { complete: true, patterns: ["build"] },
+            total: 1,
+        };
+        const stubs = {
+            driver: {
+                getPullRequest: vi.fn().mockResolvedValue({ headSha: "sha-2", mergeState: "clean", state: "open" }),
+                listChecks: vi.fn().mockResolvedValue(failing),
+                listReviews: vi.fn().mockResolvedValue({ items: [{ authorLogin: "me", id: "9" }], total: 1 }),
+            } as never,
+            login: async () => {
+                throw new HostApiError("forbidden", 403);
+            },
+        };
+        const { loginFailure, observation: observed } = await observeWatched(request, { ...TARGET, reviewId: "5" }, stubs);
+
+        expect(loginFailure).toBe("forbidden");
+        expect(observed.watcherLogin).toBe("");
+
+        const event = vi.fn();
+
+        await harness.run(async (ctx: any) => {
+            ctx.log.event = event;
+            await ctx.runMutation(recordWatchObservation, { lease: LEASE, linkId, loginFailure, observation: observed, startedAt: STARTED_AT });
+        });
+
+        const row = await rowOf(linkId);
+
+        // Head and checks update; review handling is skipped, so the marker stays and no review wakes.
+        expect(row.watch).toMatchObject({ checksHeadSha: "sha-2", headSha: "sha-2", reviewId: "5" });
+        expect(row.watchPending).toEqual(["checks"]);
+        expect(row.watchReadFailure).toBeUndefined();
+        expect(event).toHaveBeenCalledWith("develop.watch_login_failed", { linkId, status: "forbidden" });
+    });
+
+    it("lets a refusal of the pull request read itself go up, to be counted as a failure", async () => {
+        const stubs = {
+            driver: {
+                getPullRequest: vi.fn().mockRejectedValue(new HostApiError("forbidden", 403)),
+                listChecks: vi.fn(),
+                listReviews: vi.fn(),
+            } as never,
+            login: async () => "me",
+        };
+
+        await expect(observeWatched(request, TARGET, stubs)).rejects.toBeInstanceOf(HostApiError);
+    });
+
+    it("lets a 401 on the login lookup go up, so the token is renewed", async () => {
+        const stubs = {
+            driver: {
+                getPullRequest: vi.fn().mockResolvedValue(detail("open")),
+                listChecks: vi.fn().mockResolvedValue({ checks: [], required: { complete: true, patterns: [] }, total: 0 }),
+                listReviews: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+            } as never,
+            login: async () => {
+                throw new HostApiError("unauthorized", 401);
+            },
+        };
+
+        await expect(observeWatched(request, TARGET, stubs)).rejects.toBeInstanceOf(HostApiError);
+    });
+
     it("reads the login once for a watch that goes on", async () => {
         const login = vi.fn().mockResolvedValue("me");
         const driver = {
@@ -659,6 +726,34 @@ describe("a watch that can never be read", () => {
 
         expect(row.watchActive).toBe(true);
         expect(row.watch.stoppedAt).toBeUndefined();
+    });
+});
+
+describe("the end of a watch", () => {
+    const endsWith = async (watch: Record<string, unknown>, observed: PullRequestObservation): Promise<{ event: ReturnType<typeof vi.fn>; row: any }> => {
+        const linkId = await seedWatch({ watch: { baselined: true, headSha: "sha-1", startedAt: STARTED_AT, ...watch } });
+        const event = vi.fn();
+
+        await harness.run(async (ctx: any) => {
+            ctx.log.event = event;
+            await ctx.runMutation(recordWatchObservation, { lease: LEASE, linkId, observation: observed, startedAt: STARTED_AT });
+        });
+
+        return { event, row: await rowOf(linkId) };
+    };
+
+    it("is logged with the reason: closed", async () => {
+        const { event, row } = await endsWith({}, observation({ state: "closed" }));
+
+        expect(row.watchActive).toBe(false);
+        expect(event).toHaveBeenCalledExactlyOnceWith("develop.watch_ended", { linkId: expect.any(String), reason: "closed" });
+    });
+
+    it("is logged with the reason: cap", async () => {
+        const { event, row } = await endsWith({ wakes: PR_WATCH_MAX_WAKES }, observation());
+
+        expect(row.watchActive).toBe(false);
+        expect(event).toHaveBeenCalledExactlyOnceWith("develop.watch_ended", { linkId: expect.any(String), reason: "cap" });
     });
 });
 
