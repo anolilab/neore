@@ -2,19 +2,22 @@ import { useIsFocused } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 
 import { useIsAppActive } from "@/chat/use-app-active";
-import { withCatch } from "@/lib/guarded";
 import { getClient } from "@/lib/lunora";
+import { isNetworkFailure } from "@/offline/connectivity";
 import { useOffline } from "@/offline/offline-context";
 import { settleQuietly } from "@/offline/quietly";
 
-import type { BrowserStatus } from "./browser-api";
-import { handBackBrowser, keepBrowserControl, navigateBrowser, readFrame, takeBrowserControl, watchBrowserStatus } from "./browser-api";
+import type { BrowserFrame, BrowserStatus } from "./browser-api";
+import { handBackBrowser, keepBrowserControl, navigateBrowser, readBrowserStatus, readFrame, takeBrowserControl, watchBrowserStatus } from "./browser-api";
 import type { ViewState } from "./browser-view-state";
-import { FRAME_REFRESH_MS, frameMessage, frameTrigger, shouldReadFrame, viewStateOf } from "./browser-view-state";
+import { frameMessage, frameTrigger, grantEndOnDevice, isOlderStatus, shouldReadFrame, viewStateOf } from "./browser-view-state";
 import type { ControlSession, ControlState } from "./control-session";
-import { createControlSession } from "./control-session";
+import { createControlSession, rememberClaim, rememberedClaim } from "./control-session";
+import { startFrameReader } from "./frame-reader";
 
 export interface ShownFrame {
+    /** The browser the picture is of: one replaced since is not shown. */
+    browserId: string;
     image: string;
     /** On the server's clock: the "Last synced" time of the picture on screen. */
     takenAt: number;
@@ -23,6 +26,7 @@ export interface ShownFrame {
 
 export interface BrowserView {
     control: ControlState;
+    /** Only a picture of the browser the screen may show now: none once access ended or the browser changed. */
     frame: ShownFrame | undefined;
     /** Why the newest frame read brought no picture; the last picture stays on screen. */
     frameNote: string | undefined;
@@ -32,22 +36,43 @@ export interface BrowserView {
     view: ViewState;
 }
 
+const NOT_SHOWN = "The page could not be shown right now.";
+
+type Answer = { receivedAt: number; status: BrowserStatus } | undefined;
+
+/** An answer older than the one on screen (a lagging read of a grant since removed) never replaces it. */
+const accepting
+    = (setAnswer: (update: (current: Answer) => Answer) => void, setError: (error: string | undefined) => void) =>
+        (next: BrowserStatus): void => {
+            setError(undefined);
+            setAnswer((current) => {
+                if (isOlderStatus(current?.status, next)) {
+                    return current;
+                }
+
+                return { receivedAt: Date.now(), status: next };
+            });
+        };
+
 /**
  * The thread's cloud browser on the phone: the live status, a frame read on every agent action and on a timer while the
  * screen is in front and online, and the phone's control session, given back when the screen is left, the app goes to
- * the background, or the phone goes offline.
+ * the background, or the phone goes offline. The screen is keyed by account and thread, so none of this outlives either.
  */
-export const useBrowserView = (threadId: string): BrowserView => {
-    const { isOffline } = useOffline();
+export const useBrowserView = (threadId: string, userId: string): BrowserView => {
+    const { isOffline, reportRead } = useOffline();
     const isActive = useIsAppActive();
     const isFocused = useIsFocused();
-    const [status, setStatus] = useState<BrowserStatus | undefined>(undefined);
+    const [answer, setAnswer] = useState<Answer>(undefined);
     const [error, setError] = useState<string | undefined>(undefined);
+    /** The answer whose grant ran out on this device's clock. */
+    const [expiredAnswer, setExpiredAnswer] = useState<BrowserStatus | undefined>(undefined);
     const [frame, setFrame] = useState<ShownFrame | undefined>(undefined);
     const [frameNote, setFrameNote] = useState<string | undefined>(undefined);
     const [control, setControl] = useState<ControlState>({ kind: "idle" });
     const [session] = useState<ControlSession>(() => {
         const client = getClient();
+        const key = `${userId}:${threadId}`;
 
         return createControlSession({
             api: {
@@ -56,26 +81,42 @@ export const useBrowserView = (threadId: string): BrowserView => {
                 navigate: async (claim, url) => await navigateBrowser(client, threadId, claim, url),
                 take: async (renews) => await takeBrowserControl(client, threadId, renews),
             },
+            lastClaim: rememberedClaim(key),
             onChange: setControl,
+            onClaim: (claim) => rememberClaim(key, claim),
         });
     });
-    /** Only the newest frame read may paint: an older one that answers late is dropped. */
-    const reads = useRef(0);
+    const lastRead = useRef(-Infinity);
     const [nudge, setNudge] = useState(0);
+    const status = answer?.status;
 
-    useEffect(
-        () =>
-            watchBrowserStatus(
-                getClient(),
-                threadId,
-                (next) => {
-                    setError(undefined);
-                    setStatus(next);
-                },
-                setError,
-            ),
-        [threadId],
-    );
+    const accept = accepting(setAnswer, setError);
+
+    useEffect(() => watchBrowserStatus(getClient(), threadId, accept, setError), [threadId]);
+
+    // A grant ends without a write, so no new answer comes: the screen stops at its end, then reads once to learn
+    // whether it was renewed (a renewal pushes nothing either).
+    const grantEnd = grantEndOnDevice(status, answer?.receivedAt ?? 0);
+
+    useEffect(() => {
+        if (grantEnd === undefined || status === undefined) {
+            return undefined;
+        }
+
+        const timer = setTimeout(
+            () => {
+                setExpiredAnswer(status);
+                settleQuietly(async () => accept(await readBrowserStatus(getClient(), threadId)));
+            },
+            Math.max(0, grantEnd - Date.now()),
+        );
+
+        return () => clearTimeout(timer);
+    }, [grantEnd, status, threadId]);
+
+    const view = viewStateOf(status, error, status !== undefined && expiredAnswer === status);
+    const isHolding = control.kind === "holding";
+    const browserId = status?.kind === "running" ? status.browserId : undefined;
 
     useEffect(() => {
         if (status !== undefined) {
@@ -102,51 +143,47 @@ export const useBrowserView = (threadId: string): BrowserView => {
         [session],
     );
 
-    const view = viewStateOf(status, error);
-    const isReading = shouldReadFrame(view, { isActive: isActive && isFocused, isOffline });
-    const trigger = frameTrigger(status);
+    const isReading = shouldReadFrame(view, { isActive: isActive && isFocused, isOffline }) && browserId !== undefined;
+    const trigger = frameTrigger(status, isHolding);
 
     useEffect(() => {
-        if (!isReading) {
+        if (!isReading || browserId === undefined) {
             return undefined;
         }
 
-        const read = (): void => {
-            reads.current += 1;
+        return startFrameReader<BrowserFrame>({
+            lastReadAt: lastRead.current,
+            onAnswer: (read) => {
+                reportRead("succeeded");
+                setFrameNote(frameMessage(read));
 
-            const mine = reads.current;
-
-            settleQuietly(async () => {
-                const answer = await withCatch(async () => await readFrame(getClient(), threadId), () => undefined);
-
-                if (mine !== reads.current) {
-                    return;
+                if (read.status === "ok") {
+                    setFrame({ browserId, image: read.image, takenAt: read.takenAt, ...read.viewport !== undefined && { viewport: read.viewport } });
+                }
+            },
+            onFailure: (failure) => {
+                // A refusal is the server's answer, not a lost connection.
+                if (isNetworkFailure(failure)) {
+                    reportRead("failed");
                 }
 
-                if (answer === undefined) {
-                    setFrameNote("The page could not be shown right now.");
+                setFrameNote(NOT_SHOWN);
+            },
+            onRead: (at) => {
+                lastRead.current = at;
+            },
+            read: async () => await readFrame(getClient(), threadId),
+        });
+    }, [browserId, isReading, nudge, reportRead, threadId, trigger]);
 
-                    return;
-                }
+    const isShown = view.kind === "ready" && frame !== undefined && frame.browserId === browserId;
 
-                setFrameNote(frameMessage(answer));
-
-                if (answer.status === "ok") {
-                    setFrame({ image: answer.image, takenAt: answer.takenAt, ...answer.viewport !== undefined && { viewport: answer.viewport } });
-                }
-            });
-        };
-
-        read();
-
-        const timer = setInterval(read, FRAME_REFRESH_MS);
-
-        return () => {
-            clearInterval(timer);
-            // A read still out when the screen stops reading paints nothing.
-            reads.current += 1;
-        };
-    }, [isReading, nudge, threadId, trigger]);
-
-    return { control, frame, frameNote, refresh: () => setNudge((count) => count + 1), session, view };
+    return {
+        control,
+        frame: isShown ? frame : undefined,
+        frameNote: view.kind === "ready" ? frameNote : undefined,
+        refresh: () => setNudge((count) => count + 1),
+        session,
+        view,
+    };
 };

@@ -40,6 +40,23 @@ export interface ControlSession {
     take: () => Promise<void>;
 }
 
+/**
+ * The claim this phone last held, per account and thread, kept across screens: a screen opened again takes back its
+ * own lease (`renews`), which a lease left after going offline or a lost hand back still is, instead of being refused
+ * it as another window's.
+ */
+const heldClaims = new Map<string, string>();
+
+export const rememberedClaim = (key: string): string | undefined => heldClaims.get(key);
+
+export const rememberClaim = (key: string, claim: string | undefined): void => {
+    if (claim === undefined) {
+        heldClaims.delete(key);
+    } else {
+        heldClaims.set(key, claim);
+    }
+};
+
 export const createControlSession = ({
     api,
     every = (ms, run) => {
@@ -47,16 +64,22 @@ export const createControlSession = ({
 
         return () => clearInterval(timer);
     },
+    lastClaim: initialClaim,
     onChange,
+    onClaim = () => {},
 }: {
     api: ControlApi;
     every?: (ms: number, run: () => void) => () => void;
+    /** The claim this phone last held on the thread, kept across screens: see {@link rememberClaim}. */
+    lastClaim?: string;
     onChange: (state: ControlState) => void;
+    /** A claim taken (its value), or handed back (`undefined`). */
+    onClaim?: (claim: string | undefined) => void;
 }): ControlSession => {
     let state: ControlState = { kind: "idle" };
     let stopKeeping: (() => void) | undefined;
     /** The last claim this phone held, so taking control again is its own renewal and never `held` from itself. */
-    let lastClaim: string | undefined;
+    let lastClaim = initialClaim;
     /** Counts takes: an answer to one that was left (released, suspended, or followed by another) holds nothing. */
     let attempt = 0;
 
@@ -132,7 +155,11 @@ export const createControlSession = ({
             const { claim } = state;
 
             stop();
-            settleQuietly(api.handBack(claim, reason));
+            settleQuietly(async () => {
+                if (await api.handBack(claim, reason)) {
+                    onClaim(undefined);
+                }
+            });
         },
         state: () => state,
         suspend: () => {
@@ -179,6 +206,7 @@ export const createControlSession = ({
             }
 
             lastClaim = answer.claim;
+            onClaim(answer.claim);
             set({ claim: answer.claim, claimId: answer.claimId, kind: "holding", until: answer.until });
             stopKeeping = every(CONTROL_KEEP_INTERVAL_MS, () => {
                 if (state.kind === "holding") {

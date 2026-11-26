@@ -3,7 +3,7 @@ import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 
 /** The slice of the client this uses, so tests can fake it. */
-export type BrowserClient = Pick<LunoraClient, "action" | "mutation" | "subscribe">;
+export type BrowserClient = Pick<LunoraClient, "action" | "mutation" | "query" | "subscribe">;
 
 export type BrowserStatus = ReturnOf<typeof api.browser.live_view.getThreadBrowser>;
 export type BrowserFrame = ReturnOf<typeof api.browser.frame.readBrowserFrame>;
@@ -20,6 +20,10 @@ export const watchBrowserStatus = (
     onError: (message: string) => void,
 ): Unsubscribe =>
     client.subscribe(api.browser.live_view.getThreadBrowser, { threadId: thread(threadId) }, onStatus, { onError: (error) => onError(error.message) });
+
+/** One read of the status, past the live subscription: a renewed grant pushes nothing to it. */
+export const readBrowserStatus = async (client: BrowserClient, threadId: string): Promise<BrowserStatus> =>
+    await client.query(api.browser.live_view.getThreadBrowser, { threadId: thread(threadId) });
 
 export const readFrame = async (client: BrowserClient, threadId: string): Promise<BrowserFrame> =>
     await client.action(api.browser.frame.readBrowserFrame, { threadId: thread(threadId) });

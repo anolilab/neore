@@ -2,7 +2,7 @@ import { CONTROL_KEEP_INTERVAL_MS, CONTROL_LEASE_MS } from "@neore/client-runtim
 import { describe, expect, it, vi } from "vitest";
 
 import type { ControlApi, ControlState } from "./control-session";
-import { CONTROL_ELSEWHERE, CONTROL_ENDED, CONTROL_OFFLINE, createControlSession } from "./control-session";
+import { CONTROL_ELSEWHERE, CONTROL_ENDED, CONTROL_OFFLINE, createControlSession, rememberClaim, rememberedClaim } from "./control-session";
 
 const NOW = 1_000_000;
 const OK = { claim: "c-1", claimId: "id-1", connectBy: NOW, status: "ok" as const, until: NOW + CONTROL_LEASE_MS, url: "https://live.test/v" };
@@ -123,5 +123,34 @@ describe(createControlSession, () => {
 
         await session.take();
         expect(api.take).toHaveBeenLastCalledWith("c-1");
+    });
+
+    it("names the claim a screen opened before held, so its own leftover lease is not refused as another window's", async () => {
+        const onClaim = vi.fn();
+        const api: ControlApi = {
+            handBack: vi.fn(async () => true),
+            keep: vi.fn(async () => null),
+            navigate: vi.fn(async () => {
+                return { status: "ok" as const };
+            }),
+            take: vi.fn(async () => OK),
+        };
+        const session = createControlSession({ api, every: () => () => {}, lastClaim: "c-0", onChange: () => {}, onClaim });
+
+        await session.take();
+        expect(api.take).toHaveBeenCalledWith("c-0");
+        expect(onClaim).toHaveBeenLastCalledWith("c-1");
+
+        session.release("handed_back");
+        await vi.waitFor(() => expect(onClaim).toHaveBeenLastCalledWith(undefined));
+    });
+
+    it("keeps the claim per account and thread across screens until it is handed back", () => {
+        rememberClaim("u:t", "c-1");
+        expect(rememberedClaim("u:t")).toBe("c-1");
+        expect(rememberedClaim("u:other")).toBeUndefined();
+
+        rememberClaim("u:t", undefined);
+        expect(rememberedClaim("u:t")).toBeUndefined();
     });
 });

@@ -4,9 +4,6 @@
  */
 import type { BrowserFrame, BrowserStatus } from "./browser-api";
 
-/** How often a frame is read while the screen is open and nothing else asked for one. */
-export const FRAME_REFRESH_MS = 10_000;
-
 export type ViewState
     = | { kind: "connecting" }
     /** No browser runs in the chat, or the caller cannot read it. */
@@ -19,8 +16,12 @@ export const NO_BROWSER = "No browser is open in this chat. It opens when the ag
 export const NOT_READABLE = "This chat's browser cannot be shown. The chat may be locked, or no longer shared with you.";
 export const CONTROLLED_BY_OTHER = "Someone else is controlling this browser. The page is hidden until they hand it back.";
 
-export const viewStateOf = (status: BrowserStatus | undefined, error: string | undefined): ViewState => {
-    if (error !== undefined) {
+/**
+ * `isExpired`: the grant this status was read under has ended (its `accessUntil` passed). A live status is re-run only
+ * by a write, not by the clock, so the screen stops showing it then, as every later answer would be a denial.
+ */
+export const viewStateOf = (status: BrowserStatus | undefined, error: string | undefined, isExpired = false): ViewState => {
+    if (error !== undefined || isExpired) {
         return { kind: "ended", message: NOT_READABLE };
     }
 
@@ -47,12 +48,47 @@ export const viewStateOf = (status: BrowserStatus | undefined, error: string | u
  * Changes whenever the agent acted on the browser (its activity moves `idleUntil`, a page moves `currentUrl`) or the
  * browser was replaced: a new frame is read then, not only on the timer.
  */
-export const frameTrigger = (status: BrowserStatus | undefined): string | undefined => {
+
+/**
+ * While the phone holds control the agent cannot act, and the phone's own renewals move `idleUntil`: only the page and
+ * the browser count then, so its renewals never spend frame reads.
+ */
+export const frameTrigger = (status: BrowserStatus | undefined, isHolding = false): string | undefined => {
     if (status?.kind !== "running") {
         return undefined;
     }
 
-    return `${status.browserId}|${status.idleUntil}|${status.currentUrl ?? ""}`;
+    return `${status.browserId}|${isHolding ? "" : status.idleUntil}|${status.currentUrl ?? ""}`;
+};
+
+/**
+ * An answer older than the one on screen, which must not replace it: one that names an older grant revision (a
+ * lagging read of a grant since removed), or one from earlier on the server's clock. A denial is kept over another
+ * answer from the same moment.
+ */
+export const isOlderStatus = (current: BrowserStatus | undefined, next: BrowserStatus): boolean => {
+    if (current === undefined) {
+        return false;
+    }
+
+    if (current.revision !== undefined && next.revision !== undefined && next.revision !== current.revision) {
+        return next.revision < current.revision;
+    }
+
+    if (next.now !== current.now) {
+        return next.now < current.now;
+    }
+
+    return current.kind === "denied" && next.kind !== "denied";
+};
+
+/** When the grant `status` was read under ends, on this device's clock (it came at `receivedAt`); none for the owner. */
+export const grantEndOnDevice = (status: BrowserStatus | undefined, receivedAt: number): number | undefined => {
+    if (status === undefined || status.kind === "denied" || status.accessUntil === undefined) {
+        return undefined;
+    }
+
+    return receivedAt + (status.accessUntil - status.now);
 };
 
 /** A frame is read only for a screen that shows the page, in front, online. */

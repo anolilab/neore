@@ -115,9 +115,8 @@ const ControlPanel = ({ control, onOpened, session }: { control: ControlState; o
     );
 };
 
-const BrowserScreen = () => {
-    const { threadId } = useLocalSearchParams<{ threadId: string }>();
-    const { control, frame, frameNote, refresh, session, view } = useBrowserView(threadId);
+const BrowserScreen = ({ threadId, userId }: { threadId: string; userId: string }) => {
+    const { control, frame, frameNote, refresh, session, view } = useBrowserView(threadId, userId);
     const isReady = view.kind === "ready";
     const message = view.kind === "ended" || view.kind === "hidden" ? view.message : undefined;
 
@@ -153,10 +152,15 @@ const BrowserScreen = () => {
     );
 };
 
-/** Keyed by the signed-in account, so one account's lease and page never stay on screen for the next. */
+/**
+ * Keyed by the signed-in account and the thread, so one account's or chat's lease and page never stay on screen for
+ * the next: a new key hands the old lease back and starts afresh.
+ */
 // eslint-disable-next-line react/function-component-definition -- the default export is declared inline (unicorn/default-export-style), which makes it a function declaration
 export default function BrowserRoute() {
     const { user } = useAuth();
+    const { threadId } = useLocalSearchParams<{ threadId: string }>();
+    const userId = user?.id ?? "none";
 
-    return <BrowserScreen key={user?.id ?? "none"} />;
+    return <BrowserScreen key={`${userId}:${threadId}`} threadId={threadId} userId={userId} />;
 }
