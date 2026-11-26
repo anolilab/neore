@@ -248,6 +248,15 @@ const withoutHiddenText = (options: HeadlessRunOptions): HeadlessRunOptions => {
     };
 };
 
+/**
+ * A headless run's end in the owner's Events log, keyed by its own reply key. A log write that fails is logged, never the run's failure.
+ */
+const recordHeadlessEnd = async (ctx: ActionCtx, runKey: string, threadId: string, outcome: "succeeded" | "failed"): Promise<void> => {
+    await ctx.runMutation(internal.public_api.events.recordHeadlessRunEnd, { outcome, runKey, threadId }).catch((eventError: unknown) => {
+        console.error("[headless-run] could not record the run's end in the Events log", { eventError, threadId });
+    });
+};
+
 export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOptions): Promise<HeadlessRunResult> => {
     const options = withoutHiddenText(rawOptions);
 
@@ -329,6 +338,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
 
     // This run's own reply (`ToolCtx.replyKey`): two runs on one continued thread are two replies.
     const replyKey = `headless:${crypto.randomUUID()}`;
+    // The thread this run ended on, once it exists: a failure after that is recorded in the Events log (`catch` below).
+    let endedThread: string | undefined;
 
     try {
         setResearchDepth(ctx, "balanced");
@@ -429,6 +440,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             ({ thread } = await agent.continueThread(ctx, { threadId, userId }));
         }
 
+        endedThread = threadId;
+
         await options.onGenerationStart?.();
 
         // The goal's time budget is the invocation's, so it starts before the first generation.
@@ -437,16 +450,9 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         const callOptions = options.freshContext ? { contextOptions: { recentMessages: 0 } } : undefined;
         // A generation that fails on a thread this run continues wakes it if the owner snoozed it, as a chat run that fails
         // does; the first generation and every later goal round go through here. The generation's own error is the one thrown.
-        // The run's end in the owner's Events log, keyed by its own reply key. A log write that fails is logged, never the run's failure.
-        const recordEnd = async (outcome: "succeeded" | "failed"): Promise<void> => {
-            await ctx.runMutation(internal.public_api.events.recordHeadlessRunEnd, { outcome, runKey: replyKey, threadId }).catch((eventError: unknown) => {
-                console.error("[headless-run] could not record the run's end in the Events log", { eventError, threadId });
-            });
-        };
+        const recordEnd = async (outcome: "succeeded" | "failed"): Promise<void> => await recordHeadlessEnd(ctx, replyKey, threadId, outcome);
 
         const wakeOnFailure = async (error: unknown): Promise<never> => {
-            await recordEnd("failed");
-
             if (existingThreadId !== undefined) {
                 await ctx
                     .runMutation(internal.agent.threads.updateThread, { failed: true, patch: {}, threadId: threadId as Id<"threads"> })
@@ -641,6 +647,13 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             threadId,
             totalTokens: outcome.totalTokens,
         };
+    } catch (error) {
+        // Any failure after the thread exists ends the run as failed, whichever step threw: a generation's error, or a write after it.
+        if (endedThread !== undefined) {
+            await recordHeadlessEnd(ctx, replyKey, endedThread, "failed");
+        }
+
+        throw error;
     } finally {
         await closeMCPClients(toolResult.mcpClients);
     }

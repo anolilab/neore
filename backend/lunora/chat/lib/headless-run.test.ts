@@ -227,6 +227,37 @@ describe("runHeadlessAgent personalization", () => {
         expect(ends[0]?.runKey).toMatch(HEADLESS_RUN_KEY);
     });
 
+    it("records one failure for a run that fails on a thread it set up, once, whichever step threw", async () => {
+        seen.failAt = "round";
+        seen.met = [false];
+        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
+        await expect(
+            runHeadlessAgent(ctx as never, {
+                goal: { text: "Ship it" },
+                memory: false,
+                model: "test-model",
+                organizationId: null,
+                origin: "lead",
+                personalization: "none",
+                prompt: "Run the report",
+                thread: { threadId: "thread-1" },
+                tools: "none",
+                userId: "owner",
+            }),
+        ).rejects.toThrow("model call failed");
+
+        const calls = ctx.runMutation.mock.calls as unknown as [string, { outcome?: string }][];
+
+        expect(
+            calls
+                .map(([, args]) => args)
+                .filter((args) => args.outcome !== undefined)
+                .map((args) => args.outcome),
+        ).toStrictEqual(["failed"]);
+        seen.failAt = undefined;
+    });
+
     it("records no success for a headless run that was stopped, since a stop writes no run event", async () => {
         const ctx = fakeCtx() as unknown as Parameters<typeof runHeadlessAgent>[0] & { runMutation: ReturnType<typeof vi.fn> };
 
