@@ -20,7 +20,7 @@ vi.mock("@neore/backend/api", () => {
 });
 
 const sideChat = vi.hoisted(() => {
-    return { navigate: vi.fn(), result: { reason: "locked", status: "refused" } as { reason?: string; status: string; threadId?: string }, showError: vi.fn() };
+    return { openChat: vi.fn(), result: { reason: "locked", status: "refused" } as { reason?: string; status: string; threadId?: string }, showError: vi.fn() };
 });
 
 vi.mock("@tanstack/react-query", () => {
@@ -34,8 +34,8 @@ vi.mock("@tanstack/react-query", () => {
     };
 });
 
-vi.mock("@tanstack/react-router", () => {
-    return { useNavigate: () => sideChat.navigate };
+vi.mock("../split/use-open-chat", () => {
+    return { useOpenChatClick: () => sideChat.openChat };
 });
 
 vi.mock("@/lib/lunora/crpc", () => {
@@ -137,7 +137,7 @@ describe("ThreadOptionsMenu", () => {
 
     describe("side chat", () => {
         beforeEach(() => {
-            sideChat.navigate.mockReset();
+            sideChat.openChat.mockReset();
             sideChat.showError.mockReset();
         });
 
@@ -146,7 +146,7 @@ describe("ThreadOptionsMenu", () => {
             renderMenu();
             fireEvent.click(screen.getByRole("menuitem", { name: "Side chat" }));
 
-            expect(sideChat.navigate).toHaveBeenCalledWith({ params: { threadId: "side1" }, to: "/chat/$threadId" });
+            expect(sideChat.openChat).toHaveBeenCalledWith("side1", expect.objectContaining({ button: 0, ctrlKey: false, metaKey: false }), "t1");
             expect(sideChat.showError).not.toHaveBeenCalled();
         });
 
@@ -164,7 +164,7 @@ describe("ThreadOptionsMenu", () => {
             fireEvent.click(screen.getByRole("menuitem", { name: "Side chat" }));
 
             expect(sideChat.showError).toHaveBeenCalledWith(message);
-            expect(sideChat.navigate).not.toHaveBeenCalled();
+            expect(sideChat.openChat).not.toHaveBeenCalled();
         });
     });
 

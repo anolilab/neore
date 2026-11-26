@@ -6,13 +6,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
 import cn from "@neore/ui/utils/cn";
 import { useMutation } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
 import { MoreHorizontal } from "lucide-react";
 
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
 import { showError, showSuccess } from "@/lib/toast";
 
 import { useThreadFollow } from "../follows/use-thread-follow";
+import { useOpenChatClick } from "../split/use-open-chat";
 
 interface ThreadOptionsMenuProps {
     /** Where this copy of the menu shows: `className` for the wrapper, which is `display: contents` while it shows. */
@@ -41,7 +41,7 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
         retry: 0,
     });
     // The follow state is read only while the menu is open, so a list of rows opens no subscription per thread.
-    const navigate = useNavigate();
+    const openChat = useOpenChatClick();
     const { isPending: isStartingSideChat, mutate: startSideChat } = useMutation({
         ...useLunoraActionOptions(api.chat.side_chat.createSideChat),
         networkMode: "always",
@@ -135,7 +135,10 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
                     {!isHostRun && !isLocked && (
                         <DropdownMenuItem
                             disabled={isStartingSideChat}
-                            onClick={() =>
+                            onClick={(event) => {
+                                // Copied now: the event is spent when the action answers. The click and the saved setting pick where the chat opens.
+                                const click = { button: event.button, ctrlKey: event.ctrlKey, detail: event.detail, metaKey: event.metaKey };
+
                                 startSideChat(
                                     { threadId },
                                     {
@@ -145,14 +148,14 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
                                         },
                                         onSuccess: (result) => {
                                             if (result.status === "ok") {
-                                                navigate({ params: { threadId: result.threadId }, to: "/chat/$threadId" });
+                                                openChat(result.threadId, click, threadId);
                                             } else {
                                                 showError(sideChatRefusal(result.reason));
                                             }
                                         },
                                     },
-                                )
-                            }
+                                );
+                            }}
                         >
                             {t`Side chat`}
                         </DropdownMenuItem>
