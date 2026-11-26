@@ -9,6 +9,7 @@ import { getSystemPrompt } from "@neore/ai/prompts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { mappedReferences } from "../../../test/registered-api";
+import type { MockRunContext } from "../../../test/mock-run-context";
 
 // A reference is read as its dispatch key, which the fake ctx below switches on.
 vi.mock("../../_generated/api", async (importOriginal) => mappedReferences(await importOriginal(), (reference) => reference.__lunoraRef));
@@ -16,7 +17,7 @@ vi.mock("../../_generated/internal", async (importOriginal) => mappedReferences(
 
 const seen = vi.hoisted(() => {
     return {
-        backups: [] as (string | undefined)[],
+        backups: [] as (ReadonlyArray<string> | undefined)[],
         /** The bot's permission mode `bots_functions:getBotPermissionModeForRun` answers, and the arguments it was asked with. */
         botMode: null as "auto" | "full" | "supervised" | null,
         botModeFails: false,
@@ -38,6 +39,8 @@ const seen = vi.hoisted(() => {
         replies: [] as string[],
         // Extra fields of the next generation's result (its prompt's order, its steps).
         result: {} as Record<string, unknown>,
+        /** The reviewer's call fails: the goal is left unconfirmed. */
+        reviewFails: false,
         saved: [] as unknown[][],
         system: [] as string[],
         tools: [] as string[][],
@@ -49,7 +52,7 @@ vi.mock("./get-agent", () => {
         default: async (
             _model: string,
             options: {
-                backupModelId?: string;
+                backupModelIds?: ReadonlyArray<string>;
                 language?: string;
                 location?: string;
                 modelFilterRules?: unknown;
@@ -59,7 +62,7 @@ vi.mock("./get-agent", () => {
             },
         ) => {
             seen.tools.push(Object.keys(options.tools ?? {}));
-            seen.backups.push(options.backupModelId);
+            seen.backups.push(options.backupModelIds);
             seen.filters.push(options.modelFilterRules);
 
             const instructions = getSystemPrompt(options.timezone, options.location, options.language, options.personalization);
@@ -106,6 +109,10 @@ vi.mock("./get-agent", () => {
 vi.mock("../goals/review", () => {
     return {
         reviewRound: vi.fn(async () => {
+            if (seen.reviewFails) {
+                throw new Error("reviewer unavailable");
+            }
+
             return { costMicrodollars: 0, met: seen.met.shift() ?? true, reason: "Add more." };
         }),
     };
@@ -155,6 +162,8 @@ const PREFS = {
     profession: "SECRET-PROFESSION",
 };
 
+const HEADLESS_RUN_KEY = /^headless:/;
+
 const fakeCtx = (prefs: typeof PREFS = PREFS) =>
     ({
         runAction: vi.fn(),
@@ -200,6 +209,143 @@ const SECRETS = ["SECRET-ABOUT-ME", "SECRET-NICKNAME", "SECRET-PROFESSION", "SEC
 describe("runHeadlessAgent personalization", () => {
     beforeEach(() => {
         seen.system = [];
+    });
+
+    it("records a headless run's end in the Events log once it finishes, keyed by its own reply key", async () => {
+        const ctx = fakeCtx() as unknown as MockRunContext & Parameters<typeof runHeadlessAgent>[0];
+
+        await runHeadlessAgent(ctx, {
+            maxSteps: 3,
+            memory: false,
+            model: "test-model",
+            organizationId: null,
+            origin: "lead",
+            personalization: "none",
+            thread: { threadId: "thread-1" },
+            tools: "none",
+            userId: "owner",
+        });
+
+        const calls = ctx.runMutation.mock.calls as unknown as [string, { outcome?: string; runKey?: string; threadId?: string }][];
+        const ends = calls.map(([, args]) => args).filter((args) => args.outcome !== undefined);
+
+        expect(ends).toHaveLength(1);
+        expect(ends[0]).toMatchObject({ outcome: "succeeded", threadId: "thread-1" });
+        expect(ends[0]?.runKey).toMatch(HEADLESS_RUN_KEY);
+    });
+
+    it("records one failure for a run that fails on a thread it set up, once, whichever step threw", async () => {
+        seen.failAt = "round";
+        seen.met = [false];
+        const ctx = fakeCtx() as unknown as MockRunContext;
+
+        await expect(
+            runHeadlessAgent(ctx as never, {
+                goal: { text: "Ship it" },
+                memory: false,
+                model: "test-model",
+                organizationId: null,
+                origin: "lead",
+                personalization: "none",
+                prompt: "Run the report",
+                thread: { threadId: "thread-1" },
+                tools: "none",
+                userId: "owner",
+            }),
+        ).rejects.toThrow("model call failed");
+
+        const calls = ctx.runMutation.mock.calls as unknown as [string, { outcome?: string }][];
+
+        expect(
+            calls
+                .map(([, args]) => args)
+                .filter((args) => args.outcome !== undefined)
+                .map((args) => args.outcome),
+        ).toStrictEqual(["failed"]);
+        seen.failAt = undefined;
+    });
+
+    it("records a failure, not a completion, for a goal whose reviewer failed", async () => {
+        seen.reviewFails = true;
+
+        try {
+            const ctx = fakeCtx() as unknown as MockRunContext & Parameters<typeof runHeadlessAgent>[0];
+
+            await runHeadlessAgent(ctx, {
+                goal: { text: "Ship it" },
+                maxSteps: 3,
+                memory: false,
+                model: "test-model",
+                organizationId: null,
+                origin: "lead",
+                personalization: "none",
+                prompt: "Run the report",
+                thread: { threadId: "thread-1" },
+                tools: "none",
+                userId: "owner",
+            });
+
+            const calls = ctx.runMutation.mock.calls as unknown as [string, { outcome?: string }][];
+
+            expect(
+                calls
+                    .map(([, args]) => args)
+                    .filter((args) => args.outcome !== undefined)
+                    .map((args) => args.outcome),
+            ).toStrictEqual(["failed"]);
+        } finally {
+            seen.reviewFails = false;
+        }
+    });
+
+    it("records no success for a headless run that was stopped, since a stop writes no run event", async () => {
+        const ctx = fakeCtx() as unknown as MockRunContext & Parameters<typeof runHeadlessAgent>[0];
+
+        await runHeadlessAgent(ctx, {
+            maxSteps: 3,
+            memory: false,
+            model: "test-model",
+            organizationId: null,
+            origin: "lead",
+            personalization: "none",
+            shouldStop: async () => true,
+            thread: { threadId: "thread-1" },
+            tools: "none",
+            userId: "owner",
+        });
+
+        const calls = ctx.runMutation.mock.calls as unknown as [string, { outcome?: string }][];
+
+        expect(calls.map(([, args]) => args).filter((args) => args.outcome !== undefined)).toStrictEqual([]);
+    });
+
+    it("records a headless run's failure in the Events log before the failure is raised", async () => {
+        const ctx = fakeCtx() as unknown as MockRunContext & Parameters<typeof runHeadlessAgent>[0];
+
+        seen.failAt = "generate";
+
+        try {
+            await expect(
+                runHeadlessAgent(ctx, {
+                    maxSteps: 3,
+                    memory: false,
+                    model: "test-model",
+                    organizationId: null,
+                    origin: "lead",
+                    personalization: "none",
+                    thread: { threadId: "thread-1" },
+                    tools: "none",
+                    userId: "owner",
+                }),
+            ).rejects.toThrow();
+        } finally {
+            seen.failAt = undefined;
+        }
+
+        const calls = ctx.runMutation.mock.calls as unknown as [string, { outcome?: string }][];
+        const ends = calls.map(([, args]) => args).filter((args) => args.outcome !== undefined);
+
+        expect(ends.map((args) => args.outcome)).toStrictEqual(["failed"]);
     });
 
     it("keeps the owner's personalization out of a messenger reply", async () => {
@@ -340,7 +486,7 @@ describe("runHeadlessAgent backup model", () => {
         ctx.runQuery.mockImplementation(async (reference: string, args: unknown) => {
             const result = await base(reference, args);
 
-            return reference === "auth_functions:getUserPreferencesQuery" ? { ...(result as object), backupModel } : result;
+            return reference === "auth_functions:getUserPreferencesQuery" ? { ...(result as object), backupModels: backupModel ? [backupModel] : [] } : result;
         });
 
         return ctx;
@@ -363,10 +509,10 @@ describe("runHeadlessAgent backup model", () => {
         seen.backups = [];
     });
 
-    it("gives the agent the user's backup model, so an unattended run survives an outage too", async () => {
+    it("gives the agent the user's backup models, so an unattended run survives an outage too", async () => {
         await run(ctxWith(BACKUP));
 
-        expect(seen.backups).toEqual([BACKUP]);
+        expect(seen.backups).toEqual([[BACKUP]]);
     });
 
     it("hands the user's privacy routing rules to the agent that builds the primary and the backup gateway models", async () => {
@@ -380,7 +526,7 @@ describe("runHeadlessAgent backup model", () => {
         }
 
         expect(seen.filters).toEqual([{ requireZDR: true }]);
-        expect(seen.backups).toEqual([BACKUP]);
+        expect(seen.backups).toEqual([[BACKUP]]);
     });
 
     it("gives none when the user's stored model filters exclude it, though the caller passes no rules", async () => {
@@ -392,13 +538,13 @@ describe("runHeadlessAgent backup model", () => {
             seen.filterRules = undefined;
         }
 
-        expect(seen.backups).toEqual([undefined]);
+        expect(seen.backups).toEqual([[]]);
     });
 
     it("gives none when the user set none", async () => {
         await run(ctxWith(undefined));
 
-        expect(seen.backups).toEqual([undefined]);
+        expect(seen.backups).toEqual([[]]);
     });
 });
 
@@ -427,7 +573,7 @@ describe("runHeadlessAgent context sizing for a backup", () => {
 
             const result = await base(reference, args);
 
-            return reference === "auth_functions:getUserPreferencesQuery" ? { ...(result as object), backupModel: NO_TOOLS_BACKUP } : result;
+            return reference === "auth_functions:getUserPreferencesQuery" ? { ...(result as object), backupModels: [NO_TOOLS_BACKUP] } : result;
         });
 
         await runHeadlessAgent(ctx as never, {
@@ -479,7 +625,7 @@ describe("runHeadlessAgent thread tags", () => {
         });
 
     it("creates a new thread with its tags, so no later write is needed to tell it apart", async () => {
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext;
 
         await run(ctx);
 
@@ -491,7 +637,7 @@ describe("runHeadlessAgent thread tags", () => {
     });
 
     it("leaves tags out of the creation when the caller gave none, and still sets the bot", async () => {
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext;
 
         await run(ctx, { botId: "bot-1", thread: { title: "Chat" } });
 
@@ -503,7 +649,7 @@ describe("runHeadlessAgent thread tags", () => {
     });
 
     it("gives a new thread of a bot the bot's mode before it names the bot", async () => {
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext;
 
         seen.botMode = "supervised";
 
@@ -523,7 +669,7 @@ describe("runHeadlessAgent thread tags", () => {
     });
 
     it("creates a new thread with the run's organization, so no linked thread exists without it", async () => {
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext;
 
         await run(ctx, { organizationId: "org-a" });
 
@@ -545,7 +691,7 @@ describe("runHeadlessAgent thread tags", () => {
     });
 
     it("never moves an existing thread into another organization", async () => {
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext;
 
         await run(ctx, { organizationId: "org-b", thread: { threadId: "thread-1" } });
 
@@ -695,7 +841,7 @@ describe("runHeadlessAgent tool allowlist", () => {
     });
 
     it("builds a new thread's tools under the mode of the bot its lead thread leads to, and stamps nothing", async () => {
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext;
 
         seen.botMode = "supervised";
 
@@ -718,7 +864,7 @@ describe("runHeadlessAgent tool allowlist", () => {
     });
 
     it("builds its tools supervised when the bot's mode cannot be read, and starts a new thread of the bot supervised", async () => {
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext;
 
         seen.botModeFails = true;
 
@@ -901,7 +1047,7 @@ describe("runHeadlessAgent failure on a thread it continues", () => {
     ] as const)("wakes the thread when %s fails", async (_label, failAt) => {
         seen.failAt = failAt;
         seen.met = [false];
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext;
 
         await expect(
             runHeadlessAgent(ctx as never, {
@@ -1090,7 +1236,7 @@ describe("runHeadlessAgent pauseForApproval", () => {
     it("labels the saved MCP calls with their real server before recording the request, as an interactive pause does", async () => {
         seen.saved = [approvalRequest];
 
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext;
 
         await run(ctx, { pauseForApproval: { subAgentRunId: RUN_ID } });
 
@@ -1103,7 +1249,7 @@ describe("runHeadlessAgent pauseForApproval", () => {
     it("schedules the paid generation's usage even when the pause write fails, and fails the run", async () => {
         seen.saved = [approvalRequest];
 
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn>; scheduler: { runAfter: ReturnType<typeof vi.fn> } };
+        const ctx = fakeCtx() as unknown as MockRunContext & { scheduler: { runAfter: ReturnType<typeof vi.fn> } };
 
         ctx.runMutation.mockImplementation(async (reference: string) => {
             if (reference === "chat_tool_permissions:recordPendingToolApprovals") {

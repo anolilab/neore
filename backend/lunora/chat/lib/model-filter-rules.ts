@@ -37,7 +37,7 @@ const settled = async <T>(read: () => Promise<T>): Promise<T | typeof FAILED> =>
 /**
  * The user's model filters (`{}` when they set none), for a run to read once and hand to both the gateway models
  * (`getAgent({ modelFilterRules })`, which is where `requireZDR` / `denyDataCollection` reach the provider routing)
- * and `resolveBackupModelId`. Every run path loads them here, so the chosen model and its backup are routed alike.
+ * and `resolveBackupModelIds`. Every run path loads them here, so the chosen model and its backups are routed alike.
  * Background model calls (`getUtilityModel`) read them the same way, and the returned rules also carry whether the
  * user's plan opens paid-plan models, which `pickUtilityModelId` applies to its candidates.
  *

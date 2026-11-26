@@ -156,6 +156,18 @@ describe(PullRequestFixes, () => {
         }
     });
 
+    it("offers no retry for a cached failure in a view that does not read the host, since a retry there would read nothing", () => {
+        for (const current of [{ data: { status: "rate_limited" } }, { data: { status: "host_error" } }, { isError: true }]) {
+            status.current = current;
+
+            const { unmount } = render(<PullRequestFixes address={{ number: 7, repository: "octo/hello" }} readStatus={false} threadId="thread-1" />);
+
+            expect(screen.queryByRole("button")).toBeNull();
+
+            unmount();
+        }
+    });
+
     it("does not reopen the list by itself once the chip went away and came back", async () => {
         open({ conflicting: true });
 

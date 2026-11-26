@@ -178,6 +178,8 @@ const OWNER_TABLES = [
     "dailyBriefState",
     "deviceCalls",
     "deviceCode",
+    "mcpEventWatermarks",
+    "mcpEvents",
     "devicePairingRevocations",
     "devices",
     "documentVersions",

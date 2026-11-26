@@ -9,6 +9,7 @@ import { v } from "lunorash/server";
 import { internal } from "../../../_generated/internal";
 import type { Id } from "../../../_generated/dataModel";
 import type { HostActivity } from "../../../acp/lib/activity";
+import { isRunReplaced } from "../../lib/run-epoch";
 import type { StreamStatus } from "./schema";
 
 /**
@@ -163,7 +164,11 @@ export class PersistentTextStreaming {
             try {
                 await streamWriter(ctx, request, streamId, chunkAppender);
             } catch (error) {
-                await this.setStreamStatus(ctx, streamId, "error");
+                // A run a newer one replaced stops quietly. The stream is the newer run's now, so its status is not this run's to
+                // set: an error here would fail the live run and record a failure that did not happen.
+                if (!isRunReplaced(error)) {
+                    await this.setStreamStatus(ctx, streamId, "error");
+                }
 
                 if (writer) {
                     await writer.close();

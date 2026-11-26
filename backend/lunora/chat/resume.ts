@@ -61,7 +61,10 @@ export const latestResumableThread = liteAuthQuery
                 const ids = threads.page.map((thread) => thread._id as Id<"threads">);
                 const relationships = ids.length === 0 ? { page: [] } : await ctx.db.threadRelationships.findMany({ where: { threadId: { in: ids } } });
 
-                branchIds = new Set(relationships.page.map((relationship) => relationship.threadId as string));
+                // A side chat is a chat of its own; a branch or a sub-agent is listed through its parent.
+                branchIds = new Set(
+                    relationships.page.filter((relationship) => relationship.branchType !== "side").map((relationship) => relationship.threadId as string),
+                );
 
                 return threads;
             },

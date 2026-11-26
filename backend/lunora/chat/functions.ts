@@ -2736,7 +2736,7 @@ export const generateSummary = authAction
 export const createThreadRelationship = internalMutation
     .input({
         branchPoint: v.optional(v.number()),
-        branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"))),
+        branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("side"))),
         parentThreadId: v.string(),
         threadId: v.string(),
     })
@@ -2806,7 +2806,9 @@ export const getChildThreads = authQuery
             v.object({
                 ...vThreadDocumentFields,
                 branchPoint: v.optional(v.number()),
-                branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("subagent"))),
+                branchType: v.optional(
+                    v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("side"), v.literal("subagent")),
+                ),
                 createdAt: v.number(),
             }),
         ),
@@ -3621,7 +3623,8 @@ export const searchSentPrompts = authQuery
                     .withIndex("by_thread", (q) => q.eq("threadId", current as Id<"threads">))
                     .take(1);
 
-                if (!link || link.branchType === "subagent" || (link.userId ?? userId) !== userId) {
+                // A side chat is its own chat: its prompts are not a copy of the parent's family to deduplicate against.
+                if (!link || link.branchType === "subagent" || link.branchType === "side" || (link.userId ?? userId) !== userId) {
                     break;
                 }
 
@@ -3990,8 +3993,9 @@ export const getFullThreadForExport = authQuery
             ? await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadRelationship.parentThreadId as Id<"threads"> })
             : null;
 
-        // A locked parent is not exported: the proof covers this thread only.
-        if (threadRelationship && parentThread?.userId === userId && !isThreadLocked(parentThread)) {
+        // A locked parent is not exported: the proof covers this thread only. A side chat already holds its own copy of the
+        // parent's settled history (`side-chat.ts`), so its parent is not prefixed again.
+        if (threadRelationship && threadRelationship.branchType !== "side" && parentThread?.userId === userId && !isThreadLocked(parentThread)) {
             const parentMessages = await agent.listMessages(context, {
                 paginationOpts: { cursor: null, numItems: 10_000 },
                 threadId: threadRelationship.parentThreadId,
@@ -4285,12 +4289,12 @@ export const hardDeleteThread = internalMutation
         return null;
     });
 
-export const undoDeleteThread = authMutation
+export const undoDeleteThread = authAction
     .use(rateLimit("chat/update"))
     .input({
         threadId: v.id("threads"),
     })
-    .mutation(async ({ args: { threadId }, ctx: context }) => {
+    .action(async ({ args: { threadId }, ctx: context }) => {
         refuseImpersonation(context.user.impersonatedBy, "A chat cannot be restored from the trash");
 
         const { userId } = context.user;
@@ -4302,27 +4306,32 @@ export const undoDeleteThread = authMutation
             throwForbidden("Not allowed");
         }
 
-        await context.runMutation(internal.agent.threads.restoreThread, {
+        // The trashed chat's leftover events go first, one batch per `runMutation`. This is an action, so each call is its own
+        // transaction and the batches do not share a budget. Restore then refuses while any events remain (`agent/threads.ts`).
+        while (!(await context.runMutation(internal.public_api.events.drainTrashedThreadEvents, { threadId, userId }))) {
+            // Each call removes up to one batch; the loop ends once none are left.
+        }
+
+        const restore = await context.runMutation(internal.agent.threads.restoreThread, {
             threadId: threadId as Id<"threads">,
         });
 
-        // Record audit history for restore
-        const restoredThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
-
-        if (restoredThread) {
+        // Only the call that changed the chat from trashed to live records the restore: an overlapping undo finds it live already. The
+        // history's old state is the row that call read, not this action's earlier snapshot.
+        if (restore.restored) {
             await context.runMutation(internal.lib.document_history.recordHistory, {
                 attribution: { action: "update", metadata: { restored: true }, source: "manual" },
-                doc: restoredThread,
+                doc: restore.thread,
                 documentId: threadId,
                 isDeleted: false,
-                oldDoc: thread,
-                organizationId: restoredThread.organizationId ?? undefined,
+                oldDoc: restore.before,
+                organizationId: restore.thread.organizationId ?? undefined,
                 tableName: "threads",
                 userId,
             });
         }
 
-        context.log.event("chat.undo_delete_thread", { restored: true });
+        context.log.event("chat.undo_delete_thread", { restored: restore.restored });
     });
 
 // Tag functions removed — replaced by auto-categorization.

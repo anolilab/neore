@@ -21,6 +21,7 @@ import {
     deleteShardRows,
     dropImportMarkersPage,
     dropRowsGoneFromGuest,
+    drainTakenBackThread,
     importShardRows,
     listRowsMissingOnGuest,
     listShardRowsPage,
@@ -1058,7 +1059,8 @@ describe("mergeGuestInto", () => {
         // Two pins: the fake moves one a call, so the second route takes two steps.
         pinRows.push({ ownerId: "owner-a", threadId: "shared-2", userId: "guest" }, { ownerId: "owner-a", threadId: "shared-2", userId: "guest" });
 
-        const resume: MergeProgress = { cursor: null, moved: 0, phase: "repins", run: 1, table: "" };
+        // A resumed run: its progress already says whether the two keys share a store, so no probe is made.
+        const resume: MergeProgress = { cursor: null, moved: 0, phase: "repins", run: 1, sharedStore: false, table: "" };
         // The lease calls and two of the pass's steps (two calls each): it stops inside the second route.
         const { next } = await mergeGuestInto(call, REFERENCES, "guest", "user", { budget: MERGE_LEASE_CALLS + MERGE_STOP_CALLS + 4, resume });
 
@@ -2223,6 +2225,30 @@ describe("importShardRows for runWebhooks", () => {
     });
 });
 
+const webhookRow = (fields: Record<string, unknown>) => {
+    return { createdAt: 1, enabled: true, secretCiphertext: "v1:cipher", updatedAt: 1, url: "https://example.com/hook", ...fields };
+};
+
+describe("firstTableWithGuestRows on a store the new account shares", () => {
+    it("counts only the guest's own rows of an owned table, on a shared store or a separate one: another user's row never holds the deletion up", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                await context.db.insert("runWebhooks", webhookRow({ userId: "user" }));
+            });
+
+            const shared = await harness.run(async (context: any) => await firstTableWithGuestRows(context, "guest", true));
+            const separate = await harness.run(async (context: any) => await firstTableWithGuestRows(context, "guest", false));
+
+            expect(shared).toBeNull();
+            expect(separate).toBeNull();
+        } finally {
+            harness.close();
+        }
+    });
+});
+
 describe("clearPlanOf", () => {
     it("clears a table whole on separate stores, except a table copied for the guest alone, which it clears the guest's rows of", () => {
         expect(clearPlanOf(false, "threads", "guest", "user")).toBe("whole");
@@ -2399,6 +2425,7 @@ describe("mergeGuestInto across two real shards", () => {
         claimHeld: { fn: claimHeld, kind: "query" },
         claimKey: { fn: claimKey, kind: "mutation" },
         deleteShardRows: { fn: deleteShardRows, kind: "mutation" },
+        drainTakenBackThread: { fn: drainTakenBackThread, kind: "mutation" },
         dropImportMarkersPage: { fn: dropImportMarkersPage, kind: "mutation" },
         dropRowsGoneFromGuest: { fn: dropRowsGoneFromGuest, kind: "mutation" },
         handOverOrganizationContributors: { fn: handOverOrganizationContributors, kind: "mutation" },
@@ -2420,8 +2447,13 @@ describe("mergeGuestInto across two real shards", () => {
 
     const byId = (a: { _id: unknown }, b: { _id: unknown }) => String(a._id).localeCompare(String(b._id));
 
-    const twoShards = () => {
-        const shards = { guest: lunoraTest(schemaWithShardedTables([]) as never), user: lunoraTest(schemaWithShardedTables([]) as never) };
+    /** `sameStore`: both keys serve one store, as local routing can, so the probe finds the marker and the clear keeps the account's rows. */
+    const twoShards = ({ sameStore = false }: { sameStore?: boolean } = {}) => {
+        const shards = sameStore
+            ? ((store) => {
+                  return { guest: store, user: store };
+              })(lunoraTest(schemaWithShardedTables([]) as never))
+            : { guest: lunoraTest(schemaWithShardedTables([]) as never), user: lunoraTest(schemaWithShardedTables([]) as never) };
         let before: { hook: () => Promise<void>; name: string } | undefined;
         let failOnce: ((name: string, args: Record<string, unknown>) => boolean) | undefined;
         /** Each guest deletion: the table that still held a row of the guest's, or `null` when it went. */
@@ -2446,9 +2478,9 @@ describe("mergeGuestInto across two real shards", () => {
             switch (name) {
                 // The guest's user row is `.global()`, which this harness does not hold: the deletion's own shard check only.
                 case "deleteMergedGuest": {
-                    const left = (await shards.guest.run(async (context: any) => await firstTableWithGuestRows(context, args.userId as string))) as
-                        | string
-                        | null;
+                    const left = (await shards.guest.run(
+                        async (context: any) => await firstTableWithGuestRows(context, args.userId as string, args.sharedStore === true),
+                    )) as string | null;
 
                     guestDeletions.push(left);
 
@@ -2492,7 +2524,10 @@ describe("mergeGuestInto across two real shards", () => {
             call,
             close: () => {
                 shards.guest.close();
-                shards.user.close();
+
+                if (!sameStore) {
+                    shards.user.close();
+                }
             },
             guestDeletions,
             /** The lease of a delivery that died or paused lapses, as `MERGE_LEASE_MS` after its last write would. */
@@ -2553,6 +2588,499 @@ describe("mergeGuestInto across two real shards", () => {
             await mergeToEnd(merge.call, "guest", "user");
 
             expect(await merge.threadsOn("user")).toStrictEqual([{ _id: id, title: "guest", userId: "user" }]);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("copies a guest's Events log across runs when it spans several pages, renumbered after the account's own, and clears it", async () => {
+        const merge = twoShards();
+
+        try {
+            await merge.shards.user.run(async (context: any) => {
+                await context.db.insert("mcpEvents", {
+                    createdAt: Date.now(),
+                    data: "{}",
+                    eventId: "run:own",
+                    name: "run.completed",
+                    seq: 1,
+                    timestamp: 1,
+                    userId: "user",
+                });
+                await context.db.insert("mcpEventWatermarks", { seq: 1, userId: "user" });
+            });
+            await merge.shards.guest.run(async (context: any) => {
+                for (let seq = 1; seq <= 250; seq += 1) {
+                    await context.db.insert("mcpEvents", {
+                        createdAt: Date.now(),
+                        data: "{}",
+                        eventId: `run:g${String(seq)}`,
+                        name: "run.completed",
+                        seq,
+                        timestamp: 1,
+                        userId: "guest",
+                    });
+                }
+
+                await context.db.insert("mcpEventWatermarks", { seq: 250, userId: "guest" });
+            });
+
+            // A small budget, so the copy spans runs: the log is copied a page per call, not in one go.
+            const { runs } = await mergeToEnd(merge.call, "guest", "user", { budget: MERGE_LEASE_CALLS + MERGE_STOP_CALLS + 4 });
+
+            expect(runs.length).toBeGreaterThan(1);
+
+            const onUser = (await merge.shards.user.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 1000, where: { userId: "user" } });
+                const watermark = await context.db.mcpEventWatermarks.findFirst({ where: { userId: "user" } });
+
+                return { seqs: page.map((row: { seq: number }) => row.seq).toSorted((a: number, b: number) => a - b), watermark: watermark?.seq };
+            })) as { seqs: number[]; watermark: number };
+
+            expect(onUser.seqs).toStrictEqual(Array.from({ length: 251 }, (_, index) => index + 1));
+            expect(onUser.watermark).toBe(251);
+
+            const leftOnGuest = (await merge.shards.guest.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 1000, where: { userId: "guest" } });
+                const watermarks = await context.db.mcpEventWatermarks.findMany({ limit: 10, where: { userId: "guest" } });
+
+                return page.length + watermarks.page.length;
+            })) as number;
+
+            expect(leftOnGuest).toBe(0);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("does not copy a guest's Event again once the new account's copy of it has been pruned", async () => {
+        const merge = twoShards();
+
+        try {
+            await merge.shards.guest.run(async (context: any) => {
+                await context.db.insert("mcpEvents", {
+                    createdAt: Date.now(),
+                    data: "{}",
+                    eventId: "run:g1",
+                    name: "run.completed",
+                    seq: 1,
+                    timestamp: 1,
+                    userId: "guest",
+                });
+            });
+
+            const guestRow = (await merge.shards.guest.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10, where: { userId: "guest" } });
+
+                return page[0];
+            })) as Row;
+
+            // The first import copies the event and writes its marker.
+            const first = (await merge.shards.user.run(
+                async (context: any) => await asLeaseHolder(context, importShardRows, { rows: [guestRow], table: "mcpEvents" }),
+            )) as { imported: number };
+
+            expect(first.imported).toBe(1);
+
+            // The new account's retention prunes that copy, and the import runs again for the same row.
+            await merge.shards.user.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10, where: { userId: "user" } });
+
+                for (const row of page) {
+                    await context.db.delete("mcpEvents", row._id);
+                }
+            });
+
+            const again = (await merge.shards.user.run(
+                async (context: any) => await asLeaseHolder(context, importShardRows, { rows: [guestRow], table: "mcpEvents" }),
+            )) as { imported: number };
+            const onUser = (await merge.shards.user.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10, where: { userId: "user" } });
+
+                return page.length;
+            })) as number;
+
+            expect(again.imported).toBe(0);
+            expect(onUser).toBe(0);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("keeps a copied Event when its guest row is gone, since only a deleted thread takes its Events back", async () => {
+        const merge = twoShards();
+
+        try {
+            await merge.shards.guest.run(async (context: any) => {
+                await context.db.insert("mcpEvents", {
+                    createdAt: Date.now(),
+                    data: "{}",
+                    eventId: "run:g2",
+                    name: "run.completed",
+                    seq: 1,
+                    timestamp: 1,
+                    userId: "guest",
+                });
+            });
+
+            const guestRow = (await merge.shards.guest.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10, where: { userId: "guest" } });
+
+                return page[0];
+            })) as Row;
+
+            await merge.shards.user.run(async (context: any) => await asLeaseHolder(context, importShardRows, { rows: [guestRow], table: "mcpEvents" }));
+
+            // The guest's row is gone before the clear reads it: the reconcile leaves the copy, which keeps its own retention window.
+            const reconciled = (await merge.shards.user.run(
+                async (context: any) => await asLeaseHolder(context, dropRowsGoneFromGuest, { ids: [guestRow._id], table: "mcpEvents" }),
+            )) as { dropped: number };
+            const onUser = (await merge.shards.user.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10, where: { userId: "user" } });
+
+                return page.length;
+            })) as number;
+
+            expect(reconciled.dropped).toBe(0);
+            expect(onUser).toBe(1);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("does not copy a guest's Event whose thread the new account does not hold", async () => {
+        const merge = twoShards();
+
+        try {
+            // The guest deleted this thread before its copy, so the new account never receives the thread.
+            await merge.shards.guest.run(async (context: any) => {
+                await context.db.insert("mcpEvents", {
+                    createdAt: Date.now(),
+                    data: JSON.stringify({ threadId: "thread-gone" }),
+                    eventId: "run:orphan",
+                    name: "run.completed",
+                    seq: 1,
+                    timestamp: 1,
+                    userId: "guest",
+                });
+            });
+
+            const guestRow = (await merge.shards.guest.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10, where: { userId: "guest" } });
+
+                return page[0];
+            })) as Row;
+
+            const imported = (await merge.shards.user.run(
+                async (context: any) => await asLeaseHolder(context, importShardRows, { rows: [guestRow], table: "mcpEvents" }),
+            )) as { imported: number };
+            const onUser = (await merge.shards.user.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10, where: { userId: "user" } });
+
+                return page.length;
+            })) as number;
+
+            expect(imported.imported).toBe(0);
+            expect(onUser).toBe(0);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("takes a thread's copied Events back with the thread copy", async () => {
+        const merge = twoShards();
+
+        try {
+            const threadId = (await merge.shards.guest.run(
+                async (context: any) => await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "T", userId: "guest" }),
+            )) as string;
+
+            await merge.shards.guest.run(async (context: any) => {
+                await context.db.insert("mcpEvents", {
+                    createdAt: Date.now(),
+                    data: JSON.stringify({ threadId }),
+                    eventId: "run:in-thread",
+                    name: "run.completed",
+                    seq: 1,
+                    threadId,
+                    timestamp: 1,
+                    userId: "guest",
+                });
+            });
+
+            const guestThread = (await merge.shards.guest.run(async (context: any) => {
+                const { page } = await context.db.threads.findMany({ limit: 10, where: { userId: "guest" } });
+
+                return page[0];
+            })) as Row;
+            const guestEvent = (await merge.shards.guest.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10, where: { userId: "guest" } });
+
+                return page[0];
+            })) as Row;
+
+            await merge.shards.user.run(async (context: any) => await asLeaseHolder(context, importShardRows, { rows: [guestThread], table: "threads" }));
+            await merge.shards.user.run(async (context: any) => await asLeaseHolder(context, importShardRows, { rows: [guestEvent], table: "mcpEvents" }));
+
+            // The guest deletes the thread after the copy: its copy is taken back, and the Events copied with it go too.
+            await merge.shards.guest.run(async (context: any) => {
+                await context.db.delete("threads", threadId);
+            });
+
+            const reconciled = (await merge.shards.user.run(
+                async (context: any) => await asLeaseHolder(context, dropRowsGoneFromGuest, { ids: [threadId], table: "threads" }),
+            )) as { dropped: number };
+            const onUser = (await merge.shards.user.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10, where: { userId: "user" } });
+
+                return page.length;
+            })) as number;
+
+            expect(reconciled.dropped).toBe(1);
+            expect(onUser).toBe(0);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("takes a large thread's copied Events back one batch per call, keeping the thread copy until none are left", async () => {
+        const merge = twoShards();
+
+        try {
+            const threadId = (await merge.shards.guest.run(
+                async (context: any) => await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "T", userId: "guest" }),
+            )) as string;
+
+            await merge.shards.guest.run(async (context: any) => {
+                for (let index = 0; index < 205; index += 1) {
+                    await context.db.insert("mcpEvents", {
+                        createdAt: Date.now(),
+                        data: JSON.stringify({ threadId }),
+                        eventId: `run:big-${String(index)}`,
+                        name: "run.completed",
+                        seq: index + 1,
+                        threadId,
+                        timestamp: 1,
+                        userId: "guest",
+                    });
+                }
+            });
+
+            const guestThread = (await merge.shards.guest.run(async (context: any) => {
+                const { page } = await context.db.threads.findMany({ limit: 10, where: { userId: "guest" } });
+
+                return page[0];
+            })) as Row;
+            const guestEvents = (await merge.shards.guest.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 300, where: { userId: "guest" } });
+
+                return page;
+            })) as Row[];
+
+            await merge.shards.user.run(async (context: any) => await asLeaseHolder(context, importShardRows, { rows: [guestThread], table: "threads" }));
+            await merge.shards.user.run(async (context: any) => await asLeaseHolder(context, importShardRows, { rows: guestEvents, table: "mcpEvents" }));
+            await merge.shards.guest.run(async (context: any) => {
+                await context.db.delete("threads", threadId);
+            });
+
+            // One leased call takes one batch (200): the thread copy stays, with its marker, while Events remain.
+            const first = (await merge.shards.user.run(
+                async (context: any) => await asLeaseHolder(context, dropRowsGoneFromGuest, { ids: [threadId], table: "threads" }),
+            )) as { dropped: number };
+            const midway = (await merge.shards.user.run(async (context: any) => {
+                const copy = await context.db.threads.findFirst({ consistency: "primary", where: { _id: threadId } });
+                const { page } = await context.db.mcpEvents.findMany({ limit: 300, where: { userId: "user" } });
+
+                return { events: page.length, thread: copy !== null };
+            })) as { events: number; thread: boolean };
+
+            expect(first.dropped).toBe(0);
+            expect(midway.thread).toBe(true);
+            expect(midway.events).toBe(5);
+
+            // The merge has finished by now, so the rest is taken back without a lease: the drain runs until the thread copy is gone.
+            for (let pass = 0; pass < 3; pass += 1) {
+                await merge.shards.user.run(async (context: any) => await context.runMutation(drainTakenBackThread, { from: "guest", threadId, to: "user" }));
+            }
+
+            const state = (await merge.shards.user.run(async (context: any) => {
+                const copy = await context.db.threads.findFirst({ consistency: "primary", where: { _id: threadId } });
+                const { page } = await context.db.mcpEvents.findMany({ limit: 300, where: { userId: "user" } });
+
+                return { events: page.length, thread: copy !== null };
+            })) as { events: number; thread: boolean };
+
+            expect(state.thread).toBe(false);
+            expect(state.events).toBe(0);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("never takes back the account's own Event that shares a guest event's id", async () => {
+        const merge = twoShards();
+
+        try {
+            await merge.shards.user.run(async (context: any) => {
+                await context.db.insert("mcpEvents", {
+                    createdAt: Date.now(),
+                    data: "{}",
+                    eventId: "run:shared",
+                    name: "run.completed",
+                    seq: 1,
+                    timestamp: 1,
+                    userId: "user",
+                });
+            });
+            await merge.shards.guest.run(async (context: any) => {
+                await context.db.insert("mcpEvents", {
+                    createdAt: Date.now(),
+                    data: "{}",
+                    eventId: "run:shared",
+                    name: "run.completed",
+                    seq: 1,
+                    timestamp: 1,
+                    userId: "guest",
+                });
+            });
+
+            const guestRow = (await merge.shards.guest.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10, where: { userId: "guest" } });
+
+                return page[0];
+            })) as Row;
+
+            // The account already holds this id, so the import copies nothing, and the reconcile must not reach its own event.
+            const imported = (await merge.shards.user.run(
+                async (context: any) => await asLeaseHolder(context, importShardRows, { rows: [guestRow], table: "mcpEvents" }),
+            )) as { imported: number };
+            const reconciled = (await merge.shards.user.run(
+                async (context: any) => await asLeaseHolder(context, dropRowsGoneFromGuest, { ids: [guestRow._id], table: "mcpEvents" }),
+            )) as { dropped: number };
+            const onUser = (await merge.shards.user.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10, where: { userId: "user" } });
+
+                return page.map((row: { eventId: string }) => row.eventId);
+            })) as string[];
+
+            expect(imported.imported).toBe(0);
+            expect(reconciled.dropped).toBe(0);
+            expect(onUser).toStrictEqual(["run:shared"]);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("finishes the merge when another user's Events sit on the guest's own store, and moves only the guest's", async () => {
+        const merge = twoShards();
+
+        try {
+            await merge.shards.guest.run(async (context: any) => {
+                await context.db.insert("mcpEvents", {
+                    createdAt: Date.now(),
+                    data: "{}",
+                    eventId: "run:mine",
+                    name: "run.completed",
+                    seq: 1,
+                    timestamp: 1,
+                    userId: "guest",
+                });
+                await context.db.insert("mcpEvents", {
+                    createdAt: Date.now(),
+                    data: "{}",
+                    eventId: "run:theirs",
+                    name: "run.completed",
+                    seq: 1,
+                    timestamp: 1,
+                    userId: "stranger",
+                });
+            });
+
+            await mergeToEnd(merge.call, "guest", "user");
+
+            // The copy moved the guest's event to the new account's store; the stranger's stayed on the guest's own, untouched.
+            const eventIdsOn = async (store: "guest" | "user", userId: string) =>
+                (await merge.shards[store].run(async (context: any) => {
+                    const { page } = await context.db.mcpEvents.findMany({ limit: 100, where: { userId } });
+
+                    return page.map((row: { eventId: string }) => row.eventId);
+                })) as string[];
+
+            expect(await eventIdsOn("user", "user")).toStrictEqual(["run:mine"]);
+            expect(await eventIdsOn("guest", "stranger")).toStrictEqual(["run:theirs"]);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("copies a guest's large Events one page at a time, each within the byte budget, and loses none", async () => {
+        const merge = twoShards();
+
+        try {
+            // Each payload is about 300 KB, so a page holds one event: the byte cut must hand the rest on, in order.
+            const payload = "x".repeat(300 * 1024);
+
+            await merge.shards.guest.run(async (context: any) => {
+                for (let seq = 1; seq <= 3; seq += 1) {
+                    await context.db.insert("mcpEvents", {
+                        createdAt: Date.now(),
+                        data: payload,
+                        eventId: `run:big${String(seq)}`,
+                        name: "run.completed",
+                        seq,
+                        timestamp: 1,
+                        userId: "guest",
+                    });
+                }
+
+                await context.db.insert("mcpEventWatermarks", { seq: 3, userId: "guest" });
+            });
+
+            await mergeToEnd(merge.call, "guest", "user");
+
+            const eventIds = (await merge.shards.user.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 10, orderBy: [{ seq: "asc" }], where: { userId: "user" } });
+
+                return page.map((row: { eventId: string }) => row.eventId);
+            })) as string[];
+
+            expect(eventIds).toStrictEqual(["run:big1", "run:big2", "run:big3"]);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("copies a guest's Events in sequence order across pages, though they were stored out of sequence", async () => {
+        const merge = twoShards();
+
+        try {
+            // Inserted from the highest seq down, so creation order is the reverse of sequence order.
+            await merge.shards.guest.run(async (context: any) => {
+                for (let seq = 250; seq >= 1; seq -= 1) {
+                    await context.db.insert("mcpEvents", {
+                        createdAt: Date.now(),
+                        data: "{}",
+                        eventId: `run:g${String(seq)}`,
+                        name: "run.completed",
+                        seq,
+                        timestamp: 1,
+                        userId: "guest",
+                    });
+                }
+
+                await context.db.insert("mcpEventWatermarks", { seq: 250, userId: "guest" });
+            });
+
+            await mergeToEnd(merge.call, "guest", "user", { budget: MERGE_LEASE_CALLS + MERGE_STOP_CALLS + 4 });
+
+            const eventIds = (await merge.shards.user.run(async (context: any) => {
+                const { page } = await context.db.mcpEvents.findMany({ limit: 1000, orderBy: [{ seq: "asc" }], where: { userId: "user" } });
+
+                return page.map((row: { eventId: string }) => row.eventId);
+            })) as string[];
+
+            // The copies take the next numbers in the guest's own sequence order, so their ids read 1 to 250 in order.
+            expect(eventIds).toStrictEqual(Array.from({ length: 250 }, (_, index) => `run:g${String(index + 1)}`));
         } finally {
             merge.close();
         }
@@ -2638,9 +3166,8 @@ describe("mergeGuestInto across two real shards", () => {
             const { runs } = await mergeToEnd(merge.call, "guest", "user");
 
             expect(runs.at(-1)).toMatchObject({ guestKept: true });
-            // Some run ends past `threads`, so the merge went on past the kept row. The last run may end in the global phase, which reports
-            // the first table, so the check is not on the last run alone.
-            expect(runs.some((run) => shardLocalTables().indexOf(run.table) > shardLocalTables().indexOf("threads"))).toBe(true);
+            // The clear went on past the kept row's table, and the merge stopped for good there (its last run may be a later phase).
+            expect(runs.some((run) => run.phase === "clear" && shardLocalTables().indexOf(run.table) > shardLocalTables().indexOf("threads"))).toBe(true);
             expect(runs.length).toBeLessThan(shardLocalTables().length);
             expect(await merge.threadsOn("user")).toStrictEqual(
                 [
@@ -4013,9 +4540,12 @@ describe("a merge's end past the fence", () => {
     const PROCEDURES: Record<string, unknown> = {
         acquireMergeLease,
         beginMergeRun,
+        claimHeld,
+        claimKey,
         dropImportMarkersPage,
         handOverOrganizationContributors,
         noteMergeGeneration,
+        releaseKey,
         releaseMergeLease,
     };
 
@@ -4024,7 +4554,9 @@ describe("a merge's end past the fence", () => {
         const call: ShardCall = async (reference, args) => {
             const name = reference.__lunoraRef.split(":", 2)[1]!;
 
-            return (await harness.run(async (context: any) => await context.runMutation(PROCEDURES[name], args))) as never;
+            return (await harness.run(async (context: any) =>
+                name === "claimHeld" ? await context.runQuery(PROCEDURES[name], args) : await context.runMutation(PROCEDURES[name], args),
+            )) as never;
         };
         const claimsOf = async (scope: string) =>
             (await harness.run(

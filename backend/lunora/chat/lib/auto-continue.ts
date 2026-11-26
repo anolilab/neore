@@ -648,9 +648,9 @@ const extractErrorText = (error: unknown): string => {
     return String(error);
 };
 
-/** The window a prompt must fit when `backupModelId` may serve the call in place of `modelId`: the smaller of the two. */
-export const getFallbackContextWindow = (modelId: string, backupModelId?: string): number =>
-    backupModelId ? Math.min(getModelContextWindow(modelId), getModelContextWindow(backupModelId)) : getModelContextWindow(modelId);
+/** The window a prompt must fit when `backupModelIds` may serve the call in place of `modelId`: the smallest of them. */
+export const getFallbackContextWindow = (modelId: string, backupModelIds: ReadonlyArray<string> = []): number =>
+    Math.min(getModelContextWindow(modelId), ...backupModelIds.map((id) => getModelContextWindow(id)));
 
 // ─── Late Compression ───────────────────────────────────────────────────────
 
@@ -664,8 +664,8 @@ const LATE_COMPRESSION_THRESHOLD = 0.85;
  *
  * Returns the original messages if no compression is needed.
  */
-export const applyLateCompression = (messages: ModelMessage[], modelId: string, backupModelId?: string): ModelMessage[] => {
-    const contextWindow = getFallbackContextWindow(modelId, backupModelId);
+export const applyLateCompression = (messages: ModelMessage[], modelId: string, backupModelIds?: ReadonlyArray<string>): ModelMessage[] => {
+    const contextWindow = getFallbackContextWindow(modelId, backupModelIds);
     const currentTokens = estimateTokens(messages);
 
     if (currentTokens < contextWindow * LATE_COMPRESSION_THRESHOLD) {

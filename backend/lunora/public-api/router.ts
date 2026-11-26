@@ -19,7 +19,7 @@ import type { Context } from "hono";
 import type { HttpActionCtx, LunoraHttpEnv } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
-import { PUBLIC_ORIGIN } from "../env";
+import { BETTER_AUTH_SECRET, PUBLIC_ORIGIN } from "../env";
 import { inShard } from "../lib/http-shard";
 import { httpLogger } from "../lib/logger";
 import { errorResponse, fromProcedureError, PublicApiError } from "./errors";
@@ -27,6 +27,8 @@ import type { IdempotencyRecord, IdempotencyStore } from "./idempotency";
 import { IDEMPOTENCY_FAMILY, IDEMPOTENCY_HEADER, IDEMPOTENCY_TTL_MS, parseIdempotencyKey, withIdempotency } from "./idempotency";
 import type { ApiKeyIdentity } from "./identity";
 import { extractApiKey, MCP_PATH, readApiKeyIdentity } from "./identity";
+import { POLL_INTERVAL_MS } from "./events-catalog";
+import { decodeEventCursor, encodeEventCursor } from "./events-cursor";
 import { buildMcpTools, serveMcp, toolRequest } from "./mcp";
 import { buildOpenApiDocument, renderDocsHtml } from "./openapi";
 import type { RouteDefinition, RouteResult } from "./routes";
@@ -242,6 +244,50 @@ const handleMcp = async (routes: ReadonlyArray<RouteDefinition>, c: Context<Luno
             },
             canUse: (route) => missingScopes(identity, route).length === 0,
             chargeProtocolCall,
+            events: {
+                poll: async (poll) => {
+                    // The Events log is a thread's record: a key reads it with `threads:read`, the scope its thread reads take. Without
+                    // it the call is refused, not answered with an empty list.
+                    assertScopes(identity, { scopes: [["threads", "read"]] });
+                    // Charged once the key may read the log: a refused poll (no scope) draws on nothing.
+                    await chargeProtocolCall();
+
+                    // The cursor is the key owner's own: another user's, or an edited one, is not a position in this log.
+                    const fromSeq = poll.cursor === null ? undefined : await decodeEventCursor(BETTER_AUTH_SECRET, identity.userId, poll.cursor);
+
+                    if (poll.cursor !== null && fromSeq === null) {
+                        throw new PublicApiError("invalid_request", "`cursor` is not one this key was given.");
+                    }
+
+                    // The log's own errors (a suspended account's ban, for one) are procedure errors: mapped as every route maps them, so the
+                    // dispatcher sees a `PublicApiError` it can answer, not a raw `LunoraError`.
+                    const outcome = await inShard(
+                        c.var.lunora,
+                        identity.userId,
+                        async (ctx) =>
+                            await ctx.runQuery(internal.public_api.events.pollEvents, {
+                                ...(fromSeq !== undefined && fromSeq !== null && { fromSeq }),
+                                ...(poll.maxAgeMs !== undefined && { maxAgeMs: poll.maxAgeMs }),
+                                maxEvents: poll.maxEvents,
+                                name: poll.name,
+                                ...(poll.threadId !== undefined && { threadId: poll.threadId }),
+                                userId: identity.userId,
+                            }),
+                    ).catch((error: unknown) => {
+                        throw fromProcedureError(error);
+                    });
+
+                    return {
+                        cursor: await encodeEventCursor(BETTER_AUTH_SECRET, identity.userId, outcome.nextSeq),
+                        events: outcome.events.map((event) => {
+                            return { ...event, data: JSON.parse(event.data) as Record<string, unknown> };
+                        }),
+                        hasMore: outcome.hasMore,
+                        nextPollMs: outcome.hasMore ? 0 : POLL_INTERVAL_MS,
+                        truncated: outcome.truncated,
+                    };
+                },
+            },
             request,
             tools: buildMcpTools(routes),
         });

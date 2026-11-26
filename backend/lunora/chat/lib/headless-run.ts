@@ -43,7 +43,7 @@ import {
     LEFT_ORGANIZATION_MESSAGE,
     loadModelFilterRules,
     loadUserProviderKeys,
-    resolveBackupModelId,
+    resolveBackupModelIds,
     resolveRunModel,
     retrieveMemoryContext,
     setChainSource,
@@ -57,7 +57,9 @@ import {
     withoutAskToolsOnLastStep,
 } from "./agent-run";
 import { buildAgentTools } from "./agent-tools";
-import { collectApprovalRequestIds } from "./tool-approval-claim";
+import { collectApprovalRequestIds, collectAskUserApprovalIds } from "./tool-approval-claim";
+import { ASK_USER_TOOL_NAME } from "../tools/ask-user-constants";
+import { REQUEST_SECRET_TOOL_NAME } from "../tools/request-secret-constants";
 import type { ToolRunConfig } from "./tool-run-config";
 import { getMaxSteps } from "./auto-continue";
 import { gatewayFetch } from "../../lib/services";
@@ -246,6 +248,15 @@ const withoutHiddenText = (options: HeadlessRunOptions): HeadlessRunOptions => {
     };
 };
 
+/**
+ * A headless run's end in the owner's Events log, keyed by its own reply key. A log write that fails is logged, never the run's failure.
+ */
+const recordHeadlessEnd = async (ctx: ActionCtx, runKey: string, threadId: string, outcome: "succeeded" | "failed"): Promise<void> => {
+    await ctx.runMutation(internal.public_api.events.recordHeadlessRunEnd, { outcome, runKey, threadId }).catch((eventError: unknown) => {
+        console.error("[headless-run] could not record the run's end in the Events log", { eventError, threadId });
+    });
+};
+
 export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOptions): Promise<HeadlessRunResult> => {
     const options = withoutHiddenText(rawOptions);
 
@@ -327,6 +338,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
 
     // This run's own reply (`ToolCtx.replyKey`): two runs on one continued thread are two replies.
     const replyKey = `headless:${crypto.randomUUID()}`;
+    // The thread this run ended on, once it exists: a failure after that is recorded in the Events log (`catch` below).
+    let endedThread: string | undefined;
 
     try {
         setResearchDepth(ctx, "balanced");
@@ -339,14 +352,14 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         const existingThreadId = "threadId" in options.thread ? options.thread.threadId : undefined;
         const personal = options.personalization === "full";
         const modelFilterRules = await loadModelFilterRules(ctx, userId);
-        const backupModelId = await resolveBackupModelId(ctx, userId, prefs.backupModel, model, modelFilterRules);
+        const backupModelIds = await resolveBackupModelIds(ctx, userId, prefs.backupModels, model, modelFilterRules);
         // The tools the call carries: after the allowlist, so a run it strips bare is sized for a backup that cannot call tools.
         const runTools = applyToolAllowlist(toolResult.tools, toolAllowlist);
         // Listed only while the run still offers `instruction_read`: the cap, the bot's selection, a skill, the permissions or the
         // allowlist may have removed it like any other tool.
         const instructions = Object.hasOwn(runTools, INSTRUCTION_READ_TOOL) ? (options.projectInstructions?.instructions ?? []) : [];
         const agent = await getAgent(model, {
-            backupModelId,
+            backupModelIds,
             customProvider,
             gateway: gatewayFetch(ctx),
             language: prefs.language,
@@ -371,7 +384,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         const shouldAutoContinue = options.maxSteps === undefined;
         const generateArgs: Record<string, unknown> = {
             ...buildRunStreamArgs({
-                backupModelId,
+                backupModelIds,
                 hasTools: Object.keys(runTools).length > 0,
                 model,
                 reasoningEffort: options.reasoningEffort ?? skill?.config?.reasoningEffort,
@@ -404,6 +417,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             });
 
             threadId = created.threadId;
+            endedThread = threadId;
             thread = created.thread!;
 
             // As soon as the thread exists, so a failed bot patch below cannot leave it unrecorded.
@@ -424,6 +438,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             }
         } else {
             threadId = existingThreadId;
+            endedThread = threadId;
             ({ thread } = await agent.continueThread(ctx, { threadId, userId }));
         }
 
@@ -435,6 +450,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         const callOptions = options.freshContext ? { contextOptions: { recentMessages: 0 } } : undefined;
         // A generation that fails on a thread this run continues wakes it if the owner snoozed it, as a chat run that fails
         // does; the first generation and every later goal round go through here. The generation's own error is the one thrown.
+        const recordEnd = (outcome: "succeeded" | "failed"): Promise<void> => recordHeadlessEnd(ctx, replyKey, threadId, outcome);
+
         const wakeOnFailure = async (error: unknown): Promise<never> => {
             if (existingThreadId !== undefined) {
                 await ctx
@@ -481,6 +498,9 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         const { savedMessages } = result as { savedMessages?: { _id: string; message?: { content?: unknown; role?: string } }[] };
         // Only a run that may pause keeps `ask` tools, so only such a run can have stopped on a request.
         const approvalIds = options.pauseForApproval ? collectApprovalRequestIds(savedMessages) : [];
+        // The same subsets the interactive pause records (`agent-run.ts`): a question or a secret card is labelled as one, not as an approval.
+        const askUserApprovalIds = options.pauseForApproval ? collectAskUserApprovalIds(savedMessages, ASK_USER_TOOL_NAME) : [];
+        const secretApprovalIds = options.pauseForApproval ? collectAskUserApprovalIds(savedMessages, REQUEST_SECRET_TOOL_NAME) : [];
         // What is left of the run's budget. The last step offers no `ask` tool (`withoutAskToolsOnLastStep`); should a request
         // still come from it, it is not recorded: no step would be left to answer it, so the run ends unpaused.
         const stepsLeft = Math.max(0, (options.maxSteps ?? getMaxSteps(true)) - (result.steps?.length ?? 0));
@@ -544,8 +564,10 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             // The run's first pause (0: never resumed) moves it to `awaiting` before the owner is told, or ends it refused.
             await ctx.runMutation(internal.chat.tool_permissions.recordPendingToolApprovals, {
                 approvalIds,
+                ...(askUserApprovalIds.length > 0 && { askUserApprovalIds }),
                 awaitingInput: "approval",
                 config: snapshot,
+                ...(secretApprovalIds.length > 0 && { secretApprovalIds }),
                 subAgentResumedWith: 0,
                 threadId,
                 userId,
@@ -590,6 +612,11 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
 
         if (!options.goal) {
             extract(text);
+            // A stop writes no run event, as a chat's stop does not.
+
+            if (!(await options.shouldStop?.())) {
+                await recordEnd("succeeded");
+            }
 
             return { costMicrodollars: first.priced, text, threadId, totalTokens: result.totalUsage?.totalTokens };
         }
@@ -609,6 +636,13 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
 
         extract(outcome.result.text);
 
+        // A stop writes no run event. A reviewer that failed leaves the goal unconfirmed, so that run failed; the limits and `met` finished it.
+        if (outcome.ended === "review_failed") {
+            await recordEnd("failed");
+        } else if (outcome.ended !== "user") {
+            await recordEnd("succeeded");
+        }
+
         return {
             costMicrodollars: outcome.costMicrodollars || undefined,
             goal: { ended: outcome.ended, reason: outcome.reason, rounds: outcome.rounds },
@@ -616,6 +650,13 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             threadId,
             totalTokens: outcome.totalTokens,
         };
+    } catch (error) {
+        // Any failure after the thread exists ends the run as failed, whichever step threw: a generation's error, or a write after it.
+        if (endedThread !== undefined) {
+            await recordHeadlessEnd(ctx, replyKey, endedThread, "failed");
+        }
+
+        throw error;
     } finally {
         await closeMCPClients(toolResult.mcpClients);
     }

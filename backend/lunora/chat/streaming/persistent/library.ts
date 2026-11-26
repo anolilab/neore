@@ -25,6 +25,7 @@ import { runStreamingAgentFields } from "../../lib/streaming-run-args";
 import { streamLockedAfterStart } from "../../lib/thread-gate";
 import { type OpenToolProgress, openToolProgress } from "../../lib/mcp-progress";
 import { discardPausedThreadSecrets, discardThreadSecrets, replyKeyOfStream } from "../../lib/secret-requests";
+import { recordRunEnd } from "../../../public-api/events-log";
 import { findPendingRequestOnLatestTurn } from "../../lib/tool-approval-claim";
 import { ASK_USER_TOOL_NAME } from "../../tools/ask-user-constants";
 import { MAX_LENGTH } from "../../../lib/validators";
@@ -153,6 +154,11 @@ export const addChunk = internalMutation
         reasoning: v.optional(v.string()),
         /** Steering: the reply continues below a message the user sent into it (`chat/steering.ts`). */
         restart: v.optional(v.boolean()),
+        /**
+         * How the run ended, on the chunk that ends it: the owner's Events log gets one event for the reply (`run:<streamId>`,
+         * `public-api/events-log.ts`), in this mutation, so the event and the end commit together.
+         */
+        runEnd: v.optional(v.union(v.literal("succeeded"), v.literal("failed"))),
         /** The writing run's epoch (`run-epoch.ts`): a chunk from a run a newer one replaced is refused. */
         runEpoch: v.optional(v.number()),
         /** Group chat: this chunk starts a new participant's reply. */
@@ -229,10 +235,17 @@ export const addChunk = internalMutation
 
             await ctx.db.patch("persistentStreams", args.streamId, { status, ...(steers && { steers }) });
         }
+
+        // The run's end: one event per reply, keyed by its stream. A redelivered end finds the event and writes nothing more.
+        if (args.final && args.runEnd !== undefined) {
+            await recordRunEnd(ctx, { outcome: args.runEnd, streamId: args.streamId, threadId: stream.threadId });
+        }
     });
 
 export const setStreamStatus = internalMutation
     .input({
+        /** The writing run's epoch (`run-epoch.ts`): a run a newer one replaced sets nothing, in the same transaction as the check. */
+        runEpoch: v.optional(v.number()),
         status: streamStatusValidator,
         streamId: v.id("persistentStreams"),
     })
@@ -241,6 +254,13 @@ export const setStreamStatus = internalMutation
 
         if (!stream) {
             throw new LunoraError("NOT_FOUND", "Stream not found");
+        }
+
+        assertCurrentRun(stream, args.runEpoch);
+
+        // The same refusal as `addChunk`: a paused stream stays live for its resume, so the run that paused it does not end it here.
+        if (args.runEpoch !== undefined && stream.pause !== undefined) {
+            throw new LunoraError(RUN_REPLACED, "The run is paused or being resumed");
         }
 
         if (stream.status !== "pending" && stream.status !== "streaming") {
@@ -256,6 +276,11 @@ export const setStreamStatus = internalMutation
             status: args.status,
             ...(steers && { steers }),
         });
+
+        // A live stream set to error is a failed run: its final chunk may have been refused, so the end is recorded here.
+        if (args.status === "error") {
+            await recordRunEnd(ctx, { outcome: "failed", streamId: args.streamId, threadId: stream.threadId });
+        }
     });
 
 /** Every live stream of a thread, read in pages (a thread has one or two; the bound is for a runaway one). */

@@ -1650,6 +1650,41 @@ export const schema = defineSchema({
         .index("by_userId_collectionId", ["userId", "collectionId"])
         .index("by_vaultFileId", ["vaultFileId"]),
 
+    /**
+     * The Events log (`public-api/events-log.ts`): one row per run end and approval request, read by `events/poll`. `seq` is
+     * one past the user's highest (`mcpEventWatermarks`); `eventId` is stable per upstream event; `data` is the payload as
+     * JSON text. Kept seven days (`RETENTION_MS`); every expired row goes, the highest included.
+     */
+    mcpEvents: defineTable({
+        createdAt: v.number(),
+        data: v.string(),
+        eventId: v.string(),
+        name: v.string(),
+        seq: v.number(),
+        /** The thread the event concerns, as its payload names it: a thread's events are removed with the thread. */
+        threadId: v.optional(v.string()),
+        timestamp: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId_seq", ["userId", "seq"])
+        .index("by_userId_eventId", ["userId", "eventId"])
+        .index("by_userId_threadId", ["userId", "threadId"])
+        .index("by_createdAt", ["createdAt"]),
+
+    /**
+     * The highest `seq` a user's Events log has issued. Kept apart from the rows, so retention can delete every event and the
+     * sequence still never restarts. One row per user; removed with the user (`public-api/gdpr.ts`).
+     */
+    mcpEventWatermarks: defineTable({
+        /** The highest seq the retention sweep has expired for this user. A poll reports a gap only behind it: a chat's removal leaves none. */
+        prunedThrough: v.optional(v.number()),
+        seq: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId", ["userId"]),
+
     // An OAuth grant for one of the user's own MCP servers
     // (`aiUserPreferences.mcpServers`), keyed by server name AND url: a grant
     // for a server whose URL was since edited is never sent to the new URL.
@@ -2683,10 +2718,13 @@ export const schema = defineSchema({
         kind: v.union(v.literal("attached"), v.literal("linked"), v.literal("opened")),
         // The last archive attempt for this merge that found the chat busy. The next read tries the least recently attempted links first.
         mergeAttemptedAt: v.optional(v.number()),
-        // Set once the pull request is seen merged (`source-control/pr-threads.ts#recordPullRequestMerged`). Written once: a merge is terminal.
+        // Set once the pull request is seen merged (`source-control/pr-merged.ts#recordMergedPullRequest`). Written once: a merge is terminal.
         mergedAt: v.optional(v.number()),
         // The exclusive upper bound of the merge's time, as the recorder was given it. Unset: the merge is bounded by `mergedAt` plus a second.
         mergedBefore: v.optional(v.number()),
+        // When this link first recorded the merge. A merge is seen only after it happened, so this bounds the merge from above even
+        // without a host time; the reopen guard reads it (`agent/auto-archive.ts`).
+        mergeRecordedAt: v.optional(v.number()),
         // Set once this merge's archive attempt for the link finished: archived, or declined by a guard or the setting. Until then a read retries it.
         mergeSettledAt: v.optional(v.number()),
         number: v.number(),
@@ -2704,10 +2742,33 @@ export const schema = defineSchema({
         title: v.string(),
         url: v.string(),
         userId: v.string(),
+        // The person asked for this thread to be woken when the pull request fails checks, conflicts or gets a review
+        // (`source-control/pr-watch-logic.ts`). Absent: no watch. Its keys are the decision's stored keys (`pr-watch-logic.ts#storedWatchOf`); the pending reasons live in `watchPending`.
+        watch: v.optional(
+            v.object({
+                baselined: v.optional(v.boolean()),
+                checksHeadSha: v.optional(v.string()),
+                conflictHeadSha: v.optional(v.string()),
+                headSha: v.optional(v.string()),
+                lastWakeAt: v.optional(v.number()),
+                reviewId: v.optional(v.string()),
+                startedAt: v.number(),
+                // Set when the person stopped the watch, or the pull request ended it. A stopped watch is kept, not removed.
+                stoppedAt: v.optional(v.number()),
+                wakes: v.optional(v.number()),
+            }),
+        ),
+        // True exactly while a watch runs, so a person's running watches are counted exactly through an index. Cleared by anything that ends a watch.
+        watchActive: v.optional(v.boolean()),
+        // Occurrences seen during a cooldown, delivered once the cooldown has passed (`source-control/pr-watch-logic.ts`).
+        // Cleared by a fresh start; a stopped watch keeps whatever it had.
+        watchPending: v.optional(v.array(v.union(v.literal("checks"), v.literal("conflict"), v.literal("review")))),
     })
         .shardBy("userId")
         .index("by_user_and_repository_number", ["userId", "repository", "number"])
-        .index("by_user_and_threadId", ["userId", "threadId"]),
+        .index("by_user_and_repository_number_threadId", ["userId", "repository", "number", "threadId"])
+        .index("by_user_and_threadId", ["userId", "threadId"])
+        .index("by_user_and_watchActive", ["userId", "watchActive"]),
 
     // A phone's Expo push token (`notifications/native-push.ts`): one row per token, owned by the account signed in on
     // that phone. Global (D1) and keyed by `token`, so a second account signing in on the same phone moves the row in
@@ -3744,7 +3805,8 @@ export const schema = defineSchema({
 
     threadRelationships: defineTable({
         branchPoint: v.optional(v.number()),
-        branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("subagent"))),
+        // "side": a side chat started beside its parent (`chat/side-chat.ts`); the parent is read, never written.
+        branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("side"), v.literal("subagent"))),
         createdAt: v.number(),
         parentThreadId: v.id("threads"),
         threadId: v.id("threads"),
@@ -3834,6 +3896,12 @@ export const schema = defineSchema({
         // Set while the thread has a passcode (locked). Content is refused
         // without a proof; `lib/thread-lock.ts`. The hash lives in `threadPasscodes`.
         lockedAt: v.optional(v.number()),
+        // Set while a merge owes this chat an archive (`source-control/pr-thread-links.ts#setThreadMergeOwed`), cleared once its owed
+        // links settle. The sweep reads a chat's links for an owed merge only while this is set, so a chat with none is never read.
+        mergeOwed: v.optional(v.boolean()),
+        // Where the sweep's scan for an owed merge stands in this chat's links, saved between sweeps for a chat too large to scan in
+        // one mutation. Empty: the scan starts from the first link. Any new owed merge empties it, so a scan cannot pass that link.
+        mergeOwedScan: v.optional(v.string()),
         messengerConnectionId: v.optional(v.id("messengerConnections")),
         mode: v.optional(v.string()),
         model: v.optional(v.string()),
@@ -4396,8 +4464,10 @@ export const schema = defineSchema({
         autoCompactThreshold: v.optional(v.number()),
         // Opt-in: speak every finished reply aloud (`features/chat/voice-mode`). Absent = off.
         autoReadReplies: v.optional(v.boolean()),
-        // Model a reply is retried on once when the chosen model fails with an infrastructure error (`chat/lib/backup-model.ts`). Blank or absent = none.
+        // The single backup model saved before `backupModels`, read only while that list is absent (`chat/lib/backup-model.ts#storedBackupModels`).
         backupModel: v.optional(v.string()),
+        // Models a reply is retried on, in order, when the chosen model fails with an infrastructure error (`chat/lib/backup-model.ts`). Empty = none; absent = `backupModel`.
+        backupModels: v.optional(v.array(v.string())),
         // Appearance: cap long chat code blocks (absent = on). Accepted values: `auth/fields.ts`.
         capLongCodeBlocks: v.optional(v.boolean()),
         // In-app toasts for chat events (`features/notifications/lib/chat-toasts.ts`). Absent = on.

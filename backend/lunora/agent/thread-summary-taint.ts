@@ -17,13 +17,24 @@ import { agentSwitchOf } from "./agent-switch-logic";
 import { walkPath } from "./branch-rows";
 import { SUMMARIES_KEPT_PER_THREAD } from "./thread-summary-logic";
 
-export const threadSummaryTaint = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"threads">): Promise<DeviceTaintSource[]> => {
-    const rows = await ctx.db
+const summaryRowsOf = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"threads">) =>
+    await ctx.db
         .query("threadContextSummaries")
         .withIndex("by_threadId", (q) => q.eq("threadId", threadId))
         .take(SUMMARIES_KEPT_PER_THREAD + 2);
 
-    return mergeTaint(...rows.map((row) => row.taintedBy));
+export const threadSummaryTaint = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"threads">): Promise<DeviceTaintSource[]> => {
+    const rows = await summaryRowsOf(ctx, threadId);
+
+    // A side chat copies its parent's history but not the parent's summaries, which the model was also shown. The parent's
+    // taint therefore applies to the side chat too.
+    const [link] = await ctx.db
+        .query("threadRelationships")
+        .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+        .take(1);
+    const parentRows = link?.branchType === "side" ? await summaryRowsOf(ctx, link.parentThreadId as Id<"threads">) : [];
+
+    return mergeTaint(...[...rows, ...parentRows].map((row) => row.taintedBy));
 };
 
 /**

@@ -19,6 +19,7 @@ import { activeGoalsOf } from "../../goals/rows";
 import { runAfterWithRetry } from "../../../lib/shard-scheduler";
 import { interruptionMessage, planInterruption, RUN_STALE_MS, RUN_WATCH_MS, RUN_WATCH_RETRY, type SavedRow, settleSavedRows } from "../../lib/interrupted-run";
 import { recordPausedRunUsage } from "../../lib/pause-usage";
+import { recordRunEnd } from "../../../public-api/events-log";
 import { assertCurrentRun, assertRunHeld, epochOf, RUN_REPLACED } from "../../lib/run-epoch";
 import type { SteerEntry } from "../../lib/steer-queue";
 import { runStreamingAgentFields } from "../../lib/streaming-run-args";
@@ -360,6 +361,9 @@ export const inspectRun = internalMutation
             const ownGoal = finishedGoals.find((goal) => goal.promptMessageId === stream.messageId);
 
             await endPausedRun(ctx, { ...stream, pausedRun }, { holdThread: finishedGoals.length > 0 });
+
+            // The saved answer is the reply's end, so the Events log records it as a finished run, as the run's own end would.
+            await recordRunEnd(ctx, { outcome: "succeeded", streamId: stream._id, threadId: stream.threadId });
 
             if (ownGoal) {
                 await enqueueJob(internal.chat.goals.execute.reviewGoalRound, { goalId: ownGoal._id, round: ownGoal.round + 1 });

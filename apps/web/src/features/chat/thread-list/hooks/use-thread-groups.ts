@@ -13,6 +13,7 @@ import { useDateBoundaries } from "../contexts/date-boundaries-context";
 import { isIdleThread, nextSnoozeWake, partitionDerivedSections } from "../lib/derived-sections";
 import type { NodesById } from "../lib/share-unchanged-nodes";
 import { shareUnchangedNodes } from "../lib/share-unchanged-nodes";
+import { indexRelationships, nodeBranchType } from "../lib/thread-relationships";
 import { selectSelectedTagIds, useThreadListUIStore } from "../stores/thread-list-ui-store";
 import type { BranchNode, GroupType, MinimalThreadRelationship, ThreadGroup } from "../types";
 import { usePersistThreadList, useThreadListPlaceholder } from "./use-thread-list-cache";
@@ -158,7 +159,7 @@ const useThreadGroups = (
         const threadMap = new Map<string, any>(allThreadsForMap.map((thread: any) => [thread._id, thread]));
 
         const relationships = effectiveRelationships || [];
-        const relationshipMap = new Map<string, MinimalThreadRelationship>(relationships.map((rel: MinimalThreadRelationship) => [rel.threadId, rel]));
+        const { childrenMap, relationshipMap } = indexRelationships(relationships);
 
         // pinnedThreads returns ThreadDoc objects with _id field, not threadId
         const pinnedThreadsArray = pinnedThreads || [];
@@ -168,22 +169,8 @@ const useThreadGroups = (
         const threadOrdersArray = threadOrders || [];
         const threadOrderMap = new Map<string, number>(threadOrdersArray.map((order: any) => [order._id, order.order]));
 
-        // Find root threads (threads without parent relationships)
+        // Find root threads (threads without parent relationships; a side chat is a child, so it is never one)
         const rootThreads = threadsToUse.filter((thread: any) => !relationshipMap.has(thread._id));
-
-        // Build child map once for O(1) lookups instead of filtering each time
-        const childrenMap = new Map<string, MinimalThreadRelationship[]>();
-
-        for (const rel of relationships) {
-            if (!rel.parentThreadId) {
-                continue;
-            }
-
-            const existing = childrenMap.get(rel.parentThreadId) || [];
-
-            existing.push(rel);
-            childrenMap.set(rel.parentThreadId, existing);
-        }
 
         // Build temporary root threads
         const temporaryRootThreads = temporaryThreadsPage.filter((thread: any) => !relationshipMap.has(thread._id));
@@ -233,7 +220,11 @@ const useThreadGroups = (
             // Find direct children using pre-built map
             const childRelationships = childrenMap.get(threadId) || [];
             const children = childRelationships
-                .map((rel: MinimalThreadRelationship) => buildHierarchy(rel.threadId, depth + 1))
+                .map((rel: MinimalThreadRelationship) => {
+                    const child = buildHierarchy(rel.threadId, depth + 1);
+
+                    return child === null ? null : { ...child, branchType: nodeBranchType(rel) };
+                })
                 .filter((node): node is BranchNode => node !== null);
 
             // Apply optimistic state overrides (instant UI updates)

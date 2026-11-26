@@ -33,7 +33,7 @@ import { buildAgentTools } from "./agent-tools";
 import { answerFilesMessage, filesTheModelReads, loadAskUserFiles, modelReads, withAnswerFiles } from "./ask-user-files";
 import { loadModelFilterRules } from "./model-filter-rules";
 import { BUILTIN_TOOLS_NEEDING_A_PERSON } from "./person-tools";
-import { backupCanServe, backupCapabilities, backupFilterRejection, eligibleBackupModel, supportsBackupFallback } from "./backup-model";
+import { backupCanServe, backupCapabilities, backupFilterRejection, eligibleBackupModels, supportsBackupFallback } from "./backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "./paid-model";
 import { compressContextMessages, getFallbackContextWindow, getMaxSteps } from "./auto-continue";
 import { isLocalBrowserProvider, toGatewayFormat } from "./custom-providers";
@@ -189,32 +189,35 @@ const assertModelAllowed = async (ctx: Pick<ActionCtx, "runQuery">, model: strin
 };
 
 /**
- * The user's backup model for a run on `model` (`FallbackLanguageModel`), or `undefined`: none set, a stale id,
- * the run's own model, or one the user's plan cannot run — a backup must not open a paid model the run's own
- * gate (`canRunPaidModel`) would refuse.
+ * The user's backup models for a run on `model` (`FallbackLanguageModel`), in order: each one that is still a
+ * registry text model, is not the run's own model, passes the user's model filters, and is one the user's plan
+ * can run — a backup must not open a paid model the run's own gate (`canRunPaidModel`) would refuse.
  */
-export const resolveBackupModelId = async (
+export const resolveBackupModelIds = async (
     ctx: Pick<ActionCtx, "runQuery">,
     userId: string,
-    backupModel: string | undefined,
+    backupModels: ReadonlyArray<string> | undefined,
     model: string,
     filterRules?: ModelFilterRules,
-): Promise<string | undefined> => {
-    const definition = supportsBackupFallback(model) ? eligibleBackupModel(backupModel, model) : undefined;
+): Promise<string[]> => {
+    const definitions = supportsBackupFallback(model) ? eligibleBackupModels(backupModels ?? [], model) : [];
 
-    if (!definition) {
-        return undefined;
+    if (definitions.length === 0) {
+        return [];
     }
 
     // The caller may already hold the rules (the interactive run reads them for the gateway); every other path loads them here,
     // since the filters can encode privacy rules (regions, providers) that a backup must honour as much as the chosen model.
     const rules = filterRules ?? (await loadModelFilterRules(ctx, userId));
+    const allowed: string[] = [];
 
-    if (backupFilterRejection(definition, rules) !== null) {
-        return undefined;
+    for (const definition of definitions) {
+        if (backupFilterRejection(definition, rules) === null && (await canRunPaidModel(ctx, userId, definition))) {
+            allowed.push(definition.id);
+        }
     }
 
-    return (await canRunPaidModel(ctx, userId, definition)) ? definition.id : undefined;
+    return allowed;
 };
 
 export const resolveRunModel = async (ctx: Pick<ActionCtx, "runQuery">, model: string, userId: string, plan?: RunPlan): Promise<RunModel> => {
@@ -614,7 +617,7 @@ export const loadRunContext = async (
         memoryEnabled: prefs.memoryEnabled,
         prefs: {
             autoCompactThreshold: prefs.autoCompactThreshold,
-            backupModel: prefs.backupModel,
+            backupModels: prefs.backupModels,
             language: args.threadLanguage || prefs.language,
             location: prefs.location,
             personalization,
@@ -967,14 +970,14 @@ const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Paramet
  * own prompt / system fields on top.
  */
 export const buildRunStreamArgs = (options: {
-    backupModelId?: string;
+    backupModelIds?: ReadonlyArray<string>;
     /** Whether the calls carry tools: a backup that cannot call them is skipped for such a call, so it does not size the prompt. */
     hasTools?: boolean;
     model: string;
     reasoningEffort: number | undefined;
     shouldAutoContinue?: boolean;
 }): Record<string, unknown> => {
-    const { backupModelId, hasTools, model, reasoningEffort } = options;
+    const { backupModelIds = [], hasTools, model, reasoningEffort } = options;
     const modelDefinition = MODEL_LOOKUP.get(model);
     const supportsReasoningEffort =
         modelDefinition?.filterCapabilities?.includes("effort_control") || modelDefinition?.filterCapabilities?.includes("reasoning");
@@ -996,12 +999,15 @@ export const buildRunStreamArgs = (options: {
     // run's tool results pile up after the one-shot check in `applyLateCompression`.
     // `shouldAutoContinue` no longer changes this; it stays in the type so callers
     // need no edit.
-    const backupDefinition = backupModelId ? MODEL_LOOKUP.get(backupModelId) : undefined;
-    const backupTraits = backupDefinition ? backupCapabilities(backupDefinition) : undefined;
+    const backups = backupModelIds.map((id) => {
+        const definition = MODEL_LOOKUP.get(id);
+
+        return { id, traits: definition ? backupCapabilities(definition) : undefined };
+    });
 
     streamTextArgs.prepareStep = ({ messages }: { messages: unknown[] }) => {
-        // Sized for the backup only while it could take the call (same rule as the wrapper's switch).
-        const sizedFor = !backupTraits || backupCanServe(backupTraits, { hasTools: hasTools === true, messages }) ? backupModelId : undefined;
+        // Sized for every backup that could take the call (same rule as the wrapper's switch): a run that lands on any of them must fit.
+        const sizedFor = backups.filter(({ traits }) => !traits || backupCanServe(traits, { hasTools: hasTools === true, messages })).map(({ id }) => id);
         const compressed = compressContextMessages(messages as never, getFallbackContextWindow(model, sizedFor));
 
         return compressed === messages ? undefined : { messages: compressed };
@@ -1249,6 +1255,8 @@ export const finishRun = async (
     try {
         await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
             final: paused || keepOpenUnlessPaused !== true,
+            // A run that ends here (not paused, not a group turn going on) is recorded in the Events log by the chunk that ends it.
+            ...(!paused && keepOpenUnlessPaused !== true && { runEnd: "succeeded" as const }),
             reasoning: pending.reasoning || undefined,
             ...(runEpoch !== undefined && { runEpoch }),
             streamId: streamId as Id<"persistentStreams">,
@@ -1582,9 +1590,9 @@ export const resumeApprovedRun = async (
         }
 
         const modelFilterRules = await loadModelFilterRules(ctx, userId);
-        const backupModelId = await resolveBackupModelId(ctx, userId, preferences.backupModel, config.model, modelFilterRules);
+        const backupModelIds = await resolveBackupModelIds(ctx, userId, preferences.backupModels, config.model, modelFilterRules);
         const agent = await getAgent(config.model, {
-            backupModelId,
+            backupModelIds,
             customProvider,
             gateway: gatewayFetch(ctx),
             maxSteps,
@@ -1628,7 +1636,7 @@ export const resumeApprovedRun = async (
 
         const stopping = new AbortController();
         const streamTextArgs = buildRunStreamArgs({
-            backupModelId,
+            backupModelIds,
             hasTools: Object.keys(toolResult.tools).length > 0,
             model: config.model,
             reasoningEffort: config.reasoningEffort,
@@ -1942,6 +1950,7 @@ export const failRun = async (
         try {
             await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
                 final: true,
+                runEnd: "failed",
                 ...(runEpoch !== undefined && { runEpoch }),
                 streamId: streamId as Id<"persistentStreams">,
                 text: `\n\nError: ${safeMessage}`,
@@ -1957,10 +1966,20 @@ export const failRun = async (
             endedElsewhere = (await readStatus()) === "done";
 
             if (!endedElsewhere) {
-                await ctx.runMutation(internal.chat.streaming.persistent.library.setStreamStatus, {
-                    status: "error",
-                    streamId: streamId as Id<"persistentStreams">,
-                });
+                try {
+                    await ctx.runMutation(internal.chat.streaming.persistent.library.setStreamStatus, {
+                        status: "error",
+                        ...(runEpoch !== undefined && { runEpoch }),
+                        streamId: streamId as Id<"persistentStreams">,
+                    });
+                } catch (statusError) {
+                    // A newer run took the stream between the refused write and this one: it is not this run's to fail.
+                    if (isRunReplaced(statusError)) {
+                        return { replaced: true };
+                    }
+
+                    throw statusError;
+                }
             }
         }
     }

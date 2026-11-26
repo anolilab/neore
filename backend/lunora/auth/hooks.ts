@@ -30,6 +30,7 @@ import { guestHasPinRoutes } from "../chat/pins/pin-route-writes";
 import { reclaimPinWriteLeases } from "../lib/account-moves";
 import { ADMIN } from "../env";
 import { dropMergeGeneration, dropPinsLeft, firstTableWithGuestRows, mergeGenerationCurrent, onGuestShard } from "../lib/account-merge";
+import { patchBetterAuthRow } from "../lib/better-auth-dates";
 import { authLogger } from "../lib/logger";
 import { noteShardActivity } from "../lib/shard-housekeeping";
 import { deleteShardRoute, deleteShardRoutesOf } from "../lib/shard-routes";
@@ -88,7 +89,7 @@ export const promoteVerifiedAdmin = internalMutation.input({ userId: v.id("user"
     }
 
     if (adminEmails().includes(user.email.toLowerCase())) {
-        await ctx.db.patch("user", args.userId, { role: "admin" });
+        await patchBetterAuthRow(ctx.db, "user", user, { role: "admin" });
     }
 });
 
@@ -180,7 +181,7 @@ const cascadeDelete = async (ctx: MutationCtx, user: Id<"user">): Promise<void> 
  * it after the merge; a grant written under the guest from then on finds no account and is refused.
  */
 export const deleteMergedGuest = internalMutation
-    .input({ generation: v.number(), userId: v.string() })
+    .input({ generation: v.number(), sharedStore: v.optional(v.boolean()), userId: v.string() })
     .output(
         v.object({
             deleted: v.boolean(),
@@ -233,7 +234,7 @@ export const deleteMergedGuest = internalMutation
             return { deleted: false, grantsRemain: true };
         }
 
-        const rowsRemain = await firstTableWithGuestRows(ctx, guestId);
+        const rowsRemain = await firstTableWithGuestRows(ctx, guestId, args.sharedStore === true);
 
         if (rowsRemain !== null) {
             return { deleted: false, rowsRemain };

@@ -51,7 +51,7 @@ import {
     AgentRunError,
     buildRunStreamArgs,
     loadModelFilterRules,
-    resolveBackupModelId,
+    resolveBackupModelIds,
     endStoppedRun,
     finishRun,
     loadRunContext,
@@ -312,9 +312,9 @@ const runSpeaker = async (
         setRunReplyKey(ctx, turn.replyKey);
         setRunOrganizationId(ctx, turn.permissionOrganizationId);
 
-        const backupModelId = await resolveBackupModelId(ctx, turn.userId, turn.prefs.backupModel, model, modelFilterRules);
+        const backupModelIds = await resolveBackupModelIds(ctx, turn.userId, turn.prefs.backupModels, model, modelFilterRules);
         const agent = await getAgent(model, {
-            backupModelId,
+            backupModelIds,
             customProvider,
             gateway: gatewayFetch(ctx),
             language: turn.prefs.language,
@@ -367,7 +367,7 @@ const runSpeaker = async (
         });
         const streamTextArgs: Record<string, unknown> = {
             ...buildRunStreamArgs({
-                backupModelId,
+                backupModelIds,
                 hasTools: Object.keys(toolResult.tools).length > 0,
                 model,
                 reasoningEffort,
@@ -600,6 +600,9 @@ const runQueue = async (
     const spoken = [...start.spokenSkillIds];
     let queue = boundedQueue(start.plan, spoken);
     let continueFrom = start.continueFromMessageId;
+    // The end the closing chunk records: none for a stop (a stopped run writes no event). A quota that ends the turn after a reply was
+    // delivered still succeeds: that reply went out, and the stream closes as done.
+    let runEnd: "succeeded" | "failed" | undefined = "succeeded";
 
     while (!isQueueEmpty(queue)) {
         const { next, rest } = shiftQueue(queue);
@@ -617,6 +620,8 @@ const runQueue = async (
             spoken.length > 0 &&
             (await ctx.runQuery(internal.chat.group.functions.isGroupStopRequested, { since: turn.turnStartedAt, threadId: turn.threadId }))
         ) {
+            runEnd = undefined;
+
             break;
         }
 
@@ -657,11 +662,9 @@ const runQueue = async (
         continueFrom = lastMessageId ?? continueFrom;
     }
 
-    await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
-        final: true,
-        streamId: turn.streamId as Id<"persistentStreams">,
-        text: "",
-    });
+    // Every way past the speaker loop that is not a pause lands here and closes the stream. The end it records is `runEnd`: a stop
+    // records none, and the rest (a quota refusal after a delivered reply, and the repeated-call guard's stop included) succeed.
+    await closeGroupTurnStream(ctx, turn, runEnd);
 
     await setThreadStatus(ctx, turn.threadId, "active", { replied: true });
     // The turn is over for good (a pause or a stop returned before this): its saved references go with it.
@@ -748,6 +751,23 @@ const loadTurnContext = async (
         userId,
         userProviderKeys: runContext.userProviderKeys,
     };
+};
+
+/**
+ * The chunk that closes a group turn's stream. `runEnd` is the end it records in the Events log; `undefined` records none, which
+ * is what a stop does. A paused turn returns before this is called, so it writes nothing.
+ */
+export const closeGroupTurnStream = async (
+    ctx: Pick<ActionCtx, "runMutation">,
+    turn: Pick<TurnContext, "streamId">,
+    runEnd: "succeeded" | "failed" | undefined,
+): Promise<void> => {
+    await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
+        final: true,
+        ...(runEnd !== undefined && { runEnd }),
+        streamId: turn.streamId as Id<"persistentStreams">,
+        text: "",
+    });
 };
 
 /**

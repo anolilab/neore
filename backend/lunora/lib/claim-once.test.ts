@@ -11,13 +11,16 @@ import {
     claimKey,
     claimKeyFenced,
     claimOnce,
+    claimRow,
     completeKey,
     holdClaim,
     holdKey,
     holdTtlFrom,
     purgeExpiredClaims,
     reapLapsedClaims,
+    recordClaimResult,
     releaseKey,
+    swapClaimResult,
 } from "./claim-once";
 
 const NOW = 1_800_000_000_000;
@@ -272,5 +275,39 @@ describe("holdTtlFrom", () => {
         // The hold ended at the request's clock (ten minutes from the request), so a second request takes the key mid-run.
         vi.setSystemTime(NOW + TTL * 25);
         await expect(claim("late", { scope: "rt" })).resolves.toBe(true);
+    });
+});
+
+describe("swapClaimResult", () => {
+    it("moves nothing on once another caller lapsed the claim between its read and its write", async () => {
+        expect.assertions(3);
+
+        const outcome = await harness.run(async (ctx: any) => {
+            await holdClaim(ctx, "s", "k", NOW, TTL, "u");
+            await recordClaimResult(ctx, "s", "k", NOW, "r0");
+
+            // The other caller lapses the claim after this one read it, right before this one's conditional write.
+            const racing = {
+                ...ctx,
+                db: new Proxy(ctx.db, {
+                    get: (target, property, receiver) =>
+                        property === "patchIf"
+                            ? async (...args: unknown[]) => {
+                                  await swapClaimResult(ctx, "s", "k", NOW, "r0", null);
+
+                                  return await target.patchIf(...args);
+                              }
+                            : Reflect.get(target, property, receiver),
+                }),
+            };
+
+            const swapped = await swapClaimResult(racing, "s", "k", NOW, "r0", "r1");
+
+            return { claim: (await claimRow(ctx, "s", "k")) !== null, swapped };
+        });
+
+        expect(outcome.swapped).toBe(false);
+        expect(outcome.claim).toBe(false);
+        await expect(harness.run(async (ctx: any) => await claimRow(ctx, "s", "k"))).resolves.toBeNull();
     });
 });

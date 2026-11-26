@@ -12,6 +12,7 @@ import { addMessagesHandler, updateMessage } from "./messages";
 import { MEANING_MIN_CHARS, MEANING_SEARCH_REFUSED } from "./thread-search-plan";
 import { SYNC_RETRY } from "./thread-search-triggers";
 import { runThreadSearchSync, searchThreadsByMeaningFor, visibleThreadsForSearch } from "./thread-search";
+import type { MockRunContext } from "../../test/mock-run-context";
 
 const mocks = vi.hoisted(() => {
     return {
@@ -120,7 +121,7 @@ describe(runThreadSearchSync, () => {
     });
 
     it("writes the thread's archived flag on the vector it inserts", async () => {
-        const ctx = makeCtx({ readThreadSearchState: readyThread({ archived: true }) }) as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = makeCtx({ readThreadSearchState: readyThread({ archived: true }) }) as unknown as MockRunContext;
 
         await runThreadSearchSync(ctx as never, { changed: ["title"], threadId: THREAD });
 
@@ -138,10 +139,11 @@ describe(runThreadSearchSync, () => {
         await runThreadSearchSync(ctx as never, { changed: ["title", "summary"], threadId: THREAD });
 
         expect(mocks.embedMany).not.toHaveBeenCalled();
-        expect((ctx as unknown as { runMutation: ReturnType<typeof vi.fn> }).runMutation).toHaveBeenCalledWith(
-            internal.agent.thread_search.commitThreadSearch,
-            { clear: [{ kind: "title", vectorId: "stored-title" }], embedded: [], threadId: THREAD },
-        );
+        expect((ctx as unknown as MockRunContext).runMutation).toHaveBeenCalledWith(internal.agent.thread_search.commitThreadSearch, {
+            clear: [{ kind: "title", vectorId: "stored-title" }],
+            embedded: [],
+            threadId: THREAD,
+        });
     });
 
     it("embeds nothing for a thread with three user turns or fewer", async () => {
@@ -158,7 +160,7 @@ describe(runThreadSearchSync, () => {
 
         await runThreadSearchSync(ctx as never, { changed: ["title"], threadId: THREAD });
 
-        const { runMutation } = ctx as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const { runMutation } = ctx as unknown as MockRunContext;
 
         expect(mocks.embedMany).not.toHaveBeenCalled();
         expect(runMutation).toHaveBeenCalledTimes(1);
@@ -172,7 +174,7 @@ describe(runThreadSearchSync, () => {
 
         expect(mocks.embedMany.mock.calls[0]?.[1]).toMatchObject({ values: ["PDF totals off by one"] });
 
-        const { runMutation } = ctx as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const { runMutation } = ctx as unknown as MockRunContext;
         const commit = runMutation.mock.calls.find(([reference]) => reference === internal.agent.thread_search.commitThreadSearch);
 
         expect(commit?.[1]).toMatchObject({ embedded: [{ kind: "title", text: "PDF totals off by one" }] });
@@ -225,7 +227,7 @@ describe(runThreadSearchSync, () => {
 
         await runThreadSearchSync(ctx as never, { changed: ["title"], threadId: THREAD });
 
-        const { runMutation } = ctx as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const { runMutation } = ctx as unknown as MockRunContext;
         const claim = runMutation.mock.calls.find(([reference]) => reference === internal.agent.thread_search.claimThreadSearch);
         const release = runMutation.mock.calls.find(([reference]) => reference === internal.agent.thread_search.releaseThreadSearch);
 
@@ -268,7 +270,7 @@ describe(runThreadSearchSync, () => {
 
         await expect(runThreadSearchSync(ctx as never, { changed: ["title"], threadId: THREAD })).rejects.toThrow("gateway down");
 
-        const { runMutation } = ctx as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const { runMutation } = ctx as unknown as MockRunContext;
 
         expect(runMutation).not.toHaveBeenCalledWith(internal.agent.vector.insertBatch, expect.anything());
         expect(runMutation).not.toHaveBeenCalledWith(internal.agent.thread_search.commitThreadSearch, expect.anything());

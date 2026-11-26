@@ -19,6 +19,7 @@
     "add-steer-text-length",
     "backfill-approval-organization",
     "backfill-message-typed-text",
+    "backfill-pull-request-watch-active",
     "drop-agent-option-fields",
     "session-options-to-session-state",
     "widen-not-typed-steer-collaborator",
@@ -10919,6 +10920,125 @@
         "by_vaultFileId": {
           "fields": [
             "vaultFileId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
+    "mcpEventWatermarks": {
+      "commitOrdered": false,
+      "fields": {
+        "prunedThrough": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "seq": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
+    "mcpEvents": {
+      "commitOrdered": false,
+      "fields": {
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "data": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "eventId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "name": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "seq": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "threadId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "timestamp": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_createdAt": {
+          "fields": [
+            "createdAt"
+          ],
+          "unique": false
+        },
+        "by_userId_eventId": {
+          "fields": [
+            "userId",
+            "eventId"
+          ],
+          "unique": false
+        },
+        "by_userId_seq": {
+          "fields": [
+            "userId",
+            "seq"
+          ],
+          "unique": false
+        },
+        "by_userId_threadId": {
+          "fields": [
+            "userId",
+            "threadId"
           ],
           "unique": false
         }
@@ -24669,6 +24789,12 @@
           "optional": true,
           "unique": false
         },
+        "mergeRecordedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "mergeSettledAt": {
           "kind": "number",
           "nullable": false,
@@ -24770,6 +24896,109 @@
           "nullable": false,
           "optional": false,
           "unique": false
+        },
+        "watch": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "baselined": {
+              "kind": "boolean",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "checksHeadSha": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "conflictHeadSha": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "headSha": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "lastWakeAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "reviewId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "startedAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "stoppedAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "wakes": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            }
+          }
+        },
+        "watchActive": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "watchPending": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "union",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "members": [
+              {
+                "kind": "literal",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "literal": "\"checks\""
+              },
+              {
+                "kind": "literal",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "literal": "\"conflict\""
+              },
+              {
+                "kind": "literal",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "literal": "\"review\""
+              }
+            ]
+          }
         }
       },
       "indexes": {
@@ -24781,10 +25010,26 @@
           ],
           "unique": false
         },
+        "by_user_and_repository_number_threadId": {
+          "fields": [
+            "userId",
+            "repository",
+            "number",
+            "threadId"
+          ],
+          "unique": false
+        },
         "by_user_and_threadId": {
           "fields": [
             "userId",
             "threadId"
+          ],
+          "unique": false
+        },
+        "by_user_and_watchActive": {
+          "fields": [
+            "userId",
+            "watchActive"
           ],
           "unique": false
         }
@@ -30105,6 +30350,13 @@
               "nullable": false,
               "optional": false,
               "unique": false,
+              "literal": "\"side\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
               "literal": "\"subagent\""
             }
           ]
@@ -30715,6 +30967,18 @@
         },
         "lockedAt": {
           "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "mergeOwed": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "mergeOwedScan": {
+          "kind": "string",
           "nullable": false,
           "optional": true,
           "unique": false
@@ -33874,6 +34138,18 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "backupModels": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
         },
         "capLongCodeBlocks": {
           "kind": "boolean",

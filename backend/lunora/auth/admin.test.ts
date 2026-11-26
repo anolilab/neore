@@ -7,9 +7,10 @@
  * better-auth lookup) and the rate limiter are replaced; `isAdmin` comes from the
  * `ADMINS` set below, the way production derives it from `user.role`.
  */
-import { lunoraTest } from "@lunora/testing";
+import type { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { harnessWithSqlite, storeDatesAsText } from "../../test/better-auth-dates";
 import schema from "../schema";
 
 const { admins, sessionFrom } = vi.hoisted(() => {
@@ -54,6 +55,7 @@ const {
 } = await import("./admin");
 
 let harness: ReturnType<typeof lunoraTest>;
+let sqlite: ReturnType<typeof harnessWithSqlite>["sqlite"];
 
 /** The session id of the caller; every user row's `_id` is also its session `userId`. */
 const as = (userId: string) => harness.withIdentity({ userId } as never);
@@ -78,7 +80,7 @@ let otherAdminId: string;
 let memberId: string;
 
 beforeEach(async () => {
-    harness = lunoraTest(schema as never);
+    ({ harness, sqlite } = harnessWithSqlite(schema));
     admins.clear();
 
     adminId = await insertUser("admin@example.com", "admin");
@@ -190,6 +192,34 @@ describe("role changes", () => {
         const otherAdminRow = await readUser(otherAdminId);
 
         expect(otherAdminRow.role).toBeNull();
+    });
+});
+
+describe("a user row better-auth wrote (ISO dates)", () => {
+    const asBetterAuthWroteIt = (userId: string): void => storeDatesAsText(sqlite, "user", userId, ["createdAt", "updatedAt"]);
+
+    it("changes its role, by id and by email, and stores its dates as numbers", async () => {
+        asBetterAuthWroteIt(memberId);
+
+        await expect(as(adminId).mutation(updateUserRole as never, { role: "admin", userId: memberId } as never)).resolves.toBe(true);
+        expect(await readUser(memberId)).toMatchObject({ createdAt: 1, role: "admin", updatedAt: 1 });
+
+        asBetterAuthWroteIt(otherAdminId);
+
+        await expect(as(adminId).mutation(revokeAdminByEmail as never, { email: "other-admin@example.com" } as never)).resolves.toMatchObject({
+            success: true,
+        });
+        asBetterAuthWroteIt(otherAdminId);
+        await expect(as(adminId).mutation(grantAdminByEmail as never, { email: "other-admin@example.com" } as never)).resolves.toMatchObject({ success: true });
+    });
+
+    it("bans and unbans it", async () => {
+        asBetterAuthWroteIt(memberId);
+
+        await expect(as(adminId).mutation(banUser as never, { banExpiresIn: 60, userId: memberId } as never)).resolves.toBe(true);
+        asBetterAuthWroteIt(memberId);
+        await expect(as(adminId).mutation(unbanUser as never, { userId: memberId } as never)).resolves.toBe(true);
+        expect(await readUser(memberId)).toMatchObject({ banned: false, createdAt: 1 });
     });
 });
 

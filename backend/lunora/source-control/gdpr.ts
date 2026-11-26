@@ -205,6 +205,8 @@ export const deleteUserGuides = internalMutation
 /** Links per export step: each row is small, so a page is generous and a long history still takes few steps. */
 const PULL_REQUEST_LINKS_EXPORT_PAGE = 100;
 
+const vWatchWakeReason = v.union(v.literal("checks"), v.literal("conflict"), v.literal("review"));
+
 /**
  * The user's links between threads and the pull requests they work on. `title` is a copy of the thread's title when
  * the link was made (the user's own words, and it outlives a rename or a deletion), so the links travel with the export.
@@ -223,6 +225,7 @@ export const collectPullRequestThreadsForExport = internalQuery
                     mergeAttemptedAt: v.optional(v.number()),
                     mergedAt: v.optional(v.number()),
                     mergedBefore: v.optional(v.number()),
+                    mergeRecordedAt: v.optional(v.number()),
                     mergeSettledAt: v.optional(v.number()),
                     number: v.number(),
                     repository: v.string(),
@@ -232,6 +235,20 @@ export const collectPullRequestThreadsForExport = internalQuery
                     threadId: v.string(),
                     title: v.string(),
                     url: v.string(),
+                    watch: v.optional(
+                        v.object({
+                            baselined: v.optional(v.boolean()),
+                            checksHeadSha: v.optional(v.string()),
+                            conflictHeadSha: v.optional(v.string()),
+                            headSha: v.optional(v.string()),
+                            lastWakeAt: v.optional(v.number()),
+                            reviewId: v.optional(v.string()),
+                            startedAt: v.number(),
+                            stoppedAt: v.optional(v.number()),
+                            wakes: v.optional(v.number()),
+                        }),
+                    ),
+                    watchPending: v.optional(v.array(vWatchWakeReason)),
                 }),
             ),
         }),
@@ -252,6 +269,7 @@ export const collectPullRequestThreadsForExport = internalQuery
                     ...(link.mergeAttemptedAt !== undefined && { mergeAttemptedAt: link.mergeAttemptedAt }),
                     ...(link.mergedAt !== undefined && { mergedAt: link.mergedAt }),
                     ...(link.mergedBefore !== undefined && { mergedBefore: link.mergedBefore }),
+                    ...(link.mergeRecordedAt !== undefined && { mergeRecordedAt: link.mergeRecordedAt }),
                     ...(link.mergeSettledAt !== undefined && { mergeSettledAt: link.mergeSettledAt }),
                     kind: link.kind,
                     number: link.number,
@@ -259,6 +277,8 @@ export const collectPullRequestThreadsForExport = internalQuery
                     ...(link.statusReadAt !== undefined && { statusReadAt: link.statusReadAt }),
                     ...(link.state !== undefined && { state: link.state }),
                     ...(link.stateCheckedAt !== undefined && { stateCheckedAt: link.stateCheckedAt }),
+                    ...(link.watch !== undefined && { watch: link.watch }),
+                    ...(link.watchPending !== undefined && { watchPending: link.watchPending }),
                     threadId: link.threadId,
                     title: link.title,
                     url: link.url,

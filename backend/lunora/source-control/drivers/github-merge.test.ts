@@ -644,6 +644,42 @@ describe("reading past the first page", () => {
         expect(reviews.items[0]?.body).toBe("r220");
         expect(reviews.items.at(-1)?.body).toBe("r101");
     });
+
+    it("goes back through earlier pages until the seen review is listed, within a bound", async () => {
+        const page = (from: number, count: number) =>
+            Array.from({ length: count }, (_, index) => {
+                const id = from + index;
+
+                return {
+                    body: `r${String(id)}`,
+                    id,
+                    state: "COMMENTED",
+                    submitted_at: new Date(Date.UTC(2026, 0, 1, 0, 0, id)).toISOString(),
+                    user: { login: "x" },
+                };
+            });
+        const link = `<https://api.github.com/repositories/1/pulls/7/reviews?page=2&per_page=100>; rel="next", <https://api.github.com/repositories/1/pulls/7/reviews?page=5&per_page=100>; rel="last"`;
+        // Reads in order: the first page, the last, the one before it, then one earlier page at a time.
+        const request = () =>
+            paged({
+                [`${REPO}/pulls/7/reviews`]: [
+                    { body: page(1, 100), link },
+                    { body: page(401, 20) },
+                    { body: page(301, 100) },
+                    { body: page(201, 100) },
+                    { body: page(101, 100) },
+                ],
+            });
+
+        const found = await githubDriver.listReviews(request(), REF, { seenId: "250" });
+        const without = await githubDriver.listReviews(request(), REF);
+        const absent = await githubDriver.listReviews(request(), REF, { seenId: "9999" });
+
+        expect(found.items.some((item) => item.id === "250")).toBe(true);
+        expect(without.items.some((item) => item.id === "250")).toBe(false);
+        // Never found: the read stops at the bound (5 pages in all, the first included), not at the end of the list.
+        expect(absent.items.some((item) => item.id === "101")).toBe(true);
+    });
 });
 
 describe("the review count", () => {

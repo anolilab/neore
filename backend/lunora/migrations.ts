@@ -406,3 +406,28 @@ export const addProjectRunnerThreadId = defineMigration({
     // `undefined` leaves every row untouched (`MigrationTransform`).
     up: () => undefined,
 });
+
+/**
+ * `pullRequestThreads.watchActive` (true exactly while a watch runs) is what `setPullRequestWatch` counts a person's
+ * watches through (`by_user_and_watchActive`). A watch started before that field has a `watch` with no `stoppedAt` and no
+ * flag, so the count could not see it. This sets `watchActive: true` on such a row: a running watch on a live thread.
+ * A stopped watch, a watch on a deleted thread, a row without a watch and a row already flagged are left as they are,
+ * and only `watchActive` is added: `watch`, `watchPending` and every other field are copied through.
+ *
+ * Idempotent: a flagged row is skipped, so a second run changes nothing. There is no `down`: a rollback cannot tell a
+ * filled row from one a watch start flagged after this ran.
+ */
+export const backfillPullRequestWatchActive = defineMigration({
+    id: "backfill-pull-request-watch-active",
+    table: "pullRequestThreads",
+    // `undefined` leaves the row untouched: skipped, not rewritten (`MigrationTransform`).
+    up: (document) => {
+        const watch = document.watch as { stoppedAt?: number } | null | undefined;
+
+        if (!watch || watch.stoppedAt !== undefined || document.threadDeleted === true || document.watchActive === true) {
+            return undefined;
+        }
+
+        return { ...document, watchActive: true };
+    },
+});

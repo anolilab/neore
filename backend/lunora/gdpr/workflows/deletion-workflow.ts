@@ -593,6 +593,15 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 ),
         );
         await drain(
+            "delete-user-mcp-events",
+            async (round) =>
+                await context.run(
+                    internal.public_api.gdpr.deleteUserMcpEvents,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-mcp-events", round) },
+                ),
+        );
+        await drain(
             "delete-user-pages",
             async (round) =>
                 await context.run(internal.pages.gdpr.deleteUserPages, { userId: args.userId }, { dedupId: stepDedupId(scope, "delete-user-pages", round) }),
@@ -899,6 +908,18 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     internal.gdpr.steps.deletion_steps.deleteUserFollowRows,
                     { userId: args.userId },
                     { dedupId: stepDedupId(scope, "delete-user-follow-rows-final", round) },
+                ),
+        );
+
+        // An Event recorded before the sessions were revoked can land after the first Events drain, as a follow row can. The
+        // final drain takes what is left once no new one is admitted.
+        await drain(
+            "delete-user-mcp-events-final",
+            async (round) =>
+                await context.run(
+                    internal.public_api.gdpr.deleteUserMcpEvents,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-mcp-events-final", round) },
                 ),
         );
 

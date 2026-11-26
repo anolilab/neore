@@ -758,6 +758,32 @@ describe("searchSentPrompts", () => {
         }
     });
 
+    it("lists a side chat's copied prompts as its own, beside the parent's", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const ids = await harness.run(async (context: any) => {
+                const parent = await insertThread(context, { title: "Parent", userId: OWNER });
+                const side = await insertThread(context, { title: "Side", userId: OWNER });
+
+                await context.db.insert("threadRelationships", { branchType: "side", createdAt: 6, parentThreadId: parent, threadId: side, userId: OWNER });
+
+                for (const threadId of [parent, side]) {
+                    await insertMessage(context, { createdAt: 5, order: 0, role: "user", text: "deploy it now", threadId, userId: OWNER });
+                }
+
+                return { parent, side };
+            });
+
+            const prompts = await search(harness, "deploy");
+
+            expect(new Set(prompts.map((prompt) => prompt.threadId))).toEqual(new Set([ids.parent, ids.side]));
+            expect(prompts).toHaveLength(2);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("lists the same words sent at the same time in two unrelated chats once per chat", async () => {
         const harness = lunoraTest(schema as never);
 
