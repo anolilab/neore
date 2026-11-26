@@ -77,6 +77,7 @@ import {
     vTaskRunOrigin,
     vTaskRunStatus,
     vTaskSkipReason,
+    vTaskSuggestionStatus,
     vTaskStatus,
     vVerdict,
 } from "./tasks/validators";
@@ -3441,6 +3442,31 @@ export const schema = defineSchema({
         .index("by_status_and_updatedAt", ["status", "updatedAt"])
         .index("by_status_and_stuckCheckAt", ["status", "stuckCheckAt"]),
 
+    /**
+     * A scheduled task proposed from the user's own messages (`tasks/suggestions.ts`), waiting for an accept or a
+     * dismiss. Nothing here runs: accepting creates a task through the normal path and records its id. The row keeps
+     * the proposal in the task's own shape and only the ids of the chats it came from, never message text.
+     */
+    taskSuggestions: defineTable({
+        createdAt: v.number(),
+        // The proposed schedule, in the task's format (5-field UTC cron).
+        cronExpression: v.string(),
+        // Set with `status` when the person accepts or dismisses.
+        decidedAt: v.optional(v.number()),
+        instructions: v.string(),
+        // Where it came from: the chats (at most `MAX_SUGGESTION_SOURCES`) whose messages the idea was drawn from.
+        sourceThreadIds: v.array(v.string()),
+        status: vTaskSuggestionStatus,
+        // The task an accept created.
+        taskId: v.optional(v.id("tasks")),
+        title: v.string(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_user_and_status_and_createdAt", ["userId", "status", "createdAt"])
+        // The trim of decided rows keeps the most recently decided (`trimDecidedSuggestions`).
+        .index("by_user_and_status_and_decidedAt", ["userId", "status", "decidedAt"]),
+
     team: defineTable({
         createdAt: v.number(),
         // better-auth 1.7.3's seat counter: `addTeamMemberWithLimit` reserves a
@@ -4542,6 +4568,8 @@ export const schema = defineSchema({
         resumeInterruptedRuns: v.optional(v.boolean()),
         // Opt-in: opening /chat lands on the most recent thread. Absent = off.
         resumeLastChat: v.optional(v.boolean()),
+        // Opt-in: suggest scheduled tasks drawn from the user's own messages (`tasks/suggestions.ts`). Absent = off.
+        scheduleIdeasEnabled: v.optional(v.boolean()),
         // Hostnames the web search tool never returns (`chat/tools/search-domains.ts`). Absent = none.
         searchDomainBlocklist: v.optional(v.array(v.string())),
         sendBehavior: v.optional(v.string()),

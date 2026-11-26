@@ -77,10 +77,6 @@ msgstr "\"{fileName}\" 无法上传，因此消息未发送。"
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "无法上传“{fileName}”。请检查你的网络连接，然后重试。"
 
-#: src/features/chat/thread/composer-input.tsx:1146
-#~ msgid "\"{fileName}\" could not be uploaded. Remove it to send."
-#~ msgstr "\"{fileName}\" 无法上传。请移除后再发送。"
-
 #: src/features/chat/thread/composer-input.tsx:719
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "“{fileName}”太大了。文档最大为 {maxMegabytes} MB。"
@@ -263,7 +259,7 @@ msgid "{0, plural, one {# active day} other {# active days}}"
 msgstr "{0, plural, other {# 个活跃日}}"
 
 #. placeholder {0}: node.children.length
-#: src/features/chat/thread-list/thread-node.tsx:872
+#: src/features/chat/thread-list/thread-node.tsx:870
 msgid "{0, plural, one {# branch} other {# branches}}"
 msgstr "{0, plural, other {# 个分支}}"
 
@@ -333,7 +329,7 @@ msgid "{0, plural, one {# line} other {# lines}}"
 msgstr "{0, plural, other {# 行}}"
 
 #. placeholder {0}: node.relevantMessages?.length ?? 0
-#: src/features/chat/thread-list/thread-node.tsx:916
+#: src/features/chat/thread-list/thread-node.tsx:914
 msgid "{0, plural, one {# match} other {# matches}}"
 msgstr "{0, plural, other {# 个匹配}}"
 
@@ -3031,7 +3027,7 @@ msgstr "调整"
 #: src/features/auth/components/team/team-switcher.tsx:152
 #: src/features/chat/sharing/thread-share-button.tsx:217
 #: src/features/chat/sharing/thread-share-button.tsx:323
-#: src/features/layout/components/sidebar-shortcut.tsx:265
+#: src/features/layout/components/sidebar-shortcut.tsx:266
 #: src/features/layout/lib/dashboard-page-names.ts:12
 #: src/routes/admin/route.tsx:56
 #: src/routes/admin/route.tsx:76
@@ -3524,7 +3520,7 @@ msgstr "垂直对齐（V）"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:793
 #: src/components/model-picker/model-picker.tsx:1239
 #: src/components/model-picker/model-picker.tsx:1317
-#: src/features/chat/thread-list/thread-list-filter-menu.tsx:122
+#: src/features/chat/thread-list/thread-list-filter-menu.tsx:120
 #: src/features/marketing/components/tutorials-page.tsx:130
 #: src/features/settings/components/chat/models-settings.tsx:422
 #: src/features/settings/components/chat/models-settings.tsx:443
@@ -4287,7 +4283,7 @@ msgstr "正在应用..."
 msgid "approval"
 msgstr "审批"
 
-#: src/features/chat/thread-list/thread-node.tsx:837
+#: src/features/chat/thread-list/thread-node.tsx:838
 msgid "Approval"
 msgstr "审批"
 
@@ -4498,7 +4494,7 @@ msgid "Are you sure you want to delete this item? This action cannot be undone."
 msgstr "确定要删除此项吗？此操作无法撤销。"
 
 #: src/components/command-palette.tsx:899
-#: src/features/chat/thread-list/thread-node.tsx:1107
+#: src/features/chat/thread-list/thread-node.tsx:1105
 #: src/features/chat/thread/thread-shortcuts-listener.tsx:82
 msgid "Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation."
 msgstr "确定要删除此对话吗？此操作无法撤销，并将永久删除此对话中的所有消息。"
@@ -6376,7 +6372,7 @@ msgstr "追上"
 msgid "Catch up {pullRequest} with {base}"
 msgstr "让 {pullRequest} 追上 {base}"
 
-#: src/features/chat/thread-list/thread-list-filter-menu.tsx:114
+#: src/features/chat/thread-list/thread-list-filter-menu.tsx:112
 #: src/features/skills/components/skill-builder-diff.tsx:27
 #: src/features/skills/components/skill-form-dialog.tsx:317
 #: src/features/skills/components/skill-marketplace.tsx:160
@@ -7134,7 +7130,7 @@ msgstr "清除选择"
 msgid "Clear Selection"
 msgstr "清除选择"
 
-#: src/features/chat/thread-list/thread-list-filter-menu.tsx:169
+#: src/features/chat/thread-list/thread-list-filter-menu.tsx:167
 msgid "Clear tag filter"
 msgstr "清除标签筛选"
 
@@ -7529,7 +7525,7 @@ msgstr "收起{groupLabel}操作"
 msgid "Collapse {title}"
 msgstr "折叠 {title}"
 
-#: src/features/chat/thread-list/thread-node.tsx:874
+#: src/features/chat/thread-list/thread-node.tsx:872
 msgid "Collapse branches"
 msgstr "收起分支"
 
@@ -9494,7 +9490,7 @@ msgstr "无法开始试运行。"
 msgid "Could not stop the conversation"
 msgstr "无法停止对话"
 
-#: src/features/chat/thread-list/thread-node.tsx:962
+#: src/features/chat/thread-list/thread-node.tsx:960
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:196
 msgid "Could not stop the reply. Please try again."
 msgstr "无法停止回复。请重试。"
@@ -10913,7 +10909,7 @@ msgstr "删除此登录信息？"
 msgid "Delete thread"
 msgstr "删除对话"
 
-#: src/features/chat/thread-list/thread-node.tsx:1121
+#: src/features/chat/thread-list/thread-node.tsx:1119
 msgid "Delete Thread"
 msgstr "删除对话"
 
@@ -11823,7 +11819,7 @@ msgid "Downloads open the GitHub releases page. If no installers are listed ther
 msgstr "下载会打开 GitHub 发布页面。如果页面上还没有安装包，说明桌面版尚未发布。"
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/chat/thread-list/thread-node.tsx:896
+#: src/features/chat/thread-list/thread-node.tsx:894
 #: src/features/develop/components/inbox-list.tsx:118
 #: src/features/develop/components/pull-request-view.tsx:83
 #: src/features/skills/components/skill-builder-review.tsx:133
@@ -13297,10 +13293,6 @@ msgstr "此机器人的每次聊天和计划运行只获得这些工具。你的
 msgid "Every chat, unless its project sets the role."
 msgstr "所有聊天，除非其项目设置了该角色。"
 
-#: src/features/settings/components/chat/agent-settings.tsx:70
-#~ msgid "Every click is checked, then made for real. A page can change a button between the check and the press, so a purchase click may not be checked."
-#~ msgstr "每次点击都会先检查，然后真实执行。页面可能在检查和按下之间更改按钮，因此购买点击可能无法被检查。"
-
 #: src/features/tasks/components/task-form-dialog.tsx:126
 msgid "Every day at 09:00 UTC"
 msgstr "每天 09:00 UTC"
@@ -13537,7 +13529,7 @@ msgstr "展开 {groupLabel} 操作"
 msgid "Expand {title}"
 msgstr "展开 {title}"
 
-#: src/features/chat/thread-list/thread-node.tsx:874
+#: src/features/chat/thread-list/thread-node.tsx:872
 msgid "Expand branches"
 msgstr "展开分支"
 
@@ -13662,7 +13654,7 @@ msgstr "过期时间"
 msgid "Expires {date}"
 msgstr "{date} 过期"
 
-#: src/features/chat/thread-list/thread-node.tsx:908
+#: src/features/chat/thread-list/thread-node.tsx:906
 msgid "Expires in {remainingTime}"
 msgstr "{remainingTime} 后过期"
 
@@ -17162,7 +17154,7 @@ msgstr "你好，{0}！今天想做点什么？"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:115
 #: src/features/layout/components/mobile-section-nav.tsx:72
-#: src/features/layout/components/sidebar-shortcut.tsx:286
+#: src/features/layout/components/sidebar-shortcut.tsx:287
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:159
 msgid "Help"
 msgstr "帮助"
@@ -17693,7 +17685,7 @@ msgid "Identity"
 msgstr "身份"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:53
-#: src/features/chat/thread-list/thread-node.tsx:897
+#: src/features/chat/thread-list/thread-node.tsx:895
 #: src/features/sub-agents/components/worker-list.tsx:104
 msgid "Idle"
 msgstr "空闲"
@@ -19050,7 +19042,7 @@ msgid "Key file (optional, absolute path)"
 msgstr "密钥文件（可选，绝对路径）"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:333
-#: src/features/chat/thread-list/thread-list-filter-menu.tsx:193
+#: src/features/chat/thread-list/thread-list-filter-menu.tsx:191
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:137
 #: src/features/workflow/components/canvas/workflow-controls.tsx:374
 msgid "Keyboard shortcuts"
@@ -19884,7 +19876,7 @@ msgstr "关联拉取请求"
 msgid "Linked by hand"
 msgstr "手动关联"
 
-#: src/features/chat/thread-list/thread-node.tsx:891
+#: src/features/chat/thread-list/thread-node.tsx:889
 msgid "Linked pull requests: {linkedPullRequests}"
 msgstr "已关联的拉取请求：{linkedPullRequests}"
 
@@ -20259,10 +20251,6 @@ msgstr "正在加载指南"
 #: src/features/develop/components/thread-pull-requests.tsx:318
 msgid "Loading the linked pull requests…"
 msgstr "正在加载已关联的拉取请求…"
-
-#: src/features/devices/components/devices-settings.tsx:110
-#~ msgid "Loading the projects this computer may be used in…"
-#~ msgstr "正在加载可使用此计算机的项目…"
 
 #: src/features/sub-agents/components/sub-agent-approvals.tsx:48
 msgid "Loading the sub-agent's requests…"
@@ -20832,7 +20820,7 @@ msgid "Manage tags"
 msgstr "管理标签"
 
 #: src/features/chat/tags/thread-tags-menu.tsx:66
-#: src/features/chat/thread-list/thread-list-filter-menu.tsx:178
+#: src/features/chat/thread-list/thread-list-filter-menu.tsx:176
 msgid "Manage tags…"
 msgstr "管理标签…"
 
@@ -21407,7 +21395,7 @@ msgstr "输入消息..."
 
 #: src/components/command-palette.tsx:802
 #: src/features/chat/sharing/shared-thread-page.tsx:151
-#: src/features/chat/thread-list/thread-list-filter-menu.tsx:110
+#: src/features/chat/thread-list/thread-list-filter-menu.tsx:108
 msgid "Messages"
 msgstr "消息"
 
@@ -21415,8 +21403,8 @@ msgstr "消息"
 msgid "Messages API (/v1/messages) — Anthropic and services that mirror it."
 msgstr "Messages API（/v1/messages）——Anthropic 及与其兼容的服务。"
 
-#: src/features/chat/thread-list/thread-node.tsx:925
-#: src/features/chat/thread-list/thread-node.tsx:937
+#: src/features/chat/thread-list/thread-node.tsx:923
+#: src/features/chat/thread-list/thread-node.tsx:935
 msgid "Messages from {sourceName}"
 msgstr "来自 {sourceName} 的消息"
 
@@ -21766,7 +21754,7 @@ msgstr "模型已被屏蔽"
 msgid "Model Breakdown"
 msgstr "模型明细"
 
-#: src/features/chat/thread-list/thread-node.tsx:793
+#: src/features/chat/thread-list/thread-node.tsx:794
 msgid "Model comparison"
 msgstr "模型对比"
 
@@ -22567,7 +22555,7 @@ msgid "Neore"
 msgstr "Neore"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:89
-#: src/features/layout/components/sidebar-shortcut.tsx:238
+#: src/features/layout/components/sidebar-shortcut.tsx:239
 #: src/features/marketing/components/navbar-menu.tsx:44
 msgid "Neore - AI Text & Video & Audio & Image & Documents Generation Platform"
 msgstr "Neore - AI 文本、视频、音频、图像和文档生成平台"
@@ -22823,7 +22811,7 @@ msgstr "新建目标"
 #: src/features/chat/group/create-group-chat-button.tsx:130
 #: src/features/chat/group/create-group-chat-button.tsx:135
 #: src/features/chat/group/create-group-chat-button.tsx:145
-#: src/features/chat/thread-list/thread-list-filter-menu.tsx:185
+#: src/features/chat/thread-list/thread-list-filter-menu.tsx:183
 msgid "New group chat"
 msgstr "新建群聊"
 
@@ -23675,7 +23663,7 @@ msgid "No summary available. Click \"Generate\" to create one."
 msgstr "暂无摘要。点击“生成”来创建一个。"
 
 #: src/features/chat/tags/thread-tags-menu.tsx:42
-#: src/features/chat/thread-list/thread-list-filter-menu.tsx:145
+#: src/features/chat/thread-list/thread-list-filter-menu.tsx:143
 msgid "No tags yet"
 msgstr "还没有标签"
 
@@ -24492,11 +24480,6 @@ msgid "Only someone who can write in this chat can take control of the browser."
 msgstr "只有可以在此聊天中发言的人才能接管浏览器。"
 
 #. placeholder {0}: allThreadsData.lunora.length
-#: src/components/command-palette.tsx:631
-#~ msgid "Only the {0} threads loaded here are filtered by state; older ones are not included."
-#~ msgstr "仅按状态筛选此处已加载的 {0} 个对话；更早的对话不包括在内。"
-
-#. placeholder {0}: allThreadsData.lunora.length
 #: src/components/command-palette.tsx:973
 msgid "Only the {0} threads loaded here are filtered; older ones are not included."
 msgstr "仅筛选此处已加载的 {0} 个对话；较早的对话未包含在内。"
@@ -24700,7 +24683,7 @@ msgstr "全屏打开"
 msgid "Open in new window"
 msgstr "在新窗口中打开"
 
-#: src/features/chat/thread-list/thread-node.tsx:810
+#: src/features/chat/thread-list/thread-node.tsx:811
 #: src/features/chat/thread-list/thread-options-menu.tsx:160
 msgid "Open in split view"
 msgstr "在分屏视图中打开"
@@ -24789,7 +24772,7 @@ msgid "Open settings"
 msgstr "打开设置"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:112
-#: src/features/layout/components/sidebar-shortcut.tsx:274
+#: src/features/layout/components/sidebar-shortcut.tsx:275
 msgid "Open Settings"
 msgstr "打开设置"
 
@@ -24903,8 +24886,8 @@ msgid "Open up to three chats side by side. Applies to this browser only."
 msgstr "最多可并排打开三个聊天。仅适用于此浏览器。"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:118
-#: src/features/layout/components/sidebar-shortcut.tsx:224
-#: src/features/layout/components/sidebar-shortcut.tsx:311
+#: src/features/layout/components/sidebar-shortcut.tsx:225
+#: src/features/layout/components/sidebar-shortcut.tsx:312
 msgid "Open user menu"
 msgstr "打开用户菜单"
 
@@ -25370,14 +25353,6 @@ msgstr "为你在模型选择器中加星标的模型排序，并为它们起自
 #: src/features/settings/components/chat/agent-settings.tsx:65
 msgid "Ordinary buttons and links are checked, then clicked for real, so popups and real-click checks work. A page can change one in the moment between that check and the press, and that press is not checked again, so an ordinary button can become a purchase unseen. Purchases you approve are still checked in the page."
 msgstr "普通按钮和链接会先被检查，然后真实点击，因此弹窗和需要真实点击的检查可以正常工作。页面可能在检查与按下之间的那一刻改变其中某个元素，而该次按下不会再次检查，因此普通按钮可能在不知情的情况下变成购买按钮。你批准的购买仍会在页面中检查。"
-
-#: src/features/settings/components/chat/agent-settings.tsx:65
-#~ msgid "Ordinary buttons and links are checked, then clicked for real, so popups and real-click checks work. A page can still change one in the moment between that check and the press. Purchases and approved clicks stay checked in the page."
-#~ msgstr "普通按钮和链接会先检查，再真实点击，因此弹窗和真实点击检查可以正常工作。页面仍可能在检查与按下之间的瞬间更改其中一个。购买和已批准的点击仍在页面内检查。"
-
-#: src/features/settings/components/chat/agent-settings.tsx:65
-#~ msgid "Ordinary buttons and links get real clicks, so popups and real-click checks work. Purchases and approved clicks stay checked in the page."
-#~ msgstr "普通按钮和链接接收真实点击，因此弹窗和真实点击检查可以正常工作。购买和已批准的点击仍在页面内检查。"
 
 #: src/features/settings/components/chat/agent-settings.tsx:70
 msgid "Ordinary clicks are checked, then made for real. A page can change an ordinary button between the check and the press, so it can become a purchase unseen. Purchases you approve are still checked in the page."
@@ -27717,7 +27692,7 @@ msgstr "路由引擎分配的查询复杂度等级"
 msgid "Query usage analytics and costs"
 msgstr "查询用量分析和成本"
 
-#: src/features/chat/thread-list/thread-node.tsx:837
+#: src/features/chat/thread-list/thread-node.tsx:838
 msgid "Question"
 msgstr "问题"
 
@@ -28972,7 +28947,7 @@ msgstr "重命名、锁文件、快照和生成的文件。最后阅读，且只
 msgid "Reopen"
 msgstr "重新打开"
 
-#: src/features/chat/thread-list/thread-node.tsx:753
+#: src/features/chat/thread-list/thread-node.tsx:754
 msgid "Reorder"
 msgstr "重新排序"
 
@@ -29330,7 +29305,7 @@ msgstr "资源"
 msgid "Response"
 msgstr "响应"
 
-#: src/features/chat/thread-list/thread-node.tsx:822
+#: src/features/chat/thread-list/thread-node.tsx:823
 msgid "Response failed - try again"
 msgstr "回复失败——请重试"
 
@@ -29984,7 +29959,7 @@ msgstr "运行在 Cloudflare Workers 上——冷启动低于 50ms，全球 300+
 msgid "Runs on the schedule {0}{1}, on {2}."
 msgstr "按计划 {0}{1} 运行，使用 {2}。"
 
-#: src/features/chat/thread-list/thread-node.tsx:881
+#: src/features/chat/thread-list/thread-node.tsx:879
 msgid "Runs on your computer"
 msgstr "在你的电脑上运行"
 
@@ -30472,8 +30447,8 @@ msgid "Search files and chats..."
 msgstr "搜索文件和聊天..."
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:144
-#: src/features/chat/thread-list/thread-list-filter-menu.tsx:84
-#: src/features/chat/thread-list/thread-list-filter-menu.tsx:96
+#: src/features/chat/thread-list/thread-list-filter-menu.tsx:82
+#: src/features/chat/thread-list/thread-list-filter-menu.tsx:94
 msgid "Search filters"
 msgstr "搜索筛选"
 
@@ -30489,7 +30464,7 @@ msgstr "搜索太空探索的最新消息"
 msgid "Search GitHub repositories and code"
 msgstr "搜索 GitHub 仓库和代码"
 
-#: src/features/chat/thread-list/thread-list-filter-menu.tsx:100
+#: src/features/chat/thread-list/thread-list-filter-menu.tsx:98
 msgid "Search in"
 msgstr "搜索范围"
 
@@ -30780,7 +30755,7 @@ msgstr "种子"
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:585
 #: ../../packages/ui/src/components/data-grid/data-grid-column-header.tsx:30
 #: src/features/chat/forward/select-messages-action.tsx:29
-#: src/features/chat/thread-list/thread-node.tsx:768
+#: src/features/chat/thread-list/thread-node.tsx:769
 #: src/features/prompts/components/prompt-list.tsx:583
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:220
 msgid "Select"
@@ -30925,7 +30900,7 @@ msgstr "选择模型（可选）"
 msgid "Select model..."
 msgstr "选择模型..."
 
-#: src/features/chat/thread-list/thread-list-filter-menu.tsx:189
+#: src/features/chat/thread-list/thread-list-filter-menu.tsx:187
 msgid "Select multiple threads"
 msgstr "选择多个对话"
 
@@ -32305,7 +32280,7 @@ msgstr "平滑过渡"
 msgid "Snooze"
 msgstr "暂时搁置"
 
-#: src/features/chat/thread-list/thread-node.tsx:1049
+#: src/features/chat/thread-list/thread-node.tsx:1047
 msgid "Snooze 1 hour"
 msgstr "暂时搁置 1 小时"
 
@@ -32313,8 +32288,8 @@ msgstr "暂时搁置 1 小时"
 msgid "Snooze chats until the limit resets"
 msgstr "在上限重置前暂时搁置对话"
 
-#: src/features/chat/thread-list/thread-node.tsx:1028
-#: src/features/chat/thread-list/thread-node.tsx:1042
+#: src/features/chat/thread-list/thread-node.tsx:1026
+#: src/features/chat/thread-list/thread-node.tsx:1040
 msgid "Snooze thread"
 msgstr "暂时搁置对话"
 
@@ -32322,15 +32297,15 @@ msgstr "暂时搁置对话"
 msgid "Snooze until"
 msgstr "暂时搁置至"
 
-#: src/features/chat/thread-list/thread-node.tsx:1055
+#: src/features/chat/thread-list/thread-node.tsx:1053
 msgid "Snooze until next week"
 msgstr "暂时搁置至下周"
 
-#: src/features/chat/thread-list/thread-node.tsx:1051
+#: src/features/chat/thread-list/thread-node.tsx:1049
 msgid "Snooze until tomorrow 09:00"
 msgstr "暂时搁置至明天 09:00"
 
-#: src/features/chat/thread-list/thread-node.tsx:1056
+#: src/features/chat/thread-list/thread-node.tsx:1054
 msgid "Snooze until…"
 msgstr "暂时搁置至…"
 
@@ -33202,8 +33177,8 @@ msgstr "停止并清空队列"
 msgid "Stop browser session"
 msgstr "停止浏览器会话"
 
-#: src/features/chat/thread-list/thread-node.tsx:951
-#: src/features/chat/thread-list/thread-node.tsx:973
+#: src/features/chat/thread-list/thread-node.tsx:949
+#: src/features/chat/thread-list/thread-node.tsx:971
 #: src/features/chat/thread/composer-input-area.tsx:424
 #: src/features/chat/thread/composer-input-area.tsx:437
 msgid "Stop generating"
@@ -33314,7 +33289,7 @@ msgstr "Streamable HTTP（推荐）"
 msgid "Streaming"
 msgstr "流式输出中"
 
-#: src/features/chat/thread-list/thread-node.tsx:821
+#: src/features/chat/thread-list/thread-node.tsx:822
 msgid "Streaming..."
 msgstr "流式输出中..."
 
@@ -34068,7 +34043,7 @@ msgid "Table"
 msgstr "表格"
 
 #: src/features/chat/tags/thread-tags-menu.tsx:98
-#: src/features/chat/thread-list/thread-list-filter-menu.tsx:139
+#: src/features/chat/thread-list/thread-list-filter-menu.tsx:137
 #: src/features/chat/thread-list/thread-node.tsx:568
 #: src/features/chat/thread-list/thread-node.tsx:574
 #: src/features/prompts/components/prompt-form-dialog.tsx:285
@@ -34416,7 +34391,7 @@ msgstr "模板"
 msgid "Temporary"
 msgstr "临时"
 
-#: src/features/chat/thread-list/thread-node.tsx:908
+#: src/features/chat/thread-list/thread-node.tsx:906
 msgid "Temporary chat"
 msgstr "临时聊天"
 
@@ -36402,10 +36377,6 @@ msgstr "此链接目前不接收消息。请稍后再试。"
 msgid "This list is full: remove a tool before adding another."
 msgstr "此列表已满：请先移除一个工具，再添加新的。"
 
-#: src/features/vault/components/site-logins.tsx:307
-#~ msgid "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
-#~ msgstr "此登录信息已在别处更改，并已重新加载。你对用户名和标签的修改已保留；请检查它的机器人，如果你正在更改密码，请重新输入，然后再次保存。"
-
 #: src/features/vault/components/site-logins.tsx:362
 msgid "This login was changed elsewhere and has been reloaded. Your username, label and sign-in page edits are kept; check its bots, type the password again if you were changing it, and save again."
 msgstr "此登录信息已在别处更改，并已重新加载。你对用户名、标签和登录页面的修改已保留；请检查它的机器人，如果你正在更改密码，请重新输入，然后再次保存。"
@@ -36870,7 +36841,7 @@ msgstr "对话将在 {0} 后自动删除"
 #: src/features/admin/components/admin-shard-footprint-row.tsx:142
 #: src/features/admin/components/admin-shard-footprint-row.tsx:163
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:35
-#: src/features/chat/thread-list/thread-list-filter-menu.tsx:109
+#: src/features/chat/thread-list/thread-list-filter-menu.tsx:107
 msgid "Threads"
 msgstr "对话"
 
@@ -38111,7 +38082,7 @@ msgstr "取消置顶对话"
 msgid "Unpublish"
 msgstr "取消发布"
 
-#: src/features/chat/thread-list/thread-node.tsx:848
+#: src/features/chat/thread-list/thread-node.tsx:846
 msgid "Unread"
 msgstr "未读"
 
@@ -38123,7 +38094,7 @@ msgstr "未保存的更改"
 msgid "Unsent draft"
 msgstr "未发送的草稿"
 
-#: src/features/chat/thread-list/thread-node.tsx:1058
+#: src/features/chat/thread-list/thread-node.tsx:1056
 msgid "Unsnooze"
 msgstr "取消暂时搁置"
 
@@ -38329,7 +38300,7 @@ msgstr "已更新：{0} · 已知晓：{1}"
 msgid "Updated: {timestamp}"
 msgstr "更新于：{timestamp}"
 
-#: src/features/layout/components/sidebar-shortcut.tsx:291
+#: src/features/layout/components/sidebar-shortcut.tsx:292
 msgid "Updates"
 msgstr "更新动态"
 
@@ -38710,7 +38681,7 @@ msgstr "用户"
 #: src/features/devices/components/devices-settings.tsx:549
 #: src/features/layout/components/nav-user.tsx:373
 #: src/features/layout/components/nav-user.tsx:373
-#: src/features/layout/components/sidebar-shortcut.tsx:216
+#: src/features/layout/components/sidebar-shortcut.tsx:217
 msgid "User"
 msgstr "用户"
 
@@ -39641,8 +39612,8 @@ msgstr "正在等待上传完成…"
 msgid "Waiting for you"
 msgstr "正在等待你"
 
-#: src/features/chat/thread-list/thread-node.tsx:824
-#: src/features/chat/thread-list/thread-node.tsx:831
+#: src/features/chat/thread-list/thread-node.tsx:825
+#: src/features/chat/thread-list/thread-node.tsx:832
 #: src/features/chat/thread/ask-user-prompt.tsx:184
 msgid "Waiting for your answer"
 msgstr "正在等待你的回答"
@@ -39652,8 +39623,8 @@ msgstr "正在等待你的回答"
 msgid "Waiting for your answer in {0}"
 msgstr "正在“{0}”中等待你的回答"
 
-#: src/features/chat/thread-list/thread-node.tsx:823
-#: src/features/chat/thread-list/thread-node.tsx:830
+#: src/features/chat/thread-list/thread-node.tsx:824
+#: src/features/chat/thread-list/thread-node.tsx:831
 #: src/features/chat/thread/tool-approval.tsx:78
 #: src/features/home/components/home-page.tsx:116
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
@@ -40010,7 +39981,7 @@ msgid "What's included in the free plan?"
 msgstr "免费套餐包含哪些内容？"
 
 #: src/features/changelog/components/changelog-panel.tsx:103
-#: src/features/layout/components/sidebar-shortcut.tsx:298
+#: src/features/layout/components/sidebar-shortcut.tsx:299
 msgid "What's New"
 msgstr "新功能"
 

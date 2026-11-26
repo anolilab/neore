@@ -28088,6 +28088,116 @@
       "relations": {},
       "shardMode": "shardBy:userId"
     },
+    "taskSuggestions": {
+      "commitOrdered": false,
+      "fields": {
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "cronExpression": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "decidedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "instructions": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "sourceThreadIds": {
+          "kind": "array",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "of": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
+        },
+        "status": {
+          "kind": "union",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"accepted\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"dismissed\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"pending\""
+            }
+          ]
+        },
+        "taskId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "tasks"
+        },
+        "title": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_user_and_status_and_createdAt": {
+          "fields": [
+            "userId",
+            "status",
+            "createdAt"
+          ],
+          "unique": false
+        },
+        "by_user_and_status_and_decidedAt": {
+          "fields": [
+            "userId",
+            "status",
+            "decidedAt"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
     "tasks": {
       "commitOrdered": false,
       "fields": {
@@ -34500,6 +34610,12 @@
           "unique": false
         },
         "resumeLastChat": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "scheduleIdeasEnabled": {
           "kind": "boolean",
           "nullable": false,
           "optional": true,
