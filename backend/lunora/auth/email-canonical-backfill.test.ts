@@ -3,9 +3,10 @@
  * per call from that completed check, never by picking one of two accounts that fold to one address. The deploy's runner
  * drives these calls here.
  */
+import { DatabaseSync } from "node:sqlite";
+
 import { canonicalEmail, resolveAuthOptions } from "@lunora/auth";
 import { lunoraTest } from "@lunora/testing";
-import { LunoraError } from "lunorash/server";
 import { describe, expect, it, vi } from "vitest";
 
 import type { BackfillCall, BackfillRequest } from "../../../scripts/data-migrations";
@@ -35,6 +36,27 @@ const LONG_CURSOR_PAD = "c".repeat(700);
 
 const userRow = (email: string, extra: Record<string, unknown> = {}) => {
     return { createdAt: 1, email, emailVerified: true, name: email, updatedAt: 1, ...extra };
+};
+
+/**
+ * Stores a `user` row's dates as better-auth leaves them in D1: its Lunora adapter sets `supportsDates: false` and writes
+ * past Lunora's validators, so `createdAt`/`updatedAt` hold ISO strings in `v.number()` columns. The harness validates its
+ * writes, so the row is rewritten under it, in the document its SQLite holds. A date not given is the stored one as ISO.
+ */
+const storeDatesAsText = (email: string, dates: { banExpires?: string; createdAt?: string; updatedAt?: string } = {}): void => {
+    const table = harnessSqlite!.prepare(`SELECT id, __doc__ FROM "user" WHERE json_extract(__doc__, '$.email') = ?`);
+    const { __doc__: stored, id } = table.get(email) as { __doc__: string; id: string };
+    const doc = JSON.parse(stored) as Record<string, unknown>;
+
+    for (const column of ["createdAt", "updatedAt"] as const) {
+        doc[column] = dates[column] ?? new Date(doc[column] as number).toISOString();
+    }
+
+    if (dates.banExpires !== undefined) {
+        doc["banExpires"] = dates.banExpires;
+    }
+
+    harnessSqlite!.prepare(`UPDATE "user" SET __doc__ = ? WHERE id = ?`).run(JSON.stringify(doc), id);
 };
 
 /** Every user row as `[email, emailCanonical]`, in email order. */
@@ -67,14 +89,6 @@ interface CountOptions {
     patchIf?: (ctx: any, id: string, call: number) => Promise<void>;
     /** Rounds the conditional patch goes before it applies, each charged a read and a write; at {@link PATCH_IF_ATTEMPTS} it throws `occ`. */
     patchRounds?: number;
-    /**
-     * `user` rows as D1 holds the ones better-auth wrote: its Lunora adapter sets `supportsDates: false`, so a sign-up or
-     * profile update stores `createdAt`/`updatedAt` as ISO strings, whatever the column's `v.number()` says. `iso` answers
-     * them as those strings; `unreadable` as text no clock reads. The harness cannot hold such a row (it validates every
-     * column on a write), so only reads present them; a conditional patch whose guard carries such a date is refused, as
-     * Lunora refused it on staging (`VALIDATION_ERROR`, the column being `v.number()`).
-     */
-    storedDates?: "iso" | "unreadable";
 }
 
 /**
@@ -84,16 +98,6 @@ interface CountOptions {
  */
 const counted = (ctx: any, options: CountOptions = {}) => {
     const spent = { patches: 0, queries: [] as unknown[], rowsRead: 0, statements: 0 };
-    const presentDates = (value: number): string => (options.storedDates === "iso" ? new Date(value).toISOString() : "not a date");
-    const present = <T>(row: T): T => {
-        if (options.storedDates === undefined || row === null || typeof row !== "object") {
-            return row;
-        }
-
-        const { createdAt, updatedAt } = row as unknown as { createdAt: number; updatedAt: number };
-
-        return { ...row, createdAt: presentDates(createdAt), updatedAt: presentDates(updatedAt) };
-    };
     const unpad = (cursor: unknown) => (typeof cursor === "string" && options.longCursors === true ? cursor.slice(LONG_CURSOR_PAD.length) : cursor);
     const user = {
         findFirst: async (query: unknown) => {
@@ -103,7 +107,7 @@ const counted = (ctx: any, options: CountOptions = {}) => {
 
             spent.rowsRead += row === null ? 0 : 1;
 
-            return present(row);
+            return row;
         },
         findMany: async (input: { cursor?: string; limit?: number; where?: { emailCanonical?: unknown } }) => {
             spent.statements += 1;
@@ -127,7 +131,6 @@ const counted = (ctx: any, options: CountOptions = {}) => {
             }
 
             spent.rowsRead += result.page.length;
-            result = { ...result, page: result.page.map((row) => present(row)) };
 
             return options.longCursors === true && typeof result.continueCursor === "string"
                 ? { ...result, continueCursor: `${LONG_CURSOR_PAD}${result.continueCursor}` }
@@ -160,14 +163,7 @@ const counted = (ctx: any, options: CountOptions = {}) => {
 
         await options.patchIf?.(ctx, id, spent.patches);
 
-        const guarded = args as { patch: Record<string, unknown>; where: Record<string, unknown> };
-
-        // Lunora validates every guard value against its column, as staging answered for a stored ISO `updatedAt`.
-        if (options.storedDates !== undefined && typeof guarded.where.updatedAt === "string") {
-            throw new LunoraError("VALIDATION_ERROR", "Expected number at <root>, received string");
-        }
-
-        const result = await ctx.db.patchIf(table, id, guarded);
+        const result = await ctx.db.patchIf(table, id, args);
 
         // The audit trigger's `documentHistory` insert, charged before it can fail.
         spent.statements += result.applied ? 1 : 0;
@@ -265,8 +261,15 @@ const refusal = async (work: Promise<unknown>): Promise<string> => {
     return "not refused";
 };
 
+/** The SQLite under the latest {@link withHarness}. */
+let harnessSqlite: DatabaseSync | undefined;
+
 const withHarness = async <T>(body: (ctx: any) => Promise<T>): Promise<T> => {
+    const prepare = vi.spyOn(DatabaseSync.prototype, "prepare");
     const harness = lunoraTest(schema as never);
+
+    harnessSqlite = prepare.mock.contexts[0] as DatabaseSync;
+    prepare.mockRestore();
 
     try {
         return await harness.run(body);
@@ -868,20 +871,78 @@ describe("the user.emailCanonical backfill", () => {
         ]);
     });
 
-    it("fills an account better-auth wrote, whose dates D1 holds as ISO strings, through the deploy's runner", async () => {
-        expect.assertions(3);
+    it("fills an account better-auth wrote, whose dates D1 holds as ISO strings, and stores those dates as epoch ms", async () => {
+        expect.assertions(4);
 
-        const { rows, run } = await withHarness(async (ctx) => {
-            await ctx.db.insert("user", userRow("Signed.Up@Example.com"));
+        const createdAt = "2026-11-05T10:00:56.180Z";
+        const { audited, rows, run, stored } = await withHarness(async (ctx) => {
+            const id = await ctx.db.insert("user", userRow("Signed.Up@Example.com"));
 
-            const result = await runBackfill(ctx, { storedDates: "iso" });
+            // Lunora validates the whole row on any patch, so on `main` this answered `VALIDATION_ERROR`, as staging did.
+            storeDatesAsText("Signed.Up@Example.com", { banExpires: createdAt, createdAt, updatedAt: createdAt });
 
-            return { rows: await canonicals(ctx), run: result };
+            const result = await runBackfill(ctx);
+            const { page } = await ctx.db.documentHistory.findMany({ where: { documentId: id, tableName: "user" } });
+
+            return { audited: page.length, rows: await canonicals(ctx), run: result, stored: await ctx.db.get("user", id) };
         });
 
-        expect(run.exitCode).toBe(0);
-        expect(run.output).not.toContain("changed during the fill");
+        expect({ exitCode: run.exitCode, output: run.output }).toMatchObject({ exitCode: 0 });
         expect(rows).toStrictEqual([["Signed.Up@Example.com", "signed.up@example.com"]]);
+        expect(stored).toMatchObject({ banExpires: Date.parse(createdAt), createdAt: Date.parse(createdAt), updatedAt: Date.parse(createdAt) });
+        // The insert and the fill: the audit trigger ran on the converted row.
+        expect(audited).toBe(2);
+    });
+
+    it("skips an ISO-dated row whose updatedAt changes between the fill's read and its write", async () => {
+        expect.assertions(2);
+
+        const { result, stored } = await withHarness(async (ctx) => {
+            const id = await ctx.db.insert("user", userRow("Lena@example.com"));
+
+            storeDatesAsText("Lena@example.com");
+
+            const { ids, token } = await completedCheck(ctx);
+
+            return {
+                result: await fillEmailCanonicalBatch(
+                    counted(ctx, {
+                        patchIf: async () => {
+                            storeDatesAsText("Lena@example.com", { updatedAt: "2026-11-05T10:00:56.180Z" });
+                        },
+                    }).ctx,
+                    { ids, token },
+                ),
+                stored: await ctx.db.get("user", id),
+            };
+        });
+
+        expect(result).toMatchObject({ filled: 0, skipped: 1, status: "progress" });
+        expect(stored).toMatchObject({ updatedAt: "2026-11-05T10:00:56.180Z" });
+    });
+
+    it("skips a row whose numeric updatedAt better-auth turns into an ISO string between the fill's read and its write", async () => {
+        expect.assertions(2);
+
+        const { result, stored } = await withHarness(async (ctx) => {
+            const id = await ctx.db.insert("user", userRow("Mira@example.com"));
+            const { ids, token } = await completedCheck(ctx);
+
+            return {
+                result: await fillEmailCanonicalBatch(
+                    counted(ctx, {
+                        patchIf: async () => {
+                            storeDatesAsText("Mira@example.com", { updatedAt: "2026-11-05T10:00:56.180Z" });
+                        },
+                    }).ctx,
+                    { ids, token },
+                ),
+                stored: await ctx.db.get("user", id),
+            };
+        });
+
+        expect(result).toMatchObject({ filled: 0, skipped: 1, status: "progress" });
+        expect(stored).toMatchObject({ updatedAt: "2026-11-05T10:00:56.180Z" });
     });
 
     it("skips a row whose email changes between the fill's read and its write, and fills nothing for it", async () => {
@@ -917,11 +978,15 @@ describe("the user.emailCanonical backfill", () => {
                 await ctx.db.insert("user", userRow("old@example.com"));
                 await ctx.db.insert("user", userRow("fresh@example.com", { updatedAt: NOW - EMAIL_CANONICAL_SETTLE_MS + 1 }));
 
-                const { token } = await completedCheck(ctx, { storedDates });
+                for (const email of ["old@example.com", "fresh@example.com"]) {
+                    storeDatesAsText(email, storedDates === "iso" ? {} : { createdAt: "not a date", updatedAt: "not a date" });
+                }
+
+                const { token } = await completedCheck(ctx);
                 const answers = [];
 
                 for (const email of ["old@example.com", "fresh@example.com"]) {
-                    answers.push(await fillEmailCanonicalBatch(counted(ctx, { storedDates }).ctx, { ids: [await userIdOf(ctx, email)], token }));
+                    answers.push(await fillEmailCanonicalBatch(counted(ctx).ctx, { ids: [await userIdOf(ctx, email)], token }));
                 }
 
                 return answers.map(({ filled, skipped }) => {
@@ -938,6 +1003,22 @@ describe("the user.emailCanonical backfill", () => {
             { filled: 0, skipped: 1 },
             { filled: 0, skipped: 1 },
         ]);
+    });
+
+    it("refuses a settled row whose createdAt no clock reads, rather than store another time for it", async () => {
+        expect.assertions(2);
+
+        const { code, rows } = await withHarness(async (ctx) => {
+            await ctx.db.insert("user", userRow("old@example.com"));
+            storeDatesAsText("old@example.com", { createdAt: "not a date" });
+
+            const { ids, token } = await completedCheck(ctx);
+
+            return { code: await refusal(fillEmailCanonicalBatch(counted(ctx).ctx, { ids, token })), rows: await canonicals(ctx) };
+        });
+
+        expect(code).toBe("BAD_REQUEST");
+        expect(rows).toStrictEqual([["old@example.com", undefined]]);
     });
 
     it("charges every round of a contended conditional patch, and a fill call still fits the 50 statements", async () => {

@@ -27,7 +27,7 @@
 import { canonicalEmail } from "@lunora/auth";
 import { LunoraError, v } from "lunorash/server";
 
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { claimFence, claimRow, holdClaim, recordClaimResult, releaseClaim, swapClaimResult } from "../lib/claim-once";
@@ -185,6 +185,54 @@ const changedAt = (value: unknown): number => {
     }
 
     return typeof value === "string" ? Date.parse(value) : NaN;
+};
+
+/** The `user` columns better-auth writes as dates, so a row it wrote may hold them as ISO strings. */
+const USER_DATE_COLUMNS = ["banExpires", "createdAt", "updatedAt"] as const;
+
+type UserDateColumn = (typeof USER_DATE_COLUMNS)[number];
+
+/** A fill's conditional patch: the dates it converts as numbers, and every date guarded on the value it read. */
+interface FillPatch {
+    patch: Partial<Record<UserDateColumn, number>> & { emailCanonical: string };
+    where: Partial<Record<UserDateColumn, number | string | null>> & { email: string; emailCanonical: null };
+}
+
+/**
+ * The conditional patch that fills one row: `emailCanonical`, only while the row is unfilled and holds the address the
+ * fill folded. Lunora's writer validates every column of the row a patch leaves, not only the patched ones, so a row
+ * better-auth wrote (ISO dates in `v.number()` columns) refuses any patch with `VALIDATION_ERROR`. Each date column that
+ * holds a string is therefore rewritten as the epoch milliseconds it names. Every date column is guarded on the value
+ * read (a number, a string, or none): a write in between, also one that turns a number into a string, makes the patch
+ * miss rather than put back an older time or leave a row the writer refuses. better-auth's adapter hands a stored number back
+ * unchanged, not as a `Date`; its own reads and the web app wrap it in `new Date(...)`. A string no clock reads is refused,
+ * never stored as some other time.
+ */
+const fillPatchOf = (row: Pick<Doc<"user">, "email" | UserDateColumn>, canonical: string): FillPatch => {
+    const patch: FillPatch["patch"] = { emailCanonical: canonical };
+    const where: FillPatch["where"] = { email: row.email, emailCanonical: null };
+
+    for (const column of USER_DATE_COLUMNS) {
+        // Typed a number; better-auth's rows hold a string.
+        const stored: unknown = row[column];
+
+        if (typeof stored !== "string") {
+            where[column] = typeof stored === "number" ? stored : null;
+
+            continue;
+        }
+
+        const epochMs = Date.parse(stored);
+
+        if (!Number.isFinite(epochMs)) {
+            throw new LunoraError("BAD_REQUEST", `A user row's ${column} does not read as a time; fix the row before the fill`);
+        }
+
+        patch[column] = epochMs;
+        where[column] = stored;
+    }
+
+    return { patch, where };
 };
 
 const toHex = (bytes: Uint8Array): string => [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -454,13 +502,8 @@ export const fillEmailCanonicalBatch = async (ctx: BackfillCtx, { ids, token }: 
         let applied: boolean;
 
         try {
-            // Only while the row is still unfilled and holds the address this call folded: the fill derives from `email`
-            // alone, so an email change in between makes this miss after one read more, and the row waits for the next
-            // check. Not on `updatedAt`: better-auth stores it as an ISO string, which Lunora refuses in a `v.number()` guard.
-            ({ applied } = await ctx.db.patchIf("user", id, {
-                patch: { emailCanonical: canonical },
-                where: { email: row.email, emailCanonical: null },
-            }));
+            // An email or date change in between makes this miss after one read more, and the row waits for the next check.
+            ({ applied } = await ctx.db.patchIf("user", id, fillPatchOf(row, canonical)));
         } catch (error) {
             // A sign-up that took this address since the check: the unique index refused the write. Anything else (the
             // audit insert, the network, the conditional patch's own `occ`) is not a conflict and is not swallowed.
