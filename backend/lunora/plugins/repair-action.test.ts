@@ -71,7 +71,7 @@ const procedureAt = (module: keyof typeof MODULES, name: string): never => {
 const OWNER = "owner-a";
 const ANALYST = { description: "Analyst skill", instructions: "Be the analyst.", name: "analyst", slug: "analyst" };
 
-const body = () => buildBundleMarkdown({ description: "", items: [{ kind: "skill", skill: ANALYST }], name: "Daily brief" });
+const body = () => buildBundleMarkdown({ description: "", items: [{ key: "analyst", kind: "skill", skill: ANALYST }], name: "Daily brief" });
 const pluginFile = (contentHash: string) => withPluginHeader(body(), { contentHash, slug: "daily-brief", version: "1.0.0" });
 
 describe("repair through the action", () => {
@@ -135,7 +135,7 @@ describe("repair through the action", () => {
 
         const otherBody = buildBundleMarkdown({
             description: "",
-            items: [{ kind: "skill", skill: { ...ANALYST, instructions: "Something else entirely." } }],
+            items: [{ key: "analyst", kind: "skill", skill: { ...ANALYST, instructions: "Something else entirely." } }],
             name: "Daily brief",
         });
         const otherHash = await bodyHash(otherBody);
