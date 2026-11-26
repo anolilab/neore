@@ -15,7 +15,8 @@
  * First it fills `user.emailCanonical` through D1 (`POST /admin/backfill-email-canonical`): a check of every account, page
  * by page, that no address is shared by two, then the fill, one batch per call, then a check again until it is done. The
  * check's token and the ids travel only in the request and response bodies, never in the log. `user` is a
- * `.global()` table, which `lunora migrate up` does not reach. The backfill and the shard migrations are
+ * `.global()` table, which `lunora migrate up` does not reach. It stops at its own deadline, well before the step's
+ * timeout; what it filled stays filled, and the next deploy goes on. The backfill and the shard migrations are
  * independent, so each runs whether or not the other fails; the job fails if either does. A migration declared on a
  * `.global()` table fails the step before anything runs.
  *

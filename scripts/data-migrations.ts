@@ -18,132 +18,55 @@ export const SCHEMA_BASELINE = "backend/lunora/.lunora-schema.json";
 export const MIGRATION_ATTEMPTS = 4;
 const MIGRATION_PAUSE_MS = 15_000;
 
-const literalText = (node: ts.Node | undefined): string | undefined =>
-    node !== undefined && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) ? node.text : undefined;
+/** A quoted string literal: Lunora's codegen reads no other form, not even a template literal without substitutions. */
+const literalText = (node: ts.Node | undefined): string | undefined => (node !== undefined && ts.isStringLiteral(node) ? node.text : undefined);
 
-/** `node` without the `as`, `satisfies` and parentheses around it. */
-const unwrapped = (node: ts.Expression): ts.Expression =>
-    ts.isAsExpression(node) || ts.isSatisfiesExpression(node) || ts.isParenthesizedExpression(node) ? unwrapped(node.expression) : node;
-
-/**
- * Reads the string a name stands for: the value of the module's top-level `const NAME = "literal"` the name is bound to,
- * by the checker's scopes, so a local binding of the same spelling never reads as the top-level one.
- */
-interface Constants {
-    /** The string `name` (an identifier) is bound to, if that is a top-level string constant. */
-    ofIdentifier: (name: ts.Identifier) => string | undefined;
-    /** The same for the value of a shorthand property (`{ table }`). */
-    ofShorthand: (member: ts.ShorthandPropertyAssignment) => string | undefined;
-}
-
-/** `source` as `MIGRATIONS_MODULE` in a program of that one file (no lib, nothing resolved), and its constants. */
-const parsedModule = (source: string): { constants: Constants; file: ts.SourceFile } => {
-    const parsed = ts.createSourceFile(MIGRATIONS_MODULE, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-    const options: ts.CompilerOptions = { noLib: true, noResolve: true, types: [] };
-    const host: ts.CompilerHost = {
-        fileExists: (name) => name === MIGRATIONS_MODULE,
-        getCanonicalFileName: (name) => name,
-        getCurrentDirectory: () => "",
-        getDefaultLibFileName: () => "lib.d.ts",
-        getNewLine: () => "\n",
-        getSourceFile: (name) => (name === MIGRATIONS_MODULE ? parsed : undefined),
-        readFile: (name) => (name === MIGRATIONS_MODULE ? source : undefined),
-        useCaseSensitiveFileNames: () => true,
-        writeFile: () => {},
-    };
-    const program = ts.createProgram({ host, options, rootNames: [MIGRATIONS_MODULE] });
-    // The program's own instance, so the checker knows every node the scan visits.
-    const file = program.getSourceFile(MIGRATIONS_MODULE) ?? parsed;
-    const checker = program.getTypeChecker();
-    const values = new Map<ts.Declaration, string>();
-
-    for (const statement of file.statements) {
-        if (ts.isVariableStatement(statement) && (statement.declarationList.flags & ts.NodeFlags.Const) !== 0) {
-            for (const declaration of statement.declarationList.declarations) {
-                const value = declaration.initializer === undefined ? undefined : literalText(unwrapped(declaration.initializer));
-
-                if (ts.isIdentifier(declaration.name) && value !== undefined) {
-                    values.set(declaration, value);
-                }
-            }
-        }
-    }
-
-    const valueOf = (symbol: ts.Symbol | undefined): string | undefined => {
-        const declarations = symbol?.declarations ?? [];
-
-        return declarations.length === 1 ? values.get(declarations[0]!) : undefined;
-    };
-
-    return {
-        constants: {
-            ofIdentifier: (name) => valueOf(checker.getSymbolAtLocation(name)),
-            ofShorthand: (member) => valueOf(checker.getShorthandAssignmentValueSymbol(member)),
-        },
-        file,
-    };
-};
-
-/** A literal string, or a top-level string constant `node` is bound to. */
-const resolvedText = (node: ts.Expression, constants: Constants): string | undefined => {
-    const bare = unwrapped(node);
-
-    return literalText(bare) ?? (ts.isIdentifier(bare) ? constants.ofIdentifier(bare) : undefined);
-};
-
-/** What a definition says about one property: not there, a string the runner can read, or something it cannot. */
+/** What a definition says about one property: not there, a literal string, or something else. */
 type PropertyValue = { kind: "absent" } | { kind: "string"; value: string } | { kind: "unresolved" };
 
 const UNRESOLVED: PropertyValue = { kind: "unresolved" };
 
 /**
- * The value of the `name` property of `call`'s first argument. `literalOnly` refuses a constant. A spread, a computed key
- * the runner cannot read, or a definition that is not an object literal could hide the property: unresolved.
+ * The value of the `name` property of `call`'s first argument, read the way Lunora's own migration discovery reads it: a
+ * quoted string literal only. Lunora records any other value (a constant, a shorthand, a template, a call) as an empty
+ * table, which `migrate up` refuses, so it is unresolved here too. A spread, a computed key, or a definition that is not
+ * itself an object literal (Lunora does not look through parentheses or `as`) could hide the property: unresolved.
  */
-const definitionProperty = (call: ts.CallExpression, name: string, constants: Constants, literalOnly: boolean): PropertyValue => {
+const definitionProperty = (call: ts.CallExpression, name: string): PropertyValue => {
     const [definition] = call.arguments;
-    const read = (node: ts.Expression): PropertyValue => {
-        const value = literalOnly ? literalText(node) : resolvedText(node, constants);
 
-        return value === undefined ? UNRESOLVED : { kind: "string", value };
-    };
-
-    if (definition === undefined || !ts.isObjectLiteralExpression(unwrapped(definition))) {
+    if (definition === undefined || !ts.isObjectLiteralExpression(definition)) {
         return UNRESOLVED;
     }
 
     let found: PropertyValue = { kind: "absent" };
 
-    for (const member of (unwrapped(definition) as ts.ObjectLiteralExpression).properties) {
+    for (const member of definition.properties) {
         if (ts.isSpreadAssignment(member)) {
             return UNRESOLVED;
         }
 
         const key =
-            member.name === undefined
-                ? undefined
-                : ts.isComputedPropertyName(member.name)
-                  ? resolvedText(member.name.expression, constants)
-                  : ts.isIdentifier(member.name) || ts.isStringLiteral(member.name) || ts.isNoSubstitutionTemplateLiteral(member.name)
-                    ? member.name.text
-                    : undefined;
+            member.name !== undefined && (ts.isIdentifier(member.name) || ts.isStringLiteral(member.name) || ts.isNoSubstitutionTemplateLiteral(member.name))
+                ? member.name.text
+                : undefined;
 
         if (key === undefined) {
             return UNRESOLVED;
         }
 
         if (key === name) {
-            const shorthand = ts.isShorthandPropertyAssignment(member) && !literalOnly ? constants.ofShorthand(member) : undefined;
+            const value = ts.isPropertyAssignment(member) ? literalText(member.initializer) : undefined;
 
-            found = ts.isPropertyAssignment(member) ? read(member.initializer) : shorthand === undefined ? UNRESOLVED : { kind: "string", value: shorthand };
+            found = value === undefined ? UNRESOLVED : { kind: "string", value };
         }
     }
 
     return found;
 };
 
-const migrationId = (call: ts.CallExpression, file: ts.SourceFile, globalTables: ReadonlySet<string>, constants: Constants): string => {
-    const id = definitionProperty(call, "id", constants, true);
+const migrationId = (call: ts.CallExpression, file: ts.SourceFile, globalTables: ReadonlySet<string>): string => {
+    const id = definitionProperty(call, "id");
     const { line } = file.getLineAndCharacterOfPosition(call.getStart(file));
     const at = `${MIGRATIONS_MODULE}:${String(line + 1)}`;
 
@@ -151,12 +74,12 @@ const migrationId = (call: ts.CallExpression, file: ts.SourceFile, globalTables:
         throw new Error(`${at}: defineMigration needs a literal string \`id\` so the deploy can run it`);
     }
 
-    const table = definitionProperty(call, "table", constants, false);
+    const table = definitionProperty(call, "table");
 
-    // Fail closed: a table the runner cannot read could be a `.global()` one.
+    // Fail closed: a table the runner cannot read could be a `.global()` one, and Lunora would record it as empty.
     if (table.kind !== "string") {
         throw new Error(
-            `${at}: migration "${id.value}" needs a \`table\` that is a literal string or a top-level string constant of this module, so the deploy can tell it is not a .global() table`,
+            `${at}: migration "${id.value}" needs a \`table\` that is a literal string (not a constant, a template or any other expression): Lunora's migrate up reads only a literal, and the deploy must tell it is not a .global() table`,
         );
     }
 
@@ -182,16 +105,16 @@ export const globalTablesOf = (baseline: string): Set<string> => {
 
 /**
  * Every migration id declared in `source`, in declaration order. Throws when a `defineMigration` call's `id` is not a
- * literal string (a partial list would skip that migration on deploy), when its `table` is not a string the runner can read,
+ * literal string (a partial list would skip that migration on deploy), when its `table` is not a literal string,
  * and when one targets a table in `globalTables`: a shard migration does not reach a `.global()` table's rows, and its
  * run fails on the root shard, stopping every migration after it.
  */
 export const declaredMigrationIds = (source: string, globalTables: ReadonlySet<string> = new Set()): string[] => {
-    const { constants, file } = parsedModule(source);
+    const file = ts.createSourceFile(MIGRATIONS_MODULE, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
     const ids: string[] = [];
     const visit = (node: ts.Node): void => {
         if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "defineMigration") {
-            ids.push(migrationId(node, file, globalTables, constants));
+            ids.push(migrationId(node, file, globalTables));
         }
 
         ts.forEachChild(node, visit);
@@ -358,11 +281,17 @@ export const EMAIL_CANONICAL_BACKFILL = "backfill-email-canonical";
 
 /**
  * Calls one run of the backfill may make, over every phase and round: a fill call takes one id, so this is about how many
- * accounts one deploy fills. It stays under what the route's rate limit (3,000 per 15 minutes) lets through within the
- * deploy step's 30 minutes, so the run stops with its own message rather than the step's timeout. A run that stops here
- * fails the step; what it filled stays filled, and the next deploy goes on.
+ * accounts one deploy fills. The calls run one after another, so {@link EMAIL_CANONICAL_DEADLINE_MS} bounds the run too.
+ * A run that stops here fails the step; what it filled stays filled, and the next deploy goes on.
  */
 export const EMAIL_CANONICAL_MAX_CALLS = 5000;
+
+/**
+ * How long one run of the backfill may take, its requests, rate-limit waits and round pauses together. It runs first in
+ * the deploy's data-migration step (`timeout-minutes: 30`), so it stops well before that, with its own message, and leaves
+ * the shard migrations after it the rest of the step. A run that stops here fails the step; what it filled stays filled.
+ */
+export const EMAIL_CANONICAL_DEADLINE_MS = 22 * 60 * 1000;
 
 /** Check-then-fill rounds one run makes: a round after the first checks again what an earlier one left. */
 export const EMAIL_CANONICAL_ROUNDS = 3;
@@ -398,6 +327,8 @@ export interface RunBackfillOptions {
     error: (line: string) => void;
     log: (line: string) => void;
     maxCalls?: number;
+    /** The clock the deadline is read from, in milliseconds; `Date.now` by default. */
+    now?: () => number;
     /** Production prints a refusal's code alone; elsewhere also its message, URLs replaced. */
     production: boolean;
     sleep: (ms: number) => Promise<unknown>;
@@ -459,12 +390,27 @@ class BackfillStop extends Error {}
  * the cursor, and refuses any address two accounts fold to, also across calls), collecting the unfilled ids; only then a
  * fill of those ids under that token, a batch per call; then a check again, which answers `done` once nothing is left. A round that left rows behind (they changed meanwhile) is followed by another, up to {@link EMAIL_CANONICAL_ROUNDS}.
  * A 429 is waited out; {@link EMAIL_CANONICAL_STALLS} answers in a row that move nothing, a conflict, any other answer, or
- * `maxCalls` stop it with an error. Prints counts only, never a token or an id. Returns the process exit code.
+ * `maxCalls` stop it with an error, as does {@link EMAIL_CANONICAL_DEADLINE_MS}: no call starts and no wait begins that
+ * would end past it. Prints counts only, never a token or an id. Returns the process exit code.
  */
 export const runEmailCanonicalBackfill = async (options: RunBackfillOptions): Promise<number> => {
     const maxCalls = options.maxCalls ?? EMAIL_CANONICAL_MAX_CALLS;
+    const now = options.now ?? Date.now;
+    const deadline = now() + EMAIL_CANONICAL_DEADLINE_MS;
     let filled = 0;
     let calls = 0;
+
+    /** Stops the run when `ms` more (a wait; 0 for a call) would end past the deadline. */
+    const withinDeadline = (ms: number): void => {
+        if (now() + ms >= deadline) {
+            throw new BackfillStop(`deadline reached, ${String(filled)} filled; the next deploy continues`);
+        }
+    };
+
+    const pause = async (ms: number): Promise<void> => {
+        withinDeadline(ms);
+        await options.sleep(ms);
+    };
 
     /** One answered call; a 429 is waited out and asked again. */
     const ask = async (request: BackfillRequest): Promise<BackfillAnswer> => {
@@ -472,6 +418,8 @@ export const runEmailCanonicalBackfill = async (options: RunBackfillOptions): Pr
             if (calls >= maxCalls) {
                 throw new BackfillStop(`not done after ${String(maxCalls)} calls`);
             }
+
+            withinDeadline(0);
 
             let answer: BackfillCall;
 
@@ -492,7 +440,7 @@ export const runEmailCanonicalBackfill = async (options: RunBackfillOptions): Pr
                 }
 
                 options.log(`${EMAIL_CANONICAL_BACKFILL}: rate limited, waiting ${String(waitMs / 1000)}s`);
-                await options.sleep(waitMs);
+                await pause(waitMs);
                 continue;
             }
 
@@ -599,7 +547,7 @@ export const runEmailCanonicalBackfill = async (options: RunBackfillOptions): Pr
 
             if (left > 0) {
                 options.log(`${EMAIL_CANONICAL_BACKFILL}: ${String(left)} account(s) changed during the fill, checking again`);
-                await options.sleep(EMAIL_CANONICAL_ROUND_PAUSE_MS);
+                await pause(EMAIL_CANONICAL_ROUND_PAUSE_MS);
             }
         }
     } catch (error) {

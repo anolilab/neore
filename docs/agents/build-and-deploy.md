@@ -127,7 +127,7 @@ Write`; without them the deploy fails, hence the switch.
   `backend/lunora/migrations.ts`), every declared one in declaration order, through
   `scripts/run-data-migrations.ts` (`lunora migrate up <id> --prod --yes`, which takes one id). A new
   backfill needs no workflow edit: declare it after any migration it depends on, in that file (the
-  runner reads no other), with a literal string `id`: one it cannot read fails the step. `up` is idempotent and resumable: a shard that completed a migration
+  runner reads no other), with a quoted string literal `id` and `table` (Lunora's codegen reads no constant or template): any other fails the step. `up` is idempotent and resumable: a shard that completed a migration
   answers at once, so a deploy only pays one fan-out per migration. The admin token reaches the CLI only as `LUNORA_ADMIN_TOKEN` in the step's environment;
   the log shows ids and counts only, and production no error detail. A failed or unfinished
   migration fails the job. `backend/deploy-migrations.test.ts` pins it.

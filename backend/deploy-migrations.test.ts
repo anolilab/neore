@@ -12,6 +12,7 @@ import ts from "typescript";
 import type { BackfillCall, BackfillRequest, CliRun } from "../scripts/data-migrations";
 import {
     declaredMigrationIds,
+    EMAIL_CANONICAL_DEADLINE_MS,
     EMAIL_CANONICAL_FILL_IDS,
     EMAIL_CANONICAL_ROUND_PAUSE_MS,
     EMAIL_CANONICAL_ROUNDS,
@@ -36,6 +37,8 @@ const runner = readFileSync(join(REPO_ROOT, "scripts/run-data-migrations.ts"), "
 /** The refusal of a definition whose `id` or `table` the runner cannot read. */
 /** A check's digest or a row id in printed output. */
 const DIGEST_OR_ID = /same|u[12]\b/u;
+/** The data-migration step's `timeout-minutes`. */
+const STEP_TIMEOUT = /timeout-minutes: (\d+)/u;
 const UNREADABLE_DEFINITION = /needs a (`table`|literal string `id`)/u;
 const baseline = readFileSync(join(REPO_ROOT, SCHEMA_BASELINE), "utf8");
 
@@ -117,10 +120,12 @@ describe("the post-deploy data migrations", () => {
         const source = [
             'export const a = defineMigration({ table: "t", options: { batch: { size: 10 } }, id: "after-nested" });',
             "export const b = defineMigration({ id: 'single-quoted', table: 't', up: () => ({}) });",
-            'export const c = defineMigration({ up: () => { return {}; }, id: `template-literal`, table: "t" });',
+            'export const c = defineMigration({ up: () => { return {}; }, id: "after-up", table: "t" });',
         ].join("\n");
 
-        expect(declaredMigrationIds(source)).toStrictEqual(["after-nested", "single-quoted", "template-literal"]);
+        expect(declaredMigrationIds(source)).toStrictEqual(["after-nested", "single-quoted", "after-up"]);
+        // Lunora's codegen reads a quoted literal only.
+        expect(() => declaredMigrationIds('export const t = defineMigration({ id: `template`, table: "t" });')).toThrow("literal string");
         expect(() => declaredMigrationIds(`${source}\nconst name = "x";\nexport const d = defineMigration({ id: name });`)).toThrow(
             `${MIGRATIONS_MODULE}:5: defineMigration needs a literal string`,
         );
@@ -149,39 +154,26 @@ describe("the post-deploy data migrations", () => {
         );
     });
 
-    it("refuse a .global() table passed through a constant, and any table the runner cannot read", () => {
+    it("refuse a table that is not a literal string, a constant included, naming the migration", () => {
         const global = new Set(["user"]);
         const declare = (definition: string, prelude = ""): string => `${prelude}\nexport const m = defineMigration(${definition});`;
 
-        expect(() => declaredMigrationIds(declare('{ id: "fill", table: USER }', 'const USER = "user";'), global)).toThrow(
-            'migration "fill" targets the .global() table "user"',
+        // Lunora's own discovery records any other value as an empty table, which `migrate up` refuses.
+        expect(() => declaredMigrationIds(declare('{ id: "fine", table: MESSAGES }', 'const MESSAGES = "messages";'), global)).toThrow(
+            `${MIGRATIONS_MODULE}:2: migration "fine" needs a \`table\` that is a literal string`,
         );
-        expect(() => declaredMigrationIds(declare('{ id: "fill", table }', 'const table = "user" as const;'), global)).toThrow(
-            'targets the .global() table "user"',
-        );
-        expect(declaredMigrationIds(declare('{ id: "fine", table: MESSAGES }', 'const MESSAGES = "messages";'), global)).toStrictEqual(["fine"]);
-        // An unshadowed top-level constant reads the same inside a function.
-        expect(
-            declaredMigrationIds('const MESSAGES = "messages";\nexport const m = (() => defineMigration({ id: "nested", table: MESSAGES }))();', global),
-        ).toStrictEqual(["nested"]);
-
-        // A local binding of the top-level constant's name: the call gets the local value, so neither reads as the constant.
-        for (const [binding, property] of [
-            ["TABLE", "table: TABLE"],
-            ["table", "table"],
-        ]) {
-            const source = `const ${binding!} = "messages";\nexport const m = (() => {\n    const ${binding!} = "user";\n\n    return defineMigration({ id: "fill", ${property!} });\n})();`;
-
-            expect(() => declaredMigrationIds(source, global), property).toThrow(UNREADABLE_DEFINITION);
-        }
 
         for (const [definition, prelude] of [
+            ['{ id: "fill", table: USER }', 'const USER = "user";'],
+            ['{ id: "fill", table }', 'const table = "messages";'],
+            ['{ id: "fill", table: "messages" as const }', ""],
+            ['{ id: "fill", table: `messages` }', ""],
+            ['({ id: "fill", table: "messages" })', ""],
             ['{ id: "fill", table: TABLES.user }', 'const TABLES = { user: "user" };'],
             ['{ id: "fill", table: pick() }', ""],
             ['{ id: "fill", table: "us" + "er" }', ""],
             ['{ id: "fill", table: "messages", ...override }', 'const override = { table: "user" };'],
-            ['{ id: "fill", ["table"]: name }', 'let name = "user";'],
-            ['{ id: "fill", table }', 'let table = "user";'],
+            ['{ id: "fill", ["table"]: "messages" }', ""],
             ['{ id: "fill" }', ""],
             ["definition", 'const definition = { id: "fill", table: "user" };'],
         ]) {
@@ -364,14 +356,19 @@ describe("the data migration runner", () => {
     });
 });
 
-/** Runs the backfill loop against `answers` in turn, recording requests, pauses and printed lines. */
-const backfillWith = async (answers: (BackfillCall | Error)[], maxCalls?: number, production = false) => {
+/**
+ * Runs the backfill loop against `answers` in turn, recording requests, pauses and printed lines. Its clock starts at 0 and
+ * moves by each pause and by `callMs` for each call.
+ */
+const backfillWith = async (answers: (BackfillCall | Error)[], maxCalls?: number, production = false, callMs = 0) => {
+    let time = 0;
     const pauses: number[] = [];
     const printed: string[] = [];
     const requests: BackfillRequest[] = [];
     const exitCode = await runEmailCanonicalBackfill({
         call: async (request) => {
             requests.push(request);
+            time += callMs;
 
             const answer = answers.shift() ?? { body: { status: "done" }, status: 200 };
 
@@ -388,9 +385,11 @@ const backfillWith = async (answers: (BackfillCall | Error)[], maxCalls?: number
             printed.push(line);
         },
         maxCalls,
+        now: () => time,
         production,
         sleep: async (ms) => {
             pauses.push(ms);
+            time += ms;
         },
     });
 
@@ -576,5 +575,45 @@ describe("the user.emailCanonical backfill in the deploy", () => {
 
         expect(capped.exitCode).toBe(1);
         expect(capped.output).toContain("not done after 3 calls");
+    });
+
+    it("stops at its deadline, well inside the step's timeout, with its own message, keeping what it filled", async () => {
+        const stepMinutes = Number(STEP_TIMEOUT.exec(step)?.[1]);
+
+        expect(EMAIL_CANONICAL_DEADLINE_MS).toBeLessThanOrEqual((stepMinutes - 3) * 60 * 1000);
+
+        // A minute a call: the call that would start at the deadline is not made.
+        const callMs = 60_000;
+        const startedInTime = EMAIL_CANONICAL_DEADLINE_MS / callMs;
+        const slow = await backfillWith([checked(1, idsOf(100)), ...Array.from({ length: 99 }, () => filledBatch(1))], undefined, false, callMs);
+
+        expect(slow.exitCode).toBe(1);
+        expect(slow.calls).toBe(startedInTime);
+        expect(slow.output).toContain(
+            `::error::backfill-email-canonical: deadline reached, ${String(startedInTime - 1)} filled; the next deploy continues (filled ${String(startedInTime - 1)} over ${String(startedInTime)} call(s))`,
+        );
+
+        // A rate-limit wait that would end past the deadline is not begun.
+        const limited: BackfillCall = { body: {}, retryAfterSeconds: EMAIL_CANONICAL_DEADLINE_MS / 2 / 1000 - 1, status: 429 };
+        const waited = await backfillWith([limited, limited, limited]);
+
+        expect(waited.exitCode).toBe(1);
+        expect(waited.pauses).toHaveLength(2);
+        expect(waited.output).toContain("deadline reached, 0 filled; the next deploy continues");
+
+        // A round pause too.
+        const rounds = await backfillWith([checked(1, ["u1"]), filledBatch(1, 0, 1)], undefined, false, EMAIL_CANONICAL_DEADLINE_MS / 2);
+
+        expect(rounds.exitCode).toBe(1);
+        expect(rounds.pauses).toStrictEqual([]);
+        expect(rounds.output).toContain("deadline reached");
+    });
+
+    it("finishes normally when it is done before its deadline", async () => {
+        const callMs = EMAIL_CANONICAL_DEADLINE_MS / 4;
+        const { exitCode, output } = await backfillWith([checked(1, ["u1"]), filledBatch(1), done], undefined, false, callMs);
+
+        expect(exitCode).toBe(0);
+        expect(output).toContain("done, filled 1 over 3 call(s)");
     });
 });
