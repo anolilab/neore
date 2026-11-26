@@ -42,6 +42,7 @@ import {
     TASK_EFFORT_MAX,
     TASK_INSTRUCTIONS_MAX,
     TASK_NOTE_MAX,
+    TASK_SCHEDULE_MAX,
     TASK_TITLE_MAX,
     validateParent,
 } from "./logic";
@@ -271,7 +272,7 @@ const resolveDefinition = async (
     tasks: ReadonlyArray<Doc<"tasks">>,
     taskId?: Id<"tasks">,
 ) => {
-    const cronExpression = optionalText(input.cronExpression, 100, "Schedule");
+    const cronExpression = optionalText(input.cronExpression, TASK_SCHEDULE_MAX, "Schedule");
 
     if (cronExpression && !isValidCronExpression(cronExpression)) {
         throw new LunoraError("BAD_REQUEST", 'Schedule must be a 5-field cron expression (UTC), e.g. "0 9 * * 1"');

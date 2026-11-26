@@ -26,6 +26,9 @@ export const MAX_REPAIR_ROUNDS_LIMIT = 5;
 
 export const TASK_TITLE_MAX = 200;
 
+/** Longest schedule a task holds; a suggestion over it could never be accepted, so it is never stored. */
+export const TASK_SCHEDULE_MAX = 100;
+
 export const TASK_INSTRUCTIONS_MAX = 20_000;
 
 export const TASK_CRITERIA_MAX = 5000;

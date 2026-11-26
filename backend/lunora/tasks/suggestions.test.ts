@@ -3,12 +3,16 @@
  * accept — which creates exactly one task, once, for the owner's pending row. Dismiss, ownership, the server-only
  * insert, the erase and the GDPR export and deletion are pinned here too.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
-import { collectTasksForExport, deleteUserTasks } from "./gdpr";
-import { MAX_PENDING_SUGGESTIONS } from "./logic";
+import { collectTaskSuggestionsForExport, deleteUserTasks } from "./gdpr";
+import { collectAllTaskSuggestions } from "./export-pages";
+import { MAX_PENDING_SUGGESTIONS, TASK_SCHEDULE_MAX } from "./logic";
 import { acceptTaskSuggestion, dismissTaskSuggestion, eraseUserTaskSuggestions, insertTaskSuggestions, listTaskSuggestions } from "./suggestions";
 
 const { sessionFrom, users } = vi.hoisted(() => {
@@ -96,6 +100,11 @@ const seedSuggestion = async (userId: string, fields: Record<string, unknown>): 
     });
 };
 
+const exportSuggestions = async (userId: string): Promise<any[]> =>
+    (await collectAllTaskSuggestions(
+        async (cursor) => await harness.run(async (ctx: any) => await ctx.runQuery(collectTaskSuggestionsForExport, { cursor, userId })),
+    )) as any[];
+
 const pendingId = async (userId: string): Promise<string> => {
     const rows = await rowsOf("taskSuggestions", userId);
 
@@ -152,6 +161,23 @@ describe("the switch", () => {
         expect(await rowsOf("taskSuggestions", B)).toHaveLength(1);
     });
 
+    it("erases an older pending suggestion even when a full batch of newer decided ones sorts ahead of it", async () => {
+        await setSwitch(A, true);
+        await seedSuggestion(A, { createdAt: 100, status: "pending", title: "Old pending" });
+
+        for (let index = 0; index < 120; index += 1) {
+            await seedSuggestion(A, { createdAt: 500 + index, status: index % 2 === 0 ? "accepted" : "dismissed", title: `Newer ${String(index)}` });
+        }
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(eraseUserTaskSuggestions, { before: 200, userId: A }));
+
+        const remaining = await rowsOf("taskSuggestions", A);
+        const titles = remaining.map((row) => row.title);
+
+        expect(titles).toHaveLength(120);
+        expect(titles).not.toContain("Old pending");
+    });
+
     it("keeps a suggestion stored after the cutoff, so a late erase cannot remove fresh ones", async () => {
         await setSwitch(A, true);
         await seedSuggestion(A, { createdAt: 100, title: "Before" });
@@ -205,6 +231,23 @@ describe("storing", () => {
 
         expect(rows).toHaveLength(1);
         expect(rows[0]).toMatchObject({ status: "pending", title: "Kept" });
+    });
+
+    it("drops a schedule that matches no date, and one an accept would refuse as too long", async () => {
+        await setSwitch(A, true);
+
+        const tooLong = `${Array.from({ length: 60 }, (_, minute) => String(minute)).join(",")} 9 * * 1`;
+
+        expect(tooLong.length).toBeGreaterThan(TASK_SCHEDULE_MAX);
+        await expect(
+            insert(A, [proposal({ cronExpression: "0 0 30 2 *" }), proposal({ cronExpression: tooLong }), proposal({ title: "Kept" })]),
+        ).resolves.toEqual({
+            inserted: 1,
+        });
+
+        const stored = await rowsOf("taskSuggestions", A);
+
+        expect(stored.map((row) => row.title)).toEqual(["Kept"]);
     });
 
     it("drops a proposal whose text holds a secret", async () => {
@@ -334,10 +377,28 @@ describe("GDPR", () => {
         await insert(B, [proposal()]);
         await as(A).mutation(dismissTaskSuggestion as never, { suggestionId: await pendingId(A) } as never);
 
-        const exported = await harness.run(async (ctx: any) => await ctx.runQuery(collectTasksForExport, { userId: A }));
+        const exported = await exportSuggestions(A);
 
-        expect(exported.taskSuggestions).toHaveLength(2);
-        expect(exported.taskSuggestions.every((row: { userId: string }) => row.userId === A)).toBe(true);
+        expect(exported).toHaveLength(2);
+        expect(exported.every((row: { userId: string }) => row.userId === A)).toBe(true);
+    });
+
+    it("exports every suggestion past the old 1,000-row cap, across statuses", async () => {
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 1050; index += 1) {
+                await ctx.db.insert("taskSuggestions", {
+                    createdAt: index,
+                    cronExpression: "0 9 * * 1",
+                    instructions: "x",
+                    sourceThreadIds: [],
+                    status: index % 2 === 0 ? "dismissed" : "pending",
+                    title: `Idea ${String(index)}`,
+                    userId: A,
+                });
+            }
+        });
+
+        expect(await exportSuggestions(A)).toHaveLength(1050);
     });
 
     it("deletes the user's suggestions with their tasks, past one batch, and nobody else's", async () => {
@@ -368,5 +429,16 @@ describe("GDPR", () => {
 
         expect(await rowsOf("taskSuggestions", A)).toHaveLength(0);
         expect(await rowsOf("taskSuggestions", B)).toHaveLength(1);
+    });
+});
+
+describe("suggestions in the export workflow", () => {
+    // Read from source: the workflow needs a Cloudflare Workflows runtime to run.
+    it("collects them page by page and hands them to the export file with the tasks", () => {
+        const source = readFileSync(join(import.meta.dirname, "../gdpr/workflows/export-workflow.ts"), "utf8");
+
+        expect(source).toContain('"collect-task-suggestions"');
+        expect(source).toContain("internal.tasks.gdpr.collectTaskSuggestionsForExport");
+        expect(source).toContain("tasks: { ...(tasks as Record<string, unknown>), taskSuggestions }");
     });
 });

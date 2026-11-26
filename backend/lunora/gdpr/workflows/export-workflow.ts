@@ -27,6 +27,7 @@ import type { BrowserExportCursor } from "../../browser/gdpr";
 import { browserExportPageKey, browserExportPrefix, storeAllBrowserPages } from "../../browser/export-pages";
 import { GrantRevisionsExportError, grantRevisionsExportPageKey, storeAllGrantRevisionPages } from "../../agent/export-pages";
 import { collectAllGuides, collectAllPullRequestThreads, collectAllReviewDrafts } from "../../source-control/export-pages";
+import { collectAllTaskSuggestions } from "../../tasks/export-pages";
 import { clearUsagePieces, collectUsageExport, UsageExportError, type UsageExportIo, type UsagePageSummary, usageObjectKey } from "../usage-export-steps";
 
 export interface ExportParams {
@@ -265,6 +266,16 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                 "collect-tasks",
                 async () => await context.run(internal.tasks.gdpr.collectTasksForExport, { userId }, { dedupId: stepDedupId(scope, "collect-tasks") }),
             );
+            // A page per step, like the review drafts: the first step is "collect-task-suggestions".
+            const taskSuggestions = await collectAllTaskSuggestions(async (cursor, page) => {
+                const name = page === 0 ? "collect-task-suggestions" : `collect-task-suggestions-${String(page)}`;
+
+                return await context.step.do(
+                    name,
+                    async () =>
+                        await context.run(internal.tasks.gdpr.collectTaskSuggestionsForExport, { cursor, userId }, { dedupId: stepDedupId(scope, name) }),
+                );
+            });
             const memories = await context.step.do(
                 "collect-memories",
                 async () => await context.run(internal.memory.gdpr.collectMemoriesForExport, { userId }, { dedupId: stepDedupId(scope, "collect-memories") }),
@@ -463,7 +474,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                             runWebhooks,
                             settings,
                             sharedThreadPins,
-                            tasks,
+                            tasks: { ...(tasks as Record<string, unknown>), taskSuggestions },
                             threadTags,
                             usageKey,
                             userEmail,

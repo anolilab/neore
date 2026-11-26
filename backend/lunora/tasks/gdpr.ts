@@ -18,8 +18,8 @@ const BATCH = 100;
 /** Runs per task in the export — the newest; older ones are history, not the task. */
 const EXPORT_RUNS_PER_TASK = 50;
 
-/** Suggestions in the export: a user holds at most `MAX_PENDING_SUGGESTIONS` pending plus the ones decided since. */
-const EXPORT_SUGGESTIONS_CAP = 1000;
+/** Suggestions per export step: the workflow persists each step's result, so a page stays small and a long history takes more steps. */
+const EXPORT_SUGGESTIONS_PAGE = 100;
 
 export const collectTasksForExport = internalQuery
     .input({ userId: v.string() })
@@ -27,11 +27,10 @@ export const collectTasksForExport = internalQuery
         v.object({
             goals: v.array(v.any()),
             tasks: v.array(v.any()),
-            taskSuggestions: v.array(v.any()),
         }),
     )
     .query(async ({ args: { userId }, ctx }) => {
-        const [goals, tasks, taskSuggestions] = await Promise.all([
+        const [goals, tasks] = await Promise.all([
             ctx.db
                 .query("goals")
                 .withIndex("by_user_and_status", (q) => q.eq("userId", userId))
@@ -40,11 +39,6 @@ export const collectTasksForExport = internalQuery
                 .query("tasks")
                 .withIndex("by_user_and_status", (q) => q.eq("userId", userId))
                 .take(MAX_TASKS_PER_USER),
-            // Every status; the pending list is capped, and decided rows are erased with the switch.
-            ctx.db
-                .query("taskSuggestions")
-                .withIndex("by_user_and_status_and_createdAt", (q) => q.eq("userId", userId))
-                .take(EXPORT_SUGGESTIONS_CAP),
         ]);
 
         const withRuns = await Promise.all(
@@ -62,7 +56,24 @@ export const collectTasksForExport = internalQuery
             }),
         );
 
-        return { goals, tasks: withRuns, taskSuggestions };
+        return { goals, tasks: withRuns };
+    });
+
+/**
+ * One page of the user's suggestions, every status (decided ones stay until the switch is turned off, so a long
+ * history is more than one page). `cursor` is `null` on the last page; the workflow walks them
+ * (`collectAllTaskSuggestions`).
+ */
+export const collectTaskSuggestionsForExport = internalQuery
+    .input({ cursor: v.optional(v.union(v.string(), v.null())), userId: v.string() })
+    .output(v.object({ cursor: v.union(v.string(), v.null()), taskSuggestions: v.array(v.any()) }))
+    .query(async ({ args: { cursor, userId }, ctx }) => {
+        const page = await ctx.db
+            .query("taskSuggestions")
+            .withIndex("by_user_and_status_and_createdAt", (q) => q.eq("userId", userId))
+            .paginate({ cursor: cursor ?? null, numItems: EXPORT_SUGGESTIONS_PAGE });
+
+        return { cursor: page.isDone ? null : page.continueCursor, taskSuggestions: page.page };
     });
 
 export const deleteUserTasks = internalMutation

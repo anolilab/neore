@@ -15,12 +15,14 @@ import { internalMutation } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { containsSecret } from "../lib/secret-redaction";
 import { runAfterOnShard } from "../lib/shard-scheduler";
-import { isValidCronExpression } from "../triggers/schedule";
+import { findNextCronTime, isValidCronExpression } from "../triggers/schedule";
 import { insertTask } from "./functions";
-import { MAX_PENDING_SUGGESTIONS, MAX_SUGGESTION_SOURCES, TASK_INSTRUCTIONS_MAX, TASK_TITLE_MAX } from "./logic";
+import { MAX_PENDING_SUGGESTIONS, MAX_SUGGESTION_SOURCES, TASK_INSTRUCTIONS_MAX, TASK_SCHEDULE_MAX, TASK_TITLE_MAX } from "./logic";
 
-/** Rows removed per erase call; a full page queues the next. */
+/** Rows removed per erase call; a full batch queues the next. */
 const ERASE_BATCH = 100;
+
+const SUGGESTION_STATUSES = ["pending", "accepted", "dismissed"] as const;
 
 const vSuggestionView = v.object({
     _id: v.id("taskSuggestions"),
@@ -134,8 +136,9 @@ export const dismissTaskSuggestion = authMutation
 
 /**
  * Stores suggestions for one user. Server-only: the caller is the daily job. Writes nothing while the switch is off,
- * drops a proposal whose schedule is not a valid cron expression or whose text is empty, and keeps the pending list
- * within {@link MAX_PENDING_SUGGESTIONS}.
+ * drops a proposal whose schedule is not a valid cron expression, is longer than a task's schedule may be, or matches
+ * no date (`0 0 30 2 *`: a task would fall back to running hourly), or whose text is empty, and keeps the pending
+ * list within {@link MAX_PENDING_SUGGESTIONS}.
  */
 export const insertTaskSuggestions = internalMutation
     .input({
@@ -169,10 +172,20 @@ export const insertTaskSuggestions = internalMutation
 
             const title = suggestion.title.trim().slice(0, TASK_TITLE_MAX);
             const instructions = suggestion.instructions.trim().slice(0, TASK_INSTRUCTIONS_MAX);
-            const cronExpression = suggestion.cronExpression.trim();
 
             // The words come from the person's messages: a proposal that carries a secret is dropped, never stored.
-            if (!title || !instructions || !isValidCronExpression(cronExpression) || containsSecret(title) || containsSecret(instructions)) {
+            if (!title || !instructions || containsSecret(title) || containsSecret(instructions)) {
+                continue;
+            }
+
+            const cronExpression = suggestion.cronExpression.trim();
+
+            // Accepting runs the task rules: a schedule they refuse, or one that never fires, is dropped here, not left pending.
+            if (
+                cronExpression.length > TASK_SCHEDULE_MAX ||
+                !isValidCronExpression(cronExpression) ||
+                findNextCronTime(cronExpression, ctx.now) === undefined
+            ) {
                 continue;
             }
 
@@ -195,23 +208,34 @@ export const insertTaskSuggestions = internalMutation
 /**
  * Erases the user's suggestions made before `before`, every status: queued when the switch is turned off
  * (`auth/functions.ts`, with the time of that save), on the user's own shard. A suggestion stored after the switch
- * was turned back on is newer than the cutoff and stays. A batch that deleted a full page queues the next one.
+ * was turned back on is newer than the cutoff and stays. The index sorts by status before time, so each status is
+ * read with its own bound on `createdAt`: newer rows of one status never hide older rows of the next. A call that
+ * filled its batch queues the next one.
  */
 export const eraseUserTaskSuggestions = internalMutation
     .input({ before: v.number(), userId: v.string() })
     .output(v.null())
     .mutation(async ({ args: { before, userId }, ctx }) => {
-        const rows = await ctx.db
-            .query("taskSuggestions")
-            .withIndex("by_user_and_status_and_createdAt", (q) => q.eq("userId", userId))
-            .take(ERASE_BATCH);
-        const older = rows.filter((row) => row.createdAt <= before);
+        let erased = 0;
 
-        for (const row of older) {
-            await ctx.db.delete("taskSuggestions", row._id);
+        for (const status of SUGGESTION_STATUSES) {
+            if (erased >= ERASE_BATCH) {
+                break;
+            }
+
+            const rows = await ctx.db
+                .query("taskSuggestions")
+                .withIndex("by_user_and_status_and_createdAt", (q) => q.eq("userId", userId).eq("status", status).lte("createdAt", before))
+                .take(ERASE_BATCH - erased);
+
+            for (const row of rows) {
+                await ctx.db.delete("taskSuggestions", row._id);
+            }
+
+            erased += rows.length;
         }
 
-        if (rows.length >= ERASE_BATCH && older.length > 0) {
+        if (erased >= ERASE_BATCH) {
             await runAfterOnShard(ctx.scheduler, 0, internal.tasks.suggestions.eraseUserTaskSuggestions, { before, userId }, userId);
         }
 
