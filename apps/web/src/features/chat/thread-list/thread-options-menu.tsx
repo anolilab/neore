@@ -6,6 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
 import cn from "@neore/ui/utils/cn";
 import { useMutation } from "@tanstack/react-query";
+import { useRouter } from "@tanstack/react-router";
 import { MoreHorizontal } from "lucide-react";
 import { useRef } from "react";
 
@@ -43,6 +44,7 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
     });
     // The follow state is read only while the menu is open, so a list of rows opens no subscription per thread.
     const openChat = useOpenChatClick();
+    const router = useRouter();
     // Set before the action runs, cleared when it settles: a click made in between would start a second side chat.
     const isStartingRef = useRef(false);
     const { isPending: isStartingSideChat, mutate: startSideChat } = useMutation({
@@ -93,6 +95,9 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
 
         isStartingRef.current = true;
 
+        // Where the person is now: a reply that comes after they have gone elsewhere must not pull them into the new chat.
+        const startedAt = router.state.location.pathname;
+
         const click = { button: event.button, ctrlKey: event.ctrlKey, detail: event.detail, metaKey: event.metaKey };
 
         startSideChat(
@@ -107,6 +112,10 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
                 },
                 onSuccess: (result) => {
                     if (result.status === "ok") {
+                        if (router.state.location.pathname !== startedAt) {
+                            return;
+                        }
+
                         openChat(result.threadId, click, threadId);
                     } else {
                         showError(sideChatRefusal(result.reason));

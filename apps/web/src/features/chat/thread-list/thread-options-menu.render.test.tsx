@@ -37,13 +37,29 @@ vi.mock("@tanstack/react-query", () => {
                 mutate: (_input: unknown, callbacks?: { onSettled?: () => void; onSuccess?: (result: unknown) => void }) => {
                     sideChat.start();
 
-                    if (!sideChat.hold) {
+                    if (sideChat.hold) {
+                        sideChat.held = callbacks;
+                    } else {
                         callbacks?.onSuccess?.(sideChat.result);
                         callbacks?.onSettled?.();
                     }
                 },
             };
         },
+    };
+});
+
+vi.mock("@tanstack/react-router", () => {
+    return {
+        useRouter: () => {return {
+            state: {
+                location: {
+                    get pathname() {
+                        return sideChat.pathname;
+                    },
+                },
+            },
+        }},
     };
 });
 
@@ -154,6 +170,21 @@ describe("ThreadOptionsMenu", () => {
             sideChat.showError.mockReset();
             sideChat.start.mockReset();
             sideChat.hold = false;
+            sideChat.held = undefined;
+            sideChat.pathname = "/chat/t1";
+        });
+
+        it("does not open the side chat when the person has moved to another chat before the reply", () => {
+            sideChat.hold = true;
+            sideChat.result = { status: "ok", threadId: "side1" };
+            renderMenu();
+            fireEvent.click(screen.getByRole("menuitem", { name: "Side chat" }));
+
+            sideChat.pathname = "/chat/other";
+            sideChat.held?.onSuccess?.(sideChat.result);
+            sideChat.held?.onSettled?.();
+
+            expect(sideChat.openChat).not.toHaveBeenCalled();
         });
 
         it("starts one side chat for clicks made while the first is still running", () => {
