@@ -533,6 +533,59 @@ describe("AsidePanel", () => {
         }
     });
 
+    it("scrolls the panel back down when a scroll box inside it moves the hit under the sticky bar", async () => {
+        vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
+
+        let hitTop = 900;
+        // Centring the hit leaves it at 300, below the sticky bar's band and inside the panel.
+        const scroll = vi.fn(() => {
+            hitTop = 300;
+        });
+
+        useAsideStore.setState({ byThread: { "thread-1": [{ answer: "A cat.", id: "a", question: "Why?", status: "answered", token: "tok" }] } });
+        render(<AsidePanel threadId="thread-1" />);
+
+        // The answer is a scroll box of its own that ends at 250, so the hit at 300 lies below it. Scrolling the box by the 70 px
+        // it needs moves the hit past the box's own range, to 40: under the sticky bar, where the panel itself does not see it.
+        const answer = screen.getByText("A cat.");
+        const scrollBox = vi.fn(() => {
+            hitTop = 40;
+        });
+
+        answer.style.overflowY = "auto";
+        Object.defineProperties(answer, {
+            getBoundingClientRect: {
+                configurable: true,
+                value: () => {
+                    return { bottom: 250, left: 0, right: 1000, top: 0 };
+                },
+            },
+            scrollBy: { configurable: true, value: scrollBox },
+        });
+
+        vi.stubGlobal("innerHeight", 400);
+        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
+        Object.defineProperty(Range.prototype, "getBoundingClientRect", { configurable: true, value: () => rectAt(hitTop) });
+
+        try {
+            act(() => {
+                globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+            });
+            fireEvent.change(screen.getByRole("textbox", { name: "Find in side questions" }), { target: { value: "cat" } });
+            await settleReveal();
+
+            expect(scroll).toHaveBeenCalledTimes(1);
+            expect(scrollBox).toHaveBeenCalledWith({ behavior: "instant", left: 0, top: 70 });
+            // The hit ends at 40, 16 px above the band the sticky bar covers, so the panel is scrolled back by 16 px.
+            expect(window.scrollBy).toHaveBeenCalledWith({ behavior: "instant", left: 0, top: -16 });
+        } finally {
+            Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+            Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
+            vi.unstubAllGlobals();
+            vi.useRealTimers();
+        }
+    });
+
     it("brings the current hit into view again when resizing the panel leaves it out of sight", async () => {
         vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
         // Under the sticky find bar, so the first reveal scrolls it.
