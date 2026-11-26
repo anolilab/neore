@@ -18,6 +18,7 @@ import {
 } from "../agent/export-pages";
 import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
 import { callOnShard } from "../lib/cross-shard";
+import { SWEEP_ROUTES_PER_ACTION, sweepRoutePage, type SweptRoute } from "./owner-sweep";
 import { collectOrganizationReplyPages } from "../usage/organization";
 import { collectAcpSessionPages } from "../acp/gdpr";
 import { BROWSER_EXPORT_BYTES, browserExportPageKey, readAllBrowserPages } from "../browser/export-pages";
@@ -54,7 +55,6 @@ const USAGE_OBJECT_WRAPPER_BYTES = 1024;
 const TRAILING_SLASH = /\/$/;
 
 /** Shared-pin routes one owner-shard sweep step reads at most, so the erasure's step count stays under the workflow's cap. */
-const ROUTES_PER_OWNER_SWEEP_STEP = 1000;
 
 export const collectProfile = internalQuery
     .input({ userId: v.string() })
@@ -464,49 +464,41 @@ export const collectSharedPins = internalAction.input({ userId: v.string() }).ac
  * Erases the caller's pins on the threads other people own, from each owner's shard, before the routes that find them are removed
  * (`gdpr/workflows/deletion-workflow.ts`). A collaborator's pins are written on the owner's shard, so the caller's own shard holds none.
  *
- * Up to `ROUTES_PER_OWNER_SWEEP_STEP` routes per call, read page by page: the workflow repeats the call from the returned `cursor` while
- * `hasMore`. A step per page would exceed the workflow's step limit for a large route history; one per budget keeps the count far below it.
+ * One bounded page of routes per call, within `SWEEP_CALL_BUDGET` shard calls (`gdpr/owner-sweep.ts`): the workflow repeats the call from the
+ * returned `cursor` while `hasMore`. A page boundary is always a safe resume point, since every route of a page is swept before the call returns.
  */
 export const erasePinsOnOwnerShards = internalAction
     .input({ cursor: v.union(v.string(), v.null()), userId: v.string() })
-    .output(v.object({ cursor: v.union(v.string(), v.null()), hasMore: v.boolean(), owners: v.array(v.string()) }))
+    .output(
+        v.object({
+            cursor: v.union(v.string(), v.null()),
+            hasMore: v.boolean(),
+            owners: v.array(v.string()),
+            routes: v.number(),
+        }),
+    )
     .action(async ({ args: { cursor, userId }, ctx: context }) => {
-        const routes: { ownerId: string; threadId: string }[] = [];
-        let next: string | null = cursor;
-        let done = false;
-
-        while (!done && routes.length < ROUTES_PER_OWNER_SWEEP_STEP) {
-            const result = await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, { cursor: next, userId });
-
-            routes.push(...result.page);
-            next = result.continueCursor;
-            done = result.isDone;
-        }
-
-        const owners = [...new Set(routes.map((route) => route.ownerId))];
+        const result = await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, {
+            cursor,
+            limit: SWEEP_ROUTES_PER_ACTION,
+            userId,
+        });
 
         // Each owner shard is fenced before it is swept, and stays fenced until the routes are gone (`releasePinFences`): a pin write of
         // this account on that shard is refused in its own transaction for the whole erasure, so nothing it commits can escape the sweep.
-        for (const ownerId of owners) {
-            await callOnShard(internal.lib.account_moves.fencePinsOnShardFor, { userId }, { shardKey: ownerId });
-        }
-
-        for (const route of routes) {
-            // One batch per call on the owner's shard: repeat until none is left.
-            let more = true;
-
-            while (more) {
-                const erased = await callOnShard(
+        const { owners } = await sweepRoutePage(result.page as SweptRoute[], {
+            eraseBatch: async (route) =>
+                await callOnShard(
                     internal.chat.pins.functions.eraseUserPinsOnThread,
                     { threadId: route.threadId as Id<"threads">, userId },
                     { shardKey: route.ownerId },
-                );
+                ),
+            fence: async (ownerId) => {
+                await callOnShard(internal.lib.account_moves.fencePinsOnShardFor, { userId }, { shardKey: ownerId });
+            },
+        });
 
-                more = erased.hasMore;
-            }
-        }
-
-        return { cursor: next, hasMore: !done, owners };
+        return { cursor: result.continueCursor, hasMore: !result.isDone, owners, routes: result.page.length };
     });
 
 /**

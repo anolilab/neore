@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "../../_generated/dataModel";
 import { resolveThreadReadAccess } from "../../agent/thread-read-access";
 import { BATCH } from "../../gdpr/batch";
+import { beginAccountMove, endAccountMove, unfencePinsOnShard } from "../../lib/account-moves";
 import schema from "../../schema";
 import {
     createDocumentPin,
@@ -90,6 +91,13 @@ const runRouteCleanup = async (userId: string) => {
         await finishRouteCleanup(context, threadId, userId);
     });
 };
+
+/** Gives the collaborator write access to the thread, as a grant does. */
+const grantWrite = async () =>
+    await harness.run(
+        async (context: any) =>
+            await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId, userId: "user-collaborator" }),
+    );
 
 const pinsOf = async () => (await as(OWNER).query(getThreadPins as never, { threadId } as never)) as Record<string, unknown>[];
 
@@ -711,12 +719,6 @@ describe("the route cleanup and the erasure's owner sweep", () => {
             return page as unknown[];
         });
 
-    const grantWrite = async () =>
-        await harness.run(
-            async (context: any) =>
-                await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId, userId: "user-collaborator" }),
-        );
-
     it("defers the route removal to the scheduled cleanup, which runs after the delete commits", async () => {
         await grantWrite();
 
@@ -822,5 +824,72 @@ describe("a fenced owner shard refuses a pin write of the account", () => {
         await expect(
             as("user-collaborator").mutation(createPin as never, { messageId: "m-fenced", messageRole: "assistant", threadId } as never),
         ).rejects.toThrow(MOVED_ACCOUNT_ERROR);
+    });
+});
+
+describe("the thread owner's merge, and the erasure replayed in order", () => {
+    const routesOfCollaborator = async () =>
+        await harness.run(async (context: any) => {
+            const { page } = await context.db.sharedPinRoutes.findMany({ where: { userId: "user-collaborator" } });
+
+            return page as unknown[];
+        });
+
+    it("takes no route while the thread's owner is merging, and takes it once the merge ends", async () => {
+        await grantWrite();
+
+        const pinId = await as("user-collaborator").mutation(createPin as never, { messageId: "m-owner-merge", messageRole: "assistant", threadId } as never);
+
+        // The pin has moved with the thread to the merged account's shard; this shard keeps only the collaborator's route.
+        await harness.run(async (context: any) => await context.db.delete("threadPins", pinId as never));
+
+        await harness.run(async (context: any) => await beginAccountMove(context, OWNER, "merging", Date.now()));
+        await runRouteCleanup("user-collaborator");
+
+        expect(await routesOfCollaborator()).toHaveLength(1);
+
+        await harness.run(async (context: any) => await endAccountMove(context, OWNER, "merging"));
+        await runRouteCleanup("user-collaborator");
+
+        expect(await routesOfCollaborator()).toHaveLength(0);
+    });
+
+    it("refuses a pin write after the second sweep and the fence release, and leaves no pin without a route", async () => {
+        await grantWrite();
+        await as("user-collaborator").mutation(createPin as never, { messageId: "m-replay-before", messageRole: "assistant", threadId } as never);
+
+        // Erasure begins: the account is marked, its owner shard is fenced, and the first sweep erases its pins there.
+        await harness.run(async (context: any) => await beginAccountMove(context, "user-collaborator", "erasing", Date.now()));
+        await harness.run(async (context: any) => await context.db.insert("shardPinFences", { createdAt: Date.now(), userId: "user-collaborator" }));
+        await harness.run(async (context: any) => await context.runMutation(eraseUserPinsOnThread, { threadId, userId: "user-collaborator" }));
+
+        // The grace wait, then the second sweep, then the fences are lifted. The route is still there: the drain has not run.
+        await harness.run(async (context: any) => await context.runMutation(eraseUserPinsOnThread, { threadId, userId: "user-collaborator" }));
+        await harness.run(async (context: any) => await unfencePinsOnShard(context, "user-collaborator"));
+
+        expect(await routesOfCollaborator()).toHaveLength(1);
+
+        // The window the drain closes: a write of the erased account commits nothing, since the erasing marker is still live.
+        await expect(
+            as("user-collaborator").mutation(createPin as never, { messageId: "m-replay-window", messageRole: "assistant", threadId } as never),
+        ).rejects.toThrow(MOVED_ACCOUNT_ERROR);
+
+        // The route drain: the account's routes go, and no pin of the account is left.
+        await harness.run(async (context: any) => {
+            const { page } = await context.db.sharedPinRoutes.findMany({ where: { userId: "user-collaborator" } });
+
+            for (const route of page) {
+                await context.db.delete("sharedPinRoutes", route._id);
+            }
+        });
+
+        const pins = await harness.run(async (context: any) => {
+            const rows: { userId: string }[] = await context.db.query("threadPins").collect();
+
+            return rows.filter((row) => row.userId === "user-collaborator");
+        });
+
+        expect(pins).toHaveLength(0);
+        expect(await routesOfCollaborator()).toHaveLength(0);
     });
 });

@@ -24,6 +24,7 @@ import { gdprLogger } from "../../lib/logger";
 import { ROOT_SHARD_KEY } from "../../lib/shard-context";
 import { onUserShard } from "../../lib/workflow-shard";
 import { stepDedupId } from "./dedup-id";
+import { SWEEP_ROUTES_PER_STEP } from "../owner-sweep";
 import { DELETION_CONFIRMATION_CLAIM_TTL_MS, DELETION_CONFIRMATION_EMAIL_SCOPE, POSTHOG_FAILED_MESSAGE } from "../constants";
 
 export interface DeletionParams {
@@ -220,31 +221,49 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             await context.step.sleep(`pin-writes-wait-${String(round)}`, "1 minute");
         }
 
-        // One pass over every page of owner shards: a step per budget of routes (`erasePinsOnOwnerShards`), so the step count stays under the
-        // workflow's cap and no step result carries every owner. Returns the owners of all pages.
+        // One pass over every page of owner shards. Each durable step covers up to `SWEEP_ROUTES_PER_STEP` routes, swept by repeated
+        // budgeted actions (`erasePinsOnOwnerShards`, one page each), so the step count stays under the workflow's cap and no step result
+        // carries more owners than one group holds. Returns the owners of all groups.
         const sweepOwnerShards = async (label: string): Promise<string[]> => {
             const owners: string[] = [];
             let cursor: string | null = null;
+            let hasMore = true;
+            let group = 0;
 
-            for (let round = 0; ; round += 1) {
-                const page = (await context.step.do(
-                    `${label}-${String(round)}`,
-                    async () =>
-                        await context.run(
+            while (hasMore) {
+                const groupLabel = `${label}-${String(group)}`;
+                const result = (await context.step.do(groupLabel, async () => {
+                    const groupOwners: string[] = [];
+                    let groupCursor: string | null = cursor;
+                    let groupHasMore = true;
+                    let routes = 0;
+
+                    let round = 0;
+
+                    while (groupHasMore && routes < SWEEP_ROUTES_PER_STEP) {
+                        const page = (await context.run(
                             internal.gdpr.steps.erasePinsOnOwnerShards,
-                            { cursor, userId: args.userId },
-                            { dedupId: stepDedupId(scope, label, round) },
-                        ),
-                )) as { cursor: string | null; hasMore: boolean; owners: string[] };
+                            { cursor: groupCursor, userId: args.userId },
+                            { dedupId: stepDedupId(scope, groupLabel, round) },
+                        )) as { cursor: string | null; hasMore: boolean; owners: string[]; routes: number };
 
-                owners.push(...page.owners);
+                        groupOwners.push(...page.owners);
+                        routes += page.routes;
+                        groupCursor = page.cursor;
+                        groupHasMore = page.hasMore;
+                        round += 1;
+                    }
 
-                if (!page.hasMore) {
-                    return owners;
-                }
+                    return { cursor: groupCursor, hasMore: groupHasMore, owners: [...new Set(groupOwners)] };
+                })) as { cursor: string | null; hasMore: boolean; owners: string[] };
 
-                cursor = page.cursor;
+                owners.push(...result.owners);
+                cursor = result.cursor;
+                hasMore = result.hasMore;
+                group += 1;
             }
+
+            return owners;
         };
 
         // The pins this user made on other owners' threads are removed from those owners' shards first: their routes are the only way to find them.
@@ -263,7 +282,8 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         // refused, because the erasing marker stays live until the erasure ends and every write checks it before its insert
         // (`lib/account-moves.ts`). Batches keep each call's input small.
         const owners = [...new Set([...firstOwners, ...secondOwners])];
-        const releaseBatch = 200;
+        // Each owner is one shard call, so a batch stays within the action's call budget (`SWEEP_CALL_BUDGET`).
+        const releaseBatch = 30;
 
         for (let batch = 0; batch * releaseBatch < owners.length; batch += 1) {
             await context.step.do(

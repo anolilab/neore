@@ -42,7 +42,7 @@ const workflowContext = () => {
 
         // The owner sweep reports the owner shards it fenced; the fake reports none unless a test says so.
         if (entry.ref === "gdpr_steps:erasePinsOnOwnerShards") {
-            return { owners: [], ...(answer(entry.ref, round, args) as object) };
+            return { owners: [], routes: 0, ...(answer(entry.ref, round, args) as object) };
         }
 
         return answer(entry.ref, round, args);
@@ -665,7 +665,7 @@ describe("account deletion workflow: the owner fences outlive the route drain", 
         expect(secondSweep?.args).not.toHaveProperty("release");
     });
 
-    it("pages each owner sweep, one step per page, carrying the cursor forward, and releases every owner it fenced", async () => {
+    it("pages each owner sweep inside one step, carrying the cursor forward, and releases every owner it fenced", async () => {
         // Each pass has two pages: the first returns a cursor, the second is the last. Both passes fence owners on each page.
         answer = (ref, _round, args) => {
             if (ref !== "gdpr_steps:erasePinsOnOwnerShards") {
@@ -673,18 +673,19 @@ describe("account deletion workflow: the owner fences outlive the route drain", 
             }
 
             if (args["cursor"] === null) {
-                return { cursor: "page-2", hasMore: true, owners: ["owner-a"] };
+                return { cursor: "page-2", hasMore: true, owners: ["owner-a"], routes: 1 };
             }
 
-            return { cursor: null, hasMore: false, owners: ["owner-b"] };
+            return { cursor: null, hasMore: false, owners: ["owner-b"], routes: 1 };
         };
 
         await execute();
 
         const names = stepNames();
 
-        expect(names).toContain("erase-pins-on-owner-shards-1");
-        expect(names).toContain("erase-pins-on-owner-shards-again-1");
+        // Two pages fit in one step: the step covers its routes budget only once, so no second group step is needed.
+        expect(names).not.toContain("erase-pins-on-owner-shards-1");
+        expect(names).not.toContain("erase-pins-on-owner-shards-again-1");
 
         const sweeps = runs().filter((entry) => entry.ref === "gdpr_steps:erasePinsOnOwnerShards");
 
@@ -693,5 +694,34 @@ describe("account deletion workflow: the owner fences outlive the route drain", 
         const releaseRun = runs().find((entry) => entry.ref === "gdpr_steps:releasePinFences");
 
         expect(releaseRun?.args).toStrictEqual({ owners: ["owner-a", "owner-b"], userId: USER });
+    });
+
+    it("starts a new step once a step has covered its budget of routes, and resumes from the cursor it stopped at", async () => {
+        // Each page holds 600 routes and asks for more, so a step stops after two pages (1,200 routes, over the 1,000 budget).
+        answer = (ref, round) => {
+            if (ref !== "gdpr_steps:erasePinsOnOwnerShards") {
+                return { cursor: null, hasMore: false, owners: [], routes: 0 };
+            }
+
+            if (round <= 3) {
+                return { cursor: `c${String(round)}`, hasMore: round < 3, owners: [`owner-${String(round)}`], routes: 600 };
+            }
+
+            return { cursor: null, hasMore: false, owners: [], routes: 0 };
+        };
+
+        await execute();
+
+        const names = stepNames();
+
+        expect(names).toContain("erase-pins-on-owner-shards-0");
+        expect(names).toContain("erase-pins-on-owner-shards-1");
+
+        const firstSweep = runs()
+            .filter((entry) => entry.ref === "gdpr_steps:erasePinsOnOwnerShards")
+            .slice(0, 3)
+            .map((entry) => entry.args["cursor"]);
+
+        expect(firstSweep).toStrictEqual([null, "c1", "c2"]);
     });
 });

@@ -17,6 +17,7 @@ import { enqueueJob } from "../../lib/job-queue";
 import { MAX_LENGTH } from "../../lib/validators";
 import { systemDb } from "../../lib/rls/scope";
 import { threadGateOutcome, throwUnlessGranted } from "../lib/thread-gate";
+import { pinRouteOwnerOf } from "./pin-route-writes";
 import { isPinnableDocumentKind } from "./pinnable";
 
 /** The highest image index an image pin may name; a reply has far fewer images. */
@@ -147,7 +148,12 @@ export const listPinsForExport = internalQuery
  * pins still export.
  */
 export const listSharedPinRoutesForExport = internalQuery
-    .input({ cursor: v.union(v.string().max(MAX_LENGTH.cursor), v.null()), userId: v.string().max(MAX_LENGTH.id) })
+    .input({
+        cursor: v.union(v.string().max(MAX_LENGTH.cursor), v.null()),
+        // Routes per page, at most the export's page. The owner sweep asks for fewer, so one action stays within its shard-call budget.
+        limit: v.optional(v.number()),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
     .output(
         v.object({
             continueCursor: v.union(v.string(), v.null()),
@@ -160,7 +166,7 @@ export const listSharedPinRoutesForExport = internalQuery
         const result = await context.db.sharedPinRoutes.findMany({
             consistency: "primary",
             cursor: args.cursor ?? undefined,
-            limit: PIN_EXPORT_PAGE,
+            limit: Math.min(Math.max(args.limit ?? PIN_EXPORT_PAGE, 1), PIN_EXPORT_PAGE),
             where: { userId: args.userId },
         });
 
@@ -246,6 +252,11 @@ export const dropRoutesWithoutPins = async (
         return;
     }
 
+    // Nothing to remove, and the merge wait below reschedules itself: an owner, who keeps no route to their thread, schedules nothing.
+    if ((await pinRouteOwnerOf(context.db, userId, threadId)) === null) {
+        return;
+    }
+
     // A guest merge is moving this account's pins, and the route it has not transferred yet is still the only way to find them: none is
     // taken until the merge ends. An erasure is not waited for: its drain removes every route, and a refused write takes back its own.
     if ((await isAccountMoving(context, userId, Date.now())) && !(await isErasing(context, userId))) {
@@ -290,6 +301,17 @@ export const finishRouteCleanup = async (context: MutationCtx, threadId: Id<"thr
 
     // This shard cannot see the pins of a thread that moved off it, so it cannot tell whether any are left: the routes stay.
     if (!thread) {
+        return;
+    }
+
+    // The thread's owner is merging: the thread and its pins are moving to another shard, and this shard's view is partial until the
+    // merge ends. The routes name the owner, and the merge re-points them, so this job takes none.
+    if (thread.userId !== undefined && (await isAccountMoving(context, thread.userId, Date.now()))) {
+        return;
+    }
+
+    // Nothing to remove: an owner keeps no route to their own thread, so a cleanup there schedules no further pass.
+    if ((await pinRouteOwnerOf(context.db, userId, threadId)) === null) {
         return;
     }
 
@@ -651,8 +673,11 @@ export const deletePin = authMutation
 
         await context.db.delete("threadPins", pinId as Id<"threadPins">);
 
-        // After this commits: the job finds the pin gone, or a pin a later write committed, and removes the routes only if none is left.
-        await scheduleRouteCleanup(context, pin.threadId, userId);
+        // Only a collaborator holds a route to the thread. After this commits, the job finds the pin gone, or a pin a later write committed,
+        // and removes the routes only if none is left.
+        if ((await pinRouteOwnerOf(context.db, userId, pin.threadId)) !== null) {
+            await scheduleRouteCleanup(context, pin.threadId, userId);
+        }
 
         context.log.event("chat.delete_pin", { deleted: true });
     });
