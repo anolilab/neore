@@ -25,12 +25,13 @@ import { Separator } from "@neore/ui/components/separator";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, X } from "lucide-react";
 import type { FC } from "react";
-import { useId } from "react";
+import { useEffect, useId, useRef } from "react";
 import { toast } from "sonner";
 
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { moveBackupModel, offerableBackupModels } from "@/features/settings/lib/backup-model-options";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
+import { useFilteredModels } from "@/hooks/use-model-filter-rules";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -144,7 +145,7 @@ export const ModelSelect = <Field extends string>({
  * The models a reply is retried on, in order, when the chosen model fails with an infrastructure error. A saved model
  * the list no longer offers (retired, or now outside the plan) stays listed as unavailable, so it can still be removed.
  */
-const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[]; providersWithKey: ReadonlySet<string> }> = ({
+export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[]; providersWithKey: ReadonlySet<string> }> = ({
     disabled,
     models: allModels,
     providersWithKey,
@@ -153,13 +154,34 @@ const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[]; prov
     const crpc = useCRPC();
     const labelId = useId();
     const { data: access } = useQuery(crpc.auth.functions.getPaidModelAccess.queryOptions({}, { live: false }));
-    // The backend's own answer, not a client-side guess; the save re-checks it.
-    const offerable = offerableBackupModels(allModels, access?.canRunPaidModels === true, providersWithKey);
+    // The backend's own answer, not a client-side guess; the save re-checks it. A model the user's filters exclude is
+    // skipped on a retry, so it is not offered and a saved one shows as unavailable.
+    const offerable = useFilteredModels(offerableBackupModels(allModels, access?.canRunPaidModels === true, providersWithKey));
     const { data: userSettings } = useUserSettings();
-    const { isPending, updateLatest } = useUpdateUserSettings();
+    // Edits queue behind each other (`updateLatest`), so the controls stay enabled while one saves and keep their focus.
+    const { updateLatest } = useUpdateUserSettings();
     const chosen = storedBackupModels(userSettings);
-    const busy = disabled || isPending;
+    const chosenKey = chosen.join("\n");
     const limit = MAX_BACKUP_MODELS;
+    const removeButtons = useRef(new Map<string, HTMLButtonElement>());
+    const addRow = useRef<HTMLDivElement>(null);
+    // After a removal, the entry whose remove button takes focus, or "" for the add picker.
+    const focusAfterRemove = useRef<string | null>(null);
+
+    useEffect(() => {
+        const target = focusAfterRemove.current;
+
+        if (target === null) {
+            return;
+        }
+
+        const element = target === "" ? addRow.current?.querySelector("button") : removeButtons.current.get(target);
+
+        if (element) {
+            focusAfterRemove.current = null;
+            element.focus();
+        }
+    }, [chosenKey]);
 
     // Built from the cached settings when its turn comes, so two quick edits never undo each other.
     const save = (edit: (backupModels: string[]) => string[]) => {
@@ -198,7 +220,7 @@ const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[]; prov
                                 </span>
                                 <Button
                                     aria-label={t`Move ${name} up`}
-                                    disabled={busy || index === 0}
+                                    disabled={disabled || index === 0}
                                     onClick={() => save((list) => moveBackupModel(list, id, -1))}
                                     size="icon-sm"
                                     variant="ghost"
@@ -207,7 +229,7 @@ const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[]; prov
                                 </Button>
                                 <Button
                                     aria-label={t`Move ${name} down`}
-                                    disabled={busy || index === chosen.length - 1}
+                                    disabled={disabled || index === chosen.length - 1}
                                     onClick={() => save((list) => moveBackupModel(list, id, 1))}
                                     size="icon-sm"
                                     variant="ghost"
@@ -216,8 +238,18 @@ const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[]; prov
                                 </Button>
                                 <Button
                                     aria-label={t`Remove ${name}`}
-                                    disabled={busy}
-                                    onClick={() => save((list) => list.filter((entry) => entry !== id))}
+                                    disabled={disabled}
+                                    onClick={() => {
+                                        focusAfterRemove.current = chosen[index + 1] ?? chosen[index - 1] ?? "";
+                                        save((list) => list.filter((entry) => entry !== id));
+                                    }}
+                                    ref={(element) => {
+                                        if (element) {
+                                            removeButtons.current.set(id, element);
+                                        } else {
+                                            removeButtons.current.delete(id);
+                                        }
+                                    }}
                                     size="icon-sm"
                                     variant="ghost"
                                 >
@@ -229,20 +261,22 @@ const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[]; prov
                 </ol>
             )}
             {chosen.length < limit && (
-                <ModelSelect
-                    description={t`Up to ${limit}, tried in the order listed`}
-                    disabled={busy}
-                    emptyLabel={t`Choose a model`}
-                    field="backupModels"
-                    label={chosen.length === 0 ? t`Add a backup model` : t`Add another backup model`}
-                    models={offerable.filter((m) => !chosen.includes(m.id))}
-                    onChange={(_field, modelId) => {
-                        if (modelId) {
-                            save((list) => (list.includes(modelId) || list.length >= limit ? list : [...list, modelId]));
-                        }
-                    }}
-                    value={undefined}
-                />
+                <div ref={addRow}>
+                    <ModelSelect
+                        description={t`Up to ${limit}, tried in the order listed`}
+                        disabled={disabled}
+                        emptyLabel={t`Choose a model`}
+                        field="backupModels"
+                        label={chosen.length === 0 ? t`Add a backup model` : t`Add another backup model`}
+                        models={offerable.filter((m) => !chosen.includes(m.id))}
+                        onChange={(_field, modelId) => {
+                            if (modelId) {
+                                save((list) => (list.includes(modelId) || list.length >= limit ? list : [...list, modelId]));
+                            }
+                        }}
+                        value={undefined}
+                    />
+                </div>
             )}
         </div>
     );
