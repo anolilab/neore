@@ -450,7 +450,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         const callOptions = options.freshContext ? { contextOptions: { recentMessages: 0 } } : undefined;
         // A generation that fails on a thread this run continues wakes it if the owner snoozed it, as a chat run that fails
         // does; the first generation and every later goal round go through here. The generation's own error is the one thrown.
-        const recordEnd = async (outcome: "succeeded" | "failed"): Promise<void> => await recordHeadlessEnd(ctx, replyKey, threadId, outcome);
+        const recordEnd = (outcome: "succeeded" | "failed"): Promise<void> => recordHeadlessEnd(ctx, replyKey, threadId, outcome);
 
         const wakeOnFailure = async (error: unknown): Promise<never> => {
             if (existingThreadId !== undefined) {
@@ -612,7 +612,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
 
         if (!options.goal) {
             extract(text);
-            // A stop writes no run event (as a chat's stop does not): the run ended, but was not finished.
+            // A stop writes no run event, as a chat's stop does not.
 
             if (!(await options.shouldStop?.())) {
                 await recordEnd("succeeded");
