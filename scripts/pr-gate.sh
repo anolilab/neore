@@ -83,13 +83,39 @@ for line in body.split("\n"):
         mark = " [NEW]" if "⭐ New" in title else ""
         print(f"    {m.group(1)}. {title.replace('⭐ New', '').strip()}{mark}")
 
-cited = sorted({m for m in re.findall(r"\[((?:backend|apps|packages|services|scripts)/[\w./-]+\.\w+)(?:\[R[\d-]+\])?\]", body)})
-if cited:
+CITE = re.compile(r"\[((?:backend|apps|packages|services|scripts)/[\w./-]+\.\w+)(?:\[R[\d-]+\])?\]")
+
+# The added lines of each cited file's snippet: the "+" lines after its citation, up to the next citation.
+snippets = {}
+current = None
+for line in body.split("\n"):
+    m = CITE.search(line)
+    if m:
+        current = m.group(1)
+        snippets.setdefault(current, [])
+        continue
+    if current and line.startswith("+") and not line.startswith("+++"):
+        code = line[1:].strip()
+        if len(code) >= 12:
+            snippets[current].append(code)
+
+if snippets:
     print("  cited files at head:")
-    for path in cited[:20]:
+    for path in list(snippets)[:20]:
         probe = subprocess.run(
-            ["gh", "api", f"repos/{repo}/contents/{path}?ref={head}", "--silent"],
+            ["gh", "api", f"repos/{repo}/contents/{path}?ref={head}", "-H", "Accept: application/vnd.github.raw"],
             capture_output=True,
+            text=True,
         )
-        print(f"    {'present' if probe.returncode == 0 else 'GONE   '} {path}")
+        if probe.returncode != 0:
+            print(f"    GONE    {path}")
+            continue
+        lines = [code for code in snippets[path] if code]
+        found = sum(1 for code in lines if code in probe.stdout)
+        if not lines:
+            print(f"    present {path} (no added lines quoted)")
+        elif found == 0:
+            print(f"    CHANGED {path}: none of its {len(lines)} quoted lines is at head")
+        else:
+            print(f"    present {path}: {found} of {len(lines)} quoted lines at head")
 PY

@@ -212,7 +212,7 @@ describe("runHeadlessAgent personalization", () => {
     });
 
     it("records a headless run's end in the Events log once it finishes, keyed by its own reply key", async () => {
-        const ctx = fakeCtx() as unknown as Parameters<typeof runHeadlessAgent>[0] & { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext & Parameters<typeof runHeadlessAgent>[0];
 
         await runHeadlessAgent(ctx, {
             maxSteps: 3,
@@ -269,7 +269,7 @@ describe("runHeadlessAgent personalization", () => {
         seen.reviewFails = true;
 
         try {
-            const ctx = fakeCtx() as unknown as Parameters<typeof runHeadlessAgent>[0] & { runMutation: ReturnType<typeof vi.fn> };
+            const ctx = fakeCtx() as unknown as MockRunContext & Parameters<typeof runHeadlessAgent>[0];
 
             await runHeadlessAgent(ctx, {
                 goal: { text: "Ship it" },
@@ -299,7 +299,7 @@ describe("runHeadlessAgent personalization", () => {
     });
 
     it("records no success for a headless run that was stopped, since a stop writes no run event", async () => {
-        const ctx = fakeCtx() as unknown as Parameters<typeof runHeadlessAgent>[0] & { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext & Parameters<typeof runHeadlessAgent>[0];
 
         await runHeadlessAgent(ctx, {
             maxSteps: 3,
@@ -320,7 +320,7 @@ describe("runHeadlessAgent personalization", () => {
     });
 
     it("records a headless run's failure in the Events log before the failure is raised", async () => {
-        const ctx = fakeCtx() as unknown as Parameters<typeof runHeadlessAgent>[0] & { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext & Parameters<typeof runHeadlessAgent>[0];
 
         seen.failAt = "generate";
 
@@ -1249,7 +1249,7 @@ describe("runHeadlessAgent pauseForApproval", () => {
     it("schedules the paid generation's usage even when the pause write fails, and fails the run", async () => {
         seen.saved = [approvalRequest];
 
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn>; scheduler: { runAfter: ReturnType<typeof vi.fn> } };
+        const ctx = fakeCtx() as unknown as MockRunContext & { scheduler: { runAfter: ReturnType<typeof vi.fn> } };
 
         ctx.runMutation.mockImplementation(async (reference: string) => {
             if (reference === "chat_tool_permissions:recordPendingToolApprovals") {
