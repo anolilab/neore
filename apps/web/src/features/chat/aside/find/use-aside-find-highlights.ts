@@ -275,8 +275,8 @@ const useAsideFindHighlights = (
 
                 apply();
 
-                // Reveal a hit that came into existence, or the same hit moving along the panel. A different occurrence that
-                // takes the selected index was not moved by the reader, so it is highlighted without a scroll.
+                // Reveal a hit that came into existence, or the same hit moving along the panel. A different occurrence, which
+                // only happens once the selected entry is gone, was not moved by the reader, so it is highlighted without a scroll.
                 const appeared = before === undefined && applied !== undefined;
                 const moved = isSameHit(before, applied) && !sameOffset(beforeOffset, appliedOffset);
 
