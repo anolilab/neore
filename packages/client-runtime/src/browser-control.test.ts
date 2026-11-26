@@ -7,6 +7,8 @@ describe(leaseHolder, () => {
         expect(leaseHolder({ byYou: true, claimIds: ["a"], until: 200 }, "a", 100)).toBe("mine");
         expect(leaseHolder({ byYou: true, claimIds: ["b"], until: 200 }, "a", 100)).toBe("other-view");
         expect(leaseHolder({ byYou: false, until: 200 }, "a", 100)).toBe("other-person");
+        // A view that holds no claim: the person's lease is another view's.
+        expect(leaseHolder({ byYou: true, claimIds: ["b"], until: 200 }, undefined, 100)).toBe("other-view");
     });
 
     it("reads a lease that ended on the server's clock as none", () => {

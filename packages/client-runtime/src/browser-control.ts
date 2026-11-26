@@ -22,8 +22,8 @@ export const CONTROL_KEEP_INTERVAL_MS = 30_000;
 
 /**
  * Whose the lease is, seen from a view that holds the claim named `claimId` (or none): `mine`, `other-view` (another
- * of the same person's views took it over: the live status names its claim, not this one), `other-person`, or `none`
- * (no lease, or one that ended on the server's clock `now`).
+ * of the same person's views holds it: the live status names its claim, not this one, or this view holds no claim),
+ * `other-person`, or `none` (no lease, or one that ended on the server's clock `now`).
  */
 export const leaseHolder = (lease: BrowserLease | undefined, claimId: string | undefined, now: number): "mine" | "none" | "other-person" | "other-view" => {
     if (lease === undefined || lease.until <= now) {
@@ -32,6 +32,11 @@ export const leaseHolder = (lease: BrowserLease | undefined, claimId: string | u
 
     if (!lease.byYou) {
         return "other-person";
+    }
+
+    // A view that holds no claim cannot be the one the lease is under.
+    if (claimId === undefined) {
+        return "other-view";
     }
 
     return isTakenOverByOwnView(lease, claimId) ? "other-view" : "mine";

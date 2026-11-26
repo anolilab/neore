@@ -562,7 +562,9 @@ export const claimControl = internalMutation
                     since: current.since,
                     until,
                 },
-                ...(view !== undefined && { controlView: view }),
+                // The view taking the lease names itself or no one: a takeover by a view that names none never keeps the
+                // previous holder's name, which would let that holder take it back past `exclusive`.
+                controlView: view,
             });
 
             return {

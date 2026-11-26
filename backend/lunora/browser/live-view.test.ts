@@ -1999,6 +1999,18 @@ describe("a phone that takes control", () => {
         await expect(viewTake("phone-2")).resolves.toStrictEqual({ status: "held" });
     });
 
+    it("forgets the phone's view name when the web takes the lease over, so the phone cannot take it back", async () => {
+        await addSession();
+        await as(OWNER).action(takeControl as never, { exclusive: true, threadId, view: "phone-1" } as never);
+        // The web card takes over (a renewal of the same person's lease that names no view).
+        const web = await take(OWNER);
+
+        await expect(as(OWNER).action(takeControl as never, { exclusive: true, threadId, view: "phone-1" } as never)).resolves.toStrictEqual({
+            status: "held",
+        });
+        await expect(heldClaim()).resolves.toBe(web.claim);
+    });
+
     it("gives the claim back when it leaves, or within one lease interval when it sends nothing", async () => {
         await addSession();
         const phone = await take(OWNER, true);
