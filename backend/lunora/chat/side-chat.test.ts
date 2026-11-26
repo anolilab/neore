@@ -582,10 +582,10 @@ describe("createSideChat", () => {
         expect(await sideRelations()).toHaveLength(0);
     });
 
-    it("copies nothing of a reply interrupted mid tool call, even when a later prompt follows it", async () => {
+    it("keeps a completed tool turn whose result is stored in a later message than its call", async () => {
         const parentId = await parentWith(OWNER);
 
-        await withMessages(parentId, OWNER, ["first question"]);
+        await withMessages(parentId, OWNER, ["question"]);
         await harness.run(async (ctx: any) => {
             await addMessagesHandler(ctx, {
                 messages: [
@@ -598,8 +598,28 @@ describe("createSideChat", () => {
                 userId: OWNER,
             });
         });
-        // The run stopped at the tool call; the owner then sent another prompt.
-        await withMessages(parentId, OWNER, ["second question"]);
+        // The approved call resumes later: its result is stored after the call, in a message of its own, then the reply finishes.
+        await harness.run(async (ctx: any) => {
+            await addMessagesHandler(ctx, {
+                messages: [
+                    {
+                        message: {
+                            content: [{ output: { type: "text", value: "hits" }, toolCallId: "c1", toolName: "search", type: "tool-result" }],
+                            role: "tool",
+                        },
+                        status: "success",
+                    },
+                ],
+                overrideOrder: 10,
+                threadId: parentId as never,
+                userId: OWNER,
+            });
+            await addMessagesHandler(ctx, {
+                messages: [{ message: { content: [{ text: "done", type: "text" }], role: "assistant" }, status: "success" }],
+                threadId: parentId as never,
+                userId: OWNER,
+            });
+        });
 
         const outcome = (await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)) as { status: string; threadId: string };
         const childRows = await harness.run(async (ctx: any) => {
@@ -610,10 +630,9 @@ describe("createSideChat", () => {
         const copied = JSON.stringify(childRows.map((row: any) => row.message));
 
         expect(outcome.status).toBe("ok");
-        expect(childRows).toHaveLength(1);
-        expect(copied).toContain("first question");
-        expect(copied).not.toContain("tool-call");
-        expect(copied).not.toContain("second question");
+        expect(childRows).toHaveLength(4);
+        expect(copied).toContain("hits");
+        expect(copied).toContain("done");
     });
 
     it("forks a parent whose only grant has expired, since nobody else can read it through that grant", async () => {

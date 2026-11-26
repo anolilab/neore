@@ -269,8 +269,10 @@ export const lastSettledMessageId = internalQuery
         );
         // The first displayed message holding a tool call that never reached a settled result (an interrupted run): a fork ends
         // before it, whatever finished message follows, so the child carries no unfinished tool call.
-        const interrupted = groups.findIndex((rows) => {
-            const parts = rows
+        // A call is answered by a settled result anywhere on the path: an approved call's result is stored after it, in a
+        // message of its own, so the answer is searched for across every message, not only the call's own.
+        const partsOf = (rows: ReadonlyArray<(typeof groups)[number][number]>) =>
+            rows
                 .filter((entry) => entry.row.status === "success")
                 .flatMap((entry) => {
                     // A row with no message body has no tool parts, so it reads as empty rather than throwing.
@@ -278,10 +280,12 @@ export const lastSettledMessageId = internalQuery
 
                     return Array.isArray(content) ? (content as { toolCallId?: string; type?: string }[]) : [];
                 });
-            const answered = new Set(parts.filter((part) => part.type === "tool-result").map((part) => part.toolCallId));
-
-            return parts.some((part) => part.type === "tool-call" && !answered.has(part.toolCallId));
-        });
+        const answered = new Set(
+            partsOf(groups.flat())
+                .filter((part) => part.type === "tool-result")
+                .map((part) => part.toolCallId),
+        );
+        const interrupted = groups.findIndex((rows) => partsOf(rows).some((part) => part.type === "tool-call" && !answered.has(part.toolCallId)));
         const candidates = interrupted === -1 ? groups : groups.slice(0, interrupted);
         const settled = candidates.findLast((rows) => {
             const last = rows.at(-1)?.row;
