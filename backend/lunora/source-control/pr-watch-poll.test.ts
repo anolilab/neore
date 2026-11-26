@@ -158,6 +158,21 @@ describe("dispatchDueWatches", () => {
         expect(result.dispatched).toBe(0);
     });
 
+    it("reaches an older due watch behind many that are not due", async () => {
+        const recent = Date.now();
+
+        for (let number = 1; number <= 24; number += 1) {
+            await seedWatch({ watchCheckedAt: recent }, number);
+        }
+
+        const due = await seedWatch({ watchCheckedAt: undefined }, 25);
+        const result = await harness.run(async (ctx: any) => await runInShard(OWNER, () => ctx.runMutation(dispatchDueWatches, {})));
+        const { watchCheckedAt } = await rowOf(due);
+
+        expect(result.dispatched).toBe(1);
+        expect(watchCheckedAt).toBeGreaterThan(0);
+    });
+
     it("takes a bounded number of watches per sweep", async () => {
         for (let number = 1; number <= 12; number += 1) {
             await seedWatch({ watchCheckedAt: undefined }, number);

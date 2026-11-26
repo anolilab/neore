@@ -34,6 +34,9 @@ import type { CheckRun, CheckState, CheckSummary, MergeState } from "./types";
 export const PR_WATCH_POLL_INTERVAL_MS = 3 * 60 * 1000;
 /** Watches one sweep leases, so one person's host calls stay bounded whatever the person's limit is. */
 const POLL_LIMIT = 10;
+/** Running watches read per page of the sweep, and pages per sweep. */
+const SCAN_PAGE_SIZE = 50;
+const SCAN_PAGES = 4;
 /** Failing check names kept in an observation, and their length: the names are text the host sent. */
 const MAX_FAILING_NAMES = 10;
 const MAX_NAME_LENGTH = 200;
@@ -91,14 +94,29 @@ export const dispatchDueWatches = internalMutation
         }
 
         const { now } = ctx;
-        const running = await ctx.db
-            .query("pullRequestThreads")
-            .withIndex("by_user_and_watchActive", (q) => q.eq("userId", userId).eq("watchActive", true))
-            .take(POLL_LIMIT * 2);
-        const due = running
-            .filter((link) => isDue(link, now))
-            .toSorted((a, b) => (a.watchCheckedAt ?? 0) - (b.watchCheckedAt ?? 0))
-            .slice(0, POLL_LIMIT);
+        // The running watches are paged through until enough are due or the pages run out, so a due watch is reached whatever its
+        // place in the index. Both bounds are fixed: a person holds few running watches, but nothing here relies on that.
+        const due: Doc<"pullRequestThreads">[] = [];
+        let cursor: string | null = null;
+
+        for (let pages = 0; pages < SCAN_PAGES && due.length < POLL_LIMIT; pages += 1) {
+            const page = await ctx.db
+                .query("pullRequestThreads")
+                .withIndex("by_user_and_watchActive", (q) => q.eq("userId", userId).eq("watchActive", true))
+                .paginate({ cursor, numItems: SCAN_PAGE_SIZE });
+
+            due.push(...page.page.filter((link) => isDue(link, now)));
+
+            if (page.isDone) {
+                break;
+            }
+
+            cursor = page.continueCursor;
+        }
+
+        // Oldest read first, so a watch is not starved by the ones read before it.
+        due.sort((a, b) => (a.watchCheckedAt ?? 0) - (b.watchCheckedAt ?? 0));
+        due.length = Math.min(due.length, POLL_LIMIT);
 
         for (const link of due) {
             await leaseWatch(ctx, link, now);
