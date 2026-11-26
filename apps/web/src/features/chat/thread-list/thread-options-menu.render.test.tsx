@@ -23,6 +23,8 @@ const sideChat = vi.hoisted(() => {
     return {
         hold: false,
         openChat: vi.fn(),
+        pathname: "/chat/t1",
+        release: () => {},
         start: vi.fn(),
         result: { reason: "locked", status: "refused" } as { reason?: string; status: string; threadId?: string },
         showError: vi.fn(),

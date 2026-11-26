@@ -112,7 +112,7 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
                 }
             } catch (error) {
                 console.error("Failed to start a side chat:", error);
-                showError(error);
+                showError(error instanceof Error ? error : new Error(String(error)));
             } finally {
                 isStartingRef.current = false;
             }
