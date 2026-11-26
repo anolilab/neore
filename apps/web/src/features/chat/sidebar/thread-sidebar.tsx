@@ -169,7 +169,7 @@ const ThreadSummary: FC<{ threadId?: string }> = ({ threadId }) => {
                 </div>
 
                 <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                         <Label className="text-foreground text-sm font-medium" htmlFor="custom-system-prompt">
                             {t`Custom System Prompt`}
                         </Label>
@@ -324,29 +324,30 @@ const ThreadSidebar: FC<ThreadSidebarProps> = ({ threadId }) => {
             <SidebarResizeHandle />
             <SidebarContent className="gap-0 overflow-hidden p-1.5">
                 <Tabs className="flex min-h-0 flex-1 flex-col" onValueChange={setActiveRightSidebarTab} value={activeRightSidebarTab}>
-                    <div>
+                    {/* A narrow panel shows the tabs as icons; the names stay for screen readers. */}
+                    <div className="@container">
                         <TabsList className="w-full" variant="default">
                             <TabsTrigger value="summary">
-                                <MessageSquare className="mr-1.5 size-3.5" />
-                                {t`Thread`}
+                                <MessageSquare aria-hidden="true" className="size-3.5 @min-[22rem]:mr-1.5" />
+                                <span className="@max-[22rem]:sr-only">{t`Thread`}</span>
                             </TabsTrigger>
                             <TabsTrigger value="prompts">
-                                <FileText className="mr-1.5 size-3.5" />
-                                {t`Prompts`}
+                                <FileText aria-hidden="true" className="size-3.5 @min-[22rem]:mr-1.5" />
+                                <span className="@max-[22rem]:sr-only">{t`Prompts`}</span>
                             </TabsTrigger>
                             <TabsTrigger value="variables">
-                                <Braces className="mr-1.5 size-3.5" />
-                                {t`Variables`}
+                                <Braces aria-hidden="true" className="size-3.5 @min-[22rem]:mr-1.5" />
+                                <span className="@max-[22rem]:sr-only">{t`Variables`}</span>
                             </TabsTrigger>
                             {isTextModel && (
                                 <TabsTrigger value={ASIDE_TAB}>
-                                    <MessageCircleQuestionIcon aria-hidden="true" className="mr-1.5 size-3.5" />
-                                    {t`Ask`}
+                                    <MessageCircleQuestionIcon aria-hidden="true" className="size-3.5 @min-[22rem]:mr-1.5" />
+                                    <span className="@max-[22rem]:sr-only">{t`Ask`}</span>
                                 </TabsTrigger>
                             )}
                             <TabsTrigger value="pins">
-                                <PinIcon className="mr-1.5 size-3.5" />
-                                {t`Pins`}
+                                <PinIcon aria-hidden="true" className="size-3.5 @min-[22rem]:mr-1.5" />
+                                <span className="@max-[22rem]:sr-only">{t`Pins`}</span>
                             </TabsTrigger>
                         </TabsList>
                     </div>
