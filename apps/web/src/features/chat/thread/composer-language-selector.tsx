@@ -148,11 +148,14 @@ const ComposerLanguageSelector: FC = () => {
                                 />
                             }
                         >
-                            <div className="flex min-w-0 flex-1 items-center gap-2">
+                            <div className="flex min-w-0 flex-1 items-center gap-1.5">
                                 <Globe aria-hidden="true" className="size-3 shrink-0" />
-                                <ComboboxValue />
+                                {/* The name carries the language, so a narrow strip shows the globe alone. */}
+                                <span className="@max-[48rem]/strip:hidden">
+                                    <ComboboxValue />
+                                </span>
                             </div>
-                            <ChevronsUpDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            <ChevronsUpDownIcon aria-hidden="true" className="size-3.5 shrink-0 opacity-50 @max-[48rem]/strip:hidden" />
                         </ComboboxTrigger>
                     }
                 />

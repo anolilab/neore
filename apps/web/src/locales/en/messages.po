@@ -1334,8 +1334,8 @@ msgid "{minutes}m remaining"
 msgstr "{minutes}m remaining"
 
 #: src/features/chat/thread/composer.tsx:236
-msgid "{modeLabel} mode — click to change"
-msgstr "{modeLabel} mode — click to change"
+#~ msgid "{modeLabel} mode — click to change"
+#~ msgstr "{modeLabel} mode — click to change"
 
 #: src/features/chat/thread/thread.tsx:266
 msgid "{modelCount, plural, one {Ask # model anything...} other {Ask # models anything...}}"
@@ -4603,7 +4603,7 @@ msgid "ask"
 msgstr "ask"
 
 #: src/features/chat/aside/aside-panel.tsx:306
-#: src/features/chat/sidebar/thread-sidebar.tsx:344
+#: src/features/chat/sidebar/thread-sidebar.tsx:345
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:63
 msgid "Ask"
 msgstr "Ask"
@@ -4636,7 +4636,7 @@ msgstr "Ask anything to start a new chat…"
 msgid "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 msgstr "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 
-#: src/features/chat/thread/composer.tsx:272
+#: src/features/chat/thread/composer.tsx:191
 msgid "Ask me anything..."
 msgstr "Ask me anything..."
 
@@ -4786,7 +4786,7 @@ msgstr "Auckland"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:781
 #: src/components/model-picker/model-picker.tsx:1291
 #: src/features/chat/sidebar/usage-card.tsx:131
-#: src/features/chat/thread/composer.tsx:133
+#: src/features/chat/thread/composer.tsx:132
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
 #: src/features/workflow/components/gallery/gallery-card.tsx:25
 #: src/features/workflow/components/gallery/publish-dialog.tsx:31
@@ -4847,7 +4847,7 @@ msgstr "auto"
 #: src/features/chat/thread/composer-image-settings.tsx:28
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
-#: src/features/chat/thread/composer-model-selector.tsx:121
+#: src/features/chat/thread/composer-model-selector.tsx:123
 #: src/features/chat/thread/composer-permission-mode.tsx:42
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:65
@@ -5620,11 +5620,11 @@ msgstr "Bottom"
 msgid "Box Blur"
 msgstr "Box Blur"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:74
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:73
 msgid "Brainstorm creative marketing strategies for a new product"
 msgstr "Brainstorm creative marketing strategies for a new product"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:78
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:77
 msgid "Brainstorm ways to improve team productivity"
 msgstr "Brainstorm ways to improve team productivity"
 
@@ -7834,7 +7834,7 @@ msgstr "Compare outputs from multiple image models side-by-side"
 msgid "Compare outputs from multiple models side-by-side"
 msgstr "Compare outputs from multiple models side-by-side"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:87
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:86
 msgid "Compare the pros and cons of renewable energy sources"
 msgstr "Compare the pros and cons of renewable energy sources"
 
@@ -9022,7 +9022,7 @@ msgstr "Could not cancel the message. It is still queued."
 msgid "Could not cancel the run."
 msgstr "Could not cancel the run."
 
-#: src/features/chat/thread/composer-model-selector.tsx:128
+#: src/features/chat/thread/composer-model-selector.tsx:130
 msgid "Could not change Auto. Please try again."
 msgstr "Could not change Auto. Please try again."
 
@@ -9634,7 +9634,7 @@ msgstr "Create a new team to organize members within your organization"
 msgid "Create a permanent account to save your data and access it from any device."
 msgstr "Create a permanent account to save your data and access it from any device."
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:107
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:106
 msgid "Create a script for a 5-minute educational video about photosynthesis"
 msgstr "Create a script for a 5-minute educational video about photosynthesis"
 
@@ -9662,7 +9662,7 @@ msgstr "Create an account to translate messages."
 msgid "Create an Azure Bot resource in the Azure portal and note its Microsoft App ID, a client secret (App password) and, for single-tenant bots, the Tenant ID."
 msgstr "Create an Azure Bot resource in the Azure portal and note its Microsoft App ID, a client secret (App password) and, for single-tenant bots, the Tenant ID."
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:119
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:118
 msgid "Create an outline for a blog post about sustainable living"
 msgstr "Create an outline for a blog post about sustainable living"
 
@@ -10345,7 +10345,7 @@ msgstr "Debate rounds"
 msgid "Debates for {0} rounds."
 msgstr "Debates for {0} rounds."
 
-#: src/features/chat/thread/composer.tsx:278
+#: src/features/chat/thread/composer.tsx:197
 msgid "Debug an error or review my code..."
 msgstr "Debug an error or review my code..."
 
@@ -10619,9 +10619,9 @@ msgstr "Delegated {0} work runs on this model."
 
 #: src/components/delete-confirmation-dialog.tsx:45
 #: src/components/delete-confirmation-dialog.tsx:71
-#: src/features/auth/components/settings/api-key/api-key-cell.tsx:94
+#: src/features/auth/components/settings/api-key/api-key-cell.tsx:96
 #: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:120
-#: src/features/auth/components/settings/passkey/passkey-cell.tsx:98
+#: src/features/auth/components/settings/passkey/passkey-cell.tsx:100
 #: src/features/chat/thread-list/group-header.tsx:183
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:115
 #: src/features/develop/components/draft-comment-card.tsx:60
@@ -11825,11 +11825,11 @@ msgstr "Downloads open the GitHub releases page. If no installers are listed the
 msgid "Draft"
 msgstr "Draft"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:121
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:120
 msgid "Draft a cover letter for a software engineering position"
 msgstr "Draft a cover letter for a software engineering position"
 
-#: src/features/chat/thread/composer.tsx:276
+#: src/features/chat/thread/composer.tsx:195
 msgid "Draft an email, report, or essay..."
 msgstr "Draft an email, report, or essay..."
 
@@ -13674,11 +13674,11 @@ msgstr "Expires: {expiresAt}"
 msgid "Expiring soon"
 msgstr "Expiring soon"
 
-#: src/features/chat/thread/composer.tsx:279
+#: src/features/chat/thread/composer.tsx:198
 msgid "Explain a concept in simple terms..."
 msgstr "Explain a concept in simple terms..."
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:86
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:85
 msgid "Explain the causes and effects of climate change"
 msgstr "Explain the causes and effects of climate change"
 
@@ -13864,11 +13864,11 @@ msgstr "Facebook and Instagram ad campaign management and analytics"
 msgid "Facebook Post"
 msgstr "Facebook Post"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:61
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:60
 msgid "Fact Check"
 msgstr "Fact Check"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:66
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:65
 msgid "Fact check: Does sugar cause hyperactivity in children?"
 msgstr "Fact check: Does sugar cause hyperactivity in children?"
 
@@ -15376,11 +15376,11 @@ msgstr "Find in thread"
 msgid "Find in Thread"
 msgstr "Find in Thread"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:96
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:95
 msgid "Find the best restaurants near me for Italian cuisine"
 msgstr "Find the best restaurants near me for Italian cuisine"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:99
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:98
 msgid "Find tutorials on how to learn Python programming"
 msgstr "Find tutorials on how to learn Python programming"
 
@@ -16165,7 +16165,7 @@ msgstr "Generate"
 msgid "Generate 4 images with different models and compare them side by side"
 msgstr "Generate 4 images with different models and compare them side by side"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:111
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:110
 msgid "Generate a storyboard for a short documentary"
 msgstr "Generate a storyboard for a short documentary"
 
@@ -16189,7 +16189,7 @@ msgstr "Generate an image from a text prompt and upscale it to 4x"
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "Generate an image of a cozy reading nook with warm lighting and plants."
 
-#: src/features/chat/thread/composer.tsx:281
+#: src/features/chat/thread/composer.tsx:200
 msgid "Generate an image or video..."
 msgstr "Generate an image or video..."
 
@@ -16201,7 +16201,7 @@ msgstr "Generate audio"
 msgid "Generate from a description"
 msgstr "Generate from a description"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:122
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:121
 msgid "Generate ideas for a creative writing story"
 msgstr "Generate ideas for a creative writing story"
 
@@ -16227,7 +16227,7 @@ msgstr "Generate images with FLUX and Stable Diffusion, create videos with Runwa
 msgid "Generate random seed"
 msgstr "Generate random seed"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:75
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:74
 msgid "Generate unique business ideas for 2025"
 msgstr "Generate unique business ideas for 2025"
 
@@ -17162,7 +17162,7 @@ msgstr "Help"
 msgid "Help me write a professional email to introduce myself to a new team."
 msgstr "Help me write a professional email to introduce myself to a new team."
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:118
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:117
 msgid "Help me write a professional email to my manager"
 msgstr "Help me write a professional email to my manager"
 
@@ -17675,7 +17675,7 @@ msgid "Ideal for simple classification and extraction"
 msgstr "Ideal for simple classification and extraction"
 
 #: src/features/admin/components/feedback-admin-page.tsx:169
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:72
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:71
 msgid "Ideas"
 msgstr "Ideas"
 
@@ -17730,7 +17730,7 @@ msgstr "illustration"
 #: src/components/model-picker/model-picker.tsx:1265
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:80
 #: src/features/chat/sidebar/usage-card.tsx:129
-#: src/features/chat/thread/composer.tsx:131
+#: src/features/chat/thread/composer.tsx:130
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:600
 #: src/features/settings/components/chat/models-settings.tsx:41
@@ -18547,11 +18547,11 @@ msgstr "Intensity"
 msgid "Interface, user experience and visual design."
 msgstr "Interface, user experience and visual design."
 
-#: src/features/chat/thread/composer-input-area.tsx:370
+#: src/features/chat/thread/composer-input-area.tsx:366
 msgid "Interrupt and restart"
 msgstr "Interrupt and restart"
 
-#: src/features/chat/thread/composer-input-area.tsx:386
+#: src/features/chat/thread/composer-input-area.tsx:382
 msgid "Interrupt and restart — stops the current reply and sends this"
 msgstr "Interrupt and restart — stops the current reply and sends this"
 
@@ -18761,7 +18761,7 @@ msgstr "Is {0} free to use?"
 msgid "Is it compatible with the OpenAI SDK?"
 msgstr "Is it compatible with the OpenAI SDK?"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:63
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:62
 msgid "Is it true that drinking 8 glasses of water daily is necessary?"
 msgstr "Is it true that drinking 8 glasses of water daily is necessary?"
 
@@ -18769,7 +18769,7 @@ msgstr "Is it true that drinking 8 glasses of water daily is necessary?"
 msgid "Is my data private?"
 msgstr "Is my data private?"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:67
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:66
 msgid "Is the claim about 5G causing health issues supported by science?"
 msgstr "Is the claim about 5G causing health issues supported by science?"
 
@@ -19836,7 +19836,7 @@ msgid "Lines that are not valid JSON"
 msgstr "Lines that are not valid JSON"
 
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:340
-#: src/features/auth/components/settings/providers/provider-cell.tsx:113
+#: src/features/auth/components/settings/providers/provider-cell.tsx:117
 #: src/features/develop/components/thread-pull-requests.tsx:398
 msgid "Link"
 msgstr "Link"
@@ -21701,7 +21701,6 @@ msgid "Mobile app icon"
 msgstr "Mobile app icon"
 
 #: src/features/chat/host/host-options.tsx:146
-#: src/features/chat/thread/composer.tsx:225
 #: src/features/workflow/components/nodes/image-node.tsx:45
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:132
 #: src/features/workflow/components/nodes/text-node.tsx:123
@@ -22572,7 +22571,7 @@ msgstr "Neore {0}"
 msgid "Neore agent"
 msgstr "Neore agent"
 
-#: src/features/chat/thread/composer.tsx:695
+#: src/features/chat/thread/composer.tsx:614
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore can make mistakes. Check important information."
 
@@ -22967,8 +22966,8 @@ msgid "Next option"
 msgstr "Next option"
 
 #: src/features/chat/thread/composer.tsx:242
-msgid "Next output mode"
-msgstr "Next output mode"
+#~ msgid "Next output mode"
+#~ msgstr "Next output mode"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:144
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:925
@@ -23340,7 +23339,7 @@ msgstr "No knowledge base files yet. Upload files in Settings."
 msgid "No labs are hidden."
 msgstr "No labs are hidden."
 
-#: src/features/chat/thread/composer-language-selector.tsx:180
+#: src/features/chat/thread/composer-language-selector.tsx:183
 msgid "No languages found"
 msgstr "No languages found"
 
@@ -25548,9 +25547,13 @@ msgstr "Output Format"
 msgid "Output is not loaded in this view."
 msgstr "Output is not loaded in this view."
 
+#: src/features/chat/thread/composer.tsx:155
+msgid "Output mode"
+msgstr "Output mode"
+
 #: src/features/chat/thread/composer.tsx:253
-msgid "Output Mode"
-msgstr "Output Mode"
+#~ msgid "Output Mode"
+#~ msgstr "Output Mode"
 
 #: src/features/chat/thread/host-activity.tsx:220
 msgid "Output of {title}"
@@ -26370,7 +26373,7 @@ msgstr "Pinned project"
 msgid "Pinned threads"
 msgstr "Pinned threads"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:349
+#: src/features/chat/sidebar/thread-sidebar.tsx:350
 msgid "Pins"
 msgstr "Pins"
 
@@ -26402,7 +26405,7 @@ msgstr "plan"
 msgid "Plan"
 msgstr "Plan"
 
-#: src/features/chat/thread/composer.tsx:275
+#: src/features/chat/thread/composer.tsx:194
 msgid "Plan a project or brainstorm ideas..."
 msgstr "Plan a project or brainstorm ideas..."
 
@@ -26959,8 +26962,8 @@ msgid "Previous option"
 msgstr "Previous option"
 
 #: src/features/chat/thread/composer.tsx:208
-msgid "Previous output mode"
-msgstr "Previous output mode"
+#~ msgid "Previous output mode"
+#~ msgstr "Previous output mode"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:130
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:916
@@ -27451,7 +27454,7 @@ msgstr "Prompt updated with optimized content"
 msgid "Prompt Variables"
 msgstr "Prompt Variables"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:335
+#: src/features/chat/sidebar/thread-sidebar.tsx:336
 #: src/features/layout/components/sidebar-shortcut.tsx:87
 #: src/features/prompts/components/prompt-header.tsx:10
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:521
@@ -27699,11 +27702,11 @@ msgstr "Question"
 msgid "Queue"
 msgstr "Queue"
 
-#: src/features/chat/thread/composer-input-area.tsx:397
+#: src/features/chat/thread/composer-input-area.tsx:393
 msgid "Queue message"
 msgstr "Queue message"
 
-#: src/features/chat/thread/composer-input-area.tsx:416
+#: src/features/chat/thread/composer-input-area.tsx:412
 msgid "Queue message — sends when the current reply finishes"
 msgstr "Queue message — sends when the current reply finishes"
 
@@ -29164,7 +29167,7 @@ msgid "research"
 msgstr "research"
 
 #: src/features/chat/tags/thread-categories.ts:17
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:83
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:82
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:55
 #: src/features/skills/components/skill-form-dialog.tsx:123
 msgid "Research"
@@ -29174,7 +29177,7 @@ msgstr "Research"
 msgid "Research a topic"
 msgstr "Research a topic"
 
-#: src/features/chat/thread/composer.tsx:277
+#: src/features/chat/thread/composer.tsx:196
 msgid "Research a topic in depth..."
 msgstr "Research a topic in depth..."
 
@@ -30386,7 +30389,7 @@ msgstr "search"
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:241
 #: src/features/chat/signed-out/signed-out-chat.tsx:141
 #: src/features/chat/thread-list/thread-list-dock.tsx:91
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:94
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:93
 msgid "Search"
 msgstr "Search"
 
@@ -30455,7 +30458,7 @@ msgstr "Search filters"
 msgid "Search for an icon..."
 msgstr "Search for an icon..."
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:98
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:97
 msgid "Search for the latest news about space exploration"
 msgstr "Search for the latest news about space exploration"
 
@@ -30467,7 +30470,7 @@ msgstr "Search GitHub repositories and code"
 msgid "Search in"
 msgstr "Search in"
 
-#: src/features/chat/thread/composer-language-selector.tsx:174
+#: src/features/chat/thread/composer-language-selector.tsx:177
 msgid "Search languages..."
 msgstr "Search languages..."
 
@@ -30907,7 +30910,7 @@ msgstr "Select multiple threads"
 msgid "Select range"
 msgstr "Select range"
 
-#: src/features/chat/thread/composer-language-selector.tsx:164
+#: src/features/chat/thread/composer-language-selector.tsx:167
 msgid "Select response language"
 msgstr "Select response language"
 
@@ -30927,7 +30930,7 @@ msgstr "Select some text to comment on"
 msgid "Select text in the page and choose “Comment”."
 msgstr "Select text in the page and choose “Comment”."
 
-#: src/features/chat/thread/composer-language-selector.tsx:160
+#: src/features/chat/thread/composer-language-selector.tsx:163
 msgid "Select the language for AI responses. This determines which language the assistant will use when generating replies."
 msgstr "Select the language for AI responses. This determines which language the assistant will use when generating replies."
 
@@ -31091,7 +31094,7 @@ msgstr "Send Magic Link"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:169
 #: src/features/chat/thread/composer-input-area.tsx:200
-#: src/features/chat/thread/composer-input-area.tsx:451
+#: src/features/chat/thread/composer-input-area.tsx:447
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:105
 msgid "Send message"
 msgstr "Send message"
@@ -31165,7 +31168,7 @@ msgstr "Send: {snippet}"
 
 #: src/features/chat/thread/composer-input-area.tsx:222
 #: src/features/chat/thread/composer-input-area.tsx:224
-#: src/features/chat/thread/composer-input-area.tsx:481
+#: src/features/chat/thread/composer-input-area.tsx:477
 msgid "Sending once uploads finish…"
 msgstr "Sending once uploads finish…"
 
@@ -32841,7 +32844,7 @@ msgstr "Start a conversation of your own with the latest AI models."
 msgid "Start a conversation to ask a side question."
 msgstr "Start a conversation to ask a side question."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:371
+#: src/features/chat/sidebar/thread-sidebar.tsx:372
 msgid "Start a conversation to configure variables."
 msgstr "Start a conversation to configure variables."
 
@@ -33093,11 +33096,11 @@ msgstr "Status"
 msgid "Status Page"
 msgstr "Status Page"
 
-#: src/features/chat/thread/composer-input-area.tsx:387
+#: src/features/chat/thread/composer-input-area.tsx:383
 msgid "Steer — the current reply reads this at its next step"
 msgstr "Steer — the current reply reads this at its next step"
 
-#: src/features/chat/thread/composer-input-area.tsx:370
+#: src/features/chat/thread/composer-input-area.tsx:366
 msgid "Steer the reply"
 msgstr "Steer the reply"
 
@@ -33178,8 +33181,8 @@ msgstr "Stop browser session"
 
 #: src/features/chat/thread-list/thread-node.tsx:949
 #: src/features/chat/thread-list/thread-node.tsx:971
-#: src/features/chat/thread/composer-input-area.tsx:424
-#: src/features/chat/thread/composer-input-area.tsx:437
+#: src/features/chat/thread/composer-input-area.tsx:420
+#: src/features/chat/thread/composer-input-area.tsx:433
 msgid "Stop generating"
 msgstr "Stop generating"
 
@@ -33716,11 +33719,11 @@ msgstr "Success criteria must be {CRITERIA_MAX} characters or less"
 msgid "Successfully imported {imported} conversations from {0}"
 msgstr "Successfully imported {imported} conversations from {0}"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:76
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:75
 msgid "Suggest innovative solutions to reduce plastic waste"
 msgstr "Suggest innovative solutions to reduce plastic waste"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:108
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:107
 msgid "Suggest video ideas for a tech YouTube channel"
 msgstr "Suggest video ideas for a tech YouTube channel"
 
@@ -33770,7 +33773,7 @@ msgstr "Summarise my notes from today"
 msgid "Summarise my notes in three bullets."
 msgstr "Summarise my notes in three bullets."
 
-#: src/features/chat/thread/composer.tsx:274
+#: src/features/chat/thread/composer.tsx:193
 msgid "Summarize a document or URL..."
 msgstr "Summarize a document or URL..."
 
@@ -33786,7 +33789,7 @@ msgstr "Summarize my email inbox every morning"
 msgid "Summarize my inbox and highlight urgent items. Use {PAYLOAD_TOKEN} for webhook data."
 msgstr "Summarize my inbox and highlight urgent items. Use {PAYLOAD_TOKEN} for webhook data."
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:89
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:88
 msgid "Summarize the history of the internet"
 msgstr "Summarize the history of the internet"
 
@@ -34486,7 +34489,7 @@ msgstr "text"
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
 #: src/components/model-picker/model-picker.tsx:1252
 #: src/features/chat/sidebar/usage-card.tsx:128
-#: src/features/chat/thread/composer.tsx:130
+#: src/features/chat/thread/composer.tsx:129
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:556
 #: src/features/settings/components/chat/models-settings.tsx:45
@@ -34966,7 +34969,7 @@ msgstr "The bot and its computer are removed. Its chats stay, as plain chats."
 msgid "The bot gets only the tools you allow. With none allowed, it gets no tools."
 msgstr "The bot gets only the tools you allow. With none allowed, it gets no tools."
 
-#: src/features/chat/thread/composer-model-selector.tsx:136
+#: src/features/chat/thread/composer-model-selector.tsx:138
 msgid "The bot sets the model for this chat."
 msgstr "The bot sets the model for this chat."
 
@@ -36727,7 +36730,7 @@ msgstr "Thought for a few seconds"
 msgid "thread"
 msgstr "thread"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:331
+#: src/features/chat/sidebar/thread-sidebar.tsx:332
 #: src/features/settings/components/chat/event-trigger-fields.tsx:270
 #: src/features/settings/components/chat/trigger-settings.tsx:1010
 msgid "Thread"
@@ -37362,7 +37365,7 @@ msgstr "Transformed Image"
 msgid "Translate"
 msgstr "Translate"
 
-#: src/features/chat/thread/composer.tsx:280
+#: src/features/chat/thread/composer.tsx:199
 msgid "Translate text to another language..."
 msgstr "Translate text to another language..."
 
@@ -38004,7 +38007,7 @@ msgstr "Unknown user"
 msgid "Unlimited requests"
 msgstr "Unlimited requests"
 
-#: src/features/auth/components/settings/providers/provider-cell.tsx:113
+#: src/features/auth/components/settings/providers/provider-cell.tsx:117
 msgid "Unlink"
 msgstr "Unlink"
 
@@ -38855,7 +38858,7 @@ msgstr "Variable focal length"
 msgid "Variable name..."
 msgstr "Variable name..."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:339
+#: src/features/chat/sidebar/thread-sidebar.tsx:340
 #: src/features/prompts/components/prompt-list-view.tsx:180
 #: src/features/prompts/components/variable-definitions.tsx:69
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:141
@@ -38965,7 +38968,7 @@ msgstr "Verify"
 msgid "Verify Code"
 msgstr "Verify Code"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:64
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:63
 msgid "Verify the claim: \"The Great Wall of China is visible from space\""
 msgstr "Verify the claim: \"The Great Wall of China is visible from space\""
 
@@ -39101,7 +39104,7 @@ msgstr "video"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
 #: src/components/model-picker/model-picker.tsx:1278
 #: src/features/chat/sidebar/usage-card.tsx:130
-#: src/features/chat/thread/composer.tsx:132
+#: src/features/chat/thread/composer.tsx:131
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:642
 #: src/features/settings/components/chat/models-settings.tsx:46
@@ -39196,7 +39199,7 @@ msgstr "Video to video"
 msgid "video understanding"
 msgstr "video understanding"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:105
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:104
 msgid "Videos"
 msgstr "Videos"
 
@@ -39603,7 +39606,7 @@ msgid "Waiting for the owner to approve"
 msgstr "Waiting for the owner to approve"
 
 #: src/features/chat/thread/composer-input-area.tsx:224
-#: src/features/chat/thread/composer-input-area.tsx:397
+#: src/features/chat/thread/composer-input-area.tsx:393
 msgid "Waiting for uploads to complete…"
 msgstr "Waiting for uploads to complete…"
 
@@ -39836,27 +39839,27 @@ msgstr "Welsh"
 msgid "Welsh (UK)"
 msgstr "Welsh (UK)"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:77
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:76
 msgid "What are some creative date night ideas?"
 msgstr "What are some creative date night ideas?"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:110
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:109
 msgid "What are the best practices for video editing?"
 msgstr "What are the best practices for video editing?"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:100
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:99
 msgid "What are the current trends in web development?"
 msgstr "What are the current trends in web development?"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:88
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:87
 msgid "What are the key findings from recent AI research papers?"
 msgstr "What are the key findings from recent AI research papers?"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:85
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:84
 msgid "What are the latest developments in quantum computing?"
 msgstr "What are the latest developments in quantum computing?"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:97
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:96
 msgid "What are the top-rated productivity apps in 2025?"
 msgstr "What are the top-rated productivity apps in 2025?"
 
@@ -39988,7 +39991,7 @@ msgstr "What's New"
 msgid "What's the latency overhead?"
 msgstr "What's the latency overhead?"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:65
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:64
 msgid "What's the scientific evidence for the health benefits of meditation?"
 msgstr "What's the scientific evidence for the health benefits of meditation?"
 
@@ -40286,7 +40289,7 @@ msgstr "world knowledge"
 msgid "Write"
 msgstr "Write"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:120
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:119
 msgid "Write a compelling product description for an e-commerce site"
 msgstr "Write a compelling product description for an e-commerce site"
 
@@ -40294,7 +40297,7 @@ msgstr "Write a compelling product description for an e-commerce site"
 msgid "Write a summary, or add a comment, before you submit this review."
 msgstr "Write a summary, or add a comment, before you submit this review."
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:109
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:108
 msgid "Write a video description for a product launch"
 msgstr "Write a video description for a product launch"
 
@@ -40314,7 +40317,7 @@ msgstr "Write long-form content alongside chat"
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 
-#: src/features/chat/thread/composer.tsx:273
+#: src/features/chat/thread/composer.tsx:192
 msgid "Write some code for me..."
 msgstr "Write some code for me..."
 
@@ -40335,7 +40338,7 @@ msgid "Write, or type '/' for commands…"
 msgstr "Write, or type '/' for commands…"
 
 #: src/features/chat/tags/thread-categories.ts:18
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:116
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:115
 msgid "Writing"
 msgstr "Writing"
 

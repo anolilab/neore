@@ -1,4 +1,5 @@
 import { Separator } from "@neore/ui/components/separator";
+import cn from "@neore/ui/utils/cn";
 import type { FC, PropsWithChildren, ReactNode } from "react";
 import { useMediaMatch } from "rooks";
 
@@ -26,9 +27,9 @@ const SiteHeader: FC<
             className="text-foreground relative flex h-(--header-height) w-full shrink-0 items-center gap-2 transition-[width,height] ease-linear"
             data-chrome=""
         >
-            <div className="relative z-20 flex h-full w-full items-center gap-1">
+            <div className={cn("relative z-20 flex h-full w-full items-center gap-1", !trigger && !workspaceSwitch && "ps-4")}>
                 {trigger}
-                {(trigger || !workspaceSwitch) && <Separator className="mx-2 mt-2 data-[orientation=vertical]:h-6" orientation="vertical" />}
+                {trigger && <Separator className="mx-2 mt-2 data-[orientation=vertical]:h-6" orientation="vertical" />}
                 {workspaceSwitch && <WorkspaceSwitch />}
                 {title && <h1 className="text-sm font-medium">{title}</h1>}
                 {children}

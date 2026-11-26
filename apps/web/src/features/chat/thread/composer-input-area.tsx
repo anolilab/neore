@@ -305,10 +305,6 @@ const ComposerInputArea = ({
                                 <TooltipContent side="bottom">{t`Add attachment`}</TooltipContent>
                             </Tooltip>
                         )}
-
-                        <div className={clsx("flex self-stretch", compact ? "py-1.5" : "py-4")}>
-                            <Separator className="h-full" orientation="vertical" />
-                        </div>
                     </>
                 )}
 

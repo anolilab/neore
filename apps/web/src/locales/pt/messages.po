@@ -1335,8 +1335,8 @@ msgid "{minutes}m remaining"
 msgstr "{minutes}min restantes"
 
 #: src/features/chat/thread/composer.tsx:236
-msgid "{modeLabel} mode — click to change"
-msgstr "Modo {modeLabel} — clique para alterar"
+#~ msgid "{modeLabel} mode — click to change"
+#~ msgstr "Modo {modeLabel} — clique para alterar"
 
 #: src/features/chat/thread/thread.tsx:266
 msgid "{modelCount, plural, one {Ask # model anything...} other {Ask # models anything...}}"
@@ -4604,7 +4604,7 @@ msgid "ask"
 msgstr "perguntar"
 
 #: src/features/chat/aside/aside-panel.tsx:306
-#: src/features/chat/sidebar/thread-sidebar.tsx:344
+#: src/features/chat/sidebar/thread-sidebar.tsx:345
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:63
 msgid "Ask"
 msgstr "Perguntar"
@@ -4637,7 +4637,7 @@ msgstr "Pergunte qualquer coisa para iniciar um novo chat…"
 msgid "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 msgstr "Faça a mesma pergunta ao GPT-4, ao Claude e ao Gemini. Rode o mesmo prompt no FLUX, no Imagen e no Stable Diffusion. Escolha o vencedor — não o padrão."
 
-#: src/features/chat/thread/composer.tsx:272
+#: src/features/chat/thread/composer.tsx:191
 msgid "Ask me anything..."
 msgstr "Pergunte qualquer coisa..."
 
@@ -4787,7 +4787,7 @@ msgstr "Auckland"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:781
 #: src/components/model-picker/model-picker.tsx:1291
 #: src/features/chat/sidebar/usage-card.tsx:131
-#: src/features/chat/thread/composer.tsx:133
+#: src/features/chat/thread/composer.tsx:132
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
 #: src/features/workflow/components/gallery/gallery-card.tsx:25
 #: src/features/workflow/components/gallery/publish-dialog.tsx:31
@@ -4848,7 +4848,7 @@ msgstr "automático"
 #: src/features/chat/thread/composer-image-settings.tsx:28
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
-#: src/features/chat/thread/composer-model-selector.tsx:121
+#: src/features/chat/thread/composer-model-selector.tsx:123
 #: src/features/chat/thread/composer-permission-mode.tsx:42
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:65
@@ -5621,11 +5621,11 @@ msgstr "Inferior"
 msgid "Box Blur"
 msgstr "Desfoque de caixa"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:74
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:73
 msgid "Brainstorm creative marketing strategies for a new product"
 msgstr "Crie ideias de estratégias de marketing criativas para um novo produto"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:78
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:77
 msgid "Brainstorm ways to improve team productivity"
 msgstr "Crie ideias para melhorar a produtividade da equipe"
 
@@ -7835,7 +7835,7 @@ msgstr "Compare lado a lado os resultados de vários modelos de imagem"
 msgid "Compare outputs from multiple models side-by-side"
 msgstr "Compare lado a lado os resultados de vários modelos"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:87
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:86
 msgid "Compare the pros and cons of renewable energy sources"
 msgstr "Compare os prós e contras das fontes de energia renovável"
 
@@ -9023,7 +9023,7 @@ msgstr "Não foi possível cancelar a mensagem. Ela ainda está na fila."
 msgid "Could not cancel the run."
 msgstr "Não foi possível cancelar a execução."
 
-#: src/features/chat/thread/composer-model-selector.tsx:128
+#: src/features/chat/thread/composer-model-selector.tsx:130
 msgid "Could not change Auto. Please try again."
 msgstr "Não foi possível alterar Auto. Tente novamente."
 
@@ -9635,7 +9635,7 @@ msgstr "Crie uma nova equipe para organizar os membros da sua organização"
 msgid "Create a permanent account to save your data and access it from any device."
 msgstr "Crie uma conta permanente para salvar seus dados e acessá-los de qualquer dispositivo."
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:107
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:106
 msgid "Create a script for a 5-minute educational video about photosynthesis"
 msgstr "Crie um roteiro para um vídeo educativo de 5 minutos sobre fotossíntese"
 
@@ -9663,7 +9663,7 @@ msgstr "Crie uma conta para traduzir mensagens."
 msgid "Create an Azure Bot resource in the Azure portal and note its Microsoft App ID, a client secret (App password) and, for single-tenant bots, the Tenant ID."
 msgstr "Crie um recurso Azure Bot no portal do Azure e anote o Microsoft App ID, um client secret (App password) e, para bots single-tenant, o Tenant ID."
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:119
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:118
 msgid "Create an outline for a blog post about sustainable living"
 msgstr "Crie um esboço para um post de blog sobre vida sustentável"
 
@@ -10346,7 +10346,7 @@ msgstr "Rodadas de debate"
 msgid "Debates for {0} rounds."
 msgstr "Debate por {0} rodadas."
 
-#: src/features/chat/thread/composer.tsx:278
+#: src/features/chat/thread/composer.tsx:197
 msgid "Debug an error or review my code..."
 msgstr "Depure um erro ou revise meu código..."
 
@@ -10620,9 +10620,9 @@ msgstr "O trabalho de {0} delegado é executado neste modelo."
 
 #: src/components/delete-confirmation-dialog.tsx:45
 #: src/components/delete-confirmation-dialog.tsx:71
-#: src/features/auth/components/settings/api-key/api-key-cell.tsx:94
+#: src/features/auth/components/settings/api-key/api-key-cell.tsx:96
 #: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:120
-#: src/features/auth/components/settings/passkey/passkey-cell.tsx:98
+#: src/features/auth/components/settings/passkey/passkey-cell.tsx:100
 #: src/features/chat/thread-list/group-header.tsx:183
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:115
 #: src/features/develop/components/draft-comment-card.tsx:60
@@ -11826,11 +11826,11 @@ msgstr "Os downloads abrem a página de versões do GitHub. Se nenhum instalador
 msgid "Draft"
 msgstr "Rascunho"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:121
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:120
 msgid "Draft a cover letter for a software engineering position"
 msgstr "Escreva uma carta de apresentação para uma vaga de engenharia de software"
 
-#: src/features/chat/thread/composer.tsx:276
+#: src/features/chat/thread/composer.tsx:195
 msgid "Draft an email, report, or essay..."
 msgstr "Escreva um e-mail, relatório ou redação..."
 
@@ -13675,11 +13675,11 @@ msgstr "Expira: {expiresAt}"
 msgid "Expiring soon"
 msgstr "Expira em breve"
 
-#: src/features/chat/thread/composer.tsx:279
+#: src/features/chat/thread/composer.tsx:198
 msgid "Explain a concept in simple terms..."
 msgstr "Explique um conceito em termos simples..."
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:86
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:85
 msgid "Explain the causes and effects of climate change"
 msgstr "Explique as causas e os efeitos das mudanças climáticas"
 
@@ -13865,11 +13865,11 @@ msgstr "Gerenciamento e análise de campanhas de anúncios no Facebook e no Inst
 msgid "Facebook Post"
 msgstr "Post do Facebook"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:61
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:60
 msgid "Fact Check"
 msgstr "Checagem de fatos"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:66
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:65
 msgid "Fact check: Does sugar cause hyperactivity in children?"
 msgstr "Checagem de fatos: o açúcar causa hiperatividade em crianças?"
 
@@ -15377,11 +15377,11 @@ msgstr "Buscar na conversa"
 msgid "Find in Thread"
 msgstr "Buscar na conversa"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:96
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:95
 msgid "Find the best restaurants near me for Italian cuisine"
 msgstr "Encontre os melhores restaurantes italianos perto de mim"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:99
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:98
 msgid "Find tutorials on how to learn Python programming"
 msgstr "Encontre tutoriais para aprender a programar em Python"
 
@@ -16166,7 +16166,7 @@ msgstr "Gerar"
 msgid "Generate 4 images with different models and compare them side by side"
 msgstr "Gerar 4 imagens com modelos diferentes e compará-las lado a lado"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:111
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:110
 msgid "Generate a storyboard for a short documentary"
 msgstr "Crie um storyboard para um documentário curto"
 
@@ -16190,7 +16190,7 @@ msgstr "Gerar uma imagem a partir de um prompt de texto e aumentar a resolução
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "Gere uma imagem de um cantinho de leitura aconchegante com luz quente e plantas."
 
-#: src/features/chat/thread/composer.tsx:281
+#: src/features/chat/thread/composer.tsx:200
 msgid "Generate an image or video..."
 msgstr "Gere uma imagem ou vídeo..."
 
@@ -16202,7 +16202,7 @@ msgstr "Gerar áudio"
 msgid "Generate from a description"
 msgstr "Gerar a partir de uma descrição"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:122
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:121
 msgid "Generate ideas for a creative writing story"
 msgstr "Gere ideias para uma história criativa"
 
@@ -16228,7 +16228,7 @@ msgstr "Gere imagens com FLUX e Stable Diffusion, crie vídeos com Runway e Luma
 msgid "Generate random seed"
 msgstr "Gerar seed aleatória"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:75
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:74
 msgid "Generate unique business ideas for 2025"
 msgstr "Gere ideias de negócio originais para 2025"
 
@@ -17163,7 +17163,7 @@ msgstr "Ajuda"
 msgid "Help me write a professional email to introduce myself to a new team."
 msgstr "Me ajude a escrever um e-mail profissional para me apresentar a uma nova equipe."
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:118
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:117
 msgid "Help me write a professional email to my manager"
 msgstr "Me ajude a escrever um e-mail profissional para meu gerente"
 
@@ -17676,7 +17676,7 @@ msgid "Ideal for simple classification and extraction"
 msgstr "Ideal para classificação e extração simples"
 
 #: src/features/admin/components/feedback-admin-page.tsx:169
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:72
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:71
 msgid "Ideas"
 msgstr "Ideias"
 
@@ -17731,7 +17731,7 @@ msgstr "ilustração"
 #: src/components/model-picker/model-picker.tsx:1265
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:80
 #: src/features/chat/sidebar/usage-card.tsx:129
-#: src/features/chat/thread/composer.tsx:131
+#: src/features/chat/thread/composer.tsx:130
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:600
 #: src/features/settings/components/chat/models-settings.tsx:41
@@ -18548,11 +18548,11 @@ msgstr "Intensidade"
 msgid "Interface, user experience and visual design."
 msgstr "Interface, experiência do usuário e design visual."
 
-#: src/features/chat/thread/composer-input-area.tsx:370
+#: src/features/chat/thread/composer-input-area.tsx:366
 msgid "Interrupt and restart"
 msgstr "Interromper e reiniciar"
 
-#: src/features/chat/thread/composer-input-area.tsx:386
+#: src/features/chat/thread/composer-input-area.tsx:382
 msgid "Interrupt and restart — stops the current reply and sends this"
 msgstr "Interromper e reiniciar — para a resposta atual e envia isto"
 
@@ -18762,7 +18762,7 @@ msgstr "O {0} é gratuito?"
 msgid "Is it compatible with the OpenAI SDK?"
 msgstr "É compatível com o SDK da OpenAI?"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:63
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:62
 msgid "Is it true that drinking 8 glasses of water daily is necessary?"
 msgstr "É verdade que é preciso beber 8 copos de água por dia?"
 
@@ -18770,7 +18770,7 @@ msgstr "É verdade que é preciso beber 8 copos de água por dia?"
 msgid "Is my data private?"
 msgstr "Meus dados são privados?"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:67
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:66
 msgid "Is the claim about 5G causing health issues supported by science?"
 msgstr "A afirmação de que o 5G causa problemas de saúde tem respaldo científico?"
 
@@ -19837,7 +19837,7 @@ msgid "Lines that are not valid JSON"
 msgstr "Linhas que não são JSON válido"
 
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:340
-#: src/features/auth/components/settings/providers/provider-cell.tsx:113
+#: src/features/auth/components/settings/providers/provider-cell.tsx:117
 #: src/features/develop/components/thread-pull-requests.tsx:398
 msgid "Link"
 msgstr "Vincular"
@@ -21702,7 +21702,6 @@ msgid "Mobile app icon"
 msgstr "Ícone de app para celular"
 
 #: src/features/chat/host/host-options.tsx:146
-#: src/features/chat/thread/composer.tsx:225
 #: src/features/workflow/components/nodes/image-node.tsx:45
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:132
 #: src/features/workflow/components/nodes/text-node.tsx:123
@@ -22573,7 +22572,7 @@ msgstr "Neore {0}"
 msgid "Neore agent"
 msgstr "Agente do Neore"
 
-#: src/features/chat/thread/composer.tsx:695
+#: src/features/chat/thread/composer.tsx:614
 msgid "Neore can make mistakes. Check important information."
 msgstr "O Neore pode cometer erros. Confira as informações importantes."
 
@@ -22968,8 +22967,8 @@ msgid "Next option"
 msgstr "Próxima opção"
 
 #: src/features/chat/thread/composer.tsx:242
-msgid "Next output mode"
-msgstr "Próximo modo de saída"
+#~ msgid "Next output mode"
+#~ msgstr "Próximo modo de saída"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:144
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:925
@@ -23341,7 +23340,7 @@ msgstr "Ainda não há arquivos na base de conhecimento. Envie arquivos nas Conf
 msgid "No labs are hidden."
 msgstr "Nenhum laboratório está oculto."
 
-#: src/features/chat/thread/composer-language-selector.tsx:180
+#: src/features/chat/thread/composer-language-selector.tsx:183
 msgid "No languages found"
 msgstr "Nenhum idioma encontrado"
 
@@ -25549,9 +25548,13 @@ msgstr "Formato de saída"
 msgid "Output is not loaded in this view."
 msgstr "A saída não é carregada nesta visualização."
 
-#: src/features/chat/thread/composer.tsx:253
-msgid "Output Mode"
+#: src/features/chat/thread/composer.tsx:155
+msgid "Output mode"
 msgstr "Modo de saída"
+
+#: src/features/chat/thread/composer.tsx:253
+#~ msgid "Output Mode"
+#~ msgstr "Modo de saída"
 
 #: src/features/chat/thread/host-activity.tsx:220
 msgid "Output of {title}"
@@ -26371,7 +26374,7 @@ msgstr "Projeto fixado"
 msgid "Pinned threads"
 msgstr "Conversas fixadas"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:349
+#: src/features/chat/sidebar/thread-sidebar.tsx:350
 msgid "Pins"
 msgstr "Itens fixados"
 
@@ -26403,7 +26406,7 @@ msgstr "plano"
 msgid "Plan"
 msgstr "Plano"
 
-#: src/features/chat/thread/composer.tsx:275
+#: src/features/chat/thread/composer.tsx:194
 msgid "Plan a project or brainstorm ideas..."
 msgstr "Planeje um projeto ou crie ideias..."
 
@@ -26960,8 +26963,8 @@ msgid "Previous option"
 msgstr "Opção anterior"
 
 #: src/features/chat/thread/composer.tsx:208
-msgid "Previous output mode"
-msgstr "Modo de saída anterior"
+#~ msgid "Previous output mode"
+#~ msgstr "Modo de saída anterior"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:130
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:916
@@ -27452,7 +27455,7 @@ msgstr "Prompt atualizado com o conteúdo otimizado"
 msgid "Prompt Variables"
 msgstr "Variáveis do prompt"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:335
+#: src/features/chat/sidebar/thread-sidebar.tsx:336
 #: src/features/layout/components/sidebar-shortcut.tsx:87
 #: src/features/prompts/components/prompt-header.tsx:10
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:521
@@ -27700,11 +27703,11 @@ msgstr "Pergunta"
 msgid "Queue"
 msgstr "Fila"
 
-#: src/features/chat/thread/composer-input-area.tsx:397
+#: src/features/chat/thread/composer-input-area.tsx:393
 msgid "Queue message"
 msgstr "Colocar mensagem na fila"
 
-#: src/features/chat/thread/composer-input-area.tsx:416
+#: src/features/chat/thread/composer-input-area.tsx:412
 msgid "Queue message — sends when the current reply finishes"
 msgstr "Colocar mensagem na fila — será enviada quando a resposta atual terminar"
 
@@ -29165,7 +29168,7 @@ msgid "research"
 msgstr "pesquisa"
 
 #: src/features/chat/tags/thread-categories.ts:17
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:83
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:82
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:55
 #: src/features/skills/components/skill-form-dialog.tsx:123
 msgid "Research"
@@ -29175,7 +29178,7 @@ msgstr "Pesquisa"
 msgid "Research a topic"
 msgstr "Pesquisar um tema"
 
-#: src/features/chat/thread/composer.tsx:277
+#: src/features/chat/thread/composer.tsx:196
 msgid "Research a topic in depth..."
 msgstr "Pesquise um tema a fundo..."
 
@@ -30387,7 +30390,7 @@ msgstr "pesquisar"
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:241
 #: src/features/chat/signed-out/signed-out-chat.tsx:141
 #: src/features/chat/thread-list/thread-list-dock.tsx:91
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:94
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:93
 msgid "Search"
 msgstr "Pesquisar"
 
@@ -30456,7 +30459,7 @@ msgstr "Filtros de pesquisa"
 msgid "Search for an icon..."
 msgstr "Pesquisar um ícone..."
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:98
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:97
 msgid "Search for the latest news about space exploration"
 msgstr "Pesquise as últimas notícias sobre exploração espacial"
 
@@ -30468,7 +30471,7 @@ msgstr "Pesquise repositórios e código no GitHub"
 msgid "Search in"
 msgstr "Pesquisar em"
 
-#: src/features/chat/thread/composer-language-selector.tsx:174
+#: src/features/chat/thread/composer-language-selector.tsx:177
 msgid "Search languages..."
 msgstr "Pesquisar idiomas..."
 
@@ -30908,7 +30911,7 @@ msgstr "Selecionar várias conversas"
 msgid "Select range"
 msgstr "Selecionar intervalo"
 
-#: src/features/chat/thread/composer-language-selector.tsx:164
+#: src/features/chat/thread/composer-language-selector.tsx:167
 msgid "Select response language"
 msgstr "Selecione o idioma da resposta"
 
@@ -30928,7 +30931,7 @@ msgstr "Selecione um texto para comentar"
 msgid "Select text in the page and choose “Comment”."
 msgstr "Selecione um texto na página e escolha “Comentar”."
 
-#: src/features/chat/thread/composer-language-selector.tsx:160
+#: src/features/chat/thread/composer-language-selector.tsx:163
 msgid "Select the language for AI responses. This determines which language the assistant will use when generating replies."
 msgstr "Selecione o idioma das respostas da IA. Isso define em qual idioma o assistente vai responder."
 
@@ -31092,7 +31095,7 @@ msgstr "Enviar link mágico"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:169
 #: src/features/chat/thread/composer-input-area.tsx:200
-#: src/features/chat/thread/composer-input-area.tsx:451
+#: src/features/chat/thread/composer-input-area.tsx:447
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:105
 msgid "Send message"
 msgstr "Enviar mensagem"
@@ -31166,7 +31169,7 @@ msgstr "Enviar: {snippet}"
 
 #: src/features/chat/thread/composer-input-area.tsx:222
 #: src/features/chat/thread/composer-input-area.tsx:224
-#: src/features/chat/thread/composer-input-area.tsx:481
+#: src/features/chat/thread/composer-input-area.tsx:477
 msgid "Sending once uploads finish…"
 msgstr "Enviando quando os uploads terminarem…"
 
@@ -32842,7 +32845,7 @@ msgstr "Comece sua própria conversa com os modelos de IA mais recentes."
 msgid "Start a conversation to ask a side question."
 msgstr "Inicie uma conversa para fazer uma pergunta paralela."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:371
+#: src/features/chat/sidebar/thread-sidebar.tsx:372
 msgid "Start a conversation to configure variables."
 msgstr "Comece uma conversa para configurar variáveis."
 
@@ -33094,11 +33097,11 @@ msgstr "Status"
 msgid "Status Page"
 msgstr "Página de status"
 
-#: src/features/chat/thread/composer-input-area.tsx:387
+#: src/features/chat/thread/composer-input-area.tsx:383
 msgid "Steer — the current reply reads this at its next step"
 msgstr "Orientar — a resposta atual lê isto no próximo passo"
 
-#: src/features/chat/thread/composer-input-area.tsx:370
+#: src/features/chat/thread/composer-input-area.tsx:366
 msgid "Steer the reply"
 msgstr "Orientar a resposta"
 
@@ -33179,8 +33182,8 @@ msgstr "Parar sessão do navegador"
 
 #: src/features/chat/thread-list/thread-node.tsx:949
 #: src/features/chat/thread-list/thread-node.tsx:971
-#: src/features/chat/thread/composer-input-area.tsx:424
-#: src/features/chat/thread/composer-input-area.tsx:437
+#: src/features/chat/thread/composer-input-area.tsx:420
+#: src/features/chat/thread/composer-input-area.tsx:433
 msgid "Stop generating"
 msgstr "Parar de gerar"
 
@@ -33717,11 +33720,11 @@ msgstr "Os critérios de sucesso devem ter no máximo {CRITERIA_MAX} caracteres"
 msgid "Successfully imported {imported} conversations from {0}"
 msgstr "{imported} conversas importadas de {0} com sucesso"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:76
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:75
 msgid "Suggest innovative solutions to reduce plastic waste"
 msgstr "Sugira soluções inovadoras para reduzir o lixo plástico"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:108
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:107
 msgid "Suggest video ideas for a tech YouTube channel"
 msgstr "Sugira ideias de vídeos para um canal de tecnologia no YouTube"
 
@@ -33771,7 +33774,7 @@ msgstr "Resuma minhas anotações de hoje"
 msgid "Summarise my notes in three bullets."
 msgstr "Resuma minhas anotações em três tópicos."
 
-#: src/features/chat/thread/composer.tsx:274
+#: src/features/chat/thread/composer.tsx:193
 msgid "Summarize a document or URL..."
 msgstr "Resuma um documento ou URL..."
 
@@ -33787,7 +33790,7 @@ msgstr "Resumir minha caixa de entrada de e-mail todas as manhãs"
 msgid "Summarize my inbox and highlight urgent items. Use {PAYLOAD_TOKEN} for webhook data."
 msgstr "Resuma minha caixa de entrada e destaque os itens urgentes. Use {PAYLOAD_TOKEN} para os dados do webhook."
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:89
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:88
 msgid "Summarize the history of the internet"
 msgstr "Resuma a história da internet"
 
@@ -34487,7 +34490,7 @@ msgstr "texto"
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
 #: src/components/model-picker/model-picker.tsx:1252
 #: src/features/chat/sidebar/usage-card.tsx:128
-#: src/features/chat/thread/composer.tsx:130
+#: src/features/chat/thread/composer.tsx:129
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:556
 #: src/features/settings/components/chat/models-settings.tsx:45
@@ -34967,7 +34970,7 @@ msgstr "O bot e o computador dele são removidos. Os chats dele permanecem, como
 msgid "The bot gets only the tools you allow. With none allowed, it gets no tools."
 msgstr "O bot recebe apenas as ferramentas que você permitir. Sem nenhuma permitida, ele não recebe ferramentas."
 
-#: src/features/chat/thread/composer-model-selector.tsx:136
+#: src/features/chat/thread/composer-model-selector.tsx:138
 msgid "The bot sets the model for this chat."
 msgstr "O bot define o modelo deste chat."
 
@@ -36728,7 +36731,7 @@ msgstr "Pensou por alguns segundos"
 msgid "thread"
 msgstr "conversa"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:331
+#: src/features/chat/sidebar/thread-sidebar.tsx:332
 #: src/features/settings/components/chat/event-trigger-fields.tsx:270
 #: src/features/settings/components/chat/trigger-settings.tsx:1010
 msgid "Thread"
@@ -37363,7 +37366,7 @@ msgstr "Imagem transformada"
 msgid "Translate"
 msgstr "Traduzir"
 
-#: src/features/chat/thread/composer.tsx:280
+#: src/features/chat/thread/composer.tsx:199
 msgid "Translate text to another language..."
 msgstr "Traduza um texto para outro idioma..."
 
@@ -38005,7 +38008,7 @@ msgstr "Usuário desconhecido"
 msgid "Unlimited requests"
 msgstr "Requisições ilimitadas"
 
-#: src/features/auth/components/settings/providers/provider-cell.tsx:113
+#: src/features/auth/components/settings/providers/provider-cell.tsx:117
 msgid "Unlink"
 msgstr "Desvincular"
 
@@ -38856,7 +38859,7 @@ msgstr "Distância focal variável"
 msgid "Variable name..."
 msgstr "Nome da variável..."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:339
+#: src/features/chat/sidebar/thread-sidebar.tsx:340
 #: src/features/prompts/components/prompt-list-view.tsx:180
 #: src/features/prompts/components/variable-definitions.tsx:69
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:141
@@ -38966,7 +38969,7 @@ msgstr "Verificar"
 msgid "Verify Code"
 msgstr "Verificar código"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:64
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:63
 msgid "Verify the claim: \"The Great Wall of China is visible from space\""
 msgstr "Verifique a afirmação: \"A Grande Muralha da China é visível do espaço\""
 
@@ -39102,7 +39105,7 @@ msgstr "vídeo"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
 #: src/components/model-picker/model-picker.tsx:1278
 #: src/features/chat/sidebar/usage-card.tsx:130
-#: src/features/chat/thread/composer.tsx:132
+#: src/features/chat/thread/composer.tsx:131
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:642
 #: src/features/settings/components/chat/models-settings.tsx:46
@@ -39197,7 +39200,7 @@ msgstr "Vídeo para vídeo"
 msgid "video understanding"
 msgstr "compreensão de vídeo"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:105
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:104
 msgid "Videos"
 msgstr "Vídeos"
 
@@ -39604,7 +39607,7 @@ msgid "Waiting for the owner to approve"
 msgstr "Aguardando a aprovação do proprietário"
 
 #: src/features/chat/thread/composer-input-area.tsx:224
-#: src/features/chat/thread/composer-input-area.tsx:397
+#: src/features/chat/thread/composer-input-area.tsx:393
 msgid "Waiting for uploads to complete…"
 msgstr "Aguardando os envios terminarem…"
 
@@ -39837,27 +39840,27 @@ msgstr "Galês"
 msgid "Welsh (UK)"
 msgstr "Galês (Reino Unido)"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:77
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:76
 msgid "What are some creative date night ideas?"
 msgstr "Quais são algumas ideias criativas para um encontro a dois?"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:110
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:109
 msgid "What are the best practices for video editing?"
 msgstr "Quais são as boas práticas de edição de vídeo?"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:100
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:99
 msgid "What are the current trends in web development?"
 msgstr "Quais são as tendências atuais em desenvolvimento web?"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:88
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:87
 msgid "What are the key findings from recent AI research papers?"
 msgstr "Quais são as principais descobertas dos artigos recentes sobre IA?"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:85
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:84
 msgid "What are the latest developments in quantum computing?"
 msgstr "Quais são as novidades mais recentes em computação quântica?"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:97
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:96
 msgid "What are the top-rated productivity apps in 2025?"
 msgstr "Quais são os apps de produtividade mais bem avaliados em 2025?"
 
@@ -39989,7 +39992,7 @@ msgstr "Novidades"
 msgid "What's the latency overhead?"
 msgstr "Qual é a latência adicional?"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:65
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:64
 msgid "What's the scientific evidence for the health benefits of meditation?"
 msgstr "Quais são as evidências científicas dos benefícios da meditação para a saúde?"
 
@@ -40287,7 +40290,7 @@ msgstr "conhecimento de mundo"
 msgid "Write"
 msgstr "Escrita"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:120
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:119
 msgid "Write a compelling product description for an e-commerce site"
 msgstr "Escreva uma descrição de produto atraente para uma loja virtual"
 
@@ -40295,7 +40298,7 @@ msgstr "Escreva uma descrição de produto atraente para uma loja virtual"
 msgid "Write a summary, or add a comment, before you submit this review."
 msgstr "Escreva um resumo ou adicione um comentário antes de enviar esta revisão."
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:109
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:108
 msgid "Write a video description for a product launch"
 msgstr "Escreva uma descrição de vídeo para o lançamento de um produto"
 
@@ -40315,7 +40318,7 @@ msgstr "Escreva conteúdos longos junto com o chat"
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "Escreva textos longos em um editor de canvas lado a lado. Vá do chat ao documento final sem trocar de ferramenta."
 
-#: src/features/chat/thread/composer.tsx:273
+#: src/features/chat/thread/composer.tsx:192
 msgid "Write some code for me..."
 msgstr "Escreva um código para mim..."
 
@@ -40336,7 +40339,7 @@ msgid "Write, or type '/' for commands…"
 msgstr "Escreva ou digite '/' para comandos…"
 
 #: src/features/chat/tags/thread-categories.ts:18
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:116
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:115
 msgid "Writing"
 msgstr "Escrita"
 

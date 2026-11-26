@@ -98,7 +98,9 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
         }
     };
 
-    const baseClassName = className || "bg-transparent hover:bg-surface-row-hover dark:hover:bg-surface-row-hover rounded-lg text-foreground h-7 max-w-[200px]";
+    const baseClassName =
+        className ||
+        "bg-transparent hover:bg-surface-row-hover dark:hover:bg-surface-row-hover rounded-lg text-foreground h-7 max-w-[200px] @max-[26rem]/strip:max-w-[160px]";
 
     return (
         <>
@@ -118,7 +120,7 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
             />
             {canRouteAuto && (
                 <div aria-labelledby={autoLabelId} className="flex items-center gap-1.5" role="group">
-                    <span className="text-muted-foreground text-xs" id={autoLabelId}>{t`Auto`}</span>
+                    <span className="text-muted-foreground text-xs @max-[26rem]/strip:sr-only" id={autoLabelId}>{t`Auto`}</span>
                     <Switch
                         aria-labelledby={autoLabelId}
                         checked={autoModel}

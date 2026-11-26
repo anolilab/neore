@@ -32,12 +32,12 @@ export interface ComposerBaseProps {
     compact?: boolean;
     /** Data attribute for drag state */
     isDragging?: boolean;
-    /** Panel rendered to the left of the input inside the recessed area */
-    leftPanel?: ReactNode;
     /** Current composer mode */
     mode: ComposerMode;
     /** Content to render in the mode settings row (above input) */
     modeSettings?: ReactNode;
+    /** The output mode switch, on the panel's top edge (a new chat only) */
+    modeTabs?: ReactNode;
     /** Drag event handlers */
     onDragEnter?: (e: React.DragEvent) => void;
     onDragLeave?: (e: React.DragEvent) => void;
@@ -65,8 +65,8 @@ const ComposerBase = ({
     className,
     compact = false,
     isDragging,
-    leftPanel,
     mode,
+    modeTabs,
     modeSettings,
     onDragEnter,
     onDragLeave,
@@ -113,10 +113,13 @@ const ComposerBase = ({
                 type: "spring",
             }}
         >
+            {modeTabs && <div className="relative z-20 flex">{modeTabs}</div>}
             {/* Main composer container: one raised panel, the input sits on it without a box of its own. */}
             <motion.div
                 className={clsx(
                     "surface-raised w-full overflow-hidden rounded-2xl",
+                    // The mode tabs sit on the first corner, so it squares off under them.
+                    modeTabs && "rounded-ss-md",
                     "data-[dragging=true]:outline-ring data-[dragging=true]:bg-accent/50 data-[dragging=true]:-outline-offset-2 data-[dragging=true]:outline-2 data-[dragging=true]:outline-dashed",
                     "relative z-10",
                 )}
@@ -143,18 +146,15 @@ const ComposerBase = ({
                         )}
                     </AnimatePresence>
 
-                    {/* Input area: no box of its own, the panel is the surface */}
-                    <div className="relative flex px-2 pt-2">
-                        {leftPanel && <div className="border-surface-edge flex shrink-0 self-stretch border-r">{leftPanel}</div>}
-                        <div className="relative flex min-w-0 flex-1 items-center justify-center px-1">{children}</div>
-                    </div>
+                    {/* Input row: attach, the text, voice and send. No box of its own, the panel is the surface */}
+                    <div className="relative flex min-w-0 items-center justify-center px-3 pt-1.5">{children}</div>
 
-                    {/* Bottom toolbar — hidden in compact mode, separated by a subtle border */}
+                    {/* The settings strip, pressed into the panel; hidden in compact mode */}
                     <AnimatePresence>
                         {bottomToolbar && !compact && (
                             <motion.div
                                 animate={{ height: "auto", opacity: 1 }}
-                                className="flex w-full flex-row flex-wrap items-center gap-1 px-2 pt-1 pb-2"
+                                className="surface-well @container/strip mx-1.5 mb-1.5 flex flex-row flex-wrap items-center gap-0.5 rounded-[11px] px-1 py-0.5"
                                 exit={{ height: 0, opacity: 0 }}
                                 initial={skipEntrance ? false : { height: 0, opacity: 0 }}
                                 transition={{ duration: 0.15, ease: "easeOut" }}

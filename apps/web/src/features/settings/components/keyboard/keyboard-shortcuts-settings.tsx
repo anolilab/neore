@@ -313,7 +313,7 @@ const KeyboardShortcutsSettings: FC = () => {
         <div className="space-y-6">
             <Card>
                 <CardHeader className="pb-2">
-                    <CardTitle className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">{t`Keyboard Shortcuts`}</CardTitle>
+                    <CardTitle className="text-[15px] font-semibold">{t`Keyboard Shortcuts`}</CardTitle>
                     <p className="text-muted-foreground mt-1 text-xs">
                         {t`Customize keyboard shortcuts for common actions. Click "Record" and press your desired key combination.`}
                     </p>

@@ -55,7 +55,7 @@ const ComposerResearchDepth: FC<ComposerResearchDepthProps> = ({ depth, disabled
                         variant="ghost"
                     >
                         <Gauge aria-hidden="true" className="size-3 shrink-0" />
-                        <span className="hidden sm:inline">{labels[depth]}</span>
+                        <span className="@max-[32rem]/strip:sr-only">{labels[depth]}</span>
                     </Button>
                 }
             />

@@ -99,7 +99,7 @@ const MessengerPage: FC = () => {
                     <div className="flex items-center gap-2">
                         <MessageCircle aria-hidden="true" className="size-5" />
                         <div>
-                            <CardTitle className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">{t`Messenger Integration`}</CardTitle>
+                            <CardTitle className="text-[15px] font-semibold">{t`Messenger Integration`}</CardTitle>
                             <CardDescription className="text-muted-foreground mt-1 text-xs">
                                 {t`Connect your messenger platforms to chat with AI directly from Telegram, Slack, Discord, WhatsApp, LINE, Feishu/Lark, Microsoft Teams or WeChat. Messages appear in your thread list with the platform tag.`}
                             </CardDescription>

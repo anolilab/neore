@@ -9,7 +9,6 @@
 import { useLingui } from "@lingui/react/macro";
 import { Tabs, TabsList, TabsTrigger } from "@neore/ui/components/tabs";
 import cn from "@neore/ui/utils/cn";
-import clsx from "clsx";
 import { BookOpen, CheckCircle2, FileText, Lightbulb, Search, Video } from "lucide-react";
 import type { FC } from "react";
 import { useRef, useState } from "react";
@@ -143,16 +142,10 @@ const ThreadWelcomeSuggestions: FC<{ className?: string }> = ({ className }) => 
     const suggestionHandlers = buildSuggestionHandlers();
 
     return (
-        <div className={cn("flex w-full flex-col overflow-hidden rounded-lg pt-2 pl-1.5", "bg-sidebar", className)} ref={containerRef}>
-            <Tabs
-                className={clsx("flex flex-col", {
-                    "h-50": isOpen,
-                })}
-                onValueChange={handleTabChange}
-                value={activeTab}
-            >
+        <div className={cn("flex w-full flex-col", className)} ref={containerRef}>
+            <Tabs className="flex flex-col gap-2" onValueChange={handleTabChange} value={activeTab}>
                 {isOpen && activeTab !== "" && (
-                    <div className="flex-1 overflow-y-auto">
+                    <div className="surface-raised max-h-56 overflow-y-auto rounded-xl p-1">
                         {Object.entries(categories).map(([key, category]) => {
                             if (key !== activeTab) {
                                 return undefined;
@@ -168,20 +161,16 @@ const ThreadWelcomeSuggestions: FC<{ className?: string }> = ({ className }) => 
                                         return (
                                             <button
                                                 className={cn(
-                                                    "group relative flex min-h-[44px] cursor-pointer items-center gap-3 px-4 py-3 text-left text-sm transition-colors outline-none",
-                                                    "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2",
-                                                    "active:bg-muted",
-                                                    "border-sidebar border-b last:border-b-0",
-                                                    "bg-sidebar-foreground hover:bg-sidebar focus-visible:bg-sidebar active:bg-sidebar",
+                                                    "group relative flex min-h-[44px] w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors outline-none",
+                                                    "focus-visible:ring-ring focus-visible:ring-2",
+                                                    "hover:bg-surface-row-hover focus-visible:bg-surface-row-hover active:bg-surface-row-active",
                                                 )}
                                                 key={suggestionKey}
                                                 onClick={suggestionHandlers[suggestionKey]}
                                                 type="button"
                                             >
                                                 <Icon className="text-muted-foreground group-hover:text-foreground dark:text-muted-foreground dark:group-hover:text-foreground size-4 shrink-0 transition-colors" />
-                                                <span className="text-foreground group-hover:text-foreground flex-1 leading-relaxed transition-colors dark:text-neutral-100 dark:group-hover:text-white">
-                                                    {suggestion}
-                                                </span>
+                                                <span className="text-foreground flex-1 leading-relaxed">{suggestion}</span>
                                             </button>
                                         );
                                     })}
@@ -191,19 +180,21 @@ const ThreadWelcomeSuggestions: FC<{ className?: string }> = ({ className }) => 
                     </div>
                 )}
 
-                <TabsList className="h-auto w-full justify-start rounded-none bg-transparent px-0 py-2 dark:bg-transparent" variant="line">
+                <TabsList
+                    className="h-auto w-full flex-wrap justify-center gap-1.5 bg-transparent p-0 group-data-horizontal/tabs:h-auto dark:bg-transparent"
+                    variant="line"
+                >
                     {Object.entries(categories).map(([key, category]) => {
                         const Icon = category.icon;
 
                         return (
                             <TabsTrigger
-                                className="hover:text-foreground dark:hover:text-muted-foreground dark:data-active:text-muted-foreground text-foreground flex items-center gap-1.5 px-3 py-2 text-sm after:bg-transparent dark:text-neutral-200 dark:after:bg-transparent"
+                                className="surface-edge hover:bg-surface-row-hover data-active:bg-surface-row-active! text-muted-foreground hover:text-foreground data-active:text-foreground h-7 flex-none rounded-full px-2.5 text-xs font-normal after:hidden"
                                 key={key}
                                 value={key}
                             >
                                 <Icon className="size-3.5" />
-                                {/* The label sets its own colour: an inactive tab's faded text fails contrast on the white page. */}
-                                <span className="text-neutral-700 dark:text-neutral-200">{category.label}</span>
+                                {category.label}
                             </TabsTrigger>
                         );
                     })}

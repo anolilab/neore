@@ -109,7 +109,7 @@ const PinnedGoal: FC<PinnedGoalProps> = ({ disabled, threadId }) => {
                                 variant="outline"
                             >
                                 <Pin aria-hidden="true" className="size-3 shrink-0" />
-                                <span className="hidden text-neutral-700 sm:inline dark:text-neutral-200">{t`Pin goal`}</span>
+                                <span className="text-neutral-700 @max-[36rem]/strip:sr-only dark:text-neutral-200">{t`Pin goal`}</span>
                             </Button>
                         )
                     }

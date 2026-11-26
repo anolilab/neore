@@ -229,11 +229,11 @@ export const SignedOutComposer: FC = () => {
     return (
         <div className="relative w-full">
             {/* Filling the draft from a suggestion needs no account; sending it asks for one. */}
-            <ThreadWelcomeSuggestions className="-mb-5 pb-5.5" />
+            <ThreadWelcomeSuggestions className="mb-3" />
             <ComposerBase
                 bottomToolbar={<SignedOutComposerToolbar />}
-                leftPanel={<ComposerModeSwitcher mode="text" onModeChange={() => openLoginPrompt()} />}
                 mode="text"
+                modeTabs={<ComposerModeSwitcher mode="text" onModeChange={() => openLoginPrompt()} />}
             >
                 <ComposerInputArea
                     onAddAttachment={openLoginPrompt}

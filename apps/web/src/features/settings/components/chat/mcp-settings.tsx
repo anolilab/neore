@@ -404,7 +404,7 @@ const MCPSettings: FC = () => {
                         <div className="flex items-center gap-2">
                             <MCPIcon aria-hidden="true" className="size-5" />
                             <div>
-                                <CardTitle className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">{t`MCP Servers`}</CardTitle>
+                                <CardTitle className="text-[15px] font-semibold">{t`MCP Servers`}</CardTitle>
                                 <CardDescription className="text-muted-foreground mt-1 text-xs">
                                     {t`Connect to Model Context Protocol servers to extend AI capabilities with external tools.`}
                                 </CardDescription>

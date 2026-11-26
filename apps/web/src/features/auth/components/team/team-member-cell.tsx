@@ -122,7 +122,7 @@ const TeamMemberCell = ({ canManageRoles, className, classNames, isOwner, member
     const currentRole = member.role;
 
     return (
-        <Card className={cn("flex-row items-center gap-3 p-3", className, classNames?.cell)}>
+        <Card className={cn("surface-row-card bg-surface-row rounded-xl flex-row items-center gap-3 px-3.5 py-3", className, classNames?.cell)}>
             <Avatar className="size-10">
                 <AvatarImage alt={member.user.name || member.user.email} src={member.user.image || undefined} />
                 <AvatarFallback name={member.user.name || member.user.email}>{initials}</AvatarFallback>

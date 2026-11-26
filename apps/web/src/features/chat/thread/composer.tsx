@@ -21,11 +21,10 @@ import { ANONYMOUS_FREE_MODEL } from "@neore/ai/constants";
 import type { ImageSize } from "@neore/ai/models";
 import type { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
+import { ToggleGroup, ToggleGroupItem } from "@neore/ui/components/toggle-group";
 import cn from "@neore/ui/utils/cn";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, ChevronDown, ChevronUp, FileText, Image, Mic, Video } from "lucide-react";
+import { FileText, Image, Mic, Video } from "lucide-react";
 import { AnimatePresence, domAnimation, LazyMotion, m, useReducedMotion } from "motion/react";
 import type { FC, RefObject } from "react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -133,9 +132,6 @@ const COMPOSER_MODE_OPTIONS: ComposerModeOption[] = [
     { icon: Mic, id: "audio", label: msg`Audio` },
 ];
 
-// Mode order for cycling through with arrows / scroll
-const MODES_ORDER: ComposerMode[] = ["text", "image", "video", "audio"];
-
 // Icon accent color per mode
 const MODE_ICON_COLOR: Record<ComposerMode, string> = {
     audio: "text-rose-500 dark:text-rose-400",
@@ -144,122 +140,45 @@ const MODE_ICON_COLOR: Record<ComposerMode, string> = {
     video: "text-sky-500 dark:text-sky-400",
 };
 
-/**
- * Vertical mode switcher — lives on the left side of the input area.
- * ↑/↓ arrows (or scroll wheel) cycle through modes; clicking the icon opens a full picker.
- */
+const isComposerMode = (value: unknown): value is ComposerMode => COMPOSER_MODE_OPTIONS.some((option) => option.id === value);
+
+/** The output mode switch: tabs on the composer's top edge, the current one joined to the panel below it. */
 export const ComposerModeSwitcher: FC<{
     disabled?: boolean;
     mode: ComposerMode;
     onModeChange: (mode: ComposerMode) => void;
 }> = ({ disabled, mode, onModeChange }) => {
     const { i18n, t } = useLingui();
-    const containerRef = useRef<HTMLDivElement>(null);
-    const safeIndex = Math.max(0, MODES_ORDER.indexOf(mode));
-
-    const cyclePrevious = useCallback(() => {
-        const previousMode = MODES_ORDER[(safeIndex - 1 + MODES_ORDER.length) % MODES_ORDER.length];
-
-        if (previousMode) {
-            onModeChange(previousMode);
-        }
-    }, [safeIndex, onModeChange]);
-
-    const cycleNext = useCallback(() => {
-        const nextMode = MODES_ORDER[(safeIndex + 1) % MODES_ORDER.length];
-
-        if (nextMode) {
-            onModeChange(nextMode);
-        }
-    }, [safeIndex, onModeChange]);
-
-    // Passive-false wheel listener so we can prevent page scroll
-    useEffect(() => {
-        const element = containerRef.current;
-
-        if (!element) {
-            return undefined;
-        }
-
-        const onWheel = (e: WheelEvent) => {
-            e.preventDefault();
-
-            if (e.deltaY > 0) {
-                cycleNext();
-            } else {
-                cyclePrevious();
-            }
-        };
-
-        element.addEventListener("wheel", onWheel, { passive: false });
-
-        return () => element.removeEventListener("wheel", onWheel);
-    }, [cyclePrevious, cycleNext]);
-
-    const currentOption = (COMPOSER_MODE_OPTIONS.find((opt) => opt.id === mode) ?? COMPOSER_MODE_OPTIONS[0]) as ComposerModeOption;
-    const CurrentIcon = currentOption.icon;
-    const modeLabel = i18n._(currentOption.label);
 
     return (
-        <DropdownMenu>
-            <div className="flex w-7 flex-col items-center justify-between py-1.5" ref={containerRef}>
-                {/* Up arrow — previous mode */}
-                <button
-                    aria-label={t`Previous output mode`}
-                    className="text-muted-foreground/40 hover:text-muted-foreground flex size-4 items-center justify-center rounded transition-colors"
-                    disabled={disabled}
-                    onClick={cyclePrevious}
-                    type="button"
+        <ToggleGroup
+            aria-label={t`Output mode`}
+            className="gap-0.5"
+            disabled={disabled}
+            onValueChange={(value) => {
+                const next = value?.[0];
+
+                // Pressing the current mode again would leave none selected; a mode is always on.
+                if (next && next !== mode && isComposerMode(next)) {
+                    onModeChange(next);
+                }
+            }}
+            value={[mode]}
+        >
+            {COMPOSER_MODE_OPTIONS.map(({ icon: Icon, id, label }) => (
+                <ToggleGroupItem
+                    className={cn(
+                        "text-muted-foreground hover:text-foreground h-7 gap-1.5 rounded-none rounded-t-[9px] px-2.5 text-xs font-normal hover:bg-transparent aria-pressed:bg-transparent",
+                        "aria-pressed:surface-raised aria-pressed:text-foreground aria-pressed:[clip-path:inset(-4px_-4px_0_-4px)]",
+                    )}
+                    key={id}
+                    value={id}
                 >
-                    <ChevronUp aria-hidden="true" className="size-3" />
-                </button>
-
-                {/* Current mode icon — click to open full picker */}
-                <Tooltip>
-                    <TooltipTrigger
-                        render={
-                            <DropdownMenuTrigger
-                                disabled={disabled}
-                                render={
-                                    <button
-                                        aria-label={t`Mode`}
-                                        className="flex size-6 items-center justify-center rounded-md transition-colors hover:bg-black/[0.06] dark:hover:bg-white/[0.08]"
-                                        type="button"
-                                    >
-                                        <CurrentIcon className={cn("size-3.5 shrink-0", MODE_ICON_COLOR[mode])} />
-                                    </button>
-                                }
-                            />
-                        }
-                    />
-                    <TooltipContent side="right" sideOffset={10}>
-                        <p>{t`${modeLabel} mode — click to change`}</p>
-                    </TooltipContent>
-                </Tooltip>
-
-                {/* Down arrow — next mode */}
-                <button
-                    aria-label={t`Next output mode`}
-                    className="text-muted-foreground/40 hover:text-muted-foreground flex size-4 items-center justify-center rounded transition-colors"
-                    disabled={disabled}
-                    onClick={cycleNext}
-                    type="button"
-                >
-                    <ChevronDown aria-hidden="true" className="size-3" />
-                </button>
-            </div>
-
-            <DropdownMenuContent align="start" className="min-w-[160px] p-1.5" side="right" sideOffset={6}>
-                <div className="text-muted-foreground px-2 py-1.5 text-xs font-semibold">{t`Output Mode`}</div>
-                {COMPOSER_MODE_OPTIONS.map(({ icon: Icon, id, label }) => (
-                    <DropdownMenuItem className="gap-2.5 py-2" key={id} onClick={() => onModeChange(id)}>
-                        <Icon className={cn("size-4 shrink-0", MODE_ICON_COLOR[id])} />
-                        <span className="font-medium">{i18n._(label)}</span>
-                        {mode === id && <Check className="text-muted-foreground ml-auto size-3.5 shrink-0" />}
-                    </DropdownMenuItem>
-                ))}
-            </DropdownMenuContent>
-        </DropdownMenu>
+                    <Icon aria-hidden="true" className={cn("size-3.5 shrink-0", mode === id && MODE_ICON_COLOR[id])} />
+                    {i18n._(label)}
+                </ToggleGroupItem>
+            ))}
+        </ToggleGroup>
     );
 };
 
@@ -709,7 +628,7 @@ const Composer: FC<ComposerProps> = ({
                             transition={SLIDE_TRANSITION}
                         >
                             {/* Welcome suggestions for empty threads */}
-                            {!minimal && isEmpty && <ThreadWelcomeSuggestions className="-mb-5 pb-5.5" key={threadId} />}
+                            {!minimal && isEmpty && <ThreadWelcomeSuggestions className="mb-3" key={threadId} />}
 
                             {/* Followup suggestions - only for text mode, hide while streaming or regenerating */}
                             {/* The owner's setting decides whether a thread has suggestions (the cache is written only when it is on), so a viewer's own
@@ -834,11 +753,6 @@ const Composer: FC<ComposerProps> = ({
                         </>
                     }
                     compact={compact}
-                    leftPanel={
-                        !compact && !validThreadId ? (
-                            <ComposerModeSwitcher disabled={isSSEStreaming} mode={composerMode} onModeChange={handleModeChange} />
-                        ) : undefined
-                    }
                     mode={composerMode}
                     modeSettings={
                         composerMode === "text" ? null : (
@@ -846,6 +760,11 @@ const Composer: FC<ComposerProps> = ({
                                 {renderModeSettings()}
                             </AnimatePresence>
                         )
+                    }
+                    modeTabs={
+                        !compact && !validThreadId ? (
+                            <ComposerModeSwitcher disabled={isSSEStreaming} mode={composerMode} onModeChange={handleModeChange} />
+                        ) : undefined
                     }
                 >
                     <ComposerInputWrapper

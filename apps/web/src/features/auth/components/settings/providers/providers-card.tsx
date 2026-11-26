@@ -41,7 +41,7 @@ const ProvidersCardContent = ({ accounts, className, classNames, isPending, refe
             isPending={isPending}
             title={t`Connected Accounts`}
         >
-            <CardContent className={cn("grid gap-4", classNames?.content)}>
+            <CardContent className={cn("grid gap-1.5", classNames?.content)}>
                 {isPending ? (
                     socialProviders.map((provider) => (
                         <Card className={cn("flex-row items-center gap-3 px-4 py-3", classNames?.cell)} key={provider}>

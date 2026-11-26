@@ -33,9 +33,8 @@ const SettingsCardFooter = ({
 }: SettingsCardFooterProperties) => (
     <CardFooter
         className={cn(
-            "flex flex-col justify-between gap-4 rounded-b-lg md:flex-row",
-            (actionLabel || instructions) && "border-t py-4!",
-            variant === "destructive" ? "border-destructive/30 bg-destructive/15" : "bg-muted/50",
+            "flex flex-col justify-between gap-3 rounded-b-2xl pt-0 pb-4 md:flex-row md:items-center",
+            variant === "destructive" && "border-destructive/30 border-t pt-4",
             className,
             classNames?.footer,
         )}
@@ -49,9 +48,7 @@ const SettingsCardFooter = ({
         ) : (
             <>
                 {instructions && (
-                    <CardDescription className={cn("text-muted-foreground text-center text-xs md:text-start md:text-sm", classNames?.instructions)}>
-                        {instructions}
-                    </CardDescription>
+                    <CardDescription className={cn("text-muted-foreground text-start text-sm", classNames?.instructions)}>{instructions}</CardDescription>
                 )}
 
                 {actionLabel && (

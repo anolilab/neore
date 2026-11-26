@@ -64,7 +64,7 @@ const OrganizationMembersContent = ({ className, classNames, ...properties }: Se
                 {...properties}
             >
                 {!isPending && members && members.length > 0 && (
-                    <CardContent className={cn("grid gap-4", classNames?.content)}>
+                    <CardContent className={cn("grid gap-1.5", classNames?.content)}>
                         {members
                             .toSorted((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
                             .map((member) => (

@@ -364,7 +364,7 @@ const ModelsSettings: FC = () => {
                 <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
                         <div>
-                            <CardTitle className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">{t`Models`}</CardTitle>
+                            <CardTitle className="text-[15px] font-semibold">{t`Models`}</CardTitle>
                             <CardDescription className="text-muted-foreground mt-1 text-xs">
                                 {t`Enable or disable models to control which ones appear in the model selector.`} {enabledCount} / {models.length}
                             </CardDescription>

@@ -100,7 +100,7 @@ const UserInvitationCell = ({ className, invitation, refetchInvitations }: UserI
     };
 
     return (
-        <Card className={cn("flex-row items-center gap-4 p-4", className)}>
+        <Card className={cn("surface-row-card bg-surface-row rounded-xl flex-row items-center gap-4 px-3.5 py-3", className)}>
             <div className="flex flex-1 flex-col gap-1">
                 <span className="font-medium">{invitation.organizationName}</span>
                 <span className="text-muted-foreground text-sm">
@@ -151,7 +151,7 @@ const UserInvitationsCard = ({ className, classNames, ...properties }: SettingsC
             {...properties}
         >
             {!isPending && pendingInvitations.length > 0 && (
-                <CardContent className={cn("grid gap-4", classNames?.content)}>
+                <CardContent className={cn("grid gap-1.5", classNames?.content)}>
                     {pendingInvitations.map((invitation) => (
                         <UserInvitationCell
                             invitation={invitation}

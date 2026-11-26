@@ -36,6 +36,7 @@
     --surface-well: #ffffff;
     --surface-well-shadow: inset 0 0 0 1px #595959;
     --surface-edge: #595959;
+    --surface-row-edge: #595959;
     --surface-edge-top: transparent;
     --surface-drop: none;
     --surface-glow: none;
@@ -75,6 +76,7 @@
     --surface-well: #000000;
     --surface-well-shadow: inset 0 0 0 1px #a6a6a6;
     --surface-edge: #a6a6a6;
+    --surface-row-edge: #a6a6a6;
     --surface-edge-top: transparent;
     --surface-drop: none;
     --surface-glow: none;

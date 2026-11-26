@@ -25,9 +25,9 @@ const SettingsCardHeader = ({ className, classNames, description, isPending, tit
             </>
         ) : (
             <>
-                <CardTitle className={cn("text-sm font-semibold tracking-widest uppercase", classNames?.title)}>{title}</CardTitle>
+                <CardTitle className={cn("text-[15px] font-semibold", classNames?.title)}>{title}</CardTitle>
 
-                {description && <CardDescription className={cn("text-xs md:text-sm", classNames?.description)}>{description}</CardDescription>}
+                {description && <CardDescription className={cn("text-sm", classNames?.description)}>{description}</CardDescription>}
             </>
         )}
     </CardHeader>

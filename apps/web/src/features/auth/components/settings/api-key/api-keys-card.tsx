@@ -52,7 +52,7 @@ const APIKeysCard = ({ ...properties }: APIKeysCardProperties) => {
         );
     } else if (sortedAPIKeys.length > 0) {
         listBody = (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
                 {sortedAPIKeys.map((apiKey) => (
                     <APIKeyCell apiKey={apiKey} key={apiKey.id} />
                 ))}

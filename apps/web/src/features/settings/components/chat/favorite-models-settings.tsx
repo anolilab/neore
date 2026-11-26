@@ -115,7 +115,7 @@ const FavoriteModelsSettings: FC = () => {
     return (
         <Card>
             <CardHeader className="pb-2">
-                <CardTitle className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">{t`Favorite models`}</CardTitle>
+                <CardTitle className="text-[15px] font-semibold">{t`Favorite models`}</CardTitle>
                 <CardDescription className="text-muted-foreground mt-1 text-xs">
                     {t`Order the models you starred in the model picker and give them your own names. A nickname shows in the picker, the composer and on replies.`}
                 </CardDescription>

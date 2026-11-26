@@ -132,7 +132,7 @@ const ModelFilterSettings: FC = () => {
                 <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
                         <div>
-                            <CardTitle className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">{t`Model Restrictions`}</CardTitle>
+                            <CardTitle className="text-[15px] font-semibold">{t`Model Restrictions`}</CardTitle>
                             <CardDescription className="text-muted-foreground mt-1 text-xs">
                                 {t`Control which AI models and providers can be used based on geographic region, compliance requirements, and privacy preferences.`}
                             </CardDescription>

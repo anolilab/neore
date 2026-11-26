@@ -75,7 +75,7 @@ const ComposerGoal: FC<ComposerGoalProps> = ({ disabled, threadId }) => {
                             variant="ghost"
                         >
                             <Target aria-hidden="true" className="size-3 shrink-0" />
-                            <span className="hidden sm:inline">{t`Goal`}</span>
+                            <span className="@max-[32rem]/strip:sr-only">{t`Goal`}</span>
                         </Button>
                     }
                 />

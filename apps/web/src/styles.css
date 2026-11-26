@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @import "fumadocs-ui/css/neutral.css";
 @import "fumadocs-ui/css/preset.css";
+/* The faces `--font-sans` and `--font-mono` name; the root route preloads the Latin file. */
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
 
 @source "../../../packages/ui";
 @source "../node_modules/fumadocs-ui/dist/**/*.js";

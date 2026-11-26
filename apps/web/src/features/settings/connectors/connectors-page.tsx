@@ -36,7 +36,7 @@ const ConnectorsPage: FC = () => {
                     <div className="flex items-center gap-2">
                         <Plug aria-hidden className="size-5" />
                         <div>
-                            <CardTitle className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">{t`Connectors`}</CardTitle>
+                            <CardTitle className="text-[15px] font-semibold">{t`Connectors`}</CardTitle>
                             <CardDescription className="text-muted-foreground mt-1 text-xs">
                                 {t`Connect third-party services to extend AI capabilities with your data and tools.`}
                             </CardDescription>

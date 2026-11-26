@@ -157,7 +157,7 @@ export const MCPServerCatalog: FC<MCPServerCatalogProps> = ({ configuredUrls, di
     return (
         <Card>
             <CardHeader className="pb-2">
-                <CardTitle className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">{t`MCP Registry`}</CardTitle>
+                <CardTitle className="text-[15px] font-semibold">{t`MCP Registry`}</CardTitle>
                 <CardDescription className="text-muted-foreground mt-1 text-xs">
                     {t`One-click setup for remote servers from the official MCP Registry. Only servers reachable over HTTP or SSE are listed.`}
                 </CardDescription>

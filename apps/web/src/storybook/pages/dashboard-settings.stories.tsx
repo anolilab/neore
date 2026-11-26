@@ -1,8 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect } from "storybook/test";
+import { http, HttpResponse } from "msw";
+import { expect, waitFor } from "storybook/test";
 
 import { Route as DashboardRoute } from "@/routes/dashboard/route";
+import { Route as AccountRoute } from "@/routes/dashboard/settings/auth/account";
 import { Route as ApiKeysRoute } from "@/routes/dashboard/settings/auth/api-keys";
+import { Route as SecurityRoute } from "@/routes/dashboard/settings/auth/security";
 import { Route as ModelFiltersRoute } from "@/routes/dashboard/settings/chat/model-filters";
 import { apiKeyHandlers } from "@/storybook/fixtures/api-keys";
 import { gatewayModelsHandler } from "@/storybook/fixtures/models";
@@ -38,6 +41,24 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+/** The linked-account (a password login) and session lists the security and account pages read. */
+const authListHandlers = () => [
+    http.get("*/api/auth/list-accounts", () =>
+        HttpResponse.json([
+            {
+                accountId: "user-pro",
+                createdAt: "2026-10-01T00:00:00.000Z",
+                id: "account-credential",
+                providerId: "credential",
+                scopes: [],
+                updatedAt: "2026-10-01T00:00:00.000Z",
+                userId: "user-pro",
+            },
+        ]),
+    ),
+    http.get("*/api/auth/list-sessions", () => HttpResponse.json([])),
+];
+
 const dashboard = { component: DashboardRoute.options.component, path: "/dashboard" } as const;
 
 export const ModelFilters: Story = {
@@ -58,5 +79,33 @@ export const ApiKeys: Story = {
     },
     play: async ({ canvas }) => {
         await expect(await canvas.findByText("Laptop CLI", undefined, PAGE_WAIT)).toBeVisible();
+    },
+};
+
+/** Form-bodied cards (change email, change password) with their action footer. */
+export const Security: Story = {
+    args: {
+        levels: [dashboard, { component: SecurityRoute.options.component, path: "settings/auth/security" }],
+        url: "/dashboard/settings/auth/security",
+    },
+    parameters: {
+        msw: { handlers: { authLists: authListHandlers() } },
+    },
+    play: async ({ canvasElement }) => {
+        await waitFor(() => expect(canvasElement.querySelector('input[type="password"]')).not.toBeNull(), PAGE_WAIT);
+    },
+};
+
+/** The account page: profile form cards, and the destructive delete-account card at the bottom. */
+export const Account: Story = {
+    args: {
+        levels: [dashboard, { component: AccountRoute.options.component, path: "settings/auth/account" }],
+        url: "/dashboard/settings/auth/account",
+    },
+    parameters: {
+        msw: { handlers: { authLists: authListHandlers() } },
+    },
+    play: async ({ canvas }) => {
+        await expect(await canvas.findAllByRole("textbox", undefined, PAGE_WAIT)).not.toHaveLength(0);
     },
 };

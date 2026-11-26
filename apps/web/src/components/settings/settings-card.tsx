@@ -67,14 +67,24 @@ const SettingsCard = ({
     ...properties
 }: SettingsCardProperties) => {
     const displayTitle = header || title;
+    const hasFooter = Boolean(actionLabel || action);
 
     return (
-        <Card className={cn("w-full pb-0 text-start", variant === "destructive" && "border-destructive/40", className, classNames?.base)} {...properties}>
+        <Card
+            className={cn(
+                "w-full rounded-2xl text-start",
+                hasFooter && "pb-0",
+                variant === "destructive" && "border-destructive/40",
+                className,
+                classNames?.base,
+            )}
+            {...properties}
+        >
             <SettingsCardHeader classNames={classNames} description={description} isPending={isPending} title={displayTitle} />
 
-            {children && <div className="dark:bg-sidebar-foreground m-1 rounded-lg bg-white py-4 shadow-md">{children}</div>}
+            {children && <div className="px-4 [&>[data-slot=card-content]]:px-0">{children}</div>}
 
-            {(actionLabel || action) && (
+            {hasFooter && (
                 <SettingsCardFooter
                     action={action}
                     actionLabel={actionLabel}

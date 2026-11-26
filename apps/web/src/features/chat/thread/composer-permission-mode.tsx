@@ -67,7 +67,7 @@ export const ComposerPermissionMode: FC<ComposerPermissionModeProps> = ({ disabl
                 variant="ghost"
             >
                 <ShieldCheck aria-hidden="true" className="size-3 shrink-0" />
-                <span className="hidden sm:inline">{labels[mode]}</span>
+                <span className="@max-[32rem]/strip:sr-only">{labels[mode]}</span>
                 <span className="sr-only" id={noteId}>
                     {note}
                 </span>
@@ -81,7 +81,7 @@ export const ComposerPermissionMode: FC<ComposerPermissionModeProps> = ({ disabl
                 render={
                     <Button aria-label={t`Permission mode: ${labels[mode]}`} className={buttonClass} disabled={disabled} variant="ghost">
                         <ShieldCheck aria-hidden="true" className="size-3 shrink-0" />
-                        <span className="hidden sm:inline">{labels[mode]}</span>
+                        <span className="@max-[32rem]/strip:sr-only">{labels[mode]}</span>
                     </Button>
                 }
             />

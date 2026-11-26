@@ -224,22 +224,19 @@ const RouteComponent = () => {
                     <SidebarInset className="bg-surface-main">
                         <SiteHeader>
                             <Breadcrumb>
-                                <BreadcrumbList>
+                                <BreadcrumbList className="gap-1 text-sm">
                                     {breadcrumbItems.map((item, index) => (
                                         <Fragment key={item.href}>
                                             <BreadcrumbItem>
                                                 {item.isLast ? (
-                                                    <BreadcrumbPage className="text-foreground font-medium">{item.label}</BreadcrumbPage>
+                                                    <BreadcrumbPage className="font-medium">{item.label}</BreadcrumbPage>
                                                 ) : (
-                                                    <BreadcrumbLink
-                                                        className="hover:text-muted-foreground hover:dark:text-muted-foreground text-sm text-black transition-colors dark:text-white"
-                                                        href={item.href}
-                                                    >
-                                                        {item.label}
-                                                    </BreadcrumbLink>
+                                                    <BreadcrumbLink href={item.href}>{item.label}</BreadcrumbLink>
                                                 )}
                                             </BreadcrumbItem>
-                                            {index < breadcrumbItems.length - 1 && <BreadcrumbSeparator className="text-muted-foreground mx-2" />}
+                                            {index < breadcrumbItems.length - 1 && (
+                                                <BreadcrumbSeparator className="text-muted-foreground/60 mx-0.5 [&>svg]:size-3" />
+                                            )}
                                         </Fragment>
                                     ))}
                                 </BreadcrumbList>
