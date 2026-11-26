@@ -147,9 +147,10 @@ export const releasePinWrite = async (context: Pick<MutationCtx, "db">, userId: 
  * Whether a pin write of the account must be refused on this shard: a move is marking it, or this shard is fenced by an erasure. A
  * pin write calls it once before it renews its lease, and again as the last step before its insert (`chat/pins/functions.ts`).
  *
- * The last call names the write (`writerId`) and is refused too when that write's own lease is no longer live. A move waits for leases to
- * expire before it ends, so a write that stalled past its lease may find the move already finished. Its lease check then stops the insert
- * instead of letting a pin land under an account that was just deleted.
+ * The last call names the write (`writerId`). It is refused too when that write's own lease is no longer live, or when the account row is
+ * gone. A move can finish between a write's first check and its insert, and a finished move leaves no marker and no live lease for this
+ * check to see. The account row is what outlives it: the guest's row goes only when its merge or erasure ends it (`auth/hooks.ts`), as a
+ * grant written under a deleted account is refused (`agent/sharing.ts`). Both reads are on the primary.
  */
 export const refusesPinWrite = async (context: Pick<QueryCtx, "db">, userId: string, now: number, writerId: string | null = null): Promise<boolean> => {
     if ((await isAccountMoving(context, userId, now)) || (await isShardFenced(context, userId))) {
@@ -158,6 +159,12 @@ export const refusesPinWrite = async (context: Pick<QueryCtx, "db">, userId: str
 
     if (writerId === null) {
         return false;
+    }
+
+    const account = await context.db.user.findFirst({ consistency: "primary", where: { _id: context.db.asId("user", userId) } });
+
+    if (account === null) {
+        return true;
     }
 
     const leases = await leasesOf(context, userId);

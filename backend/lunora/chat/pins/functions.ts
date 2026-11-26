@@ -713,7 +713,8 @@ export const createPin = authMutation
             async () => {
                 // The last check, after the route write and right before the insert. No external call sits between them, so an erasure
                 // that fences this shard either runs before this check (the write is refused) or after the insert (its sweep sees the pin).
-                if (await refusesPinWrite(context, userId, now, writerId)) {
+                // It reads the wall clock, not `now`: a write that stalled past its own lease must see that lease as expired.
+                if (await refusesPinWrite(context, userId, Date.now(), writerId)) {
                     throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
                 }
 
@@ -798,7 +799,7 @@ export const createDocumentPin = authMutation
             now,
             async () => {
                 // The last check, as in `createPin`: after the route write, right before the insert.
-                if (await refusesPinWrite(context, userId, now, writerId)) {
+                if (await refusesPinWrite(context, userId, Date.now(), writerId)) {
                     throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
                 }
 
