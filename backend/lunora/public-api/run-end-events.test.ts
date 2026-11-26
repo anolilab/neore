@@ -123,7 +123,7 @@ describe("a run's end in the Events log", () => {
 });
 
 describe("retention of the Events log", () => {
-    const OLD = Date.now() - 8 * 24 * 60 * 60 * 1000;
+    const OLD = FIXED_NOW - 8 * 24 * 60 * 60 * 1000;
 
     /** `count` events of `OWNER`'s log written `OLD`, numbered from 1, and the watermark the recorder would have left. */
     const seedOldLog = async (count: number): Promise<void> => {
