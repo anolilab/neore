@@ -15,8 +15,10 @@ import { v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
-import { internalQuery } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
 import { threadSharedWithOthers } from "../agent/live-grant";
+import { patchThread } from "../agent/table-writes";
+import { vWorkerPolicy } from "../sub-agents/validators";
 import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { parseCustomModelId } from "@neore/ai/models";
@@ -120,6 +122,16 @@ export const sharedWithOthers = internalQuery
         const thread = await ctx.db.get("threads", args.threadId);
 
         return thread?.userId !== undefined && (await threadSharedWithOthers(ctx, args.threadId, thread.userId, Date.now()));
+    });
+
+/** The worker-dispatch policy the parent carries, copied onto the side chat. It is not a thread-creation field, so it is set here. */
+export const copyWorkerPolicy = internalMutation
+    .input({ threadId: v.id("threads"), workerPolicy: vWorkerPolicy })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await patchThread(ctx.db, args.threadId, { workerPolicy: args.workerPolicy });
+
+        return null;
     });
 
 export const createSideChat = authAction
@@ -269,6 +281,11 @@ export const createSideChat = authAction
             // A handed-over conversation stays handed over in the copy, so the side chat's tools are not auto-approved on it.
             if (parent.hasHandoff) {
                 await ctx.runMutation(internal.chat.context_reset.markForkedHandoff, { threadId: newThreadId });
+            }
+
+            // The parent's worker-dispatch policy (sources and hourly cap) governs the child's worker requests too.
+            if (parent.workerPolicy) {
+                await ctx.runMutation(internal.chat.side_chat.copyWorkerPolicy, { threadId: newThreadId, workerPolicy: parent.workerPolicy });
             }
 
             const createdThread = await ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId: newThreadId });

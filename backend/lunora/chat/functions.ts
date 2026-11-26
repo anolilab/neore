@@ -3623,7 +3623,8 @@ export const searchSentPrompts = authQuery
                     .withIndex("by_thread", (q) => q.eq("threadId", current as Id<"threads">))
                     .take(1);
 
-                if (!link || link.branchType === "subagent" || (link.userId ?? userId) !== userId) {
+                // A side chat is its own chat: its prompts are not a copy of the parent's family to deduplicate against.
+                if (!link || link.branchType === "subagent" || link.branchType === "side" || (link.userId ?? userId) !== userId) {
                     break;
                 }
 

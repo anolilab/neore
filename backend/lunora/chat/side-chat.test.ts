@@ -841,4 +841,16 @@ describe("createSideChat", () => {
         expect(await sideRelations()).toHaveLength(0);
         expect(await harness.run(async (ctx: any) => await ctx.db.query("threads").collect())).toHaveLength(2);
     });
+
+    it("gives the side chat the parent's worker-dispatch policy, so its worker requests keep the same cap", async () => {
+        const parentId = await parentWith(OWNER, { workerPolicy: { allowedSources: [], hostDispatch: "ask", maxDispatchesPerHour: 5 } });
+
+        await withMessages(parentId, OWNER, ["hello"]);
+
+        const outcome = (await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)) as { status: string; threadId: string };
+        const child = await threadRow(outcome.threadId);
+
+        expect(outcome.status).toBe("ok");
+        expect(child.workerPolicy).toMatchObject({ allowedSources: [], hostDispatch: "ask", maxDispatchesPerHour: 5 });
+    });
 });
