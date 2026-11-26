@@ -227,11 +227,13 @@ export const createControlSession = ({
 
             // A hand back still out lands first: a claim it gave back is not named as one to renew (a hand back that
             // failed keeps it, so a lease left on the server is still the phone's own).
-            await releasing;
+            if (releasing !== undefined) {
+                await releasing;
 
-            // Left or suspended while that hand back was out: nothing is asked for.
-            if (mine !== attempt) {
-                return;
+                // Left or suspended while that hand back was out: nothing is asked for.
+                if (mine !== attempt) {
+                    return;
+                }
             }
 
             const answer = await withCatch(async () => await api.take(lastClaim), () => undefined);
