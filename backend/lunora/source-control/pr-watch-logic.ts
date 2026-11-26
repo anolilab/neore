@@ -74,7 +74,7 @@ export type WatchDecision =
  * Whether the review is the watcher's own. Host logins are not case-sensitive, so the comparison is not either. With no
  * watcher login (the lookup failed) no review is known to be the watcher's, so every one counts as someone else's.
  */
-const isByWatcher = (review: { authorLogin: string }, watcherLogin: string): boolean =>
+export const isByWatcher = (review: { authorLogin: string }, watcherLogin: string): boolean =>
     watcherLogin !== "" && review.authorLogin.toLowerCase() === watcherLogin.toLowerCase();
 
 /**
@@ -106,7 +106,19 @@ const newerReviewsByOthers = (
         return { left: true, newer: [] };
     }
 
-    return { left: false, newer: observed.reviews.slice(0, at).filter((review) => !isByWatcher(review, observed.watcherLogin.trim())) };
+    // By position the reviews before the seen one are newer, but position is the host's order: where both carry a submission time it
+    // must be strictly later, as on the beyond-read path, so an equal time neither wakes nor moves the marker.
+    const seenAt = observed.reviews[at]?.submittedAt ?? 0;
+
+    return {
+        left: false,
+        newer: observed.reviews
+            .slice(0, at)
+            .filter(
+                (review) =>
+                    !isByWatcher(review, observed.watcherLogin.trim()) && (seenAt === 0 || review.submittedAt === undefined || review.submittedAt > seenAt),
+            ),
+    };
 };
 
 /**

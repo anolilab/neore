@@ -691,6 +691,20 @@ describe("reading past the first page", () => {
             expect(reviews.items[0]?.id).toBe("40");
         });
 
+        it("keeps the first page it read when it falls back, so the newest reviews of page 1 are not dropped", async () => {
+            const last = 12;
+            const pages = Array.from({ length: last }, (_, index) => {
+                // Review 55 on page 1 was submitted after everything else.
+                return { body: pageOf(index * 100 + 1, 100, (id) => (id === 55 ? 99_999 : id)), ...(index === 0 && { link: linkTo(last) }) };
+            });
+            const { request, requests } = counted(pages);
+            const reviews = await githubDriver.listReviews(request, REF, { readAll: true });
+
+            expect(requests).toEqual([1, last]);
+            expect(reviews.items[0]?.id).toBe("55");
+            expect(new Set(reviews.items.map((item) => item.id)).size).toBe(reviews.items.length);
+        });
+
         it("falls back to the newest pages without an error when there are more pages than the bound", async () => {
             const last = 12;
             const pages = Array.from({ length: last }, (_, index) => {

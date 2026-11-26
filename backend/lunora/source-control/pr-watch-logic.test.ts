@@ -292,6 +292,23 @@ describe("a seen review beyond a truncated read", () => {
     });
 });
 
+describe("a listed seen review ordered by submission time", () => {
+    const seen = { authorLogin: "bob", id: "5", submittedAt: 5000 };
+    const marked = { ...baselined, reviewId: "5" };
+
+    it("does not wake, or move the marker, for a review listed before it with an equal time", () => {
+        const decision = decideWatch(marked, { ...quiet, reviews: [{ authorLogin: "amy", id: "6", submittedAt: 5000 }, seen] }, NOW);
+
+        expect(decision).toMatchObject({ action: "none", state: { reviewId: "5" } });
+    });
+
+    it("wakes for a strictly later one", () => {
+        const decision = decideWatch(marked, { ...quiet, reviews: [{ authorLogin: "amy", id: "6", submittedAt: 5001 }, seen] }, NOW);
+
+        expect(decision).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "6" } });
+    });
+});
+
 describe("the watcher's own reviews", () => {
     const own = { authorLogin: "Dev", id: "r9" };
 

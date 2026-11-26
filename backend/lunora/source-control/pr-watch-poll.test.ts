@@ -501,7 +501,8 @@ describe("observeWatched", () => {
         const { observation: observed } = await observeWatched(request, TARGET, { driver: driver as never, login: async () => "me" });
 
         expect(observed.reviews[0]?.id).toBe("r120");
-        expect(observed.reviews.length).toBeLessThanOrEqual(120);
+        expect(observed.reviews).toHaveLength(100);
+        expect(observed.reviews.at(-1)?.id).toBe("r21");
 
         const decision = decideWatch({ baselined: true, headSha: "sha-1", reviewId: "r119" }, observed, Date.now());
 
@@ -740,6 +741,37 @@ describe("observeWatched", () => {
         await expect(observeWatched(request, TARGET, stubs)).rejects.toBeInstanceOf(HostApiError);
     });
 
+    it("removes the watcher's own reviews before the bound, so 100 self-reviews do not crowd out another reviewer", async () => {
+        const items = [
+            ...Array.from({ length: 100 }, (_, index) => {
+                return { authorLogin: "Me", id: String(500 - index), submittedAt: 9000 - index };
+            }),
+            { authorLogin: "bob", id: "7", submittedAt: 100 },
+        ];
+        const { observation: observed } = await observeWatched(request, TARGET, dependencies(items, 101));
+
+        expect(observed.reviews).toEqual([{ authorLogin: "bob", id: "7", submittedAt: 100 }]);
+    });
+
+    it("keeps the seen review in the selection even when the watcher wrote it", async () => {
+        const items = [
+            { authorLogin: "bob", id: "9", submittedAt: 300 },
+            { authorLogin: "me", id: "5", submittedAt: 200 },
+        ];
+        const { observation: observed } = await observeWatched(request, { ...TARGET, reviewId: "5" }, dependencies(items, 2));
+
+        expect(observed.reviews.map((review) => review.id)).toEqual(["9", "5"]);
+    });
+
+    it("reads a bounded number of check pages, not one", async () => {
+        const stubs = dependencies([], 0);
+        const driver = stubs.driver as unknown as { listChecks: Mock };
+
+        await observeWatched(request, TARGET, stubs);
+
+        expect(driver.listChecks).toHaveBeenCalledExactlyOnceWith(expect.anything(), expect.anything(), "sha-1", 5);
+    });
+
     it("reads the login once for a watch that goes on", async () => {
         const login = vi.fn().mockResolvedValue("me");
         const driver = {
@@ -875,6 +907,48 @@ describe("the end of a watch", () => {
 
         expect(row.watchActive).toBe(false);
         expect(event).toHaveBeenCalledExactlyOnceWith("develop.watch_ended", { linkId: expect.any(String), reason: "cap" });
+    });
+});
+
+describe("a watch's failure streak when its pull request closes", () => {
+    it("is reset by the closing read, keeping the last status and time, and the watch ends", async () => {
+        const linkId = await seedWatch({
+            watch: { baselined: true, headSha: "sha-1", startedAt: STARTED_AT },
+            watchReadFailure: { at: 7, attempts: 3, status: "host_error" },
+        });
+
+        await record(linkId, { observation: observation({ state: "merged" }) });
+
+        const row = await rowOf(linkId);
+
+        expect(row.watchActive).toBe(false);
+        expect(row.watchReadFailure).toEqual({ at: 7, attempts: 0, status: "host_error" });
+    });
+});
+
+describe("a poll whose token was renewed", () => {
+    const TARGET = { number: 7, repository: "octo/hello", userId: OWNER };
+    const TOKEN = {
+        accessToken: "t",
+        renew: async () => {
+            return { accessToken: "t2" };
+        },
+    } as never;
+
+    it("makes no host read when the watch was stopped while the token was renewed", async () => {
+        const reads = vi.fn().mockRejectedValueOnce(new HostApiError("unauthorized", 401)).mockResolvedValue(new Response("{}"));
+        const read = vi.fn().mockResolvedValueOnce(TARGET).mockResolvedValueOnce(TARGET).mockResolvedValueOnce(null);
+        const readHost = vi.fn(async (_target, _token, stillCurrent: () => Promise<boolean>) => {
+            // Stands in for `readFromHost`: the first attempt is refused (401), the token is renewed, then the second attempt asks.
+            await reads().catch(() => undefined);
+
+            return (await stillCurrent()) ? { observation: observation(), status: "ok" as const } : { status: "stale" as const };
+        });
+        const saved = vi.fn();
+
+        await runWatchPoll({ fail: vi.fn(), read, readHost, record: saved, token: async () => TOKEN });
+
+        expect(saved).not.toHaveBeenCalled();
     });
 });
 

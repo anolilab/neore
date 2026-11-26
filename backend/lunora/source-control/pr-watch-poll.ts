@@ -27,7 +27,7 @@ import { DEVELOP_DRIVER } from "./develop-driver";
 import type { HostDriver } from "./driver";
 import { signedInLogin } from "./drivers/github";
 import type { PullRequestObservation } from "./pr-watch-logic";
-import { decideWatch, stateOf, storedWatchOf } from "./pr-watch-logic";
+import { decideWatch, isByWatcher, stateOf, storedWatchOf } from "./pr-watch-logic";
 import { HostApiError, type HostRequest } from "./origin-fetch";
 import { failureOf, readFromHost, type ReadFailure, type ReadOutcome } from "./read-host";
 import type { CheckRun, CheckState, CheckSummary, MergeState } from "./types";
@@ -50,6 +50,11 @@ const MAX_FAILING_NAMES = 10;
 const MAX_NAME_LENGTH = 200;
 /** Reviews kept when no seen review bounds the list. The host lists newest first and the cut keeps the head: only the oldest are dropped, which the decision never needs. */
 const MAX_REVIEWS = 100;
+/**
+ * Pages of check runs one read goes through (100 per page): 500 checks. The first page is one request, as before; a head with more
+ * than that is reported as pending (`checksOf` takes an incomplete list for pending), never passing.
+ */
+const CHECK_MAX_PAGES = 5;
 
 /** Failures that retrying cannot cure, and how many in a row end the watch. Transient ones (host error, rate limit) retry for good. */
 const TERMINAL_FAILURES = new Set<ReadFailure>(["forbidden", "needs_reconnect", "not_connected", "not_found"]);
@@ -315,7 +320,13 @@ export const recordWatchObservation = internalMutation
         if (decision.action === "end") {
             const stored = storedWatchOf({ ...decision.state, startedAt, stoppedAt: ctx.now });
 
-            await ctx.db.patch("pullRequestThreads", link._id, { watch: stored.watch, watchActive: false, watchPending: stored.watchPending ?? [] });
+            await ctx.db.patch("pullRequestThreads", link._id, {
+                watch: stored.watch,
+                watchActive: false,
+                watchPending: stored.watchPending ?? [],
+                // A read landed: the streak of failures is over, the last status and time stay as history.
+                ...(link.watchReadFailure !== undefined && { watchReadFailure: { ...link.watchReadFailure, attempts: 0 } }),
+            });
             ctx.log.event("develop.watch_ended", { linkId: String(link._id), reason: decision.reason });
 
             return null;
@@ -377,13 +388,17 @@ const recordWithRetry = async (
     }
 };
 
+/** What a poll's host read gave: an outcome, or that the watch changed while a renewed token was being used. */
+type PollRead = ReadOutcome<{ loginFailure?: ReadFailure; observation: PullRequestObservation }> | { status: "stale" };
+
 /** The steps of one poll, apart from where they run, so their order is pinned by a test. */
 export interface WatchPollSteps {
     /** Notes a host read that failed: nothing else changes, and the retry is the one already armed. */
     fail: (status: ReadFailure) => Promise<unknown>;
     /** The watch's target while this poll's lease and watch are still the link's own; null once they are not. */
     read: () => Promise<WatchTarget | null>;
-    readHost: (target: WatchTarget, token: GithubTokenOutcome) => Promise<ReadOutcome<{ loginFailure?: ReadFailure; observation: PullRequestObservation }>>;
+    /** `stillCurrent` is asked before a read that follows a token renewal: a watch stopped meanwhile must not reach the host. */
+    readHost: (target: WatchTarget, token: GithubTokenOutcome, stillCurrent: () => Promise<boolean>) => Promise<PollRead>;
     record: (observation: PullRequestObservation, loginFailure?: ReadFailure) => Promise<unknown>;
     token: (userId: string) => Promise<GithubTokenOutcome>;
 }
@@ -406,7 +421,11 @@ export const runWatchPoll = async (steps: WatchPollSteps): Promise<void> => {
         return;
     }
 
-    const outcome = await steps.readHost(target, token);
+    const outcome = await steps.readHost(target, token, async () => (await steps.read()) !== null);
+
+    if (outcome.status === "stale") {
+        return;
+    }
 
     if (outcome.status === "ok") {
         await recordWithRetry(steps.record, outcome.observation, outcome.loginFailure);
@@ -497,7 +516,7 @@ export const observeWatched = async (
     // up, so the token is renewed once like any other read.
     const [login, summary, reviews] = await Promise.all([
         readLogin(dependencies, request),
-        dependencies.driver.listChecks(request, ref, detail.headSha),
+        dependencies.driver.listChecks(request, ref, detail.headSha, CHECK_MAX_PAGES),
         // Every review, up to the driver's page bound: the host pages by creation, so a review submitted after the seen one can sit on
         // any page. With more pages than the bound the read keeps the newest pages and looks the seen review up directly (below).
         dependencies.driver.listReviews(request, ref, { readAll: true, ...(target.reviewId !== undefined && { seenId: target.reviewId }) }),
@@ -505,9 +524,12 @@ export const observeWatched = async (
     const watcherLogin = login.name;
     const { failing, status } = checksOf(summary);
     const { items, total } = reviews;
-    const seenAt = target.reviewId === undefined ? -1 : items.findIndex((review) => review.id === target.reviewId);
+    // The watcher's own reviews leave before the bound is applied, so a run of them cannot crowd out another reviewer's; the seen
+    // review stays whoever wrote it, so the decision can still compare against it.
+    const others = items.filter((review) => review.id === target.reviewId || !isByWatcher(review, watcherLogin.trim()));
+    const seenAt = target.reviewId === undefined ? -1 : others.findIndex((review) => review.id === target.reviewId);
     // Through the seen review, however many are newer (those are what the decision needs); with none seen, the newest bound.
-    const kept = seenAt === -1 ? items.slice(0, MAX_REVIEWS) : items.slice(0, seenAt + 1);
+    const kept = seenAt === -1 ? others.slice(0, MAX_REVIEWS) : others.slice(0, seenAt + 1);
     const markerBeyondRead = target.reviewId !== undefined && seenAt === -1 && items.length < total;
     const found = markerBeyondRead ? await seenReviewState(dependencies, request, ref, target.reviewId) : undefined;
     const seenReview =
@@ -532,11 +554,31 @@ export const observeWatched = async (
     };
 };
 
-const readObservation = async (
-    target: WatchTarget,
-    token: GithubTokenOutcome,
-): Promise<ReadOutcome<{ loginFailure?: ReadFailure; observation: PullRequestObservation }>> =>
-    await readFromHost(DEVELOP_DRIVER, token, async (request) => await observeWatched(request, target));
+/** Thrown inside a host read when the watch changed while a renewed token was being used; the read stops there. */
+class StalePoll extends Error {}
+
+const readObservation = async (target: WatchTarget, token: GithubTokenOutcome, stillCurrent: () => Promise<boolean>): Promise<PollRead> => {
+    let attempts = 0;
+
+    try {
+        return await readFromHost(DEVELOP_DRIVER, token, async (request) => {
+            // The second attempt follows a forced renewal of the token (`readFromHost`): the watch may have been stopped meanwhile.
+            attempts += 1;
+
+            if (attempts > 1 && !(await stillCurrent())) {
+                throw new StalePoll();
+            }
+
+            return await observeWatched(request, target);
+        });
+    } catch (error) {
+        if (error instanceof StalePoll) {
+            return { status: "stale" };
+        }
+
+        throw error;
+    }
+};
 
 /** One host read for one watched link, with the person's own token. */
 export const pollWatchedPullRequest = internalAction

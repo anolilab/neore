@@ -811,6 +811,12 @@ const listReviews = async (request: HostRequest, ref: PullRequestRef, options?: 
         }
     }
 
+    // A full read that is over the bound keeps the first page it already read beside the trailing pages (no extra request). Pages can
+    // overlap once the seen-review lookup walks back to it, so a review is kept once.
+    if (options?.readAll === true && earliest > 1) {
+        values = [...first.values, ...values];
+    }
+
     const listsSeen = (): boolean =>
         values.some((value) => typeof value === "object" && value !== null && "id" in value && String(value.id) === options?.seenId);
 
@@ -822,6 +828,25 @@ const listReviews = async (request: HostRequest, ref: PullRequestRef, options?: 
 
         values = [...older.values, ...values];
     }
+
+    // A page read twice (the first page, once the walk back reaches it) lists its reviews twice: keep each once.
+    const seenIds = new Set<string>();
+
+    values = values.filter((value) => {
+        const id = typeof value === "object" && value !== null && "id" in value ? String(value.id) : undefined;
+
+        if (id === undefined) {
+            return true;
+        }
+
+        if (seenIds.has(id)) {
+            return false;
+        }
+
+        seenIds.add(id);
+
+        return true;
+    });
 
     const items = values.flatMap((value): PullRequestReview[] => {
         const review = submittedReviewSchema.safeParse(value);
