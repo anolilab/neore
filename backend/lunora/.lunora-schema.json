@@ -24881,6 +24881,12 @@
           "optional": true,
           "unique": false
         },
+        "watchCheckedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "watchPending": {
           "kind": "array",
           "nullable": false,

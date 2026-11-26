@@ -2736,6 +2736,8 @@ export const schema = defineSchema({
         ),
         // True exactly while a watch runs, so a person's running watches are counted exactly through an index. Cleared by anything that ends a watch.
         watchActive: v.optional(v.boolean()),
+        // The poller's lease: when it last took this watch for a host read (`source-control/pr-watch-poll.ts`). A read's answer lands only while it still matches.
+        watchCheckedAt: v.optional(v.number()),
         // Occurrences seen during a cooldown, delivered once the cooldown has passed (`source-control/pr-watch-logic.ts`).
         // Cleared by a fresh start; a stopped watch keeps whatever it had.
         watchPending: v.optional(v.array(v.union(v.literal("checks"), v.literal("conflict"), v.literal("review")))),

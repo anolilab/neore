@@ -226,7 +226,7 @@ const logins = new WeakMap<HostRequest, Promise<string>>();
  * The signed-in login, read once per requester (one per action), since `@me` is not
  * documented for the REST search. A failed read is not kept, so a retry asks again.
  */
-const signedInLogin = (request: HostRequest): Promise<string> => {
+export const signedInLogin = (request: HostRequest): Promise<string> => {
     const known = logins.get(request);
 
     if (known) {
