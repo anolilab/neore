@@ -110,12 +110,12 @@ if snippets:
         if probe.returncode != 0:
             print(f"    GONE    {path}")
             continue
-        lines = [code for code in snippets[path] if code]
-        found = sum(1 for code in lines if code in probe.stdout)
-        if not lines:
+        quoted = snippets[path]
+        found = sum(1 for code in quoted if code in probe.stdout)
+        if not quoted:
             print(f"    present {path} (no added lines quoted)")
         elif found == 0:
-            print(f"    CHANGED {path}: none of its {len(lines)} quoted lines is at head")
+            print(f"    CHANGED {path}: none of its {len(quoted)} quoted lines is at head")
         else:
-            print(f"    present {path}: {found} of {len(lines)} quoted lines at head")
+            print(f"    present {path}: {found} of {len(quoted)} quoted lines at head")
 PY
