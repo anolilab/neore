@@ -19,7 +19,9 @@ import { internal } from "../_generated/internal";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { threadSharedWithOthers } from "../agent/live-grant";
 import { isTeamMember } from "../auth/lib/team-helpers";
+import { publicThread } from "../agent/threads";
 import { patchThread } from "../agent/table-writes";
+import { vThreadCreateFields, vThreadDoc as vThreadDocument } from "../agent/validators";
 import { vWorkerPolicy } from "../sub-agents/validators";
 import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
@@ -127,11 +129,23 @@ export const sharedWithOthers = internalQuery
         return thread?.userId !== undefined && (await threadSharedWithOthers(ctx, args.threadId, thread.userId, Date.now()));
     });
 
-/** Whether `userId` is still a member of `teamId`: a side chat is placed in the parent's team only for a member, as a new team chat is. */
-export const callerInTeam = internalQuery
-    .input({ teamId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
-    .output(v.boolean())
-    .query(async ({ args, ctx }) => await isTeamMember(ctx, args.teamId, args.userId));
+/**
+ * Creates the side chat's thread, and for a team parent checks in the same transaction that the owner is still a member. A
+ * membership read in another call could be stale by the time the thread is written, so the check and the insert are one
+ * decision; `null` means the caller left the team and nothing was written.
+ */
+export const createSideChatThread = internalMutation
+    .input(vThreadCreateFields)
+    .output(v.from(v.union(vThreadDocument, v.null())))
+    .mutation(async ({ args, ctx }) => {
+        if (args.teamId !== undefined && (args.userId === undefined || !(await isTeamMember(ctx, args.teamId, args.userId)))) {
+            return null;
+        }
+
+        const insertedId = await ctx.db.insert("threads", { createdAt: ctx.now, ...args, status: "active" });
+
+        return publicThread((await ctx.db.get("threads", insertedId as Id<"threads">))!);
+    });
 
 /** The worker-dispatch policy the parent carries, copied onto the side chat. It is not a thread-creation field, so it is set here. */
 export const copyWorkerPolicy = internalMutation
@@ -177,11 +191,6 @@ export const createSideChat = authAction
             return refuse("shared_or_temporary");
         }
 
-        // The child is placed in the parent's team only for a caller who is still in it, so it cannot reach a team the caller left.
-        if (parent.teamId !== undefined && !(await ctx.runQuery(internal.chat.side_chat.callerInTeam, { teamId: parent.teamId, userId }))) {
-            return refuse("team");
-        }
-
         // A bot's run model is the bot's, not the thread's: a bot now on a custom endpoint would carry the child there.
         const bot = parent.botId ? await ctx.runQuery(internal.bots.functions.getBotForRun, { botId: parent.botId, userId }) : null;
 
@@ -202,7 +211,7 @@ export const createSideChat = authAction
         // Placed as a branch is (a temporary parent's lasting placement), else in the parent's own organization, cap and project,
         // so the child stays under the same policy and caps as the parent.
         const placement = await ctx.runQuery(internal.agent.threads.lastingChatPlacement, { threadId });
-        const created = await ctx.runMutation(internal.agent.threads.createThread, {
+        const created = await ctx.runMutation(internal.chat.side_chat.createSideChatThread, {
             language: parent.language,
             ...placement,
             ...(placement.organizationId === undefined && parent.organizationId !== undefined && { organizationId: parent.organizationId }),
@@ -222,6 +231,12 @@ export const createSideChat = authAction
             title: parent.title ?? "",
             userId,
         });
+
+        // The caller left the parent's team after the read above: the check ran inside the insert, so nothing was written.
+        if (created === null) {
+            return refuse("team");
+        }
+
         const newThreadId = created._id as Id<"threads">;
 
         // The child is removed with its link, so a failed or refused copy leaves neither behind.

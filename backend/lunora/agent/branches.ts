@@ -33,6 +33,9 @@ import { MAX_LENGTH } from "../lib/validators";
 /** The rows `lastSettledMessageId` reads at a time, newest first. */
 const SETTLED_SCAN_PAGE = 200;
 
+/** The most pages one `lastSettledMessageId` call reads (5000 rows): the total work of the scan is bounded, not only each page. */
+const SETTLED_SCAN_MAX_PAGES = 25;
+
 const BRANCH_CURSOR_PREFIX = "branch:";
 
 /** A page that runs up to a pinned `endCursor` stops here if that row has left the path. */
@@ -253,9 +256,12 @@ export const resolveForkEnd = internalQuery
  * is a user message or an assistant message with no tool call; a tool result, or an assistant row that still holds a
  * tool call, means the reply is mid-way, so the fork ends at the message before it. A message earlier on the path whose
  * tool call never got a settled result (an interrupted run) is never copied either: the fork ends before it.
+ * The scan reads at most `SETTLED_SCAN_MAX_PAGES` pages: a path longer than that gives `null` (no fork end), so one call never
+ * does unbounded work.
  */
 export const lastSettledMessageId = internalQuery
-    .input({ threadId: v.id("threads") })
+    // `pageSize` and `maxPages` are the scan's bounds; the defaults are the constants above, and a test passes smaller ones.
+    .input({ maxPages: v.optional(v.number()), pageSize: v.optional(v.number()), threadId: v.id("threads") })
     .output(v.union(v.null(), v.string()))
     .query(async ({ args, ctx }) => {
         const thread = await ctx.db.get("threads", args.threadId);
@@ -276,9 +282,18 @@ export const lastSettledMessageId = internalQuery
         // The oldest displayed message of a page may continue on the next one: held back (newest row first) until the rest arrives.
         let held: Doc<"messages">[] = [];
         let from = leaf;
+        let pages = 0;
 
         while (from !== null) {
-            const { next, rows } = await walkPath(ctx, args.threadId, from, { limit: SETTLED_SCAN_PAGE });
+            // The whole path is read, because an older unanswered call cuts the fork below a newer settled reply. When the budget runs
+            // out first the answer is unknown, and no fork end is better than one that might carry an unfinished call: `null`.
+            if (pages >= (args.maxPages ?? SETTLED_SCAN_MAX_PAGES)) {
+                return null;
+            }
+
+            pages += 1;
+
+            const { next, rows } = await walkPath(ctx, args.threadId, from, { limit: args.pageSize ?? SETTLED_SCAN_PAGE });
             // A row with no message body is not a reply and is read by nothing below: dropped before any scan touches its message.
             const chunk = [...held, ...rows.filter((row) => row.message !== undefined)].toReversed();
             const groups = groupPathRows(

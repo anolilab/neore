@@ -8,7 +8,7 @@ import { v } from "lunorash/server";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { registeredApi, registerModule } from "../../test/registered-api";
 
-import { internalAction, internalMutation } from "../_generated/server";
+import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { addMessagesHandler, cloneMessageBatch } from "../agent/messages";
 import { lastSettledMessageId } from "../agent/branches";
 import { insertContextResetRow, insertThread } from "../agent/table-writes";
@@ -632,6 +632,43 @@ describe("createSideChat", () => {
         expect(await harness.run(async (ctx: any) => await ctx.db.query("threads").collect())).toHaveLength(1);
     });
 
+    it("refuses a caller removed from the team after the first membership read, and creates no child", async () => {
+        const parentId = await parentWith(OWNER, { teamId: "team-1" });
+
+        await withMessages(parentId, OWNER, ["hello"]);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("teamMember", { teamId: "team-1", userId: OWNER });
+        });
+
+        // The sharing read runs after the parent was read and before the child is written: the member is removed there.
+        const key = "chat_side_chat:sharedWithOthers";
+        const original = registry.get(key);
+
+        registry.set(
+            key,
+            internalQuery.input({ threadId: v.id("threads") }).query(async () => {
+                await harness.run(async (ctx: any) => {
+                    const members = await ctx.db.query("teamMember").collect();
+
+                    for (const row of members) {
+                        await ctx.db.delete("teamMember", row._id);
+                    }
+                });
+
+                return false;
+            }),
+        );
+
+        try {
+            expect(await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)).toStrictEqual({ reason: "team", status: "refused" });
+        } finally {
+            registry.set(key, original);
+        }
+
+        expect(await sideRelations()).toHaveLength(0);
+        expect(await harness.run(async (ctx: any) => await ctx.db.query("threads").collect())).toHaveLength(1);
+    });
+
     it("refuses and discards the child when a grant is accepted while the history is being copied", async () => {
         const parentId = await parentWith(OWNER);
 
@@ -707,6 +744,24 @@ describe("createSideChat", () => {
         const question = rows.find((row: any) => row.message?.content === "question");
 
         expect(await harness.run(async (ctx: any) => await ctx.runQuery(lastSettledMessageId, { threadId: parentId }))).toBe(question._id);
+    });
+
+    it("reads a bounded number of pages: a path longer than the budget gives no fork end, one inside it is found", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await withMessages(
+            parentId,
+            OWNER,
+            Array.from({ length: 12 }, (_, index) => `message ${index}`),
+        );
+
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("messages").collect());
+        const last = rows.find((row: any) => row.message?.content === "message 11");
+        const scan = async (maxPages: number) =>
+            await harness.run(async (ctx: any) => await ctx.runQuery(lastSettledMessageId, { maxPages, pageSize: 5, threadId: parentId }));
+
+        expect(await scan(3)).toBe(last._id);
+        expect(await scan(2)).toBeNull();
     });
 
     it("still ends before an interrupted run that is more than one page behind the newest reply", async () => {
