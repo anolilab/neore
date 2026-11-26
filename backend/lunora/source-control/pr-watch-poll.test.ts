@@ -553,7 +553,7 @@ describe("observeWatched", () => {
         expect(row.watchPending).toEqual(["review"]);
     });
 
-    it("records a readable pull request when only the login lookup is refused, and counts no read failure", async () => {
+    it("records a readable pull request and wakes for checks and a new review when only the login lookup is refused, and counts no read failure", async () => {
         const linkId = await seedWatch({ watch: { baselined: true, headSha: "sha-0", reviewId: "5", startedAt: STARTED_AT } });
         const failing = {
             checks: [{ id: null, name: "build", required: true, state: "failure", url: null }],
@@ -564,7 +564,13 @@ describe("observeWatched", () => {
             driver: {
                 getPullRequest: vi.fn().mockResolvedValue({ headSha: "sha-2", mergeState: "clean", state: "open" }),
                 listChecks: vi.fn().mockResolvedValue(failing),
-                listReviews: vi.fn().mockResolvedValue({ items: [{ authorLogin: "me", id: "9" }], total: 1 }),
+                listReviews: vi.fn().mockResolvedValue({
+                    items: [
+                        { authorLogin: "me", id: "9" },
+                        { authorLogin: "bob", id: "5" },
+                    ],
+                    total: 2,
+                }),
             } as never,
             login: async () => {
                 throw new HostApiError("forbidden", 403);
@@ -584,11 +590,37 @@ describe("observeWatched", () => {
 
         const row = await rowOf(linkId);
 
-        // Head and checks update; review handling is skipped, so the marker stays and no review wakes.
-        expect(row.watch).toMatchObject({ checksHeadSha: "sha-2", headSha: "sha-2", reviewId: "5" });
-        expect(row.watchPending).toEqual(["checks"]);
+        // Head and checks update, and the review newer than the marker wakes too: with no login it is taken for someone else's.
+        expect(row.watch).toMatchObject({ checksHeadSha: "sha-2", headSha: "sha-2", reviewId: "9" });
+        expect(row.watchPending).toEqual(["checks", "review"]);
         expect(row.watchReadFailure).toBeUndefined();
         expect(event).toHaveBeenCalledWith("develop.watch_login_failed", { linkId, status: "forbidden" });
+    });
+
+    it("still leaves the watcher's own review out when the login is known", async () => {
+        const linkId = await seedWatch({ watch: { baselined: true, headSha: "sha-1", reviewId: "5", startedAt: STARTED_AT } });
+        const stubs = {
+            driver: {
+                getPullRequest: vi.fn().mockResolvedValue({ headSha: "sha-1", mergeState: "clean", state: "open" }),
+                listChecks: vi.fn().mockResolvedValue({ checks: [], required: { complete: true, patterns: [] }, total: 0 }),
+                listReviews: vi.fn().mockResolvedValue({
+                    items: [
+                        { authorLogin: "Me", id: "9" },
+                        { authorLogin: "bob", id: "5" },
+                    ],
+                    total: 2,
+                }),
+            } as never,
+            login: async () => "me",
+        };
+        const { observation: observed } = await observeWatched(request, { ...TARGET, reviewId: "5" }, stubs);
+
+        await record(linkId, { observation: observed });
+
+        const row = await rowOf(linkId);
+
+        expect(row.watchPending).toEqual([]);
+        expect(row.watch.reviewId).toBe("5");
     });
 
     it("lets a refusal of the pull request read itself go up, to be counted as a failure", async () => {

@@ -300,7 +300,7 @@ describe("the watcher's own reviews", () => {
         expect(decision).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "r10" } });
     });
 
-    it("are not told from others' when the login is missing: no review wakes and the marker stays", () => {
+    it("may wake when the login is missing: every review newer than the marker counts as someone else's", () => {
         for (const watcherLogin of ["", "  "]) {
             const decision = decideWatch(
                 { ...baselined, reviewId: "r1" },
@@ -308,36 +308,21 @@ describe("the watcher's own reviews", () => {
                 NOW,
             );
 
-            expect(decision.action).toBe("none");
-            expect(decision.state.reviewId).toBe("r1");
+            expect(decision).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "r9" } });
         }
     });
 
-    it("with no login at the baseline, mark the newest review so older ones do not alert once the login is known", () => {
-        const reviews = [{ authorLogin: "bob", id: "r3" }, own, { authorLogin: "amy", id: "r1" }];
-        const blind = decideWatch({}, { ...quiet, reviews, watcherLogin: "" }, NOW);
+    it("do not wake with the login known, even when one was missing on an earlier read", () => {
+        const reviews = [own, { authorLogin: "bob", id: "r2" }];
+        const known = decideWatch({ ...baselined, reviewId: "r2" }, { ...quiet, reviews, watcherLogin: "dev" }, NOW);
 
-        expect(blind.state.reviewId).toBe("r3");
-
-        const later = decideWatch(blind.state, { ...quiet, reviews, watcherLogin: "dev" }, NOW);
-
-        expect(later.action).toBe("none");
-        expect(later.state.reviewId).toBe("r3");
-        expect(decideWatch(later.state, { ...quiet, reviews: [{ authorLogin: "bob", id: "r4" }, ...reviews], watcherLogin: "dev" }, NOW)).toMatchObject({
-            action: "wake",
-            reasons: ["review"],
-        });
+        expect(known.action).toBe("none");
     });
 
-    it("with no login after a baseline that had no review, mark the newest review; with a marker already set, leave it", () => {
-        const reviews = [
-            { authorLogin: "bob", id: "r3" },
-            { authorLogin: "amy", id: "r1" },
-        ];
+    it("with no login at the baseline, mark the newest review silently", () => {
+        const reviews = [{ authorLogin: "bob", id: "r3" }, own];
 
-        expect(decideWatch(baselined, { ...quiet, reviews, watcherLogin: "" }, NOW).state.reviewId).toBe("r3");
-        expect(decideWatch({ ...baselined, reviewId: "r1" }, { ...quiet, reviews, watcherLogin: "" }, NOW).state.reviewId).toBe("r1");
-        expect(decideWatch({}, { ...quiet, reviews: [], watcherLogin: "" }, NOW).state.reviewId).toBeUndefined();
+        expect(decideWatch({}, { ...quiet, reviews, watcherLogin: "" }, NOW)).toMatchObject({ action: "baseline", state: { reviewId: "r3" } });
     });
 
     it("do not stop a missing login from waking for checks", () => {

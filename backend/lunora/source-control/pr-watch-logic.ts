@@ -69,17 +69,17 @@ export type WatchDecision =
 
 /**
  * Whether the review is the watcher's own. Host logins are not case-sensitive, so the comparison is not either. With no
- * watcher login the review cannot be told from anyone else's.
+ * watcher login (the lookup failed) no review is known to be the watcher's, so every one counts as someone else's.
  */
 const isByWatcher = (review: { authorLogin: string }, watcherLogin: string): boolean =>
     watcherLogin !== "" && review.authorLogin.toLowerCase() === watcherLogin.toLowerCase();
 
 /**
- * The reviews by someone other than the watcher are only known when the watcher is. A missing login (empty) leaves review
- * handling out altogether: guessing would wake the person for their own review, or record one of theirs as the one seen.
+ * The reviews by someone other than the watcher. With a missing login all of them: a review of the watcher's own may then wake
+ * the watch, which is accepted, because a real review that goes unnoticed is worse than a spurious wake.
  */
 const reviewsByOthers = (observed: PullRequestObservation): { authorLogin: string; id: string }[] =>
-    observed.watcherLogin.trim() === "" ? [] : observed.reviews.filter((review) => !isByWatcher(review, observed.watcherLogin.trim()));
+    observed.reviews.filter((review) => !isByWatcher(review, observed.watcherLogin.trim()));
 
 /**
  * Whether review `id` is newer than the `seen` one by the host's numeric ids. Ids that are not both whole numbers cannot be ordered,
@@ -95,13 +95,8 @@ const isNewerReviewId = (id: string, seen: string | undefined): boolean => {
     return BigInt(id) > BigInt(seen);
 };
 
-/**
- * The review a read leaves as the watch's marker: the newest by someone other than the watcher. With no login the watcher's
- * reviews cannot be told apart, so the newest review of all marks the place: every review at or before it is old, and a later
- * read that has the login alerts only on reviews newer than it.
- */
-const newestReviewByOthers = (observed: PullRequestObservation): { authorLogin: string; id: string } | undefined =>
-    observed.watcherLogin.trim() === "" ? observed.reviews[0] : reviewsByOthers(observed)[0];
+/** The review a read leaves as the watch's marker: the newest by someone other than the watcher. */
+const newestReviewByOthers = (observed: PullRequestObservation): { authorLogin: string; id: string } | undefined => reviewsByOthers(observed)[0];
 
 /**
  * The reviews by others that are newer than the one the watch last saw. The host lists reviews newest first, so those are
@@ -114,10 +109,6 @@ const newerReviewsByOthers = (
 ): { left: boolean; newer: { authorLogin: string; id: string }[] } => {
     if (seenId === undefined) {
         return { left: false, newer: reviewsByOthers(observed) };
-    }
-
-    if (observed.watcherLogin.trim() === "") {
-        return { left: false, newer: [] };
     }
 
     const at = observed.reviews.findIndex((review) => review.id === seenId);
@@ -181,11 +172,7 @@ export const decideWatch = (previous: PullRequestWatchState, observed: PullReque
 
     const { left, newer } = newerReviewsByOthers(observed, previous.reviewId);
 
-    if (observed.watcherLogin.trim() === "") {
-        // The watcher is unknown: no review wakes and a marker already set does not move. A watch with none yet is marked at the
-        // newest review, silently, so the next read that has the login does not take every older review for a new one.
-        next.reviewId ??= observed.reviews[0]?.id;
-    } else if (left) {
+    if (left) {
         // The seen review left the host's list (deleted, or older than the pages the read went back through: its bound is the limit
         // of what this can tell). Nothing can be said about what is new, so re-baseline silently on the newest review by someone
         // else, or clear the marker when there is none: the next review by someone else then wakes the thread.
