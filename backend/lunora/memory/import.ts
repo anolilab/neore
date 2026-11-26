@@ -463,7 +463,10 @@ export const importMemoryFile = authAction
         let parsed: ParsedMemoryFile;
 
         try {
-            parsed = parseMemoryFile(args.content, args.format);
+            parsed = parseMemoryFile(args.content, args.format, {
+                maxEntries: MEMORY_FILE_INLINE_MAX_ENTRIES,
+                tooManyMessage: MEMORY_FILE_TOO_LARGE_INLINE_MESSAGE,
+            });
         } catch (error) {
             if (error instanceof MemoryFileError) {
                 throw new LunoraError("BAD_REQUEST", error.message);
