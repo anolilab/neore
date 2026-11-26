@@ -47,7 +47,7 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
     const router = useRouter();
     // Set before the action runs, cleared when it settles: a click made in between would start a second side chat.
     const isStartingRef = useRef(false);
-    const { isPending: isStartingSideChat, mutate: startSideChat } = useMutation({
+    const { isPending: isStartingSideChat, mutateAsync: startSideChat } = useMutation({
         ...useLunoraActionOptions(api.chat.side_chat.createSideChat),
         networkMode: "always",
         retry: 0,
@@ -100,29 +100,23 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
 
         const click = { button: event.button, ctrlKey: event.ctrlKey, detail: event.detail, metaKey: event.metaKey };
 
-        startSideChat(
-            { threadId },
-            {
-                onError: (error: Error) => {
-                    console.error("Failed to start a side chat:", error);
-                    showError(error);
-                },
-                onSettled: () => {
-                    isStartingRef.current = false;
-                },
-                onSuccess: (result) => {
-                    if (result.status === "ok") {
-                        if (router.state.location.pathname !== startedAt) {
-                            return;
-                        }
+        // Awaited here, not in a callback of the menu: the menu closes on the click and may be gone before the answer comes.
+        void (async () => {
+            try {
+                const result = await startSideChat({ threadId });
 
-                        openChat(result.threadId, click, threadId);
-                    } else {
-                        showError(sideChatRefusal(result.reason));
-                    }
-                },
-            },
-        );
+                if (result.status !== "ok") {
+                    showError(sideChatRefusal(result.reason));
+                } else if (router.state.location.pathname === startedAt) {
+                    openChat(result.threadId, click, threadId);
+                }
+            } catch (error) {
+                console.error("Failed to start a side chat:", error);
+                showError(error);
+            } finally {
+                isStartingRef.current = false;
+            }
+        })();
     };
 
     const showFollowChoices = !isLocked && follow.error === null && follow.state !== undefined;

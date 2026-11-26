@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /** The row's options menu offers "Open in split view" only while the split view preference hands it a handler. */
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@lingui/react/macro", () => {
@@ -34,15 +34,14 @@ vi.mock("@tanstack/react-query", () => {
         useMutation: () => {
             return {
                 isPending: false,
-                mutate: (_input: unknown, callbacks?: { onSettled?: () => void; onSuccess?: (result: unknown) => void }) => {
+                mutateAsync: () => {
                     sideChat.start();
 
-                    if (sideChat.hold) {
-                        sideChat.held = callbacks;
-                    } else {
-                        callbacks?.onSuccess?.(sideChat.result);
-                        callbacks?.onSettled?.();
-                    }
+                    return sideChat.hold
+                        ? new Promise((resolve) => {
+                              sideChat.release = () => resolve(sideChat.result);
+                          })
+                        : Promise.resolve(sideChat.result);
                 },
             };
         },
@@ -172,21 +171,35 @@ describe("ThreadOptionsMenu", () => {
             sideChat.showError.mockReset();
             sideChat.start.mockReset();
             sideChat.hold = false;
-            sideChat.held = undefined;
+            sideChat.release = () => {};
             sideChat.pathname = "/chat/t1";
         });
 
-        it("does not open the side chat when the person has moved to another chat before the reply", () => {
+        it("does not open the side chat when the person has moved to another chat before the reply", async () => {
             sideChat.hold = true;
             sideChat.result = { status: "ok", threadId: "side1" };
             renderMenu();
             fireEvent.click(screen.getByRole("menuitem", { name: "Side chat" }));
 
             sideChat.pathname = "/chat/other";
-            sideChat.held?.onSuccess?.(sideChat.result);
-            sideChat.held?.onSettled?.();
+            sideChat.release();
+            await waitFor(() => expect(sideChat.start).toHaveBeenCalledTimes(1));
+            await Promise.resolve();
 
             expect(sideChat.openChat).not.toHaveBeenCalled();
+        });
+
+        it("still opens the side chat when the menu is gone before the create returns", async () => {
+            sideChat.hold = true;
+            sideChat.result = { status: "ok", threadId: "side1" };
+            const { unmount } = renderMenu();
+
+            fireEvent.click(screen.getByRole("menuitem", { name: "Side chat" }));
+
+            unmount();
+            sideChat.release();
+
+            await waitFor(() => expect(sideChat.openChat).toHaveBeenCalledWith("side1", expect.objectContaining({ button: 0 }), "t1"));
         });
 
         it("starts one side chat for clicks made while the first is still running", () => {
@@ -201,26 +214,28 @@ describe("ThreadOptionsMenu", () => {
             expect(sideChat.start).toHaveBeenCalledTimes(1);
         });
 
-        it("allows another side chat once the first has settled", () => {
+        it("allows another side chat once the first has settled", async () => {
             renderMenu();
             const item = screen.getByRole("menuitem", { name: "Side chat" });
 
             fireEvent.click(item);
+            await waitFor(() => expect(sideChat.openChat).toHaveBeenCalledTimes(1));
             fireEvent.click(item);
 
             expect(sideChat.start).toHaveBeenCalledTimes(2);
         });
 
-        it("opens the new thread when the side chat starts", () => {
+        it("opens the new thread when the side chat starts", async () => {
             sideChat.result = { status: "ok", threadId: "side1" };
             renderMenu();
             fireEvent.click(screen.getByRole("menuitem", { name: "Side chat" }));
 
+            await waitFor(() => expect(sideChat.openChat).toHaveBeenCalledTimes(1));
             expect(sideChat.openChat).toHaveBeenCalledWith("side1", expect.objectContaining({ button: 0, ctrlKey: false, metaKey: false }), "t1");
             expect(sideChat.showError).not.toHaveBeenCalled();
         });
 
-        it("starts a side chat from a middle click, with the button passed on, and not from other aux buttons", () => {
+        it("starts a side chat from a middle click, with the button passed on, and not from other aux buttons", async () => {
             sideChat.result = { status: "ok", threadId: "side1" };
             renderMenu();
             const item = screen.getByRole("menuitem", { name: "Side chat" });
@@ -229,7 +244,7 @@ describe("ThreadOptionsMenu", () => {
             expect(sideChat.openChat).not.toHaveBeenCalled();
 
             fireEvent(item, new MouseEvent("auxclick", { bubbles: true, button: 1, cancelable: true }));
-            expect(sideChat.openChat).toHaveBeenCalledTimes(1);
+            await waitFor(() => expect(sideChat.openChat).toHaveBeenCalledTimes(1));
             expect(sideChat.openChat).toHaveBeenCalledWith("side1", expect.objectContaining({ button: 1 }), "t1");
         });
 
@@ -241,12 +256,12 @@ describe("ThreadOptionsMenu", () => {
             ["host_run", "A chat that runs on your computer cannot start a side chat."],
             ["locked", "Unlock this chat to start a side chat."],
             ["not_found", "This chat cannot start a side chat."],
-        ])("says why a %s chat is refused", (reason, message) => {
+        ])("says why a %s chat is refused", async (reason, message) => {
             sideChat.result = { reason, status: "refused" };
             renderMenu();
             fireEvent.click(screen.getByRole("menuitem", { name: "Side chat" }));
 
-            expect(sideChat.showError).toHaveBeenCalledWith(message);
+            await waitFor(() => expect(sideChat.showError).toHaveBeenCalledWith(message));
             expect(sideChat.openChat).not.toHaveBeenCalled();
         });
     });
