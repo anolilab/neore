@@ -14,8 +14,11 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** Only messages sent this recently are read. */
 export const SCHEDULE_IDEAS_WINDOW_MS = 7 * DAY_MS;
 
-/** Most chats read for one run, newest first. */
+/** Most chats read for one run, newest first, counted after the ones that are not the person's own are left out. */
 export const MAX_IDEA_SOURCE_THREADS = 30;
+
+/** Hard bound on the recent chats looked at to find {@link MAX_IDEA_SOURCE_THREADS} readable ones (run threads are skipped, not counted). */
+export const IDEA_THREADS_SCANNED = 200;
 
 /** Most rows read from the end of one chat; the user rows among them are taken. */
 export const IDEA_ROWS_READ_PER_THREAD = 30;
@@ -36,8 +39,41 @@ export const MAX_IDEA_PROPOSALS = 3;
 export const SCHEDULE_IDEAS_CLAIM_SCOPE = "schedule-ideas";
 export const SCHEDULE_IDEAS_CLAIM_TTL_MS = 2 * DAY_MS;
 
+/**
+ * The mark that a day's job is already on the queue, taken by the sweep before it sends, so later passes while the queue
+ * is slow send nothing more. Given back when the job is skipped (a switch off) or the send fails; kept once the job ran.
+ */
+export const SCHEDULE_IDEAS_QUEUED_SCOPE = "schedule-ideas-queued";
+
 /** One key per user per UTC day. */
 export const scheduleIdeasDayKey = (userId: string, now: number): string => `${userId}:${new Date(now).toISOString().slice(0, 10)}`;
+
+/**
+ * Every text of a stored user turn: its `text` column (quotes and attachment text included) and the text of each part of
+ * its content. A privacy marker in any of them opts the whole turn out, as it does for memory extraction.
+ */
+export const turnTexts = (row: { message?: unknown; text?: string }): string[] => {
+    const content = (row.message as { content?: unknown } | null | undefined)?.content;
+    let parts: unknown[] = [];
+
+    if (typeof content === "string") {
+        parts = [content];
+    } else if (Array.isArray(content)) {
+        parts = content;
+    }
+
+    const texts = parts.flatMap((part: unknown) => {
+        if (typeof part === "string") {
+            return [part];
+        }
+
+        const text = (part as { text?: unknown } | null)?.text;
+
+        return typeof text === "string" ? [text] : [];
+    });
+
+    return [...(row.text === undefined ? [] : [row.text]), ...texts];
+};
 
 /** A message the person typed, and the chat it is in. */
 export interface IdeaSource {

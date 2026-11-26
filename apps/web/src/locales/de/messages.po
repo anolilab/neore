@@ -693,7 +693,7 @@ msgid "{0} lines"
 msgstr "{0} Zeilen"
 
 #. placeholder {0}: stats.total
-#: src/features/settings/components/personalization/memory-settings.tsx:225
+#: src/features/settings/components/personalization/memory-settings.tsx:186
 msgid "{0} memories"
 msgstr "{0} Erinnerungen"
 
@@ -783,7 +783,7 @@ msgid "{0} on {1}, in {2}"
 msgstr "{0} auf {1}, in {2}"
 
 #. placeholder {0}: stats.pinned
-#: src/features/settings/components/personalization/memory-settings.tsx:226
+#: src/features/settings/components/personalization/memory-settings.tsx:187
 msgid "{0} pinned"
 msgstr "{0} angeheftet"
 
@@ -3511,7 +3511,7 @@ msgid "All"
 msgstr "Alle"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:247
+#: src/features/settings/components/personalization/memory-settings.tsx:208
 msgid "All ({0})"
 msgstr "Alle ({0})"
 
@@ -6163,7 +6163,7 @@ msgstr "Kanada"
 #: src/features/settings/components/chat/usage-settings.tsx:581
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:416
 #: src/features/settings/components/personalization/memory-item.tsx:351
-#: src/features/settings/components/personalization/memory-settings.tsx:296
+#: src/features/settings/components/personalization/memory-settings.tsx:257
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
@@ -7064,11 +7064,11 @@ msgstr "Alle löschen"
 msgid "Clear All"
 msgstr "Alle löschen"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:286
+#: src/features/settings/components/personalization/memory-settings.tsx:247
 msgid "Clear All Memories"
 msgstr "Alle Erinnerungen löschen"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:290
+#: src/features/settings/components/personalization/memory-settings.tsx:251
 msgid "Clear all memories?"
 msgstr "Alle Erinnerungen löschen?"
 
@@ -7119,7 +7119,7 @@ msgstr "Tag-Filter zurücksetzen"
 msgid "Clear the queue"
 msgstr "Warteschlange leeren"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:139
+#: src/features/settings/components/personalization/memory-settings.tsx:137
 msgid "Cleared {count} memories"
 msgstr "{count} Erinnerungen gelöscht"
 
@@ -10693,7 +10693,7 @@ msgstr "Konto löschen"
 msgid "Delete alert \"{ruleName}\""
 msgstr "Alarm \"{ruleName}\" löschen"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:297
+#: src/features/settings/components/personalization/memory-settings.tsx:258
 msgid "Delete All"
 msgstr "Alle löschen"
 
@@ -12648,7 +12648,7 @@ msgstr "Folgevorschläge aktivieren"
 msgid "Enable for Next Chat"
 msgstr "Für nächsten Chat aktivieren"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:186
+#: src/features/settings/components/personalization/memory-settings.tsx:171
 msgid "Enable memory"
 msgstr "Erinnerungen aktivieren"
 
@@ -13946,7 +13946,7 @@ msgstr "Tag-Farbe konnte nicht geändert werden"
 msgid "Failed to clear filter rules"
 msgstr "Filterregeln konnten nicht gelöscht werden"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:135
+#: src/features/settings/components/personalization/memory-settings.tsx:133
 msgid "Failed to clear memories"
 msgstr "Erinnerungen konnten nicht gelöscht werden"
 
@@ -14039,7 +14039,7 @@ msgstr "Datei konnte nicht gelöscht werden. Bitte versuch es erneut."
 msgid "Failed to delete files"
 msgstr "Dateien konnten nicht gelöscht werden"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:107
+#: src/features/settings/components/personalization/memory-settings.tsx:105
 msgid "Failed to delete memory"
 msgstr "Erinnerung konnte nicht gelöscht werden"
 
@@ -14560,8 +14560,8 @@ msgstr "Tastenkürzel konnten nicht aktualisiert werden"
 msgid "Failed to update MCP server"
 msgstr "MCP-Server konnte nicht aktualisiert werden"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:118
-#: src/features/settings/components/personalization/memory-settings.tsx:126
+#: src/features/settings/components/personalization/memory-settings.tsx:116
+#: src/features/settings/components/personalization/memory-settings.tsx:124
 msgid "Failed to update memory"
 msgstr "Erinnerung konnte nicht aktualisiert werden"
 
@@ -14589,8 +14589,7 @@ msgstr "Die Pull-Request-Einstellungen konnten nicht aktualisiert werden"
 msgid "Failed to update reply tools"
 msgstr "Antwort-Tools konnten nicht aktualisiert werden"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:150
-#: src/features/settings/components/personalization/memory-settings.tsx:162
+#: src/features/settings/components/personalization/memory-settings.tsx:148
 msgid "Failed to update setting"
 msgstr "Einstellung konnte nicht aktualisiert werden"
 
@@ -15284,7 +15283,7 @@ msgstr "Nach Typ filtern"
 msgid "Filter condition"
 msgstr "Filterbedingung"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:233
+#: src/features/settings/components/personalization/memory-settings.tsx:194
 msgid "Filter memories by type"
 msgstr "Erinnerungen nach Typ filtern"
 
@@ -21192,7 +21191,7 @@ msgid "memories"
 msgstr "Erinnerungen"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/settings/components/personalization/memory-settings.tsx:259
+#: src/features/settings/components/personalization/memory-settings.tsx:220
 msgid "Memories"
 msgstr "Erinnerungen"
 
@@ -21210,7 +21209,7 @@ msgid "Memories used for this reply ({0})"
 msgstr "Für diese Antwort verwendete Erinnerungen ({0})"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
-#: src/features/settings/components/personalization/memory-settings.tsx:179
+#: src/features/settings/components/personalization/memory-settings.tsx:164
 #: src/features/settings/lib/settings-keywords.ts:96
 msgid "Memory"
 msgstr "Erinnerungen"
@@ -21219,15 +21218,15 @@ msgstr "Erinnerungen"
 msgid "Memory — what the agent keeps across chats"
 msgstr "Erinnerung – was der Agent über Chats hinweg behält"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:111
+#: src/features/settings/components/personalization/memory-settings.tsx:109
 msgid "Memory deleted"
 msgstr "Erinnerung gelöscht"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:148
+#: src/features/settings/components/personalization/memory-settings.tsx:146
 msgid "Memory disabled"
 msgstr "Erinnerungen deaktiviert"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:148
+#: src/features/settings/components/personalization/memory-settings.tsx:146
 msgid "Memory enabled"
 msgstr "Erinnerungen aktiviert"
 
@@ -23294,10 +23293,6 @@ msgstr "Noch kein Verlauf"
 msgid "No icon found"
 msgstr "Kein Icon gefunden"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:210
-msgid "No ideas are made while memory is off."
-msgstr "Solange das Gedächtnis aus ist, werden keine Ideen erstellt."
-
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:171
 #: src/features/chat/thread/media-gallery-view.tsx:353
 msgid "No images yet"
@@ -23359,11 +23354,11 @@ msgstr "Keine MCP-Server konfiguriert. Füge einen Server hinzu, um die KI zu er
 msgid "No members in this team yet"
 msgstr "Noch keine Mitglieder in diesem Team"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:275
+#: src/features/settings/components/personalization/memory-settings.tsx:236
 msgid "No memories of this type."
 msgstr "Keine Erinnerungen dieser Art."
 
-#: src/features/settings/components/personalization/memory-settings.tsx:276
+#: src/features/settings/components/personalization/memory-settings.tsx:237
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "Noch keine Erinnerungen. Die KI lernt automatisch aus deinen Unterhaltungen."
 
@@ -24289,10 +24284,6 @@ msgstr "Das Onboarding startet bei deinem nächsten Besuch im Chat neu."
 #: src/features/onboarding/components/onboarding-dialog.tsx:312
 msgid "Onboarding wizard"
 msgstr "Onboarding-Assistent"
-
-#: src/features/settings/components/personalization/memory-settings.tsx:206
-msgid "Once a day, suggest recurring tasks based only on your own recent messages. Nothing is created until you accept a suggestion. Turning this off deletes the suggestions waiting for you."
-msgstr "Schlägt einmal am Tag wiederkehrende Aufgaben vor, allein auf Grundlage deiner eigenen letzten Nachrichten. Es wird nichts erstellt, bis du einen Vorschlag annimmst. Wenn du das ausschaltest, werden die offenen Vorschläge gelöscht."
 
 #: src/features/marketing/use-cases/use-case-data.ts:123
 msgid "Once a night, for users active that day, a reflection pass merges duplicates and promotes repeated facts."
@@ -30284,14 +30275,6 @@ msgstr "Zeitplan"
 msgid "Schedule {0}"
 msgstr "Zeitplan {0}"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:160
-msgid "Schedule ideas disabled"
-msgstr "Aufgabenideen deaktiviert"
-
-#: src/features/settings/components/personalization/memory-settings.tsx:160
-msgid "Schedule ideas enabled"
-msgstr "Aufgabenideen aktiviert"
-
 #: src/features/skills/components/bundle-import-dialog.tsx:55
 msgid "Schedule or webhook"
 msgstr "Zeitplan oder Webhook"
@@ -33689,10 +33672,6 @@ msgstr "{imported} Konversationen von {0} erfolgreich importiert"
 msgid "Suggest innovative solutions to reduce plastic waste"
 msgstr "Innovative Lösungen zur Reduzierung von Plastikmüll vorschlagen"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:196
-msgid "Suggest scheduled tasks"
-msgstr "Geplante Aufgaben vorschlagen"
-
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:108
 msgid "Suggest video ideas for a tech YouTube channel"
 msgstr "Videoideen für einen Tech-YouTube-Kanal vorschlagen"
@@ -34888,7 +34867,7 @@ msgstr "Der Plan des Agenten"
 msgid "The agent's tool calls"
 msgstr "Die Tool-Aufrufe des Agenten"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:178
+#: src/features/settings/components/personalization/memory-settings.tsx:163
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 msgstr "Die KI lernt aus deinen Unterhaltungen, um ihre Antworten zu personalisieren, und reflektiert jede Nacht, was sie gelernt hat. Alles, woran sie sich erinnert, ist hier aufgelistet – bearbeite, ändere den Typ, hefte an oder lösche beliebige Einträge."
 
@@ -36645,7 +36624,7 @@ msgid "This will permanently delete {0} anonymous user accounts and all their da
 msgstr "Dies wird {0} anonyme Benutzerkonten und alle ihre Daten dauerhaft löschen. Diese Aktion kann nicht rückgängig gemacht werden."
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:292
+#: src/features/settings/components/personalization/memory-settings.tsx:253
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "Dadurch werden alle {0} Erinnerungen und ihre täglichen Zusammenfassungen dauerhaft gelöscht. Die KI lernt ab deiner nächsten Unterhaltung von vorn."
 

@@ -21,7 +21,8 @@ import { internalMutation } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { containsSecret } from "../lib/secret-redaction";
 import { runAfterOnShard } from "../lib/shard-scheduler";
-import { findNextCronTime, isValidCronExpression } from "../triggers/schedule";
+import { findNextCronTime, isHourlyOrSlowerCronExpression } from "../triggers/schedule";
+import { readMemoryEnabled } from "../memory/functions";
 import { insertTask, normalizeTaskText } from "./functions";
 import {
     MAX_DECIDED_SUGGESTIONS_PER_STATUS,
@@ -179,8 +180,9 @@ export const dismissTaskSuggestion = authMutation
     });
 
 /**
- * Stores suggestions for one user. Server-only: the caller is the daily job. Writes nothing while the switch is off,
- * drops a proposal whose schedule is not a valid cron expression, is longer than a task's schedule may be, or matches
+ * Stores suggestions for one user. Server-only: the caller is the daily job. Writes nothing while the switch or memory is off,
+ * drops a proposal whose schedule is not a valid cron expression, fires more often than hourly (the minute field is not one
+ * fixed minute), is longer than a task's schedule may be, or matches
  * no date (`0 0 30 2 *`: a task would fall back to running hourly), or whose text is empty, and keeps the pending
  * list within {@link MAX_PENDING_SUGGESTIONS}.
  */
@@ -198,7 +200,8 @@ export const insertTaskSuggestions = internalMutation
     })
     .output(v.object({ inserted: v.number() }))
     .mutation(async ({ args: { suggestions, userId }, ctx }) => {
-        if (!(await readScheduleIdeasEnabled(ctx, userId))) {
+        // The job only runs with both switches on, and this is its last write: memory turned off while the model ran stores nothing.
+        if (!(await readScheduleIdeasEnabled(ctx, userId)) || !(await readMemoryEnabled(ctx, userId))) {
             return { inserted: 0 };
         }
 
@@ -229,9 +232,10 @@ export const insertTaskSuggestions = internalMutation
             const cronExpression = normalizeTaskText(suggestion.cronExpression);
 
             // Accepting runs the task rules: a schedule they refuse, or one that never fires, is dropped here, not left pending.
+            // A model's schedule fires at most once an hour (its prompt says so): one fixed minute, never `*`, a step or a list.
             if (
                 cronExpression.length > TASK_SCHEDULE_MAX ||
-                !isValidCronExpression(cronExpression) ||
+                !isHourlyOrSlowerCronExpression(cronExpression) ||
                 findNextCronTime(cronExpression, ctx.now) === undefined
             ) {
                 continue;

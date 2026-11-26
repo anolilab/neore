@@ -17,7 +17,7 @@ import { CardContent } from "@neore/ui/components/card";
 import { Switch } from "@neore/ui/components/switch";
 import { ToggleGroup, ToggleGroupItem } from "@neore/ui/components/toggle-group";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { BrainIcon, CalendarClockIcon, Trash2Icon } from "lucide-react";
+import { BrainIcon, Trash2Icon } from "lucide-react";
 import type { FC } from "react";
 import { useCallback, useId, useState } from "react";
 import { toast } from "sonner";
@@ -77,8 +77,6 @@ const MemorySettings: FC = () => {
 
     // OPT-IN: absent means off, matching the backend's `isMemoryEnabled`.
     const memoryEnabled = userSettings?.memoryEnabled ?? false;
-    // OPT-IN: absent means off, matching `readScheduleIdeasEnabled` on the backend.
-    const scheduleIdeasEnabled = userSettings?.scheduleIdeasEnabled === true;
 
     // Fetch memories list (skip when memory is disabled to avoid unnecessary API calls)
     const { data: memories, refetch: refetchMemories } = useQuery({
@@ -153,19 +151,6 @@ const MemorySettings: FC = () => {
         [updateSettingsMutation, t],
     );
 
-    const setScheduleIdeasEnabled = useCallback(
-        async (enabled: boolean) => {
-            try {
-                await updateSettingsMutation.mutateAsync({ scheduleIdeasEnabled: enabled });
-                toast.success(enabled ? t`Schedule ideas enabled` : t`Schedule ideas disabled`);
-            } catch {
-                toast.error(t`Failed to update setting`);
-            }
-        },
-        [updateSettingsMutation, t],
-    );
-
-    const handleToggleScheduleIdeas = useCallback(async () => setScheduleIdeasEnabled(!scheduleIdeasEnabled), [scheduleIdeasEnabled, setScheduleIdeasEnabled]);
     const handleToggleMemory = useCallback(async () => setMemoryEnabled(!memoryEnabled), [memoryEnabled, setMemoryEnabled]);
     const handleEnableMemory = useCallback(async () => setMemoryEnabled(true), [setMemoryEnabled]);
 
@@ -186,30 +171,6 @@ const MemorySettings: FC = () => {
                         {t`Enable memory`}
                     </label>
                     <Switch checked={memoryEnabled} id="memory-enabled-switch" onCheckedChange={handleToggleMemory} />
-                </div>
-
-                {/* Ideas come from the person's own messages and nothing is created until they accept one. The job needs memory on, but the switch stays visible so it can always be turned off. */}
-                <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                        <label className="flex items-center gap-2 text-sm font-medium" htmlFor="schedule-ideas-switch">
-                            <CalendarClockIcon aria-hidden="true" className="text-muted-foreground h-4 w-4" />
-                            {t`Suggest scheduled tasks`}
-                        </label>
-                        <Switch
-                            aria-describedby="schedule-ideas-description"
-                            checked={scheduleIdeasEnabled}
-                            id="schedule-ideas-switch"
-                            onCheckedChange={handleToggleScheduleIdeas}
-                        />
-                    </div>
-                    <p className="text-muted-foreground text-xs" id="schedule-ideas-description">
-                        {t`Once a day, suggest recurring tasks based only on your own recent messages. Nothing is created until you accept a suggestion. Turning this off deletes the suggestions waiting for you.`}
-                    </p>
-                    {scheduleIdeasEnabled && !memoryEnabled && (
-                        <p className="text-muted-foreground text-xs" role="status">
-                            {t`No ideas are made while memory is off.`}
-                        </p>
-                    )}
                 </div>
 
                 {/* Outside the enabled block: with memory off it offers to turn it on first. */}

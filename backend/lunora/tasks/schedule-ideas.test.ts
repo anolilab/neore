@@ -7,14 +7,18 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { claimKey, completeKey, releaseKey } from "../lib/claim-once";
+import { runJobOnce } from "../lib/job-once";
 import { runInShard } from "../lib/shard-context";
 import schema from "../schema";
 import {
     IDEA_ROWS_READ_PER_THREAD,
+    IDEA_THREADS_SCANNED,
     MAX_IDEA_MESSAGE_CHARS,
     MAX_IDEA_PROPOSALS,
     MAX_IDEA_SOURCE_CHARS,
     MAX_IDEA_SOURCE_MESSAGES,
+    MAX_IDEA_SOURCE_THREADS,
     scheduleIdeasDayKey,
     SCHEDULE_IDEAS_WINDOW_MS,
     takeIdeaSources,
@@ -101,6 +105,29 @@ const run = async (userId = USER) => await harness.action(async (ctx: any) => aw
 
 const prepare = async (userId = USER) => await harness.run(async (ctx: any) => await ctx.runMutation(prepareScheduleIdeas, { userId }));
 
+/**
+ * Delivers the job the way the queue does: through `runJobOnce`, which claims the `jobId`, adds it to the target's
+ * arguments and completes or releases the claim. The target is the REAL registered action, input validation included.
+ */
+const deliver = async (jobId: string, userId = USER) =>
+    await harness.action(async (ctx: any) => {
+        const wrapped = {
+            runAction: async (reference: { __lunoraRef: string }, args: unknown) => await ctx.runAction(registry.get(reference.__lunoraRef) as never, args),
+            runMutation: async (reference: { __lunoraRef: string }, args: unknown) => {
+                const registered = { claimKey, completeKey, releaseKey }[reference.__lunoraRef.split(":", 2)[1] as "claimKey"];
+
+                return await harness.run(async (inner: any) => await inner.runMutation(registered, args));
+            },
+        };
+
+        return await (runJobOnce as unknown as { handler: (context: unknown, args: unknown) => Promise<unknown> }).handler(wrapped, {
+            args: { userId },
+            jobId,
+            target: "tasks_schedule_ideas:generateScheduleIdeas",
+            userId,
+        });
+    });
+
 const suggestions = async (): Promise<any[]> => await harness.run(async (ctx: any) => await ctx.db.query("taskSuggestions").collect());
 
 const promptSent = (): string => generateText.mock.calls[0]![0].prompt as string;
@@ -185,13 +212,15 @@ describe("what the model is sent", () => {
         expect(promptSent()).not.toContain("from another origin");
     });
 
-    it("leaves out temporary, locked, deleted and host-run chats, and messages older than a week", async () => {
+    it("leaves out temporary, locked, deleted, being-deleted and host-run chats, and messages older than a week", async () => {
         await settings();
 
         for (const [index, fields] of [
             { isTemporary: true },
             { lockedAt: Date.now() },
             { deleted: true },
+            // Hard deletion in progress: the thread row is still there while its message rows are removed page by page.
+            { deletingAt: Date.now() },
             { runner: "host" },
             { statelessMode: true },
         ].entries()) {
@@ -208,6 +237,65 @@ describe("what the model is sent", () => {
         expect(promptSent()).toContain("kept message");
         expect(promptSent()).not.toContain("old message");
         expect(promptSent()).not.toContain("excluded chat");
+    });
+
+    it("still reads the person's chats when newer run threads outnumber the chat cap", async () => {
+        await settings();
+
+        // A trigger opens a thread per run: more of them, and newer, than the cap on chats read.
+        for (let index = 0; index < MAX_IDEA_SOURCE_THREADS + 10; index += 1) {
+            await row(await thread({ tags: ["trigger"], updatedAt: Date.now() + index + 1 }), "user", `trigger prompt ${index}`);
+        }
+
+        for (let index = 0; index < 5; index += 1) {
+            await row(await thread({ updatedAt: Date.now() - 1000 - index }), "user", `typed by hand ${index}`);
+        }
+
+        await run();
+
+        expect(generateText).toHaveBeenCalledOnce();
+        expect(promptSent()).toContain("typed by hand 0");
+        expect(promptSent()).toContain("typed by hand 4");
+        expect(promptSent()).not.toContain("trigger prompt");
+    });
+
+    it("drops a whole turn whose quote or attachment carries a privacy marker, though its typed words do not", async () => {
+        await settings();
+        const threadId = await thread();
+
+        await row(threadId, "user", "keep this plain message");
+        // The full text holds a quoted line with the marker; the typed words alone are plain.
+        await row(threadId, "user", "> [private] quoted line\nTYPED-AFTER-QUOTE", { typedText: "TYPED-AFTER-QUOTE" });
+        // The marker sits only in an attachment's text part of the stored content.
+        await row(threadId, "user", "TYPED-NEXT-TO-ATTACHMENT", {
+            message: {
+                content: [
+                    { text: "TYPED-NEXT-TO-ATTACHMENT", type: "text" },
+                    { text: "notes 🔒 for me", type: "text" },
+                ],
+                role: "user",
+            },
+            text: "TYPED-NEXT-TO-ATTACHMENT",
+        });
+
+        await run();
+
+        expect(promptSent()).toContain("keep this plain message");
+        expect(promptSent()).not.toContain("TYPED-AFTER-QUOTE");
+        expect(promptSent()).not.toContain("TYPED-NEXT-TO-ATTACHMENT");
+    });
+
+    it("looks at no more than the scan bound of recent chats", async () => {
+        await settings();
+        await row(await thread({ updatedAt: Date.now() - 5000 }), "user", "too far back to be found");
+
+        for (let index = 0; index < IDEA_THREADS_SCANNED; index += 1) {
+            await thread({ tags: ["task"], updatedAt: Date.now() + index + 1 });
+        }
+
+        await run();
+
+        expect(generateText).not.toHaveBeenCalled();
     });
 
     it("leaves out a message with a privacy marker or a secret, before it is cut to length", async () => {
@@ -255,6 +343,100 @@ describe("what the model is sent", () => {
     });
 });
 
+describe("the queued job", () => {
+    it("declares the jobId the once wrapper adds to its target's arguments, as optional", () => {
+        // The runtime refuses an argument the action does not declare, and the harness does not: the declaration is checked itself.
+        const input = (generateScheduleIdeas as unknown as { args: Record<string, { isOptional?: boolean; kind: string }> }).args;
+
+        expect(Object.keys(input).toSorted((a, b) => a.localeCompare(b))).toEqual(["jobId", "userId"]);
+        expect(input.userId!.kind).not.toBe("optional");
+        expect(input.jobId!.kind).toBe("optional");
+    });
+
+    it("runs when delivered through the once wrapper, which adds its jobId to the arguments", async () => {
+        await settings();
+        await row(await thread(), "user", "remind me to water the plants every morning");
+
+        await deliver("schedule-ideas:job-1");
+
+        expect(generateText).toHaveBeenCalledOnce();
+        expect(await suggestions()).toHaveLength(1);
+    });
+
+    it("does not spend the day when a switch is off at delivery: turned on again the same day, the same job runs", async () => {
+        await settings({ scheduleIdeasEnabled: false });
+        await row(await thread(), "user", "remind me to water the plants every morning");
+
+        await deliver("schedule-ideas:job-1");
+
+        expect(generateText).not.toHaveBeenCalled();
+
+        await harness.run(async (ctx: any) => {
+            const [existing] = await ctx.db.query("userSettings").collect();
+
+            await ctx.db.patch("userSettings", existing._id, { scheduleIdeasEnabled: true });
+        });
+        // The sweep sends the same job id for the day; its claim was given back, so the delivery is not suppressed.
+        await deliver("schedule-ideas:job-1");
+
+        expect(generateText).toHaveBeenCalledOnce();
+        expect(await suggestions()).toHaveLength(1);
+
+        // A redelivery after the real run is still refused.
+        await deliver("schedule-ideas:job-1");
+
+        expect(generateText).toHaveBeenCalledOnce();
+    });
+
+    it("stops before the model call when a switch is turned off after the messages were read, and keeps the day for a later run", async () => {
+        await settings();
+        await row(await thread(), "user", "remind me to water the plants every morning");
+        // Choosing the model takes time; the person turns the feature off meanwhile.
+        getUtilityModel.mockImplementation(async () => {
+            await harness.run(async (ctx: any) => {
+                const [existing] = await ctx.db.query("userSettings").collect();
+
+                await ctx.db.patch("userSettings", existing._id, { scheduleIdeasEnabled: false });
+            });
+
+            return {};
+        });
+
+        await run();
+
+        expect(generateText).not.toHaveBeenCalled();
+        expect(await suggestions()).toHaveLength(0);
+
+        getUtilityModel.mockResolvedValue({});
+        await harness.run(async (ctx: any) => {
+            const [existing] = await ctx.db.query("userSettings").collect();
+
+            await ctx.db.patch("userSettings", existing._id, { scheduleIdeasEnabled: true });
+        });
+        await run();
+
+        expect(generateText).toHaveBeenCalledOnce();
+    });
+
+    it("stops before the model call when memory is turned off after the messages were read", async () => {
+        await settings();
+        await row(await thread(), "user", "a message");
+        getUtilityModel.mockImplementation(async () => {
+            await harness.run(async (ctx: any) => {
+                const [existing] = await ctx.db.query("userSettings").collect();
+
+                await ctx.db.patch("userSettings", existing._id, { memoryEnabled: false });
+            });
+
+            return {};
+        });
+
+        await run();
+
+        expect(generateText).not.toHaveBeenCalled();
+    });
+});
+
 describe("the day", () => {
     it("is taken once: a second run, or a redelivery, makes no second model call", async () => {
         await settings();
@@ -280,6 +462,42 @@ describe("the day", () => {
         await run(OTHER);
 
         expect(generateText).toHaveBeenCalledTimes(2);
+    });
+
+    it("is queued once by repeated sweep passes before the job is delivered", async () => {
+        await settings();
+
+        for (let pass = 0; pass < 3; pass += 1) {
+            await runInShard(USER, async () => await harness.run(async (ctx: any) => await ctx.runMutation(dispatchScheduleIdeas, {})));
+        }
+
+        expect(enqueued).toHaveLength(1);
+    });
+
+    it("is queued again after a skipped delivery once the switch is back on, and after a refused send", async () => {
+        const sweep = async () => await runInShard(USER, async () => await harness.run(async (ctx: any) => await ctx.runMutation(dispatchScheduleIdeas, {})));
+
+        await settings();
+        await row(await thread(), "user", "a message");
+        await sweep();
+        expect(enqueued).toHaveLength(1);
+
+        // The switch goes off before the job is delivered: the delivery is skipped and the day's queued mark is given back.
+        await harness.run(async (ctx: any) => {
+            const [existing] = await ctx.db.query("userSettings").collect();
+
+            await ctx.db.patch("userSettings", existing._id, { scheduleIdeasEnabled: false });
+        });
+        await deliver("schedule-ideas:job-1");
+        await harness.run(async (ctx: any) => {
+            const [existing] = await ctx.db.query("userSettings").collect();
+
+            await ctx.db.patch("userSettings", existing._id, { scheduleIdeasEnabled: true });
+        });
+        await sweep();
+
+        expect(enqueued).toHaveLength(2);
+        expect(generateText).not.toHaveBeenCalled();
     });
 
     it("is not queued again by the sweep once the job has taken it", async () => {

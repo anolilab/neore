@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { internal } from "../_generated/internal";
 import schema from "../schema";
 import { jobsQueueMessages } from "../../test/stubs/cloudflare-workers";
-import { claimKey, completeKey } from "./claim-once";
+import { claimKey, completeKey, releaseKey } from "./claim-once";
 import { JOB_LEASE_MS, runJobOnce } from "./job-once";
 import { enqueueJob } from "./job-queue";
 
@@ -29,15 +29,19 @@ afterEach(() => {
 });
 
 /** An action ctx whose `runAction` records (or fails) the target call. */
-const actionContext = (target: (path: string, args: unknown) => void = () => {}) => {
+const actionContext = (target: (path: string, args: unknown) => unknown = () => {}) => {
     const ran: { args: unknown; path: string }[] = [];
     const ctx = {
         runAction: async (reference: { __lunoraRef: string }, args: unknown) => {
             ran.push({ args, path: reference.__lunoraRef });
-            target(reference.__lunoraRef, args);
+
+            return target(reference.__lunoraRef, args);
         },
         runMutation: async (reference: unknown, args: unknown) => {
-            const registered = reference === internal.lib.claim_once.claimKey ? claimKey : completeKey;
+            const registered =
+                { [internal.lib.claim_once.claimKey.__lunoraRef]: claimKey, [internal.lib.claim_once.releaseKey.__lunoraRef]: releaseKey }[
+                    (reference as { __lunoraRef: string }).__lunoraRef
+                ] ?? completeKey;
 
             return await harness.run(async (inner: any) => await inner.runMutation(registered, args));
         },
@@ -101,6 +105,34 @@ describe("runJobOnce", () => {
 
         await deliver(retry.ctx);
         expect(retry.ran).toHaveLength(0);
+    });
+
+    it("gives the claim back when the target answers skipped, so the same job id can run once the work is allowed", async () => {
+        const skipping = actionContext(() => {
+            return { skipped: true };
+        });
+
+        await deliver(skipping.ctx);
+
+        const again = actionContext();
+
+        await deliver(again.ctx);
+        expect(again.ran).toHaveLength(1);
+
+        // Once it ran for real, the claim stands: a redelivery does nothing.
+        const late = actionContext();
+
+        await deliver(late.ctx);
+        expect(late.ran).toHaveLength(0);
+    });
+
+    it("keeps the claim for a target that returns anything else, null included", async () => {
+        await deliver(actionContext(() => null).ctx);
+
+        const again = actionContext();
+
+        await deliver(again.ctx);
+        expect(again.ran).toHaveLength(0);
     });
 
     it("never re-runs a job whose delivery died mid-run — a late redelivery is refused too", async () => {
