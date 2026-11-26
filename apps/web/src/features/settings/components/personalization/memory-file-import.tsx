@@ -33,7 +33,11 @@ interface JobProgress extends ImportCounts {
 }
 
 interface WatchedJob {
+    /** The job the progress query held when this start was answered: until the query shows this job, that one is "before". */
+    before?: Id<"memoryImportJobs">;
     jobId: Id<"memoryImportJobs">;
+    /** The progress query has answered with this job. */
+    seen: boolean;
     total: number;
 }
 
@@ -48,6 +52,33 @@ interface MemoryFileImportProps {
 const NO_COUNTS: ImportCounts = { duplicates: 0, imported: 0, invalid: 0, tooLong: 0, updated: 0 };
 
 const isActive = (status: JobStatus): boolean => status === "queued" || status === "running";
+
+/**
+ * The job to watch once the progress query has answered, or `undefined` to keep the current one.
+ *
+ * A job found running on load, or started in another tab, is shown and can be cancelled: the server refuses a second one.
+ * Once the watched job was seen, any other job the query returns is a newer one: it replaces the watched job even when it has
+ * already ended, so the page shows how it ended. A watched job not yet seen is this page's own start: only the job the query
+ * held when the start was answered (`before`) is still "before it"; any other job is a newer one. Nothing else is adopted
+ * while this page's own import is starting (`busy`): if that one fails, its error is the only one shown.
+ */
+const adoptJob = (live: JobProgress | undefined, watched: WatchedJob | undefined, busy: boolean): WatchedJob | undefined => {
+    if (!live) {
+        return undefined;
+    }
+
+    if (watched?.jobId === live.jobId) {
+        return watched.seen ? undefined : { ...watched, seen: true };
+    }
+
+    if (busy) {
+        return undefined;
+    }
+
+    const isNewer = watched === undefined ? isActive(live.status) : watched.seen || live.jobId !== watched.before;
+
+    return isNewer ? { jobId: live.jobId, seen: true, total: live.total } : undefined;
+};
 
 /** The format the server parses the file as, from its name; `undefined` for any other kind of file. */
 const formatOf = (name: string): FileFormat | undefined => {
@@ -104,15 +135,25 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
     const { isPending: isImporting, mutate: runImport } = useMutation({ ...useLunoraActionOptions(api.memory.import.importMemoryFile) });
     const { isPending: isCancelling, mutate: runCancel } = useMutation({ ...crpc.memory.import_job.cancelMemoryImport.mutationOptions() });
 
-    // A job found running on load, or started in another tab, is shown and can be cancelled: the server refuses a second one.
-    // Not while this page's own import is starting: if that one fails, its error is the only one shown.
-    if (progress && isActive(progress.status) && !isImporting && !isReading && watched?.jobId !== progress.jobId) {
-        setWatched({ jobId: progress.jobId, total: progress.total });
+    // With memory off the query is disabled: its cached answer is out of date, so it is not read until memory is on again.
+    const live = memoryEnabled ? (progress ?? undefined) : undefined;
+
+    const latestJobId = useRef<Id<"memoryImportJobs"> | undefined>(undefined);
+    const liveJobId = live?.jobId;
+
+    useEffect(() => {
+        latestJobId.current = liveJobId;
+    }, [liveJobId]);
+
+    const adopted = adoptJob(live, watched, isImporting || isReading);
+
+    if (adopted) {
+        setWatched(adopted);
     }
 
-    const job: JobProgress | undefined = progress && watched?.jobId === progress.jobId ? progress : undefined;
+    const job: JobProgress | undefined = live && watched?.jobId === live.jobId ? live : undefined;
     // Answered by the action, not yet seen by the progress query.
-    const isStarting = watched !== undefined && job === undefined;
+    const isStarting = memoryEnabled && watched !== undefined && job === undefined;
     const jobRunning = job === undefined ? isStarting : isActive(job.status);
     const running = isImporting || isReading || jobRunning;
     const jobEnded = job !== undefined && !isActive(job.status);
@@ -206,7 +247,7 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
                     setInputKey((key) => key + 1);
 
                     if ("jobId" in response) {
-                        setWatched({ jobId: response.jobId, total: response.total });
+                        setWatched({ before: latestJobId.current, jobId: response.jobId, seen: false, total: response.total });
                         void refetchProgress();
 
                         return;
@@ -290,7 +331,13 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
 
             {/* Always mounted: a live region announces only what changes inside it. Its text changes when an import starts and
                 when it ends, not on every batch (the progress bar carries those). */}
-            <div aria-label={t`Import result`} className="space-y-2 outline-none" ref={outcome} role="group" tabIndex={-1}>
+            <div
+                aria-label={t`Import result`}
+                className="focus:border-ring focus:ring-ring/30 -m-1 space-y-2 rounded-md border border-transparent p-[3px] outline-none focus:ring-[2px]"
+                ref={outcome}
+                role="group"
+                tabIndex={-1}
+            >
                 <div className="space-y-1 text-xs" role="status">
                     {running && <p>{t`Importing memories…`}</p>}
                     {finished && <p className="font-medium">{t`Import finished.`}</p>}

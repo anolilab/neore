@@ -94,12 +94,13 @@ const LARGER_RE = /larger than 500 KB/u;
 
 const onImported = vi.fn();
 
-const renderImport = (memoryEnabled = true) =>
-    render(
-        <QueryClientProvider client={harness.client ?? new QueryClient()}>
-            <MemoryFileImport memoryEnabled={memoryEnabled} onImported={onImported} />
-        </QueryClientProvider>,
-    );
+const importUi = (memoryEnabled: boolean) => (
+    <QueryClientProvider client={harness.client ?? new QueryClient()}>
+        <MemoryFileImport memoryEnabled={memoryEnabled} onImported={onImported} />
+    </QueryClientProvider>
+);
+
+const renderImport = (memoryEnabled = true) => render(importUi(memoryEnabled));
 
 const pick = (file: File) => {
     fireEvent.change(screen.getByLabelText("File to import"), { target: { files: [file] } });
@@ -240,6 +241,69 @@ describe("memory file import", () => {
 
         expect(stopped.textContent).toBe("The import was cancelled. Memories already imported are kept.");
         expect(document.activeElement).toBe(screen.getByRole("group", { name: "Import result" }));
+    });
+
+    it("shows how a newer job ended when another tab ran it while this page watched an older one", async () => {
+        expect.assertions(4);
+
+        harness.progress = job({ done: 25, status: "running" });
+        renderImport();
+
+        await screen.findByRole("button", { name: "Cancel import" });
+
+        publish(job({ done: 100, duplicates: 20, imported: 60, invalid: 14, jobId: "job-2", status: "done", tooLong: 1, updated: 5 }));
+
+        expect(await screen.findByText("Import finished.")).toBeTruthy();
+        expect(screen.getByRole("status").textContent).toMatch(FINAL_RE);
+        expect(screen.queryByRole("button", { name: "Cancel import" })).toBeNull();
+        expect(screen.queryByRole("progressbar")).toBeNull();
+    });
+
+    it("shows how a newer job ended when this page's own job ended before the query ever showed it", async () => {
+        expect.hasAssertions();
+
+        harness.progress = job({ done: 100, jobId: "job-0", status: "done" });
+        harness.importFile.mockResolvedValue({ jobId: "job-1", queued: true, total: 100 });
+        renderImport();
+
+        await waitFor(() => expect(harness.client?.getQueryData(harness.progressKey)).toBeTruthy());
+
+        pick(makeFile("export.json", "[]"));
+        fireEvent.click(screen.getByRole("button", { name: "Import file" }));
+
+        await screen.findByRole("button", { name: "Cancel import" });
+
+        publish(job({ done: 100, duplicates: 20, imported: 60, invalid: 14, jobId: "job-2", status: "done", tooLong: 1, updated: 5 }));
+
+        expect(await screen.findByText("Import finished.")).toBeTruthy();
+        expect(screen.getByRole("status").textContent).toMatch(FINAL_RE);
+        expect(screen.queryByRole("button", { name: "Cancel import" })).toBeNull();
+    });
+
+    it("stops showing a running import while memory is off, and shows how it ended once memory is on", async () => {
+        expect.assertions(5);
+
+        harness.progress = job({ done: 25, status: "running" });
+
+        const view = renderImport();
+
+        await screen.findByRole("button", { name: "Cancel import" });
+
+        view.rerender(importUi(false));
+
+        expect(screen.queryByRole("button", { name: "Cancel import" })).toBeNull();
+        expect(screen.queryByRole("progressbar")).toBeNull();
+        expect(screen.getByText("Turn on memory to import a file.")).toBeTruthy();
+
+        const message = "Memory was turned off, so the import stopped.";
+
+        publish(job({ done: 30, error: message, status: "failed" }));
+        view.rerender(importUi(true));
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toBe(message);
+        expect(screen.queryByRole("button", { name: "Cancel import" })).toBeNull();
     });
 
     it("shows nothing for a job that ended before this visit", async () => {
