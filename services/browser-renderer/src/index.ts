@@ -1140,7 +1140,8 @@ app.post("/login", async (c) => {
         await new Promise((resolve) => {
             setTimeout(resolve, LOGIN_BUSY_STEP_MS);
         });
-        refused = await holds.take(sessionId);
+        // Bounded by what is left of the wait, so a lock slow to answer never runs the sign-in past its deadline.
+        refused = await holds.take(sessionId, until - Date.now());
     }
 
     if (refused === "retired") {
