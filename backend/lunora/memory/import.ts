@@ -402,7 +402,8 @@ const askImportLabels = async (ctx: ActionCtx, userId: string, lines: ReadonlyAr
 
 /**
  * The file entries the paste's labelling rule keeps, in file order, each with the type the file gave it. One model
- * call for the whole batch (an inline file is one batch), so the subrequest count grows by one.
+ * call for the whole batch (an inline file is one batch), plus the model lookup (about 3 queries): about 4 more
+ * subrequests on top of `importFacts`' worst case (40 in `import.test.ts`), so an inline file stays under 50.
  */
 const keepLabelledEntries = async (ctx: ActionCtx, userId: string, entries: ReadonlyArray<MemoryFileEntry>): Promise<MemoryFileEntry[]> => {
     const labels = await askImportLabels(
