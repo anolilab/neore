@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import { clearLastThread } from "../chat/last-thread-store";
+import { returnedPrompts } from "../chat/returned-prompts";
 import { sendSessions } from "../chat/send-sessions";
 import { loadConfig } from "../lib/config";
 import { withFinally } from "../lib/guarded";
@@ -112,6 +113,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (jwt === null) {
                 dispatch({ type: "signed-out" });
                 sendSessions.signOut();
+                returnedPrompts.clear();
                 // Retries a cache wipe that failed at sign-out; the credential side never waits on it.
                 await emptyCacheWhileSignedOut({
                     clearCache: () => getOfflineCache().clear(),
@@ -172,6 +174,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // the whole sign-out, so a send begun during the teardown (the account still reads as signed in) is stopped too;
         // the next sign-in opens them.
         sendSessions.signOut();
+        // The departed account's returned prompts go with it.
+        returnedPrompts.clear();
 
         // A mint still out when sign-out starts applies nothing: the epoch ends before the first await (`runSignOut`).
         await runSignOut({

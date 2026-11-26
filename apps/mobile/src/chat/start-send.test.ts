@@ -34,14 +34,13 @@ const fakeClock = () => {
 describe(clientMessageIdFor, () => {
     const newId = vi.fn(() => "new-id");
 
-    it("reuses the held id when exactly the same prompt is sent again", () => {
-        expect(clientMessageIdFor({ clientMessageId: "first-id", prompt: "hello" }, "hello", newId)).toBe("first-id");
+    it("reuses the id of the returned prompt it resends", () => {
+        expect(clientMessageIdFor({ clientMessageId: "first-id" }, newId)).toBe("first-id");
     });
 
-    it("gives a new id to any other prompt, and to a send with nothing held", () => {
-        expect(clientMessageIdFor({ clientMessageId: "first-id", prompt: "hello" }, "hello again", newId)).toBe("new-id");
-        expect(clientMessageIdFor({ clientMessageId: "first-id", prompt: "hello" }, "hello\n\nand more", newId)).toBe("new-id");
-        expect(clientMessageIdFor(null, "hello", newId)).toBe("new-id");
+    it("gives a new id to a send with nothing returned, and to a returned prompt whose id the server refused", () => {
+        expect(clientMessageIdFor(undefined, newId)).toBe("new-id");
+        expect(clientMessageIdFor({ clientMessageId: null }, newId)).toBe("new-id");
     });
 });
 

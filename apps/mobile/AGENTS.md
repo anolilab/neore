@@ -37,16 +37,17 @@
   - A try with no answer (timeout, dropped connection, 5xx) is resent a bounded number of times under the same id.
   - 200 with `duplicate: true`: the first send's ids. Open that chat like any start.
   - 422 `CLIENT_MESSAGE_ID_REUSED`: show it, never retry, drop the id.
-  - A send that still fails gives its prompt back to the same mounted screen's composer with its id held; exactly the
-    same text sent again is the same send (`clientMessageIdFor`). Merged ahead of text typed meanwhile, it is another
-    message, and the notice says to send it alone and unchanged. A screen left meanwhile drops the prompt.
+  - A send that still fails keeps its prompt as a returned prompt (`returned-prompts.ts`): an item above the message box,
+    per chat, never merged into the composer. Resend reuses the item's id (`clientMessageIdFor`), and sending its exact
+    text from the box is a resend too. An item leaves only when the start answers or the person discards it; it outlives
+    the screen (in memory: a relaunch clears it). Discard and Resend are off while a send runs.
   - A send stopped before its first try sends nothing; sign-out ends the mint epoch before its first await (`runSignOut`).
-  - Sign-out stops every send still retrying (`sendSessions`) and drops its prompt and held id; sends stay closed until
+  - Sign-out stops every send still retrying (`sendSessions`), clears the returned prompts, and sends stay closed until
     the next sign-in (a send begun mid-teardown is stopped at once). A stopped send moves no route, leaves its retry
     delay at once (`abortableSleep`), and changes nothing on the screen if its start answers anyway (`afterStart`).
   - A start with `streaming: false` (no `streamToken`) follows no stream: the chat's saved reply is read instead.
   - Match codes lower-cased: the gateway passes `/chat/start`'s SCREAMING_CASE, the public API uses snake_case.
-  - Nothing is held and polled for: the resend is idempotent.
+  - Nothing is polled for or resent by the app on its own: a returned prompt waits for its person, and its resend is idempotent.
 - **Voice input paths** (`src/voice/`) — the cloud by default; "Transcribe on this device" (secure store, read on every
   press by `createDictationRouter`) switches to the phone's recognizer. There is NO fallback between them: an on-device
   press that cannot be served shows a message and records nothing, and a setting that cannot be read records nothing.

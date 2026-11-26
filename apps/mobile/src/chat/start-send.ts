@@ -1,24 +1,12 @@
 import type { StartedChat } from "./chat-api";
 import { ChatError, isClientMessageIdReused, isStartInProgress } from "./chat-api";
 
-/** A send whose prompt went back to the composer: sending the same prompt again is a retry of it, under the same id. */
-export interface HeldSend {
-    clientMessageId: string;
-    prompt: string;
-}
-
 /**
- * The `clientMessageId` of a send of `prompt`: the held one when the prompt is exactly the one that went back to the
- * composer (a retry, which the server answers with the first send's ids if that one was saved), a new one for anything
- * else, which is another message.
+ * The `clientMessageId` of a send: the id of the returned prompt it resends (a retry, which the server answers with the
+ * first send's ids if that one was saved), or a new one for any other send. A returned prompt whose id the server
+ * refused (`null`) takes a new one.
  */
-export const clientMessageIdFor = (held: HeldSend | null, prompt: string, newId: () => string): string => {
-    if (held !== null && held.prompt === prompt) {
-        return held.clientMessageId;
-    }
-
-    return newId();
-};
+export const clientMessageIdFor = (returned: { clientMessageId: string | null } | undefined, newId: () => string): string => returned?.clientMessageId ?? newId();
 
 /** How long a send whose first try is still being saved (409) is waited for: past the server's 2-minute lease, after which it is resumed. */
 export const START_IN_PROGRESS_WAIT_MS = 150_000;
