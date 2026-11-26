@@ -71,7 +71,9 @@ const settings = async (fields: Record<string, unknown> = {}, userId = USER) =>
     await harness.run(async (ctx: any) => await ctx.db.insert("userSettings", { memoryEnabled: true, scheduleIdeasEnabled: true, userId, ...fields }));
 
 const thread = async (fields: Record<string, unknown> = {}, userId = USER): Promise<string> =>
-    await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "regular", title: "Chat", updatedAt: Date.now(), userId, ...fields }));
+    await harness.run(
+        async (ctx: any) => await ctx.db.insert("threads", { status: "regular", tags: ["chat"], title: "Chat", updatedAt: Date.now(), userId, ...fields }),
+    );
 
 let order = 0;
 
@@ -150,7 +152,7 @@ describe("what the model is sent", () => {
         expect(JSON.stringify(generateText.mock.calls[0]![0].system)).not.toContain("ASSISTANT-REPLY-TEXT");
     });
 
-    it("leaves out chats a job or another person wrote in: task, trigger, eval, sub-agent, messenger, host and bot chats", async () => {
+    it("leaves out chats a job or another person wrote in: task, trigger, eval, sub-agent, messenger, host, bot and untagged threads", async () => {
         await settings();
 
         const origins: Record<string, unknown>[] = [
@@ -165,20 +167,21 @@ describe("what the model is sent", () => {
             { source: "telegram", tags: ["telegram"] },
             { externalThreadId: "ext-1" },
             { messengerConnectionId: "conn-1" },
+            { botId: "bot-1", tags: ["chat"] },
+            // A server-made thread with no tag at all (a prompt-optimiser run, a headless caller that names none).
+            { tags: undefined },
         ];
 
         for (const [index, fields] of origins.entries()) {
             await row(await thread(fields), "user", `from another origin ${index}`);
         }
 
-        // The composer's own chat, and one created without a tag, are the person's.
+        // Only the composer's own chat is the person's.
         await row(await thread({ tags: ["chat"] }), "user", "typed in a composer chat");
-        await row(await thread(), "user", "typed in an untagged chat");
 
         await run();
 
         expect(promptSent()).toContain("typed in a composer chat");
-        expect(promptSent()).toContain("typed in an untagged chat");
         expect(promptSent()).not.toContain("from another origin");
     });
 

@@ -56,7 +56,7 @@ const jobsAllowed = async (ctx: Parameters<typeof readScheduleIdeasEnabled>[0], 
 const isUserRole = (message: unknown): boolean => typeof message === "object" && message !== null && (message as { role?: unknown }).role === "user";
 
 /**
- * Chats the person typed in: no thread tag, or the composer's `chat` alone. A run thread (`task`, `trigger`, `eval`,
+ * Chats the person typed in: the composer's `chat` tag alone. A run thread (`task`, `trigger`, `eval`,
  * `sub-agent`, `worker`), a host or local-model chat, a pull request thread and a messenger chat carry another tag,
  * and a messenger or bridged chat also names its connection, external id or source; their user-role rows hold a
  * prompt a job wrote or words another person sent, not the owner's own. Temporary, locked, deleted, stateless and
@@ -64,7 +64,9 @@ const isUserRole = (message: unknown): boolean => typeof message === "object" &&
  */
 const readable = (thread: Doc<"threads">): boolean => {
     const tags = thread.tags ?? [];
-    const typedHere = tags.length === 0 || (tags.length === 1 && tags[0] === "chat");
+    // Exactly the composer's tag: both ways a chat is started (`/chat/start` and `createThread`) write it, while a thread
+    // made with no tag is a server-made one (a prompt-optimiser or headless run) whose user rows are not the person's words.
+    const typedHere = tags.length === 1 && tags[0] === "chat";
 
     return (
         typedHere &&
@@ -116,8 +118,7 @@ export const dispatchScheduleIdeas = internalMutation
  */
 export const prepareScheduleIdeas = internalMutation
     .input({ userId: v.string() })
-    // The words are the person's own: masked in request logs like the other texts this module keeps out of them.
-    .output(v.object({ messages: v.array(v.object({ text: v.sensitive(v.string()), threadId: v.string() })) }))
+    .output(v.object({ messages: v.array(v.object({ text: v.string(), threadId: v.string() })) }))
     .mutation(async ({ args: { userId }, ctx }) => {
         if (!(await jobsAllowed(ctx, userId))) {
             return { messages: [] };
