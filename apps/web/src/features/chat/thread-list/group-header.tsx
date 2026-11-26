@@ -3,11 +3,26 @@ import { Button } from "@neore/ui/components/button";
 import { Checkbox } from "@neore/ui/components/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@neore/ui/components/tooltip";
-import { ChevronDown, ChevronRight, Folder, GripVertical, Loader2, MoreVertical, Pin } from "lucide-react";
+import cn from "@neore/ui/utils/cn";
+import {
+    AlarmClock,
+    Archive,
+    Calendar,
+    ChevronDown,
+    ChevronRight,
+    CircleAlert,
+    Folder,
+    GripVertical,
+    Hammer,
+    Hourglass,
+    Loader2,
+    MoreVertical,
+    Pin,
+} from "lucide-react";
 import type { FC } from "react";
 
 import ProjectIcon from "./project-icon";
-import type { ThreadGroup } from "./types";
+import type { GroupType, ThreadGroup } from "./types";
 import { getGroupType, isGroupFullySelected } from "./utilities";
 
 interface GroupHeaderProperties {
@@ -25,6 +40,20 @@ interface GroupHeaderProperties {
     projectPinnedAt?: number | null;
     selectedThreadIds: Set<string>;
 }
+
+/** The small icon in front of a derived or dated group's label. Project groups show their own tile instead. */
+const GROUP_ICONS: Partial<Record<GroupType, FC<{ "aria-hidden"?: boolean; className?: string }>>> = {
+    archived: Archive,
+    last7days: Calendar,
+    lastMonth: Calendar,
+    needsYou: CircleAlert,
+    older: Calendar,
+    pinned: Pin,
+    snoozed: AlarmClock,
+    temporary: Hourglass,
+    today: Calendar,
+    working: Hammer,
+};
 
 const GroupHeader: FC<GroupHeaderProperties> = ({
     dragListeners,
@@ -47,20 +76,29 @@ const GroupHeader: FC<GroupHeaderProperties> = ({
     const isProjectGroup = groupType === "project" && group.projectId;
     const isPinned = !!projectPinnedAt;
 
-    const renderProjectIcon = () => {
-        if (!group.projectId) {
-            return null;
+    const needsAttention = groupType === "needsYou";
+    const GroupIcon = GROUP_ICONS[groupType];
+
+    const renderLeading = () => {
+        if (group.projectId) {
+            // An 18 px tile holds the project's icon, in the project's colour.
+            return (
+                <span aria-hidden="true" className="bg-surface-well flex size-[18px] shrink-0 items-center justify-center rounded-[5px]">
+                    {group.projectIcon ? <ProjectIcon color={group.projectColor || "#6b7280"} name={group.projectIcon} /> : <Folder className="size-3" />}
+                </span>
+            );
         }
 
-        if (!group.projectIcon) {
-            return <Folder className="size-3" />;
-        }
-
-        return <ProjectIcon color={group.projectColor || "#6b7280"} name={group.projectIcon} />;
+        return GroupIcon ? <GroupIcon aria-hidden className="size-3.5 shrink-0" /> : null;
     };
 
     return (
-        <div className="group/action-item text-brand-black/70 dark:text-brand-white/70 hover:text-brand-black hover:dark:text-brand-white flex items-center gap-2 px-2 py-1 text-xs font-medium">
+        <div
+            className={cn(
+                "group/action-item hover:text-foreground flex items-center gap-2 px-2 pt-3 pb-1 font-mono text-xs font-medium",
+                needsAttention ? "text-attention hover:text-attention" : "text-muted-foreground",
+            )}
+        >
             {isSelectionMode && (
                 <Checkbox
                     checked={isAllSelected}
@@ -82,20 +120,20 @@ const GroupHeader: FC<GroupHeaderProperties> = ({
                     role="presentation"
                     style={{ cursor: "grab", touchAction: "none" }}
                 >
-                    <GripVertical className="text-brand-black/70 dark:text-brand-white/70 h-3 w-3 cursor-grab active:cursor-grabbing" />
+                    <GripVertical className="text-muted-foreground h-3 w-3 cursor-grab active:cursor-grabbing" />
                 </div>
             )}
             {/* Loading indicator for reordering */}
-            {isReordering && <Loader2 className="text-brand-black/70 dark:text-brand-white/70 h-3 w-3 animate-spin" />}
+            {isReordering && <Loader2 className="text-muted-foreground h-3 w-3 animate-spin" />}
             <button
                 aria-expanded={!isCollapsed}
                 className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
                 onClick={onToggleCollapse}
                 type="button"
             >
-                {isCollapsed ? <ChevronRight className="size-3" /> : <ChevronDown className="size-3" />}
-                {renderProjectIcon()}
-                <span>{group.title}</span>
+                {isCollapsed ? <ChevronRight aria-hidden className="size-3 shrink-0" /> : <ChevronDown aria-hidden className="size-3 shrink-0" />}
+                {renderLeading()}
+                <span className="truncate">{group.title}</span>
                 {isPinned && isProjectGroup && (
                     <TooltipProvider>
                         <Tooltip>
@@ -104,7 +142,8 @@ const GroupHeader: FC<GroupHeaderProperties> = ({
                         </Tooltip>
                     </TooltipProvider>
                 )}
-                <span className="text-brand-black/60 dark:text-brand-white/50">({group.threads.length})</span>
+                {/* The hidden comma and the space (a flex row draws no gap for it) keep the name "Pinned, 1", not "Pinned1". */}
+                <span className="sr-only">,</span> <span className="ml-auto tabular-nums">{group.threads.length}</span>
             </button>
             {isProjectGroup && group.projectId && (
                 <div className="ml-auto">
@@ -117,7 +156,7 @@ const GroupHeader: FC<GroupHeaderProperties> = ({
                                             render={
                                                 <Button
                                                     aria-label={t`Actions for project ${group.title}`}
-                                                    className="text-brand-black/70 dark:text-brand-white/70 hover:text-brand-black hover:dark:text-brand-white h-6 w-6 shrink-0 p-0"
+                                                    className="text-muted-foreground hover:text-foreground h-6 w-6 shrink-0 p-0"
                                                     variant="ghost"
                                                 >
                                                     <MoreVertical aria-hidden="true" className="size-3" />

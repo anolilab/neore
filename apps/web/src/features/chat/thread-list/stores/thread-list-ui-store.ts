@@ -7,10 +7,14 @@
  */
 
 import type { Dispatch, SetStateAction } from "react";
+import type { StateCreator } from "zustand";
 import { create } from "zustand";
-import { devtools, subscribeWithSelector } from "zustand/middleware";
+import { createJSONStorage, devtools, persist, subscribeWithSelector } from "zustand/middleware";
 
 import { getAddProjectBridge } from "@/lib/native/bridge";
+
+import type { SectionCounts, SectionKey } from "../lib/section-filter";
+import { DEFAULT_SECTION_FILTER, EMPTY_SECTION_COUNTS, sanitizeSectionFilter } from "../lib/section-filter";
 
 interface EditingProject {
     _id: string;
@@ -35,6 +39,10 @@ interface ThreadListUIState {
     renameThreadId: string | null;
     searchQuery: string;
     searchType: "threads" | "messages";
+    /** Thread counts per section, published by the list for the section bar (not saved). */
+    sectionCounts: SectionCounts;
+    /** The sections the list shows; saved. "active" alone is the normal list. */
+    sectionFilter: ReadonlyArray<SectionKey>;
 
     selectedCategory: string | undefined;
     /** User tag filter; a thread matches when it carries any of these. */
@@ -77,6 +85,8 @@ interface ThreadListUIActions {
     setRenameThreadId: (threadId: string | null) => void;
     setSearchQuery: (query: string) => void;
     setSearchType: (type: "threads" | "messages") => void;
+    setSectionCounts: (counts: SectionCounts) => void;
+    setSectionFilter: (filter: ReadonlyArray<SectionKey>) => void;
     setSelectedCategory: (category: string | undefined) => void;
 
     setSelectedTagIds: (tagIds: ReadonlyArray<string>) => void;
@@ -103,6 +113,8 @@ const initialState: ThreadListUIState = {
     lastSelectedIndex: -1,
     searchQuery: "",
     searchType: "threads",
+    sectionCounts: EMPTY_SECTION_COUNTS,
+    sectionFilter: DEFAULT_SECTION_FILTER,
     selectedCategory: undefined,
     selectedTagIds: [],
     optionsMenuThreadId: null,
@@ -120,96 +132,143 @@ const initialState: ThreadListUIState = {
 const resolveSetStateAction = <T>(action: SetStateAction<T>, currentValue: T): T =>
     typeof action === "function" ? (action as (previous: T) => T)(currentValue) : action;
 
+/** The saved section filter lives in this browser; a browser that refuses storage just starts from the default each time. */
+const sectionFilterStorage = {
+    getItem: (name: string): string | null => {
+        try {
+            return localStorage.getItem(name);
+        } catch {
+            return null;
+        }
+    },
+    removeItem: (name: string): void => {
+        try {
+            localStorage.removeItem(name);
+        } catch {
+            // Nothing saved, nothing to remove.
+        }
+    },
+    setItem: (name: string, value: string): void => {
+        try {
+            localStorage.setItem(name, value);
+        } catch {
+            // The choice holds for this visit only.
+        }
+    },
+};
+
+/** Split out of the `create()(devtools(persist(subscribeWithSelector(…))))` chain so no call sits four levels deep. */
+const initialiseState: StateCreator<ThreadListUIStore> = (set) => {
+    return {
+        ...initialState,
+
+        closeAddProjectDialog: () => set({ showAddProjectDialog: false }),
+        closeProjectFormDialog: () => set({ showProjectFormDialog: false }),
+        // Selection mode actions
+        enterSelectionMode: () =>
+            set({
+                isSelectionMode: true,
+                lastSelectedIndex: -1,
+                selectedThreadIds: new Set(),
+            }),
+        exitSelectionMode: () =>
+            set({
+                isSelectionMode: false,
+                lastSelectedIndex: -1,
+                selectedThreadIds: new Set(),
+            }),
+        openAddProjectDialog: () =>
+            set(getAddProjectBridge() === undefined ? { editingProject: null, showProjectFormDialog: true } : { showAddProjectDialog: true }),
+        openCreateProjectDialog: () =>
+            set({
+                editingProject: null,
+                showAddProjectDialog: false,
+                showProjectFormDialog: true,
+            }),
+        // Reset
+        // Back to the defaults, the section choice and its counts included.
+        reset: () => set({ ...initialState, sectionCounts: EMPTY_SECTION_COUNTS, sectionFilter: DEFAULT_SECTION_FILTER }),
+        setOptionsMenuThreadId: (threadId) => set({ optionsMenuThreadId: threadId }),
+        setRenameThreadId: (threadId) => set({ renameThreadId: threadId }),
+        setSnoozeThreadId: (threadId) => set({ snoozeThreadId: threadId }),
+
+        setEditingProject: (project) => set({ editingProject: project }),
+        setLastSelectedIndex: ((action: SetStateAction<number>) =>
+            set((state) => {
+                return {
+                    lastSelectedIndex: resolveSetStateAction(action, state.lastSelectedIndex),
+                };
+            })) as Dispatch<SetStateAction<number>>,
+        setSearchQuery: (query) => set({ searchQuery: query }),
+        setSearchType: (type) => set({ searchType: type }),
+        setSectionCounts: (counts) => set({ sectionCounts: counts }),
+        setSectionFilter: (filter) => set({ sectionFilter: sanitizeSectionFilter(filter) }),
+
+        setSelectedCategory: (category) => set({ selectedCategory: category }),
+        setSelectedTagIds: (tagIds) => set({ selectedTagIds: tagIds }),
+        setSelectedThreadIds: ((action: SetStateAction<Set<string>>) =>
+            set((state) => {
+                return {
+                    selectedThreadIds: resolveSetStateAction(action, state.selectedThreadIds),
+                };
+            })) as Dispatch<SetStateAction<Set<string>>>,
+
+        // Keyboard help actions
+        setShowKeyboardHelp: ((action: SetStateAction<boolean>) =>
+            set((state) => {
+                return {
+                    showKeyboardHelp: resolveSetStateAction(action, state.showKeyboardHelp),
+                };
+            })) as Dispatch<SetStateAction<boolean>>,
+        setShowManageTagsDialog: (show) => set({ showManageTagsDialog: show }),
+        // Project form dialog actions
+        setShowProjectFormDialog: (show) => set({ showProjectFormDialog: show }),
+        // Search actions
+        setShowSearch: ((action: SetStateAction<boolean>) =>
+            set((state) => {
+                return {
+                    showSearch: resolveSetStateAction(action, state.showSearch),
+                };
+            })) as Dispatch<SetStateAction<boolean>>,
+        toggleShowKeyboardHelp: () =>
+            set((state) => {
+                return { showKeyboardHelp: !state.showKeyboardHelp };
+            }),
+
+        toggleShowSearch: () =>
+            set((state) => {
+                return { showSearch: !state.showSearch };
+            }),
+    };
+};
+
+const persistedState = persist(subscribeWithSelector(initialiseState), {
+    merge: (persisted, current) => {
+        return { ...current, sectionFilter: sanitizeSectionFilter((persisted as { sectionFilter?: unknown } | undefined)?.sectionFilter) };
+    },
+    name: "thread-list-sections",
+    partialize: (state) => {
+        return { sectionFilter: state.sectionFilter };
+    },
+    skipHydration: true,
+    storage: createJSONStorage(() => sectionFilterStorage),
+    version: 1,
+});
+
+/**
+ * Hydration is manual (`persist.rehydrate()`, called by the section bar once mounted), so the server render and the first client
+ * render agree on which sections are pressed.
+ */
 export const useThreadListUIStore = create<ThreadListUIStore>()(
-    devtools(
-        subscribeWithSelector((set) => {
-            return {
-                ...initialState,
-
-                closeAddProjectDialog: () => set({ showAddProjectDialog: false }),
-                closeProjectFormDialog: () => set({ showProjectFormDialog: false }),
-                // Selection mode actions
-                enterSelectionMode: () =>
-                    set({
-                        isSelectionMode: true,
-                        lastSelectedIndex: -1,
-                        selectedThreadIds: new Set(),
-                    }),
-                exitSelectionMode: () =>
-                    set({
-                        isSelectionMode: false,
-                        lastSelectedIndex: -1,
-                        selectedThreadIds: new Set(),
-                    }),
-                openAddProjectDialog: () =>
-                    set(getAddProjectBridge() === undefined ? { editingProject: null, showProjectFormDialog: true } : { showAddProjectDialog: true }),
-                openCreateProjectDialog: () =>
-                    set({
-                        editingProject: null,
-                        showAddProjectDialog: false,
-                        showProjectFormDialog: true,
-                    }),
-                // Reset
-                reset: () => set(initialState),
-                setOptionsMenuThreadId: (threadId) => set({ optionsMenuThreadId: threadId }),
-                setRenameThreadId: (threadId) => set({ renameThreadId: threadId }),
-                setSnoozeThreadId: (threadId) => set({ snoozeThreadId: threadId }),
-
-                setEditingProject: (project) => set({ editingProject: project }),
-                setLastSelectedIndex: ((action: SetStateAction<number>) =>
-                    set((state) => {
-                        return {
-                            lastSelectedIndex: resolveSetStateAction(action, state.lastSelectedIndex),
-                        };
-                    })) as Dispatch<SetStateAction<number>>,
-                setSearchQuery: (query) => set({ searchQuery: query }),
-                setSearchType: (type) => set({ searchType: type }),
-
-                setSelectedCategory: (category) => set({ selectedCategory: category }),
-                setSelectedTagIds: (tagIds) => set({ selectedTagIds: tagIds }),
-                setSelectedThreadIds: ((action: SetStateAction<Set<string>>) =>
-                    set((state) => {
-                        return {
-                            selectedThreadIds: resolveSetStateAction(action, state.selectedThreadIds),
-                        };
-                    })) as Dispatch<SetStateAction<Set<string>>>,
-
-                // Keyboard help actions
-                setShowKeyboardHelp: ((action: SetStateAction<boolean>) =>
-                    set((state) => {
-                        return {
-                            showKeyboardHelp: resolveSetStateAction(action, state.showKeyboardHelp),
-                        };
-                    })) as Dispatch<SetStateAction<boolean>>,
-                setShowManageTagsDialog: (show) => set({ showManageTagsDialog: show }),
-                // Project form dialog actions
-                setShowProjectFormDialog: (show) => set({ showProjectFormDialog: show }),
-                // Search actions
-                setShowSearch: ((action: SetStateAction<boolean>) =>
-                    set((state) => {
-                        return {
-                            showSearch: resolveSetStateAction(action, state.showSearch),
-                        };
-                    })) as Dispatch<SetStateAction<boolean>>,
-                toggleShowKeyboardHelp: () =>
-                    set((state) => {
-                        return { showKeyboardHelp: !state.showKeyboardHelp };
-                    }),
-
-                toggleShowSearch: () =>
-                    set((state) => {
-                        return { showSearch: !state.showSearch };
-                    }),
-            };
-        }),
-        { enabled: process.env.NODE_ENV === "development", name: "thread-list-ui-store" },
-    ),
+    devtools(persistedState, { enabled: process.env.NODE_ENV === "development", name: "thread-list-ui-store" }),
 );
 
 // Stable selector functions - define outside components for stable references
 export const selectShowSearch = (state: ThreadListUIStore) => state.showSearch;
 export const selectSearchQuery = (state: ThreadListUIStore) => state.searchQuery;
 export const selectSearchType = (state: ThreadListUIStore) => state.searchType;
+export const selectSectionFilter = (state: ThreadListUIStore) => state.sectionFilter;
+export const selectSectionCounts = (state: ThreadListUIStore) => state.sectionCounts;
 export const selectSelectedCategory = (state: ThreadListUIStore) => state.selectedCategory;
 export const selectSelectedTagIds = (state: ThreadListUIStore) => state.selectedTagIds;
 export const selectShowManageTagsDialog = (state: ThreadListUIStore) => state.showManageTagsDialog;

@@ -1,5 +1,5 @@
 import { Trans } from "@lingui/react/macro";
-import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarInset, SidebarProvider } from "@neore/ui/components/sidebar";
+import { Sidebar, SidebarContent, SidebarFooter, SidebarInset, SidebarProvider } from "@neore/ui/components/sidebar";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import type { FC } from "react";
 import { useEffect, useState } from "react";
@@ -42,28 +42,26 @@ const ChatLoadingSkeleton: FC = () => {
                     </div>
                 </div>
                 <Sidebar className="left-16 [--sidebar-offset:4rem] [&>div]:flex-row" collapsible="offcanvas" name="left" variant="inset">
-                    <div className="relative z-10 flex w-(--sidebar-width) flex-col rounded-l-xl">
-                        <SidebarHeader>
-                            <div className="text-brand-black flex flex-col items-stretch gap-1.5 pl-2">
-                                <Skeleton className="h-9 w-full rounded-lg" />
-                                <div className="flex items-center gap-2">
-                                    <Skeleton className="h-9 flex-1 rounded-lg" />
-                                    <Skeleton className="size-9 rounded-md" />
-                                </div>
-                            </div>
-                        </SidebarHeader>
+                    <div className="bg-sidebar relative z-10 flex w-(--sidebar-width) flex-col rounded-l-xl">
                         <SidebarContent>
-                            <div className="text-brand-black flex flex-col items-stretch gap-1.5 pl-2">
+                            {/* Two-line cards, as the thread list draws them. */}
+                            <div className="flex flex-col items-stretch gap-1.5 px-3 pt-3">
                                 {Array.from({ length: 6 }, (_, index) => (
-                                    <div className="space-y-2 rounded-lg p-2" key={index}>
-                                        <Skeleton className="h-4 w-full" />
+                                    <div className="bg-surface-row space-y-2 rounded-xl px-3 py-2" key={index}>
+                                        <div className="flex items-center gap-2">
+                                            <Skeleton className="h-4 flex-1" />
+                                            <Skeleton className="h-3 w-6" />
+                                        </div>
                                         <Skeleton className="h-3 w-3/4" />
                                     </div>
                                 ))}
                             </div>
                         </SidebarContent>
-                        <SidebarFooter>
-                            <Skeleton className="h-12 w-full rounded-lg" />
+                        <SidebarFooter className="items-stretch gap-2 p-3">
+                            {/* The section bar, the dock row and the user row. */}
+                            <Skeleton className="h-9 w-full rounded-[11px]" />
+                            <Skeleton className="h-11 w-full rounded-[14px]" />
+                            <Skeleton className="h-9 w-full rounded-lg" />
                         </SidebarFooter>
                     </div>
                 </Sidebar>

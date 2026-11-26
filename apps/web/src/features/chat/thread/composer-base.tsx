@@ -11,7 +11,7 @@ import cn from "@neore/ui/utils/cn";
 import clsx from "clsx";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
-import { useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useImperativeHandle, useRef } from "react";
 
 export type ComposerMode = "text" | "image" | "video" | "audio";
 
@@ -47,25 +47,6 @@ export interface ComposerBaseProps {
     viewTransitionName?: string;
 }
 
-const MODE_STYLES = {
-    audio: {
-        borderColor: { dark: "rgba(255,255,255,0.08)", light: "rgba(0,0,0,0.1)" },
-        gradient: { dark: "from-rose-400/[0.03]", light: "from-rose-500/[0.02]" },
-    },
-    image: {
-        borderColor: { dark: "rgba(255,255,255,0.08)", light: "rgba(0,0,0,0.1)" },
-        gradient: { dark: "from-violet-400/[0.03]", light: "from-violet-500/[0.02]" },
-    },
-    text: {
-        borderColor: { dark: "rgba(255,255,255,0.08)", light: "rgba(0,0,0,0.1)" },
-        gradient: { dark: "from-lime-400/[0.03]", light: "from-lime-500/[0.02]" },
-    },
-    video: {
-        borderColor: { dark: "rgba(255,255,255,0.08)", light: "rgba(0,0,0,0.1)" },
-        gradient: { dark: "from-sky-400/[0.03]", light: "from-sky-500/[0.02]" },
-    },
-} as const;
-
 /**
  * Container component that provides the composer structure.
  */
@@ -87,30 +68,6 @@ const ComposerBase = ({
     viewTransitionName,
 }: ComposerBaseProps & { ref?: React.RefObject<ComposerBaseRef | null> }) => {
     const containerRef = useRef<HTMLDivElement>(null);
-
-    // Detect theme (dark mode)
-    const [isDark, setIsDark] = useState(false);
-
-    useEffect(() => {
-        const checkTheme = () => {
-            setIsDark(document.documentElement.classList.contains("dark"));
-        };
-
-        checkTheme();
-
-        const observer = new MutationObserver(checkTheme);
-
-        observer.observe(document.documentElement, {
-            attributeFilter: ["class"],
-            attributes: true,
-        });
-
-        return () => observer.disconnect();
-    }, []);
-
-    const modeStyle = MODE_STYLES[mode] ?? MODE_STYLES.text;
-    const borderColor = isDark ? modeStyle.borderColor.dark : modeStyle.borderColor.light;
-    const gradient = isDark ? modeStyle.gradient.dark : modeStyle.gradient.light;
 
     useImperativeHandle(ref, () => {
         return {
@@ -148,25 +105,18 @@ const ComposerBase = ({
                 type: "spring",
             }}
         >
-            {/* Main composer container — single clean border */}
+            {/* Main composer container: one raised panel, the input sits on it without a box of its own. */}
             <motion.div
                 className={clsx(
-                    "bg-card/70 w-full overflow-hidden rounded-xl backdrop-blur-xl",
-                    // The border colour follows the theme once it is read after mount; a composer that should not animate on mount skips that.
-                    animateEntrance ? "border transition-[border-color,box-shadow] duration-300" : "border transition-[box-shadow] duration-300",
-                    "data-[dragging=true]:border-ring data-[dragging=true]:bg-accent/50 data-[dragging=true]:border-dashed",
+                    "surface-raised w-full overflow-hidden rounded-2xl",
+                    "data-[dragging=true]:outline-ring data-[dragging=true]:bg-accent/50 data-[dragging=true]:-outline-offset-2 data-[dragging=true]:outline-2 data-[dragging=true]:outline-dashed",
                     "relative z-10",
                 )}
                 data-dragging={isDragging}
+                data-mode={mode}
                 data-view-transition={viewTransitionName}
-                style={{
-                    borderColor: isDragging ? undefined : borderColor,
-                }}
             >
-                {/* Mode-specific gradient background overlay */}
-                <div className={clsx("pointer-events-none absolute inset-0 bg-gradient-to-br to-transparent", gradient)} />
-
-                {/* Content wrapper with relative positioning above gradient */}
+                {/* Content wrapper */}
                 <div className="relative z-10">
                     {/* Mode settings row (image/video/audio options) */}
                     <AnimatePresence mode="popLayout">
@@ -184,23 +134,10 @@ const ComposerBase = ({
                         )}
                     </AnimatePresence>
 
-                    {/* Input area — deep recessed panel, visually pressed into the card */}
-                    <div className="p-2">
-                        <div
-                            className={clsx(
-                                "relative overflow-hidden rounded-md",
-                                "dark:bg-brand-charcoal",
-                                "bg-zinc-100/70",
-                                "border border-black/[0.06] dark:border-white/[0.04]",
-                            )}
-                        >
-                            <div className="relative flex">
-                                {leftPanel && (
-                                    <div className="flex shrink-0 self-stretch border-r border-black/[0.06] dark:border-white/[0.04]">{leftPanel}</div>
-                                )}
-                                <div className="relative flex w-full items-center justify-center px-1">{children}</div>
-                            </div>
-                        </div>
+                    {/* Input area: no box of its own, the panel is the surface */}
+                    <div className="relative flex px-2 pt-2">
+                        {leftPanel && <div className="border-surface-edge flex shrink-0 self-stretch border-r">{leftPanel}</div>}
+                        <div className="relative flex min-w-0 flex-1 items-center justify-center px-1">{children}</div>
                     </div>
 
                     {/* Bottom toolbar — hidden in compact mode, separated by a subtle border */}
@@ -208,10 +145,9 @@ const ComposerBase = ({
                         {bottomToolbar && !compact && (
                             <motion.div
                                 animate={{ height: "auto", opacity: 1 }}
-                                className="flex w-full flex-row flex-wrap items-center gap-1 px-2 pb-1"
+                                className="flex w-full flex-row flex-wrap items-center gap-1 px-2 pt-1 pb-2"
                                 exit={{ height: 0, opacity: 0 }}
                                 initial={skipEntrance ? false : { height: 0, opacity: 0 }}
-                                style={{ borderTopColor: borderColor }}
                                 transition={{ duration: 0.15, ease: "easeOut" }}
                             >
                                 {bottomToolbar}

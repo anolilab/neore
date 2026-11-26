@@ -30,7 +30,7 @@ interface ThreadTagsMenuProperties {
  * Menu body, mounted only while the menu is open — so the hundred-odd rows of
  * a long thread list do not each hold a query observer and a mutation.
  */
-const ThreadTagsMenuItems: FC<Omit<ThreadTagsMenuProperties, "threadTitle">> = ({ onManageTags, tagIds, threadId }) => {
+export const ThreadTagsMenuItems: FC<Omit<ThreadTagsMenuProperties, "threadTitle">> = ({ onManageTags, tagIds, threadId }) => {
     const { t } = useLingui();
     const tags = useThreadTags() ?? [];
     const setThreadTagAssigned = useSetThreadTagAssigned();

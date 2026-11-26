@@ -20,6 +20,7 @@ import ThreadSidebar from "./sidebar/thread-sidebar";
 import { useSplitLayoutStore } from "./split/split-layout-store";
 import Thread from "./thread/thread";
 import ThreadList from "./thread-list/thread-list";
+import ThreadListDock from "./thread-list/thread-list-dock";
 import ThreadListHeader from "./thread-list/thread-list-header";
 import useCanvasPanel from "./use-canvas-panel";
 
@@ -65,8 +66,8 @@ const AssistantContent: FC<{
 
     return (
         <div className="animate-in fade-in flex h-dvh w-full duration-150">
-            <AppSidebar content={<ThreadList />} header={<ThreadListHeader />} name="assistant" />
-            <SidebarInset className="dark:bg-brand-obsidian md:peer-data-[variant=inset]:m-1" data-focus-area="thread">
+            <AppSidebar content={<ThreadList />} footer={<ThreadListDock />} header={<ThreadListHeader />} name="assistant" />
+            <SidebarInset className="bg-surface-main overflow-hidden" data-focus-area="thread">
                 <ChatSiteHeader threadId={threadId} />
                 {/* The thread keeps its place in the group whether or not the side panel is open: moving it would remount it,
                     which scrolls it to the bottom and reloads every attachment preview in it. */}
@@ -124,8 +125,8 @@ const SplitAssistantContent: FC<{
 
     return (
         <div className="animate-in fade-in flex h-dvh w-full duration-150">
-            <AppSidebar content={<ThreadList />} header={<ThreadListHeader />} name="assistant" />
-            <SidebarInset className="dark:bg-brand-obsidian md:peer-data-[variant=inset]:m-1" data-focus-area="thread">
+            <AppSidebar content={<ThreadList />} footer={<ThreadListDock />} header={<ThreadListHeader />} name="assistant" />
+            <SidebarInset className="bg-surface-main overflow-hidden" data-focus-area="thread">
                 {/* The focused pane renders its chat's header here, under its own gate and provider. */}
                 <div className="contents" ref={setHeaderSlot} />
                 <ResizablePanelGroup className="h-[calc(100%-40px)]">

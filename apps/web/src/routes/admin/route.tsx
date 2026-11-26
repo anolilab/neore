@@ -115,7 +115,7 @@ const RouteComponent = () => {
             >
                 <div className="flex h-dvh w-full">
                     <AppSidebar content={sidebarContent} header={sidebarHeader} name="overlay" />
-                    <SidebarInset className="dark:bg-sidebar-foreground bg-white md:peer-data-[variant=inset]:m-1">
+                    <SidebarInset className="bg-surface-main">
                         <SiteHeader themeToggle={<ModeToggle className="text-foreground" />} trigger={<SidebarTrigger className="ml-2" name="left" />}>
                             <Breadcrumb>
                                 <BreadcrumbList>

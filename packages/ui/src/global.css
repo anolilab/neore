@@ -122,6 +122,8 @@
     --surface-row-active: var(--brand-white);
     --surface-rail: #ececec;
     --surface-well: #e9e9e9;
+    /* Code sits on white in light mode: the highlighter's light theme is tuned for white (its red is 4.5:1 there, not on grey). */
+    --surface-code: var(--brand-white);
     --surface-well-shadow: inset 0 1px 2px rgb(0 0 0 / 0.06), inset 0 0 0 1px rgb(0 0 0 / 0.05);
     --surface-edge: rgb(0 0 0 / 0.08);
     --surface-edge-top: rgb(255 255 255 / 0.9);
@@ -203,6 +205,7 @@
     --surface-row-active: #1d2024;
     --surface-rail: #0b0c0d;
     --surface-well: #08090a;
+    --surface-code: var(--surface-well);
     --surface-well-shadow: inset 0 1px 1px rgb(0 0 0 / 0.3), inset 0 0 0 1px rgb(255 255 255 / 0.03);
     --surface-edge: rgb(214 224 255 / 0.075);
     --surface-edge-top: rgb(255 255 255 / 0.035);
@@ -423,6 +426,37 @@
 
 html.dark [data-streamdown="code-block-body"] pre {
     color: var(--shiki-dark, var(--sdm-fg, inherit));
+}
+
+/* Surface language: the code block's frame is a raised card and its body a well, so the highlighter's own background is not painted. */
+[data-streamdown="code-block"] {
+    border-color: transparent;
+    border-radius: 12px;
+    background-color: var(--surface-panel);
+    box-shadow:
+        inset 0 1px 0 var(--surface-edge-top),
+        inset 0 0 0 1px var(--surface-edge),
+        var(--surface-drop);
+}
+
+[data-streamdown="code-block-body"] {
+    border-color: transparent;
+    border-radius: 9px;
+    background-color: var(--surface-code);
+    box-shadow: var(--surface-well-shadow);
+}
+
+[data-streamdown="code-block-body"] pre {
+    /* The highlighter sets its background inline, so the well behind it has to win. */
+    background-color: transparent !important;
+    /* The markdown prose spacing gives every pre a block margin; inside the well it would only pad the well. */
+    margin: 0 !important;
+    padding: 12px 14px;
+}
+
+/* The well is the padding: the body's own padding would stack on the pre's. */
+[data-streamdown="code-block-body"]:has(> pre) {
+    padding: 0;
 }
 
 /*

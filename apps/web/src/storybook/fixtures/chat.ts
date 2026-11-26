@@ -102,11 +102,17 @@ export const CONVERSATION: ChatMessage[] = [
 
 const listItem = (value: Thread): ThreadListItem => value as unknown as ThreadListItem;
 
+/** A branch: `threadId` was forked from `parentThreadId`, so the sidebar nests it under its parent. */
+export interface ThreadRelationship {
+    parentThreadId: string;
+    threadId: string;
+}
+
 /** The sidebar's thread list: pinned, today, yesterday and older, plus one project thread. */
-export const threadList = (threads: Thread[] = Object.values(THREADS)): ThreadList => {
+export const threadList = (threads: Thread[] = Object.values(THREADS), relationships: ThreadRelationship[] = []): ThreadList => {
     return {
         pinnedThreads: threads.filter((item) => item.pinnedAt !== undefined).map(listItem),
-        relationships: [],
+        relationships,
         tags: [],
         temporaryThreads: pageOf([]),
         threads: pageOf(threads.map(listItem)),
@@ -145,6 +151,8 @@ interface ChatFixtureOptions {
     messages?: ChatMessage[];
     permission?: "admin" | "read" | "write";
     suggestions?: string[];
+    /** Branches, nested under their parent in the sidebar. */
+    relationships?: ThreadRelationship[];
     thread?: Thread;
     threads?: Thread[];
 }
@@ -160,7 +168,7 @@ export const chatFixtures = (options: ChatFixtureOptions = {}): LunoraFixture[] 
     const messages = options.messages ?? CONVERSATION;
 
     return [
-        lunora(api.chat.composite.getThreadListData, () => threadList(options.threads)),
+        lunora(api.chat.composite.getThreadListData, () => threadList(options.threads, options.relationships)),
         lunora(api.projects.functions.listProjects, () => pageOf([]) as ReturnOf<typeof api.projects.functions.listProjects>),
         lunora(api.chat.functions.getThread, () => ownedBy(current)),
         lunora(api.chat.composite.getThreadWithData, () => {

@@ -94,11 +94,11 @@ const ComposerMCPSelector: FC<{ disabled?: boolean }> = ({ disabled }) => {
                             render={
                                 <Button
                                     className={clsx(
-                                        "bg-sidebar border-border dark:border-sidebar-border/15 hover:bg-accent/50 dark:hover:bg-sidebar-accent/30 hover:border-border dark:hover:border-sidebar-border/50 text-foreground h-7 gap-1.5 px-1.5 dark:text-white",
+                                        "bg-transparent hover:bg-surface-row-hover dark:hover:bg-surface-row-hover rounded-lg text-muted-foreground hover:text-foreground h-7 gap-1.5 px-1.5",
                                         !isAllSelected &&
                                             "border-purple-500/30 bg-purple-500/10 text-purple-700 hover:border-purple-500/40 hover:bg-purple-500/20 dark:text-purple-300",
                                     )}
-                                    variant="outline"
+                                    variant="ghost"
                                 >
                                     <AvatarGroup className="-space-x-1.5">
                                         {activeServers.slice(0, MAX_VISIBLE_AVATARS).map((server) => {
@@ -113,7 +113,7 @@ const ComposerMCPSelector: FC<{ disabled?: boolean }> = ({ disabled }) => {
                                         })}
                                         {overflowCount > 0 && <AvatarGroupCount className="size-4 text-[7px] ring-1">+{overflowCount}</AvatarGroupCount>}
                                     </AvatarGroup>
-                                    <span className="hidden text-xs text-neutral-700 sm:inline dark:text-neutral-200">
+                                    <span className="text-foreground hidden text-xs sm:inline">
                                         {isAllSelected ? t`MCP` : `${activeCount}/${enabledServers.length}`}
                                     </span>
                                 </Button>

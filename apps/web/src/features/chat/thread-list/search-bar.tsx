@@ -1,101 +1,71 @@
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
-import { Input } from "@neore/ui/components/input";
-import { Loader2, X } from "lucide-react";
+import { ArrowLeft, Loader2, Search, X } from "lucide-react";
 import type { FC } from "react";
-
-import ThreadCategoryFilter from "@/features/chat/tags/thread-category-filter";
-import ThreadTagFilter from "@/features/chat/tags/thread-tag-filter";
-
-import { selectSelectedTagIds, selectSetSelectedTagIds, selectSetShowManageTagsDialog, useThreadListUIStore } from "./stores/thread-list-ui-store";
+import { useEffect, useRef } from "react";
 
 interface SearchBarProperties {
     isSearchLoading: boolean;
+    /** Closes the search. The button for it carries `data-search-toggle`, so the Focus Search shortcut and a deleted row's focus handoff still find a toggle. */
+    onClose: () => void;
     onSearchQueryChange: (query: string) => void;
-    onSearchTypeChange: (type: "threads" | "messages") => void;
-    onSelectedCategoryChange: (category: string | undefined) => void;
     searchQuery: string;
     searchType: "threads" | "messages";
-    selectedCategory?: string;
 }
 
-const SearchBar: FC<SearchBarProperties> = ({
-    isSearchLoading,
-    onSearchQueryChange,
-    onSearchTypeChange,
-    onSelectedCategoryChange,
-    searchQuery,
-    searchType,
-    selectedCategory,
-}) => {
+/** The dock's search field while the search is open: the input, a button that closes it, and a clear button once something is typed. */
+const SearchBar: FC<SearchBarProperties> = ({ isSearchLoading, onClose, onSearchQueryChange, searchQuery, searchType }) => {
     const { t } = useLingui();
-    const selectedTagIds = useThreadListUIStore(selectSelectedTagIds);
-    const setSelectedTagIds = useThreadListUIStore(selectSetSelectedTagIds);
-    const setShowManageTagsDialog = useThreadListUIStore(selectSetShowManageTagsDialog);
+    const inputReference = useRef<HTMLInputElement>(null);
+
+    // The field takes focus as it opens: it opens because the person asked for it, from the toggle or the shortcut.
+    useEffect(() => {
+        inputReference.current?.focus();
+    }, []);
 
     return (
-        <div className="space-y-2">
-            <div className="flex items-center gap-2">
+        <div className="relative flex h-[34px] min-w-0 flex-1 items-center">
+            <Button
+                aria-expanded
+                aria-label={t`Close search`}
+                className="text-muted-foreground hover:text-foreground absolute left-0.5 size-7 p-0"
+                data-search-toggle=""
+                onClick={onClose}
+                size="icon-sm"
+                variant="ghost"
+            >
+                <ArrowLeft aria-hidden="true" className="size-4" />
+            </Button>
+            <Search aria-hidden="true" className="text-muted-foreground pointer-events-none absolute left-9 size-3.5" />
+            <input
+                aria-label={searchType === "threads" ? t`Search thread titles and summaries` : t`Search message content`}
+                className="text-foreground placeholder:text-muted-foreground focus-visible:ring-ring h-full w-full min-w-0 rounded-[10px] bg-transparent pr-14 pl-14 text-[13.5px] focus-visible:ring-2 focus-visible:outline-none"
+                data-search-input=""
+                onChange={(e) => {
+                    onSearchQueryChange(e.target.value);
+                }}
+                placeholder={searchType === "threads" ? t`Search thread titles...` : t`Search message content...`}
+                ref={inputReference}
+                value={searchQuery}
+            />
+            {isSearchLoading && (
+                <div className="absolute top-1/2 right-8 -translate-y-1/2">
+                    <Loader2 className="text-muted-foreground size-3 animate-spin" />
+                </div>
+            )}
+            {searchQuery && (
                 <Button
-                    className="border-sidebar-border text-brand-black dark:text-brand-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active]:bg-sidebar-accent data-[active]:text-sidebar-accent-foreground text-xs"
+                    aria-label={t`Clear search`}
+                    className="absolute top-1/2 right-1 size-6 -translate-y-1/2 p-0"
                     onClick={() => {
-                        onSearchTypeChange("threads");
+                        onSearchQueryChange("");
                     }}
-                    size="sm"
-                    variant={searchType === "threads" ? "default" : "outline"}
+                    size="icon"
+                    variant="ghost"
                 >
-                    {t`Threads`}
+                    <X aria-hidden="true" className="size-3" />
                 </Button>
-                <Button
-                    className="border-sidebar-border text-brand-black dark:text-brand-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active]:bg-sidebar-accent data-[active]:text-sidebar-accent-foreground text-xs"
-                    onClick={() => {
-                        onSearchTypeChange("messages");
-                    }}
-                    size="sm"
-                    variant={searchType === "messages" ? "default" : "outline"}
-                >
-                    {t`Messages`}
-                </Button>
-                <ThreadCategoryFilter onCategoryChange={onSelectedCategoryChange} selectedCategory={selectedCategory} />
-                <ThreadTagFilter
-                    onManageTags={() => {
-                        setShowManageTagsDialog(true);
-                    }}
-                    onSelectedTagIdsChange={setSelectedTagIds}
-                    selectedTagIds={selectedTagIds}
-                />
-            </div>
-            <div className="relative">
-                <Input
-                    aria-label={searchType === "threads" ? t`Search thread titles and summaries` : t`Search message content`}
-                    autoFocus
-                    className="border-sidebar-border bg-sidebar text-brand-black dark:text-brand-white placeholder:text-brand-black/60 placeholder:dark:text-brand-white/60 pr-8"
-                    data-search-input=""
-                    onChange={(e) => {
-                        onSearchQueryChange(e.target.value);
-                    }}
-                    placeholder={searchType === "threads" ? t`Search thread titles...` : t`Search message content...`}
-                    value={searchQuery}
-                />
-                {searchQuery && (
-                    <Button
-                        aria-label={t`Clear search`}
-                        className="absolute top-1/2 right-1 h-6 w-6 -translate-y-1/2 p-0"
-                        onClick={() => {
-                            onSearchQueryChange("");
-                        }}
-                        size="icon"
-                        variant="ghost"
-                    >
-                        <X aria-hidden="true" className="h-3 w-3" />
-                    </Button>
-                )}
-                {isSearchLoading && (
-                    <div className="absolute top-1/2 right-8 -translate-y-1/2">
-                        <Loader2 className="text-muted-foreground h-3 w-3 animate-spin" />
-                    </div>
-                )}
-            </div>
+            )}
         </div>
     );
 };

@@ -345,7 +345,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     return (
         <div
             aria-labelledby={headingId}
-            className="bg-muted/40 focus-visible:ring-ring mb-4 rounded-lg border p-3 outline-none focus-visible:ring-2"
+            className="surface-raised focus-visible:ring-ring mb-4 rounded-xl p-3 outline-none focus-visible:ring-2"
             ref={groupRef}
             role="group"
             tabIndex={-1}

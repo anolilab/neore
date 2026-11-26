@@ -182,7 +182,7 @@ const DefaultUserMessage: FC<UserMessageRendererProps> = ({ actionBar, children,
             <Trans>Your message:</Trans>{" "}
         </span>
         {/* Attachments would go here */}
-        <MessageContentWrapper className="message-text col-start-2 row-start-2 rounded-3xl px-5 py-(--density-bubble-py) wrap-break-word">
+        <MessageContentWrapper className="message-text group-[.is-user]:bg-surface-panel group-[.is-user]:surface-raised col-start-2 row-start-2 rounded-3xl px-5 py-(--density-bubble-py) wrap-break-word group-[.is-user]:rounded-[14px] group-[.is-user]:px-3.5 group-[.is-user]:py-2.5">
             {children}
         </MessageContentWrapper>
         {!isPending && actionBar}

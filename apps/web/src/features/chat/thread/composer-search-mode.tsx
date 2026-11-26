@@ -73,14 +73,14 @@ const ComposerSearchMode: FC<ComposerSearchModeProps> = ({ disabled, mode, onMod
                             render={
                                 <Button
                                     className={clsx(
-                                        "bg-sidebar border-border dark:border-sidebar-border/15 hover:bg-accent/50 dark:hover:bg-sidebar-accent/30 hover:border-border dark:hover:border-sidebar-border/50 text-foreground h-7 gap-1 px-2 dark:text-white",
+                                        "bg-transparent hover:bg-surface-row-hover dark:hover:bg-surface-row-hover rounded-lg text-muted-foreground hover:text-foreground h-7 gap-1 px-2",
                                         mode !== "chat" &&
                                             "bg-primary/10 text-primary-text border-primary/30 dark:text-primary-text hover:bg-primary/20 hover:border-primary/40",
                                     )}
-                                    variant="outline"
+                                    variant="ghost"
                                 >
                                     <CurrentIcon className="size-3 shrink-0" />
-                                    <span className="hidden text-neutral-700 md:inline dark:text-neutral-200">{currentMode.label}</span>
+                                    <span className="hidden md:inline">{currentMode.label}</span>
                                 </Button>
                             }
                         />

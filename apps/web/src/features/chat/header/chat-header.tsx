@@ -32,12 +32,12 @@ export const LockedChatSiteHeader: FC = () => {
 
     return (
         <SiteHeader
-            menu={<SidebarTrigger className="text-foreground dark:text-white" icon={<PanelRightIcon />} name="right" />}
-            themeToggle={<ModeToggle className="text-foreground" />}
+            menu={<SidebarTrigger className="text-muted-foreground hover:text-foreground" icon={<PanelRightIcon />} name="right" />}
+            themeToggle={<ModeToggle className="text-muted-foreground hover:text-foreground" />}
             trigger={<SidebarTrigger className="ml-2" name="left" />}
             workspaceSwitch
         >
-            <h1 className="text-lg font-bold">{t`Locked chat`}</h1>
+            <h1 className="text-sm font-medium">{t`Locked chat`}</h1>
         </SiteHeader>
     );
 };
@@ -140,13 +140,13 @@ const ChatSiteHeader: FC<{ threadId?: string }> = ({ threadId }) => {
                     <KBAttachmentButton threadId={actualThreadId} />
                     <ThreadDownloadButton model={model} threadId={actualThreadId} />
                     <ThreadShareButton threadId={actualThreadId} />
-                    <SidebarTrigger className="text-foreground dark:text-white" icon={<PanelRightIcon />} name="right" />
+                    <SidebarTrigger className="text-muted-foreground hover:text-foreground" icon={<PanelRightIcon />} name="right" />
                 </>
             }
             themeToggle={
                 <>
-                    <TemporaryChatDropdown className="text-foreground" threadId={actualThreadId} />
-                    <ModeToggle className="text-foreground" />
+                    <TemporaryChatDropdown className="text-muted-foreground hover:text-foreground" threadId={actualThreadId} />
+                    <ModeToggle className="text-muted-foreground hover:text-foreground" />
                 </>
             }
             trigger={<SidebarTrigger className="ml-2" name="left" />}
@@ -154,14 +154,14 @@ const ChatSiteHeader: FC<{ threadId?: string }> = ({ threadId }) => {
         >
             <div className="flex items-center gap-2">
                 <InlineEdit
-                    className="border-none px-0 py-0 text-lg font-bold hover:bg-transparent"
+                    className="border-none px-0 py-0 text-sm font-medium hover:bg-transparent"
                     defaultValue={isValid ? undefined : title}
                     disabled={isValid ? !model : false}
                     onSave={isValid && model ? handleSave : undefined}
                     renderInput={(props) => (
                         <input
                             {...props}
-                            className="focus-visible:ring-ring/50 h-7 min-w-[200px] border-none bg-transparent py-0 text-lg leading-tight font-bold shadow-none focus:outline-none focus-visible:ring-1"
+                            className="focus-visible:ring-ring/50 h-7 min-w-[200px] border-none bg-transparent py-0 text-sm leading-tight font-medium shadow-none focus:outline-none focus-visible:ring-1"
                         />
                     )}
                     // The title is prose: the desktop shell turns spellcheck off page-wide.

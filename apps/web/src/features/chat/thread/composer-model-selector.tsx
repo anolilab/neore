@@ -98,9 +98,7 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
         }
     };
 
-    const baseClassName =
-        className ||
-        "bg-sidebar border-border dark:border-sidebar-border/15 hover:bg-accent/50 dark:hover:bg-sidebar-accent/30 hover:border-border dark:hover:border-sidebar-border/50 text-foreground h-7 w-[200px] dark:text-white";
+    const baseClassName = className || "bg-transparent hover:bg-surface-row-hover dark:hover:bg-surface-row-hover rounded-lg text-foreground h-7 max-w-[200px]";
 
     return (
         <>
@@ -116,6 +114,7 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
                     !isAnonymous && comparisonMode && selectedModelsForComparison.length >= MIN_COMPARISON_MODELS ? selectedModelsForComparison : undefined
                 }
                 size="sm"
+                variant="ghost"
             />
             {canRouteAuto && (
                 <div aria-labelledby={autoLabelId} className="flex items-center gap-1.5" role="group">

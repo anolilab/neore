@@ -5,7 +5,7 @@ import { ANONYMOUS_FREE_MODEL } from "@neore/ai/constants";
 import { enabledModelOf } from "@neore/ai/models";
 import { ProviderIcon } from "@neore/ui/components/ai-elements/provider-icon";
 import { Button } from "@neore/ui/components/button";
-import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarInset, SidebarProvider, SidebarTrigger } from "@neore/ui/components/sidebar";
+import { Sidebar, SidebarContent, SidebarFooter, SidebarInset, SidebarProvider, SidebarTrigger } from "@neore/ui/components/sidebar";
 import ModeToggle from "@neore/ui/components/theme-toggle";
 import cn from "@neore/ui/utils/cn";
 import {
@@ -16,12 +16,11 @@ import {
     Globe,
     HelpCircle,
     HourglassIcon,
+    ListFilter,
     LogIn,
-    MoreVertical,
-    PlusIcon,
     Search,
+    SquarePen,
     UserRound,
-    Users,
 } from "lucide-react";
 import type { CSSProperties, FC } from "react";
 import { useCallback, useEffect, useState } from "react";
@@ -46,13 +45,13 @@ import { chatDefaultOpen, chatSidebarNames, chatSidebarStyle } from "../shell-la
  * `/chat` for a visitor who is not signed in while registration is invite-only
  * (guests are refused, see `backend/lunora/auth/sign-in-methods.ts`). It draws
  * the signed-in chat's chrome from STATIC data: the rail, the thread-list
- * header, the chat header, the welcome suggestions and the composer with its
+ * dock, the chat header, the welcome suggestions and the composer with its
  * toolbar. Nothing here reads account data or calls the backend; every control
  * that would need an account opens the sign-in prompt instead. Sending holds
  * the message for after sign-in (`pending-send.ts`).
  *
  * Classes are copied from the components they stand in for (`SidebarShortcut`,
- * `ThreadListHeader`, `ChatSiteHeader`, `Composer`), which read the session,
+ * `ThreadListDock`, `ChatSiteHeader`, `Composer`), which read the session,
  * settings or the model catalog; keep them in step.
  */
 
@@ -65,7 +64,7 @@ const SIGNED_OUT_CONTEXT = "128K";
 
 const RAIL_ITEM = "group relative flex size-10 items-center justify-center rounded-md transition-colors duration-150";
 const RAIL_IDLE = "text-brand-black dark:text-brand-white hover:bg-sidebar-accent/50";
-const SIDEBAR_ICON = "text-brand-black dark:text-brand-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-9 w-9 p-0";
+const DOCK_ICON = "text-muted-foreground hover:text-foreground size-[30px] p-0";
 const TOOLBAR_BUTTON =
     "bg-sidebar border-border dark:border-sidebar-border/15 hover:bg-accent/50 dark:hover:bg-sidebar-accent/30 hover:border-border dark:hover:border-sidebar-border/50 text-foreground h-7 dark:text-white";
 
@@ -125,39 +124,32 @@ const SignedOutRail: FC = () => {
     );
 };
 
-/** `ThreadListHeader`: New Thread and the icon row, each asking to sign in. */
-const SignedOutThreadListHeader: FC = () => {
+/** `ThreadListDock`: the search field, the filter menu, Add project and New Thread in one raised row, each asking to sign in. */
+const SignedOutThreadListDock: FC = () => {
     const { t } = useLingui();
 
     return (
-        <div className="text-brand-black dark:text-brand-white flex flex-col items-stretch gap-1.5 pl-2">
-            <div className="flex w-full flex-col items-center gap-2">
-                <Button
-                    className="text-brand-black dark:text-brand-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active]:bg-sidebar-accent data-[active]:text-sidebar-accent-foreground flex grow items-center justify-start gap-1.5 rounded-lg px-2.5 py-2 text-start"
-                    onClick={askToSignIn}
-                    variant="ghost"
-                >
-                    <PlusIcon className="size-5" />
-                    {t`New Thread`}
-                </Button>
-                <div className="flex flex-row items-center gap-2">
-                    <Button aria-label={t`Search threads`} className={SIDEBAR_ICON} onClick={askToSignIn} size="sm" variant="ghost">
-                        <Search aria-hidden="true" className="h-5 w-5" />
-                    </Button>
-                    <Button aria-label={t`Create project`} className={SIDEBAR_ICON} onClick={askToSignIn} size="sm" variant="ghost">
-                        <FolderPlus aria-hidden="true" className="h-5 w-5" />
-                    </Button>
-                    <Button aria-label={t`New group chat`} className={SIDEBAR_ICON} onClick={askToSignIn} size="sm" variant="ghost">
-                        <Users aria-hidden="true" className="h-5 w-5" />
-                    </Button>
-                    <Button aria-label={t`Keyboard shortcuts`} className={SIDEBAR_ICON} onClick={askToSignIn} size="sm" variant="ghost">
-                        <HelpCircle aria-hidden="true" className="h-5 w-5" />
-                    </Button>
-                    <Button aria-label={t`Bulk actions`} className={SIDEBAR_ICON} onClick={askToSignIn} size="sm" variant="ghost">
-                        <MoreVertical aria-hidden="true" className="h-5 w-5" />
-                    </Button>
-                </div>
-            </div>
+        <div className="surface-raised flex w-full items-center gap-0.5 rounded-[14px] p-1">
+            <button
+                aria-label={t`Search threads`}
+                className="text-muted-foreground hover:text-foreground focus-visible:ring-ring flex h-[34px] min-w-0 flex-1 items-center gap-2 rounded-[10px] px-2.5 text-[13.5px] focus-visible:ring-2 focus-visible:outline-none"
+                onClick={askToSignIn}
+                type="button"
+            >
+                <Search aria-hidden="true" className="size-4 shrink-0" />
+                <span aria-hidden="true" className="truncate">
+                    {t`Search`}
+                </span>
+            </button>
+            <Button aria-label={t`Search filters`} className={DOCK_ICON} onClick={askToSignIn} size="sm" variant="ghost">
+                <ListFilter aria-hidden="true" className="size-4" />
+            </Button>
+            <Button aria-label={t`Add project`} className={DOCK_ICON} onClick={askToSignIn} size="sm" variant="ghost">
+                <FolderPlus aria-hidden="true" className="size-4" />
+            </Button>
+            <Button aria-label={t`New Thread`} className="text-foreground size-[30px] p-0" onClick={askToSignIn} size="sm" variant="ghost">
+                <SquarePen aria-hidden="true" className="size-4" />
+            </Button>
         </div>
     );
 };
@@ -264,10 +256,7 @@ const SignedOutChat: FC = () => {
             <div className="flex h-dvh w-full">
                 <SignedOutRail />
                 <Sidebar className="left-16 [--sidebar-offset:4rem] [&>div]:flex-row" collapsible="offcanvas" name="left" variant="inset">
-                    <div className="relative z-10 flex w-(--sidebar-width) flex-col rounded-l-xl">
-                        <SidebarHeader>
-                            <SignedOutThreadListHeader />
-                        </SidebarHeader>
+                    <div className="bg-sidebar relative z-10 flex w-(--sidebar-width) flex-col rounded-l-xl">
                         <SidebarContent>
                             {/* `HierarchicalThreadList`'s empty state, worded for a visitor who has no threads to load. */}
                             <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
@@ -275,7 +264,8 @@ const SignedOutChat: FC = () => {
                                 <p className="text-muted-foreground text-xs">{t`Sign in to see your chats.`}</p>
                             </div>
                         </SidebarContent>
-                        <SidebarFooter>
+                        <SidebarFooter className="items-stretch gap-2 p-3">
+                            <SignedOutThreadListDock />
                             <button
                                 className="bg-primary text-primary-foreground hover:bg-primary/90 flex w-full items-center gap-2 rounded-lg px-3 py-2 transition-colors"
                                 onClick={askToSignIn}

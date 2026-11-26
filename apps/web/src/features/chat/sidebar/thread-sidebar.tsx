@@ -146,7 +146,7 @@ const ThreadSummary: FC<{ threadId?: string }> = ({ threadId }) => {
                         </Button>
                     )}
                 </div>
-                <div className="text-foreground/70 border-sidebar-border bg-sidebar-accent/30 rounded-md border p-3 text-sm leading-relaxed">
+                <div className="text-muted-foreground surface-well rounded-[10px] px-3 py-2.5 text-[12.5px] leading-relaxed">
                     {isTextModel ? (
                         <p className="whitespace-pre-line">{thread?.summary || t`No summary available. Click "Generate" to create one.`}</p>
                     ) : (
@@ -182,6 +182,7 @@ const ThreadSummary: FC<{ threadId?: string }> = ({ threadId }) => {
                         </div>
                     </div>
                     <Textarea
+                        className="bg-surface-well dark:bg-surface-well rounded-[10px] border-transparent [box-shadow:var(--surface-well-shadow)]"
                         expandable
                         expandableDialogTitle={t`Custom System Prompt`}
                         id="custom-system-prompt"
@@ -281,7 +282,7 @@ export const LockedThreadSidebar: FC = () => {
 
     return (
         <Sidebar
-            className="py-1 [&>div]:rounded-l-xl"
+            className="[&>div]:surface-raised dark:[&>div]:bg-surface-panel py-2 pr-2 [&>div]:rounded-[14px]"
             collapsible="offcanvas"
             data-focus-area="panel"
             name="right"
@@ -291,7 +292,7 @@ export const LockedThreadSidebar: FC = () => {
         >
             <SidebarResizeHandle />
             <SidebarContent className="items-center justify-center p-4 text-center">
-                <p className="text-brand-black/60 dark:text-brand-white/60 text-sm">{t`This chat is locked. Unlock it to see its details.`}</p>
+                <p className="text-muted-foreground text-sm">{t`This chat is locked. Unlock it to see its details.`}</p>
             </SidebarContent>
         </Sidebar>
     );
@@ -312,7 +313,7 @@ const ThreadSidebar: FC<ThreadSidebarProps> = ({ threadId }) => {
 
     return (
         <Sidebar
-            className="py-1 [&>div]:rounded-l-xl"
+            className="[&>div]:surface-raised dark:[&>div]:bg-surface-panel py-2 pr-2 [&>div]:rounded-[14px]"
             collapsible="offcanvas"
             data-focus-area="panel"
             name="right"
@@ -321,44 +322,29 @@ const ThreadSidebar: FC<ThreadSidebarProps> = ({ threadId }) => {
             variant="inset"
         >
             <SidebarResizeHandle />
-            <SidebarContent className="overflow-hidden">
+            <SidebarContent className="gap-0 overflow-hidden p-1.5">
                 <Tabs className="flex min-h-0 flex-1 flex-col" onValueChange={setActiveRightSidebarTab} value={activeRightSidebarTab}>
-                    <div className="px-1">
-                        <TabsList className="bg-sidebar-accent/50 dark:bg-sidebar-accent/30 border-sidebar-border/50 w-full border" variant="default">
-                            <TabsTrigger
-                                className="text-brand-black/70 dark:text-brand-white/70 hover:text-brand-black hover:dark:text-brand-white data-active:text-brand-black data-active:dark:text-brand-white"
-                                value="summary"
-                            >
+                    <div>
+                        <TabsList className="w-full" variant="default">
+                            <TabsTrigger value="summary">
                                 <MessageSquare className="mr-1.5 size-3.5" />
                                 {t`Thread`}
                             </TabsTrigger>
-                            <TabsTrigger
-                                className="text-brand-black/70 dark:text-brand-white/70 hover:text-brand-black hover:dark:text-brand-white data-active:text-brand-black data-active:dark:text-brand-white"
-                                value="prompts"
-                            >
+                            <TabsTrigger value="prompts">
                                 <FileText className="mr-1.5 size-3.5" />
                                 {t`Prompts`}
                             </TabsTrigger>
-                            <TabsTrigger
-                                className="text-brand-black/70 dark:text-brand-white/70 hover:text-brand-black hover:dark:text-brand-white data-active:text-brand-black data-active:dark:text-brand-white"
-                                value="variables"
-                            >
+                            <TabsTrigger value="variables">
                                 <Braces className="mr-1.5 size-3.5" />
                                 {t`Variables`}
                             </TabsTrigger>
                             {isTextModel && (
-                                <TabsTrigger
-                                    className="text-brand-black/70 dark:text-brand-white/70 hover:text-brand-black hover:dark:text-brand-white data-active:text-brand-black data-active:dark:text-brand-white"
-                                    value={ASIDE_TAB}
-                                >
+                                <TabsTrigger value={ASIDE_TAB}>
                                     <MessageCircleQuestionIcon aria-hidden="true" className="mr-1.5 size-3.5" />
                                     {t`Ask`}
                                 </TabsTrigger>
                             )}
-                            <TabsTrigger
-                                className="text-brand-black/70 dark:text-brand-white/70 hover:text-brand-black hover:dark:text-brand-white data-active:text-brand-black data-active:dark:text-brand-white"
-                                value="pins"
-                            >
+                            <TabsTrigger value="pins">
                                 <PinIcon className="mr-1.5 size-3.5" />
                                 {t`Pins`}
                             </TabsTrigger>
@@ -381,7 +367,7 @@ const ThreadSidebar: FC<ThreadSidebarProps> = ({ threadId }) => {
                                 {threadId ? (
                                     <ThreadVariablesConfig threadId={threadId} />
                                 ) : (
-                                    <div className="text-brand-black/60 dark:text-brand-white/60 border-sidebar-border/50 bg-sidebar-accent/30 flex h-full items-center justify-center rounded-md border pr-2 pl-1 text-center">
+                                    <div className="text-muted-foreground surface-well flex h-full items-center justify-center rounded-[10px] pr-2 pl-1 text-center">
                                         <p className="text-sm">{t`Start a conversation to configure variables.`}</p>
                                     </div>
                                 )}

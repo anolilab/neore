@@ -1,111 +1,66 @@
 // @vitest-environment jsdom
 
-/** The header's search, create-project, shortcuts and bulk-actions buttons are icons only. */
+/** The header holds the organization and team switchers only; everything else moved to the dock. */
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-const searchState = vi.hoisted(() => {
-    return { searchType: "threads", showSearch: false };
+const session = vi.hoisted(() => {
+    return { activeOrganization: undefined as { id: string } | undefined, organizations: [] as { id: string }[] };
 });
 
-vi.mock("@lingui/react/macro", () => {
+vi.mock("@/features/auth/hooks/use-auth-session", () => {
     return {
-        useLingui: () => {
-            return {
-                t: (strings: TemplateStringsArray | string, ...values: unknown[]) =>
-                    typeof strings === "string" ? strings : String.raw({ raw: strings }, ...values),
-            };
+        useAuthActiveOrganization: () => {
+            return { data: session.activeOrganization };
         },
-    };
-});
-
-vi.mock("@tanstack/react-router", () => {
-    return { useNavigate: () => () => {} };
-});
-
-vi.mock("@/features/auth/lib/auth-ui-provider", () => {
-    return {
-        useAuth: () => {
-            return {
-                hooks: {
-                    useActiveOrganization: () => {
-                        return { data: undefined };
-                    },
-                    useListOrganizations: () => {
-                        return { data: [] };
-                    },
-                },
-            };
+        useAuthOrganizationList: () => {
+            return { data: session.organizations };
         },
     };
 });
 
 vi.mock("@/features/auth/components/organization/organization-switcher", () => {
-    return { default: () => null };
+    return { default: () => <button type="button">Organization switcher</button> };
 });
 
 vi.mock("@/features/auth/components/team/team-switcher", () => {
-    return { default: () => null };
-});
-
-vi.mock("@/features/chat/group/create-group-chat-button", () => {
-    return { default: () => null };
-});
-
-vi.mock("./search-bar", () => {
-    return { default: () => null };
-});
-
-vi.mock("./stores/thread-list-ui-store", () => {
-    return {
-        useThreadListUIStore: (selector: (state: Record<string, unknown>) => unknown) =>
-            selector({
-                enterSelectionMode: () => {},
-                openAddProjectDialog: () => {},
-                searchQuery: "",
-                searchType: searchState.searchType,
-                selectedCategory: undefined,
-                setSearchQuery: () => {},
-                setSearchType: () => {},
-                setSelectedCategory: () => {},
-                showSearch: searchState.showSearch,
-                toggleShowKeyboardHelp: () => {},
-                toggleShowSearch: () => {},
-            }),
-    };
+    return { default: () => <button type="button">Team switcher</button> };
 });
 
 const { default: ThreadListHeader } = await import("./thread-list-header");
 
 describe("ThreadListHeader", () => {
-    it.each(["Search threads", "Add project", "Keyboard shortcuts", "Bulk actions"])("names the %s button", (name) => {
+    it("renders nothing for someone with no organization", () => {
+        session.activeOrganization = undefined;
+        session.organizations = [];
+        const { container } = render(<ThreadListHeader />);
+
+        // eslint-disable-next-line testing-library/no-node-access -- an empty header must leave no markup behind
+        expect(container.firstChild).toBeNull();
+    });
+
+    it("shows the team switcher inside an organization, and the organization switcher once there are several", () => {
+        session.activeOrganization = { id: "o1" };
+        session.organizations = [{ id: "o1" }];
+        const { unmount } = render(<ThreadListHeader />);
+
+        expect(screen.getByRole("button", { name: "Team switcher" })).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Organization switcher" })).toBeNull();
+        unmount();
+
+        session.organizations = [{ id: "o1" }, { id: "o2" }];
         render(<ThreadListHeader />);
 
-        expect(screen.getByRole("button", { name })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Organization switcher" })).toBeTruthy();
     });
 
-    it("names the search button for closing while the search bar is open", () => {
-        searchState.showSearch = true;
+    it("holds none of the thread controls the dock owns", () => {
+        session.activeOrganization = { id: "o1" };
+        session.organizations = [{ id: "o1" }];
+        render(<ThreadListHeader />);
 
-        try {
-            render(<ThreadListHeader />);
-
-            expect(screen.getByRole("button", { name: "Close search" })).toBeTruthy();
-        } finally {
-            searchState.showSearch = false;
-        }
-    });
-
-    it("names the closed search button for message search when that mode is selected", () => {
-        searchState.searchType = "messages";
-
-        try {
-            render(<ThreadListHeader />);
-
-            expect(screen.getByRole("button", { name: "Search messages" })).toBeTruthy();
-            expect(screen.queryByRole("button", { name: "Search threads" })).toBeNull();
-        } finally {
-            searchState.searchType = "threads";
+        for (const name of ["Search threads", "Add project", "New Thread", "Search filters"]) {
+            expect(screen.queryByRole("button", { name })).toBeNull();
         }
     });
 });

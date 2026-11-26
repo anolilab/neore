@@ -38,11 +38,12 @@ import useStableCallback from "./hooks/use-stable-callback";
 import useThreadGroups from "./hooks/use-thread-groups";
 import useThreadHandlers from "./hooks/use-thread-handlers";
 import useThreadListKeyboard from "./hooks/use-thread-list-keyboard";
+import { countSections, filterGroupsBySection, sameSectionCounts } from "./lib/section-filter";
 import { renameFocusTarget } from "./rename-focus-target";
 import RenameThreadDialog from "./rename-thread-dialog";
 import SnoozeUntilDialog from "./snooze-until-dialog";
 import SortableThreadItem from "./sortable-thread-item";
-import { useThreadListUIStore } from "./stores/thread-list-ui-store";
+import { selectSectionFilter, useThreadListUIStore } from "./stores/thread-list-ui-store";
 import { isThreadLocked } from "./thread-lock";
 import type { BranchNode, GroupType, HierarchicalThreadListProperties, MinimalThreadRelationship, ThreadGroup } from "./types";
 import type { ThreadDateRange } from "./utilities";
@@ -226,6 +227,10 @@ const ProjectGroupContainer: FC<{ children: ReactNode; isProjectGroup: boolean; 
 /** One object for the list's life: new sensor options make new activators, and the drag context then re-renders every sortable row. */
 const KEYBOARD_SENSOR_OPTIONS = { coordinateGetter: sortableKeyboardCoordinates };
 
+/** The same groups, as the same objects, in the same order. */
+const sameGroupList = (left: ReadonlyArray<ThreadGroup>, right: ReadonlyArray<ThreadGroup>): boolean =>
+    left.length === right.length && left.every((group, index) => group === right[index]);
+
 const VirtualizedThreadList: FC<{
     expandedThreads: Set<string>;
     flattenedThreads: BranchNode[];
@@ -258,7 +263,7 @@ const VirtualizedThreadList: FC<{
         (index: number) => {
             const item = virtualItems[index];
 
-            return item?.type === "group" ? 32 : 44;
+            return item?.type === "group" ? 36 : 62;
         },
         [virtualItems],
     );
@@ -304,9 +309,11 @@ const VirtualizedThreadList: FC<{
 
                     return (
                         <div
+                            data-index={virtualItem.index}
                             key={virtualItem.key}
+                            // Measured, not sized: a two-line card's height depends on the density and on what its second line holds.
+                            ref={virtualizer.measureElement}
                             style={{
-                                height: `${virtualItem.size}px`,
                                 left: 0,
                                 position: "absolute",
                                 top: 0,
@@ -347,25 +354,27 @@ const VirtualizedThreadList: FC<{
                                     );
                                 })()
                             ) : (
-                                <SortableThreadItem
-                                    expandedThreads={props.expandedThreads}
-                                    handleCreateBranch={props.handleCreateBranch}
-                                    handleDeleteThread={props.handleDeleteThread}
-                                    handleDownloadThread={props.handleDownloadThread}
-                                    handleMouseEnter={props.handleMouseEnter}
-                                    handlePinThread={props.handlePinThread}
-                                    handleThreadToggle={props.handleThreadToggle}
-                                    handleUnpinThread={props.handleUnpinThread}
-                                    index={item.index}
-                                    isSelected={props.selectedThreadIds.has(item.thread.threadId)}
-                                    isSelectionMode={props.isSelectionMode}
-                                    key={item.thread.threadId}
-                                    loadingStates={props.loadingStates}
-                                    node={item.thread}
-                                    selectedThreadIds={props.selectedThreadIds}
-                                    toggleExpanded={props.toggleExpanded}
-                                    updateThread={props.updateThread}
-                                />
+                                <div className="pb-1.5">
+                                    <SortableThreadItem
+                                        expandedThreads={props.expandedThreads}
+                                        handleCreateBranch={props.handleCreateBranch}
+                                        handleDeleteThread={props.handleDeleteThread}
+                                        handleDownloadThread={props.handleDownloadThread}
+                                        handleMouseEnter={props.handleMouseEnter}
+                                        handlePinThread={props.handlePinThread}
+                                        handleThreadToggle={props.handleThreadToggle}
+                                        handleUnpinThread={props.handleUnpinThread}
+                                        index={item.index}
+                                        isSelected={props.selectedThreadIds.has(item.thread.threadId)}
+                                        isSelectionMode={props.isSelectionMode}
+                                        key={item.thread.threadId}
+                                        loadingStates={props.loadingStates}
+                                        node={item.thread}
+                                        selectedThreadIds={props.selectedThreadIds}
+                                        toggleExpanded={props.toggleExpanded}
+                                        updateThread={props.updateThread}
+                                    />
+                                </div>
                             )}
                         </div>
                     );
@@ -441,7 +450,11 @@ const HierarchicalThreadList: FC<
     const handleUnpinThread = useStableCallback(threadHandlers.handleUnpinThread);
     const updateThread = useStableCallback(threadHandlers.updateThread);
 
-    const { isPlaceholderData, threadGroups, threadsData } = useThreadGroups(
+    const {
+        isPlaceholderData,
+        threadGroups: allThreadGroups,
+        threadsData,
+    } = useThreadGroups(
         collapsedGroups,
         collapsedProjects,
         searchQuery,
@@ -451,6 +464,40 @@ const HierarchicalThreadList: FC<
         threadSearchResults,
         messageSearchResults,
     );
+
+    // The section bar's choice. A search looks through every thread, so while one is typed or shown the filter stands aside.
+    const sectionFilter = useThreadListUIStore(selectSectionFilter);
+    const setSectionCounts = useThreadListUIStore((state) => state.setSectionCounts);
+    const typedSearchQuery = useThreadListUIStore((state) => state.searchQuery);
+    const isSearching = searchQuery.trim() !== "" || typedSearchQuery.trim() !== "";
+    // Groups the filter shows pass through as the same objects, so the rows under them do not re-render. Drag-and-drop works on
+    // `allThreadGroups`: an order built from the filtered groups would drop the hidden threads from it.
+    const filteredGroups = useMemo(
+        () => (isSearching ? allThreadGroups : filterGroupsBySection(allThreadGroups, sectionFilter, currentThreadId)),
+        [allThreadGroups, currentThreadId, isSearching, sectionFilter],
+    );
+    // The same groups keep the same list: a new array re-derives every row's inputs (the pull request counts' ids among them) for nothing.
+    // Adjusted during render, as `previousInputs` in the list's owner does, so the list and the groups change together.
+    const [shownGroups, setShownGroups] = useState<ThreadGroup[]>(filteredGroups);
+    let threadGroups = shownGroups;
+
+    if (!sameGroupList(shownGroups, filteredGroups)) {
+        threadGroups = filteredGroups;
+        setShownGroups(filteredGroups);
+    }
+
+    // The bar's counts are the loaded rows of the unfiltered list; the dock beside the list reads them from the store.
+    useEffect(() => {
+        if (isSearching || !threadsData) {
+            return;
+        }
+
+        const counts = countSections(allThreadGroups);
+
+        if (!sameSectionCounts(counts, useThreadListUIStore.getState().sectionCounts)) {
+            setSectionCounts(counts);
+        }
+    }, [allThreadGroups, isSearching, setSectionCounts, threadsData]);
 
     // Create a map of projectId to project data for quick lookup
     const projectsMap = useMemo(() => {
@@ -773,7 +820,7 @@ const HierarchicalThreadList: FC<
             }
 
             // While the list is the stored copy, orders built from it are stale (chats made elsewhere would sink, deleted ones linger), and its stand-in project group spans projects.
-            if (isDragBlocked(threadGroups, isPlaceholderData, active.id, over.id)) {
+            if (isDragBlocked(allThreadGroups, isPlaceholderData, active.id, over.id)) {
                 return;
             }
 
@@ -782,7 +829,7 @@ const HierarchicalThreadList: FC<
             });
 
             try {
-                await applyDragEnd(active, over, threadGroups, {
+                await applyDragEnd(active, over, allThreadGroups, {
                     moveThreadToProject,
                     updateProjectOrder: updateProjectOrderMutation,
                     updateThreadOrder: updateThreadOrderMutation,
@@ -795,7 +842,7 @@ const HierarchicalThreadList: FC<
                 return { ...previous, reordering: false };
             });
         },
-        [setLoadingStates, updateThreadOrderMutation, updateProjectOrderMutation, threadGroups, isPlaceholderData, moveThreadToProject, t],
+        [setLoadingStates, updateThreadOrderMutation, updateProjectOrderMutation, allThreadGroups, isPlaceholderData, moveThreadToProject, t],
     );
 
     // Keyboard shortcuts - extracted to dedicated hook
@@ -903,13 +950,25 @@ const HierarchicalThreadList: FC<
     }
 
     // Show empty state if no threads (check threadGroups to include temporary threads)
+    // A section filter that hides every row is not an empty account: say what is empty, and keep the bar (in the dock) to change it.
+    if (threadGroups.length === 0 && allThreadGroups.length > 0 && !searchQuery.trim()) {
+        return (
+            <>
+                <div className="text-muted-foreground px-3 py-8 text-center text-sm">
+                    <p>{t`No threads in this section`}</p>
+                </div>
+                {threadHandlers.confirmDialog}
+            </>
+        );
+    }
+
     if (threadGroups.length === 0 && !searchQuery.trim()) {
         return (
             <>
                 <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
                     <p className="text-muted-foreground">{t`No threads yet`}</p>
                     <p className="text-muted-foreground text-xs">{t`Start a new conversation to create your first thread`}</p>
-                    <p className="mt-2 text-xs opacity-70">{t`Press ? for keyboard shortcuts`}</p>
+                    <p className="text-muted-foreground mt-2 text-xs">{t`Press ? for keyboard shortcuts`}</p>
                 </div>
                 {threadHandlers.confirmDialog}
             </>
@@ -922,7 +981,7 @@ const HierarchicalThreadList: FC<
             <>
                 <div className="text-muted-foreground px-3 py-8 text-center text-sm">
                     <p role="alert">{t`Search failed for "${searchQuery}". Try again.`}</p>
-                    <p className="mt-2 text-xs opacity-70">{t`Press ? for keyboard shortcuts`}</p>
+                    <p className="text-muted-foreground mt-2 text-xs">{t`Press ? for keyboard shortcuts`}</p>
                 </div>
                 {threadHandlers.confirmDialog}
             </>
@@ -948,7 +1007,7 @@ const HierarchicalThreadList: FC<
                             </p>
                         </>
                     )}
-                    <p className="mt-2 text-xs opacity-70">{t`Press ? for keyboard shortcuts`}</p>
+                    <p className="text-muted-foreground mt-2 text-xs">{t`Press ? for keyboard shortcuts`}</p>
                 </div>
                 {threadHandlers.confirmDialog}
             </>

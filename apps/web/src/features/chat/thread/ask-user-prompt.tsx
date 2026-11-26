@@ -204,7 +204,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const unreadFiles = output?.answered ? (output.unreadFiles ?? []) : [];
 
     return (
-        <div aria-labelledby={headingId} className="bg-muted/40 mb-4 rounded-lg border p-3 outline-none" ref={groupRef} role="group" tabIndex={-1}>
+        <div aria-labelledby={headingId} className="surface-raised mb-4 rounded-xl p-3 outline-none" ref={groupRef} role="group" tabIndex={-1}>
             <div className="flex items-start gap-2">
                 <MessageCircleQuestion aria-hidden="true" className="text-primary-text mt-0.5 size-4 shrink-0" />
                 <div className="min-w-0 flex-1">

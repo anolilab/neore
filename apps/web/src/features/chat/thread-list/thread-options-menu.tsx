@@ -2,12 +2,13 @@ import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
 import cn from "@neore/ui/utils/cn";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { MoreHorizontal } from "lucide-react";
+import type { ReactNode } from "react";
 import { useRef } from "react";
 
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
@@ -17,11 +18,13 @@ import { useThreadFollow } from "../follows/use-thread-follow";
 import { useOpenChatClick } from "../split/use-open-chat";
 
 interface ThreadOptionsMenuProps {
+    /** The row's own actions (create branch, move, tags, lock, download, delete), after the thread-level items. Their dialogs live in the row, not here: this content unmounts when the menu closes. */
+    children?: ReactNode;
     /** Where this copy of the menu shows: `className` for the wrapper, which is `display: contents` while it shows. */
     className?: string;
     /** A host-run chat's title is not generated in the cloud, so it gets no Regenerate; Rename still works. */
     isHostRun: boolean;
-    /** A locked chat keeps its title (the server refuses a rename or regenerate), so it gets no menu. */
+    /** A locked chat keeps its title (the server refuses a rename or regenerate), so it gets no rename, regenerate or side chat. */
     isLocked: boolean;
     /** The row's accessible name, from the thread title. */
     label: string;
@@ -33,8 +36,19 @@ interface ThreadOptionsMenuProps {
     threadId: string;
 }
 
-/** The row's options menu. Holds the thread-level actions that have no row control of their own. */
-const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange, onOpenInSplitView, onRename, open, threadId }: ThreadOptionsMenuProps) => {
+/** The row's options menu. Holds the thread-level actions that have no row control of their own, and the row's less-used ones. */
+const ThreadOptionsMenu = ({
+    children,
+    className,
+    isHostRun,
+    isLocked,
+    label,
+    onOpenChange,
+    onOpenInSplitView,
+    onRename,
+    open,
+    threadId,
+}: ThreadOptionsMenuProps) => {
     const { t } = useLingui();
     // The action client: a regenerate must fail now when offline, not replay later from a queue, and is one request, not retried.
     const { isPending, mutate: regenerateTitle } = useMutation({
@@ -53,11 +67,6 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
         retry: 0,
     });
     const follow = useThreadFollow(threadId, { enabled: open && !isLocked });
-
-    // A locked row keeps only the split-view item: the server refuses its rename and its regenerate.
-    if (isLocked && !onOpenInSplitView) {
-        return null;
-    }
 
     const sideChatRefusal = (reason: string): string => {
         switch (reason) {
@@ -202,6 +211,12 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
                         <DropdownMenuItem disabled={follow.isPending} onClick={() => follow.setState("muted")}>
                             {t`Mute thread`}
                         </DropdownMenuItem>
+                    )}
+                    {children !== undefined && children !== null && (
+                        <>
+                            <DropdownMenuSeparator />
+                            {children}
+                        </>
                     )}
                 </DropdownMenuContent>
             </DropdownMenu>

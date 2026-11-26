@@ -102,7 +102,7 @@ const ThreadGroupRenderer: FC<ThreadGroupRendererProps> = memo(
 
                 {/* Group Threads */}
                 {!group.isCollapsed && (
-                    <div className="space-y-1">
+                    <div className="space-y-1.5">
                         {group.threads.length === 0 ? (
                             <div className="text-muted-foreground px-2 py-4 text-center text-xs">
                                 {group.projectId ? t`Drop threads here to add them to this project` : t`No threads in this group`}

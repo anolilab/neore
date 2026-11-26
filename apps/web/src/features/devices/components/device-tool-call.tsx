@@ -30,8 +30,7 @@ const FAILED: ReadonlySet<DeviceCallDisplay> = new Set(["denied", "expired", "fa
 
 const formatJson = (value: unknown): string => (typeof value === "string" ? value : JSON.stringify(value, null, 2));
 
-const PRE_CLASS =
-    "mt-1 max-h-64 overflow-auto rounded border border-gray-200 bg-white/60 p-2 font-mono whitespace-pre-wrap dark:border-gray-700 dark:bg-black/20";
+const PRE_CLASS = "mt-1 max-h-64 overflow-auto surface-well rounded-lg p-2 font-mono whitespace-pre-wrap";
 
 const SectionLabel: FC<{ children: string; id: string }> = ({ children, id }) => (
     <span className="font-semibold uppercase opacity-60" id={id}>

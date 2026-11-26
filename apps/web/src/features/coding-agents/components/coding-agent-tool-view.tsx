@@ -46,7 +46,7 @@ const CodingAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
     const isWaiting = !isDenied && !output?.error && part.state !== "output-error" && part.state !== "output-available";
 
     return (
-        <div className="text-muted-foreground my-2 flex items-center gap-2 rounded-lg border p-3 text-sm">
+        <div className="text-muted-foreground surface-raised my-2 flex items-center gap-2 rounded-xl p-3 text-sm">
             {isWaiting ? (
                 <Loader2 aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />
             ) : (

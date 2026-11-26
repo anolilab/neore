@@ -142,9 +142,9 @@ const ComposerLanguageSelector: FC = () => {
                             aria-label={t`Response language: ${selectedLanguageItem.label}`}
                             render={
                                 <Button
-                                    className="bg-sidebar border-border dark:border-sidebar-border/15 hover:bg-accent/50 dark:hover:bg-sidebar-accent/30 hover:border-border dark:hover:border-sidebar-border/50 text-foreground h-7 justify-between gap-1 px-2 dark:text-white"
+                                    className="hover:bg-surface-row-hover dark:hover:bg-surface-row-hover text-muted-foreground hover:text-foreground h-7 justify-between gap-1 rounded-lg bg-transparent px-2"
                                     size="sm"
-                                    variant="outline"
+                                    variant="ghost"
                                 />
                             }
                         >

@@ -221,7 +221,7 @@ const RouteComponent = () => {
                 {/* The inset's margins sit inside the viewport height; clip them so the page does not scroll. */}
                 <div className="flex h-dvh w-full overflow-hidden">
                     <AppSidebar content={sidebarContent} name="overlay" />
-                    <SidebarInset className="dark:bg-sidebar-foreground bg-white md:peer-data-[variant=inset]:m-1">
+                    <SidebarInset className="bg-surface-main">
                         <SiteHeader>
                             <Breadcrumb>
                                 <BreadcrumbList>

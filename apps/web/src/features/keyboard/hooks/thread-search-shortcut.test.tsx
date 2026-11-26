@@ -1,5 +1,5 @@
 /**
- * Focus Search against the real thread-list header and search bar, driven by a real
+ * Focus Search against the real thread-list dock and search field, driven by a real
  * keydown through the keyboard manager, so a selector that matches nothing fails here.
  */
 
@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useThreadListUIStore } from "@/features/chat/thread-list/stores/thread-list-ui-store";
-import ThreadListHeader from "@/features/chat/thread-list/thread-list-header";
+import ThreadListDock from "@/features/chat/thread-list/thread-list-dock";
 import { KeyboardShortcutsManager } from "@/features/keyboard/components/keyboard-shortcuts-manager";
 
 import useKeyboardShortcutHandler from "./use-keyboard-shortcut-handler";
@@ -37,47 +37,18 @@ vi.mock("@tanstack/react-router", () => {
     };
 });
 
-vi.mock("@/features/auth/lib/auth-ui-provider", () => {
-    return {
-        useAuth: () => {
-            return {
-                hooks: {
-                    useActiveOrganization: () => {
-                        return { data: undefined };
-                    },
-                    useListOrganizations: () => {
-                        return { data: [] };
-                    },
-                },
-            };
-        },
-    };
-});
-
 // Backend-bound children the search does not depend on.
-vi.mock("@/features/auth/components/organization/organization-switcher", () => {
-    return {
-        default: () => null,
-    };
-});
-vi.mock("@/features/auth/components/team/team-switcher", () => {
-    return {
-        default: () => null,
-    };
-});
 vi.mock("@/features/chat/group/create-group-chat-button", () => {
     return {
         default: () => null,
     };
 });
-vi.mock("@/features/chat/tags/thread-category-filter", () => {
-    return {
-        default: () => null,
-    };
+vi.mock("@/features/chat/tags/thread-categories", () => {
+    return { THREAD_CATEGORY_LABELS: {} };
 });
-vi.mock("@/features/chat/tags/thread-tag-filter", () => {
+vi.mock("@/features/chat/tags/use-thread-tags", () => {
     return {
-        default: () => null,
+        useThreadTags: () => [],
     };
 });
 
@@ -103,7 +74,7 @@ describe("Focus Search shortcut", () => {
     it("opens a closed search bar and focuses its input", () => {
         render(
             <Shortcuts>
-                <ThreadListHeader />
+                <ThreadListDock />
             </Shortcuts>,
         );
 
@@ -119,7 +90,7 @@ describe("Focus Search shortcut", () => {
     it("moves focus to the input of a search bar that is already open", () => {
         render(
             <Shortcuts>
-                <ThreadListHeader />
+                <ThreadListDock />
                 <button type="button">elsewhere</button>
             </Shortcuts>,
         );
@@ -140,7 +111,7 @@ describe("Focus Search shortcut", () => {
         render(
             <Shortcuts>
                 <div data-slot="sidebar" data-state="collapsed">
-                    <ThreadListHeader />
+                    <ThreadListDock />
                 </div>
             </Shortcuts>,
         );

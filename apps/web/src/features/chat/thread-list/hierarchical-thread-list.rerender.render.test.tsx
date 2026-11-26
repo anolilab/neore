@@ -107,6 +107,11 @@ vi.mock("@tanstack/react-router", () => {
     };
 });
 
+// The row reads the model name from the cached gateway catalog; these tests have none.
+vi.mock("@/hooks/use-cached-model-name", () => {
+    return { default: (): undefined => undefined };
+});
+
 vi.mock("@tanstack/react-query", () => {
     return {
         // Queries answer with nothing: the rows under test read their data from the props and the stores, not from these.
@@ -295,7 +300,7 @@ vi.mock("@/features/chat/tags/thread-tag-chips", () => {
 });
 
 vi.mock("@/features/chat/tags/thread-tags-menu", () => {
-    return { default: () => null };
+    return { ThreadTagsMenuItems: () => null, default: () => null };
 });
 
 vi.mock("@/features/projects/components/move-to-project-dialog", () => {
@@ -411,7 +416,7 @@ describe("the sidebar thread list", () => {
     it("highlights the row the arrow keys select, by its thread, and no other", () => {
         const { container } = render(<HierarchicalThreadList {...listProps} currentThreadId={first} />);
         // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the highlight is only a class
-        const highlighted = () => [...container.querySelectorAll<HTMLElement>("[data-thread-id]")].filter((row) => row.className.includes("ring-white/50"));
+        const highlighted = () => [...container.querySelectorAll<HTMLElement>("[data-thread-id]")].filter((row) => row.classList.contains("ring-2"));
 
         fireEvent.keyDown(document.body, { key: "ArrowDown" });
         fireEvent.keyDown(document.body, { key: "ArrowDown" });
@@ -447,9 +452,9 @@ describe("the sidebar thread list", () => {
             }, nestedIds);
 
             expect(updatedRows).toStrictEqual([childId, plainId]);
-            expect(classesOf(container, childId)).toContain("bg-white/20");
-            expect(classesOf(container, parentId)).not.toContain("bg-white/20");
-            expect(classesOf(container, plainId)).not.toContain("bg-white/20");
+            expect(classesOf(container, childId)).toContain("bg-surface-row-active");
+            expect(classesOf(container, parentId)).not.toContain("bg-surface-row-active");
+            expect(classesOf(container, plainId)).not.toContain("bg-surface-row-active");
         });
 
         it("moves the arrow keys' highlight from the parent onto its branch, re-rendering only those two rows", () => {
@@ -459,8 +464,8 @@ describe("the sidebar thread list", () => {
             fireEvent.keyDown(document.body, { key: "ArrowDown" });
 
             expect(rowsUpdatedBy(() => fireEvent.keyDown(document.body, { key: "ArrowDown" }), nestedIds)).toStrictEqual([parentId, childId]);
-            expect(classesOf(container, childId)).toContain("ring-white/50");
-            expect(classesOf(container, parentId)).not.toContain("ring-white/50");
+            expect(classesOf(container, childId)).toContain("ring-2");
+            expect(classesOf(container, parentId)).not.toContain("ring-2");
         });
     });
 });

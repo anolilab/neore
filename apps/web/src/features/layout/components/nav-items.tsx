@@ -18,13 +18,14 @@ const colorModeClasses = {
         iconActive: "text-white",
         label: "text-white/90",
     },
+    // On the app's canvas, in either theme: rows like the thread list's, the current page lifted as a raised row.
     light: {
-        button: "text-gray-700 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800",
-        buttonActive: "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white",
+        button: "h-9 rounded-[10px] text-muted-foreground hover:bg-surface-row-hover hover:text-foreground",
+        buttonActive: "bg-surface-row-active text-foreground surface-edge",
         group: "group-data-[collapsible=icon]:hidden",
-        icon: "text-gray-600 dark:text-gray-400",
-        iconActive: "text-gray-900 dark:text-white",
-        label: "text-gray-700 dark:text-gray-300",
+        icon: "text-muted-foreground",
+        iconActive: "text-foreground",
+        label: "self-stretch font-mono text-xs text-muted-foreground",
     },
 };
 

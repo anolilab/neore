@@ -52,7 +52,7 @@ export const ComposerPermissionMode: FC<ComposerPermissionModeProps> = ({ disabl
 
     const noteId = useId();
     const buttonClass =
-        "bg-sidebar border-border dark:border-sidebar-border/15 hover:bg-accent/50 dark:hover:bg-sidebar-accent/30 text-foreground h-11 gap-1 px-2 sm:h-7 dark:text-white";
+        "bg-transparent hover:bg-surface-row-hover dark:hover:bg-surface-row-hover rounded-lg text-muted-foreground hover:text-foreground h-11 gap-1 px-2 sm:h-7";
 
     // Read-only with a reason (a comparison column): no menu, and `aria-disabled` rather than `disabled`, so a keyboard user can still
     // focus the control and hear why it cannot be changed here.
@@ -64,7 +64,7 @@ export const ComposerPermissionMode: FC<ComposerPermissionModeProps> = ({ disabl
                 aria-label={t`Permission mode: ${labels[mode]}`}
                 className={buttonClass}
                 title={note}
-                variant="outline"
+                variant="ghost"
             >
                 <ShieldCheck aria-hidden="true" className="size-3 shrink-0" />
                 <span className="hidden sm:inline">{labels[mode]}</span>
@@ -79,7 +79,7 @@ export const ComposerPermissionMode: FC<ComposerPermissionModeProps> = ({ disabl
         <DropdownMenu>
             <DropdownMenuTrigger
                 render={
-                    <Button aria-label={t`Permission mode: ${labels[mode]}`} className={buttonClass} disabled={disabled} variant="outline">
+                    <Button aria-label={t`Permission mode: ${labels[mode]}`} className={buttonClass} disabled={disabled} variant="ghost">
                         <ShieldCheck aria-hidden="true" className="size-3 shrink-0" />
                         <span className="hidden sm:inline">{labels[mode]}</span>
                     </Button>

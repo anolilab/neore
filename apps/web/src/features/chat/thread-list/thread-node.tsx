@@ -8,7 +8,16 @@ import { forgetUnlockProof, LUNORA_ID_SOURCE, useUnlockProof } from "@neore/clie
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { Checkbox } from "@neore/ui/components/checkbox";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
+    DropdownMenuTrigger,
+} from "@neore/ui/components/responsive-dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@neore/ui/components/tooltip";
 import Discord from "@neore/ui/icons/discord";
 import Line from "@neore/ui/icons/line";
@@ -33,6 +42,7 @@ import {
     GitPullRequestArrow,
     GripVertical,
     HourglassIcon,
+    Laptop,
     Loader2,
     Lock,
     Pin,
@@ -56,10 +66,11 @@ import { openThreadInSplitView, useSplitLayoutStore } from "@/features/chat/spli
 import { useChatHasDraft } from "@/features/chat/split/use-chat-has-draft";
 import { THREAD_CATEGORY_LABELS } from "@/features/chat/tags/thread-categories";
 import ThreadTagChips from "@/features/chat/tags/thread-tag-chips";
-import ThreadTagsMenu from "@/features/chat/tags/thread-tags-menu";
+import { ThreadTagsMenuItems } from "@/features/chat/tags/thread-tags-menu";
 import { usePullRequestCount } from "@/features/develop/components/pull-request-counts";
 import { focusThreadSearchToggle } from "@/features/keyboard/lib/thread-search-target";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
+import useCachedModelName from "@/hooks/use-cached-model-name";
 import { useHasOpened } from "@/hooks/use-has-opened";
 import { LOAD_MARKS, useLoadMarkWhenVisible } from "@/lib/analytics/load-marks";
 import { createLunoraQueryOptions, useCRPC, useLunora } from "@/lib/lunora/crpc";
@@ -69,7 +80,10 @@ import { showError, showWarning } from "@/lib/toast";
 import { useIsKeyboardSelected } from "./contexts/keyboard-selection-context";
 import useCanHover from "./hooks/use-can-hover";
 import { useConfirmBeforeDelete } from "./hooks/use-confirm-before-delete";
+import useMinuteClock from "./hooks/use-minute-clock";
 import { useThreadStateActions } from "./hooks/use-thread-state-actions";
+import type { Elapsed } from "./lib/elapsed";
+import { describeElapsed } from "./lib/elapsed";
 import { releaseBlinkWindow } from "./lib/needs-you-blink";
 import { hasUnreadReply, isSnoozed } from "./lib/thread-state-rules";
 import MessageSearchMatches from "./message-search-matches";
@@ -224,6 +238,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     updateThread,
 }) => {
     const { i18n, t } = useLingui();
+    // One shared tick per minute for every row's relative time.
+    const clock = useMinuteClock();
     const crpc = useCRPC();
     const lunoraClient = useLunora();
 
@@ -342,6 +358,33 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const [snoozeMenuNow, setSnoozeMenuNow] = useState(0);
     const { snooze, unsnooze } = useThreadStateActions();
 
+    // The short form a row's time shows: now, 5m, 2h, 3d, then the date.
+    const formatElapsed = (elapsed: Elapsed): string => {
+        switch (elapsed.kind) {
+            case "date": {
+                return new Intl.DateTimeFormat(i18n.locale, { day: "numeric", month: "short" }).format(elapsed.value);
+            }
+            case "day": {
+                const days = elapsed.value;
+
+                return t`${days}d`;
+            }
+            case "hour": {
+                const hours = elapsed.value;
+
+                return t`${hours}h`;
+            }
+            case "minute": {
+                const minutes = elapsed.value;
+
+                return t`${minutes}m`;
+            }
+            default: {
+                return t`now`;
+            }
+        }
+    };
+
     const formatRemainingTime = useCallback(
         (expiresAt?: number): string | null => {
             if (!expiresAt) {
@@ -447,21 +490,210 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const containerClassName = useMemo(
         () =>
             cn(
-                "cursor-pointer web:hover:bg-white/10 focus-visible:bg-white/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                isActive && "bg-white/20",
-                isKeyboardSelected && "bg-white/10 ring-2 ring-white/50",
-                isSelectionMode && isSelected && "bg-white/15",
-                !isRootThread && "ml-6",
+                "bg-surface-row web:hover:bg-surface-row-hover has-[a:focus-visible]:ring-ring cursor-pointer rounded-xl has-[a:focus-visible]:ring-2",
+                isActive && "bg-surface-row-active web:hover:bg-surface-row-active surface-edge bg-(image:--surface-glow)",
+                isKeyboardSelected && "ring-ring ring-2",
+                isSelectionMode && isSelected && "bg-surface-row-active web:hover:bg-surface-row-active",
+                !isRootThread && "ml-4",
                 (isDeleting || loadingStates.reordering) && "pointer-events-none opacity-50",
             ),
         [isActive, isKeyboardSelected, isSelectionMode, isSelected, isRootThread, isDeleting, loadingStates.reordering],
     );
 
+    const handleDeleteClick = () => {
+        if (confirmBeforeDelete) {
+            setShowDeleteDialog(true);
+
+            return;
+        }
+
+        // The row leaves at once and takes this menu with it, so focus goes to the search toggle first, which stays. The menu returns
+        // focus to its trigger as it closes, so the toggle gets it again once that has happened.
+        focusThreadSearchToggle();
+        handleDeleteThread(node.threadId);
+        globalThis.setTimeout(focusThreadSearchToggle, 0);
+    };
+
+    const handleConvertToPermanent = async () => {
+        if (isConverting) {
+            return;
+        }
+
+        setIsConverting(true);
+
+        try {
+            await convertToPermanent({ threadId: node.threadId as Id<"threads"> });
+        } catch (error) {
+            console.error("Failed to convert thread:", error);
+        }
+
+        setIsConverting(false);
+    };
+
+    // The row's less-used actions, in the options menu. Each keeps the name its own button had. Their dialogs are rendered by the row,
+    // not here: the menu's content unmounts when it closes, and a dialog opened from it would go with it.
+    const rowMenuItems = (
+        <>
+            <DropdownMenuItem
+                aria-label={named(isBranching ? t`Creating branch...` : t`Create branch`)}
+                disabled={isBranching}
+                onClick={() => handleCreateBranch(node.threadId)}
+            >
+                {isBranching ? <Loader2 aria-hidden="true" className="animate-spin" /> : <GitBranch aria-hidden="true" />}
+                {isBranching ? t`Creating branch...` : t`Create branch`}
+            </DropdownMenuItem>
+            <DropdownMenuItem aria-label={named(t`Move to project`)} onClick={() => setShowMoveToProjectDialog(true)}>
+                <Folder aria-hidden="true" />
+                {t`Move to project`}
+            </DropdownMenuItem>
+            {canOpenWindow && (
+                <DropdownMenuItem
+                    aria-label={named(t`Open in new window`)}
+                    onClick={() => {
+                        void openThreadWindow(node.threadId);
+                    }}
+                >
+                    <ExternalLink aria-hidden="true" />
+                    {t`Open in new window`}
+                </DropdownMenuItem>
+            )}
+            {isTemporary ? (
+                // Temporary chats expire and are deleted, so a tag would outlive nothing. Shown inert rather than hidden, so the reason is findable.
+                <DropdownMenuItem
+                    aria-label={named(t`Tags unavailable for temporary chats`)}
+                    disabled
+                    title={t`Temporary chats expire, so they can't be tagged. Convert it to a permanent chat to add tags.`}
+                >
+                    <Tag aria-hidden="true" />
+                    {t`Tags`}
+                </DropdownMenuItem>
+            ) : (
+                <DropdownMenuSub>
+                    <DropdownMenuSubTrigger aria-label={t`Tags for ${displayTitle}`}>
+                        <Tag aria-hidden="true" />
+                        {t`Tags`}
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="w-52">
+                        <ThreadTagsMenuItems
+                            onManageTags={() => {
+                                setShowManageTagsDialog(true);
+                            }}
+                            tagIds={node.tagIds}
+                            threadId={node.threadId}
+                        />
+                    </DropdownMenuSubContent>
+                </DropdownMenuSub>
+            )}
+            {(!isImpersonating || (isLocked && !isUnlocked)) && (
+                <DropdownMenuSub>
+                    <DropdownMenuSubTrigger aria-label={named(isLocked ? t`Chat lock: locked` : t`Chat lock`)}>
+                        <Lock aria-hidden="true" />
+                        {t`Chat lock`}
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                        {isLocked ? (
+                            <>
+                                {isUnlocked && !isImpersonating && (
+                                    <DropdownMenuItem
+                                        onClick={() => {
+                                            lockNow({ threadId: node.threadId as Id<"threads"> });
+                                        }}
+                                    >
+                                        {t`Lock now`}
+                                    </DropdownMenuItem>
+                                )}
+                                {!isUnlocked && <DropdownMenuItem onClick={() => setLockMode("unlock")}>{t`Unlock chat`}</DropdownMenuItem>}
+                                {!isImpersonating && (
+                                    <>
+                                        <DropdownMenuItem onClick={() => setLockMode("change")}>{t`Change passcode`}</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setLockMode("remove")}>{t`Remove passcode`}</DropdownMenuItem>
+                                    </>
+                                )}
+                            </>
+                        ) : (
+                            !isImpersonating && <DropdownMenuItem onClick={() => setLockMode("set")}>{t`Lock chat`}</DropdownMenuItem>
+                        )}
+                    </DropdownMenuSubContent>
+                </DropdownMenuSub>
+            )}
+            <DropdownMenuSub>
+                <DropdownMenuSubTrigger aria-label={named(isDownloading ? t`Downloading...` : t`Download thread`)} disabled={isDownloading}>
+                    {isDownloading ? <Loader2 aria-hidden="true" className="animate-spin" /> : <DownloadIcon aria-hidden="true" />}
+                    {isDownloading ? t`Downloading...` : t`Download thread`}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                    <DropdownMenuItem onClick={() => handleDownloadThread(node, "json")}>JSON</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleDownloadThread(node, "txt")}>TXT</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleDownloadThread(node, "pdf")}>PDF</DropdownMenuItem>
+                </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            {isTemporary && (
+                <DropdownMenuItem
+                    aria-label={named(isConverting ? t`Converting...` : t`Convert to permanent`)}
+                    disabled={isConverting}
+                    onClick={handleConvertToPermanent}
+                >
+                    {isConverting ? <Loader2 aria-hidden="true" className="animate-spin" /> : <HourglassIcon aria-hidden="true" />}
+                    {isConverting ? t`Converting...` : t`Convert to permanent`}
+                </DropdownMenuItem>
+            )}
+            {!isImpersonating && (
+                <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                        aria-label={named(isDeleting ? t`Deleting...` : t`Delete thread`)}
+                        disabled={isDeleting}
+                        onClick={handleDeleteClick}
+                        variant="destructive"
+                    >
+                        {isDeleting ? <Loader2 aria-hidden="true" className="animate-spin" /> : <TrashIcon aria-hidden="true" />}
+                        {isDeleting ? t`Deleting...` : t`Delete thread`}
+                    </DropdownMenuItem>
+                </>
+            )}
+        </>
+    );
+
+    const optionsMenuProps = {
+        children: rowMenuItems,
+        isHostRun: node.runner === "host",
+        isLocked,
+        label: displayTitle,
+        onOpenChange: (open: boolean) => setOptionsMenuThreadId(open ? node.threadId : null),
+        onOpenInSplitView: splitViewEnabled ? handleOpenInSplitView : undefined,
+        onRename: () => setRenameThreadId(node.threadId),
+        threadId: node.threadId,
+    };
+
+    const timeLabel = formatElapsed(describeElapsed(node.updatedAt ?? node.lastReplyAt ?? node.createdAt, clock));
+    const isArchived = node.status === "archived";
+    const hasTags = node.tags !== undefined && node.tags.length > 0;
+    const hasCategory = node.category !== undefined && node.category !== "" && node.category !== "general";
+    const hasMatches = node.relevantMessages !== undefined && node.relevantMessages.length > 0;
+    const isHostRun = node.runner === "host";
+    // The model stands in when nothing else has anything to say; a locked chat shows nothing about itself.
+    const cachedModelName = useCachedModelName(isLocked ? undefined : node.model);
+    const modelName = !isLocked && node.model ? (cachedModelName ?? node.model.split("/").pop() ?? node.model) : undefined;
+    const hasMeta =
+        hasChildren ||
+        hasTags ||
+        hasCategory ||
+        isHostRun ||
+        linkedPullRequests > 0 ||
+        hasDraft ||
+        isIdle ||
+        isTemporary ||
+        isArchived ||
+        !!node.source ||
+        hasMatches;
+    const showsModelFallback = !hasMeta && modelName !== undefined;
+    const hasSecondLine = hasMeta || showsModelFallback;
+
     const content = (
         <div
             // An outline takes no room, so the row does not shift when the mark comes and goes.
             className={cn(
-                "group/action-item relative flex items-center gap-2 overflow-hidden rounded-lg px-2.5 py-(--density-row-py)",
+                "group/action-item relative flex flex-col gap-[3px] overflow-hidden rounded-xl px-3 py-(--density-row-py)",
                 hasDraft && "outline-muted-foreground/60 outline-1 -outline-offset-1 outline-dashed",
             )}
             data-draft={hasDraft ? "" : undefined}
@@ -516,208 +748,238 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
             // A pointer shortcut: keyboard users reach the title link (and the row's buttons), so the row takes no role.
             role="presentation"
         >
-            {isSelectionMode && (
-                <Checkbox
-                    checked={isSelected}
-                    className="border-white/30 data-checked:border-white data-checked:bg-white"
-                    onCheckedChange={() => {
-                        // Selection is driven by onClick, which carries the shiftKey needed for range select.
-                    }}
-                    onClick={(e) => {
-                        e.stopPropagation();
-
-                        if (index !== undefined) {
-                            handleThreadToggle(node.threadId, index, e.shiftKey);
-                        }
-                    }}
-                />
-            )}
-
             {!isDeleting && !loadingStates.reordering && !isSelectionMode && (
                 <div
                     aria-label={named(t`Reorder`)}
-                    // A 24 × 24 px target (WCAG 2.5.8 at its minimum); the ring is the theme's, so it shows on the light sidebar too.
-                    className="focus-visible:ring-ring flex size-6 items-center justify-center rounded-sm opacity-0 transition-opacity group-hover/action-item:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none"
+                    // A 24 px tall target at the card's left edge; its icon sits in the card's padding, so the text does not move.
+                    className="focus-visible:ring-ring absolute top-1/2 -left-1.5 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-sm opacity-0 transition-opacity group-hover/action-item:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none"
                     data-reorder-handle=""
                     {...dragAttributes}
                     {...dragListeners}
                 >
-                    <GripVertical className="text-brand-black/60 dark:text-brand-white/60 h-3 w-3 cursor-grab active:cursor-grabbing" />
+                    <GripVertical className="text-muted-foreground size-3 cursor-grab active:cursor-grabbing" />
                 </div>
             )}
 
-            {loadingStates.reordering && <Loader2 className="text-brand-black/60 dark:text-brand-white/60 h-3 w-3 animate-spin" />}
+            {/* Line 1: what the thread is called and when it last moved. */}
+            <div className="flex h-5 min-w-0 items-center gap-1.5">
+                {isSelectionMode && (
+                    <Checkbox
+                        checked={isSelected}
+                        className="border-foreground/40 data-checked:border-foreground data-checked:bg-foreground"
+                        onCheckedChange={() => {
+                            // Selection is driven by onClick, which carries the shiftKey needed for range select.
+                        }}
+                        onClick={(e) => {
+                            e.stopPropagation();
 
-            {hasChildren && (
-                <Button
-                    aria-expanded={isExpanded}
-                    aria-label={named(isExpanded ? t`Collapse branches` : t`Expand branches`)}
-                    className="h-4 w-4 p-0"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        toggleExpanded(node.threadId);
-                    }}
-                    size="icon-sm"
-                    variant="ghost"
-                >
-                    {isExpanded ? <ChevronDown aria-hidden="true" className="h-3 w-3" /> : <ChevronRight aria-hidden="true" className="h-3 w-3" />}
-                </Button>
-            )}
-
-            <Tooltip>
-                <TooltipTrigger
-                    render={
-                        <span
-                            className={cn(
-                                "text-brand-black dark:text-brand-white flex flex-1 cursor-pointer items-center gap-1.5 truncate text-sm",
-                                // The pull under the trailing slot would clip the needs-you label at the row's edge.
-                                needsYou === undefined && "-mr-4",
-                                node.status === "archived" && "-mr-9",
-                            )}
-                        >
-                            {isStreaming && <ThreadStatusIcon status="running" threadId={node.threadId} />}
-                            {needsYou !== undefined && <ThreadStatusIcon status={needsYou} threadId={node.threadId} />}
-                            {isFailed && <ThreadStatusIcon status="error" threadId={node.threadId} />}
-                            {isComparisonParent && <GitCompareArrows aria-label={t`Model comparison`} className="text-muted-foreground h-3 w-3 shrink-0" />}
-                            {isLocked && <Lock aria-hidden="true" className="text-muted-foreground h-3 w-3 shrink-0" />}
-                            {isSelectionMode ? (
-                                <span className={cn("truncate", isUnread && "font-medium")}>{displayTitle}</span>
-                            ) : (
-                                // The title is the row's keyboard target: the row itself holds no role, so the link is what Tab reaches.
-                                <Link
-                                    className={cn(
-                                        "focus-visible:ring-ring truncate rounded-sm focus-visible:ring-2 focus-visible:outline-none",
-                                        isUnread && "font-medium",
-                                    )}
-                                    params={{ threadId: node.threadId }}
-                                    search={{}}
-                                    to="/chat/$threadId"
-                                >
-                                    {displayTitle}
-                                </Link>
-                            )}
-                            {isOpenInSplit && (
-                                <span
-                                    aria-label={t`Open in split view`}
-                                    className="bg-muted-foreground/60 inline-block size-1.5 shrink-0 rounded-full"
-                                    data-split-marker=""
-                                    role="img"
-                                />
-                            )}
-                            {needsYou !== undefined && (
-                                <span className={cn("shrink-0 text-xs", NEEDS_YOU_TEXT_CLASS)}>{needsYou === "approval" ? t`Approval` : t`Question`}</span>
-                            )}
-                            {hasDraft && <span className="text-muted-foreground shrink-0 text-xs">{t`Draft`}</span>}
-                            {linkedPullRequests > 0 && (
-                                <span
-                                    aria-label={t`Linked pull requests: ${linkedPullRequests}`}
-                                    className="text-muted-foreground inline-flex shrink-0 items-center gap-0.5 text-xs"
-                                >
-                                    <GitPullRequestArrow aria-hidden className="size-3" />
-                                    {linkedPullRequests}
-                                </span>
-                            )}
-                            {isIdle && <span className="text-muted-foreground shrink-0 text-xs">{t`Idle`}</span>}
-                        </span>
-                    }
-                />
-                <TooltipContent className="max-w-xs" side="right">
-                    <p className="break-words">{displayTitle}</p>
-                    {isStreaming && <p className="text-muted-foreground mt-1 text-xs">{t`Streaming...`}</p>}
-                    {isFailed && <p className="text-destructive mt-1 text-xs">{t`Response failed - try again`}</p>}
-                    {needsYou === "approval" && <p className="mt-1 text-xs">{t`Waiting for your approval`}</p>}
-                    {needsYou === "question" && <p className="mt-1 text-xs">{t`Waiting for your answer`}</p>}
-                </TooltipContent>
-            </Tooltip>
-
-            {/* Always mounted, so a thread that starts waiting is announced to a user whose focus is elsewhere. */}
-            <span className="sr-only" role="status">
-                {needsYou === "approval" && t`Waiting for your approval`}
-                {needsYou === "question" && t`Waiting for your answer`}
-            </span>
-
-            {isStreaming && !isSelectionMode && (
-                <Tooltip>
-                    <TooltipTrigger
-                        render={
-                            <Button
-                                aria-label={named(t`Stop generating`)}
-                                className="text-muted-foreground hover:text-foreground h-6 w-6 shrink-0 p-0 opacity-0 transition-none group-focus-within/action-item:opacity-100 group-hover/action-item:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
-                                disabled={isStopping}
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-
-                                    // Same as the composer's stop: queued prompts wait for the user instead of sending on their own.
-                                    usePromptQueueStore.getState().setPaused(node.threadId, true);
-                                    stopThreadStream(
-                                        { threadId: node.threadId as Id<"threads"> },
-                                        { onError: () => showError(t`Could not stop the reply. Please try again.`) },
-                                    );
-                                }}
-                                size="icon-sm"
-                                type="button"
-                                variant="ghost"
-                            >
-                                <CircleStop aria-hidden="true" className="h-4 w-4" />
-                            </Button>
-                        }
+                            if (index !== undefined) {
+                                handleThreadToggle(node.threadId, index, e.shiftKey);
+                            }
+                        }}
                     />
-                    <TooltipContent>{t`Stop generating`}</TooltipContent>
-                </Tooltip>
-            )}
+                )}
 
-            {node.tags && node.tags.length > 0 && <ThreadTagChips tags={node.tags} />}
+                {loadingStates.reordering && <Loader2 className="text-muted-foreground size-3 animate-spin" />}
 
-            {node.category && node.category !== "general" && (
-                <Badge className="text-xs capitalize" variant="secondary">
-                    {categoryLabel ? i18n._(categoryLabel) : node.category}
-                </Badge>
-            )}
-
-            {/* Messenger platform badge */}
-            {node.source && (
                 <Tooltip>
                     <TooltipTrigger
                         render={
-                            <span
-                                aria-label={t`Messages from ${sourceName}`}
-                                className={cn(
-                                    "flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] leading-none font-medium",
-                                    MESSENGER_BADGES[node.source]?.className ?? "bg-muted text-muted-foreground",
+                            <span className="text-foreground flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 text-[13.5px]">
+                                {isStreaming && <ThreadStatusIcon status="running" threadId={node.threadId} />}
+                                {needsYou !== undefined && <ThreadStatusIcon status={needsYou} threadId={node.threadId} />}
+                                {isFailed && <ThreadStatusIcon status="error" threadId={node.threadId} />}
+                                {isComparisonParent && <GitCompareArrows aria-label={t`Model comparison`} className="text-muted-foreground size-3 shrink-0" />}
+                                {isLocked && <Lock aria-hidden="true" className="text-muted-foreground size-3 shrink-0" />}
+                                {isSelectionMode ? (
+                                    <span className={cn("truncate", isUnread && "font-medium")}>{displayTitle}</span>
+                                ) : (
+                                    // The title is the row's keyboard target: the row itself holds no role, so the link is what Tab reaches.
+                                    <Link
+                                        className={cn("truncate rounded-sm focus-visible:outline-none", isUnread && "font-medium")}
+                                        params={{ threadId: node.threadId }}
+                                        search={{}}
+                                        to="/chat/$threadId"
+                                    >
+                                        {displayTitle}
+                                    </Link>
                                 )}
-                                role="img"
-                            >
-                                {renderMessengerBadgeIcon(node.source)}
-                                <span aria-hidden="true">{node.source}</span>
+                                {isOpenInSplit && (
+                                    <span
+                                        aria-label={t`Open in split view`}
+                                        className="bg-muted-foreground/60 inline-block size-1.5 shrink-0 rounded-full"
+                                        data-split-marker=""
+                                        role="img"
+                                    />
+                                )}
                             </span>
                         }
                     />
-                    <TooltipContent>{t`Messages from ${sourceName}`}</TooltipContent>
+                    <TooltipContent className="max-w-xs" side="right">
+                        <p className="break-words">{displayTitle}</p>
+                        {isStreaming && <p className="text-muted-foreground mt-1 text-xs">{t`Streaming...`}</p>}
+                        {isFailed && <p className="text-destructive mt-1 text-xs">{t`Response failed - try again`}</p>}
+                        {needsYou === "approval" && <p className="mt-1 text-xs">{t`Waiting for your approval`}</p>}
+                        {needsYou === "question" && <p className="mt-1 text-xs">{t`Waiting for your answer`}</p>}
+                    </TooltipContent>
                 </Tooltip>
+
+                {/* Always mounted, so a thread that starts waiting is announced to a user whose focus is elsewhere. */}
+                <span className="sr-only" role="status">
+                    {needsYou === "approval" && t`Waiting for your approval`}
+                    {needsYou === "question" && t`Waiting for your answer`}
+                </span>
+
+                {/* The time and marks give way to the action strip while the row is hovered, focused or has a menu open. */}
+                <span className="flex shrink-0 items-center gap-1.5 group-focus-within/action-item:invisible group-hover/action-item:invisible group-has-[[data-popup-open]]/action-item:invisible [@media(hover:none)]:group-focus-within/action-item:visible [@media(hover:none)]:group-hover/action-item:visible">
+                    {needsYou !== undefined && (
+                        <span className={cn("text-[11.5px] font-medium", NEEDS_YOU_TEXT_CLASS)}>{needsYou === "approval" ? t`Approval` : t`Question`}</span>
+                    )}
+                    <time
+                        className="text-muted-foreground text-xs tabular-nums"
+                        dateTime={new Date(node.updatedAt ?? node.lastReplyAt ?? node.createdAt).toISOString()}
+                    >
+                        {timeLabel}
+                    </time>
+                    {isUnread && (
+                        <>
+                            <span aria-hidden="true" className="bg-foreground size-1.5 shrink-0 rounded-full" />
+                            <span className="sr-only">{t`Unread`}</span>
+                        </>
+                    )}
+                </span>
+
+                {/* A touch screen has no hover to reveal the action strip: the options menu shows there by itself, in the row's flow, so it
+                    takes room from the title instead of covering it, and the rest of the strip stays hidden. */}
+                <ThreadOptionsMenu {...optionsMenuProps} className="hidden [@media(hover:none)]:contents" open={isOptionsMenuOpen && !canHover} />
+            </div>
+
+            {/* Line 2: what is attached to it. */}
+            {hasSecondLine && (
+                <div className="text-muted-foreground flex h-[18px] min-w-0 items-center gap-1.5 text-xs">
+                    {hasChildren && (
+                        <button
+                            aria-expanded={isExpanded}
+                            className="hover:text-foreground focus-visible:ring-ring -ml-1 inline-flex h-[18px] shrink-0 items-center gap-1 rounded px-1 focus-visible:ring-2 focus-visible:outline-none"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                toggleExpanded(node.threadId);
+                            }}
+                            type="button"
+                        >
+                            <GitBranch aria-hidden="true" className="size-3" />
+                            <Plural one="# branch" other="# branches" value={node.children.length} />
+                            {/* The name starts with the visible count (WCAG 2.5.3), then says what the button does to which thread. */}
+                            <span className="sr-only">, {named(isExpanded ? t`Collapse branches` : t`Expand branches`)}</span>
+                            {isExpanded ? <ChevronDown aria-hidden="true" className="size-3" /> : <ChevronRight aria-hidden="true" className="size-3" />}
+                        </button>
+                    )}
+                    {isHostRun && (
+                        <span className="inline-flex shrink-0 items-center gap-1">
+                            <Laptop aria-hidden="true" className="size-3" />
+                            {t`Runs on your computer`}
+                        </span>
+                    )}
+                    {hasTags && node.tags && <ThreadTagChips tags={node.tags} />}
+                    {hasCategory && (
+                        <Badge className="h-4 px-1.5 text-[10px] capitalize" variant="secondary">
+                            {categoryLabel ? i18n._(categoryLabel) : node.category}
+                        </Badge>
+                    )}
+                    {linkedPullRequests > 0 && (
+                        <span aria-label={t`Linked pull requests: ${linkedPullRequests}`} className="inline-flex shrink-0 items-center gap-0.5">
+                            <GitPullRequestArrow aria-hidden className="size-3" />
+                            {linkedPullRequests}
+                        </span>
+                    )}
+                    {hasDraft && <span className="shrink-0">{t`Draft`}</span>}
+                    {isIdle && <span className="shrink-0">{t`Idle`}</span>}
+                    {isTemporary && (
+                        <Tooltip>
+                            <TooltipTrigger
+                                render={
+                                    <div className="flex shrink-0 items-center gap-1 text-amber-600 dark:text-amber-400">
+                                        <HourglassIcon className="size-3 shrink-0" />
+                                        {remainingTime && <span>{remainingTime}</span>}
+                                    </div>
+                                }
+                            />
+                            <TooltipContent>{remainingTime ? t`Expires in ${remainingTime}` : t`Temporary chat`}</TooltipContent>
+                        </Tooltip>
+                    )}
+                    {isArchived && <ArchiveIcon aria-hidden="true" className="size-3 shrink-0" />}
+                    {showsModelFallback && <span className="min-w-0 truncate">{modelName}</span>}
+                    <span className="ml-auto flex shrink-0 items-center gap-1.5">
+                        {hasMatches && (
+                            <span className="bg-primary/10 text-primary-text shrink-0 rounded-full px-1.5 py-0.5 text-xs">
+                                <Plural one="# match" other="# matches" value={node.relevantMessages?.length ?? 0} />
+                            </span>
+                        )}
+                        {/* Messenger platform badge */}
+                        {node.source && (
+                            <Tooltip>
+                                <TooltipTrigger
+                                    render={
+                                        <span
+                                            aria-label={t`Messages from ${sourceName}`}
+                                            className={cn(
+                                                "flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] leading-none font-medium",
+                                                MESSENGER_BADGES[node.source]?.className ?? "bg-muted text-muted-foreground",
+                                            )}
+                                            role="img"
+                                        >
+                                            {renderMessengerBadgeIcon(node.source)}
+                                            <span aria-hidden="true">{node.source}</span>
+                                        </span>
+                                    }
+                                />
+                                <TooltipContent>{t`Messages from ${sourceName}`}</TooltipContent>
+                            </Tooltip>
+                        )}
+                    </span>
+                </div>
             )}
 
-            {/* A touch screen has no hover to reveal the action strip: the options menu shows there by itself, in the row's flow, so it
-                takes room from the title instead of covering it, and the rest of the strip stays hidden. */}
-            <ThreadOptionsMenu
-                className="hidden [@media(hover:none)]:contents"
-                isHostRun={node.runner === "host"}
-                isLocked={isLocked}
-                label={displayTitle}
-                onOpenChange={(open) => setOptionsMenuThreadId(open ? node.threadId : null)}
-                onOpenInSplitView={splitViewEnabled ? handleOpenInSplitView : undefined}
-                onRename={() => setRenameThreadId(node.threadId)}
-                open={isOptionsMenuOpen && !canHover}
-                threadId={node.threadId}
-            />
-            <div className="bg-accent-foreground/80 absolute right-0 flex items-center gap-1 rounded-l-lg opacity-0 transition-opacity group-hover/action-item:opacity-100 focus-within:opacity-100">
+            {/* The quick actions. Faded out, not removed, so an open menu keeps its anchor and focus has somewhere to return. */}
+            <div className="bg-surface-row-hover absolute top-[calc(var(--density-row-py)-3px)] right-2 flex items-center gap-0.5 rounded-lg p-0.5 opacity-0 transition-opacity group-hover/action-item:opacity-100 focus-within:opacity-100 has-[[data-popup-open]]:opacity-100">
+                {isStreaming && !isSelectionMode && (
+                    <Tooltip>
+                        <TooltipTrigger
+                            render={
+                                <Button
+                                    aria-label={named(t`Stop generating`)}
+                                    className="text-muted-foreground hover:text-foreground size-[22px] p-0"
+                                    disabled={isStopping}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+
+                                        // Same as the composer's stop: queued prompts wait for the user instead of sending on their own.
+                                        usePromptQueueStore.getState().setPaused(node.threadId, true);
+                                        stopThreadStream(
+                                            { threadId: node.threadId as Id<"threads"> },
+                                            { onError: () => showError(t`Could not stop the reply. Please try again.`) },
+                                        );
+                                    }}
+                                    size="icon-sm"
+                                    type="button"
+                                    variant="ghost"
+                                >
+                                    <CircleStop aria-hidden="true" className="size-3.5" />
+                                </Button>
+                            }
+                        />
+                        <TooltipContent>{t`Stop generating`}</TooltipContent>
+                    </Tooltip>
+                )}
+
                 {node.status !== "archived" && (
                     <Tooltip>
                         <TooltipTrigger
                             render={
                                 <Button
                                     aria-label={named(i18n._(getPinTooltip(isPinning, node.isPinned)))}
-                                    className="hover:text-primary-text h-6 w-6 p-0"
+                                    className="text-muted-foreground hover:text-foreground size-[22px] p-0"
                                     disabled={isPinning}
                                     onClick={(e) => {
                                         e.preventDefault();
@@ -737,9 +999,9 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                     type="button"
                                     variant="ghost"
                                 >
-                                    {isPinning && <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />}
+                                    {isPinning && <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />}
                                     {!isPinning &&
-                                        (node.isPinned ? <PinOff aria-hidden="true" className="h-3 w-3" /> : <Pin aria-hidden="true" className="h-3 w-3" />)}
+                                        (node.isPinned ? <PinOff aria-hidden="true" className="size-3.5" /> : <Pin aria-hidden="true" className="size-3.5" />)}
                                 </Button>
                             }
                         />
@@ -747,165 +1009,6 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     </Tooltip>
                 )}
 
-                <Tooltip>
-                    <TooltipTrigger
-                        render={
-                            <Button
-                                aria-label={named(isBranching ? t`Creating branch...` : t`Create branch`)}
-                                className="hover:text-primary-text h-6 w-6 p-0"
-                                disabled={isBranching}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-
-                                    if (isBranching) {
-                                        return; // Prevent multiple clicks
-                                    }
-
-                                    handleCreateBranch(node.threadId);
-                                }}
-                                size="icon-sm"
-                                variant="ghost"
-                            >
-                                {isBranching ? (
-                                    <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
-                                ) : (
-                                    <GitBranch aria-hidden="true" className="h-3 w-3" />
-                                )}
-                            </Button>
-                        }
-                    />
-                    <TooltipContent>{isBranching ? t`Creating branch...` : t`Create branch`}</TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                    <TooltipTrigger
-                        render={
-                            <Button
-                                aria-label={named(t`Move to project`)}
-                                className="hover:text-primary-text h-6 w-6 p-0"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setShowMoveToProjectDialog(true);
-                                }}
-                                size="icon-sm"
-                                variant="ghost"
-                            >
-                                <Folder aria-hidden="true" className="h-3 w-3" />
-                            </Button>
-                        }
-                    />
-                    <TooltipContent>{t`Move to project`}</TooltipContent>
-                </Tooltip>
-
-                {canOpenWindow && (
-                    <Tooltip>
-                        <TooltipTrigger
-                            render={
-                                <Button
-                                    aria-label={named(t`Open in new window`)}
-                                    className="hover:text-primary-text h-6 w-6 p-0"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        void openThreadWindow(node.threadId);
-                                    }}
-                                    size="icon-sm"
-                                    variant="ghost"
-                                >
-                                    <ExternalLink aria-hidden="true" className="h-3 w-3" />
-                                </Button>
-                            }
-                        />
-                        <TooltipContent>{t`Open in new window`}</TooltipContent>
-                    </Tooltip>
-                )}
-
-                {isTemporary ? (
-                    // Temporary chats expire and are deleted, so a tag would outlive
-                    // nothing. Shown inert rather than hidden, so the reason is findable.
-                    <Tooltip>
-                        <TooltipTrigger
-                            render={
-                                <Button
-                                    aria-disabled="true"
-                                    aria-label={named(t`Tags unavailable for temporary chats`)}
-                                    className="h-6 w-6 cursor-not-allowed p-0 opacity-50"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                    }}
-                                    size="icon-sm"
-                                    variant="ghost"
-                                >
-                                    <Tag aria-hidden="true" className="h-3 w-3" />
-                                </Button>
-                            }
-                        />
-                        <TooltipContent className="max-w-56">{t`Temporary chats expire, so they can't be tagged. Convert it to a permanent chat to add tags.`}</TooltipContent>
-                    </Tooltip>
-                ) : (
-                    <ThreadTagsMenu
-                        onManageTags={() => {
-                            setShowManageTagsDialog(true);
-                        }}
-                        tagIds={node.tagIds}
-                        threadId={node.threadId}
-                        threadTitle={displayTitle}
-                    />
-                )}
-
-                {(!isImpersonating || (isLocked && !isUnlocked)) && (
-                    <DropdownMenu>
-                        <Tooltip>
-                            <TooltipTrigger
-                                render={
-                                    <DropdownMenuTrigger
-                                        render={
-                                            <Button
-                                                aria-label={named(isLocked ? t`Chat lock: locked` : t`Chat lock`)}
-                                                className="hover:text-primary-text h-6 w-6 p-0"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                }}
-                                                size="icon-sm"
-                                                variant="ghost"
-                                            >
-                                                <Lock aria-hidden="true" className="h-3 w-3" />
-                                            </Button>
-                                        }
-                                    />
-                                }
-                            />
-                            <TooltipContent>{t`Chat lock`}</TooltipContent>
-                        </Tooltip>
-                        <DropdownMenuContent
-                            onClick={(e) => {
-                                e.stopPropagation();
-                            }}
-                        >
-                            {isLocked ? (
-                                <>
-                                    {isUnlocked && !isImpersonating && (
-                                        <DropdownMenuItem
-                                            onClick={() => {
-                                                lockNow({ threadId: node.threadId as Id<"threads"> });
-                                            }}
-                                        >
-                                            {t`Lock now`}
-                                        </DropdownMenuItem>
-                                    )}
-                                    {!isUnlocked && <DropdownMenuItem onClick={() => setLockMode("unlock")}>{t`Unlock chat`}</DropdownMenuItem>}
-                                    {!isImpersonating && (
-                                        <>
-                                            <DropdownMenuItem onClick={() => setLockMode("change")}>{t`Change passcode`}</DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => setLockMode("remove")}>{t`Remove passcode`}</DropdownMenuItem>
-                                        </>
-                                    )}
-                                </>
-                            ) : (
-                                !isImpersonating && <DropdownMenuItem onClick={() => setLockMode("set")}>{t`Lock chat`}</DropdownMenuItem>
-                            )}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                )}
                 {/* Only roots are sorted into the Snoozed section, so a child has no snooze to set. */}
                 {isRootThread && (node.lastReplyAt !== undefined || snoozedUntil !== undefined) && (
                     <DropdownMenu
@@ -922,14 +1025,14 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                         render={
                                             <Button
                                                 aria-label={named(t`Snooze thread`)}
-                                                className="hover:text-primary-text h-6 w-6 p-0"
+                                                className="text-muted-foreground hover:text-foreground size-[22px] p-0"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                 }}
                                                 size="icon-sm"
                                                 variant="ghost"
                                             >
-                                                <AlarmClock aria-hidden="true" className="h-3 w-3" />
+                                                <AlarmClock aria-hidden="true" className="size-3.5" />
                                             </Button>
                                         }
                                     />
@@ -956,55 +1059,6 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                         </DropdownMenuContent>
                     </DropdownMenu>
                 )}
-                <ThreadOptionsMenu
-                    className="[@media(hover:none)]:hidden"
-                    isHostRun={node.runner === "host"}
-                    isLocked={isLocked}
-                    label={displayTitle}
-                    onOpenChange={(open) => setOptionsMenuThreadId(open ? node.threadId : null)}
-                    onOpenInSplitView={splitViewEnabled ? handleOpenInSplitView : undefined}
-                    onRename={() => setRenameThreadId(node.threadId)}
-                    open={isOptionsMenuOpen && canHover}
-                    threadId={node.threadId}
-                />
-                <DropdownMenu>
-                    <Tooltip>
-                        <TooltipTrigger
-                            render={
-                                <DropdownMenuTrigger
-                                    render={
-                                        <Button
-                                            aria-label={named(isDownloading ? t`Downloading...` : t`Download thread`)}
-                                            className="hover:text-primary-text h-6 w-6 p-0"
-                                            disabled={isDownloading}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                            }}
-                                            size="icon-sm"
-                                            variant="ghost"
-                                        >
-                                            {isDownloading ? (
-                                                <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
-                                            ) : (
-                                                <DownloadIcon aria-hidden="true" className="h-3 w-3" />
-                                            )}
-                                        </Button>
-                                    }
-                                />
-                            }
-                        />
-                        <TooltipContent>{isDownloading ? t`Downloading...` : t`Download thread`}</TooltipContent>
-                    </Tooltip>
-                    <DropdownMenuContent
-                        onClick={(e) => {
-                            e.stopPropagation();
-                        }}
-                    >
-                        <DropdownMenuItem onClick={() => handleDownloadThread(node, "json")}>JSON</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDownloadThread(node, "txt")}>TXT</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDownloadThread(node, "pdf")}>PDF</DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
 
                 {!isImpersonating && (
                     <Tooltip>
@@ -1012,7 +1066,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                             render={
                                 <Button
                                     aria-label={named(i18n._(getArchiveTooltip(isArchiving, node.status)))}
-                                    className="hover:text-primary-text h-6 w-6 p-0"
+                                    className="text-muted-foreground hover:text-foreground size-[22px] p-0"
                                     disabled={isArchiving}
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -1033,9 +1087,9 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                     variant="ghost"
                                 >
                                     {isArchiving ? (
-                                        <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+                                        <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
                                     ) : (
-                                        <ArchiveIcon aria-hidden="true" className="h-3 w-3" />
+                                        <ArchiveIcon aria-hidden="true" className="size-3.5" />
                                     )}
                                 </Button>
                             }
@@ -1044,138 +1098,39 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     </Tooltip>
                 )}
 
-                {isTemporary && (
-                    <Tooltip>
-                        <TooltipTrigger
-                            render={
-                                <Button
-                                    aria-label={named(isConverting ? t`Converting...` : t`Convert to permanent`)}
-                                    className="hover:text-primary-text h-6 w-6 p-0"
-                                    disabled={isConverting}
-                                    onClick={async (e) => {
-                                        e.stopPropagation();
-
-                                        if (isConverting) {
-                                            return;
-                                        }
-
-                                        setIsConverting(true);
-
-                                        try {
-                                            await convertToPermanent({ threadId: node.threadId as Id<"threads"> });
-                                        } catch (error) {
-                                            console.error("Failed to convert thread:", error);
-                                        }
-
-                                        setIsConverting(false);
-                                    }}
-                                    size="icon-sm"
-                                    variant="ghost"
-                                >
-                                    {isConverting ? (
-                                        <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
-                                    ) : (
-                                        <HourglassIcon aria-hidden="true" className="h-3 w-3" />
-                                    )}
-                                </Button>
-                            }
-                        />
-                        <TooltipContent>{isConverting ? t`Converting...` : t`Convert to permanent`}</TooltipContent>
-                    </Tooltip>
-                )}
-
-                {!isImpersonating && (
-                    <>
-                        <Tooltip>
-                            <TooltipTrigger
-                                render={
-                                    <Button
-                                        aria-label={named(isDeleting ? t`Deleting...` : t`Delete thread`)}
-                                        className="hover:text-destructive h-6 w-6 p-0"
-                                        disabled={isDeleting}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-
-                                            if (confirmBeforeDelete) {
-                                                setShowDeleteDialog(true);
-
-                                                return;
-                                            }
-
-                                            // The row leaves at once and takes this button with it, so focus goes to the search toggle first, which stays.
-                                            focusThreadSearchToggle();
-                                            handleDeleteThread(node.threadId);
-                                        }}
-                                        size="icon-sm"
-                                        variant="ghost"
-                                    >
-                                        {isDeleting ? (
-                                            <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
-                                        ) : (
-                                            <TrashIcon aria-hidden="true" className="h-3 w-3" />
-                                        )}
-                                    </Button>
-                                }
-                            />
-                            <TooltipContent>{isDeleting ? t`Deleting...` : t`Delete thread`}</TooltipContent>
-                        </Tooltip>
-                        <DeleteConfirmationDialog
-                            description={t`Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation.`}
-                            isDeleting={isDeleting}
-                            onConfirm={() => {
-                                if (isDeleting) {
-                                    return; // Prevent multiple clicks
-                                }
-
-                                handleDeleteThread(node.threadId);
-                                setShowDeleteDialog(false);
-                                // The dialog returns focus to the button that opened it on close, and that button leaves with the row: the toggle gets focus after the return.
-                                globalThis.setTimeout(focusThreadSearchToggle, 0);
-                            }}
-                            onOpenChange={setShowDeleteDialog}
-                            open={showDeleteDialog}
-                            title={t`Delete Thread`}
-                        />
-                    </>
-                )}
-                {lockMode !== null && (
-                    <ThreadLockDialog
-                        mode={lockMode}
-                        onOpenChange={(open) => {
-                            if (!open) {
-                                setLockMode(null);
-                            }
-                        }}
-                        open
-                        threadId={node.threadId}
-                    />
-                )}
+                <ThreadOptionsMenu {...optionsMenuProps} className="[@media(hover:none)]:hidden" open={isOptionsMenuOpen && canHover} />
             </div>
 
-            {isTemporary && (
-                <Tooltip>
-                    <TooltipTrigger
-                        render={
-                            <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
-                                <HourglassIcon className="h-3 w-3 shrink-0" />
-                                {remainingTime && <span>{remainingTime}</span>}
-                            </div>
+            {!isImpersonating && (
+                <DeleteConfirmationDialog
+                    description={t`Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation.`}
+                    isDeleting={isDeleting}
+                    onConfirm={() => {
+                        if (isDeleting) {
+                            return; // Prevent multiple clicks
                         }
-                    />
-                    <TooltipContent>{remainingTime ? t`Expires in ${remainingTime}` : t`Temporary chat`}</TooltipContent>
-                </Tooltip>
+
+                        handleDeleteThread(node.threadId);
+                        setShowDeleteDialog(false);
+                        // The dialog returns focus to the item that opened it on close, and that item leaves with the row: the toggle gets focus after the return.
+                        globalThis.setTimeout(focusThreadSearchToggle, 0);
+                    }}
+                    onOpenChange={setShowDeleteDialog}
+                    open={showDeleteDialog}
+                    title={t`Delete Thread`}
+                />
             )}
-            {node.status === "archived" && <ArchiveIcon className="text-muted-foreground h-3 w-3 shrink-0" />}
-            {isUnread && (
-                <>
-                    <span aria-hidden="true" className="bg-foreground h-1.5 w-1.5 shrink-0 rounded-full" />
-                    <span className="sr-only">{t`Unread`}</span>
-                </>
-            )}
-            {node.relevantMessages && node.relevantMessages.length > 0 && (
-                <div className="bg-primary/10 text-primary-text shrink-0 rounded-full px-1.5 py-0.5 text-xs">
-                    <Plural one="# match" other="# matches" value={node.relevantMessages.length} />
-                </div>
+            {lockMode !== null && (
+                <ThreadLockDialog
+                    mode={lockMode}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setLockMode(null);
+                        }
+                    }}
+                    open
+                    threadId={node.threadId}
+                />
             )}
         </div>
     );

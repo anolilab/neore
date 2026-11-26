@@ -94,7 +94,7 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
     const preview = task.length > TASK_PREVIEW_MAX ? `${task.slice(0, TASK_PREVIEW_MAX - 1)}…` : task;
 
     return (
-        <div aria-labelledby={headingId} className="my-2 rounded-lg border p-3 text-sm" role="group">
+        <div aria-labelledby={headingId} className="surface-raised my-2 rounded-xl p-3 text-sm" role="group">
             <div className="flex items-start gap-2">
                 {isActive ? (
                     <Loader2

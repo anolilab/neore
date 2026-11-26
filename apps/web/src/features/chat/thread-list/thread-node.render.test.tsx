@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-/** The row's hover actions are icon-only buttons; each needs an accessible name of its own. */
+/** The row's quick actions are icon-only buttons and the rest are menu items; each needs an accessible name of its own. */
 // eslint-disable-next-line testing-library/no-manual-cleanup -- vitest runs without globals, so nothing else cleans up between tests
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
@@ -51,6 +51,15 @@ vi.mock("@/features/develop/components/pull-request-counts", () => {
     return {
         usePullRequestCount: () => linkedPullRequests.count,
     };
+});
+
+/** The branch toggle's name starts with its visible count ("2 branches, …"), so it is matched by its end. */
+const EXPAND_BRANCHES_NAME = /Expand branches: Quarterly plan$/u;
+const COLLAPSE_BRANCHES_NAME = /Collapse branches: Quarterly plan$/u;
+
+// The row reads the model name from the cached gateway catalog; these tests have none.
+vi.mock("@/hooks/use-cached-model-name", () => {
+    return { default: (): undefined => undefined };
 });
 
 vi.mock("@tanstack/react-query", () => {
@@ -166,12 +175,19 @@ vi.mock("@/features/chat/tags/thread-categories", () => {
     return { THREAD_CATEGORY_LABELS: {} };
 });
 
+// A fixed minute, so a time label does not depend on when the test runs.
+const NOW = Date.UTC(2026, 10, 5, 12, 0, 0);
+
+vi.mock("./hooks/use-minute-clock", () => {
+    return { default: () => NOW };
+});
+
 vi.mock("@/features/chat/tags/thread-tag-chips", () => {
     return { default: () => null };
 });
 
 vi.mock("@/features/chat/tags/thread-tags-menu", () => {
-    return { default: () => null };
+    return { ThreadTagsMenuItems: () => null, default: () => null };
 });
 
 vi.mock("@/features/projects/components/move-to-project-dialog", () => {
@@ -212,6 +228,27 @@ const { default: ThreadNode } = await import("./thread-node");
 const { KeyboardSelectionProvider } = await import("./contexts/keyboard-selection-context");
 
 const SNOOZE_BUTTON = /^Snooze thread/u;
+
+/** Renders the row with its options menu open, as the context-menu key leaves it; the row's actions are items in it. */
+const renderWithMenu = (ui: React.ReactElement) => {
+    const matchMedia = vi.fn((query: string) => {
+        return { addEventListener: () => {}, matches: query === "(hover: hover)", removeEventListener: () => {} };
+    });
+
+    vi.stubGlobal("matchMedia", matchMedia);
+    // An open menu positions itself with a ResizeObserver, which it constructs.
+    vi.stubGlobal(
+        "ResizeObserver",
+        // A constructor mock must be a `function`, not an arrow.
+        // eslint-disable-next-line prefer-arrow-callback
+        vi.fn(function ResizeObserverStub() {
+            return { disconnect: vi.fn(), observe: vi.fn(), unobserve: vi.fn() };
+        }),
+    );
+    uiState.optionsMenuThreadId = "t1";
+
+    return render(ui);
+};
 const TOUCH_CLASSES = /pointer-coarse|hover:none/u;
 
 const child = { branchPoint: 0, branchType: "branch", children: [], createdAt: 0, depth: 1, status: "idle", threadId: "c1", title: "Child" };
@@ -270,12 +307,18 @@ describe("ThreadNode delete confirmation", () => {
         userSettings.value = undefined;
     });
 
+    afterEach(() => {
+        cleanup();
+        uiState.optionsMenuThreadId = null;
+        vi.unstubAllGlobals();
+    });
+
     it("asks first by default, and deletes only once the dialog is confirmed", () => {
         const handleDeleteThread = vi.fn();
 
-        render(<ThreadNode {...baseProps} handleDeleteThread={handleDeleteThread} />);
+        renderWithMenu(<ThreadNode {...baseProps} handleDeleteThread={handleDeleteThread} />);
 
-        fireEvent.click(screen.getByRole("button", { name: "Delete thread: Quarterly plan" }));
+        fireEvent.click(screen.getByRole("menuitem", { name: "Delete thread: Quarterly plan" }));
 
         expect(handleDeleteThread).not.toHaveBeenCalled();
 
@@ -288,32 +331,33 @@ describe("ThreadNode delete confirmation", () => {
         userSettings.value = { confirmBeforeDeleteChat: false };
         const handleDeleteThread = vi.fn();
 
-        render(<ThreadNode {...baseProps} handleDeleteThread={handleDeleteThread} />);
+        renderWithMenu(<ThreadNode {...baseProps} handleDeleteThread={handleDeleteThread} />);
 
-        fireEvent.click(screen.getByRole("button", { name: "Delete thread: Quarterly plan" }));
+        fireEvent.click(screen.getByRole("menuitem", { name: "Delete thread: Quarterly plan" }));
 
         expect(handleDeleteThread).toHaveBeenCalledWith("t1");
         expect(screen.queryByRole("button", { name: "Confirm delete" })).toBeNull();
     });
 
-    it("moves focus to the search toggle when a delete at once takes the focused row away", () => {
+    it("moves focus to the search toggle when a delete at once takes the focused row away", async () => {
         userSettings.value = { confirmBeforeDeleteChat: false };
 
-        render(<RowHost />);
+        renderWithMenu(<RowHost />);
 
-        const deleteButton = screen.getByRole("button", { name: "Delete thread: Quarterly plan" });
+        const deleteItem = screen.getByRole("menuitem", { name: "Delete thread: Quarterly plan" });
 
-        deleteButton.focus();
-        fireEvent.click(deleteButton);
+        deleteItem.focus();
+        fireEvent.click(deleteItem);
 
+        // The menu hands focus back to its trigger as it closes; the toggle takes it again once that has happened.
         // eslint-disable-next-line testing-library/no-node-access -- focus placement (document.activeElement) is what this test asserts
-        expect(document.activeElement).toBe(screen.getByRole("button", { name: "Search threads" }));
+        await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Search threads" })));
     });
 
-    it("moves focus to the search toggle after a confirmed delete, since the row's button that opened the dialog leaves", async () => {
-        render(<RowHost />);
+    it("moves focus to the search toggle after a confirmed delete, since the row's item that opened the dialog leaves", async () => {
+        renderWithMenu(<RowHost />);
 
-        fireEvent.click(screen.getByRole("button", { name: "Delete thread: Quarterly plan" }));
+        fireEvent.click(screen.getByRole("menuitem", { name: "Delete thread: Quarterly plan" }));
         fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
 
         // eslint-disable-next-line testing-library/no-node-access -- focus placement (document.activeElement) is what this test asserts
@@ -336,39 +380,109 @@ describe("ThreadNode", () => {
         linkedPullRequests.count = 0;
     });
 
-    it.each([
-        "Expand branches",
-        "Pin thread",
-        "Create branch",
-        "Move to project",
-        "Download thread",
-        "Archive thread",
-        "Convert to permanent",
-        "Delete thread",
-    ])("names the %s button after its thread", (action) => {
+    it.each(["Expand branches", "Pin thread", "Archive thread"])("names the %s button after its thread", (action) => {
         render(<ThreadNode {...baseProps} />);
 
-        expect(screen.getByRole("button", { name: `${action}: Quarterly plan` })).toBeTruthy();
+        // The branch toggle's name starts with its visible count, so it is matched by its end.
+        expect(screen.getByRole("button", { name: new RegExp(`${action}: Quarterly plan$`) })).toBeTruthy();
     });
 
-    it("hides archive, delete and the lock menu from an admin impersonating the owner, as the server refuses them", () => {
-        impersonation.active = true;
-        render(<ThreadNode {...baseProps} />);
-        impersonation.active = false;
+    it("keeps only Pin, Snooze, Archive and the options menu as quick actions, and no old icon button", () => {
+        render(<ThreadNode {...baseProps} node={{ ...baseProps.node, lastReplyAt: 1 }} />);
 
-        for (const action of ["Archive thread", "Delete thread", "Chat lock"]) {
+        for (const action of ["Create branch", "Move to project", "Download thread", "Convert to permanent", "Delete thread", "Chat lock"]) {
             expect(screen.queryByRole("button", { name: `${action}: Quarterly plan` })).toBeNull();
         }
 
-        expect(screen.getByRole("button", { name: "Download thread: Quarterly plan" })).toBeTruthy();
+        for (const action of ["Pin thread", "Snooze thread", "Archive thread"]) {
+            expect(screen.getByRole("button", { name: `${action}: Quarterly plan` })).toBeTruthy();
+        }
     });
 
-    it("keeps the lock menu for an admin impersonating the owner of a locked chat, so they can still unlock it to read", () => {
-        impersonation.active = true;
-        render(<ThreadNode {...baseProps} node={{ ...baseProps.node, lockedAt: 1 }} />);
-        impersonation.active = false;
+    describe("with its options menu open", () => {
+        afterEach(() => {
+            cleanup();
+            uiState.optionsMenuThreadId = null;
+            vi.unstubAllGlobals();
+        });
 
-        expect(screen.getByRole("button", { name: "Chat lock: locked: Locked chat" })).toBeTruthy();
+        it.each(["Create branch", "Move to project", "Download thread", "Convert to permanent", "Delete thread", "Chat lock"])(
+            "holds %s as a menu item named after its thread",
+            (action) => {
+                renderWithMenu(<ThreadNode {...baseProps} />);
+
+                expect(screen.getByRole("menuitem", { name: `${action}: Quarterly plan` })).toBeTruthy();
+            },
+        );
+
+        it("holds the tags as a submenu on a permanent chat, and an inert item that says why on a temporary one", () => {
+            const { unmount } = renderWithMenu(<ThreadNode {...baseProps} />);
+
+            expect(screen.getByRole("menuitem", { name: "Tags unavailable for temporary chats: Quarterly plan" })).toBeTruthy();
+            unmount();
+
+            renderWithMenu(<ThreadNode {...baseProps} node={{ ...baseProps.node, expiresAt: undefined }} />);
+
+            expect(screen.getByRole("menuitem", { name: "Tags for Quarterly plan" })).toBeTruthy();
+        });
+
+        it("hides archive, delete and the lock menu from an admin impersonating the owner, as the server refuses them", () => {
+            impersonation.active = true;
+            renderWithMenu(<ThreadNode {...baseProps} />);
+            impersonation.active = false;
+
+            expect(screen.queryByRole("button", { name: "Archive thread: Quarterly plan" })).toBeNull();
+
+            for (const action of ["Delete thread", "Chat lock"]) {
+                expect(screen.queryByRole("menuitem", { name: `${action}: Quarterly plan` })).toBeNull();
+            }
+
+            expect(screen.getByRole("menuitem", { name: "Download thread: Quarterly plan" })).toBeTruthy();
+        });
+
+        it("keeps the lock menu for an admin impersonating the owner of a locked chat, so they can still unlock it to read", () => {
+            impersonation.active = true;
+            renderWithMenu(<ThreadNode {...baseProps} node={{ ...baseProps.node, lockedAt: 1 }} />);
+            impersonation.active = false;
+
+            expect(screen.getByRole("menuitem", { name: "Chat lock: locked: Locked chat" })).toBeTruthy();
+        });
+    });
+
+    it("words the time since the last activity in short form, in the title's line", () => {
+        render(<ThreadNode {...baseProps} node={{ ...baseProps.node, updatedAt: NOW - 5 * 60_000 }} />);
+
+        expect(screen.getByText("5m")).toBeTruthy();
+    });
+
+    it("puts what is attached to the thread in a second line: branches, host runner and linked pull requests", () => {
+        linkedPullRequests.count = 3;
+        render(<ThreadNode {...baseProps} node={{ ...baseProps.node, runner: "host" }} />);
+        linkedPullRequests.count = 0;
+
+        expect(screen.getByText("Runs on your computer")).toBeTruthy();
+        expect(screen.getByLabelText("Linked pull requests: 3")).toBeTruthy();
+        expect(screen.getByRole("button", { name: EXPAND_BRANCHES_NAME })).toBeTruthy();
+    });
+
+    it("falls back to the model's name in the second line when nothing else is attached", () => {
+        render(<ThreadNode {...baseProps} node={{ ...baseProps.node, children: [], expiresAt: undefined, model: "acme/fast-model-1" }} />);
+
+        expect(screen.getByText("fast-model-1")).toBeTruthy();
+    });
+
+    it("lifts the open thread's card and indents a branch", () => {
+        const { container, rerender } = render(<ThreadNode {...baseProps} />);
+
+        // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the surfaces are only classes on the card
+        const card = (id: string) => container.querySelector(`[data-thread-id="${CSS.escape(id)}"]`)?.classList;
+
+        expect(card("t1")?.contains("bg-surface-row")).toBe(true);
+        expect(card("t1")?.contains("ml-4")).toBe(false);
+
+        rerender(<ThreadNode {...baseProps} node={{ ...child }} />);
+
+        expect(card("c1")?.contains("ml-4")).toBe(true);
     });
 
     it("offers a snooze on a root thread that has a reply, and none on a child", () => {
@@ -390,7 +504,7 @@ describe("ThreadNode", () => {
         );
 
         // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the highlight is only a class
-        expect(container.querySelector(`[data-thread-id="t1"]`)?.className).toContain("ring-white/50");
+        expect(container.querySelector(`[data-thread-id="t1"]`)?.classList.contains("ring-2")).toBe(true);
 
         rerender(
             <KeyboardSelectionProvider threadId="c1">
@@ -399,7 +513,7 @@ describe("ThreadNode", () => {
         );
 
         // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the highlight is only a class
-        expect(container.querySelector(`[data-thread-id="t1"]`)?.className).not.toContain("ring-white/50");
+        expect(container.querySelector(`[data-thread-id="t1"]`)?.classList.contains("ring-2")).toBe(false);
     });
 
     describe("when its chat is a split view pane", () => {
@@ -493,7 +607,7 @@ describe("ThreadNode", () => {
     it("flips the expand label and state when the branches are open", () => {
         render(<ThreadNode {...baseProps} expandedThreads={new Set(["t1"])} />);
 
-        expect(screen.getByRole("button", { expanded: true, name: "Collapse branches: Quarterly plan" })).toBeTruthy();
+        expect(screen.getByRole("button", { expanded: true, name: COLLAPSE_BRANCHES_NAME })).toBeTruthy();
     });
 
     it("announces a thread that starts waiting for the user, and clears when it stops", () => {

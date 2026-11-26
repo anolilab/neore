@@ -24,7 +24,7 @@ const Card = ({ children, className, size = "default", ...props }: React.Compone
     return (
         <div
             className={cn(
-                "ring-foreground/10 bg-card text-card-foreground group/card flex flex-col gap-4 overflow-hidden rounded-lg py-4 text-xs/relaxed ring-1 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 *:[img:first-child]:rounded-t-lg *:[img:last-child]:rounded-b-lg",
+                "bg-card text-card-foreground surface-edge group/card flex flex-col gap-4 overflow-hidden rounded-xl py-4 text-xs/relaxed has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
                 className,
             )}
             data-size={size}
@@ -41,7 +41,7 @@ const Card = ({ children, className, size = "default", ...props }: React.Compone
 const CardHeader = ({ className, ...props }: React.ComponentProps<"div">) => (
     <div
         className={cn(
-            "group/card-header @container/card-header grid auto-rows-min items-start gap-1 rounded-t-lg px-4 group-data-[size=sm]/card:px-3 has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [.border-b]:pb-4 group-data-[size=sm]/card:[.border-b]:pb-3",
+            "group/card-header @container/card-header grid auto-rows-min items-start gap-1 rounded-t-xl px-4 group-data-[size=sm]/card:px-3 has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [.border-b]:pb-4 group-data-[size=sm]/card:[.border-b]:pb-3",
             className,
         )}
         data-slot="card-header"
@@ -88,7 +88,7 @@ const CardContent = ({ className, ...props }: React.ComponentProps<"div">) => (
 const CardFooter = ({ className, ...props }: React.ComponentProps<"div">) => (
     <div
         className={cn(
-            "flex items-center rounded-b-lg px-4 group-data-[size=sm]/card:px-3 [.border-t]:pt-4 group-data-[size=sm]/card:[.border-t]:pt-3",
+            "flex items-center rounded-b-xl px-4 group-data-[size=sm]/card:px-3 [.border-t]:pt-4 group-data-[size=sm]/card:[.border-t]:pt-3",
             className,
         )}
         data-slot="card-footer"

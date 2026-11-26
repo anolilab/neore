@@ -250,7 +250,7 @@ const ComposerInputArea = ({
                                                         aria-label={t`Add attachment`}
                                                         className={clsx(
                                                             buttonVariants({ size: "icon", variant: "ghost" }),
-                                                            "my-2 size-[34px]",
+                                                            "my-2 size-[30px] rounded-[9px]",
                                                             compact && "my-1.5 size-[30px]",
                                                         )}
                                                         disabled={disabled}
@@ -291,7 +291,7 @@ const ComposerInputArea = ({
                                             aria-label={t`Add attachment`}
                                             className={clsx(
                                                 buttonVariants({ size: "icon", variant: "ghost" }),
-                                                "my-2 size-[34px]",
+                                                "my-2 size-[30px] rounded-[9px]",
                                                 compact && "my-1.5 size-[30px]",
                                             )}
                                             disabled={disabled}
@@ -370,7 +370,7 @@ const ComposerInputArea = ({
                                             aria-label={followUp === "steer-restart" ? t`Interrupt and restart` : t`Steer the reply`}
                                             className={clsx(
                                                 buttonVariants({ size: "icon", variant: "outline" }),
-                                                "my-2 size-[34px]",
+                                                "my-2 size-[30px] rounded-[9px]",
                                                 compact && "my-1.5 size-[30px]",
                                             )}
                                             disabled={disabled || isOverCap}
@@ -397,7 +397,7 @@ const ComposerInputArea = ({
                                             aria-label={isUploading ? t`Waiting for uploads to complete…` : t`Queue message`}
                                             className={clsx(
                                                 buttonVariants({ size: "icon", variant: "outline" }),
-                                                "my-2 size-[34px]",
+                                                "my-2 size-[30px] rounded-[9px]",
                                                 compact && "my-1.5 size-[30px]",
                                             )}
                                             disabled={disabled || isUploading || isOverCap}
@@ -424,7 +424,7 @@ const ComposerInputArea = ({
                                         aria-label={t`Stop generating`}
                                         className={clsx(
                                             buttonVariants({ size: "icon", variant: "default" }),
-                                            "my-2 size-[34px]",
+                                            "my-2 size-[30px] rounded-[9px]",
                                             compact && "my-1.5 size-[30px]",
                                         )}
                                         onClick={onCancel}
@@ -451,7 +451,7 @@ const ComposerInputArea = ({
                                             aria-label={t`Send message`}
                                             className={clsx(
                                                 buttonVariants({ size: "icon", variant: "default" }),
-                                                "my-2 size-[34px]",
+                                                "my-2 size-[30px] rounded-[9px]",
                                                 compact && "my-1.5 size-[30px]",
                                             )}
                                             disabled={disabled || isOverCap}
