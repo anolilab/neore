@@ -20,7 +20,13 @@ vi.mock("@neore/backend/api", () => {
 });
 
 const sideChat = vi.hoisted(() => {
-    return { openChat: vi.fn(), result: { reason: "locked", status: "refused" } as { reason?: string; status: string; threadId?: string }, showError: vi.fn() };
+    return {
+        hold: false,
+        openChat: vi.fn(),
+        start: vi.fn(),
+        result: { reason: "locked", status: "refused" } as { reason?: string; status: string; threadId?: string },
+        showError: vi.fn(),
+    };
 });
 
 vi.mock("@tanstack/react-query", () => {
@@ -28,7 +34,14 @@ vi.mock("@tanstack/react-query", () => {
         useMutation: () => {
             return {
                 isPending: false,
-                mutate: (_input: unknown, callbacks?: { onSuccess?: (result: unknown) => void }) => callbacks?.onSuccess?.(sideChat.result),
+                mutate: (_input: unknown, callbacks?: { onSettled?: () => void; onSuccess?: (result: unknown) => void }) => {
+                    sideChat.start();
+
+                    if (!sideChat.hold) {
+                        callbacks?.onSuccess?.(sideChat.result);
+                        callbacks?.onSettled?.();
+                    }
+                },
             };
         },
     };
@@ -139,6 +152,30 @@ describe("ThreadOptionsMenu", () => {
         beforeEach(() => {
             sideChat.openChat.mockReset();
             sideChat.showError.mockReset();
+            sideChat.start.mockReset();
+            sideChat.hold = false;
+        });
+
+        it("starts one side chat for clicks made while the first is still running", () => {
+            sideChat.hold = true;
+            renderMenu();
+            const item = screen.getByRole("menuitem", { name: "Side chat" });
+
+            fireEvent.click(item);
+            fireEvent.click(item);
+            fireEvent(item, new MouseEvent("auxclick", { bubbles: true, button: 1, cancelable: true }));
+
+            expect(sideChat.start).toHaveBeenCalledTimes(1);
+        });
+
+        it("allows another side chat once the first has settled", () => {
+            renderMenu();
+            const item = screen.getByRole("menuitem", { name: "Side chat" });
+
+            fireEvent.click(item);
+            fireEvent.click(item);
+
+            expect(sideChat.start).toHaveBeenCalledTimes(2);
         });
 
         it("opens the new thread when the side chat starts", () => {

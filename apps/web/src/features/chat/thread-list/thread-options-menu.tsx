@@ -7,6 +7,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/to
 import cn from "@neore/ui/utils/cn";
 import { useMutation } from "@tanstack/react-query";
 import { MoreHorizontal } from "lucide-react";
+import { useRef } from "react";
 
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
 import { showError, showSuccess } from "@/lib/toast";
@@ -42,6 +43,8 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
     });
     // The follow state is read only while the menu is open, so a list of rows opens no subscription per thread.
     const openChat = useOpenChatClick();
+    // Set before the action runs, cleared when it settles: a click made in between would start a second side chat.
+    const isStartingRef = useRef(false);
     const { isPending: isStartingSideChat, mutate: startSideChat } = useMutation({
         ...useLunoraActionOptions(api.chat.side_chat.createSideChat),
         networkMode: "always",
@@ -84,6 +87,12 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
 
     // The click is copied now: the event is spent when the action answers. The click and the saved setting pick where the chat opens.
     const startFrom = (event: { button: number; ctrlKey: boolean; detail: number; metaKey: boolean }) => {
+        if (isStartingRef.current) {
+            return;
+        }
+
+        isStartingRef.current = true;
+
         const click = { button: event.button, ctrlKey: event.ctrlKey, detail: event.detail, metaKey: event.metaKey };
 
         startSideChat(
@@ -92,6 +101,9 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
                 onError: (error: Error) => {
                     console.error("Failed to start a side chat:", error);
                     showError(error);
+                },
+                onSettled: () => {
+                    isStartingRef.current = false;
                 },
                 onSuccess: (result) => {
                     if (result.status === "ok") {
