@@ -60,13 +60,7 @@ const SMART_QUOTE_CONTINUES = [
 ];
 
 /** A secret in a typographic quote that closes on its line. */
-const SMART_QUOTE_CLOSED = [
-    `${LABEL}“${VALUE}”`,
-    `${LABEL}‘${VALUE}’`,
-    `${LABEL}«${VALUE}»`,
-    `${LABEL}„${VALUE}“`,
-    `${LABEL}‚${VALUE}‘`,
-];
+const SMART_QUOTE_CLOSED = [`${LABEL}“${VALUE}”`, `${LABEL}‘${VALUE}’`, `${LABEL}«${VALUE}»`, `${LABEL}„${VALUE}“`, `${LABEL}‚${VALUE}‘`];
 
 /** A secret whose value ends in a doubled backslash: the backslash is escaped, so the value ends on its line. */
 const ESCAPED_BACKSLASH = `${LABEL}${VALUE}\\\\`;
@@ -386,7 +380,10 @@ describe("parseMemoryFile: JSON", () => {
     });
 
     it("ignores blank string items: they neither count toward the entry limit nor are reported", () => {
-        const items = [...Array.from({ length: MEMORY_FILE_BATCH_SIZE }, (_, index) => fact(index)), ...Array.from({ length: 6000 }, (_, index) => (index % 2 === 0 ? "" : "  \t"))];
+        const items = [
+            ...Array.from({ length: MEMORY_FILE_BATCH_SIZE }, (_, index) => fact(index)),
+            ...Array.from({ length: 6000 }, (_, index) => (index % 2 === 0 ? "" : "  \t")),
+        ];
         const parsed = parseMemoryFile(JSON.stringify(items), "json");
 
         expect(parsed).toMatchObject({ entries: MEMORY_FILE_BATCH_SIZE, invalid: 0, total: MEMORY_FILE_BATCH_SIZE });
