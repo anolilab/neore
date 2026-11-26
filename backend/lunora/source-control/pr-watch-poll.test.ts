@@ -432,6 +432,25 @@ describe("observeWatched", () => {
         expect(row.watch.stoppedAt).toBeGreaterThan(0);
     });
 
+    it("keeps the newest reviews when the host lists more than the bound: a new one at the top wakes the watch", async () => {
+        const items = Array.from({ length: 120 }, (_, index) => {
+            return { authorLogin: "bob", id: `r${String(120 - index)}` };
+        });
+        const driver = {
+            getPullRequest: vi.fn().mockResolvedValue(detail("open")),
+            listChecks: vi.fn().mockResolvedValue({ checks: [], required: { complete: true, patterns: [] }, total: 0 }),
+            listReviews: vi.fn().mockResolvedValue({ items, total: 120 }),
+        };
+        const { observation: observed } = await observeWatched(request, TARGET, { driver: driver as never, login: async () => "me" });
+
+        expect(observed.reviews[0]?.id).toBe("r120");
+        expect(observed.reviews.length).toBeLessThanOrEqual(120);
+
+        const decision = decideWatch({ baselined: true, headSha: "sha-1", reviewId: "r119" }, observed, Date.now());
+
+        expect(decision).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "r120" } });
+    });
+
     it("reads the login once for a watch that goes on", async () => {
         const login = vi.fn().mockResolvedValue("me");
         const driver = {

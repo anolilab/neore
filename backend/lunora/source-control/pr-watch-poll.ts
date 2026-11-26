@@ -46,7 +46,7 @@ const SCAN_PAGES = 4;
 /** Failing check names kept in an observation, and their length: the names are text the host sent. */
 const MAX_FAILING_NAMES = 10;
 const MAX_NAME_LENGTH = 200;
-/** Reviews kept in an observation: the newest ones, as the host lists them. */
+/** Reviews kept in an observation. The host lists newest first and the cut keeps the head: only the oldest are dropped, which the decision never needs. */
 const MAX_REVIEWS = 100;
 
 const NOT_PASSING = new Set<CheckState>(["cancelled", "failure"]);
