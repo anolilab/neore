@@ -50,6 +50,12 @@ export interface CreatedPullRequest {
     url: string;
 }
 
+/** What a reviews read may be asked for beyond the newest ones. */
+export interface ListReviewsOptions {
+    /** A review id the caller has seen: the read goes back until it is listed, within the driver's bound. */
+    seenId?: string;
+}
+
 export interface HostDriver {
     /** The host's API origin: the only place a token for this driver is sent. */
     readonly apiOrigin: string;
@@ -83,8 +89,11 @@ export interface HostDriver {
     listCommits: (request: HostRequest, ref: PullRequestRef, page: number) => Promise<CommitPage>;
     listFiles: (request: HostRequest, ref: PullRequestRef, page: number) => Promise<FilePage>;
     listInbox: (request: HostRequest, section: InboxSection, page: number) => Promise<InboxPage>;
-    /** The newest submitted reviews (verdict and top-level text), newest first, and how many there are in all. */
-    listReviews: (request: HostRequest, ref: PullRequestRef) => Promise<{ items: PullRequestReview[]; total: number }>;
+    /**
+     * The newest submitted reviews (verdict and top-level text), newest first, and how many there are in all. With `seenId`,
+     * the read goes back until that review is listed, within a bound.
+     */
+    listReviews: (request: HostRequest, ref: PullRequestRef, options?: ListReviewsOptions) => Promise<{ items: PullRequestReview[]; total: number }>;
     /** The review conversation: threads of line comments, with their replies. */
     listThreads: (request: HostRequest, ref: PullRequestRef, after: string | null) => Promise<CursorPage<ReviewThread>>;
     /** Which files the reviewer has marked viewed on the host. */

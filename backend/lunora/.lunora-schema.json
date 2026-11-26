@@ -19,9 +19,9 @@
     "add-steer-text-length",
     "backfill-approval-organization",
     "backfill-message-typed-text",
+    "backfill-pull-request-watch-active",
     "drop-agent-option-fields",
     "session-options-to-session-state",
-    "unique-user-email-canonical",
     "widen-not-typed-steer-collaborator",
     "widen-not-typed-steer-drafts"
   ],
@@ -24874,6 +24874,47 @@
               "unique": false
             }
           }
+        },
+        "watchActive": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "watchPending": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "union",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "members": [
+              {
+                "kind": "literal",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "literal": "\"checks\""
+              },
+              {
+                "kind": "literal",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "literal": "\"conflict\""
+              },
+              {
+                "kind": "literal",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "literal": "\"review\""
+              }
+            ]
+          }
         }
       },
       "indexes": {
@@ -24885,10 +24926,26 @@
           ],
           "unique": false
         },
+        "by_user_and_repository_number_threadId": {
+          "fields": [
+            "userId",
+            "repository",
+            "number",
+            "threadId"
+          ],
+          "unique": false
+        },
         "by_user_and_threadId": {
           "fields": [
             "userId",
             "threadId"
+          ],
+          "unique": false
+        },
+        "by_user_and_watchActive": {
+          "fields": [
+            "userId",
+            "watchActive"
           ],
           "unique": false
         }

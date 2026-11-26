@@ -10,7 +10,7 @@ import z from "zod/v4";
 import type { HostCapabilityReport } from "../capabilities";
 import { excerptLog, excerptRead, isLogAddress, readTail } from "../check-log";
 import { requirementOf } from "../checks-logic";
-import type { CreatePullRequestInput, CreatedPullRequest, HostDriver } from "../driver";
+import type { CreatePullRequestInput, CreatedPullRequest, HostDriver, ListReviewsOptions } from "../driver";
 import { graphqlRequest } from "../graphql";
 import { FETCH_TIMEOUT_LONG_MS, FETCH_TIMEOUT_MS, fetchWithDeadline } from "../../lib/fetch-timeout";
 import { HostApiError } from "../origin-fetch";
@@ -714,6 +714,8 @@ const replyToThread = async (request: HostRequest, ref: PullRequestRef, commentI
 };
 
 const REVIEW_PAGE_SIZE = 100;
+/** Pages a read for a seen review goes back through before giving up (`listReviews`), the pages already read included. */
+const REVIEW_SEEN_MAX_PAGES = 5;
 const REVIEW_BODY_MAX_CHARS = 20_000;
 
 const submittedReviewSchema = z.object({
@@ -754,9 +756,10 @@ export const lastPageOf = (link: string | null): number | undefined => {
 
 /**
  * The newest reviews, newest first, and how many there are in all. The host lists reviews oldest first, so past one
- * page the last page is read too, with the one before it when the last is short.
+ * page the last page is read too, with the one before it when the last is short. With `seenId`, earlier pages are read
+ * too until that review is listed (at most {@link REVIEW_SEEN_MAX_PAGES} pages in all), so a watch can tell what came after it.
  */
-const listReviews = async (request: HostRequest, ref: PullRequestRef): Promise<{ items: PullRequestReview[]; total: number }> => {
+const listReviews = async (request: HostRequest, ref: PullRequestRef, options?: ListReviewsOptions): Promise<{ items: PullRequestReview[]; total: number }> => {
     const path = `${repoPath(ref)}/pulls/${ref.number}/reviews`;
     const readPage = async (page: number): Promise<{ last: number | undefined; values: unknown[] }> => {
         const response = await request(path, { query: { page, per_page: REVIEW_PAGE_SIZE } });
@@ -767,18 +770,41 @@ const listReviews = async (request: HostRequest, ref: PullRequestRef): Promise<{
     const first = await readPage(1);
     let { values } = first;
     let total = first.values.length;
+    let earliest = 1;
+    let pagesRead = 1;
 
     if (first.last !== undefined && first.last > 1) {
         const last = await readPage(first.last);
 
         values = last.values;
+        earliest = first.last;
+        pagesRead += 1;
         total = (first.last - 1) * REVIEW_PAGE_SIZE + last.values.length;
 
         if (last.values.length < REVIEW_PAGE_SIZE) {
             const before = first.last > 2 ? await readPage(first.last - 1) : first;
 
             values = [...before.values, ...last.values];
+
+            if (first.last > 2) {
+                earliest = first.last - 1;
+                pagesRead += 1;
+            } else {
+                earliest = 1;
+            }
         }
+    }
+
+    const listsSeen = (): boolean =>
+        values.some((value) => typeof value === "object" && value !== null && "id" in value && String(value.id) === options?.seenId);
+
+    // The seen review is older than the pages read: go back a page at a time, within the bound. Past it the caller treats it as gone.
+    while (options?.seenId !== undefined && earliest > 1 && pagesRead < REVIEW_SEEN_MAX_PAGES && !listsSeen()) {
+        earliest -= 1;
+        pagesRead += 1;
+        const older = await readPage(earliest);
+
+        values = [...older.values, ...values];
     }
 
     const items = values.flatMap((value): PullRequestReview[] => {

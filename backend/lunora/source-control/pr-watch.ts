@@ -5,17 +5,23 @@
  *
  * Starting a watch takes a fresh baseline: whatever the pull request looks like at the first read is recorded, not
  * reported. A stopped watch keeps its row (`stoppedAt`), so a restart is a new baseline, never a replay of old wakes.
+ *
+ * `watchActive` (indexed) is true exactly while a watch runs, and the person's limit counts it. Anything that ends a
+ * watch must clear it with `stoppedAt`: the stop here, a thread's soft delete (`pr-thread-links.ts`), and the future
+ * caller that acts on a decision of "end".
  */
 import { v } from "lunorash/server";
 
+import type { Doc } from "../_generated/dataModel";
 import { internalMutation } from "../_generated/server";
 import { MAX_LENGTH } from "../lib/validators";
+import { PR_WATCH_MAX_WAKES, storedWatchOf } from "./pr-watch-logic";
 
 /** Watches one person may have running at once. Each one is a host read every few minutes. */
 export const MAX_ACTIVE_PULL_REQUEST_WATCHES = 10;
 
-/** Links read to count a person's active watches: a bound, so a long list costs a fixed read. */
-const WATCH_COUNT_SCAN = 200;
+/** Newest rows read for one thread's links to one pull request: a live link and the deleted ones newer than it. */
+const LINK_LOOKUP_BOUND = 20;
 
 export const setPullRequestWatch = internalMutation
     .input({
@@ -25,13 +31,24 @@ export const setPullRequestWatch = internalMutation
         userId: v.string().max(MAX_LENGTH.id),
         watching: v.boolean(),
     })
-    .output(v.object({ status: v.union(v.literal("already"), v.literal("not_linked"), v.literal("ok"), v.literal("too_many")) }))
+    .output(v.object({ status: v.union(v.literal("already"), v.literal("capped"), v.literal("not_linked"), v.literal("ok"), v.literal("too_many")) }))
     .mutation(async ({ args, ctx }) => {
-        const links = await ctx.db
-            .query("pullRequestThreads")
-            .withIndex("by_user_and_repository_number", (q) => q.eq("userId", args.userId).eq("repository", args.repository).eq("number", args.number))
-            .take(WATCH_COUNT_SCAN);
-        const link = links.find((row) => String(row.threadId) === args.threadId && row.threadDeleted !== true);
+        // One exact, bounded read: the newest rows of the person's links of this thread to this pull request. Deleted rows are
+        // skipped. Should several live rows match (a run can open a second link), the one holding a running watch wins, so a
+        // stop always reaches it; otherwise the newest live row. Creation time, then id, orders them whatever order the index returned.
+        const threadId = ctx.db.normalizeId("threads", args.threadId);
+        const rows =
+            threadId === null
+                ? []
+                : await ctx.db
+                      .query("pullRequestThreads")
+                      .withIndex("by_user_and_repository_number_threadId", (q) =>
+                          q.eq("userId", args.userId).eq("repository", args.repository).eq("number", args.number).eq("threadId", threadId),
+                      )
+                      .order("desc")
+                      .take(LINK_LOOKUP_BOUND);
+        const live = rows.filter((row) => row.threadDeleted !== true).toSorted((a, b) => b._creationTime - a._creationTime || (a._id < b._id ? 1 : -1));
+        const link: Doc<"pullRequestThreads"> | undefined = live.find((row) => row.watch !== undefined && row.watch.stoppedAt === undefined) ?? live[0];
 
         if (link === undefined) {
             return { status: "not_linked" as const };
@@ -44,7 +61,7 @@ export const setPullRequestWatch = internalMutation
                 return { status: "already" as const };
             }
 
-            await ctx.db.patch("pullRequestThreads", link._id, { watch: { ...link.watch, stoppedAt: ctx.now } });
+            await ctx.db.patch("pullRequestThreads", link._id, { watch: { ...link.watch, stoppedAt: ctx.now }, watchActive: false });
 
             return { status: "ok" as const };
         }
@@ -53,21 +70,27 @@ export const setPullRequestWatch = internalMutation
             return { status: "already" as const };
         }
 
-        // Counted over the person's links, not per thread: a long list of watches is the cost this bounds.
-        const everything = await ctx.db
+        // Exact and bounded: the flag is kept in step with every start and stop, and only live threads' watches carry it.
+        const running = await ctx.db
             .query("pullRequestThreads")
-            .withIndex("by_user_and_repository_number", (q) => q.eq("userId", args.userId))
-            .take(WATCH_COUNT_SCAN);
-        const running = everything.filter((row) => row.watch !== undefined && row.watch.stoppedAt === undefined).length;
+            .withIndex("by_user_and_watchActive", (q) => q.eq("userId", args.userId).eq("watchActive", true))
+            .take(MAX_ACTIVE_PULL_REQUEST_WATCHES);
 
-        if (running >= MAX_ACTIVE_PULL_REQUEST_WATCHES) {
+        if (running.length >= MAX_ACTIVE_PULL_REQUEST_WATCHES) {
             return { status: "too_many" as const };
         }
 
+        const carried = link.watch?.wakes ?? 0;
+
+        // A watch that reached its wake cap is over: restarting it would only end it on its next read.
+        if (carried >= PR_WATCH_MAX_WAKES) {
+            return { status: "capped" as const };
+        }
+
         // The wake count carries over: a restart must not reset the cap that ends a watch which keeps waking.
-        await ctx.db.patch("pullRequestThreads", link._id, {
-            watch: { startedAt: ctx.now, ...(link.watch?.wakes !== undefined && { wakes: link.watch.wakes }) },
-        });
+        const stored = storedWatchOf({ startedAt: ctx.now, ...(link.watch?.wakes !== undefined && { wakes: link.watch.wakes }) });
+
+        await ctx.db.patch("pullRequestThreads", link._id, { watch: stored.watch, watchActive: true, watchPending: stored.watchPending ?? [] });
 
         return { status: "ok" as const };
     });
