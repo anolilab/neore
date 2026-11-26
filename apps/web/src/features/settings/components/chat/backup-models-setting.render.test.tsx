@@ -705,4 +705,47 @@ describe("BackupModelsSetting", () => {
 
         expect(screen.queryByRole("status")).toBeNull();
     });
+
+    it("says at the list that a save failed for another reason, until the next edit starts", async () => {
+        state.settings = { backupModels: ["openai/first", "openai/second"] };
+        state.refuse = true;
+        show();
+
+        await userEvent.click(screen.getByRole("button", { name: "Remove First" }));
+
+        const notice = await screen.findByRole("status");
+
+        expect(notice.textContent).toBe("Failed to update backup models");
+        expect(state.settings?.backupModels).toEqual(["openai/first", "openai/second"]);
+
+        state.refuse = false;
+        await userEvent.click(screen.getByRole("button", { name: "Remove Second" }));
+
+        expect(screen.queryByRole("status")).toBeNull();
+    });
+
+    it("drops a model picked during a save that was refused for another reason, instead of sending it later", async () => {
+        state.settings = { backupModels: ["openai/first", "openai/second"] };
+        state.hold = true;
+        show();
+
+        await userEvent.click(screen.getByRole("button", { name: "Remove First" }));
+        await userEvent.click(screen.getByRole("combobox", { name: "Add another backup model" }));
+        await userEvent.click(await screen.findByRole("option", { name: "Third" }));
+
+        expect(state.updates).toBe(1);
+
+        // The held save is refused, but not with a conflict (for example the signed-in account changed).
+        state.refuse = true;
+        state.hold = false;
+        state.release();
+
+        const notice = await screen.findByRole("status");
+
+        await waitFor(() => expect(screen.getByRole("group", { name: "Backup models" }).getAttribute("aria-busy")).toBe("false"));
+
+        expect(notice.textContent).toBe("Failed to update backup models");
+        expect(state.updates).toBe(1);
+        expect(state.settings?.backupModels).toEqual(["openai/first", "openai/second"]);
+    });
 });

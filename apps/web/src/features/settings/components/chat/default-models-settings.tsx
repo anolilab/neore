@@ -187,8 +187,9 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
     const availabilityKnown = catalogLoaded && accessRead && filtersRead;
     // A failed read would leave the picker empty for good, so the user is told and can retry; a read still under way keeps the empty picker.
     const readFailed = (filtersFailed && !filtersRead) || (accessFailed && !accessRead) || catalogFailed;
-    // Why the saved list was shown again after a refused save; cleared when the next edit starts.
-    const [conflictNotice, setConflictNotice] = useState(false);
+    // Why the saved list was shown again after a refused save, kept beside the list because the toast fades; cleared when
+    // the next edit starts. "conflict" is another tab's edit; "failed" is any other refusal.
+    const [saveError, setSaveError] = useState<"conflict" | "failed" | null>(null);
     const { data: userSettings } = useUserSettings();
     const { updateLatest } = useUpdateUserSettings();
     // This list's own save, from the edit until it settles. The mutation's own pending flag is not enough: a write can
@@ -268,7 +269,7 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
      */
     const save = (edit: (backupModels: string[]) => string[], focusOnSuccess: string, focusOnFailure: string) => {
         focusAfter.current = focusOnSuccess;
-        setConflictNotice(false);
+        setSaveError(null);
         setSaving(true);
         updateLatest((current) => {
             const base = storedBackupModels(current);
@@ -279,14 +280,13 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
             .catch((error: unknown) => {
                 const conflict = (error as { code?: unknown } | null)?.code === "CONFLICT";
 
-                if (conflict) {
-                    // The stored list has not been re-read yet, so a pick queued during this save would be built on the old
-                    // one and refused again. The notice tells the user to redo it on the reloaded list.
-                    queuedPick.current = null;
-                }
+                // A pick queued during a refused save was built on a list that is not the stored one (another tab's edit),
+                // or on another account's settings (a sign-in switch), so sending it could write the wrong list. The
+                // notice tells the user to pick again on the list that is shown.
+                queuedPick.current = null;
 
                 toast.error(conflict ? t`Your backup models were changed in another tab. The saved list is shown again.` : t`Failed to update backup models`);
-                setConflictNotice(conflict);
+                setSaveError(conflict ? "conflict" : "failed");
                 focusAfter.current = focusOnFailure;
                 setFocusRequest((count) => count + 1);
             });
@@ -421,9 +421,11 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                     })}
                 </ol>
             )}
-            {conflictNotice && (
+            {saveError !== null && (
                 <p className="text-muted-foreground text-xs" role="status">
-                    {t`Your backup models were changed in another tab. The saved list is shown again.`}
+                    {saveError === "conflict"
+                        ? t`Your backup models were changed in another tab. The saved list is shown again.`
+                        : t`Failed to update backup models`}
                 </p>
             )}
             {readFailed && (
