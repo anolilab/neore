@@ -12,6 +12,7 @@ import {
     PR_WATCH_POLL_INTERVAL_MS,
     checksOf,
     dispatchDueWatches,
+    observeWatched,
     pollWatchLink,
     readWatchForPoll,
     recordWatchObservation,
@@ -274,6 +275,51 @@ describe("a poll that went stale before the host read", () => {
         });
 
         expect(saved).not.toHaveBeenCalled();
+    });
+});
+
+describe("observeWatched", () => {
+    const TARGET = { number: 7, repository: "octo/hello", userId: OWNER };
+    const request = (async () => new Response()) as never;
+    const detail = (state: "closed" | "merged" | "open") => {
+        return { headSha: "sha-1", mergeState: "clean", state };
+    };
+
+    it.each(["closed", "merged"] as const)("makes no login call and reads nothing else for a %s pull request", async (state) => {
+        const login = vi.fn();
+        const driver = { getPullRequest: vi.fn().mockResolvedValue(detail(state)), listChecks: vi.fn(), listReviews: vi.fn() };
+        const { observation: observed } = await observeWatched(request, TARGET, { driver: driver as never, login });
+
+        expect(observed.state).toBe(state);
+        expect(login).not.toHaveBeenCalled();
+        expect(driver.listChecks).not.toHaveBeenCalled();
+        expect(driver.listReviews).not.toHaveBeenCalled();
+    });
+
+    it("records the end of a closed pull request through the mutation", async () => {
+        const linkId = await seedWatch({ watch: { baselined: true, headSha: "sha-1", startedAt: STARTED_AT } });
+        const driver = { getPullRequest: vi.fn().mockResolvedValue(detail("closed")), listChecks: vi.fn(), listReviews: vi.fn() };
+        const { observation: observed } = await observeWatched(request, TARGET, { driver: driver as never, login: vi.fn() });
+
+        await record(linkId, { observation: observed });
+
+        const row = await rowOf(linkId);
+
+        expect(row.watchActive).toBe(false);
+        expect(row.watch.stoppedAt).toBeGreaterThan(0);
+    });
+
+    it("reads the login once for a watch that goes on", async () => {
+        const login = vi.fn().mockResolvedValue("me");
+        const driver = {
+            getPullRequest: vi.fn().mockResolvedValue(detail("open")),
+            listChecks: vi.fn().mockResolvedValue({ checks: [], required: { complete: true, patterns: [] }, total: 0 }),
+            listReviews: vi.fn().mockResolvedValue({ items: [{ authorLogin: "bob", id: "r1" }], total: 1 }),
+        };
+        const { observation: observed } = await observeWatched(request, TARGET, { driver: driver as never, login });
+
+        expect(login).toHaveBeenCalledOnce();
+        expect(observed).toMatchObject({ checks: "passing", mergeable: "clean", reviews: [{ authorLogin: "bob", id: "r1" }], watcherLogin: "me" });
     });
 });
 

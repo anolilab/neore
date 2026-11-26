@@ -22,9 +22,11 @@ import { currentUserShard } from "../lib/shard-context";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { rollupOf } from "./checks-logic";
 import { DEVELOP_DRIVER } from "./develop-driver";
+import type { HostDriver } from "./driver";
 import { signedInLogin } from "./drivers/github";
 import type { PullRequestObservation } from "./pr-watch-logic";
 import { decideWatch, stateOf, storedWatchOf } from "./pr-watch-logic";
+import type { HostRequest } from "./origin-fetch";
 import { readFromHost, type ReadOutcome } from "./read-host";
 import type { CheckRun, CheckState, CheckSummary, MergeState } from "./types";
 
@@ -265,47 +267,65 @@ export const runWatchPoll = async (steps: WatchPollSteps): Promise<void> => {
     }
 };
 
-const readObservation = async (target: WatchTarget, token: GithubTokenOutcome): Promise<ReadOutcome<{ observation: PullRequestObservation }>> =>
-    await readFromHost(DEVELOP_DRIVER, token, async (request): Promise<{ observation: PullRequestObservation }> => {
-        const ref = { number: target.number, repository: target.repository };
-        const detail = await DEVELOP_DRIVER.getPullRequest(request, ref);
-        const watcherLogin = await signedInLogin(request);
+/** What `observeWatched` calls out to, so a test can count the calls. */
+export interface ObserveDependencies {
+    driver: Pick<HostDriver, "getPullRequest" | "listChecks" | "listReviews">;
+    login: (request: HostRequest) => Promise<string>;
+}
 
-        // A pull request that is no longer open ends the watch: nothing else about it is read.
-        if (detail.state !== "open") {
-            return {
-                observation: {
-                    checks: "pending",
-                    failingCheckNames: [],
-                    headSha: detail.headSha,
-                    mergeable: "unknown",
-                    reviews: [],
-                    state: detail.state,
-                    watcherLogin,
-                },
-            };
-        }
+const LIVE: ObserveDependencies = { driver: DEVELOP_DRIVER, login: signedInLogin };
 
-        const [summary, reviews] = await Promise.all([
-            DEVELOP_DRIVER.listChecks(request, ref, detail.headSha),
-            DEVELOP_DRIVER.listReviews(request, ref, target.reviewId === undefined ? undefined : { seenId: target.reviewId }),
-        ]);
-        const { failing, status } = checksOf(summary);
+/**
+ * One watched pull request as the host says it now. The pull request is read first: one that is closed or merged ends the
+ * watch, which needs nothing else, so the signed-in login (only needed to leave the watcher's own reviews out) is read only
+ * for a watch that goes on.
+ */
+export const observeWatched = async (
+    request: HostRequest,
+    target: WatchTarget,
+    dependencies: ObserveDependencies = LIVE,
+): Promise<{ observation: PullRequestObservation }> => {
+    const ref = { number: target.number, repository: target.repository };
+    const detail = await dependencies.driver.getPullRequest(request, ref);
 
+    if (detail.state !== "open") {
         return {
             observation: {
-                checks: status,
-                failingCheckNames: failing.slice(0, MAX_FAILING_NAMES).map((check) => check.name.slice(0, MAX_NAME_LENGTH)),
+                checks: "pending",
+                failingCheckNames: [],
                 headSha: detail.headSha,
-                mergeable: mergeableOf(detail.mergeState),
-                reviews: reviews.items.slice(0, MAX_REVIEWS).map((review) => {
-                    return { authorLogin: review.authorLogin, id: review.id };
-                }),
+                mergeable: "unknown",
+                reviews: [],
                 state: detail.state,
-                watcherLogin,
+                watcherLogin: "",
             },
         };
-    });
+    }
+
+    const [watcherLogin, summary, reviews] = await Promise.all([
+        dependencies.login(request),
+        dependencies.driver.listChecks(request, ref, detail.headSha),
+        dependencies.driver.listReviews(request, ref, target.reviewId === undefined ? undefined : { seenId: target.reviewId }),
+    ]);
+    const { failing, status } = checksOf(summary);
+
+    return {
+        observation: {
+            checks: status,
+            failingCheckNames: failing.slice(0, MAX_FAILING_NAMES).map((check) => check.name.slice(0, MAX_NAME_LENGTH)),
+            headSha: detail.headSha,
+            mergeable: mergeableOf(detail.mergeState),
+            reviews: reviews.items.slice(0, MAX_REVIEWS).map((review) => {
+                return { authorLogin: review.authorLogin, id: review.id };
+            }),
+            state: detail.state,
+            watcherLogin,
+        },
+    };
+};
+
+const readObservation = async (target: WatchTarget, token: GithubTokenOutcome): Promise<ReadOutcome<{ observation: PullRequestObservation }>> =>
+    await readFromHost(DEVELOP_DRIVER, token, async (request) => await observeWatched(request, target));
 
 /** One host read for one watched link, with the person's own token. */
 export const pollWatchedPullRequest = internalAction
