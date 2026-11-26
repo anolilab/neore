@@ -463,8 +463,9 @@ export const observeWatched = async (
     }
 
     // The login is its own read: a refusal of `/user` says nothing about the pull request, so it must not count against the watch.
-    // An empty login skips review handling and keeps the review marker (`decideWatch`), which is smaller and safer than guessing
-    // whose reviews are the watcher's. A 401 still goes up, so the token is renewed once like any other read.
+    // With an empty login `decideWatch` counts every listed review as someone else's, so a review newer than the marker wakes the
+    // watch and moves the marker, the watcher's own included: a spurious wake is accepted over a missed review. A 401 still goes
+    // up, so the token is renewed once like any other read.
     const [login, summary, reviews] = await Promise.all([
         readLogin(dependencies, request),
         dependencies.driver.listChecks(request, ref, detail.headSha),

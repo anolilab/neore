@@ -319,6 +319,25 @@ describe("the watcher's own reviews", () => {
         expect(known.action).toBe("none");
     });
 
+    it("is not lost after a baseline with no review, whether the login is missing or back", () => {
+        const first = decideWatch({}, { ...quiet, reviews: [], watcherLogin: "" }, NOW);
+        const review = [{ authorLogin: "bob", id: "r1" }];
+
+        expect(first.state.reviewId).toBeUndefined();
+        // Login still missing: the review is counted as someone else's and wakes.
+        expect(decideWatch(first.state, { ...quiet, reviews: review, watcherLogin: "" }, NOW)).toMatchObject({
+            action: "wake",
+            reasons: ["review"],
+            state: { reviewId: "r1" },
+        });
+        // Login back: the same review wakes the same way.
+        expect(decideWatch(first.state, { ...quiet, reviews: review, watcherLogin: "dev" }, NOW)).toMatchObject({
+            action: "wake",
+            reasons: ["review"],
+            state: { reviewId: "r1" },
+        });
+    });
+
     it("with no login at the baseline, mark the newest review silently", () => {
         const reviews = [{ authorLogin: "bob", id: "r3" }, own];
 
