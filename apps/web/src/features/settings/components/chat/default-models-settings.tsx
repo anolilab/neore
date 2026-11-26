@@ -25,13 +25,13 @@ import { Separator } from "@neore/ui/components/separator";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, X } from "lucide-react";
 import type { FC } from "react";
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { moveBackupModel, offerableBackupModels } from "@/features/settings/lib/backup-model-options";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
-import { useGatewayModels } from "@/hooks/use-gateway-models";
+import { useGatewayModels, useGatewayModelsLoaded } from "@/hooks/use-gateway-models";
 import { useFilteredModels } from "@/hooks/use-model-filter-rules";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -169,6 +169,8 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
         providersWithKey,
     );
     const usable = new Set(useFilteredModels(candidates).map((m) => m.id));
+    // Without the catalog or the plan answer, nothing is known to be unusable: no entry is marked until both are read.
+    const availabilityKnown = useGatewayModelsLoaded() && access !== undefined;
     const { data: userSettings } = useUserSettings();
     // Edits queue behind each other (`updateLatest`), so the controls stay enabled while one saves and keep their focus.
     const { updateLatest } = useUpdateUserSettings();
@@ -182,6 +184,8 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
     // The entry whose remove button takes focus once the list changes, or "" for the add picker: set when the focused
     // control is about to go (its entry is removed, or the add picker after the last model it may add).
     const focusAfter = useRef<string | null>(null);
+    // Bumped to place focus after a refused save: its rollback changes the list before the refusal is seen.
+    const [focusRequest, setFocusRequest] = useState(0);
 
     useEffect(() => {
         const target = focusAfter.current;
@@ -196,13 +200,20 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
             focusAfter.current = null;
             element.focus();
         }
-    }, [chosenKey]);
+    }, [chosenKey, focusRequest]);
 
     // Built from the cached settings when its turn comes, so two quick edits never undo each other.
-    const save = (edit: (backupModels: string[]) => string[]) => {
+    const save = (edit: (backupModels: string[]) => string[], focusOnFailure?: string) => {
         updateLatest((current) => {
             return { backupModels: edit(storedBackupModels(current)) };
-        }).catch(() => toast.error(t`Failed to update backup models`));
+        }).catch(() => {
+            toast.error(t`Failed to update backup models`);
+
+            if (focusOnFailure !== undefined) {
+                focusAfter.current = focusOnFailure;
+                setFocusRequest((count) => count + 1);
+            }
+        });
     };
 
     return (
@@ -231,7 +242,7 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                                         />
                                     )}
                                     <span className="truncate">{name}</span>
-                                    {!usable.has(id) && <span className="text-muted-foreground shrink-0 text-xs">{t`Unavailable`}</span>}
+                                    {availabilityKnown && !usable.has(id) && <span className="text-muted-foreground shrink-0 text-xs">{t`Unavailable`}</span>}
                                 </span>
                                 <Button
                                     aria-label={t`Move ${name} up`}
@@ -289,11 +300,14 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                                 return;
                             }
 
-                            if (chosen.length + 1 >= limit) {
+                            const fills = chosen.length + 1 >= limit;
+
+                            if (fills) {
                                 focusAfter.current = modelId;
                             }
 
-                            save((list) => (list.includes(modelId) || list.length >= limit ? list : [...list, modelId]));
+                            // A refused add that filled the list rolls its entry back and the add picker returns: focus goes back to it.
+                            save((list) => (list.includes(modelId) || list.length >= limit ? list : [...list, modelId]), fills ? "" : undefined);
                         }}
                         value={undefined}
                     />

@@ -9,7 +9,9 @@ import { BackupModelsSetting } from "./default-models-settings";
 const state = vi.hoisted(() => {
     return {
         catalog: [] as GatewayModel[],
+        catalogLoaded: true,
         excluded: new Set<string>(),
+        refuse: false,
         rerender: (() => undefined) as () => void,
         settings: {} as undefined | { backupModels?: string[] },
     };
@@ -60,22 +62,31 @@ vi.mock("@/hooks/use-feature-flagged-models", () => {
 
 // The whole catalog, before feature flags hide any of it.
 vi.mock("@/hooks/use-gateway-models", () => {
-    return { useGatewayModels: () => state.catalog };
+    return { useGatewayModels: () => state.catalog, useGatewayModelsLoaded: () => state.catalogLoaded };
 });
 
 vi.mock("@/hooks/use-model-filter-rules", () => {
     return { useFilteredModels: (models: GatewayModel[]) => models.filter((model) => !state.excluded.has(model.id)) };
 });
 
-// A save applies at once, as the optimistic cache update does.
+// A save applies at once, as the optimistic cache update does; a refused one is rolled back before it rejects.
 vi.mock("@/features/auth/hooks/use-user-settings", () => {
     return {
         useUpdateUserSettings: () => {
             return {
                 isPending: false,
                 updateLatest: async (build: (current: typeof state.settings) => typeof state.settings) => {
+                    const before = state.settings;
+
                     state.settings = { ...state.settings, ...build(state.settings) };
                     state.rerender();
+
+                    if (state.refuse) {
+                        state.settings = before;
+                        state.rerender();
+
+                        throw new Error("refused");
+                    }
                 },
             };
         },
@@ -98,6 +109,8 @@ const show = (offered: GatewayModel[] = MODELS) => {
 
 beforeEach(() => {
     state.catalog = MODELS;
+    state.catalogLoaded = true;
+    state.refuse = false;
     state.excluded = new Set();
     state.settings = {};
     // The select positions its popup with a ResizeObserver, which jsdom lacks.
@@ -154,6 +167,30 @@ describe("BackupModelsSetting", () => {
         expect(state.settings.backupModels).toEqual(["openai/first", "openai/second", "openai/third"]);
         expect(screen.queryByRole("combobox")).toBeNull();
         expect(document.activeElement).toBe(screen.getByRole("button", { name: "Remove Third" }));
+    });
+
+    it("marks nothing unavailable before the catalog has been read", () => {
+        state.settings = { backupModels: ["openai/first"] };
+        state.catalog = [];
+        state.catalogLoaded = false;
+        show();
+
+        const [entry] = screen.getAllByRole("listitem");
+
+        expect(entry?.textContent).not.toContain("Unavailable");
+        expect(screen.getByRole("button", { name: "Remove openai/first" })).toBeDefined();
+    });
+
+    it("moves focus back to the add picker when an add that filled the list is refused", async () => {
+        state.settings = { backupModels: ["openai/first", "openai/second"] };
+        state.refuse = true;
+        show();
+
+        await userEvent.click(screen.getByRole("combobox", { name: "Add another backup model" }));
+        await userEvent.click(await screen.findByRole("option", { name: "Third" }));
+
+        expect(state.settings.backupModels).toEqual(["openai/first", "openai/second"]);
+        expect(document.activeElement).toBe(screen.getByRole("combobox", { name: "Add another backup model" }));
     });
 
     it("moves focus to the next backup's remove button when one is removed", async () => {
