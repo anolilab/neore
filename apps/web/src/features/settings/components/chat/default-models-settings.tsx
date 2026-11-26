@@ -146,8 +146,6 @@ export const ModelSelect = <Field extends string>({
  * The models a reply is retried on, in order, when the chosen model fails with an infrastructure error. A saved model
  * the list no longer offers (retired, or now outside the plan) stays listed as unavailable, so it can still be removed.
  */
-const isBackupCandidate = (model: GatewayModel): boolean => model.enabled === true && (model.mode === "text" || !model.mode);
-
 export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[]; providersWithKey: ReadonlySet<string> }> = ({
     disabled,
     models: allModels,
@@ -164,7 +162,7 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
     // hides a model from the picker, so a saved one it hides still answers and is not marked unavailable.
     const catalog = useGatewayModels();
     const candidates = offerableBackupModels(
-        catalog.filter((m) => isBackupCandidate(m)),
+        catalog.filter((m) => (m.mode ?? "text") === "text"),
         canRunPaidModels,
         providersWithKey,
     );
