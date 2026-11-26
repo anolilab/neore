@@ -31,18 +31,25 @@ type Offset = { left: number; top: number };
 
 /**
  * Where a hit sits, measured from the panel's top and left edges. Scrolling the panel moves the hit and the panel together,
- * so only a change in the content around the hit moves this offset, across either axis. jsdom lays out no ranges, so it
- * reports none there.
+ * so only a change in the content around the hit moves this offset, across either axis. A scroll box between the hit and
+ * the panel moves the hit alone, so its scroll position is added back. jsdom lays out no ranges, so it reports none there.
  */
-const offsetWithin = (range: Range | undefined, host: Element): Offset | undefined => {
+export const offsetWithin = (range: Range | undefined, host: Element): Offset | undefined => {
     if (typeof range?.getBoundingClientRect !== "function") {
         return undefined;
     }
 
     const rect = range.getBoundingClientRect();
     const origin = host.getBoundingClientRect();
+    let scrollLeft = 0;
+    let scrollTop = 0;
 
-    return { left: rect.left - origin.left, top: rect.top - origin.top };
+    for (let node = range.startContainer.parentElement; node && node !== host; node = node.parentElement) {
+        scrollLeft += node.scrollLeft;
+        scrollTop += node.scrollTop;
+    }
+
+    return { left: rect.left - origin.left + scrollLeft, top: rect.top - origin.top + scrollTop };
 };
 
 const sameOffset = (a: Offset | undefined, b: Offset | undefined): boolean => a?.left === b?.left && a?.top === b?.top;

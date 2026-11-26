@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { collectAsideRanges, isClippedWithin, isOutsideViewport, revealWithinBoxes } from "./use-aside-find-highlights";
+import { collectAsideRanges, isClippedWithin, isOutsideViewport, offsetWithin, revealWithinBoxes } from "./use-aside-find-highlights";
 
 afterEach(() => {
     document.body.replaceChildren();
@@ -169,5 +169,31 @@ describe("revealWithinBoxes", () => {
 
     it("leaves a code block alone when the hit already lies inside it", () => {
         expect(cappedBlock({ bottom: 20, left: 10, right: 30, top: 10 })).not.toHaveBeenCalled();
+    });
+});
+
+describe("offsetWithin", () => {
+    it("keeps a hit's offset when a code block inside the panel is scrolled sideways", () => {
+        document.body.innerHTML = panel(row("a", "Q", `<pre style="overflow-x: auto"><code>wide cat</code></pre>`));
+
+        const section = document.querySelector("section") as HTMLElement;
+        const pre = section.querySelector("pre") as HTMLElement;
+        const code = section.querySelector("code") as HTMLElement;
+        const range = document.createRange();
+
+        range.selectNodeContents(code);
+        // The hit moves left with the block's own scroll, as a real layout does.
+        Object.defineProperty(range, "getBoundingClientRect", {
+            configurable: true,
+            value: () => {
+                return { bottom: 20, left: 10 - pre.scrollLeft, right: 30 - pre.scrollLeft, top: 10 };
+            },
+        });
+
+        const before = offsetWithin(range, section);
+
+        pre.scrollLeft = 50;
+
+        expect(offsetWithin(range, section)).toEqual(before);
     });
 });
