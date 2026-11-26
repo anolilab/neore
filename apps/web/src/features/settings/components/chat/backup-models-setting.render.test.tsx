@@ -258,6 +258,25 @@ describe("BackupModelsSetting", () => {
         expect(screen.queryByRole("option", { name: "Second" })).toBeNull();
     });
 
+    it("offers nothing to add until the user's filters are read", () => {
+        state.preferencesRead = false;
+        show();
+
+        const picker = screen.getByRole("combobox", { name: "Add a backup model" });
+
+        expect(picker.hasAttribute("disabled") || picker.dataset.disabled !== undefined).toBe(true);
+    });
+
+    it("moves focus to the section when the only backup is removed and nothing can be added", async () => {
+        state.settings = { backupModels: ["openai/first"] };
+        state.excluded = new Set(MODELS.map((m) => m.id));
+        show();
+
+        await userEvent.click(screen.getByRole("button", { name: "Remove First" }));
+
+        expect(document.activeElement).toBe(screen.getByRole("group", { name: "Backup models" }));
+    });
+
     it("moves focus to the next backup's remove button when one is removed", async () => {
         state.settings = { backupModels: ["openai/first", "openai/second", "openai/third"] };
         show();

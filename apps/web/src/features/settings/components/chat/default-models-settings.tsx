@@ -170,8 +170,9 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
     const usable = new Set(useFilteredModels(candidates).map((m) => m.id));
     // The filters read as none until the preferences load (or when they fail to), so they must be read too.
     const { data: aiPreferences } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
+    const filtersRead = aiPreferences !== undefined;
     // Without the catalog, the plan answer or the filters, nothing is known to be unusable: no entry is marked until all are read.
-    const availabilityKnown = useGatewayModelsLoaded() && access !== undefined && aiPreferences !== undefined;
+    const availabilityKnown = useGatewayModelsLoaded() && access !== undefined && filtersRead;
     const { data: userSettings } = useUserSettings();
     const { isPending, updateLatest } = useUpdateUserSettings();
     const chosen = storedBackupModels(userSettings);
@@ -183,6 +184,7 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
     // Each entry's buttons by `controlKey`, so focus can be put back once the list has changed.
     const controls = useRef(new Map<string, HTMLButtonElement>());
     const addRow = useRef<HTMLDivElement>(null);
+    const section = useRef<HTMLDivElement>(null);
     // The control that takes focus once the save is over and the controls are enabled again, or "" for the add picker:
     // a disabled control drops focus, and the one used may be gone (its entry removed, the picker after the last add).
     const focusAfter = useRef<string | null>(null);
@@ -196,9 +198,12 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
             return;
         }
 
-        const element = target === "" ? addRow.current?.querySelector("button") : controls.current.get(target);
+        // The add picker is disabled when nothing can be added: the section then holds focus.
+        const picker = addRow.current?.querySelector("button");
+        const pickerOrSection = picker && !picker.disabled ? picker : section.current;
+        const element = target === "" ? pickerOrSection : controls.current.get(target);
 
-        if (element && !element.disabled) {
+        if (element && !(element instanceof HTMLButtonElement && element.disabled)) {
             focusAfter.current = null;
             element.focus();
         }
@@ -228,7 +233,7 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
     };
 
     return (
-        <div className="space-y-3">
+        <div aria-labelledby={labelId} className="space-y-3 outline-none" ref={section} role="group" tabIndex={-1}>
             <div className="space-y-0.5">
                 <Label className="text-sm font-medium" id={labelId}>
                     {t`Backup models`}
@@ -315,7 +320,8 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                         emptyLabel={t`Choose a model`}
                         field="backupModels"
                         label={chosen.length === 0 ? t`Add a backup model` : t`Add another backup model`}
-                        models={allModels.filter((m) => usable.has(m.id) && !chosen.includes(m.id))}
+                        // Unread filters look like none, so nothing is offered until they are read.
+                        models={filtersRead ? allModels.filter((m) => usable.has(m.id) && !chosen.includes(m.id)) : []}
                         onChange={(_field, modelId) => {
                             if (!modelId) {
                                 return;
