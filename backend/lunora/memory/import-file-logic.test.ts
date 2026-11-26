@@ -47,6 +47,27 @@ const SECRET_CONTINUES = [
     [`${LABEL}${VALUE}\\`, "battery-staple-in-vault"].join("\n"),
 ];
 
+/** A secret whose value opens with a typographic quote that nothing closes on its line, then goes on to the next. */
+const NEXT_LINE = "\nThe continuation phrase is amber-orchid-9472"; // secret-scanner:allow
+const SMART_QUOTE_CONTINUES = [
+    `${LABEL}“${NEXT_LINE}`,
+    `${LABEL}‘${VALUE}${NEXT_LINE}`,
+    `${LABEL}«${VALUE}${NEXT_LINE}`,
+    `${LABEL}„${VALUE}${NEXT_LINE}`,
+    `${LABEL}‚${VALUE}${NEXT_LINE}`,
+    // A closer that does not pair with the opener does not close it.
+    `${LABEL}“${VALUE}»${NEXT_LINE}`,
+];
+
+/** A secret in a typographic quote that closes on its line. */
+const SMART_QUOTE_CLOSED = [
+    `${LABEL}“${VALUE}”`,
+    `${LABEL}‘${VALUE}’`,
+    `${LABEL}«${VALUE}»`,
+    `${LABEL}„${VALUE}“`,
+    `${LABEL}‚${VALUE}‘`,
+];
+
 /** A secret whose value ends in a doubled backslash: the backslash is escaped, so the value ends on its line. */
 const ESCAPED_BACKSLASH = `${LABEL}${VALUE}\\\\`;
 
@@ -93,6 +114,20 @@ describe("parseMemoryFile: text", () => {
 
         expect(error).toMatchObject({ code: "secret_continues", message: expect.stringContaining("Line 2 holds a password or key") });
         expect(error?.message).not.toMatch(SECRET_WORDS);
+    });
+
+    it.each(SMART_QUOTE_CONTINUES)("refuses a secret opened with a typographic quote that is not closed on its line (%#)", (input) => {
+        const error = refusal(`The user lives in Lisbon\n${input}`, "text");
+
+        expect(error).toMatchObject({ code: "secret_continues", message: expect.stringContaining("Line 2 holds a password or key") });
+        expect(error?.message).not.toMatch(SECRET_WORDS);
+    });
+
+    it.each(SMART_QUOTE_CLOSED)("keeps a secret in a typographic quote closed on its line, redacted as before (%#)", (input) => {
+        const parsed = parseMemoryFile(`${input}\nThe user likes tea`, "text");
+
+        expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user likes tea"]);
+        expect(parsed).toMatchObject({ entries: 1, invalid: 1, total: 2 });
     });
 
     it("refuses a secret whose label is split by emphasis, reading the line as it will be stored, with the right line number", () => {
@@ -320,6 +355,20 @@ describe("parseMemoryFile: JSON", () => {
 
         expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user lives in Lisbon"]);
         expect(parsed).toMatchObject({ entries: 1, invalid: 2, total: 3 });
+    });
+
+    it.each(SMART_QUOTE_CONTINUES)("skips, counted, an item whose secret opens a typographic quote that is not closed on its line (%#)", (input) => {
+        const parsed = parseMemoryFile(JSON.stringify(["The user lives in Lisbon", input, { text: input }]), "json");
+
+        expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user lives in Lisbon"]);
+        expect(parsed).toMatchObject({ entries: 1, invalid: 2, total: 3 });
+    });
+
+    it("ignores blank string items: they neither count toward the entry limit nor are reported", () => {
+        const items = [...Array.from({ length: MEMORY_FILE_BATCH_SIZE }, (_, index) => fact(index)), ...Array.from({ length: 6000 }, (_, index) => (index % 2 === 0 ? "" : "  \t"))];
+        const parsed = parseMemoryFile(JSON.stringify(items), "json");
+
+        expect(parsed).toMatchObject({ entries: MEMORY_FILE_BATCH_SIZE, invalid: 0, total: MEMORY_FILE_BATCH_SIZE });
     });
 
     it("still imports a JSON item with emphasis and no secret label", () => {

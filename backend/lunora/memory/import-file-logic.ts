@@ -173,12 +173,28 @@ const carriesSecretLabel = (line: string): boolean => {
     return found;
 };
 
-/** Where the quote `quote` that opened a value at `from` is closed on this line (the index after it), or `-1`. */
-const closingQuoteOnLine = (line: string, from: number, quote: string): number => {
+/**
+ * The quotes that open a value, each with the characters that may close it: the ASCII pair, and the typographic pairs
+ * of English (`“…”`, `‘…’`), French (`«…»`) and German or Polish (`„…“`, `„…”`, `‚…‘`, `‚…’`).
+ */
+const QUOTE_CLOSERS: ReadonlyMap<string, string> = new Map([
+    ["'", "'"],
+    ['"', '"'],
+    ["‘", "’"],
+    ["‚", "‘’"],
+    ["“", "”"],
+    ["„", "“”"],
+    ["«", "»"],
+]);
+
+/** Where a value opened at `from` is closed on this line by one of the characters `closers` (the index after it), or `-1`. */
+const closingQuoteOnLine = (line: string, from: number, closers: string): number => {
     for (let index = from; index < line.length; index += 1) {
-        if (line[index] === "\\") {
+        const char = line[index] as string;
+
+        if (char === "\\") {
             index += 1;
-        } else if (line[index] === quote) {
+        } else if (closers.includes(char)) {
             return index + 1;
         }
     }
@@ -225,10 +241,10 @@ const secretContinues = (raw: string): boolean => {
             return true;
         }
 
-        const quote = line[start];
+        const closers = QUOTE_CLOSERS.get(line[start] as string);
 
-        if (quote === '"' || quote === "'") {
-            readUntil = closingQuoteOnLine(line, start + 1, quote);
+        if (closers !== undefined) {
+            readUntil = closingQuoteOnLine(line, start + 1, closers);
 
             if (readUntil === -1) {
                 return true;
@@ -278,6 +294,9 @@ const textOfJsonItem = (item: unknown): RawEntry => {
     return { text: field === undefined ? undefined : itemText(record[field] as string), type };
 };
 
+/** A blank string is no entry, as a blank text line is none: it neither counts toward the entry limit nor is reported. */
+const isBlankString = (item: unknown): boolean => typeof item === "string" && item.trim() === "";
+
 const rawEntriesOf = (content: string, format: MemoryFileFormat): RawEntry[] => {
     const body = content.startsWith(BYTE_ORDER_MARK) ? content.slice(1) : content;
 
@@ -311,7 +330,7 @@ const rawEntriesOf = (content: string, format: MemoryFileFormat): RawEntry[] => 
         throw new MemoryFileError("bad_shape", 'The JSON must be an array of strings, or of objects with a "content", "text" or "memory" field.');
     }
 
-    return parsed.map((item) => textOfJsonItem(item));
+    return parsed.filter((item) => !isBlankString(item)).map((item) => textOfJsonItem(item));
 };
 
 /**
