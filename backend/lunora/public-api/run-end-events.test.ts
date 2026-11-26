@@ -3,7 +3,7 @@
  * Runs against the real schema: the stream row, the thread, and `addChunk`.
  */
 import { lunoraTest } from "@lunora/testing";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { closeGroupTurnStream } from "../chat/group/run";
 import { isRunReplaced } from "../chat/lib/run-epoch";
@@ -19,7 +19,16 @@ let harness: ReturnType<typeof lunoraTest>;
 let threadId: string;
 let streamId: string;
 
+// One clock for the fixtures and the procedures: `Date.now()` is pinned, and `ctx.now` reads it.
+const FIXED_NOW = Date.parse("2026-11-26T12:00:00Z");
+
+afterEach(() => {
+    vi.useRealTimers();
+});
+
 beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(FIXED_NOW);
     harness = lunoraTest(schema as never);
     threadId = await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "T", userId: OWNER }));
     streamId = await harness.run(
