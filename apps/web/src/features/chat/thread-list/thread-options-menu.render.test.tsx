@@ -51,15 +51,17 @@ vi.mock("@tanstack/react-query", () => {
 
 vi.mock("@tanstack/react-router", () => {
     return {
-        useRouter: () => {return {
-            state: {
-                location: {
-                    get pathname() {
-                        return sideChat.pathname;
+        useRouter: () => {
+            return {
+                state: {
+                    location: {
+                        get pathname() {
+                            return sideChat.pathname;
+                        },
                     },
                 },
-            },
-        }},
+            };
+        },
     };
 });
 
