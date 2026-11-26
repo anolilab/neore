@@ -11,7 +11,6 @@
  * JSON: an array whose items are strings, or objects with a text field (`content`, `text` or `memory`) and an
  * optional `type`. Any other top-level shape is refused; an item of another shape is counted as invalid.
  */
-import { SECRET_NAME } from "../lib/secret-redaction";
 import {
     capImportText,
     IMPORT_MAX_FACT_CHARS,
@@ -146,16 +145,33 @@ export const toBatches = <T>(items: ReadonlyArray<T>, size: number): T[][] => {
     return batches;
 };
 
-const SECRET_LABEL = new RegExp(String.raw`\b${SECRET_NAME}["']?[^\S\n]*[:=]`, "giu");
-
-/** The same label without the `g` flag, so a `test` keeps no `lastIndex` between lines. */
-const SECRET_LABEL_ANYWHERE = new RegExp(SECRET_LABEL.source, "iu");
+/**
+ * A secret's word, the rest of its name, and its separator: `password=`, `DB_PASSWORD_PROD :`, `"token":`. Run on
+ * {@link detectionView} (lower case, no emphasis), so it has no `i` flag, no left boundary and no cap on the name in
+ * front of the word (`DB_PASSWORD`, or forty characters and more before `_password`): matching the word and the
+ * separator is what makes that name irrelevant. The name after the word is capped at 40 characters, so a line of
+ * `passwordpassword…` with no separator costs a bounded read at each word, never a rescan of the rest of the line.
+ */
+const SECRET_LABEL_WORDS = `passw(?:or)?d|pwd|passphrase|secret|token|(?:api|access|private|secret)[ _-]?key|authorization|credentials?`;
+const SECRET_LABEL = new RegExp(String.raw`(?:${SECRET_LABEL_WORDS})[\w-]{0,40}["']?[^\S\n]*[:=]`, "gu");
 
 /**
- * True when a raw line holds a secret label (`DB_PASSWORD=`, `api_token:`) anywhere. One linear scan with no unwrapping:
- * the label's name is bounded to 40 characters and nothing in it nests, so it cannot backtrack on a line of any length.
+ * The line as the label test reads it: lower case, with the emphasis the unwrapping removes (`**`, `__`, code ticks) taken
+ * out, so `DB_**PASSWORD**="` reads `db_password="`. One non-recursive pass, no tag stripping: it is safe on a line of
+ * any length, which the full unwrapping is not.
  */
-const carriesSecretLabel = (line: string): boolean => SECRET_LABEL_ANYWHERE.test(line);
+const detectionView = (line: string): string => line.replaceAll(/\*|__|`/gu, "").toLowerCase();
+
+/** True when the line holds a secret label anywhere: used on a line past the raw-length guard, which is never unwrapped. */
+const carriesSecretLabel = (line: string): boolean => {
+    SECRET_LABEL.lastIndex = 0;
+
+    const found = SECRET_LABEL.test(detectionView(line));
+
+    SECRET_LABEL.lastIndex = 0;
+
+    return found;
+};
 
 /** Where the quote `quote` that opened a value at `from` is closed on this line (the index after it), or `-1`. */
 const closingQuoteOnLine = (line: string, from: number, quote: string): number => {
@@ -189,7 +205,8 @@ const endsInLineContinuation = (line: string): boolean => {
  * a time, so its continuation would be read as a memory. The file is refused rather than guessing where the value ends.
  * A label inside a quoted value already read is skipped.
  */
-const secretContinues = (line: string): boolean => {
+const secretContinues = (raw: string): boolean => {
+    const line = detectionView(raw);
     let named = false;
     let readUntil = 0;
 
@@ -227,9 +244,9 @@ const secretContinues = (line: string): boolean => {
 /**
  * The one-based number of the first line of `lines` that {@link secretContinues}, or `undefined`. A line is read as
  * preparation will see it: with emphasis and tags removed, `DB_**PASSWORD**="alpha` names its secret. A line past the
- * raw-length guard is never unwrapped, and is counted too long and never stored; but it may be the start of a secret
- * whose value goes on to the next line, so it is read raw for a secret label ({@link carriesSecretLabel}) and, if it
- * has one, treated as continuing.
+ * raw-length guard is never unwrapped (that costs more than a line of any length can be allowed), and is counted too
+ * long and never stored; but it may start a secret whose value goes on to the next line. It is read through
+ * {@link detectionView} alone, and a label anywhere on it counts as continuing: refusing is the safe side.
  */
 const firstSecretContinuingLine = (lines: ReadonlyArray<string>): number | undefined => {
     const index = lines.findIndex((line) =>
