@@ -572,10 +572,11 @@ describe("createSideChat", () => {
         });
 
         const outcome = (await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)) as { status: string; threadId: string };
-        const rowsOf = async (threadId: string) =>
-            (await harness.run(async (ctx: any) => await ctx.db.query("messages").collect()))
-                .filter((row: any) => String(row.threadId) === threadId)
-                .map((row: any) => row.message);
+        const rowsOf = async (threadId: string) => {
+            const all = await harness.run(async (ctx: any) => await ctx.db.query("messages").collect());
+
+            return all.filter((row: any) => String(row.threadId) === threadId).map((row: any) => row.message);
+        };
 
         expect(outcome.status).toBe("ok");
         expect(await harness.run(async (ctx: any) => await threadHandoffTaint(ctx, parentId as never))).toStrictEqual(["web", "device"]);
