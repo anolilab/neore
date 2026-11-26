@@ -581,4 +581,38 @@ describe("createSideChat", () => {
         });
         expect(await sideRelations()).toHaveLength(0);
     });
+
+    it("copies nothing of a reply interrupted mid tool call, even when a later prompt follows it", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await withMessages(parentId, OWNER, ["first question"]);
+        await harness.run(async (ctx: any) => {
+            await addMessagesHandler(ctx, {
+                messages: [
+                    {
+                        message: { content: [{ input: {}, toolCallId: "c1", toolName: "search", type: "tool-call" }], role: "assistant" },
+                        status: "success",
+                    },
+                ],
+                threadId: parentId as never,
+                userId: OWNER,
+            });
+        });
+        // The run stopped at the tool call; the owner then sent another prompt.
+        await withMessages(parentId, OWNER, ["second question"]);
+
+        const outcome = (await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)) as { status: string; threadId: string };
+        const childRows = await harness.run(async (ctx: any) => {
+            const rows = await ctx.db.query("messages").collect();
+
+            return rows.filter((row: any) => String(row.threadId) === outcome.threadId);
+        });
+        const copied = JSON.stringify(childRows.map((row: any) => row.message));
+
+        expect(outcome.status).toBe("ok");
+        expect(childRows).toHaveLength(1);
+        expect(copied).toContain("first question");
+        expect(copied).not.toContain("tool-call");
+        expect(copied).not.toContain("second question");
+    });
 });
