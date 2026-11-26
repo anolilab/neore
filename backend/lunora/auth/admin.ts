@@ -21,6 +21,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import { createAuditLogEntry } from "../admin/audit-log";
 import { adminMutation, adminQuery, authQuery, rateLimit } from "../lib/crpc";
+import { patchBetterAuthRow } from "../lib/better-auth-dates";
 import { checkUserBanStatus } from "../lib/crpc-auth-helpers";
 import type { Where } from "lunorash/server/data-model";
 
@@ -107,7 +108,7 @@ export const updateUserRole = adminMutation
         const previousRole = targetUser.role;
 
         // Update the role
-        await ctx.db.patch("user", input.userId, {
+        await patchBetterAuthRow(ctx.db, "user", targetUser, {
             role: input.role === "admin" ? "admin" : null,
         });
 
@@ -145,7 +146,7 @@ export const grantAdminByEmail = adminMutation
         }
 
         // Update user role to admin
-        await ctx.db.patch("user", user._id, { role: "admin" });
+        await patchBetterAuthRow(ctx.db, "user", user, { role: "admin" });
 
         // Audit log
         await createAuditLogEntry(ctx, {
@@ -186,7 +187,7 @@ export const revokeAdminByEmail = adminMutation
         }
 
         // Update user role to null (regular user)
-        await ctx.db.patch("user", user._id, { role: null });
+        await patchBetterAuthRow(ctx.db, "user", user, { role: null });
 
         // Audit log
         await createAuditLogEntry(ctx, {
@@ -661,7 +662,7 @@ export const banUser = adminMutation
         // Calculate ban expiration
         const banExpires = input.banExpiresIn ? ctx.now + input.banExpiresIn * 1000 : null;
 
-        await ctx.db.patch("user", input.userId, {
+        await patchBetterAuthRow(ctx.db, "user", targetUser, {
             banExpires,
             banned: true,
             banReason: input.banReason || "No reason provided",
@@ -703,7 +704,7 @@ export const unbanUser = adminMutation
             throw new LunoraError("NOT_FOUND", "User not found");
         }
 
-        await ctx.db.patch("user", input.userId, {
+        await patchBetterAuthRow(ctx.db, "user", targetUser, {
             banExpires: null,
             banned: false,
             banReason: null,

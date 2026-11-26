@@ -30,6 +30,8 @@ import { LunoraError, v } from "lunorash/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
+import type { DatesAsNumbers } from "../lib/better-auth-dates";
+import { datesAsNumbers } from "../lib/better-auth-dates";
 import { claimFence, claimRow, holdClaim, recordClaimResult, releaseClaim, swapClaimResult } from "../lib/claim-once";
 import { isUniqueViolation } from "../lib/error-helpers";
 import { MAX_LENGTH } from "../lib/validators";
@@ -187,52 +189,22 @@ const changedAt = (value: unknown): number => {
     return typeof value === "string" ? Date.parse(value) : NaN;
 };
 
-/** The `user` columns better-auth writes as dates, so a row it wrote may hold them as ISO strings. */
-const USER_DATE_COLUMNS = ["banExpires", "createdAt", "updatedAt"] as const;
-
-type UserDateColumn = (typeof USER_DATE_COLUMNS)[number];
-
 /** A fill's conditional patch: the dates it converts as numbers, and every date guarded on the value it read. */
 interface FillPatch {
-    patch: Partial<Record<UserDateColumn, number>> & { emailCanonical: string };
-    where: Partial<Record<UserDateColumn, number | string | null>> & { email: string; emailCanonical: null };
+    patch: Record<string, number | string>;
+    where: DatesAsNumbers["where"];
 }
 
 /**
  * The conditional patch that fills one row: `emailCanonical`, only while the row is unfilled and holds the address the
- * fill folded. Lunora's writer validates every column of the row a patch leaves, not only the patched ones, so a row
- * better-auth wrote (ISO dates in `v.number()` columns) refuses any patch with `VALIDATION_ERROR`. Each date column that
- * holds a string is therefore rewritten as the epoch milliseconds it names. Every date column is guarded on the value
- * read (a number, a string, or none): a write in between, also one that turns a number into a string, makes the patch
- * miss rather than put back an older time or leave a row the writer refuses. better-auth's adapter hands a stored number back
- * unchanged, not as a `Date`; its own reads and the web app wrap it in `new Date(...)`. A string no clock reads is refused,
- * never stored as some other time.
+ * fill folded. A row better-auth wrote holds ISO dates, so the patch converts them in the same write, guarded on the value
+ * read (`lib/better-auth-dates.ts`): a write in between, also one that turns a number into a string, makes the patch miss
+ * rather than put back an older time or leave a row the writer refuses.
  */
-const fillPatchOf = (row: Pick<Doc<"user">, "email" | UserDateColumn>, canonical: string): FillPatch => {
-    const patch: FillPatch["patch"] = { emailCanonical: canonical };
-    const where: FillPatch["where"] = { email: row.email, emailCanonical: null };
+const fillPatchOf = (row: Doc<"user">, canonical: string): FillPatch => {
+    const { patch, where } = datesAsNumbers("user", row);
 
-    for (const column of USER_DATE_COLUMNS) {
-        // Typed a number; better-auth's rows hold a string.
-        const stored: unknown = row[column];
-
-        if (typeof stored !== "string") {
-            where[column] = typeof stored === "number" ? stored : null;
-
-            continue;
-        }
-
-        const epochMs = Date.parse(stored);
-
-        if (!Number.isFinite(epochMs)) {
-            throw new LunoraError("BAD_REQUEST", `A user row's ${column} does not read as a time; fix the row before the fill`);
-        }
-
-        patch[column] = epochMs;
-        where[column] = stored;
-    }
-
-    return { patch, where };
+    return { patch: { ...patch, emailCanonical: canonical }, where: { ...where, email: row.email, emailCanonical: null } };
 };
 
 const toHex = (bytes: Uint8Array): string => [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
