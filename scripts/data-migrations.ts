@@ -358,6 +358,8 @@ interface BackfillAnswer {
     scanned: number;
     skipped: number;
     status: string;
+    /** A check call another call under its token got ahead of: it moved nothing itself, the check did. */
+    superseded: boolean;
     token: string | undefined;
     unfilledIds: string[];
 }
@@ -374,6 +376,7 @@ const backfillAnswer = (body: unknown): BackfillAnswer => {
         scanned: count(record.scanned),
         skipped: count(record.skipped),
         status: typeof record.status === "string" ? record.status : "unknown",
+        superseded: record.superseded === true,
         token: typeof record.token === "string" && record.token !== "" ? record.token : undefined,
         unfilledIds: strings(record.unfilledIds),
     };
@@ -406,7 +409,7 @@ class BackfillStop extends Error {}
  * Drives the backfill: a check over every account, page by page under the token its first call answers (the server keeps
  * the cursor, and refuses any address two accounts fold to, also across calls), collecting the unfilled ids; only then a
  * fill of those ids under that token, a batch per call; then a check again, which answers `done` once nothing is left. A round that left rows behind (they changed meanwhile) is followed by another, up to {@link EMAIL_CANONICAL_ROUNDS}.
- * A 429 is waited out; {@link EMAIL_CANONICAL_STALLS} answers in a row that move nothing, a conflict, any other answer, or
+ * A 429 is waited out; {@link EMAIL_CANONICAL_STALLS} answers in a row that move nothing (a `superseded` check answer is not one), a conflict, any other answer, or
  * `maxCalls` stop it with an error, as does {@link EMAIL_CANONICAL_DEADLINE_MS}: no call starts and no wait begins that
  * would end past it. Prints counts only, never a token or an id. Returns the process exit code.
  */
@@ -516,7 +519,10 @@ export const runEmailCanonicalBackfill = async (options: RunBackfillOptions): Pr
                 break;
             }
 
-            moved(answer.scanned > 0, answer);
+            // A superseded answer means another call under the token moved the check on: the next call goes on from there.
+            if (!answer.superseded) {
+                moved(answer.scanned > 0, answer);
+            }
         }
 
         options.log(`${EMAIL_CANONICAL_BACKFILL}: checked ${String(scanned)} account(s), no address shared, ${String(unfilledIds.length)} to fill`);

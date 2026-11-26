@@ -552,6 +552,27 @@ describe("the user.emailCanonical backfill in the deploy", () => {
         expect(stuckCheck.output).toContain("made no progress");
     });
 
+    it("goes on past check answers another call under the token got ahead of, which are not stalls", async () => {
+        const superseded = (): BackfillCall => {
+            return { body: { scanned: 0, status: "checking", superseded: true, token: "t1", unfilledIds: [] }, status: 200 };
+        };
+        const { exitCode, requests } = await backfillWith([
+            checking(1, ["u0"]),
+            // One more than the stalls that would stop the run.
+            ...Array.from({ length: EMAIL_CANONICAL_STALLS + 1 }, superseded),
+            checked(1, ["u1"]),
+            filledBatch(1),
+            filledBatch(1),
+            done,
+        ]);
+
+        expect(exitCode).toBe(0);
+        expect(requests.filter((request) => request.phase === "fill")).toStrictEqual([
+            { ids: ["u0"], phase: "fill", token: "t1" },
+            { ids: ["u1"], phase: "fill", token: "t1" },
+        ]);
+    });
+
     it("checks again after a fill that left changed rows behind, pausing past the settle window, and gives up after its rounds", async () => {
         const again = await backfillWith([checked(2, ["u1", "u2"]), filledBatch(1), filledBatch(1, 0, 1), checked(2, ["u2"], "t2"), filledBatch(1), done]);
 
