@@ -74,6 +74,8 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "dispatchDueRepoPolls", ref: internal.source_control.freshness_internal.dispatchDueRepoPolls },
     // The stored state of linked pull requests that auto-archive reads (`source-control/pr-state.ts`); a no-op when the setting is off.
     { name: "dispatchLinkedPullRequestChecks", ref: internal.source_control.pr_state.dispatchLinkedPullRequestChecks },
+    // Running pull request watches whose read is due (`source-control/pr-watch-poll.ts`); a no-op for a person with none.
+    { name: "dispatchDueWatches", ref: internal.source_control.pr_watch_poll.dispatchDueWatches },
     { name: "cleanupExpiredPersistentStreams", ref: internal.chat.streaming.persistent.crons.cleanupExpiredStreams },
     { name: "purgeFinishedStreams", ref: internal.chat.streaming.persistent.purge.purgeFinishedStreams },
     { name: "failStaleMediaRows", ref: internal.chat.media_stale.failStaleMediaRows },

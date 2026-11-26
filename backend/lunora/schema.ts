@@ -2760,9 +2760,31 @@ export const schema = defineSchema({
         ),
         // True exactly while a watch runs, so a person's running watches are counted exactly through an index. Cleared by anything that ends a watch.
         watchActive: v.optional(v.boolean()),
+        // The poller's lease: when it last took this watch for a host read (`source-control/pr-watch-poll.ts`). A read's answer lands only while it still matches.
+        watchCheckedAt: v.optional(v.number()),
+        // When the watch may next be polled: the end of the lease a read holds (`watchCheckedAt` is its id), or one interval after the last recorded read.
+        watchLeaseUntil: v.optional(v.number()),
         // Occurrences seen during a cooldown, delivered once the cooldown has passed (`source-control/pr-watch-logic.ts`).
         // Cleared by a fresh start; a stopped watch keeps whatever it had.
         watchPending: v.optional(v.array(v.union(v.literal("checks"), v.literal("conflict"), v.literal("review")))),
+        // How the poller's host reads are failing, so a watch that cannot be read is not invisible (`source-control/pr-watch-poll.ts`): the last failure's
+        // status and time, and how many reads in a row failed. Reset to zero attempts by the next read that lands. Never changes the watch's decision state.
+        watchReadFailure: v.optional(
+            v.object({
+                at: v.number(),
+                attempts: v.number(),
+                status: v.union(
+                    v.literal("forbidden"),
+                    v.literal("host_error"),
+                    v.literal("needs_reconnect"),
+                    v.literal("not_connected"),
+                    v.literal("not_found"),
+                    v.literal("rate_limited"),
+                ),
+            }),
+        ),
+        // Names one start of the watch: fresh at every start and never the clock, so a poll leased before a stop and restart cannot match the restarted watch (`source-control/pr-watch-poll.ts`).
+        watchRun: v.optional(v.string()),
     })
         .shardBy("userId")
         .index("by_user_and_repository_number", ["userId", "repository", "number"])

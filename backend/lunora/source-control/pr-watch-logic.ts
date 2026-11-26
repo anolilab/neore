@@ -45,7 +45,15 @@ export interface PullRequestObservation {
     /** Whether the host can merge the head. `unknown` while the host has not computed it. */
     mergeable: "clean" | "conflicting" | "unknown";
     /** Every submitted review, newest first, as the host lists them now. */
-    reviews: ReadonlyArray<{ authorLogin: string; id: string }>;
+    reviews: ReadonlyArray<{ authorLogin: string; id: string; submittedAt?: number }>;
+    /**
+     * Set only when the host holds more reviews than were listed and the list does not reach the seen review: what a direct read of
+     * the seen review found. `present`: it exists beyond the read, so every listed review is newer. `gone`: it was deleted. `unknown`:
+     * the read failed, so nothing can be said and the marker stays where it is.
+     */
+    seenReviewBeyondRead?: "gone" | "present" | "unknown";
+    /** When the seen review was submitted (epoch ms), with `present`: the listed reviews are ordered against it. */
+    seenReviewSubmittedAt?: number;
     /** The host's state of the pull request now. */
     state: "closed" | "merged" | "open";
     /** The person's own login. Their reviews never wake them. */
@@ -62,9 +70,22 @@ export type WatchDecision =
     /** The watch is over: the pull request is no longer open, or the wake cap was reached. The caller stops it. */
     | { action: "end"; reason: "closed" | "cap"; state: PullRequestWatchState };
 
-/** The newest review by someone other than the watcher. */
-const newestReviewByOthers = (observed: PullRequestObservation): { authorLogin: string; id: string } | undefined =>
-    observed.reviews.find((review) => review.authorLogin !== observed.watcherLogin);
+/**
+ * Whether the review is the watcher's own. Host logins are not case-sensitive, so the comparison is not either. With no
+ * watcher login (the lookup failed) no review is known to be the watcher's, so every one counts as someone else's.
+ */
+export const isByWatcher = (review: { authorLogin: string }, watcherLogin: string): boolean =>
+    watcherLogin !== "" && review.authorLogin.toLowerCase() === watcherLogin.toLowerCase();
+
+/**
+ * The reviews by someone other than the watcher. With a missing login all of them: a review of the watcher's own may then wake
+ * the watch, which is accepted, because a real review that goes unnoticed is worse than a spurious wake.
+ */
+const reviewsByOthers = (observed: PullRequestObservation): { authorLogin: string; id: string; submittedAt?: number }[] =>
+    observed.reviews.filter((review) => !isByWatcher(review, observed.watcherLogin.trim()));
+
+/** The review a read leaves as the watch's marker: the newest by someone other than the watcher. */
+const newestReviewByOthers = (observed: PullRequestObservation): { authorLogin: string; id: string } | undefined => reviewsByOthers(observed)[0];
 
 /**
  * The reviews by others that are newer than the one the watch last saw. The host lists reviews newest first, so those are
@@ -74,9 +95,9 @@ const newestReviewByOthers = (observed: PullRequestObservation): { authorLogin: 
 const newerReviewsByOthers = (
     observed: PullRequestObservation,
     seenId: string | undefined,
-): { left: boolean; newer: { authorLogin: string; id: string }[] } => {
+): { left: boolean; newer: { authorLogin: string; id: string; submittedAt?: number }[] } => {
     if (seenId === undefined) {
-        return { left: false, newer: observed.reviews.filter((review) => review.authorLogin !== observed.watcherLogin) };
+        return { left: false, newer: reviewsByOthers(observed) };
     }
 
     const at = observed.reviews.findIndex((review) => review.id === seenId);
@@ -85,7 +106,21 @@ const newerReviewsByOthers = (
         return { left: true, newer: [] };
     }
 
-    return { left: false, newer: observed.reviews.slice(0, at).filter((review) => review.authorLogin !== observed.watcherLogin) };
+    // The list is sorted by submission time, so a review above the seen one was submitted at or after it. Host times have one-second
+    // resolution, so an EQUAL time counts as newer (a spurious wake is accepted over a missed review); only a time before the seen
+    // one's, which a sorted list does not show, rules a review out. This differs on purpose from the beyond-read path, which has no
+    // such order against the marker and compares strictly.
+    const seenAt = observed.reviews[at]?.submittedAt ?? 0;
+
+    return {
+        left: false,
+        newer: observed.reviews
+            .slice(0, at)
+            .filter(
+                (review) =>
+                    !isByWatcher(review, observed.watcherLogin.trim()) && (seenAt === 0 || review.submittedAt === undefined || review.submittedAt >= seenAt),
+            ),
+    };
 };
 
 /**
@@ -140,10 +175,27 @@ export const decideWatch = (previous: PullRequestWatchState, observed: PullReque
 
     const { left, newer } = newerReviewsByOthers(observed, previous.reviewId);
 
-    if (left) {
-        // The seen review left the host's list (deleted, or older than the pages the read went back through: its bound is the limit
-        // of what this can tell). Nothing can be said about what is new, so re-baseline silently on the newest review by someone
-        // else, or clear the marker when there is none: the next review by someone else then wakes the thread.
+    if (left && observed.seenReviewBeyondRead === "unknown") {
+        // The seen review could not be looked up: it neither wakes nor moves, so the next read decides with it still in place.
+    } else if (left && observed.seenReviewBeyondRead === "present") {
+        // The seen review exists beyond the read, and the list is in host order, not submission order: only a review by someone else
+        // submitted AFTER it is new (a review with no time, or the same time, is not), and the marker moves to the newest of those.
+        const seenAt = observed.seenReviewSubmittedAt ?? 0;
+        const later = reviewsByOthers(observed)
+            .filter((other) => (other.submittedAt ?? 0) > seenAt)
+            .toSorted((a, b) => (b.submittedAt ?? 0) - (a.submittedAt ?? 0));
+
+        if (later[0] !== undefined) {
+            next.reviewId = later[0].id;
+
+            if (!owed.includes("review")) {
+                owed.push("review");
+            }
+        }
+    } else if (left) {
+        // The seen review is not in the list. Complete list, or the review was found deleted: nothing newer can be told by position, so
+        // re-baseline silently on the newest review by someone else, or clear the marker when there is none (the next review by someone
+        // else then wakes the thread).
         next.reviewId = review?.id;
     } else if (newer.length > 0) {
         next.reviewId = newer[0]?.id;

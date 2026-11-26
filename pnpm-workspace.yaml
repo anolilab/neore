@@ -299,7 +299,7 @@ catalogs:
     tailwind-csstree: 0.4.2
     typescript-eslint: 8.73.0
   lunora:
-    "@lunora/auth": 1.0.0-alpha.275
+    "@lunora/auth": 1.0.0-alpha.277
     "@lunora/bindings": 1.0.0-alpha.154
     "@lunora/client": 1.0.0-alpha.304
     "@lunora/cli": 1.0.0-alpha.510

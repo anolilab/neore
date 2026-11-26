@@ -249,6 +249,20 @@ export const collectPullRequestThreadsForExport = internalQuery
                         }),
                     ),
                     watchPending: v.optional(v.array(vWatchWakeReason)),
+                    watchReadFailure: v.optional(
+                        v.object({
+                            at: v.number(),
+                            attempts: v.number(),
+                            status: v.union(
+                                v.literal("forbidden"),
+                                v.literal("host_error"),
+                                v.literal("needs_reconnect"),
+                                v.literal("not_connected"),
+                                v.literal("not_found"),
+                                v.literal("rate_limited"),
+                            ),
+                        }),
+                    ),
                 }),
             ),
         }),
@@ -279,6 +293,7 @@ export const collectPullRequestThreadsForExport = internalQuery
                     ...(link.stateCheckedAt !== undefined && { stateCheckedAt: link.stateCheckedAt }),
                     ...(link.watch !== undefined && { watch: link.watch }),
                     ...(link.watchPending !== undefined && { watchPending: link.watchPending }),
+                    ...(link.watchReadFailure !== undefined && { watchReadFailure: link.watchReadFailure }),
                     threadId: link.threadId,
                     title: link.title,
                     url: link.url,

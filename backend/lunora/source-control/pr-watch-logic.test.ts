@@ -238,6 +238,156 @@ describe("decideWatch", () => {
     });
 });
 
+describe("a seen review beyond a truncated read", () => {
+    const listed = [
+        { authorLogin: "dev", id: "109", submittedAt: 9000 },
+        { authorLogin: "bob", id: "108", submittedAt: 6000 },
+        { authorLogin: "amy", id: "107", submittedAt: 8000 },
+    ];
+    const marked = { ...baselined, reviewId: "50" };
+    const present = { seenReviewBeyondRead: "present", seenReviewSubmittedAt: 5000 } as const;
+
+    it("wakes for a review submitted after the seen one and marks the newest by submission time, not list position", () => {
+        const decision = decideWatch(marked, { ...quiet, reviews: listed, ...present }, NOW);
+
+        expect(decision).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "107" } });
+    });
+
+    it("does not wake for a review submitted before, or at the same time as, the seen one", () => {
+        for (const submittedAt of [4000, 5000]) {
+            const decision = decideWatch(marked, { ...quiet, reviews: [{ authorLogin: "bob", id: "1", submittedAt }], ...present }, NOW);
+
+            expect(decision).toMatchObject({ action: "none", state: { reviewId: "50" } });
+        }
+    });
+
+    it("does not take a review with no submission time for newer", () => {
+        const decision = decideWatch(marked, { ...quiet, reviews: [{ authorLogin: "bob", id: "1" }], ...present }, NOW);
+
+        expect(decision).toMatchObject({ action: "none", state: { reviewId: "50" } });
+    });
+
+    it("re-baselines silently when the seen review was found deleted", () => {
+        const decision = decideWatch(marked, { ...quiet, reviews: listed, seenReviewBeyondRead: "gone" }, NOW);
+
+        expect(decision).toMatchObject({ action: "none", state: { reviewId: "108" } });
+    });
+
+    it("neither wakes nor moves the marker when the seen review could not be looked up", () => {
+        const decision = decideWatch(marked, { ...quiet, reviews: listed, seenReviewBeyondRead: "unknown" }, NOW);
+
+        expect(decision).toMatchObject({ action: "none", state: { reviewId: "50" } });
+    });
+
+    it("does not wake for the watcher's own reviews alone, even when the seen review exists", () => {
+        const decision = decideWatch(marked, { ...quiet, reviews: [listed[0]!], ...present }, NOW);
+
+        expect(decision.action).toBe("none");
+    });
+
+    it("still re-baselines silently when the list is complete and the marker is gone", () => {
+        const decision = decideWatch(marked, { ...quiet, reviews: listed }, NOW);
+
+        expect(decision).toMatchObject({ action: "none", state: { reviewId: "108" } });
+    });
+});
+
+describe("a listed seen review in a list sorted by submission time", () => {
+    const seen = { authorLogin: "bob", id: "5", submittedAt: 5000 };
+    const marked = { ...baselined, reviewId: "5" };
+
+    it("wakes, and moves the marker, for a review above it with an equal time (one-second resolution)", () => {
+        const decision = decideWatch(marked, { ...quiet, reviews: [{ authorLogin: "amy", id: "6", submittedAt: 5000 }, seen] }, NOW);
+
+        expect(decision).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "6" } });
+    });
+
+    it("does not wake for a review below it, whatever its time", () => {
+        const decision = decideWatch(marked, { ...quiet, reviews: [seen, { authorLogin: "amy", id: "4", submittedAt: 5000 }] }, NOW);
+
+        expect(decision).toMatchObject({ action: "none", state: { reviewId: "5" } });
+    });
+
+    it("wakes for a strictly later one", () => {
+        const decision = decideWatch(marked, { ...quiet, reviews: [{ authorLogin: "amy", id: "6", submittedAt: 5001 }, seen] }, NOW);
+
+        expect(decision).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "6" } });
+    });
+});
+
+describe("the watcher's own reviews", () => {
+    const own = { authorLogin: "Dev", id: "r9" };
+
+    it("do not wake, whatever the letter case of the login", () => {
+        const decision = decideWatch(baselined, { ...quiet, reviews: [own], watcherLogin: "dev" }, NOW);
+
+        expect(decision.action).toBe("none");
+        expect(decision.state.reviewId).toBeUndefined();
+    });
+
+    it("are not taken as the baseline's seen review", () => {
+        expect(decideWatch({}, { ...quiet, reviews: [own], watcherLogin: "DEV" }, NOW).state.reviewId).toBeUndefined();
+    });
+
+    it("do not hide a later review by someone else", () => {
+        const decision = decideWatch(
+            { ...baselined, reviewId: "r1" },
+            { ...quiet, reviews: [{ authorLogin: "bob", id: "r10" }, own, { authorLogin: "bob", id: "r1" }] },
+            NOW,
+        );
+
+        expect(decision).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "r10" } });
+    });
+
+    it("may wake when the login is missing: every review newer than the marker counts as someone else's", () => {
+        for (const watcherLogin of ["", "  "]) {
+            const decision = decideWatch(
+                { ...baselined, reviewId: "r1" },
+                { ...quiet, reviews: [own, { authorLogin: "bob", id: "r2" }, { authorLogin: "bob", id: "r1" }], watcherLogin },
+                NOW,
+            );
+
+            expect(decision).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "r9" } });
+        }
+    });
+
+    it("do not wake with the login known, even when one was missing on an earlier read", () => {
+        const reviews = [own, { authorLogin: "bob", id: "r2" }];
+        const known = decideWatch({ ...baselined, reviewId: "r2" }, { ...quiet, reviews, watcherLogin: "dev" }, NOW);
+
+        expect(known.action).toBe("none");
+    });
+
+    it("is not lost after a baseline with no review, whether the login is missing or back", () => {
+        const first = decideWatch({}, { ...quiet, reviews: [], watcherLogin: "" }, NOW);
+        const review = [{ authorLogin: "bob", id: "r1" }];
+
+        expect(first.state.reviewId).toBeUndefined();
+        // Login still missing: the review is counted as someone else's and wakes.
+        expect(decideWatch(first.state, { ...quiet, reviews: review, watcherLogin: "" }, NOW)).toMatchObject({
+            action: "wake",
+            reasons: ["review"],
+            state: { reviewId: "r1" },
+        });
+        // Login back: the same review wakes the same way.
+        expect(decideWatch(first.state, { ...quiet, reviews: review, watcherLogin: "dev" }, NOW)).toMatchObject({
+            action: "wake",
+            reasons: ["review"],
+            state: { reviewId: "r1" },
+        });
+    });
+
+    it("with no login at the baseline, mark the newest review silently", () => {
+        const reviews = [{ authorLogin: "bob", id: "r3" }, own];
+
+        expect(decideWatch({}, { ...quiet, reviews, watcherLogin: "" }, NOW)).toMatchObject({ action: "baseline", state: { reviewId: "r3" } });
+    });
+
+    it("do not stop a missing login from waking for checks", () => {
+        expect(decideWatch(baselined, { ...quiet, checks: "failing", watcherLogin: "" }, NOW)).toMatchObject({ action: "wake", reasons: ["checks"] });
+    });
+});
+
 describe("storedWatchOf and stateOf", () => {
     it("round-trips the decision's state through the row's two stored fields", () => {
         const state = { baselined: true, checksHeadSha: "a", headSha: "b", lastWakeAt: 5, pending: ["checks", "review"] as const, reviewId: "r1", wakes: 2 };
