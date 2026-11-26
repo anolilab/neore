@@ -22,6 +22,7 @@ import {
     getThreadPins,
     isPinShapeValid,
     reassignUserPinsOnThread,
+    restoreSharedPinRoutes,
     withSharedPinRoute,
 } from "./functions";
 
@@ -852,6 +853,72 @@ describe("the thread owner's merge, and the erasure replayed in order", () => {
         await runRouteCleanup("user-collaborator");
 
         expect(await routesOfCollaborator()).toHaveLength(0);
+    });
+
+    it("restores a route a write still needs, adds only the owners the thread has none for, and does nothing twice", async () => {
+        await grantWrite();
+        await as("user-collaborator").mutation(createPin as never, { messageId: "m-restore", messageRole: "assistant", threadId } as never);
+
+        const args = {
+            routes: [
+                { createdAt: 1, ownerId: OWNER },
+                { createdAt: 2, ownerId: "owner-z" },
+            ],
+            threadId,
+            until: Date.now() + 60_000,
+            userId: "user-collaborator",
+        };
+
+        await harness.run(async (context: any) => await context.runMutation(restoreSharedPinRoutes, args));
+        await harness.run(async (context: any) => await context.runMutation(restoreSharedPinRoutes, args));
+
+        const owners = (await routesOfCollaborator()).map((route: any) => route.ownerId).sort();
+
+        expect(owners).toStrictEqual(["owner-z", OWNER]);
+    });
+
+    it("does nothing once the writes that needed the routes have run out", async () => {
+        await grantWrite();
+
+        await harness.run(
+            async (context: any) =>
+                await context.runMutation(restoreSharedPinRoutes, {
+                    routes: [{ createdAt: 1, ownerId: OWNER }],
+                    threadId,
+                    until: Date.now() - 1,
+                    userId: "user-collaborator",
+                }),
+        );
+
+        expect(await routesOfCollaborator()).toHaveLength(0);
+    });
+
+    it("reschedules the merging owner's cleanup on the route's owner shard, so the pass runs where the thread goes", async () => {
+        await grantWrite();
+
+        const pinId = await as("user-collaborator").mutation(createPin as never, { messageId: "m-owner-shard", messageRole: "assistant", threadId } as never);
+
+        await harness.run(async (context: any) => await context.db.delete("threadPins", pinId as never));
+        await harness.run(async (context: any) => await beginAccountMove(context, OWNER, "merging", Date.now()));
+
+        const scheduled: unknown[][] = [];
+
+        await harness.run(async (context: any) => {
+            const scheduler = {
+                runAfter: async (...args: unknown[]) => {
+                    scheduled.push(args);
+
+                    return "job";
+                },
+            };
+
+            await finishRouteCleanup({ ...context, scheduler }, threadId, "user-collaborator");
+        });
+
+        // One pass, on the route's owner shard: the merge re-points that route to the new owner, and the thread goes with it.
+        expect(scheduled).toHaveLength(1);
+        expect(scheduled[0]?.[2]).toStrictEqual({ threadId, userId: "user-collaborator" });
+        expect(scheduled[0]?.[3]).toMatchObject({ shardKey: OWNER });
     });
 
     it("refuses a pin write after the second sweep and the fence release, and leaves no pin without a route", async () => {

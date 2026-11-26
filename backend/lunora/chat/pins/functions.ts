@@ -8,6 +8,7 @@ import {
     isAccountMoving,
     isErasing,
     otherPinWritesInFlight,
+    pinWritesInFlightUntil,
     PIN_WRITE_LEASE_MS,
     refusesPinWrite,
     releasePinWrite,
@@ -18,7 +19,7 @@ import { MAX_LENGTH } from "../../lib/validators";
 import { systemDb } from "../../lib/rls/scope";
 import { threadGateOutcome, throwUnlessGranted } from "../lib/thread-gate";
 import { pinRouteOwnerOf } from "./pin-route-writes";
-import { runAfterOnShard } from "../../lib/shard-scheduler";
+import { runAfterOnShard, runAfterWithRetry } from "../../lib/shard-scheduler";
 import { isPinnableDocumentKind } from "./pinnable";
 
 /** The highest image index an image pin may name; a reply has far fewer images. */
@@ -233,6 +234,75 @@ const scheduleRouteCleanup = async (
 };
 
 /**
+ * Puts a batch of routes back for a write that may still need them. A restore that fails is retried by the scheduler, so it lands unless
+ * the writes that need it run out first. A refused write rethrows, which rolls back a scheduled job, so its restore goes by a queue send,
+ * which a rollback does not undo.
+ */
+const restoreRoutes = async (
+    context: MutationCtx,
+    threadId: Id<"threads">,
+    userId: string,
+    routes: ReadonlyArray<{ createdAt: number; ownerId: string }>,
+    until: number,
+    survivesRollback: boolean,
+): Promise<void> => {
+    const args = { routes: routes.map((route) => ({ createdAt: route.createdAt, ownerId: route.ownerId })), threadId, until, userId };
+
+    if (survivesRollback) {
+        await enqueueJob(internal.chat.pins.functions.restoreSharedPinRoutes, args);
+
+        return;
+    }
+
+    await runAfterWithRetry(context.scheduler, 0, internal.chat.pins.functions.restoreSharedPinRoutes, args, {
+        backoff: "exponential",
+        baseMs: 1000,
+        forever: true,
+        maxMs: 15_000,
+    });
+};
+
+/**
+ * Restores the routes a cleanup took while a write was still in flight (`restoreRoutes`). Does nothing once `until` has passed: the
+ * writes that needed the routes have run out, and the erasure's drain may already have run. Adds only the owners the thread has no route
+ * for, so a retry after a partial restore does not duplicate one.
+ */
+export const restoreSharedPinRoutes = internalMutation
+    .input({
+        routes: v.array(v.object({ createdAt: v.number(), ownerId: v.string() })),
+        threadId: v.id("threads"),
+        until: v.number(),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.null())
+    .mutation(async ({ args, ctx: context }) => {
+        if (Date.now() >= args.until) {
+            return null;
+        }
+
+        const { page } = await context.db.sharedPinRoutes.findMany({
+            consistency: "primary",
+            limit: ROUTE_CLEANUP_BATCH,
+            where: { threadId: args.threadId, userId: args.userId },
+        });
+        const present = new Set(page.map((route) => route.ownerId));
+
+        for (const route of args.routes) {
+            if (!present.has(route.ownerId)) {
+                await context.db.insert("sharedPinRoutes", {
+                    createdAt: route.createdAt,
+                    ownerId: route.ownerId,
+                    threadId: args.threadId,
+                    userId: args.userId,
+                });
+                present.add(route.ownerId);
+            }
+        }
+
+        return null;
+    });
+
+/**
  * Removes one batch of the caller's routes to a thread, once the caller holds no pin there: nothing is left to find through them. The
  * same rule runs when the last pin goes (`deletePin`). A full batch means more may remain, so a job on the thread owner's shard finishes
  * them (`finishPinRouteCleanup`); that job re-checks the pins and the in-flight writes, so it can run again safely.
@@ -281,14 +351,14 @@ export const dropRoutesWithoutPins = async (
     }
 
     // The check above is not atomic with the delete: a write admitted after it may have read its route before the delete. That write
-    // comes back for a restore, and the batch goes back with it, so the job removes it once no write is in flight. Residual: a failed
-    // restore insert after this delete cannot be rolled back, since global rows are not part of the shard's transaction. The clock is
-    // read here, not taken from the mutation's start: a lease that ran out during a slow mutation is out.
-    if (await otherPinWritesInFlight(context, userId, writerId, Date.now())) {
-        for (const route of page) {
-            await context.db.insert("sharedPinRoutes", { createdAt: route.createdAt, ownerId: route.ownerId, threadId, userId });
-        }
+    // needs the batch back, so it is restored by a job that retries until the writes that need it have run out. The clock is read here,
+    // not taken from the mutation's start: a lease that ran out during a slow mutation is out.
+    const now = Date.now();
 
+    if (await otherPinWritesInFlight(context, userId, writerId, now)) {
+        const until = (await pinWritesInFlightUntil(context, userId, now)) ?? now + PIN_WRITE_LEASE_MS;
+
+        await restoreRoutes(context, threadId, userId, page, until, refusal);
         await scheduleRouteCleanup(context, threadId, userId, { delayMs: PIN_WRITE_LEASE_MS, survivesRollback: refusal });
 
         return;
