@@ -62,9 +62,22 @@ export type WatchDecision =
     /** The watch is over: the pull request is no longer open, or the wake cap was reached. The caller stops it. */
     | { action: "end"; reason: "closed" | "cap"; state: PullRequestWatchState };
 
+/**
+ * Whether the review is the watcher's own. Host logins are not case-sensitive, so the comparison is not either. With no
+ * watcher login the review cannot be told from anyone else's.
+ */
+const isByWatcher = (review: { authorLogin: string }, watcherLogin: string): boolean =>
+    watcherLogin !== "" && review.authorLogin.toLowerCase() === watcherLogin.toLowerCase();
+
+/**
+ * The reviews by someone other than the watcher are only known when the watcher is. A missing login (empty) leaves review
+ * handling out altogether: guessing would wake the person for their own review, or record one of theirs as the one seen.
+ */
+const reviewsByOthers = (observed: PullRequestObservation): { authorLogin: string; id: string }[] =>
+    observed.watcherLogin.trim() === "" ? [] : observed.reviews.filter((review) => !isByWatcher(review, observed.watcherLogin.trim()));
+
 /** The newest review by someone other than the watcher. */
-const newestReviewByOthers = (observed: PullRequestObservation): { authorLogin: string; id: string } | undefined =>
-    observed.reviews.find((review) => review.authorLogin !== observed.watcherLogin);
+const newestReviewByOthers = (observed: PullRequestObservation): { authorLogin: string; id: string } | undefined => reviewsByOthers(observed)[0];
 
 /**
  * The reviews by others that are newer than the one the watch last saw. The host lists reviews newest first, so those are
@@ -76,7 +89,11 @@ const newerReviewsByOthers = (
     seenId: string | undefined,
 ): { left: boolean; newer: { authorLogin: string; id: string }[] } => {
     if (seenId === undefined) {
-        return { left: false, newer: observed.reviews.filter((review) => review.authorLogin !== observed.watcherLogin) };
+        return { left: false, newer: reviewsByOthers(observed) };
+    }
+
+    if (observed.watcherLogin.trim() === "") {
+        return { left: false, newer: [] };
     }
 
     const at = observed.reviews.findIndex((review) => review.id === seenId);
@@ -85,7 +102,7 @@ const newerReviewsByOthers = (
         return { left: true, newer: [] };
     }
 
-    return { left: false, newer: observed.reviews.slice(0, at).filter((review) => review.authorLogin !== observed.watcherLogin) };
+    return { left: false, newer: observed.reviews.slice(0, at).filter((review) => !isByWatcher(review, observed.watcherLogin.trim())) };
 };
 
 /**
@@ -140,7 +157,9 @@ export const decideWatch = (previous: PullRequestWatchState, observed: PullReque
 
     const { left, newer } = newerReviewsByOthers(observed, previous.reviewId);
 
-    if (left) {
+    if (observed.watcherLogin.trim() === "") {
+        // The watcher is unknown: the review marker stays as it was and no review wakes.
+    } else if (left) {
         // The seen review left the host's list (deleted, or older than the pages the read went back through: its bound is the limit
         // of what this can tell). Nothing can be said about what is new, so re-baseline silently on the newest review by someone
         // else, or clear the marker when there is none: the next review by someone else then wakes the thread.

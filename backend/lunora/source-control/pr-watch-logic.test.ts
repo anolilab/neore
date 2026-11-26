@@ -238,6 +238,50 @@ describe("decideWatch", () => {
     });
 });
 
+describe("the watcher's own reviews", () => {
+    const own = { authorLogin: "Dev", id: "r9" };
+
+    it("do not wake, whatever the letter case of the login", () => {
+        const decision = decideWatch(baselined, { ...quiet, reviews: [own], watcherLogin: "dev" }, NOW);
+
+        expect(decision.action).toBe("none");
+        expect(decision.state.reviewId).toBeUndefined();
+    });
+
+    it("are not taken as the baseline's seen review", () => {
+        expect(decideWatch({}, { ...quiet, reviews: [own], watcherLogin: "DEV" }, NOW).state.reviewId).toBeUndefined();
+    });
+
+    it("do not hide a later review by someone else", () => {
+        const decision = decideWatch(
+            { ...baselined, reviewId: "r1" },
+            { ...quiet, reviews: [{ authorLogin: "bob", id: "r10" }, own, { authorLogin: "bob", id: "r1" }] },
+            NOW,
+        );
+
+        expect(decision).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "r10" } });
+    });
+
+    it("are not told from others' when the login is missing: no review wakes and the marker stays", () => {
+        for (const watcherLogin of ["", "  "]) {
+            const decision = decideWatch(
+                { ...baselined, reviewId: "r1" },
+                { ...quiet, reviews: [own, { authorLogin: "bob", id: "r2" }, { authorLogin: "bob", id: "r1" }], watcherLogin },
+                NOW,
+            );
+
+            expect(decision.action).toBe("none");
+            expect(decision.state.reviewId).toBe("r1");
+        }
+
+        expect(decideWatch({}, { ...quiet, reviews: [own], watcherLogin: "" }, NOW).state.reviewId).toBeUndefined();
+    });
+
+    it("do not stop a missing login from waking for checks", () => {
+        expect(decideWatch(baselined, { ...quiet, checks: "failing", watcherLogin: "" }, NOW)).toMatchObject({ action: "wake", reasons: ["checks"] });
+    });
+});
+
 describe("storedWatchOf and stateOf", () => {
     it("round-trips the decision's state through the row's two stored fields", () => {
         const state = { baselined: true, checksHeadSha: "a", headSha: "b", lastWakeAt: 5, pending: ["checks", "review"] as const, reviewId: "r1", wakes: 2 };
