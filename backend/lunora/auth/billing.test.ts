@@ -166,6 +166,14 @@ describe("a row better-auth wrote (ISO dates)", () => {
         expect(await readOrganization(orgId)).toMatchObject({ baseTier: "pro", createdAt: 1 });
     });
 
+    it("lets the owner change its billing contact through the guarded facade", async () => {
+        storeDatesAsText(sqlite, "organization", orgId, ["createdAt"]);
+
+        await as(OWNER).mutation(updateBillingSettings as never, { billingEmail: "pay@example.com" } as never);
+
+        expect(await readOrganization(orgId)).toMatchObject({ billingEmail: "pay@example.com", createdAt: 1 });
+    });
+
     it("applies a Creem subscription to its user and to its organization", async () => {
         const userId = await seed(
             async (db) => await db.insert("user", { createdAt: 1, email: "buyer@example.com", emailVerified: true, name: "Buyer", updatedAt: 1 }),
