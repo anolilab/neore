@@ -175,6 +175,14 @@ describe("saved backup model list", () => {
         expect(await read()).toMatchObject({ backupModel: SECOND, backupModels: [SECOND] });
     });
 
+    it("reads as a one-entry list from a row saved before the list existed", async () => {
+        await harness.run(async (context) => {
+            await context.db.insert("userSettings", { backupModel: BACKUP, userId: USER });
+        });
+
+        expect(await read()).toMatchObject({ backupModel: BACKUP, backupModels: [BACKUP] });
+    });
+
     it("lets a saved entry that has since become unusable be reordered or removed", async () => {
         await saveList([BACKUP, SECOND]);
         await asUser().mutation(updateAIUserPreferences as never, { modelFilterRules: { blockedModels: [SECOND] } } as never);

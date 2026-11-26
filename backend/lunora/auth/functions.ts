@@ -1157,7 +1157,12 @@ export const getSearchDomainBlocklistQuery = internalQuery
         return userSettings?.searchDomainBlocklist ?? [];
     });
 
-export const getUserSettings = query.input({}).query(async (options) => await settingsGet("userSettings", options));
+export const getUserSettings = query.input({}).query(async (options) => {
+    const settings = await settingsGet("userSettings", options);
+
+    // A row saved before the list existed holds only `backupModel`; a reader of the list gets the backup it names.
+    return settings && { ...settings, backupModels: storedBackupModels(settings) };
+});
 
 export const updateAIUserPreferences = authMutation
     .use(rateLimit("settings/update"))
