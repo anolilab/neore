@@ -75,10 +75,13 @@ type ExpiredRequest = { config: { replyKey?: string }; status: string; threadId:
  * (answered, or still open), the run may have resumed, so it is not reported as failed. The end is keyed by the run's reply key.
  */
 const failExpiredHeadlessPauses = async (ctx: PurgeCtx, expired: ReadonlyArray<ExpiredRequest>): Promise<void> => {
-    for (const row of expired) {
-        const { replyKey } = row.config;
+    const headless = expired.filter((row) => row.status === "pending" && row.config.replyKey?.startsWith("headless:") === true);
 
-        if (row.status !== "pending" || replyKey?.startsWith("headless:") !== true) {
+    // One read per thread, shared by its expired requests: the reply keys still left in it. Rows a purge removed are not in it.
+    const keysByThread = new Map<string, Set<string>>();
+
+    for (const row of headless) {
+        if (keysByThread.has(row.threadId)) {
             continue;
         }
 
@@ -87,9 +90,18 @@ const failExpiredHeadlessPauses = async (ctx: PurgeCtx, expired: ReadonlyArray<E
             .withIndex("by_threadId", (q) => q.eq("threadId", row.threadId))
             .collect();
 
-        if (remaining.every((other) => other.config.replyKey !== replyKey)) {
-            await recordRunEnd(ctx, { outcome: "failed", streamId: replyKey, threadId: row.threadId });
+        keysByThread.set(row.threadId, new Set(remaining.flatMap((other) => (other.config.replyKey === undefined ? [] : [other.config.replyKey]))));
+    }
+
+    for (const row of headless) {
+        const { replyKey } = row.config;
+        const keys = keysByThread.get(row.threadId);
+
+        if (replyKey === undefined || keys === undefined || keys.has(replyKey)) {
+            continue;
         }
+
+        await recordRunEnd(ctx, { outcome: "failed", streamId: replyKey, threadId: row.threadId });
     }
 };
 

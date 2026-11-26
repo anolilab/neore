@@ -115,6 +115,32 @@ describe("a thread waiting on an expired request", () => {
         expect(ends).toStrictEqual([]);
     });
 
+    it("ends each of several expired headless runs on one thread, from a single read of that thread", async () => {
+        const threadId = await waiting();
+
+        await harness.run(async (ctx: any) => {
+            for (const run of ["a", "b"]) {
+                await ctx.db.insert("toolApprovalRuns", {
+                    approvalId: `headless-${run}`,
+                    config: { ...CONFIG, replyKey: `headless:run-${run}` },
+                    createdAt: NOW - PENDING_APPROVAL_TTL_MS - 1,
+                    status: "pending",
+                    threadId,
+                    userId: "u1",
+                });
+            }
+        });
+        await harness.run(async (ctx: any) => await purgeExpiredToolApprovalRuns(ctx, NOW));
+
+        const ends = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.mcpEvents.findMany({ limit: 10, where: { userId: "u1" } });
+
+            return page.map((row: { eventId: string }) => row.eventId).toSorted((a: string, b: string) => a.localeCompare(b));
+        });
+
+        expect(ends).toStrictEqual(["run:headless:run-a", "run:headless:run-b"]);
+    });
+
     it("stops waiting once its last pending request is purged", async () => {
         const threadId = await waiting();
 
