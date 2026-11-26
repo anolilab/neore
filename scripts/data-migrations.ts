@@ -234,11 +234,14 @@ export interface CliRun {
 /** How many of the CLI's last stderr lines a failure prints outside production. */
 const STDERR_TAIL_LINES = 15;
 
+/** `text` with every URL replaced, so a host or query string never reaches the public log. */
+const withoutUrls = (text: string): string => text.replaceAll(/https?:\/\/[^\s"'<>]*[^\s"'<>:,.;)]/gu, "<url>");
+
 /** The last lines of the CLI's log with every URL replaced, so a host or query string never reaches the public log. */
 export const redactedStderrTail = (stderr: string): string[] =>
     stderr
         .split("\n")
-        .map((line) => line.replaceAll(/https?:\/\/[^\s"'<>]*[^\s"'<>:,.;)]/gu, "<url>").trimEnd())
+        .map((line) => withoutUrls(line).trimEnd())
         .filter((line) => line !== "")
         .slice(-STDERR_TAIL_LINES);
 
@@ -320,8 +323,9 @@ export const EMAIL_CANONICAL_MAX_CALLS = 4000;
 export const EMAIL_CANONICAL_ROUNDS = 3;
 
 /**
- * Answers in a row that move nothing (no row filled, the cursor where it was) before the run gives up. One such answer is a
- * harmless race: every row of the batch changed under it, and the next call reads it again.
+ * Answers in a row that move nothing (a check page whose cursor stayed, a fill that processed none of its ids) before the
+ * run gives up. A fill that filled nothing because every row of its batch changed under it is not one: it processed them,
+ * and they wait for the next round.
  */
 export const EMAIL_CANONICAL_STALLS = 3;
 
@@ -331,8 +335,11 @@ export const EMAIL_CANONICAL_ROUND_PAUSE_MS = 61_000;
 /** The longest `retry-after` the runner waits out; a longer one fails the step. */
 const MAX_RETRY_AFTER_MS = 15 * 60 * 1000;
 
-/** What one call asks for: a check page (with the run's salt) or a fill batch (with the check's start). */
-export type BackfillRequest = { checkedAt: number; cursor?: string; phase: "fill" } | { cursor?: string; phase: "check"; salt: string };
+/** The ids one fill call takes: the backfill's `EMAIL_CANONICAL_BATCH`. */
+export const EMAIL_CANONICAL_FILL_IDS = 8;
+
+/** What one call asks for: a check page (with the run's salt), or a fill of up to {@link EMAIL_CANONICAL_FILL_IDS} unfilled ids. */
+export type BackfillRequest = { checkedAt: number; ids: string[]; phase: "fill" } | { cursor?: string; phase: "check"; salt: string };
 
 /** One call of `POST /admin/backfill-email-canonical`: its HTTP status, its JSON body (or `undefined`) and `retry-after`. */
 export interface BackfillCall {
@@ -346,6 +353,8 @@ export interface RunBackfillOptions {
     error: (line: string) => void;
     log: (line: string) => void;
     maxCalls?: number;
+    /** Production prints a refusal's code alone; elsewhere also its message, URLs replaced. */
+    production: boolean;
     /** A fresh random salt for one check; the digests a check answers mean nothing without it. */
     salt: () => string;
     sleep: (ms: number) => Promise<unknown>;
@@ -357,9 +366,13 @@ interface BackfillAnswer {
     cursor: string | undefined;
     digests: string[];
     filled: number;
+    processed: number;
     skipped: number;
     status: string;
+    unfilledIds: string[];
 }
+
+const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []);
 
 const backfillAnswer = (body: unknown): BackfillAnswer => {
     const record = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
@@ -368,25 +381,44 @@ const backfillAnswer = (body: unknown): BackfillAnswer => {
         checkedAt: typeof record.checkedAt === "number" && Number.isFinite(record.checkedAt) ? record.checkedAt : undefined,
         conflicts: count(record.conflicts),
         cursor: typeof record.cursor === "string" ? record.cursor : undefined,
-        digests: Array.isArray(record.digests) ? record.digests.filter((digest): digest is string => typeof digest === "string") : [],
+        digests: strings(record.digests),
         filled: count(record.filled),
+        processed: count(record.processed),
         skipped: count(record.skipped),
         status: typeof record.status === "string" ? record.status : "unknown",
+        unfilledIds: strings(record.unfilledIds),
     };
 };
 
 const conflictReason = (conflicts: number): string =>
     `${String(conflicts)} address(es) belong to more than one account once case and Unicode form are ignored; merge or rename them, then deploy again`;
 
+/** The longest refusal message the runner prints. */
+const MAX_REFUSAL_LENGTH = 300;
+
+/**
+ * What a refused call said, for the log: ` (CODE)` in production, ` (CODE: message)` elsewhere, with every URL replaced.
+ * Reads the route's `{ error }` and an error's `{ code, message }`, bare or under `error`.
+ */
+export const refusalDetail = (body: unknown, production: boolean): string => {
+    const record = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
+    const nested = (typeof record.error === "object" && record.error !== null ? record.error : {}) as Record<string, unknown>;
+    const code = [record.code, nested.code].find((value): value is string => typeof value === "string");
+    const message = [record.message, nested.message, record.error].find((value): value is string => typeof value === "string");
+    const shown = production || message === undefined ? code : `${code === undefined ? "" : `${code}: `}${withoutUrls(message).slice(0, MAX_REFUSAL_LENGTH)}`;
+
+    return shown === undefined ? "" : ` (${shown})`;
+};
+
 /** Why a run stopped. */
 class BackfillStop extends Error {}
 
 /**
  * Drives the backfill: a check over every account, page by page, that refuses any address two accounts fold to, also
- * across pages (the digests); only then a fill, batch by batch; then a check again, which answers `done` once nothing is
+ * across pages (the digests), and collects the unfilled ids; only then a fill of those ids, a batch per call; then a check again, which answers `done` once nothing is
  * left. A round that left rows behind (they changed meanwhile) is followed by another, up to {@link EMAIL_CANONICAL_ROUNDS}.
  * A 429 is waited out; {@link EMAIL_CANONICAL_STALLS} answers in a row that move nothing, a conflict, any other answer, or
- * `maxCalls` stop it with an error. Prints counts only, never a digest or a cursor. Returns the process exit code.
+ * `maxCalls` stop it with an error. Prints counts only, never a digest, an id or a cursor. Returns the process exit code.
  */
 export const runEmailCanonicalBackfill = async (options: RunBackfillOptions): Promise<number> => {
     const maxCalls = options.maxCalls ?? EMAIL_CANONICAL_MAX_CALLS;
@@ -432,7 +464,7 @@ export const runEmailCanonicalBackfill = async (options: RunBackfillOptions): Pr
             }
 
             if (answer.status !== 200) {
-                throw new BackfillStop(`answered HTTP ${String(answer.status)}`);
+                throw new BackfillStop(`answered HTTP ${String(answer.status)}${refusalDetail(answer.body, options.production)}`);
             }
 
             return body;
@@ -449,9 +481,10 @@ export const runEmailCanonicalBackfill = async (options: RunBackfillOptions): Pr
         }
     };
 
-    /** One check over every account: `undefined` when nothing is left to fill, otherwise the check's start. */
-    const check = async (): Promise<number | undefined> => {
+    /** One check over every account: `undefined` when nothing is left to fill, otherwise the check's start and the unfilled ids. */
+    const check = async (): Promise<{ checkedAt: number; unfilledIds: string[] } | undefined> => {
         const salt = options.salt();
+        const unfilledIds: string[] = [];
         const seen = new Set<string>();
         const repeated = new Set<string>();
         let checkedAt: number | undefined;
@@ -469,6 +502,7 @@ export const runEmailCanonicalBackfill = async (options: RunBackfillOptions): Pr
             }
 
             checkedAt ??= answer.checkedAt;
+            unfilledIds.push(...answer.unfilledIds);
 
             for (const digest of answer.digests) {
                 if (seen.has(digest)) {
@@ -494,40 +528,38 @@ export const runEmailCanonicalBackfill = async (options: RunBackfillOptions): Pr
             throw new BackfillStop("a check answered no start time");
         }
 
-        options.log(`${EMAIL_CANONICAL_BACKFILL}: checked ${String(seen.size)} account(s), no address shared`);
+        options.log(`${EMAIL_CANONICAL_BACKFILL}: checked ${String(seen.size)} account(s), no address shared, ${String(unfilledIds.length)} to fill`);
 
-        return checkedAt;
+        return { checkedAt, unfilledIds };
     };
 
-    /** One fill from the first batch to the last: how many rows it left behind. */
-    const fill = async (checkedAt: number): Promise<number> => {
-        let cursor: string | undefined;
+    /** One fill of `ids`, a batch per call: how many rows it left behind. */
+    const fill = async (checkedAt: number, ids: readonly string[]): Promise<number> => {
+        let next = 0;
         let skipped = 0;
 
-        for (;;) {
-            const answer = await ask({ checkedAt, phase: "fill", ...(cursor === undefined ? {} : { cursor }) });
-
-            skipped += answer.skipped;
-
-            if (answer.status === "filled") {
-                return skipped;
-            }
+        while (next < ids.length) {
+            const batch = ids.slice(next, next + EMAIL_CANONICAL_FILL_IDS);
+            const answer = await ask({ checkedAt, ids: batch, phase: "fill" });
 
             if (answer.status !== "progress") {
                 throw new BackfillStop(`answered ${answer.status} to a fill`);
             }
 
-            moved(answer.filled > 0 || (answer.cursor !== undefined && answer.cursor !== cursor), answer);
-            cursor = answer.cursor ?? cursor;
+            skipped += answer.skipped;
+            moved(answer.processed > 0, answer);
+            next += Math.min(answer.processed, batch.length);
         }
+
+        return skipped;
     };
 
     try {
         // Each round ends with the next one's check, so the last round is a check alone.
         for (let round = 1; ; round += 1) {
-            const checkedAt = await check();
+            const checked = await check();
 
-            if (checkedAt === undefined) {
+            if (checked === undefined) {
                 options.log(`${EMAIL_CANONICAL_BACKFILL}: done, filled ${String(filled)} over ${String(calls)} call(s)`);
 
                 return 0;
@@ -537,7 +569,7 @@ export const runEmailCanonicalBackfill = async (options: RunBackfillOptions): Pr
                 throw new BackfillStop(`accounts still unfilled after ${String(EMAIL_CANONICAL_ROUNDS)} rounds`);
             }
 
-            const left = await fill(checkedAt);
+            const left = await fill(checked.checkedAt, checked.unfilledIds);
 
             if (left > 0) {
                 options.log(`${EMAIL_CANONICAL_BACKFILL}: ${String(left)} account(s) changed during the fill, checking again`);

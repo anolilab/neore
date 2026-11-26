@@ -270,7 +270,7 @@ app.post("/gateway/notifications", httpAction(lazy(async () => await import("./c
 // Operator bootstrap for invite-only sign-up; bearer `LUNORA_ADMIN_TOKEN`.
 app.post("/admin/seed-invitations", httpAction(lazy(async () => await import("./auth/seed-invitations-http"), "seedInvitationsHttpAction")));
 
-// Fills `user.emailCanonical` one batch per call, until `done`; the deploy calls it. Bearer `LUNORA_ADMIN_TOKEN`.
+// Checks every account, then fills `user.emailCanonical` a batch of ids per call; the deploy drives it. Bearer `LUNORA_ADMIN_TOKEN`.
 app.post(
     "/admin/backfill-email-canonical",
     httpAction(lazy(async () => await import("./auth/email-canonical-backfill-http"), "emailCanonicalBackfillHttpAction")),

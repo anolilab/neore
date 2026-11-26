@@ -65,14 +65,25 @@ const backfilled = await runEmailCanonicalBackfill({
         });
         const retryAfter = Number(response.headers.get("retry-after"));
 
+        const text = await response.text().catch(() => "");
+        let body: unknown;
+
+        try {
+            body = JSON.parse(text);
+        } catch {
+            // A refusal that is not JSON still says why; the runner prints it outside production only.
+            body = text === "" ? undefined : { message: text };
+        }
+
         return {
-            body: await response.json().catch(() => undefined),
+            body,
             retryAfterSeconds: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
             status: response.status,
         };
     },
     error: console.error,
     log: console.log,
+    production: process.env.STAGE === "production",
     salt: () => randomBytes(16).toString("hex"),
     sleep,
 });

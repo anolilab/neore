@@ -12,6 +12,7 @@ import ts from "typescript";
 import type { BackfillCall, BackfillRequest, CliRun } from "../scripts/data-migrations";
 import {
     declaredMigrationIds,
+    EMAIL_CANONICAL_FILL_IDS,
     EMAIL_CANONICAL_ROUND_PAUSE_MS,
     EMAIL_CANONICAL_ROUNDS,
     EMAIL_CANONICAL_STALLS,
@@ -33,6 +34,8 @@ const start = workflow.indexOf(`- name: "Run the backend's data migrations"`);
 const step = workflow.slice(start);
 const runner = readFileSync(join(REPO_ROOT, "scripts/run-data-migrations.ts"), "utf8");
 /** The refusal of a definition whose `id` or `table` the runner cannot read. */
+/** A check's digest or a row id in printed output. */
+const DIGEST_OR_ID = /same|u[12]\b/u;
 const UNREADABLE_DEFINITION = /needs a (`table`|literal string `id`)/u;
 const baseline = readFileSync(join(REPO_ROOT, SCHEMA_BASELINE), "utf8");
 
@@ -348,7 +351,7 @@ describe("the data migration runner", () => {
 });
 
 /** Runs the backfill loop against `answers` in turn, recording requests, pauses and printed lines. */
-const backfillWith = async (answers: (BackfillCall | Error)[], maxCalls?: number) => {
+const backfillWith = async (answers: (BackfillCall | Error)[], maxCalls?: number, production = false) => {
     const pauses: number[] = [];
     const printed: string[] = [];
     const requests: BackfillRequest[] = [];
@@ -371,6 +374,7 @@ const backfillWith = async (answers: (BackfillCall | Error)[], maxCalls?: number
             printed.push(line);
         },
         maxCalls,
+        production,
         salt: () => "run-salt",
         sleep: async (ms) => {
             pauses.push(ms);
@@ -380,23 +384,22 @@ const backfillWith = async (answers: (BackfillCall | Error)[], maxCalls?: number
     return { calls: requests.length, exitCode, output: printed.join("\n"), pauses, requests };
 };
 
-const checking = (cursor: string, digests: string[], checkedAt = 100): BackfillCall => {
-    return { body: { checkedAt, cursor, digests, scanned: digests.length, status: "checking", unfilled: digests.length }, status: 200 };
+const checking = (cursor: string, digests: string[], unfilledIds: string[] = [], checkedAt = 100): BackfillCall => {
+    return { body: { checkedAt, cursor, digests, scanned: digests.length, status: "checking", unfilledIds }, status: 200 };
 };
 
-const checked = (digests: string[], checkedAt = 100): BackfillCall => {
-    return { body: { checkedAt, digests, scanned: digests.length, status: "checked", unfilled: digests.length }, status: 200 };
+const checked = (digests: string[], unfilledIds: string[] = [], checkedAt = 100): BackfillCall => {
+    return { body: { checkedAt, digests, scanned: digests.length, status: "checked", unfilledIds }, status: 200 };
 };
 
-const progress = (filled: number, cursor?: string, skipped = 0): BackfillCall => {
-    return { body: { conflicts: 0, filled, skipped, status: "progress", ...(cursor !== undefined && { cursor }) }, status: 200 };
-};
-
-const filledAll = (filled: number, skipped = 0): BackfillCall => {
-    return { body: { conflicts: 0, filled, skipped, status: "filled" }, status: 200 };
+const filledBatch = (processed: number, filled = processed, skipped = 0): BackfillCall => {
+    return { body: { conflicts: 0, filled, processed, skipped, status: "progress" }, status: 200 };
 };
 
 const done: BackfillCall = { body: { status: "done" }, status: 200 };
+
+/** `count` ids, `u0` onwards. */
+const idsOf = (count: number, from = 0): string[] => Array.from({ length: count }, (_, index) => `u${String(from + index)}`);
 
 describe("the user.emailCanonical backfill in the deploy", () => {
     it("runs in the post-deploy step, through D1, before the shard migrations, and both decide the exit code", () => {
@@ -408,12 +411,12 @@ describe("the user.emailCanonical backfill in the deploy", () => {
         expect(runner).toContain("authorization: `Bearer ${process.env.LUNORA_ADMIN_TOKEN");
     });
 
-    it("checks every page, then fills from cursor to cursor, then checks again, and prints counts only", async () => {
+    it("checks every page, then fills the unfilled ids a batch per call, then checks again, and prints counts only", async () => {
         const { calls, exitCode, output, requests } = await backfillWith([
-            checking("c1", ["d1", "d2"], 100),
-            checked(["d3"], 900),
-            progress(8, "f1"),
-            filledAll(1),
+            checking("c1", ["d1", "d2"], idsOf(7), 100),
+            checked(["d3"], idsOf(2, 7), 900),
+            filledBatch(EMAIL_CANONICAL_FILL_IDS),
+            filledBatch(1),
             done,
         ]);
 
@@ -422,22 +425,24 @@ describe("the user.emailCanonical backfill in the deploy", () => {
         expect(requests).toStrictEqual([
             { phase: "check", salt: "run-salt" },
             { cursor: "c1", phase: "check", salt: "run-salt" },
-            { checkedAt: 100, phase: "fill" },
-            { checkedAt: 100, cursor: "f1", phase: "fill" },
+            { checkedAt: 100, ids: idsOf(EMAIL_CANONICAL_FILL_IDS), phase: "fill" },
+            { checkedAt: 100, ids: idsOf(9 - EMAIL_CANONICAL_FILL_IDS, EMAIL_CANONICAL_FILL_IDS), phase: "fill" },
             { phase: "check", salt: "run-salt" },
         ]);
         expect(output).toBe(
-            ["backfill-email-canonical: checked 3 account(s), no address shared", "backfill-email-canonical: done, filled 9 over 5 call(s)"].join("\n"),
+            ["backfill-email-canonical: checked 3 account(s), no address shared, 9 to fill", "backfill-email-canonical: done, filled 9 over 5 call(s)"].join(
+                "\n",
+            ),
         );
     });
 
-    it("refuses an address two check pages share before any fill, and prints no digest", async () => {
-        const { exitCode, output, requests } = await backfillWith([checking("c1", ["same", "d2"]), checked(["same"])]);
+    it("refuses an address two check pages share before any fill, and prints no digest or id", async () => {
+        const { exitCode, output, requests } = await backfillWith([checking("c1", ["same", "d2"], ["u1"]), checked(["same"], ["u2"])]);
 
         expect(exitCode).toBe(1);
         expect(requests.every((request) => request.phase === "check")).toBe(true);
         expect(output).toContain("::error::backfill-email-canonical: 1 address(es) belong to more than one account");
-        expect(output).not.toContain("same");
+        expect(output).not.toMatch(DIGEST_OR_ID);
     });
 
     it("waits out a 429, then goes on", async () => {
@@ -450,55 +455,92 @@ describe("the user.emailCanonical backfill in the deploy", () => {
 
     it("fails on a conflict, naming the count and what to do", async () => {
         const { exitCode, output } = await backfillWith([
-            checked(["d1"]),
-            progress(8, "f1"),
-            { body: { conflicts: 2, filled: 0, skipped: 0, status: "conflict" }, status: 409 },
+            checked(["d1"], idsOf(12)),
+            filledBatch(EMAIL_CANONICAL_FILL_IDS),
+            { body: { conflicts: 2, filled: 0, processed: 0, skipped: 0, status: "conflict" }, status: 409 },
         ]);
 
         expect(exitCode).toBe(1);
         expect(output).toContain("::error::backfill-email-canonical: 2 address(es) belong to more than one account");
-        expect(output).toContain("filled 8 over 3 call(s)");
+        expect(output).toContain(`filled ${String(EMAIL_CANONICAL_FILL_IDS)} over 3 call(s)`);
     });
 
-    it("retries a fill answer that moved nothing, and goes on once one does", async () => {
-        const { exitCode, output } = await backfillWith([checked(["d1"]), progress(0), progress(0), progress(3, "f1"), progress(0, "f1"), filledAll(1), done]);
+    it("goes on after a fill that filled nothing because its rows changed, and after one that stopped early", async () => {
+        const { exitCode, requests } = await backfillWith([
+            checked(["d1"], idsOf(12)),
+            // Every row of the batch changed under it: processed, nothing filled.
+            filledBatch(EMAIL_CANONICAL_FILL_IDS, 0, EMAIL_CANONICAL_FILL_IDS),
+            // A raced write stopped the call after its first id.
+            filledBatch(1),
+            filledBatch(3),
+            // The skipped rows wait for the next round's check.
+            checked(["d1"], idsOf(EMAIL_CANONICAL_FILL_IDS), 500),
+            filledBatch(EMAIL_CANONICAL_FILL_IDS),
+            done,
+        ]);
 
         expect(exitCode).toBe(0);
-        expect(output).toContain("done, filled 4 over 7 call(s)");
+        expect(requests.filter((request) => request.phase === "fill").map((request) => (request.phase === "fill" ? request.ids[0] : ""))).toStrictEqual([
+            "u0",
+            `u${String(EMAIL_CANONICAL_FILL_IDS)}`,
+            `u${String(EMAIL_CANONICAL_FILL_IDS + 1)}`,
+            "u0",
+        ]);
+    });
+
+    it("retries a fill answer that processed nothing, and goes on once one does", async () => {
+        const { exitCode, output } = await backfillWith([checked(["d1"], idsOf(2)), filledBatch(0), filledBatch(0), filledBatch(2), done]);
+
+        expect(exitCode).toBe(0);
+        expect(output).toContain("done, filled 2 over 5 call(s)");
     });
 
     it(`fails after ${String(EMAIL_CANONICAL_STALLS)} answers in a row that move nothing`, async () => {
-        const stuck = await backfillWith([checked(["d1"]), progress(0, "f1"), progress(0, "f1"), progress(0, "f1"), progress(0, "f1")]);
+        const stuck = await backfillWith([checked(["d1"], idsOf(2)), filledBatch(0), filledBatch(0), filledBatch(0), filledBatch(0)]);
         const stuckCheck = await backfillWith([checking("c1", []), checking("c1", []), checking("c1", []), checking("c1", [])]);
 
         expect(stuck.exitCode).toBe(1);
         expect(stuck.output).toContain(`made no progress over ${String(EMAIL_CANONICAL_STALLS)} call(s)`);
-        expect(stuck.calls).toBe(1 + 1 + EMAIL_CANONICAL_STALLS);
+        expect(stuck.calls).toBe(1 + EMAIL_CANONICAL_STALLS);
         expect(stuckCheck.output).toContain("made no progress");
     });
 
     it("checks again after a fill that left changed rows behind, pausing past the settle window, and gives up after its rounds", async () => {
-        const again = await backfillWith([checked(["d1", "d2"]), filledAll(1, 1), checked(["d2"], 500), filledAll(1), done]);
+        const again = await backfillWith([checked(["d1", "d2"], ["u1", "u2"]), filledBatch(2, 1, 1), checked(["d2"], ["u2"], 500), filledBatch(1), done]);
 
         expect(again.exitCode).toBe(0);
         expect(again.pauses).toStrictEqual([EMAIL_CANONICAL_ROUND_PAUSE_MS]);
-        expect(again.requests[3]).toStrictEqual({ checkedAt: 500, phase: "fill" });
+        expect(again.requests[3]).toStrictEqual({ checkedAt: 500, ids: ["u2"], phase: "fill" });
 
-        const rounds = Array.from({ length: EMAIL_CANONICAL_ROUNDS + 1 }, () => [checked(["d1"]), filledAll(0, 1)]).flat();
+        const rounds = Array.from({ length: EMAIL_CANONICAL_ROUNDS + 1 }, () => [checked(["d1"], ["u1"]), filledBatch(1, 0, 1)]).flat();
         const restless = await backfillWith(rounds);
 
         expect(restless.exitCode).toBe(1);
         expect(restless.output).toContain(`accounts still unfilled after ${String(EMAIL_CANONICAL_ROUNDS)} rounds`);
     });
 
+    it("says why a call was refused: the code and message outside production, the code alone in production, never a URL", async () => {
+        const thrown = { body: { code: "BAD_REQUEST", message: "findMany failed at https://backend.example.invalid/x?token=1" }, status: 400 };
+        const staging = await backfillWith([thrown]);
+        const production = await backfillWith([thrown], undefined, true);
+        const nested = await backfillWith([{ body: { error: { code: "VALIDATION_ERROR", message: "bad output" } }, status: 400 }]);
+        const plain = await backfillWith([{ body: { message: "Bad Request" }, status: 400 }]);
+
+        expect(staging.output).toBe("::error::backfill-email-canonical: answered HTTP 400 (BAD_REQUEST: findMany failed at <url>) (filled 0 over 1 call(s))");
+        expect(production.output).toBe("::error::backfill-email-canonical: answered HTTP 400 (BAD_REQUEST) (filled 0 over 1 call(s))");
+        expect(nested.output).toContain("answered HTTP 400 (VALIDATION_ERROR: bad output)");
+        expect(plain.output).toContain("answered HTTP 400 (Bad Request)");
+        expect(runner).toContain('production: process.env.STAGE === "production"');
+    });
+
     it("fails on any other status, on a request error, and after its call cap", async () => {
         const refused = await backfillWith([{ body: { error: "Unauthorized" }, status: 401 }]);
         const unreachable = await backfillWith([new TypeError("fetch failed https://backend.example.invalid")]);
 
-        expect(refused.output).toContain("answered HTTP 401");
+        expect(refused.output).toContain("answered HTTP 401 (Unauthorized)");
         expect(unreachable.output).toBe("::error::backfill-email-canonical: the request failed (TypeError) (filled 0 over 1 call(s))");
 
-        const capped = await backfillWith([checked(["d1"]), progress(1, "a"), progress(1, "b"), progress(1, "c")], 3);
+        const capped = await backfillWith([checked(["d1"], idsOf(30)), filledBatch(1), filledBatch(1), filledBatch(1)], 3);
 
         expect(capped.exitCode).toBe(1);
         expect(capped.output).toContain("not done after 3 calls");

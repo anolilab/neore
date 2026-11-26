@@ -12,15 +12,17 @@
  *    digest of each row's canonical address, so the caller sees a pair that two calls split; a pair inside one call is
  *    refused here. Nothing is written. `.global()` writes are not transactional, so no account is filled before the whole
  *    table is known to fold to distinct addresses: filling one row of a pair would pick it over the other.
- * 2. **fill**: one batch of unfilled rows per call, from a cursor, so a call reads only its batch. A row is filled only
- *    while it is still unfilled and unchanged since a moment before the check began ({@link EMAIL_CANONICAL_SETTLE_MS});
- *    a row changed since is skipped, and the caller checks again from the start.
+ * 2. **fill**: the check also answers the ids of the unfilled rows it read; a fill call takes up to
+ *    {@link EMAIL_CANONICAL_BATCH} of them and reads only those rows, by id. (Reading the next unfilled rows instead would
+ *    sort every one still unfilled on each call: the `emailCanonical` index finds them, not in creation order.) A row is
+ *    filled only while it is still unfilled and unchanged since a moment before the check began
+ *    ({@link EMAIL_CANONICAL_SETTLE_MS}); a row changed since is skipped, and the caller checks again from the start.
  *
  * A run with nothing left reads once and writes nothing. Two rows that fold to one address are never resolved here: merge or
  * rename one of them, then deploy again.
  */
 import { canonicalEmail } from "@lunora/auth";
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
@@ -45,7 +47,7 @@ export const EMAIL_CANONICAL_BATCH = 8;
 export const EMAIL_CANONICAL_FILL_STATEMENTS = 3;
 
 /**
- * Statements one fill call plans for: the batch read, the holder check and {@link EMAIL_CANONICAL_BATCH} fills. The rest
+ * Statements one fill call plans for: the read of its rows by id, the holder check and {@link EMAIL_CANONICAL_BATCH} fills. The rest
  * of the 50 is headroom for the conditional patch's retry rounds (two statements each), which it neither caps nor reports
  * (`docs/agents/lunora-upstream.md`): a round repeats only after a write that left the row's `email`, `emailCanonical` and
  * `updatedAt` as they were, and the call stops after the first fill that shows one.
@@ -81,8 +83,8 @@ export type EmailCanonicalCheckResult =
           /** Rows this call read. */
           scanned: number;
           status: "checked" | "checking";
-          /** Of the scanned rows, those still unfilled. */
-          unfilled: number;
+          /** The ids of the scanned rows still unfilled, in creation order: what the fill takes. */
+          unfilledIds: Id<"user">[];
       }
     | {
           /** No unfilled row is left. */
@@ -92,13 +94,13 @@ export type EmailCanonicalCheckResult =
 export interface EmailCanonicalFillResult {
     /** Addresses an existing account holds that a row of this batch folds to; with `conflict`. */
     conflicts: number;
-    /** Where the next call goes on; absent once the last batch was read (`filled`). */
-    cursor?: string;
     filled: number;
+    /** How many of the call's ids, from the first, it is done with; the caller passes the rest again. */
+    processed: number;
     /** Rows of this batch left unfilled because they changed since the check, or lost a race to a write. */
     skipped: number;
-    /** `progress`: call again with `cursor`; `filled`: the last batch is done; `conflict`: nothing more is written. */
-    status: "conflict" | "filled" | "progress";
+    /** `progress`: call again with the ids not processed, then the next ones; `conflict`: nothing more is written. */
+    status: "conflict" | "progress";
 }
 
 export interface EmailCanonicalCheckOptions {
@@ -110,10 +112,10 @@ export interface EmailCanonicalCheckOptions {
 }
 
 export interface EmailCanonicalFillOptions {
-    batch?: number;
     /** `checkedAt` from the first call of the check this fill follows. */
     checkedAt: number;
-    cursor?: string;
+    /** Up to {@link EMAIL_CANONICAL_BATCH} ids from the check's `unfilledIds`. */
+    ids: ReadonlyArray<Id<"user">>;
 }
 
 const toHex = (bytes: Uint8Array): string => [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -140,7 +142,7 @@ export const checkEmailCanonicalPage = async (
     const counts = new Map<string, number>();
     let next: string | undefined = cursor;
     let reachedEnd = false;
-    let unfilled = 0;
+    const unfilledIds: Id<"user">[] = [];
 
     for (let page = 0; page < pages && !reachedEnd; page += 1) {
         const result = await ctx.db.user.findMany({ consistency: "primary", cursor: next, limit: pageRows });
@@ -148,7 +150,10 @@ export const checkEmailCanonicalPage = async (
         for (const row of result.page) {
             const canonical = row.emailCanonical ?? canonicalEmail(row.email);
 
-            unfilled += (row.emailCanonical ?? undefined) === undefined ? 1 : 0;
+            if ((row.emailCanonical ?? undefined) === undefined) {
+                unfilledIds.push(row._id);
+            }
+
             counts.set(canonical, (counts.get(canonical) ?? 0) + 1);
         }
 
@@ -169,18 +174,10 @@ export const checkEmailCanonicalPage = async (
         digests,
         scanned: counts.size,
         status: reachedEnd ? "checked" : "checking",
-        unfilled,
+        unfilledIds,
         ...(next !== undefined && { cursor: next }),
     };
 };
-
-interface BatchRow {
-    _id: Id<"user">;
-    canonical: string;
-    email: string;
-    row: Record<string, unknown>;
-    updatedAt: number;
-}
 
 /** Whether the row a fill wrote differs from the batch's read of it in anything but the column the fill set. */
 const changedSinceRead = (read: Record<string, unknown>, written: Record<string, unknown> | null): boolean => {
@@ -195,55 +192,61 @@ const changedSinceRead = (read: Record<string, unknown>, written: Record<string,
     return [...keys].some((key) => JSON.stringify(read[key]) !== JSON.stringify(written[key]));
 };
 
-/** One fill call: one batch of unfilled rows from `cursor`. */
+/** One fill call: the rows `ids` names, in that order. */
 export const fillEmailCanonicalBatch = async (
     ctx: Pick<MutationCtx, "db">,
-    { batch: size = EMAIL_CANONICAL_BATCH, checkedAt, cursor }: EmailCanonicalFillOptions,
+    { checkedAt, ids }: EmailCanonicalFillOptions,
 ): Promise<EmailCanonicalFillResult> => {
-    const result = await ctx.db.user.findMany({ consistency: "primary", cursor, limit: size, where: { emailCanonical: { isNull: true } } });
-    const reachedEnd = result.isDone || !result.continueCursor;
-    const next = reachedEnd ? undefined : (result.continueCursor ?? undefined);
+    if (ids.length > EMAIL_CANONICAL_BATCH) {
+        throw new LunoraError("BAD_REQUEST", `A fill takes at most ${String(EMAIL_CANONICAL_BATCH)} ids`);
+    }
+
+    const { page } = await ctx.db.user.findMany({ consistency: "primary", limit: ids.length, where: { _id: { in: [...ids] } } });
+    const byId = new Map(page.map((row) => [row._id, row]));
     const settledBefore = checkedAt - EMAIL_CANONICAL_SETTLE_MS;
-    const batch: BatchRow[] = result.page.map((row) => {
-        return { _id: row._id, canonical: canonicalEmail(row.email), email: row.email, row: { ...row }, updatedAt: row.updatedAt };
+    // A row filled meanwhile (or deleted) needs nothing; one changed since the check began waits for the next check.
+    const unfilled = ids.flatMap((id) => {
+        const row = byId.get(id);
+
+        return row === undefined || (row.emailCanonical ?? undefined) !== undefined ? [] : [{ canonical: canonicalEmail(row.email), id, row }];
     });
-    const settled = batch.filter((row) => row.updatedAt <= settledBefore);
-    let skipped = batch.length - settled.length;
+    const settled = unfilled.filter(({ row }) => row.updatedAt <= settledBefore);
+    let skipped = unfilled.length - settled.length;
 
     if (settled.length > 0) {
         const { page: holders } = await ctx.db.user.findMany({
             consistency: "primary",
             limit: settled.length,
-            where: { emailCanonical: { in: settled.map((row) => row.canonical) } },
+            where: { emailCanonical: { in: settled.map(({ canonical }) => canonical) } },
         });
 
         if (holders.length > 0) {
-            return { conflicts: holders.length, filled: 0, skipped: 0, status: "conflict" };
+            return { conflicts: holders.length, filled: 0, processed: 0, skipped: 0, status: "conflict" };
         }
     }
 
     let filled = 0;
 
-    for (const [index, row] of settled.entries()) {
+    for (const { canonical, id, row } of settled) {
         let outcome: { applied: boolean; doc: Record<string, unknown> | null };
 
         try {
-            // Only while the row is still unfilled and unchanged since the batch read it: any write in between that moves
+            // Only while the row is still unfilled and unchanged since this call read it: any write in between that moves
             // `updatedAt` makes this miss after one read more, and the row waits for the next check.
-            outcome = await ctx.db.patchIf("user", row._id, {
-                patch: { emailCanonical: row.canonical },
+            outcome = await ctx.db.patchIf("user", id, {
+                patch: { emailCanonical: canonical },
                 where: { email: row.email, emailCanonical: null, updatedAt: row.updatedAt },
             });
         } catch (error) {
             // A sign-up that took this address since the check: the unique index refused the write. Anything else (the
             // audit insert, the network, the conditional patch's own `occ`) is not a conflict and is not swallowed.
-            const holder = await ctx.db.user.findFirst({ consistency: "primary", where: { emailCanonical: row.canonical } });
+            const holder = await ctx.db.user.findFirst({ consistency: "primary", where: { emailCanonical: canonical } });
 
-            if (holder === null || holder._id === row._id) {
+            if (holder === null || holder._id === id) {
                 throw error;
             }
 
-            return { conflicts: 1, filled, skipped, status: "conflict" };
+            return { conflicts: 1, filled, processed: 0, skipped, status: "conflict" };
         }
 
         if (outcome.applied) {
@@ -253,13 +256,13 @@ export const fillEmailCanonicalBatch = async (
         }
 
         // A fill that wrote a row other writes changed in between went round at least once more, and nothing says how often.
-        // Stop the call: the same cursor reads this batch again, without the rows filled here.
-        if (outcome.applied && changedSinceRead(row.row, outcome.doc) && index < settled.length - 1) {
-            return { conflicts: 0, filled, skipped, status: "progress", ...(cursor !== undefined && { cursor }) };
+        // Stop the call; the caller passes the ids after this one again.
+        if (outcome.applied && changedSinceRead({ ...row }, outcome.doc)) {
+            return { conflicts: 0, filled, processed: ids.indexOf(id) + 1, skipped, status: "progress" };
         }
     }
 
-    return { conflicts: 0, filled, skipped, status: next === undefined ? "filled" : "progress", ...(next !== undefined && { cursor: next }) };
+    return { conflicts: 0, filled, processed: ids.length, skipped, status: "progress" };
 };
 
 export const checkEmailCanonical = internalMutation
@@ -273,7 +276,7 @@ export const checkEmailCanonical = internalMutation
                 digests: v.array(v.string()),
                 scanned: v.number(),
                 status: v.union(v.literal("checked"), v.literal("checking")),
-                unfilled: v.number(),
+                unfilledIds: v.array(v.id("user")),
             }),
             v.object({ status: v.literal("done") }),
         ),
@@ -281,14 +284,14 @@ export const checkEmailCanonical = internalMutation
     .mutation(async ({ args, ctx }) => await checkEmailCanonicalPage(ctx, { cursor: args.cursor, salt: args.salt }));
 
 export const fillEmailCanonical = internalMutation
-    .input({ checkedAt: v.number(), cursor: v.optional(v.string()) })
+    .input({ checkedAt: v.number(), ids: v.array(v.id("user")) })
     .output(
         v.object({
             conflicts: v.number(),
-            cursor: v.optional(v.string()),
             filled: v.number(),
+            processed: v.number(),
             skipped: v.number(),
-            status: v.union(v.literal("conflict"), v.literal("filled"), v.literal("progress")),
+            status: v.union(v.literal("conflict"), v.literal("progress")),
         }),
     )
-    .mutation(async ({ args, ctx }) => await fillEmailCanonicalBatch(ctx, { checkedAt: args.checkedAt, cursor: args.cursor }));
+    .mutation(async ({ args, ctx }) => await fillEmailCanonicalBatch(ctx, { checkedAt: args.checkedAt, ids: args.ids }));
