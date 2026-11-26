@@ -729,6 +729,10 @@ msgstr "新增 {0} 条，合并 {1} 条，提升 {2} 条，解决 {3} 处矛盾�
 msgid "{0} of {1}"
 msgstr "第 {0} 个，共 {1} 个"
 
+#: src/features/chat/aside/find/aside-find-bar.tsx:139
+msgid "{0} of {matchCount}"
+msgstr "第 {0} 个，共 {matchCount} 个"
+
 #. placeholder {0}: activeIndex + 1
 #. placeholder {1}: matches.length
 #: src/features/chat/thread/find/thread-find-bar.tsx:182

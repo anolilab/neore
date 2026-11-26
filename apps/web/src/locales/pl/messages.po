@@ -729,6 +729,10 @@ msgstr "Nowe: {0}, scalone: {1}, awansowane: {2}, rozwiązane sprzeczności: {3}
 msgid "{0} of {1}"
 msgstr "{0} z {1}"
 
+#: src/features/chat/aside/find/aside-find-bar.tsx:139
+msgid "{0} of {matchCount}"
+msgstr "{0} z {matchCount}"
+
 #. placeholder {0}: activeIndex + 1
 #. placeholder {1}: matches.length
 #: src/features/chat/thread/find/thread-find-bar.tsx:182
