@@ -1,6 +1,6 @@
 /* eslint-disable testing-library/no-node-access -- focus placement (document.activeElement) is what these tests assert */
 import type { GatewayModel } from "@neore/ai/models";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,7 +11,9 @@ const state = vi.hoisted(() => {
         catalog: [] as GatewayModel[],
         catalogLoaded: true,
         excluded: new Set<string>(),
-        pending: false,
+        hold: false,
+        lastPatch: undefined as unknown,
+        release: () => undefined as void,
         preferencesRead: true,
         refuse: false,
         rerender: (() => undefined) as () => void,
@@ -81,12 +83,18 @@ vi.mock("@/features/auth/hooks/use-user-settings", () => {
     return {
         useUpdateUserSettings: () => {
             return {
-                isPending: state.pending,
                 updateLatest: async (build: (current: typeof state.settings) => typeof state.settings) => {
                     const before = state.settings;
 
-                    state.settings = { ...state.settings, ...build(state.settings) };
+                    state.lastPatch = build(state.settings);
+                    state.settings = { ...state.settings, ...(state.lastPatch as typeof state.settings) };
                     state.rerender();
+
+                    if (state.hold) {
+                        await new Promise<void>((resolve) => {
+                            state.release = resolve;
+                        });
+                    }
 
                     if (state.refuse) {
                         state.settings = before;
@@ -117,7 +125,8 @@ const show = (offered: GatewayModel[] = MODELS) => {
 beforeEach(() => {
     state.catalog = MODELS;
     state.catalogLoaded = true;
-    state.pending = false;
+    state.hold = false;
+    state.lastPatch = undefined;
     state.preferencesRead = true;
     state.refuse = false;
     state.excluded = new Set();
@@ -213,13 +222,18 @@ describe("BackupModelsSetting", () => {
         expect(entry?.textContent).not.toContain("Unavailable");
     });
 
-    it("cannot be edited while a save runs, so a later edit is never built on a value that may be refused", () => {
-        state.settings = { backupModels: ["openai/first", "openai/second"] };
-        state.pending = true;
+    it("cannot be edited while a save runs, so a later edit is never built on a value that may be refused", async () => {
+        state.settings = { backupModels: ["openai/first", "openai/second", "openai/third"] };
+        state.hold = true;
         show();
 
-        expect(screen.getByRole("button", { name: "Remove First" }).hasAttribute("disabled")).toBe(true);
-        expect(screen.getByRole("button", { name: "Move Second up" }).hasAttribute("disabled")).toBe(true);
+        await userEvent.click(screen.getByRole("button", { name: "Remove First" }));
+
+        expect(screen.getByRole("button", { name: "Remove Second" }).hasAttribute("disabled")).toBe(true);
+        expect(screen.getByRole("button", { name: "Move Third up" }).hasAttribute("disabled")).toBe(true);
+
+        state.release();
+        await waitFor(() => expect(screen.getByRole("button", { name: "Remove Second" }).hasAttribute("disabled")).toBe(false));
     });
 
     it("keeps focus on the moved backup, on its other arrow when the one used is now disabled", async () => {
@@ -275,6 +289,15 @@ describe("BackupModelsSetting", () => {
         await userEvent.click(screen.getByRole("button", { name: "Remove First" }));
 
         expect(document.activeElement).toBe(screen.getByRole("group", { name: "Backup models" }));
+    });
+
+    it("sends the list an edit was built on, so the server can refuse it when another tab changed the list", async () => {
+        state.settings = { backupModels: ["openai/first", "openai/second"] };
+        show();
+
+        await userEvent.click(screen.getByRole("button", { name: "Remove First" }));
+
+        expect(state.lastPatch).toEqual({ backupModels: ["openai/second"], backupModelsBase: ["openai/first", "openai/second"] });
     });
 
     it("moves focus to the next backup's remove button when one is removed", async () => {

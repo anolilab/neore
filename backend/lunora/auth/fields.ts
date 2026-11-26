@@ -47,6 +47,13 @@ export const userSettingsFieldsWithoutUserId = {
             message: `At most ${MAX_BACKUP_MODELS} backup models`,
         }),
     ),
+    // The list a `backupModels` write was built on. The write is refused (CONFLICT) when the stored list is no longer this
+    // one, so an edit made on a stale copy (another tab) never overwrites a newer list. Never stored.
+    backupModelsBase: v.optional(
+        v.array(v.string().max(MAX_LENGTH.short)).check((value) => value.length <= MAX_BACKUP_MODELS, {
+            message: `At most ${MAX_BACKUP_MODELS} backup models`,
+        }),
+    ),
     // Appearance: cap long chat code blocks at 24 lines with an expand toggle. Absent means ON.
     capLongCodeBlocks: v.optional(v.boolean()),
     // In-app toasts for chat events (`features/notifications/lib/chat-toasts.ts`). Absent means ON.

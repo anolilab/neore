@@ -303,8 +303,17 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
         // The backup list and the single value saved before it are kept in step: a write of either sets both, so a reader
         // of either sees the same first backup. An older client writes `backupModel` alone, and that edits only the first
         // entry: a model replaces it (and leaves its later place), "" removes it, and the rest of the list stays.
+        const backupModelsBase = toStore.backupModelsBase as string[] | undefined;
+
+        delete toStore.backupModelsBase;
+
         if (Array.isArray(toStore.backupModels) || typeof toStore.backupModel === "string") {
             const saved = storedBackupModels(settings as Doc<"userSettings"> | null);
+
+            if (backupModelsBase !== undefined && (backupModelsBase.length !== saved.length || backupModelsBase.some((id, index) => id !== saved[index]))) {
+                throw new LunoraError("CONFLICT", "Your backup models were changed elsewhere. Reload them and try again.");
+            }
+
             const single = toStore.backupModel as string;
             const backupModels = Array.isArray(toStore.backupModels)
                 ? (toStore.backupModels as string[])

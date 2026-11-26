@@ -174,11 +174,14 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
     // Without the catalog, the plan answer or the filters, nothing is known to be unusable: no entry is marked until all are read.
     const availabilityKnown = useGatewayModelsLoaded() && access !== undefined && filtersRead;
     const { data: userSettings } = useUserSettings();
-    const { isPending, updateLatest } = useUpdateUserSettings();
+    const { updateLatest } = useUpdateUserSettings();
+    // This list's own save, from the edit until it settles. The mutation's own pending flag is not enough: a write can
+    // wait behind another settings write before it is sent.
+    const [saving, setSaving] = useState(false);
     const chosen = storedBackupModels(userSettings);
     // Until the settings load, the list only looks empty: an edit then would replace the saved one. While a save runs,
     // another edit would be built on its unconfirmed value and could save it even if it fails.
-    const locked = disabled === true || userSettings === undefined || isPending;
+    const locked = disabled === true || userSettings === undefined || saving;
     const chosenKey = chosen.join("\n");
     const limit = MAX_BACKUP_MODELS;
     // Each entry's buttons by `controlKey`, so focus can be put back once the list has changed.
@@ -218,18 +221,28 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
     };
 
     /**
-     * Saves `edit`, built from the cached settings when its turn comes. Focus then goes to `focusOnSuccess`, or to
-     * `focusOnFailure` when the save is refused and its rollback has put the old list back.
+     * Saves `edit` with the list it was built on: the server refuses it when the stored list has changed since (another
+     * tab), and the rollback and re-read then show the stored one. Focus goes to `focusOnSuccess`, or to `focusOnFailure`
+     * once a refused save's rollback has put the old list back.
      */
     const save = (edit: (backupModels: string[]) => string[], focusOnSuccess: string, focusOnFailure: string) => {
         focusAfter.current = focusOnSuccess;
+        setSaving(true);
         updateLatest((current) => {
-            return { backupModels: edit(storedBackupModels(current)) };
-        }).catch(() => {
-            toast.error(t`Failed to update backup models`);
-            focusAfter.current = focusOnFailure;
-            setFocusRequest((count) => count + 1);
-        });
+            const base = storedBackupModels(current);
+
+            return { backupModels: edit(base), backupModelsBase: base };
+        })
+            .finally(() => setSaving(false))
+            .catch((error: unknown) => {
+                toast.error(
+                    (error as { code?: unknown } | null)?.code === "CONFLICT"
+                        ? t`Your backup models were changed in another tab. The saved list is shown again.`
+                        : t`Failed to update backup models`,
+                );
+                focusAfter.current = focusOnFailure;
+                setFocusRequest((count) => count + 1);
+            });
     };
 
     return (
@@ -316,14 +329,15 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                 <div ref={addRow}>
                     <ModelSelect
                         description={t`Up to ${limit}, tried in the order listed`}
-                        disabled={locked}
+                        // Not disabled while a save runs, so it keeps focus; a pick made then is ignored below.
+                        disabled={disabled === true || userSettings === undefined}
                         emptyLabel={t`Choose a model`}
                         field="backupModels"
                         label={chosen.length === 0 ? t`Add a backup model` : t`Add another backup model`}
                         // Unread filters look like none, so nothing is offered until they are read.
                         models={filtersRead ? allModels.filter((m) => usable.has(m.id) && !chosen.includes(m.id)) : []}
                         onChange={(_field, modelId) => {
-                            if (!modelId) {
+                            if (!modelId || locked) {
                                 return;
                             }
 
