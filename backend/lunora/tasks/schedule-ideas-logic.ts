@@ -41,7 +41,7 @@ export const SCHEDULE_IDEAS_CLAIM_TTL_MS = 2 * DAY_MS;
 
 /**
  * The mark that a day's job is already on the queue, taken by the sweep before it sends, so later passes while the queue
- * is slow send nothing more. Given back when the job is skipped (a switch off) or the send fails; kept once the job ran.
+ * is slow send nothing more. Marked `skipped` when the job is skipped (a switch off), and then replaced by the sweep once the job's own claim is gone; given back when the send fails; kept once the job ran.
  */
 export const SCHEDULE_IDEAS_QUEUED_SCOPE = "schedule-ideas-queued";
 

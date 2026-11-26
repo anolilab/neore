@@ -7,8 +7,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
-import { claimKey, completeKey, releaseKey } from "../lib/claim-once";
-import { JOB_CLAIM_TTL_MS } from "../lib/claim-once";
+import { claimKey, completeKey, JOB_CLAIM_TTL_MS, releaseKey } from "../lib/claim-once";
 import { runJobOnce } from "../lib/job-once";
 import { runInShard } from "../lib/shard-context";
 import schema from "../schema";
