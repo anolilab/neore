@@ -15,6 +15,9 @@ import { insertContextResetRow, insertThread } from "../agent/table-writes";
 import schema from "../schema";
 import { getFullThreadForExport } from "./functions";
 import { getLowRiskApprovalContext } from "./tool-permissions";
+import { agentSwitchRowContent } from "../agent/agent-switch-logic";
+import { threadHandoffTaint } from "../agent/thread-summary-taint";
+import { computeTaint } from "../devices/lib/taint";
 import { createSideChat, sideChatRefusalOf } from "./side-chat";
 
 const { sessionFrom } = vi.hoisted(() => {
@@ -529,6 +532,56 @@ describe("createSideChat", () => {
 
         expect(outcome.status).toBe("ok");
         expect(await messageCount(outcome.threadId)).toBe(1);
+    });
+
+    it("gives the child the device-call taint of the parent: the takeover and the tool results it copied", async () => {
+        const parentId = await parentWith(OWNER, { hasHandoff: true });
+        const host = { agentKey: "agent", agentLabel: "Agent", folderId: "folder", folderLabel: "Folder", hostId: "host-1", kind: "host" as const };
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("messages", {
+                ...agentSwitchRowContent({ from: host, mode: "portable", startMessageId: "none", to: { kind: "model", model: "openai/gpt-5" } }),
+                order: 0,
+                status: "success",
+                stepOrder: 0,
+                threadId: parentId,
+                tool: false,
+                userId: OWNER,
+            });
+        });
+        await withMessages(parentId, OWNER, ["look it up"]);
+        await harness.run(async (ctx: any) => {
+            await addMessagesHandler(ctx, {
+                messages: [
+                    {
+                        message: { content: [{ input: {}, toolCallId: "w1", toolName: "webSearch", type: "tool-call" }], role: "assistant" },
+                        status: "success",
+                    },
+                    {
+                        message: {
+                            content: [{ output: { type: "text", value: "page text" }, toolCallId: "w1", toolName: "webSearch", type: "tool-result" }],
+                            role: "tool",
+                        },
+                        status: "success",
+                    },
+                    { message: { content: [{ text: "here is the answer", type: "text" }], role: "assistant" }, status: "success" },
+                ],
+                threadId: parentId as never,
+                userId: OWNER,
+            });
+        });
+
+        const outcome = (await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)) as { status: string; threadId: string };
+        const rowsOf = async (threadId: string) =>
+            (await harness.run(async (ctx: any) => await ctx.db.query("messages").collect()))
+                .filter((row: any) => String(row.threadId) === threadId)
+                .map((row: any) => row.message);
+
+        expect(outcome.status).toBe("ok");
+        expect(await harness.run(async (ctx: any) => await threadHandoffTaint(ctx, parentId as never))).toStrictEqual(["web", "device"]);
+        expect(await harness.run(async (ctx: any) => await threadHandoffTaint(ctx, outcome.threadId as never))).toStrictEqual(["web", "device"]);
+        expect(computeTaint(await rowsOf(outcome.threadId))).toStrictEqual(computeTaint(await rowsOf(parentId)));
+        expect(computeTaint(await rowsOf(outcome.threadId))).toContain("web");
     });
 
     it("refuses a parent that no longer exists, and writes no child or relationship", async () => {
