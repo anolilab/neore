@@ -215,9 +215,13 @@ const secretContinues = (line: string): boolean => {
     return named && endsInLineContinuation(line);
 };
 
-/** The one-based number of the first line of `lines` that {@link secretContinues}, or `undefined`. */
+/**
+ * The one-based number of the first line of `lines` that {@link secretContinues}, or `undefined`. A line is read as
+ * preparation will see it: with emphasis and tags removed, `DB_**PASSWORD**="alpha` names its secret. A line past the
+ * raw-length guard is skipped without unwrapping: it is counted too long and never stored.
+ */
 const firstSecretContinuingLine = (lines: ReadonlyArray<string>): number | undefined => {
-    const index = lines.findIndex((line) => secretContinues(line));
+    const index = lines.findIndex((line) => line.length <= MEMORY_FILE_ENTRY_PREPARE_MAX_CHARS && secretContinues(unwrapImportLine(line)));
 
     return index === -1 ? undefined : index + 1;
 };

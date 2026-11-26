@@ -95,6 +95,29 @@ describe("parseMemoryFile: text", () => {
         expect(error?.message).not.toMatch(SECRET_WORDS);
     });
 
+    it("refuses a secret whose label is split by emphasis, reading the line as it will be stored, with the right line number", () => {
+        const error = refusal('The user lives in Lisbon\nThe user likes tea\nDB_**PASSWORD**="alpha\nbeta-gamma-7731"', "text");
+
+        expect(error).toMatchObject({ code: "secret_continues", message: expect.stringContaining("Line 3 holds a password or key") });
+        expect(error?.message).not.toMatch(SECRET_WORDS);
+    });
+
+    it("refuses a bulleted line whose emphasised label continues", () => {
+        expect(refusal('- **DB_PASSWORD**="alpha\nbeta-gamma-7731"', "text")).toMatchObject({ message: expect.stringContaining("Line 1") });
+    });
+
+    it("still imports an ordinary line with emphasis and no secret label", () => {
+        const parsed = parseMemoryFile("The **user** likes green tea\n- The user lives in **Lisbon**", "text");
+
+        expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user likes green tea", "The user lives in Lisbon"]);
+    });
+
+    it("does not refuse a file over a line past the raw-length guard that holds an unclosed secret label", () => {
+        const long = `DB_PASSWORD="${"x".repeat(MEMORY_FILE_ENTRY_MAX_CHARS * 10)}`;
+
+        expect(parseMemoryFile(`${long}\nThe user likes green tea`, "text")).toMatchObject({ entries: 1, tooLong: 1, total: 2 });
+    });
+
     it("does not refuse a secret that ends in an escaped (doubled) backslash, and stores nothing of it", () => {
         const content = `The user lives in Lisbon\n${ESCAPED_BACKSLASH}`;
 
@@ -154,9 +177,9 @@ describe("parseMemoryFile: text", () => {
         const elapsed = performance.now() - started;
 
         expect(parsed).toMatchObject({ entries: 1, tooLong: 1, total: 2 });
-        // Only the short line reached the unwrapping step.
-        expect(unwrap).toHaveBeenCalledTimes(1);
-        expect(unwrap).toHaveBeenCalledWith("The user likes green tea");
+        // Only the short line reached the unwrapping step: once for its continuation check, once to prepare it.
+        expect(unwrap).toHaveBeenCalledTimes(2);
+        expect(unwrap.mock.calls.every(([line]) => line === "The user likes green tea")).toBe(true);
         expect(elapsed).toBeLessThan(400);
     });
 
@@ -205,6 +228,20 @@ describe("parseMemoryFile: JSON", () => {
 
         expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user lives in Lisbon"]);
         expect(parsed).toMatchObject({ entries: 1, invalid: 2, total: 3 });
+    });
+
+    it("skips, counted, an item whose secret label is split by emphasis and continues past its line", () => {
+        const input = 'DB_**PASSWORD**="alpha\nbeta-gamma-7731"';
+        const parsed = parseMemoryFile(JSON.stringify(["The user lives in Lisbon", input, { content: input }]), "json");
+
+        expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user lives in Lisbon"]);
+        expect(parsed).toMatchObject({ entries: 1, invalid: 2, total: 3 });
+    });
+
+    it("still imports a JSON item with emphasis and no secret label", () => {
+        const parsed = parseMemoryFile(JSON.stringify(["The **user** likes green tea"]), "json");
+
+        expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user likes green tea"]);
     });
 
     it("counts an item that is only wrapping as invalid", () => {
