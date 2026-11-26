@@ -1745,6 +1745,28 @@ describe("deleteMergedGuest", () => {
             return await context.runMutation(deleteMergedGuest, { generation, userId });
         });
 
+    it("keeps the guest while an owed pin restore still names it, and deletes it once that restore has settled", async () => {
+        const harness = harnessWithUsers();
+        const guest = await insertUser(harness, true);
+        const owed = (await harness.run(
+            async (context: any) =>
+                await context.db.insert("pendingPinRestores", {
+                    dispatchedAt: 1,
+                    ownerId: "user",
+                    routeCreatedAt: 1,
+                    threadId: "thread-1",
+                    until: 1,
+                    userId: guest,
+                }),
+        )) as string;
+
+        expect(await deleteGuest(harness, guest)).toStrictEqual({ deleted: false, pinsRemain: true });
+
+        await harness.run(async (context: any) => await context.db.delete("pendingPinRestores", owed));
+
+        expect(await deleteGuest(harness, guest)).toStrictEqual({ deleted: true });
+    });
+
     it("keeps the guest while its pin-write leases remain, and clears them a batch per call", async () => {
         const harness = harnessWithUsers();
 
@@ -2478,6 +2500,17 @@ describe("mergeGuestInto across two real shards", () => {
             switch (name) {
                 // The guest's user row is `.global()`, which this harness does not hold: the deletion's own shard check only.
                 case "deleteMergedGuest": {
+                    // An owed restore keeps the guest, as the guard in `deleteMergedGuest` does.
+                    const owed = (await shards.guest.run(async (context: any) => {
+                        const { page } = await context.db.pendingPinRestores.findMany({ consistency: "primary", limit: 1, where: { userId: args.userId } });
+
+                        return page.length;
+                    })) as number;
+
+                    if (owed > 0) {
+                        return { deleted: false, pinsRemain: true } as never;
+                    }
+
                     const left = (await shards.guest.run(
                         async (context: any) => await firstTableWithGuestRows(context, args.userId as string, args.sharedStore === true),
                     )) as string | null;
@@ -3100,6 +3133,65 @@ describe("mergeGuestInto across two real shards", () => {
 
             expect(await merge.threadsOn("user")).toStrictEqual([{ _id: id, title: "edited during the merge", userId: "user" }]);
             expect(await merge.threadsOn("guest")).toStrictEqual([]);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("keeps the guest while an owed pin restore still names it, and deletes the guest once that restore has settled", async () => {
+        const merge = twoShards();
+
+        try {
+            const threadId = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("the guest's")))) as string;
+            const firstAnswers: unknown[] = [];
+            let deleteCalls = 0;
+            const call: ShardCall = async (reference, args, shardKey) => {
+                const name = reference.__lunoraRef.split(":", 2)[1]!;
+
+                if (name === "deleteMergedGuest") {
+                    deleteCalls += 1;
+
+                    // The first attempt finds a restore still owed to the guest, written after the global step re-pointed the rest.
+                    if (deleteCalls === 1) {
+                        await merge.shards.guest.run(
+                            async (context: any) =>
+                                await context.db.insert("pendingPinRestores", {
+                                    dispatchedAt: 1,
+                                    ownerId: "user",
+                                    routeCreatedAt: 1,
+                                    threadId,
+                                    until: 1,
+                                    userId: "guest",
+                                }),
+                        );
+                    } else if (deleteCalls === 2) {
+                        // The restore has settled by the next attempt: its row is gone.
+                        await merge.shards.guest.run(async (context: any) => {
+                            const { page } = await context.db.pendingPinRestores.findMany({ where: { userId: "guest" } });
+
+                            for (const row of page) {
+                                await context.db.delete("pendingPinRestores", row._id);
+                            }
+                        });
+                    }
+
+                    const result: unknown = await merge.call(reference, args, shardKey);
+
+                    if (deleteCalls === 1) {
+                        firstAnswers.push(result);
+                    }
+
+                    return result as never;
+                }
+
+                return (await merge.call(reference, args, shardKey)) as never;
+            };
+
+            await mergeToEnd(call, "guest", "user");
+
+            expect(firstAnswers).toStrictEqual([{ deleted: false, pinsRemain: true }]);
+            expect(deleteCalls).toBeGreaterThanOrEqual(2);
+            expect(merge.guestDeletions.at(-1)).toBeNull();
         } finally {
             merge.close();
         }
