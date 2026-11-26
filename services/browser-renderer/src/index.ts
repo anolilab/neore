@@ -13,7 +13,7 @@
  * only way in.
  */
 import type { BrowserWorker } from "@cloudflare/playwright";
-import { connect, launch } from "@cloudflare/playwright";
+import { connect, launch, sessions } from "@cloudflare/playwright";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -47,6 +47,8 @@ const actionSchema = z.object({
     direction: z.enum(["up", "down"]).optional(),
     expectTarget: z.string().optional(), // click: the `target` of the element the person was shown; refused when it differs
     fullPage: z.boolean().optional(),
+    // screenshot: one over this many bytes is taken again at a lower quality, so it fits the caller's answer.
+    maxBytes: z.int().positive().optional(),
     // A person's view of the page: a session that cannot be reconnected is gone (404, nothing run), never replaced by a new browser.
     reconnectOnly: z.boolean().optional(),
     selector: z.string().optional(),
@@ -366,8 +368,16 @@ const reconnectOnlyTo = async (
 ): Promise<{ browser: import("@cloudflare/playwright").Browser; isLaunched: false; sessionId: string }> => {
     try {
         return { browser: await connect(env.BROWSER, sessionId), isLaunched: false, sessionId };
-    } catch {
-        throw new SessionGoneError();
+    } catch (error) {
+        // Gone only when the provider no longer lists it: a connect that failed for another reason is a failure (500),
+        // not a closed browser.
+        const active = await sessions(env.BROWSER).catch(() => undefined);
+
+        if (active?.every((session) => session.sessionId !== sessionId) === true) {
+            throw new SessionGoneError();
+        }
+
+        throw error;
     }
 };
 
@@ -513,6 +523,7 @@ const actHeld = async (
         direction,
         expectTarget,
         fullPage,
+        maxBytes,
         reconnectOnly,
         selector,
         sessionId,
@@ -804,8 +815,12 @@ const actHeld = async (
                     screenshotBuffer.byteLength > 5 * 1024 * 1024
                         ? await page.screenshot({ fullPage: fullPage ?? false, quality: 60, type: "jpeg" })
                         : screenshotBuffer;
+                const fitted =
+                    maxBytes !== undefined && finalBuffer.byteLength > maxBytes
+                        ? await page.screenshot({ fullPage: fullPage ?? false, quality: 40, type: "jpeg" })
+                        : finalBuffer;
 
-                const base64 = Buffer.from(finalBuffer).toString("base64");
+                const base64 = Buffer.from(fitted).toString("base64");
                 const title = await page.title();
                 const currentUrl = page.url();
 

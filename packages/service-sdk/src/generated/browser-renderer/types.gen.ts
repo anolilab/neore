@@ -119,6 +119,10 @@ export type BrowserActionRequest = {
      */
     sessionId?: string;
     /**
+     * Screenshot: one over this many bytes is taken again at a lower quality
+     */
+    maxBytes?: number;
+    /**
      * Only reconnect to sessionId: a session that is gone answers 404 SESSION_GONE, and no new browser is launched
      */
     reconnectOnly?: boolean;

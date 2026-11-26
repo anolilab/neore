@@ -312,6 +312,10 @@
                         "type": "string",
                         "description": "Reconnect to an existing browser session"
                     },
+                    "maxBytes": {
+                        "type": "integer",
+                        "description": "Screenshot: one over this many bytes is taken again at a lower quality"
+                    },
                     "reconnectOnly": {
                         "type": "boolean",
                         "description": "Only reconnect to sessionId: a session that is gone answers 404 SESSION_GONE, and no new browser is launched"

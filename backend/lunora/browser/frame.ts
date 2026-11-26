@@ -22,6 +22,9 @@ import { isServiceBound, serviceFetch } from "../lib/services";
  */
 export const MAX_FRAME_BASE64 = 700_000;
 
+/** The JPEG size the renderer is asked to stay under: a larger shot is taken again at a lower quality. */
+const MAX_FRAME_BYTES = Math.floor((MAX_FRAME_BASE64 * 3) / 4);
+
 /**
  * `ok`: a JPEG of the browser's viewport (`viewport`, in CSS pixels, when the renderer knew it) at `takenAt`, the
  * server's clock. `controlled`: another person drives the browser and may be typing a password, so no one else sees
@@ -64,7 +67,7 @@ export const readBrowserFrame = authAction
 
         const client = createBrowserRendererClient({ fetch: serviceFetch(ctx, "browserRenderer") });
         const { data, response } = await browserAction({
-            body: { action: "screenshot", fullPage: false, reconnectOnly: true, sessionId: browser.providerSessionId },
+            body: { action: "screenshot", fullPage: false, maxBytes: MAX_FRAME_BYTES, reconnectOnly: true, sessionId: browser.providerSessionId },
             client,
             signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         }).catch(() => {
