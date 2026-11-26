@@ -8,9 +8,10 @@
  * rate limiter are replaced; the platform-admin flag and each caller's role in
  * their active organization come from the `ADMINS` / `SESSIONS` maps below.
  */
-import { lunoraTest } from "@lunora/testing";
+import type { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { harnessWithSqlite, storeDatesAsText } from "../../test/better-auth-dates";
 import schema from "../schema";
 
 const { admins, sessionFrom, sessions } = vi.hoisted(() => {
@@ -50,8 +51,15 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("../lib/rate-limiter")>()), rateLimitGuard: async () => undefined };
 });
 
-const { getBillingInfo, getMemberCredits, listMemberCredits, setMemberCreditOverride, setOrganizationBillingTier, updateBillingSettings } =
-    await import("./billing");
+const {
+    applyCreemSubscription,
+    getBillingInfo,
+    getMemberCredits,
+    listMemberCredits,
+    setMemberCreditOverride,
+    setOrganizationBillingTier,
+    updateBillingSettings,
+} = await import("./billing");
 
 const PLATFORM_ADMIN = "user-platform-admin";
 const OWNER = "user-owner";
@@ -61,6 +69,7 @@ const OUTSIDER = "user-outsider";
 const MULTI_OWNER = "user-multi-owner";
 
 let harness: ReturnType<typeof lunoraTest>;
+let sqlite: ReturnType<typeof harnessWithSqlite>["sqlite"];
 let orgId: string;
 let otherOrgId: string;
 
@@ -83,7 +92,7 @@ const readCredits = async (organizationId: string, userId: string): Promise<any>
 const forbidden = { code: "FORBIDDEN" };
 
 beforeEach(async () => {
-    harness = lunoraTest(schema as never);
+    ({ harness, sqlite } = harnessWithSqlite(schema));
     admins.clear();
     sessions.clear();
 
@@ -145,6 +154,37 @@ describe("getBillingInfo", () => {
         await as(MULTI_OWNER).mutation(updateBillingSettings as never, { billingEmail: "new@acme.test" } as never);
 
         expect(await readOrganization(orgId)).toMatchObject({ billingEmail: "new@acme.test" });
+    });
+});
+
+describe("a row better-auth wrote (ISO dates)", () => {
+    it("sets the tier of its organization and stores createdAt as a number", async () => {
+        storeDatesAsText(sqlite, "organization", orgId, ["createdAt"]);
+
+        await as(PLATFORM_ADMIN).mutation(setOrganizationBillingTier as never, { baseTier: "pro", organizationId: orgId } as never);
+
+        expect(await readOrganization(orgId)).toMatchObject({ baseTier: "pro", createdAt: 1 });
+    });
+
+    it("applies a Creem subscription to its user and to its organization", async () => {
+        const userId = await seed(
+            async (db) => await db.insert("user", { createdAt: 1, email: "buyer@example.com", emailVerified: true, name: "Buyer", updatedAt: 1 }),
+        );
+
+        storeDatesAsText(sqlite, "user", userId, ["createdAt", "updatedAt"]);
+        storeDatesAsText(sqlite, "organization", orgId, ["createdAt"]);
+
+        for (const [subject, referenceId] of [
+            ["user", userId],
+            ["organization", orgId],
+        ] as const) {
+            await harness.run(
+                async (ctx: any) => await ctx.runMutation(applyCreemSubscription, { baseTier: "pro", creemSubscriptionId: "sub_1", referenceId, subject }),
+            );
+        }
+
+        expect(await seed(async (db) => await db.user.findFirst({ where: { _id: userId } }))).toMatchObject({ baseTier: "pro", createdAt: 1, updatedAt: 1 });
+        expect(await readOrganization(orgId)).toMatchObject({ baseTier: "pro", createdAt: 1 });
     });
 });
 

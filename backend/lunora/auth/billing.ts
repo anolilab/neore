@@ -9,12 +9,13 @@ import type { Infer } from "lunorash/server";
  * credits, models) that tier drives.
  */
 import { LunoraError } from "lunorash/server";
-import type { Id } from "../_generated/dataModel";
+import type { Doc } from "../_generated/dataModel";
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { claimLease, releaseClaim } from "../lib/claim-once";
+import { patchBetterAuthRow } from "../lib/better-auth-dates";
 import { adminMutation, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { getMemberByOrganizationAndUser, getOrganization, getUser } from "./lib/better-auth-queries";
 import { getUserEffectiveSettings } from "./lib/settings-resolver";
@@ -224,7 +225,7 @@ export const updateBillingSettings = authMutation
         }
 
         if (Object.keys(updates).length > 0) {
-            await context.db.patch("organization", organizationId, withoutUndefined(updates));
+            await patchBetterAuthRow(context.db, "organization", org, withoutUndefined(updates));
         }
 
         context.log.event("billing.update_billing_settings", {
@@ -259,7 +260,7 @@ export const setOrganizationBillingTier = adminMutation
         const updates = withoutUndefined({ baseTier: args.baseTier, creditsPerUser: args.creditsPerUser });
 
         if (Object.keys(updates).length > 0) {
-            await context.db.patch("organization", organizationId, updates);
+            await patchBetterAuthRow(context.db, "organization", org, updates);
         }
 
         context.log.event("billing.set_organization_billing_tier", {
@@ -300,7 +301,11 @@ export const applyCreemSubscription = internalMutation
         const patch = creemTierPatch(row, update);
 
         if (patch) {
-            await context.db.patch(subject === "user" ? "user" : "organization", row._id as Id<"user">, patch);
+            if (subject === "user") {
+                await patchBetterAuthRow(context.db, "user", row as Doc<"user">, patch);
+            } else {
+                await patchBetterAuthRow(context.db, "organization", row as Doc<"organization">, patch);
+            }
         }
 
         return null;
