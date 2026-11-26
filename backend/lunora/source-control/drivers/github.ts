@@ -226,7 +226,7 @@ const logins = new WeakMap<HostRequest, Promise<string>>();
  * The signed-in login, read once per requester (one per action), since `@me` is not
  * documented for the REST search. A failed read is not kept, so a retry asks again.
  */
-const signedInLogin = (request: HostRequest): Promise<string> => {
+export const signedInLogin = (request: HostRequest): Promise<string> => {
     const known = logins.get(request);
 
     if (known) {
@@ -716,6 +716,13 @@ const replyToThread = async (request: HostRequest, ref: PullRequestRef, commentI
 const REVIEW_PAGE_SIZE = 100;
 /** Pages a read for a seen review goes back through before giving up (`listReviews`), the pages already read included. */
 const REVIEW_SEEN_MAX_PAGES = 5;
+/**
+ * Pages a full read of reviews (`readAll`, the watch poll's) goes through: 1000 reviews. Reviews are paged in creation order but the
+ * ones a watch needs are those submitted after the seen one, which can sit on any page (a review is created before it is
+ * submitted), so the poll reads them all; this bound caps the cost of that. A PR with more pages falls back to the newest pages and
+ * the seen-review lookup, in the same page budget as before (`REVIEW_SEEN_MAX_PAGES`).
+ */
+const REVIEW_ALL_MAX_PAGES = 10;
 const REVIEW_BODY_MAX_CHARS = 20_000;
 
 const submittedReviewSchema = z.object({
@@ -773,7 +780,16 @@ const listReviews = async (request: HostRequest, ref: PullRequestRef, options?: 
     let earliest = 1;
     let pagesRead = 1;
 
-    if (first.last !== undefined && first.last > 1) {
+    if (options?.readAll === true && first.last !== undefined && first.last > 1 && first.last <= REVIEW_ALL_MAX_PAGES) {
+        // The whole list fits under the bound: every page, in order, so the decision sees all of it. One request when there is one page.
+        for (let page = 2; page <= first.last; page += 1) {
+            const next = await readPage(page);
+
+            values = [...values, ...next.values];
+        }
+
+        total = values.length;
+    } else if (first.last !== undefined && first.last > 1) {
         const last = await readPage(first.last);
 
         values = last.values;
@@ -795,6 +811,12 @@ const listReviews = async (request: HostRequest, ref: PullRequestRef, options?: 
         }
     }
 
+    // A full read that is over the bound keeps the first page it already read beside the trailing pages (no extra request). Pages can
+    // overlap once the seen-review lookup walks back to it, so a review is kept once.
+    if (options?.readAll === true && earliest > 1) {
+        values = [...first.values, ...values];
+    }
+
     const listsSeen = (): boolean =>
         values.some((value) => typeof value === "object" && value !== null && "id" in value && String(value.id) === options?.seenId);
 
@@ -806,6 +828,25 @@ const listReviews = async (request: HostRequest, ref: PullRequestRef, options?: 
 
         values = [...older.values, ...values];
     }
+
+    // A page read twice (the first page, once the walk back reaches it) lists its reviews twice: keep each once.
+    const seenIds = new Set<string>();
+
+    values = values.filter((value) => {
+        const id = typeof value === "object" && value !== null && "id" in value ? String(value.id) : undefined;
+
+        if (id === undefined) {
+            return true;
+        }
+
+        if (seenIds.has(id)) {
+            return false;
+        }
+
+        seenIds.add(id);
+
+        return true;
+    });
 
     const items = values.flatMap((value): PullRequestReview[] => {
         const review = submittedReviewSchema.safeParse(value);
@@ -933,6 +974,16 @@ const setViewed = async (request: HostRequest, ref: PullRequestRef, path: string
         { path, pullRequestId },
         z.object({ [viewed ? "markFileAsViewed" : "unmarkFileAsViewed"]: z.object({}).passthrough() }),
     );
+};
+
+/** One review by id: when it was submitted. A 404 (a deleted review) rejects like any other read; the caller tells it from a failure by its status. */
+const reviewSubmittedAt = async (request: HostRequest, ref: PullRequestRef, reviewId: string): Promise<number> => {
+    const review = parse(
+        z.object({ submitted_at: z.string().nullable().optional() }),
+        await readJson(await request(`${repoPath(ref)}/pulls/${ref.number}/reviews/${encodeURIComponent(reviewId)}`)),
+    );
+
+    return toMs(review.submitted_at);
 };
 
 const reviewSchema = z.object({ html_url: z.string().optional(), id: z.number(), state: z.string() });
@@ -1820,6 +1871,7 @@ export const githubDriver: HostDriver = {
     rerunGroupOf,
     rerunnableOfGroup,
     revertPullRequest,
+    reviewSubmittedAt,
     setAutoMerge,
     setThreadResolved,
     setViewed,

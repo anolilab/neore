@@ -52,6 +52,11 @@ export interface CreatedPullRequest {
 
 /** What a reviews read may be asked for beyond the newest ones. */
 export interface ListReviewsOptions {
+    /**
+     * Read every page of reviews, up to the driver's bound, instead of the newest ones only. A PR with more pages than the bound
+     * falls back to the newest-and-seen reading, so `total` then exceeds what was listed.
+     */
+    readAll?: boolean;
     /** A review id the caller has seen: the read goes back until it is listed, within the driver's bound. */
     seenId?: string;
 }
@@ -133,6 +138,12 @@ export interface HostDriver {
     rerunnableOfGroup?: (request: HostRequest, ref: PullRequestRef, groupId: string) => Promise<string[] | null>;
     /** Opens a pull request that reverts a merged one; the host's rules may refuse it. */
     revertPullRequest: (request: HostRequest, ref: PullRequestRef, revert: PullRequestEdit) => Promise<RevertPullRequestResult>;
+    /**
+     * One submitted review by id, in ONE request: when the host submitted it (epoch ms; 0 when it names no time). A review that is gone
+     * rejects with the host's not-found error, like any other read. Used to tell a seen review beyond the window of `listReviews`
+     * from a deleted one, and to order the listed reviews against it.
+     */
+    reviewSubmittedAt: (request: HostRequest, ref: PullRequestRef, reviewId: string) => Promise<number>;
     /** Turns auto-merge on (merging `headSha` with `method` once the host's rules are met) or off. */
     setAutoMerge: (request: HostRequest, ref: PullRequestRef, enabled: boolean, method: MergeMethod, headSha: string) => Promise<void>;
     setThreadResolved: (request: HostRequest, threadId: string, resolved: boolean) => Promise<void>;
