@@ -65,3 +65,12 @@ export const useGatewayModelsSettled = (): boolean => !useQuery(gatewayModelsQue
 
 /** Whether the catalog has been read at all: until then (or after a first read that failed) it says nothing about which models exist. */
 export const useGatewayModelsLoaded = (): boolean => useQuery(gatewayModelsQuery).data !== undefined;
+
+/** Reads the catalog again, for a retry after it failed to load. */
+export const useRefetchGatewayModels = (): (() => void) => {
+    const { refetch } = useQuery(gatewayModelsQuery);
+
+    return () => {
+        void refetch();
+    };
+};

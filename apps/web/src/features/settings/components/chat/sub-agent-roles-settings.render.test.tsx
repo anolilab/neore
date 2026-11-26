@@ -65,6 +65,16 @@ vi.mock("@/hooks/use-feature-flagged-models", () => {
     return { default: () => MODELS };
 });
 
+// `default-models-settings` imports the catalog hooks, which read the app's environment at import time.
+vi.mock("@/hooks/use-gateway-models", () => {
+    return {
+        useGatewayModels: () => MODELS,
+        useGatewayModelsLoaded: () => true,
+        useGatewayModelsSettled: () => true,
+        useRefetchGatewayModels: () => vi.fn(),
+    };
+});
+
 vi.mock("@/features/tasks/hooks/use-task-projects", () => {
     return {
         default: () => {

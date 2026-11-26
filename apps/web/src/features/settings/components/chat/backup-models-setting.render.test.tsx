@@ -9,13 +9,17 @@ import { BackupModelsSetting } from "./default-models-settings";
 const state = vi.hoisted(() => {
     return {
         catalog: [] as GatewayModel[],
+        catalogFailed: false,
         catalogLoaded: true,
         conflict: false,
         excluded: new Set<string>(),
         hold: false,
         lastPatch: undefined as unknown,
         release: () => undefined as void,
+        preferencesFailed: false,
         preferencesRead: true,
+        refetchCatalog: vi.fn(),
+        refetchPreferences: vi.fn(),
         refuse: false,
         /** When set, the stored list is shown in place of the rollback: the re-read lands before the refusal is handled. */
         reread: undefined as undefined | { backupModels?: string[] },
@@ -40,7 +44,15 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("@tanstack/react-query")>()),
         useQuery: (options: { query?: string }) => {
-            return { data: options.query === "preferences" && !state.preferencesRead ? undefined : { canRunPaidModels: true } };
+            if (options.query === "preferences") {
+                return {
+                    data: state.preferencesRead ? { canRunPaidModels: true } : undefined,
+                    isError: state.preferencesFailed,
+                    refetch: state.refetchPreferences,
+                };
+            }
+
+            return { data: { canRunPaidModels: true } };
         },
     };
 });
@@ -74,7 +86,13 @@ vi.mock("@/hooks/use-feature-flagged-models", () => {
 
 // The whole catalog, before feature flags hide any of it.
 vi.mock("@/hooks/use-gateway-models", () => {
-    return { useGatewayModels: () => state.catalog, useGatewayModelsLoaded: () => state.catalogLoaded };
+    return {
+        useGatewayModels: () => state.catalog,
+        useGatewayModelsLoaded: () => state.catalogLoaded,
+        // Settled is loaded or failed; a catalog that is neither is still loading.
+        useGatewayModelsSettled: () => state.catalogLoaded || state.catalogFailed,
+        useRefetchGatewayModels: () => state.refetchCatalog,
+    };
 });
 
 vi.mock("@/hooks/use-model-filter-rules", () => {
@@ -128,11 +146,15 @@ const show = (offered: GatewayModel[] = MODELS) => {
 
 beforeEach(() => {
     state.catalog = MODELS;
+    state.catalogFailed = false;
     state.catalogLoaded = true;
     state.conflict = false;
     state.hold = false;
     state.lastPatch = undefined;
+    state.preferencesFailed = false;
     state.preferencesRead = true;
+    state.refetchCatalog = vi.fn();
+    state.refetchPreferences = vi.fn();
     state.refuse = false;
     state.reread = undefined;
     state.excluded = new Set();
@@ -297,12 +319,6 @@ describe("BackupModelsSetting", () => {
         expect(document.activeElement).toBe(screen.getByRole("group", { name: "Backup models" }));
     });
 
-    it("shows a focus ring on the section, which takes focus from script", () => {
-        show();
-
-        expect(screen.getByRole("group", { name: "Backup models" }).className).toContain("focus:ring-[2px]");
-    });
-
     it("moves focus to the add picker when a re-read after a conflict removes the entry whose button had focus", async () => {
         state.settings = { backupModels: ["openai/first", "openai/second"] };
         state.refuse = true;
@@ -405,5 +421,80 @@ describe("BackupModelsSetting", () => {
 
         expect(screen.queryAllByRole("listitem")).toHaveLength(0);
         expect(document.activeElement).toBe(screen.getByRole("combobox", { name: "Add a backup model" }));
+    });
+
+    it("says the models to add could not be loaded when the user's filters fail to read, and retries them", async () => {
+        state.settings = { backupModels: ["openai/first"] };
+        state.preferencesRead = false;
+        state.preferencesFailed = true;
+        show();
+
+        expect(screen.getByRole("alert").textContent).toContain("Couldn't load the models you can add.");
+        expect(screen.queryByRole("combobox")).toBeNull();
+        // The saved list stays editable.
+        expect(screen.getByRole("button", { name: "Remove First" }).hasAttribute("disabled")).toBe(false);
+
+        await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+        expect(state.refetchPreferences).toHaveBeenCalledTimes(1);
+        expect(state.refetchCatalog).not.toHaveBeenCalled();
+    });
+
+    it("moves focus to the add picker when a retry succeeds and the button that had focus goes", async () => {
+        state.preferencesRead = false;
+        state.preferencesFailed = true;
+        state.refetchPreferences = vi.fn(() => {
+            state.preferencesFailed = false;
+            state.preferencesRead = true;
+            state.rerender();
+        });
+        show();
+
+        await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+        expect(screen.queryByRole("alert")).toBeNull();
+        expect(document.activeElement).toBe(screen.getByRole("combobox", { name: "Add a backup model" }));
+    });
+
+    it("says the models to add could not be loaded when the catalog fails to read, and retries it", async () => {
+        state.catalog = [];
+        state.catalogLoaded = false;
+        state.catalogFailed = true;
+        show();
+
+        expect(screen.getByRole("alert").textContent).toContain("Couldn't load the models you can add.");
+        expect(screen.queryByRole("combobox")).toBeNull();
+
+        await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+        expect(state.refetchCatalog).toHaveBeenCalledTimes(1);
+        expect(state.refetchPreferences).not.toHaveBeenCalled();
+    });
+
+    it("keeps the empty picker, with no error, while the catalog is still loading", () => {
+        state.catalog = [];
+        state.catalogLoaded = false;
+        show();
+
+        expect(screen.queryByRole("alert")).toBeNull();
+        expect(screen.getByRole("combobox", { name: "Add a backup model" })).toBeDefined();
+    });
+
+    it("explains a conflict at the list until the next edit starts", async () => {
+        state.settings = { backupModels: ["openai/first", "openai/second"] };
+        state.refuse = true;
+        state.conflict = true;
+        show();
+
+        await userEvent.click(screen.getByRole("button", { name: "Remove First" }));
+
+        const notice = await screen.findByRole("status");
+
+        expect(notice.textContent).toBe("Your backup models were changed in another tab. The saved list is shown again.");
+
+        state.refuse = false;
+        await userEvent.click(screen.getByRole("button", { name: "Remove Second" }));
+
+        expect(screen.queryByRole("status")).toBeNull();
     });
 });

@@ -31,7 +31,7 @@ import { toast } from "sonner";
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { moveBackupModel, offerableBackupModels } from "@/features/settings/lib/backup-model-options";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
-import { useGatewayModels, useGatewayModelsLoaded } from "@/hooks/use-gateway-models";
+import { useGatewayModels, useGatewayModelsLoaded, useGatewayModelsSettled, useRefetchGatewayModels } from "@/hooks/use-gateway-models";
 import { useFilteredModels } from "@/hooks/use-model-filter-rules";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -169,10 +169,18 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
     );
     const usable = new Set(useFilteredModels(candidates).map((m) => m.id));
     // The filters read as none until the preferences load (or when they fail to), so they must be read too.
-    const { data: aiPreferences } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
+    const { data: aiPreferences, isError: filtersFailed, refetch: refetchFilters } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
     const filtersRead = aiPreferences !== undefined;
+    const catalogLoaded = useGatewayModelsLoaded();
+    // Settled without data: the catalog read failed, so the empty list says nothing about which models exist.
+    const catalogFailed = useGatewayModelsSettled() && !catalogLoaded;
+    const refetchCatalog = useRefetchGatewayModels();
     // Without the catalog, the plan answer or the filters, nothing is known to be unusable: no entry is marked until all are read.
-    const availabilityKnown = useGatewayModelsLoaded() && access !== undefined && filtersRead;
+    const availabilityKnown = catalogLoaded && access !== undefined && filtersRead;
+    // A failed read would leave the picker empty for good, so the user is told and can retry; a read still under way keeps the empty picker.
+    const readFailed = (filtersFailed && !filtersRead) || catalogFailed;
+    // Why the saved list was shown again after a refused save; cleared when the next edit starts.
+    const [conflictNotice, setConflictNotice] = useState(false);
     const { data: userSettings } = useUserSettings();
     const { updateLatest } = useUpdateUserSettings();
     // This list's own save, from the edit until it settles. The mutation's own pending flag is not enough: a write can
@@ -231,7 +239,7 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
         if (focusLost && (targetGone || (target === null && holdsFocus.current))) {
             pickerOrSection?.focus();
         }
-    }, [chosenKey, focusRequest, locked]);
+    }, [chosenKey, focusRequest, locked, readFailed]);
 
     const register = (key: string) => (element: HTMLButtonElement | null) => {
         if (element) {
@@ -248,6 +256,7 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
      */
     const save = (edit: (backupModels: string[]) => string[], focusOnSuccess: string, focusOnFailure: string) => {
         focusAfter.current = focusOnSuccess;
+        setConflictNotice(false);
         setSaving(true);
         updateLatest((current) => {
             const base = storedBackupModels(current);
@@ -256,11 +265,10 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
         })
             .finally(() => setSaving(false))
             .catch((error: unknown) => {
-                toast.error(
-                    (error as { code?: unknown } | null)?.code === "CONFLICT"
-                        ? t`Your backup models were changed in another tab. The saved list is shown again.`
-                        : t`Failed to update backup models`,
-                );
+                const conflict = (error as { code?: unknown } | null)?.code === "CONFLICT";
+
+                toast.error(conflict ? t`Your backup models were changed in another tab. The saved list is shown again.` : t`Failed to update backup models`);
+                setConflictNotice(conflict);
                 focusAfter.current = focusOnFailure;
                 setFocusRequest((count) => count + 1);
             });
@@ -370,7 +378,33 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                     })}
                 </ol>
             )}
-            {chosen.length < limit && (
+            {conflictNotice && (
+                <p className="text-muted-foreground text-xs" role="status">
+                    {t`Your backup models were changed in another tab. The saved list is shown again.`}
+                </p>
+            )}
+            {chosen.length < limit && readFailed && (
+                <div className="flex flex-wrap items-center gap-2" ref={addRow} role="alert">
+                    <p className="text-destructive text-xs">{t`Couldn't load the models you can add.`}</p>
+                    <Button
+                        onClick={() => {
+                            if (filtersFailed && !filtersRead) {
+                                void refetchFilters();
+                            }
+
+                            if (catalogFailed) {
+                                refetchCatalog();
+                            }
+                        }}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                    >
+                        {t`Try again`}
+                    </Button>
+                </div>
+            )}
+            {chosen.length < limit && !readFailed && (
                 <div ref={addRow}>
                     <ModelSelect
                         description={t`Up to ${limit}, tried in the order listed`}
