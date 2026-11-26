@@ -1,5 +1,5 @@
 import type { RefObject } from "react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import { ASIDE_HIGHLIGHTS, clearHighlights, collectRanges, installHighlightStyles, setHighlights } from "@/features/chat/thread/find/highlight";
 import { clampIndex } from "@/features/chat/thread/find/match";
@@ -190,6 +190,13 @@ interface Anchor {
     occurrence: number;
 }
 
+/** The selected hit: its anchor, the flat position it last held, and the navigation that selected it. */
+interface Selection {
+    anchor: Anchor | undefined;
+    navigation: string;
+    position: number;
+}
+
 const anchorAt = (all: Range[], position: number): Anchor => {
     const entryId = entryOf(all[position]);
 
@@ -217,6 +224,9 @@ const useAsideFindHighlights = (
     revealKey: number,
     onMatches: (count: number, position: number) => void,
 ): void => {
+    // Kept across effect re-runs, so reopening the bar or re-showing the Ask tab leaves the selection where the reader had it.
+    const selection = useRef<Selection>({ anchor: undefined, navigation: "", position: 0 });
+
     useEffect(() => {
         if (!active) {
             return undefined;
@@ -236,15 +246,27 @@ const useAsideFindHighlights = (
         let revealTimer: ReturnType<typeof setTimeout> | undefined;
         let applied: Range | undefined;
         let appliedOffset: Offset | undefined;
-        // Seeded from the index the reader stepped to on the first scan, then followed through every later scan.
-        let anchor: Anchor | undefined;
+
+        // A new query or a step selects the hit at `index` afresh. Any other re-run keeps the hit the reader was on.
+        const navigation = JSON.stringify([query, index, revealKey]);
+
+        if (selection.current.navigation !== navigation) {
+            selection.current = { anchor: undefined, navigation, position: index };
+        }
 
         const apply = (): Range | undefined => {
             const all = collectAsideRanges(host, query);
-            const position = (anchor === undefined ? undefined : positionOf(all, anchor)) ?? (all.length > 0 ? clampIndex(index, all.length) : undefined);
+            const state = selection.current;
+            // The hit is followed through the rescan. Once its entry is gone, the selection takes the hit now at the position it last held.
+            const followed = state.anchor === undefined ? undefined : positionOf(all, state.anchor);
+            const position = all.length > 0 ? (followed ?? clampIndex(state.position, all.length)) : undefined;
             const current = position === undefined ? undefined : all[position];
 
-            anchor = position === undefined ? undefined : anchorAt(all, position);
+            if (position !== undefined) {
+                state.position = position;
+                state.anchor = anchorAt(all, position);
+            }
+
             setHighlights(all, current, ASIDE_HIGHLIGHTS);
             onMatches(all.length, position ?? 0);
             applied = current;

@@ -762,4 +762,95 @@ describe("AsidePanel", () => {
             vi.useRealTimers();
         }
     });
+
+    it("keeps the selected hit when the bar is reopened after an earlier entry gains a hit", async () => {
+        vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
+        const b = { answer: "A cat.", id: "b", question: "First", status: "answered", token: "tok-b" } as const;
+        const c = { answer: "A cat.", id: "c", question: "Second", status: "answered", token: "tok-c" } as const;
+
+        useAsideStore.setState({ byThread: { "thread-1": [b, c] } });
+        render(<AsidePanel threadId="thread-1" />);
+
+        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
+        Object.defineProperty(Range.prototype, "getBoundingClientRect", { configurable: true, value: () => rectAt(20) });
+
+        try {
+            act(() => {
+                globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+            });
+            const input = screen.getByRole("textbox", { name: "Find in side questions" });
+
+            fireEvent.change(input, { target: { value: "cat" } });
+            fireEvent.click(screen.getByRole("button", { name: "Next match" }));
+            await settleReveal();
+            expect(within(screen.getByRole("search")).getByRole("status").textContent).toBe("2 of 2");
+
+            // An earlier entry gains a hit, so the selected hit, now third of three, moves down the list.
+            act(() => {
+                useAsideStore.setState({
+                    byThread: { "thread-1": [{ answer: "A cat too.", id: "z", question: "Above?", status: "answered", token: "tok-z" }, b, c] },
+                });
+            });
+            await settleReveal();
+
+            fireEvent.keyDown(input, { key: "Escape" });
+            act(() => {
+                globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+            });
+            await settleReveal();
+
+            expect(within(screen.getByRole("search")).getByRole("status").textContent).toBe("3 of 3");
+        } finally {
+            Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+            Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
+            vi.useRealTimers();
+        }
+    });
+
+    it("selects the hit that follows a dismissed selection, not the hit at its old index", async () => {
+        vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
+        const b = { answer: "A cat.", id: "b", question: "First", status: "answered", token: "tok-b" } as const;
+        const c = { answer: "A cat.", id: "c", question: "Second", status: "answered", token: "tok-c" } as const;
+        const d = { answer: "A cat.", id: "d", question: "Third", status: "answered", token: "tok-d" } as const;
+        const scroll = vi.fn();
+
+        useAsideStore.setState({ byThread: { "thread-1": [b, c, d] } });
+        render(<AsidePanel threadId="thread-1" />);
+
+        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
+        Object.defineProperty(Range.prototype, "getBoundingClientRect", { configurable: true, value: () => rectAt(20) });
+
+        try {
+            act(() => {
+                globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+            });
+            fireEvent.change(screen.getByRole("textbox", { name: "Find in side questions" }), { target: { value: "cat" } });
+            fireEvent.click(screen.getByRole("button", { name: "Next match" }));
+            await settleReveal();
+
+            // An earlier entry gains a hit above the selected one, which moves the selection to third of four.
+            act(() => {
+                useAsideStore.setState({
+                    byThread: { "thread-1": [{ answer: "A cat too.", id: "z", question: "Above?", status: "answered", token: "tok-z" }, b, c, d] },
+                });
+            });
+            await settleReveal();
+            expect(within(screen.getByRole("search")).getByRole("status").textContent).toBe("3 of 4");
+            scroll.mockClear();
+
+            // The selected entry is dismissed. The hit that follows it takes its place, not the one at its old index.
+            act(() => {
+                useAsideStore.setState({
+                    byThread: { "thread-1": [{ answer: "A cat too.", id: "z", question: "Above?", status: "answered", token: "tok-z" }, b, d] },
+                });
+            });
+            await settleReveal();
+            expect(within(screen.getByRole("search")).getByRole("status").textContent).toBe("3 of 3");
+            expect(scroll).not.toHaveBeenCalled();
+        } finally {
+            Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+            Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
+            vi.useRealTimers();
+        }
+    });
 });
