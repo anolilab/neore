@@ -60,6 +60,9 @@ interface Sweep {
     ref: FunctionReference<"mutation", {}, unknown>;
 }
 
+/** Events-log prune batches one housekeeping run may delete (`pruneMcpEvents` deletes 200 per call). */
+const MCP_EVENT_PRUNE_ROUNDS = 10;
+
 /**
  * The sweeps a housekeeping run performs on one shard — the per-user half of
  * `crons.ts`. A function, so the references resolve at use, not at import.
@@ -284,12 +287,13 @@ export const noteRetentionDueAt = async (ctx: CensusCtx, dueAt: number, shardKey
  * A reply's retained rows, expiring at `dueAt`: brings the shard's wake and its retained-rows time forward to it, if either is later (or
  * unset). One census read covers both, where two calls read it twice.
  */
-export const noteRetentionWake = async (ctx: CensusCtx, dueAt: number, shardKey: string | undefined = currentUserShard()): Promise<void> => {
+export const noteRetentionWake = async (ctx: CensusCtx, dueAt: number, shardKey: string | undefined = currentUserShard()): Promise<boolean> => {
     if (shardKey === undefined) {
-        return;
+        return true;
     }
 
-    await bestEffort("noteRetentionWake", async () => {
+    // Whether the wake was written: a caller that must not lose it (the Events log's retry) acts on a failure.
+    return await bestEffort("noteRetentionWake", async () => {
         const row = await censusRow(ctx, shardKey, "primary");
 
         if (!row) {
@@ -565,6 +569,27 @@ export const runShardTick = internalMutation
         const retentionDue = retention.failed || (retention.at !== undefined && retention.at !== NO_RETENTION_DUE && retention.at <= ctx.now);
         // Not yet due: the time is a wake of its own, so the shard is not left with none once this tick's other work is done.
         const retentionLater = !retentionDue && retention.at !== undefined && retention.at !== NO_RETENTION_DUE ? retention.at : undefined;
+
+        // The Events log's expired rows (`public-api/events.ts`), pruned before the retention sweep sets the shard's time, so that time
+        // counts only what is left. A dormant shard gets no housekeeping visit, so its expired events expire here, with its other rows.
+        // One batch in this transaction: a nested mutation shares the tick's read budget, so the rows left are a tick of their own, scheduled
+        // below in a transaction of its own (`eventsLeft`), not looped here.
+        let eventsLeft = false;
+
+        if (retentionDue) {
+            await bestEffort("pruneMcpEvents", async () => {
+                const { hasMore } = await ctx.runMutation(internal.public_api.events.pruneMcpEvents, {});
+
+                eventsLeft = hasMore;
+            });
+        }
+
+        if (eventsLeft && shardKey !== undefined) {
+            await bestEffort("pruneMcpEventsNext", async () => {
+                await runAfterOnShard(ctx.scheduler, 0, internal.public_api.events.pruneMcpEventsBacklog, {}, shardKey);
+            });
+        }
+
         const pruned = retentionDue
             ? await bestEffort("pruneRetainedActivity", async () => {
                   await ctx.runMutation(internal.gdpr.retention.pruneRetainedActivity, {});
@@ -645,8 +670,8 @@ export const runShardTick = internalMutation
         ].filter((at): at is number => at !== undefined);
 
         // The dispatch cleared this shard's due time; a reap, a merge check, a retention prune or an export-run read that failed recorded
-        // no next time, so try again.
-        if (!reaped || !mergesChecked || !pruned || !triggersChecked || exportRunRead === undefined) {
+        // no next time, so try again. So does an Events backlog the rounds above did not finish.
+        if (!reaped || !mergesChecked || !pruned || !triggersChecked || exportRunRead === undefined || eventsLeft) {
             candidates.push(now);
         }
 
@@ -673,6 +698,21 @@ export const runShardHousekeeping = internalAction
             } catch (error) {
                 failed.push(sweep.name);
                 cronsLogger.error(`[housekeeping] ${sweep.name} failed:`, error);
+            }
+        }
+
+        // The Events log's seven-day window (`public-api/events.ts`): one batch per call, so a backlog takes several calls, up to a
+        // bounded number per run. The rest waits for the next run.
+        for (let round = 0; round < MCP_EVENT_PRUNE_ROUNDS; round += 1) {
+            const pruned = await ctx.runMutation(internal.public_api.events.pruneMcpEvents, {}).catch((error: unknown) => {
+                failed.push("pruneMcpEvents");
+                cronsLogger.error("[housekeeping] pruneMcpEvents failed:", error);
+
+                return { hasMore: false };
+            });
+
+            if (!pruned.hasMore) {
+                break;
             }
         }
 

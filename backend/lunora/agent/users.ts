@@ -13,6 +13,7 @@ import { nullable, paginationOptionsValidator } from "../lib/validators";
 import { stream } from "../lib/streams";
 import { deleteFollowRowsOfThread } from "../chat/follows/functions";
 import { eraseThreadPinsAndRoutesBatch } from "../chat/gdpr";
+import { deleteMcpEventsOfThread } from "../public-api/events-log";
 import { deleteMessage } from "./messages";
 import { revokeThreadGrants } from "./sharing";
 import { deleteStreamsPageForThreadId } from "./streams";
@@ -231,8 +232,10 @@ async function deletePageForUserId(context: MutationContext, args: DeleteAllArgs
     // goes once none of those are left (`chat/gdpr.ts`: a collaborator's pins are stored on this shard).
     const threadDrained = streamResult.isDone && (await deleteFollowRowsOfThread(context, threadInProgress!));
     const pinsBatch = threadDrained ? await eraseThreadPinsAndRoutesBatch(context, threadInProgress!) : { hasMore: true };
+    // The thread's Events go with it (`public-api/events-log.ts`), one batch per call, as its follow rows and pins do.
+    const eventsGone = threadDrained && !pinsBatch.hasMore && (await deleteMcpEventsOfThread(context, args.userId, threadInProgress!));
 
-    if (threadDrained && !pinsBatch.hasMore) {
+    if (threadDrained && !pinsBatch.hasMore && eventsGone) {
         await context.db.delete("threads", threadInProgress);
         // Grants and revisions written after the cascade erased this chat's (an invite accepted in between) go with it.
         // The cascade deleted its invites first; only an acceptance already past its invite check can land after this.

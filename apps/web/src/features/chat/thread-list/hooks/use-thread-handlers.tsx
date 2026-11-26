@@ -103,7 +103,7 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
     const { mutateAsync: pinThreadMutation } = useMutation(crpc.chat.functions.pinThread.mutationOptions());
     const { mutateAsync: unpinThreadMutation } = useMutation(crpc.chat.functions.unpinThread.mutationOptions());
     const { mutateAsync: updateThreadAction } = useMutation(useLunoraActionOptions(api.chat.functions.updateThread));
-    const { mutateAsync: undoDeleteThreadMutation } = useMutation(crpc.chat.functions.undoDeleteThread.mutationOptions());
+    const { mutateAsync: undoDeleteThreadMutation } = useMutation(useLunoraActionOptions(api.chat.functions.undoDeleteThread));
     const { mutateAsync: deleteThreadsMutation } = useMutation(crpc.chat.functions.deleteThreads.mutationOptions());
 
     const handleUndoDeleteThread = useCallback(

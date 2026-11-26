@@ -4285,12 +4285,12 @@ export const hardDeleteThread = internalMutation
         return null;
     });
 
-export const undoDeleteThread = authMutation
+export const undoDeleteThread = authAction
     .use(rateLimit("chat/update"))
     .input({
         threadId: v.id("threads"),
     })
-    .mutation(async ({ args: { threadId }, ctx: context }) => {
+    .action(async ({ args: { threadId }, ctx: context }) => {
         refuseImpersonation(context.user.impersonatedBy, "A chat cannot be restored from the trash");
 
         const { userId } = context.user;
@@ -4302,27 +4302,32 @@ export const undoDeleteThread = authMutation
             throwForbidden("Not allowed");
         }
 
-        await context.runMutation(internal.agent.threads.restoreThread, {
+        // The trashed chat's leftover events go first, one batch per `runMutation`. This is an action, so each call is its own
+        // transaction and the batches do not share a budget. Restore then refuses while any events remain (`agent/threads.ts`).
+        while (!(await context.runMutation(internal.public_api.events.drainTrashedThreadEvents, { threadId, userId }))) {
+            // Each call removes up to one batch; the loop ends once none are left.
+        }
+
+        const restore = await context.runMutation(internal.agent.threads.restoreThread, {
             threadId: threadId as Id<"threads">,
         });
 
-        // Record audit history for restore
-        const restoredThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
-
-        if (restoredThread) {
+        // Only the call that changed the chat from trashed to live records the restore: an overlapping undo finds it live already. The
+        // history's old state is the row that call read, not this action's earlier snapshot.
+        if (restore.restored) {
             await context.runMutation(internal.lib.document_history.recordHistory, {
                 attribution: { action: "update", metadata: { restored: true }, source: "manual" },
-                doc: restoredThread,
+                doc: restore.thread,
                 documentId: threadId,
                 isDeleted: false,
-                oldDoc: thread,
-                organizationId: restoredThread.organizationId ?? undefined,
+                oldDoc: restore.before,
+                organizationId: restore.thread.organizationId ?? undefined,
                 tableName: "threads",
                 userId,
             });
         }
 
-        context.log.event("chat.undo_delete_thread", { restored: true });
+        context.log.event("chat.undo_delete_thread", { restored: restore.restored });
     });
 
 // Tag functions removed — replaced by auto-categorization.
