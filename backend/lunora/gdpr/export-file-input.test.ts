@@ -18,4 +18,10 @@ describe("generateExportFile input", () => {
     it("still refuses a page count that is not a number", () => {
         expect(() => args.grantRevisionPages!.parse("3")).toThrow();
     });
+
+    it("accepts a replay stored before the suggestion page count existed, and refuses a count that is not a number", () => {
+        expect(() => args.taskSuggestionPages!.parse(undefined)).not.toThrow();
+        expect(() => args.taskSuggestionsCut!.parse(undefined)).not.toThrow();
+        expect(() => args.taskSuggestionPages!.parse("3")).toThrow();
+    });
 });

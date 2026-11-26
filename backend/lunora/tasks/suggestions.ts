@@ -211,6 +211,11 @@ export const insertTaskSuggestions = internalMutation
  * was turned back on is newer than the cutoff and stays. The index sorts by status before time, so each status is
  * read with its own bound on `createdAt`: newer rows of one status never hide older rows of the next. A call that
  * filled its batch queues the next one.
+ *
+ * The cutoff is inclusive (`lte`) on purpose: a suggestion stored in the same millisecond as the opt-out was stored
+ * before it, and a strict bound would leave it behind after the person switched the feature off. The opposite case
+ * (a suggestion stored after a re-enable in that same millisecond) needs a save, a second save and a generation job
+ * to all commit within one millisecond, and costs one idea, which the next run proposes again.
  */
 export const eraseUserTaskSuggestions = internalMutation
     .input({ before: v.number(), userId: v.string() })

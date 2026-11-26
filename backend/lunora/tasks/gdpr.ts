@@ -8,9 +8,14 @@
  * the residual steps' contract (`gdpr/steps/residual-deletion-steps.ts`): at most
  * `BATCH` rows per table per call, `{ hasMore }` back, idempotent on retry.
  */
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
-import { internalMutation, internalQuery } from "../_generated/server";
+import { internal } from "../_generated/internal";
+import { internalAction, internalMutation, internalQuery } from "../_generated/server";
+import { browserExportUserPrefix } from "../browser/export-pages";
+import { withDependency } from "../lib/dependency";
+import { MAX_LENGTH } from "../lib/validators";
+import { TASK_SUGGESTIONS_EXPORT_PAGE, taskSuggestionsPageFileBytes } from "./export-pages";
 import { MAX_GOALS_PER_USER, MAX_TASKS_PER_USER } from "./logic";
 
 const BATCH = 100;
@@ -18,8 +23,8 @@ const BATCH = 100;
 /** Runs per task in the export — the newest; older ones are history, not the task. */
 const EXPORT_RUNS_PER_TASK = 50;
 
-/** Suggestions per export step: the workflow persists each step's result, so a page stays small and a long history takes more steps. */
-const EXPORT_SUGGESTIONS_PAGE = 100;
+/** The most a stored suggestion page can be: {@link TASK_SUGGESTIONS_EXPORT_PAGE} rows of at most 20,000 characters each, in the worst JSON escaping, with room. */
+const SUGGESTIONS_PAGE_MAX_BYTES = 2 * 1024 * 1024;
 
 export const collectTasksForExport = internalQuery
     .input({ userId: v.string() })
@@ -61,8 +66,9 @@ export const collectTasksForExport = internalQuery
 
 /**
  * One page of the user's suggestions, every status (decided ones stay until the switch is turned off, so a long
- * history is more than one page). `cursor` is `null` on the last page; the workflow walks them
- * (`collectAllTaskSuggestions`).
+ * history is more than one page), the pending ones first: the index sorts by status, and a history cut for its size
+ * loses its oldest rows, never the live ones. `cursor` is `null` on the last page. A page is few rows
+ * ({@link TASK_SUGGESTIONS_EXPORT_PAGE}) because each can hold 20,000 characters of instructions.
  */
 export const collectTaskSuggestionsForExport = internalQuery
     .input({ cursor: v.optional(v.union(v.string(), v.null())), userId: v.string() })
@@ -71,9 +77,59 @@ export const collectTaskSuggestionsForExport = internalQuery
         const page = await ctx.db
             .query("taskSuggestions")
             .withIndex("by_user_and_status_and_createdAt", (q) => q.eq("userId", userId))
-            .paginate({ cursor: cursor ?? null, numItems: EXPORT_SUGGESTIONS_PAGE });
+            .order("desc")
+            .paginate({ cursor: cursor ?? null, numItems: TASK_SUGGESTIONS_EXPORT_PAGE });
 
         return { cursor: page.isDone ? null : page.continueCursor, taskSuggestions: page.page };
+    });
+
+/**
+ * One page of the suggestions ({@link collectTaskSuggestionsForExport}), read in this action's own query and stored at `key`
+ * (`export-pages.ts#taskSuggestionsExportPageKey`); only its size in the file and its `next` cursor go back to the workflow, so no
+ * step result or dispatch body carries the rows. As `agent/gdpr.ts#storeGrantRevisionsExportPage`: nothing is stored once the run
+ * has stopped (`usage/gdpr.ts#exportRunStopped`), and a page whose write ends after it stopped is deleted again.
+ */
+export const storeTaskSuggestionsExportPage = internalAction
+    .input({
+        cursor: v.optional(v.string()),
+        key: v.string(),
+        runKey: v.string().max(MAX_LENGTH.key),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.object({ bytes: v.number(), next: v.optional(v.string()) }))
+    .action(async ({ args: { cursor, key, runKey, userId }, ctx }) => {
+        // Only ever under the user's own export prefix: a key anywhere else would write another account's object.
+        if (!key.startsWith(browserExportUserPrefix(userId))) {
+            throw new LunoraError("FORBIDDEN", "A suggestion page belongs under the user's own export prefix");
+        }
+
+        const stopIfRunStopped = async (): Promise<void> => {
+            if ((await ctx.runQuery(internal.usage.gdpr.exportRunStopped, { runKey, userId })) !== true) {
+                return;
+            }
+
+            await withDependency("file storage", () => ctx.storage.delete(key));
+
+            throw new LunoraError("CONFLICT", "The export has stopped: its request ended or the account's deletion is underway");
+        };
+
+        await stopIfRunStopped();
+
+        const page = (await ctx.runQuery(internal.tasks.gdpr.collectTaskSuggestionsForExport, { ...(cursor !== undefined && { cursor }), userId })) as {
+            cursor: string | null;
+            taskSuggestions: unknown[];
+        };
+        const blob = new Blob([JSON.stringify({ taskSuggestions: page.taskSuggestions })], { type: "application/json" });
+
+        await withDependency("file storage", () =>
+            ctx.storage.store(key, blob, { allowedContentTypes: ["application/json"], contentType: "application/json", maxSize: SUGGESTIONS_PAGE_MAX_BYTES }),
+        );
+
+        await stopIfRunStopped();
+
+        const bytes = taskSuggestionsPageFileBytes(page.taskSuggestions);
+
+        return page.cursor === null ? { bytes } : { bytes, next: page.cursor };
     });
 
 export const deleteUserTasks = internalMutation

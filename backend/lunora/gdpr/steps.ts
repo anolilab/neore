@@ -21,6 +21,7 @@ import { callOnShard } from "../lib/cross-shard";
 import { collectOrganizationReplyPages } from "../usage/organization";
 import { collectAcpSessionPages } from "../acp/gdpr";
 import { BROWSER_EXPORT_BYTES, browserExportPageKey, readAllBrowserPages } from "../browser/export-pages";
+import { readAllTaskSuggestionPages, TASK_SUGGESTIONS_EXPORT_BYTES, taskSuggestionsExportPageKey } from "../tasks/export-pages";
 import { collectAllFeedback } from "../feedback/gdpr";
 import { collectAllTriggers } from "../triggers/export-pages";
 import { attachProjectRuleFiles, collectAllOwnedProjects, collectAllRepositories } from "../projects/export-pages";
@@ -770,6 +771,10 @@ export const generateExportFile = internalAction
         // Goals and tasks with their run history (`tasks/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
         tasks: v.optional(v.any()),
+        // How many suggestion pages the workflow stored under `browserPrefix` (`tasks/export-pages.ts`), read here, and whether the
+        // history went on past its page cap. Optional so a step queued with an earlier signature still validates: absent is no page.
+        taskSuggestionPages: v.optional(v.number()),
+        taskSuggestionsCut: v.optional(v.boolean()),
         // Optional so an export workflow already in flight when this shipped
         // still replays against the new signature.
         threadTags: v.optional(v.any()),
@@ -884,6 +889,23 @@ export const generateExportFile = internalAction
                       async (page) => await readStoredText(context.storage, grantRevisionsExportPageKey(browserPrefix, page), { maxBytes: MAX_EXPORT_BYTES }),
                       grantRevisionPages,
                   );
+        const taskSuggestionPages = args.taskSuggestionPages ?? 0;
+
+        // The task suggestions, every page the workflow stored under the run's prefix (`tasks/export-pages.ts`), read from their objects.
+        // A count of pages with nowhere to read them from fails the export rather than writing it without them.
+        if (browserPrefix === undefined && taskSuggestionPages > 0) {
+            throw new Error("The task suggestions' pages were stored without a prefix to read them from");
+        }
+
+        const suggestions =
+            browserPrefix === undefined
+                ? { cut: false, taskSuggestions: [] }
+                : await readAllTaskSuggestionPages(
+                      async (page) => await readStoredText(context.storage, taskSuggestionsExportPageKey(browserPrefix, page), { maxBytes: MAX_EXPORT_BYTES }),
+                      taskSuggestionPages,
+                      TASK_SUGGESTIONS_EXPORT_BYTES,
+                      args.taskSuggestionsCut === true,
+                  );
         const browser =
             browserPrefix === undefined || browserPages === undefined
                 ? { actions: [], extensions: [], humanChecks: [], sessions: [] }
@@ -966,7 +988,8 @@ export const generateExportFile = internalAction
             settings: args.settings,
             sharedThreadPins: args.sharedThreadPins ?? [],
             subAgentRuns: activity?.subAgentRuns ?? [],
-            tasks: args.tasks ?? { goals: [], tasks: [] },
+            // `taskSuggestionsCut`: the suggestion history passed its share of the file, and the oldest decided ones are left out.
+            tasks: { ...(args.tasks ?? { goals: [], tasks: [] }), taskSuggestions: suggestions.taskSuggestions, taskSuggestionsCut: suggestions.cut },
             threadFollows: threadFollows.section,
             threadTags: args.threadTags ?? [],
             triggers: { triggers: triggers.triggers },

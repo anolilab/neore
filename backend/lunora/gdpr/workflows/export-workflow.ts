@@ -27,7 +27,7 @@ import type { BrowserExportCursor } from "../../browser/gdpr";
 import { browserExportPageKey, browserExportPrefix, storeAllBrowserPages } from "../../browser/export-pages";
 import { GrantRevisionsExportError, grantRevisionsExportPageKey, storeAllGrantRevisionPages } from "../../agent/export-pages";
 import { collectAllGuides, collectAllPullRequestThreads, collectAllReviewDrafts } from "../../source-control/export-pages";
-import { collectAllTaskSuggestions } from "../../tasks/export-pages";
+import { storeAllTaskSuggestionPages, taskSuggestionsExportPageKey } from "../../tasks/export-pages";
 import { clearUsagePieces, collectUsageExport, UsageExportError, type UsageExportIo, type UsagePageSummary, usageObjectKey } from "../usage-export-steps";
 
 export interface ExportParams {
@@ -266,16 +266,6 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                 "collect-tasks",
                 async () => await context.run(internal.tasks.gdpr.collectTasksForExport, { userId }, { dedupId: stepDedupId(scope, "collect-tasks") }),
             );
-            // A page per step, like the review drafts: the first step is "collect-task-suggestions".
-            const taskSuggestions = await collectAllTaskSuggestions(async (cursor, page) => {
-                const name = page === 0 ? "collect-task-suggestions" : `collect-task-suggestions-${String(page)}`;
-
-                return await context.step.do(
-                    name,
-                    async () =>
-                        await context.run(internal.tasks.gdpr.collectTaskSuggestionsForExport, { cursor, userId }, { dedupId: stepDedupId(scope, name) }),
-                );
-            });
             const memories = await context.step.do(
                 "collect-memories",
                 async () => await context.run(internal.memory.gdpr.collectMemoriesForExport, { userId }, { dedupId: stepDedupId(scope, "collect-memories") }),
@@ -422,6 +412,23 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                 )) as { next?: string };
             });
 
+            // The user's task suggestions, every status: a page per step, each stored under the run's prefix as the browser pages are
+            // (`tasks/export-pages.ts`), so no step result or dispatch body carries the history. Held to its share of the file: past it
+            // the section is cut and says so (the pending ones come first), and the rest of the export is written.
+            const { cut: taskSuggestionsCut, pages: taskSuggestionPages } = await storeAllTaskSuggestionPages(async (cursor, page) => {
+                const name = `collect-task-suggestions-${String(page)}`;
+
+                return (await context.step.do(
+                    name,
+                    async () =>
+                        await context.run(
+                            internal.tasks.gdpr.storeTaskSuggestionsExportPage,
+                            { ...(cursor !== undefined && { cursor }), key: taskSuggestionsExportPageKey(browserPrefix, page), runKey: scope, userId },
+                            { dedupId: stepDedupId(scope, name) },
+                        ),
+                )) as { bytes?: number; next?: string };
+            });
+
             await progress({ currentStep: "collecting_usage", progress: 70 });
             const collected = await collectUsageExport(usageIo);
 
@@ -474,7 +481,9 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                             runWebhooks,
                             settings,
                             sharedThreadPins,
-                            tasks: { ...(tasks as Record<string, unknown>), taskSuggestions },
+                            tasks,
+                            taskSuggestionPages,
+                            taskSuggestionsCut,
                             threadTags,
                             usageKey,
                             userEmail,

@@ -3,15 +3,19 @@
  * accept — which creates exactly one task, once, for the owner's pending row. Dismiss, ownership, the server-only
  * insert, the erase and the GDPR export and deletion are pinned here too.
  */
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { browserExportPrefix } from "../browser/export-pages";
 import schema from "../schema";
-import { collectTaskSuggestionsForExport, deleteUserTasks } from "./gdpr";
-import { collectAllTaskSuggestions } from "./export-pages";
+import {
+    readAllTaskSuggestionPages,
+    storeAllTaskSuggestionPages,
+    TASK_SUGGESTIONS_EXPORT_BYTES,
+    TASK_SUGGESTIONS_EXPORT_PAGES,
+    taskSuggestionsExportPageKey,
+} from "./export-pages";
+import { collectTaskSuggestionsForExport, deleteUserTasks, storeTaskSuggestionsExportPage } from "./gdpr";
 import { MAX_PENDING_SUGGESTIONS, TASK_SCHEDULE_MAX } from "./logic";
 import { acceptTaskSuggestion, dismissTaskSuggestion, eraseUserTaskSuggestions, insertTaskSuggestions, listTaskSuggestions } from "./suggestions";
 
@@ -100,10 +104,63 @@ const seedSuggestion = async (userId: string, fields: Record<string, unknown>): 
     });
 };
 
-const exportSuggestions = async (userId: string): Promise<any[]> =>
-    (await collectAllTaskSuggestions(
-        async (cursor) => await harness.run(async (ctx: any) => await ctx.runQuery(collectTaskSuggestionsForExport, { cursor, userId })),
-    )) as any[];
+type Handler = { handler: (ctx: unknown, args: unknown) => Promise<unknown> };
+
+const RUN = "request-1:instance-1";
+const ONE_MIB = 1024 * 1024;
+
+/** What the export workflow does with the suggestions: every page read through the real query, stored as an object, and read back. */
+const exportThroughStorage = async (userId: string, { stopped = false }: { stopped?: boolean } = {}) => {
+    const objects = new Map<string, string>();
+    const results: unknown[] = [];
+    const queried: unknown[] = [];
+    const prefix = browserExportPrefix(userId, RUN);
+    const ctx = {
+        runQuery: async (_reference: unknown, args: Record<string, unknown>) => {
+            if ("runKey" in args) {
+                return stopped;
+            }
+
+            const page = await harness.run(async (context: any) => await context.runQuery(collectTaskSuggestionsForExport, args));
+
+            queried.push(page);
+
+            return page;
+        },
+        storage: {
+            delete: async (key: string) => objects.delete(key),
+            store: async (key: string, blob: Blob) => {
+                objects.set(key, await blob.text());
+            },
+        },
+    };
+    const walked = await storeAllTaskSuggestionPages(async (cursor, page) => {
+        const result = (await (storeTaskSuggestionsExportPage as unknown as Handler).handler(ctx, {
+            ...(cursor !== undefined && { cursor }),
+            key: taskSuggestionsExportPageKey(prefix, page),
+            runKey: RUN,
+            userId,
+        })) as { bytes?: number; next?: string };
+
+        results.push(result);
+
+        return result;
+    });
+    const read = await readAllTaskSuggestionPages(
+        async (page) => objects.get(taskSuggestionsExportPageKey(prefix, page))!,
+        walked.pages,
+        TASK_SUGGESTIONS_EXPORT_BYTES,
+        walked.cut,
+    );
+
+    return { cut: read.cut, objects, queried, results, rows: read.taskSuggestions as any[] };
+};
+
+const exportSuggestions = async (userId: string): Promise<any[]> => {
+    const { rows } = await exportThroughStorage(userId);
+
+    return rows;
+};
 
 const pendingId = async (userId: string): Promise<string> => {
     const rows = await rowsOf("taskSuggestions", userId);
@@ -401,6 +458,93 @@ describe("GDPR", () => {
         expect(await exportSuggestions(A)).toHaveLength(1050);
     });
 
+    it("lists the pending suggestions first, so a history cut for its size loses the oldest decided ones", async () => {
+        await seedSuggestion(A, { createdAt: 1, status: "accepted", title: "Accepted" });
+        await seedSuggestion(A, { createdAt: 2, status: "dismissed", title: "Dismissed" });
+        await seedSuggestion(A, { createdAt: 3, status: "pending", title: "Pending" });
+
+        const rows = await exportSuggestions(A);
+
+        expect(rows.map((row) => row.title)).toStrictEqual(["Pending", "Dismissed", "Accepted"]);
+    });
+
+    it("keeps a page of the largest rows under 1 MiB, even when every character is escaped to six bytes", async () => {
+        const worst = "\u{1}".repeat(20_000);
+
+        for (let index = 0; index < 20; index += 1) {
+            await seedSuggestion(A, { createdAt: index, instructions: worst, title: "\u{1}".repeat(200) });
+        }
+
+        const { queried, rows } = await exportThroughStorage(A);
+
+        expect(rows).toHaveLength(20);
+
+        for (const page of queried as { taskSuggestions: unknown[] }[]) {
+            expect(page.taskSuggestions.length).toBeLessThanOrEqual(8);
+            expect(new TextEncoder().encode(JSON.stringify(page)).byteLength).toBeLessThan(ONE_MIB);
+        }
+    });
+
+    it("exports a history of more than 1 MiB whole, through pages that each stay under it", async () => {
+        for (let index = 0; index < 100; index += 1) {
+            await seedSuggestion(A, { createdAt: index, instructions: "x".repeat(20_000), status: index % 2 === 0 ? "dismissed" : "accepted" });
+        }
+
+        const { cut, objects, results, rows } = await exportThroughStorage(A);
+        const stored = [...objects.values()].map((text) => new TextEncoder().encode(text).byteLength);
+
+        expect(rows).toHaveLength(100);
+        expect(cut).toBe(false);
+        // More than a step result or a dispatch body may carry, yet no page is, and no step result carries a row.
+        expect(stored.reduce((total, size) => total + size, 0)).toBeGreaterThan(ONE_MIB);
+        expect(Math.max(...stored)).toBeLessThan(ONE_MIB);
+        expect(JSON.stringify(results).length).toBeLessThan(10_000);
+    });
+
+    it("cuts a history that passes its share of the file or its page cap, and says so", async () => {
+        const never = async () => {
+            return { next: "more" };
+        };
+
+        expect(await storeAllTaskSuggestionPages(never)).toStrictEqual({ cut: true, pages: TASK_SUGGESTIONS_EXPORT_PAGES });
+        // The page that would pass the share is not counted, and none is stored after it.
+        expect(
+            await storeAllTaskSuggestionPages(async () => {
+                return { bytes: TASK_SUGGESTIONS_EXPORT_BYTES / 2 + 1, next: "more" };
+            }),
+        ).toStrictEqual({
+            cut: true,
+            pages: 1,
+        });
+        expect(
+            await storeAllTaskSuggestionPages(async () => {
+                return { bytes: 10 };
+            }),
+        ).toStrictEqual({ cut: false, pages: 1 });
+        expect(await readAllTaskSuggestionPages(async () => JSON.stringify({ taskSuggestions: [{ instructions: "x".repeat(100) }] }), 3, 300)).toMatchObject({
+            cut: true,
+            taskSuggestions: [expect.anything(), expect.anything()],
+        });
+    });
+
+    it("stores nothing once the export has stopped, and nothing outside the user's own prefix", async () => {
+        await seedSuggestion(A, {});
+
+        const stopped = exportThroughStorage(A, { stopped: true });
+
+        await expect(stopped).rejects.toThrow("The export has stopped");
+
+        const ctx = { runQuery: async () => false, storage: { delete: async () => true, store: async () => undefined } };
+
+        await expect(
+            (storeTaskSuggestionsExportPage as unknown as Handler).handler(ctx, {
+                key: taskSuggestionsExportPageKey(browserExportPrefix(B, RUN), 0),
+                runKey: RUN,
+                userId: A,
+            }),
+        ).rejects.toThrow("own export prefix");
+    });
+
     it("deletes the user's suggestions with their tasks, past one batch, and nobody else's", async () => {
         await setSwitch(A, true);
         await setSwitch(B, true);
@@ -429,16 +573,5 @@ describe("GDPR", () => {
 
         expect(await rowsOf("taskSuggestions", A)).toHaveLength(0);
         expect(await rowsOf("taskSuggestions", B)).toHaveLength(1);
-    });
-});
-
-describe("suggestions in the export workflow", () => {
-    // Read from source: the workflow needs a Cloudflare Workflows runtime to run.
-    it("collects them page by page and hands them to the export file with the tasks", () => {
-        const source = readFileSync(join(import.meta.dirname, "../gdpr/workflows/export-workflow.ts"), "utf8");
-
-        expect(source).toContain('"collect-task-suggestions"');
-        expect(source).toContain("internal.tasks.gdpr.collectTaskSuggestionsForExport");
-        expect(source).toContain("tasks: { ...(tasks as Record<string, unknown>), taskSuggestions }");
     });
 });
