@@ -229,6 +229,11 @@ export const createControlSession = ({
             // failed keeps it, so a lease left on the server is still the phone's own).
             await releasing;
 
+            // Left or suspended while that hand back was out: nothing is asked for.
+            if (mine !== attempt) {
+                return;
+            }
+
             const answer = await withCatch(async () => await api.take(lastClaim), () => undefined);
 
             if (mine !== attempt) {

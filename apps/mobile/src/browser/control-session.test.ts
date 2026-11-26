@@ -247,4 +247,33 @@ describe(createControlSession, () => {
         await retaking;
         expect(take).toHaveBeenLastCalledWith(undefined);
     });
+
+    it("asks for nothing when the screen is left while a hand back it waited for was still out", async () => {
+        const handBack = Promise.withResolvers<boolean>();
+        const take = vi.fn(async () => OK);
+        const session = createControlSession({
+            api: {
+                handBack: vi.fn(async () => await handBack.promise),
+                keep: vi.fn(async () => null),
+                navigate: vi.fn(async () => {
+                    return { status: "ok" as const };
+                }),
+                take,
+            },
+            every: () => () => {},
+            onChange: () => {},
+        });
+
+        await session.take();
+        session.release("left");
+
+        const retaking = session.take();
+
+        session.release("left");
+        handBack.resolve(true);
+        await retaking;
+
+        expect(take).toHaveBeenCalledTimes(1);
+        expect(session.state()).toStrictEqual({ kind: "idle" });
+    });
 });
