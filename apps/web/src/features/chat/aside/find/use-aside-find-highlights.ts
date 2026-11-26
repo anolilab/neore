@@ -304,6 +304,9 @@ const useAsideFindHighlights = (
 
                 if (appeared || moved) {
                     scheduleReveal();
+                } else if (!isSameHit(before, applied)) {
+                    // The selected hit was replaced, so a reveal still pending for the old one must not scroll to the replacement.
+                    clearTimeout(revealTimer);
                 }
             });
         };

@@ -763,6 +763,46 @@ describe("AsidePanel", () => {
         }
     });
 
+    it("does not scroll to the hit that replaces a dismissed selection while its reveal is still pending", async () => {
+        vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
+        const hitTop = 20;
+        const scroll = vi.fn();
+        const answered = { answer: "A cat.", id: "a", question: "Why?", status: "answered", token: "tok" } as const;
+
+        useAsideStore.setState({ byThread: { "thread-1": [answered] } });
+        render(<AsidePanel threadId="thread-1" />);
+
+        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
+        Object.defineProperty(Range.prototype, "getBoundingClientRect", {
+            configurable: true,
+            value: function rectOfHit(this: Range) {
+                // eslint-disable-next-line unicorn/no-this-outside-of-class -- the rect depends on which range is asked, which only the receiver says
+                return rectAt(this.startContainer.textContent?.includes("too") ? 900 : hitTop);
+            },
+        });
+
+        try {
+            act(() => {
+                globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+            });
+            // The query schedules a reveal for the hit in "a", which is out of sight, and it has not run yet.
+            fireEvent.change(screen.getByRole("textbox", { name: "Find in side questions" }), { target: { value: "cat" } });
+
+            // Before that reveal runs, the entry is dismissed and its place is taken by a hit far below.
+            await act(async () => {
+                useAsideStore.setState({
+                    byThread: { "thread-1": [{ answer: "A cat too.", id: "z", question: "Below?", status: "answered", token: "tok-z" }] },
+                });
+            });
+            await settleReveal();
+            expect(scroll).not.toHaveBeenCalled();
+        } finally {
+            Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+            Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
+            vi.useRealTimers();
+        }
+    });
+
     it("keeps the selected hit when the bar is reopened after an earlier entry gains a hit", async () => {
         vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
         const b = { answer: "A cat.", id: "b", question: "First", status: "answered", token: "tok-b" } as const;
