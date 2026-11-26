@@ -2,7 +2,7 @@ import { CONTROL_KEEP_INTERVAL_MS, CONTROL_LEASE_MS } from "@neore/client-runtim
 import { describe, expect, it, vi } from "vitest";
 
 import type { ControlApi, ControlState } from "./control-session";
-import { CONTROL_ELSEWHERE, CONTROL_ENDED, CONTROL_OFFLINE, createControlSession, rememberClaim, rememberedClaim } from "./control-session";
+import { CONTROL_ELSEWHERE, CONTROL_ENDED, CONTROL_OFFLINE, createControlSession, forgetClaim, rememberClaim, rememberedClaim } from "./control-session";
 
 const NOW = 1_000_000;
 const OK = { claim: "c-1", claimId: "id-1", connectBy: NOW, status: "ok" as const, until: NOW + CONTROL_LEASE_MS, url: "https://live.test/v" };
@@ -75,6 +75,32 @@ describe(createControlSession, () => {
         expect(session.state()).toStrictEqual({ kind: "idle" });
     });
 
+    it("remembers a claim whose answer came after the phone went offline, so a hand back that could not go out never locks it out", async () => {
+        const late = Promise.withResolvers<typeof OK>();
+        const onClaim = vi.fn();
+        const onReleased = vi.fn();
+        const api: ControlApi = {
+            handBack: vi.fn(async () => {
+                throw new TypeError("Network request failed");
+            }),
+            keep: vi.fn(async () => null),
+            navigate: vi.fn(async () => {
+                return { status: "ok" as const };
+            }),
+            take: vi.fn(async () => await late.promise),
+        };
+        const session = createControlSession({ api, every: () => () => {}, onChange: () => {}, onClaim, onReleased });
+        const taking = session.take();
+
+        session.suspend();
+        late.resolve(OK);
+        await taking;
+
+        expect(onClaim).toHaveBeenCalledWith("c-1");
+        await vi.waitFor(() => expect(api.handBack).toHaveBeenCalledWith("c-1", "left"));
+        expect(onReleased).not.toHaveBeenCalled();
+    });
+
     it("gives back a claim whose answer came after the screen went", async () => {
         const late = Promise.withResolvers<typeof OK>();
         const { api, session } = setup({ take: vi.fn(async () => await late.promise) });
@@ -127,6 +153,7 @@ describe(createControlSession, () => {
 
     it("names the claim a screen opened before held, so its own leftover lease is not refused as another window's", async () => {
         const onClaim = vi.fn();
+        const onReleased = vi.fn();
         const api: ControlApi = {
             handBack: vi.fn(async () => true),
             keep: vi.fn(async () => null),
@@ -135,14 +162,14 @@ describe(createControlSession, () => {
             }),
             take: vi.fn(async () => OK),
         };
-        const session = createControlSession({ api, every: () => () => {}, lastClaim: "c-0", onChange: () => {}, onClaim });
+        const session = createControlSession({ api, every: () => () => {}, lastClaim: "c-0", onChange: () => {}, onClaim, onReleased });
 
         await session.take();
         expect(api.take).toHaveBeenCalledWith("c-0");
         expect(onClaim).toHaveBeenLastCalledWith("c-1");
 
         session.release("handed_back");
-        await vi.waitFor(() => expect(onClaim).toHaveBeenLastCalledWith(undefined));
+        await vi.waitFor(() => expect(onReleased).toHaveBeenCalledWith("c-1"));
     });
 
     it("keeps the claim per account and thread across screens until it is handed back", () => {
@@ -150,7 +177,12 @@ describe(createControlSession, () => {
         expect(rememberedClaim("u:t")).toBe("c-1");
         expect(rememberedClaim("u:other")).toBeUndefined();
 
-        rememberClaim("u:t", undefined);
+        // A late hand back of an older claim leaves the newer one remembered since.
+        rememberClaim("u:t", "c-2");
+        forgetClaim("u:t", "c-1");
+        expect(rememberedClaim("u:t")).toBe("c-2");
+
+        forgetClaim("u:t", "c-2");
         expect(rememberedClaim("u:t")).toBeUndefined();
     });
 });

@@ -49,11 +49,14 @@ const heldClaims = new Map<string, string>();
 
 export const rememberedClaim = (key: string): string | undefined => heldClaims.get(key);
 
-export const rememberClaim = (key: string, claim: string | undefined): void => {
-    if (claim === undefined) {
+export const rememberClaim = (key: string, claim: string): void => {
+    heldClaims.set(key, claim);
+};
+
+/** Forgets `claim` once it was handed back, unless a newer claim was remembered since. */
+export const forgetClaim = (key: string, claim: string): void => {
+    if (heldClaims.get(key) === claim) {
         heldClaims.delete(key);
-    } else {
-        heldClaims.set(key, claim);
     }
 };
 
@@ -67,14 +70,17 @@ export const createControlSession = ({
     lastClaim: initialClaim,
     onChange,
     onClaim = () => {},
+    onReleased = () => {},
 }: {
     api: ControlApi;
     every?: (ms: number, run: () => void) => () => void;
     /** The claim this phone last held on the thread, kept across screens: see {@link rememberClaim}. */
     lastClaim?: string;
     onChange: (state: ControlState) => void;
-    /** A claim taken (its value), or handed back (`undefined`). */
-    onClaim?: (claim: string | undefined) => void;
+    /** A claim taken. */
+    onClaim?: (claim: string) => void;
+    /** A claim handed back: only that claim is forgotten, never a newer one taken since. */
+    onReleased?: (claim: string) => void;
 }): ControlSession => {
     let state: ControlState = { kind: "idle" };
     let stopKeeping: (() => void) | undefined;
@@ -157,7 +163,7 @@ export const createControlSession = ({
             stop();
             settleQuietly(async () => {
                 if (await api.handBack(claim, reason)) {
-                    onClaim(undefined);
+                    onReleased(claim);
                 }
             });
         },
@@ -186,8 +192,17 @@ export const createControlSession = ({
 
             if (mine !== attempt) {
                 // Suspended or left meanwhile: a claim that came back anyway is given back at once.
+                // Remembered first: a hand back that cannot go out (offline) leaves a lease the next take must name.
                 if (answer?.status === "ok") {
-                    settleQuietly(api.handBack(answer.claim, "left"));
+                    const { claim } = answer;
+
+                    lastClaim = claim;
+                    onClaim(claim);
+                    settleQuietly(async () => {
+                        if (await api.handBack(claim, "left")) {
+                            onReleased(claim);
+                        }
+                    });
                 }
 
                 return;

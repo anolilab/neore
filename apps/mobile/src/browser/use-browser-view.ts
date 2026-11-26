@@ -12,8 +12,9 @@ import { handBackBrowser, keepBrowserControl, navigateBrowser, readBrowserStatus
 import type { ViewState } from "./browser-view-state";
 import { frameMessage, frameTrigger, grantEndOnDevice, isOlderStatus, shouldReadFrame, viewStateOf } from "./browser-view-state";
 import type { ControlSession, ControlState } from "./control-session";
-import { createControlSession, rememberClaim, rememberedClaim } from "./control-session";
+import { createControlSession, forgetClaim, rememberClaim, rememberedClaim } from "./control-session";
 import { startFrameReader } from "./frame-reader";
+import { watchGrantEnd } from "./grant-end";
 
 export interface ShownFrame {
     /** The browser the picture is of: one replaced since is not shown. */
@@ -84,6 +85,7 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
             lastClaim: rememberedClaim(key),
             onChange: setControl,
             onClaim: (claim) => rememberClaim(key, claim),
+            onReleased: (claim) => forgetClaim(key, claim),
         });
     });
     const lastRead = useRef(-Infinity);
@@ -103,15 +105,11 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
             return undefined;
         }
 
-        const timer = setTimeout(
-            () => {
-                setExpiredAnswer(status);
-                settleQuietly(async () => accept(await readBrowserStatus(getClient(), threadId)));
-            },
-            Math.max(0, grantEnd - Date.now()),
-        );
-
-        return () => clearTimeout(timer);
+        return watchGrantEnd({
+            endsAt: grantEnd,
+            onEnd: () => setExpiredAnswer(status),
+            reread: () => settleQuietly(async () => accept(await readBrowserStatus(getClient(), threadId))),
+        });
     }, [grantEnd, status, threadId]);
 
     const view = viewStateOf(status, error, status !== undefined && expiredAnswer === status);
