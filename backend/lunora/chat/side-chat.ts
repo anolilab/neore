@@ -208,25 +208,25 @@ export const createSideChat = authAction
             if (parent.hasContextReset) {
                 await ctx.runMutation(internal.chat.context_reset.markForkedContextReset, { threadId: newThreadId });
             }
+
+            const createdThread = await ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId: newThreadId });
+
+            if (createdThread) {
+                await ctx.runMutation(internal.lib.document_history.recordHistory, {
+                    attribution: { action: "insert", metadata: { branchPoint: forkEnd.index, sideChatOf: threadId }, source: "manual" },
+                    doc: createdThread,
+                    documentId: newThreadId,
+                    isDeleted: false,
+                    organizationId: createdThread.organizationId ?? undefined,
+                    tableName: "threads",
+                    userId,
+                });
+            }
         } catch (error) {
             // A child left half-copied would be an empty chat the person never asked for.
             await discard();
 
             throw error;
-        }
-
-        const createdThread = await ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId: newThreadId });
-
-        if (createdThread) {
-            await ctx.runMutation(internal.lib.document_history.recordHistory, {
-                attribution: { action: "insert", metadata: { branchPoint: forkEnd.index, sideChatOf: threadId }, source: "manual" },
-                doc: createdThread,
-                documentId: newThreadId,
-                isDeleted: false,
-                organizationId: createdThread.organizationId ?? undefined,
-                tableName: "threads",
-                userId,
-            });
         }
 
         return { status: "ok" as const, threadId: String(newThreadId) };

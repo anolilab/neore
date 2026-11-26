@@ -248,7 +248,8 @@ export const resolveForkEnd = internalQuery
  * reply in flight or one that failed ends (`createSideChat`). The unit is the displayed message (`groupPathRows`),
  * because a fork at a row keeps the whole message it belongs to. A message is finished when its last row succeeded and
  * is a user message or an assistant message with no tool call; a tool result, or an assistant row that still holds a
- * tool call, means the reply is mid-way, so the fork ends at the message before it.
+ * tool call, means the reply is mid-way, so the fork ends at the message before it. A message earlier on the path whose
+ * tool call never got a settled result (an interrupted run) is never copied either: the fork ends before it.
  */
 export const lastSettledMessageId = internalQuery
     .input({ threadId: v.id("threads") })
@@ -266,7 +267,22 @@ export const lastSettledMessageId = internalQuery
                 return { _id: row._id as string, order: row.order, role: (row.message as { role?: string } | undefined)?.role, row };
             }),
         );
-        const settled = groups.findLast((rows) => {
+        // The first displayed message holding a tool call that never reached a settled result (an interrupted run): a fork ends
+        // before it, whatever finished message follows, so the child carries no unfinished tool call.
+        const interrupted = groups.findIndex((rows) => {
+            const parts = rows
+                .filter((entry) => entry.row.status === "success")
+                .flatMap((entry) => {
+                    const { content } = entry.row.message as { content?: unknown };
+
+                    return Array.isArray(content) ? (content as { toolCallId?: string; type?: string }[]) : [];
+                });
+            const answered = new Set(parts.filter((part) => part.type === "tool-result").map((part) => part.toolCallId));
+
+            return parts.some((part) => part.type === "tool-call" && !answered.has(part.toolCallId));
+        });
+        const candidates = interrupted === -1 ? groups : groups.slice(0, interrupted);
+        const settled = candidates.findLast((rows) => {
             const last = rows.at(-1)?.row;
 
             return last !== undefined && last.status === "success" && !last.tool && !isTool(last.message as Message);

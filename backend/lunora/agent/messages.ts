@@ -753,6 +753,10 @@ export const cloneMessageBatch = internalMutation
                       ["order", "stepOrder"],
                   ).collect();
 
+        // Each file's count is read, then written back one higher: two copied messages sharing a file would both read the
+        // same count and lose an increment, so the file links of a batch are taken one after another.
+        let fileLinks: Promise<void> = Promise.resolve();
+
         await Promise.all(
             result.page
                 .filter((m) => !activePath || activePath.has(m._id))
@@ -760,7 +764,10 @@ export const cloneMessageBatch = internalMutation
                 .filter((m) => existing.every((existingMessage) => !(existingMessage.order === m.order && existingMessage.stepOrder === m.stepOrder)))
                 .map(async (m) => {
                     if (m.fileIds) {
-                        await changeMessageFiles(ctx, args.targetThreadId, [], m.fileIds);
+                        const { fileIds } = m;
+
+                        fileLinks = fileLinks.then(async () => await changeMessageFiles(ctx, args.targetThreadId, [], fileIds));
+                        await fileLinks;
                     }
 
                     let embeddingId: VectorTableId | undefined;

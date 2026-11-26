@@ -8,11 +8,12 @@ import { v } from "lunorash/server";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { registeredApi, registerModule } from "../../test/registered-api";
 
-import { internalAction } from "../_generated/server";
+import { internalAction, internalMutation } from "../_generated/server";
 import { addMessagesHandler, cloneMessageBatch } from "../agent/messages";
 import { lastSettledMessageId } from "../agent/branches";
 import { insertContextResetRow, insertThread } from "../agent/table-writes";
 import schema from "../schema";
+import { getFullThreadForExport } from "./functions";
 import { createSideChat, sideChatRefusalOf } from "./side-chat";
 
 const { sessionFrom } = vi.hoisted(() => {
@@ -391,6 +392,138 @@ describe("createSideChat", () => {
         const question = parentRows.find((row: any) => JSON.stringify(row.message).includes("question"));
 
         expect(await harness.run(async (ctx: any) => await ctx.runQuery(lastSettledMessageId, { threadId: parentId }))).toBe(question._id);
+    });
+
+    it("gives the child the parent's run settings", async () => {
+        const parentId = await parentWith(OWNER, { autoModel: true, customSystemPrompt: "answer in haiku", reasoningEffort: 3, statelessMode: true });
+
+        await withMessages(parentId, OWNER, ["hello"]);
+
+        const outcome = (await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)) as { status: string; threadId: string };
+
+        expect(await threadRow(outcome.threadId)).toMatchObject({
+            autoModel: true,
+            customSystemPrompt: "answer in haiku",
+            model: "openai/gpt-5",
+            reasoningEffort: 3,
+            statelessMode: true,
+        });
+    });
+
+    it("leaves no child and no side relationship when recording the history fails", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await withMessages(parentId, OWNER, ["hello"]);
+
+        const key = "lib_document_history:recordHistory";
+        const original = registry.get(key);
+
+        registry.set(
+            key,
+            internalMutation.input({}).mutation(async () => {
+                throw new Error("history failed");
+            }),
+        );
+
+        try {
+            await expect(as(OWNER).action(createSideChat as never, { threadId: parentId } as never)).rejects.toThrow("history failed");
+        } finally {
+            registry.set(key, original);
+        }
+
+        expect(await sideRelations()).toHaveLength(0);
+        expect(await harness.run(async (ctx: any) => await ctx.db.query("threads").collect())).toHaveLength(1);
+    });
+
+    it("exports a side chat with each settled turn once, and none of the parent's unsettled rows", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await withMessages(parentId, OWNER, ["first question", "second question"]);
+        await harness.run(async (ctx: any) => {
+            await addMessagesHandler(ctx, {
+                messages: [{ message: { content: "still streaming", role: "assistant" }, status: "pending" }],
+                threadId: parentId as never,
+                userId: OWNER,
+            });
+        });
+
+        const outcome = (await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)) as { status: string; threadId: string };
+        const exported = (await as(OWNER).query(getFullThreadForExport as never, { model: "openai/gpt-5", threadId: outcome.threadId } as never)) as {
+            messages: { message: { content: unknown } }[];
+        };
+        const texts = exported.messages.map((row) => JSON.stringify(row.message.content));
+
+        expect(texts).toHaveLength(2);
+        expect(texts.filter((text) => text.includes("first question"))).toHaveLength(1);
+        expect(texts.filter((text) => text.includes("second question"))).toHaveLength(1);
+        expect(texts.some((text) => text.includes("still streaming"))).toBe(false);
+    });
+
+    it("ends before an earlier reply that stopped mid tool call, even when a later user message succeeded", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await withMessages(parentId, OWNER, ["first question"]);
+        await harness.run(async (ctx: any) => {
+            await addMessagesHandler(ctx, {
+                messages: [{ message: { content: [{ text: "complete answer", type: "text" }], role: "assistant" }, status: "success" }],
+                threadId: parentId as never,
+                userId: OWNER,
+            });
+        });
+        await withMessages(parentId, OWNER, ["second question"]);
+        await harness.run(async (ctx: any) => {
+            await addMessagesHandler(ctx, {
+                messages: [
+                    {
+                        message: { content: [{ input: {}, toolCallId: "lost", toolName: "search", type: "tool-call" }], role: "assistant" },
+                        status: "success",
+                    },
+                ],
+                threadId: parentId as never,
+                userId: OWNER,
+            });
+        });
+        await withMessages(parentId, OWNER, ["later question"]);
+
+        const parentRows = await harness.run(async (ctx: any) => await ctx.db.query("messages").collect());
+        const secondQuestion = parentRows.find((row: any) => JSON.stringify(row.message).includes("second question"));
+        const outcome = (await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)) as { status: string; threadId: string };
+
+        expect(outcome.status).toBe("ok");
+        expect(await harness.run(async (ctx: any) => await ctx.runQuery(lastSettledMessageId, { threadId: parentId }))).toBe(secondQuestion._id);
+
+        const allRows = await harness.run(async (ctx: any) => await ctx.db.query("messages").collect());
+        const copied = allRows.filter((row: any) => String(row.threadId) === outcome.threadId).map((row: any) => JSON.stringify(row.message));
+
+        expect(copied).toHaveLength(3);
+        expect(copied.some((text: string) => text.includes("complete answer"))).toBe(true);
+        expect(copied.some((text: string) => text.includes("tool-call") || text.includes("later question"))).toBe(false);
+    });
+
+    it("copies only the prompt when the first reply stopped mid tool call", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await harness.run(async (ctx: any) => {
+            await addMessagesHandler(ctx, {
+                fromUser: true,
+                messages: [{ message: { content: "question", role: "user" }, status: "success" }],
+                threadId: parentId as never,
+                userId: OWNER,
+            });
+            await addMessagesHandler(ctx, {
+                messages: [
+                    { message: { content: [{ input: {}, toolCallId: "lost", toolName: "search", type: "tool-call" }], role: "assistant" }, status: "success" },
+                ],
+                threadId: parentId as never,
+                userId: OWNER,
+            });
+        });
+        await withMessages(parentId, OWNER, ["follow up"]);
+
+        const outcome = (await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)) as { status: string; threadId: string };
+
+        expect(outcome.status).toBe("ok");
+        expect(await messageCount(outcome.threadId)).toBe(1);
     });
 
     it("refuses a parent that no longer exists, and writes no child or relationship", async () => {
