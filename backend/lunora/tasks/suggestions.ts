@@ -16,7 +16,7 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { containsSecret } from "../lib/secret-redaction";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { findNextCronTime, isValidCronExpression } from "../triggers/schedule";
-import { insertTask } from "./functions";
+import { insertTask, normalizeTaskText } from "./functions";
 import { MAX_PENDING_SUGGESTIONS, MAX_SUGGESTION_SOURCES, TASK_INSTRUCTIONS_MAX, TASK_SCHEDULE_MAX, TASK_TITLE_MAX } from "./logic";
 
 /** Rows removed per erase call; a full batch queues the next. */
@@ -170,15 +170,15 @@ export const insertTaskSuggestions = internalMutation
                 break;
             }
 
-            const title = suggestion.title.trim().slice(0, TASK_TITLE_MAX);
-            const instructions = suggestion.instructions.trim().slice(0, TASK_INSTRUCTIONS_MAX);
+            const title = normalizeTaskText(suggestion.title).slice(0, TASK_TITLE_MAX);
+            const instructions = normalizeTaskText(suggestion.instructions).slice(0, TASK_INSTRUCTIONS_MAX);
 
             // The words come from the person's messages: a proposal that carries a secret is dropped, never stored.
             if (!title || !instructions || containsSecret(title) || containsSecret(instructions)) {
                 continue;
             }
 
-            const cronExpression = suggestion.cronExpression.trim();
+            const cronExpression = normalizeTaskText(suggestion.cronExpression);
 
             // Accepting runs the task rules: a schedule they refuse, or one that never fires, is dropped here, not left pending.
             if (

@@ -320,6 +320,31 @@ describe("storing", () => {
         expect(await rowsOf("taskSuggestions", A)).toMatchObject([{ title: "Clean" }]);
     });
 
+    it("drops a secret broken up by a zero-width character, which accepting would make whole again", async () => {
+        await setSwitch(A, true);
+
+        // Built from parts so the repo holds no key-shaped literal.
+        const key = ["AKIA", "IOSFODNN7EXAMPLE"].join("");
+        const split = `${key.slice(0, 6)}\u{200B}${key.slice(6)}`;
+        const tagged = `${key.slice(0, 6)}\u{E0041}${key.slice(6)}`;
+
+        await expect(
+            insert(A, [proposal({ instructions: `Use the key ${split}` }), proposal({ title: `Key ${tagged}` }), proposal({ title: "Clean" })]),
+        ).resolves.toEqual({ inserted: 1 });
+
+        expect(await rowsOf("taskSuggestions", A)).toMatchObject([{ title: "Clean" }]);
+    });
+
+    it("drops a title made only of hidden characters, and stores the text as accepting would", async () => {
+        await setSwitch(A, true);
+
+        await expect(
+            insert(A, [proposal({ title: "​‮\u{E0041}" }), proposal({ instructions: "​ ⁠", title: "No text" }), proposal({ title: "Wee​kly" })]),
+        ).resolves.toEqual({ inserted: 1 });
+
+        expect(await rowsOf("taskSuggestions", A)).toMatchObject([{ title: "Weekly" }]);
+    });
+
     it("keeps the source chat ids once each, at most five, and no message text", async () => {
         await setSwitch(A, true);
         await insert(A, [proposal({ sourceThreadIds: ["t1", "t1", "t2", "t3", "t4", "t5", "t6"] })]);

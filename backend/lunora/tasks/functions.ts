@@ -163,10 +163,16 @@ const requireOwnedGoal = async (ctx: QueryCtx, goalId: Id<"goals">, userId: stri
     return goal;
 };
 
-/** Trims, and turns an empty optional into `undefined` so it clears the column. */
+/**
+ * The one way task text is cleaned before it is checked or stored: hidden characters (tag block, bidi controls, zero
+ * width) can carry instructions nobody reads, or split a secret so a filter misses it, so they are removed first.
+ * Task writes and the suggestion filter both use it, so a suggestion is checked in the form it will be accepted in.
+ */
+export const normalizeTaskText = (value: string): string => stripHiddenText(value).text.trim();
+
+/** Normalises, and turns an empty optional into `undefined` so it clears the column. */
 const optionalText = (value: string | undefined, max: number, label: string): string | undefined => {
-    // Hidden characters (tag block, bidi controls) can carry instructions nobody reads; a task never stores them.
-    const trimmed = value === undefined ? undefined : stripHiddenText(value).text.trim();
+    const trimmed = value === undefined ? undefined : normalizeTaskText(value);
 
     if (!trimmed) {
         return undefined;
