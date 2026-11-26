@@ -27,12 +27,25 @@ export const isOutsideViewport = (rect: Pick<DOMRect, "bottom" | "top">, bounds:
 /** Whether two current hits are the same occurrence, by where each starts in the document. */
 const isSameHit = (a: Range | undefined, b: Range | undefined): boolean => a?.startContainer === b?.startContainer && a?.startOffset === b?.startOffset;
 
+type Offset = { left: number; top: number };
+
 /**
- * Where a hit sits, measured from the panel's top edge. Scrolling the panel moves the hit and the panel together, so only
- * a change in the content above the hit moves this offset. jsdom lays out no ranges, so it reports none there.
+ * Where a hit sits, measured from the panel's top and left edges. Scrolling the panel moves the hit and the panel together,
+ * so only a change in the content around the hit moves this offset, across either axis. jsdom lays out no ranges, so it
+ * reports none there.
  */
-const offsetWithin = (range: Range | undefined, host: Element): number | undefined =>
-    typeof range?.getBoundingClientRect === "function" ? range.getBoundingClientRect().top - host.getBoundingClientRect().top : undefined;
+const offsetWithin = (range: Range | undefined, host: Element): Offset | undefined => {
+    if (typeof range?.getBoundingClientRect !== "function") {
+        return undefined;
+    }
+
+    const rect = range.getBoundingClientRect();
+    const origin = host.getBoundingClientRect();
+
+    return { left: rect.left - origin.left, top: rect.top - origin.top };
+};
+
+const sameOffset = (a: Offset | undefined, b: Offset | undefined): boolean => a?.left === b?.left && a?.top === b?.top;
 
 /**
  * Every occurrence of `query` in the panel as it is rendered, in panel order (question, then answer, entry by entry).
@@ -185,7 +198,7 @@ const useAsideFindHighlights = (
         let frame = 0;
         let revealTimer: ReturnType<typeof setTimeout> | undefined;
         let applied: Range | undefined;
-        let appliedOffset: number | undefined;
+        let appliedOffset: Offset | undefined;
 
         const apply = (): Range | undefined => {
             const all = collectAsideRanges(host, query);
@@ -221,7 +234,7 @@ const useAsideFindHighlights = (
 
                 apply();
 
-                if (beforeOffset !== appliedOffset || !isSameHit(before, applied)) {
+                if (!sameOffset(beforeOffset, appliedOffset) || !isSameHit(before, applied)) {
                     scheduleReveal();
                 }
             });
