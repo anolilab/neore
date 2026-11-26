@@ -162,8 +162,10 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
     const { t } = useLingui();
     const crpc = useCRPC();
     const labelId = useId();
-    const { data: access } = useQuery(crpc.auth.functions.getPaidModelAccess.queryOptions({}, { live: false }));
-    // The backend's own answer, not a client-side guess; the save re-checks it.
+    const { data: access, isError: accessFailed, refetch: refetchAccess } = useQuery(crpc.auth.functions.getPaidModelAccess.queryOptions({}, { live: false }));
+    // The backend's own answer, not a client-side guess; the save re-checks it. Until it is read, paid models look
+    // out of reach, so the picker waits for it.
+    const accessRead = access !== undefined;
     const canRunPaidModels = access?.canRunPaidModels === true;
     // A retry skips what is not a text model, outside the plan, or excluded by the user's filters. A feature flag only
     // hides a model from the picker, so a saved one it hides still answers and is not marked unavailable.
@@ -182,9 +184,9 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
     const catalogFailed = useGatewayModelsSettled() && !catalogLoaded;
     const refetchCatalog = useRefetchGatewayModels();
     // Without the catalog, the plan answer or the filters, nothing is known to be unusable: no entry is marked until all are read.
-    const availabilityKnown = catalogLoaded && access !== undefined && filtersRead;
+    const availabilityKnown = catalogLoaded && accessRead && filtersRead;
     // A failed read would leave the picker empty for good, so the user is told and can retry; a read still under way keeps the empty picker.
-    const readFailed = (filtersFailed && !filtersRead) || catalogFailed;
+    const readFailed = (filtersFailed && !filtersRead) || (accessFailed && !accessRead) || catalogFailed;
     // Why the saved list was shown again after a refused save; cleared when the next edit starts.
     const [conflictNotice, setConflictNotice] = useState(false);
     const { data: userSettings } = useUserSettings();
@@ -280,8 +282,37 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
             });
     };
 
+    const addBackup = (modelId: string) => {
+        const fills = chosen.length + 1 >= limit;
+
+        // The picker stays unless this add fills the list; then the new entry's remove button takes focus. A refused
+        // add rolls its entry back and brings the picker back, so focus returns to it.
+        save((list) => (list.includes(modelId) || list.length >= limit ? list : [...list, modelId]), fills ? controlKey(modelId, "remove") : "", "");
+    };
+
+    // A model picked while a save runs is saved once that save has settled, against the list as it is then: it is
+    // dropped if the list is full by now or already holds it. A later pick replaces an earlier one.
+    const queuedPick = useRef<string | null>(null);
+
+    // No dependency list: it returns at once while nothing is queued, and a pick waiting on the save is looked at after
+    // every render, so it is sent as soon as the save has settled.
+    useEffect(() => {
+        const pick = queuedPick.current;
+
+        if (pick === null || locked) {
+            return;
+        }
+
+        queuedPick.current = null;
+
+        if (chosen.length < limit && !chosen.includes(pick)) {
+            addBackup(pick);
+        }
+    });
+
     return (
         <div
+            aria-busy={saving}
             aria-labelledby={labelId}
             // Takes focus from script when nothing can be added; `focus:`, not `focus-visible:`, so the ring shows then too.
             // The padding and negative margin leave room for the ring without moving the layout.
@@ -401,6 +432,10 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                                 void refetchFilters();
                             }
 
+                            if (accessFailed && !accessRead) {
+                                void refetchAccess();
+                            }
+
                             if (catalogFailed) {
                                 refetchCatalog();
                             }
@@ -417,29 +452,27 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                 <div ref={addRow}>
                     <ModelSelect
                         description={t`Up to ${limit}, tried in the order listed`}
-                        // Not disabled while a save runs, so it keeps focus; a pick made then is ignored below.
+                        // Not disabled while a save runs, so it keeps focus; a pick made then waits for the save (see `queuedPick`).
                         disabled={!editable}
                         emptyLabel={t`Choose a model`}
                         field="backupModels"
                         label={chosen.length === 0 ? t`Add a backup model` : t`Add another backup model`}
-                        // No failed read here, so an empty list is one still being read until both reads are in.
-                        loading={!filtersRead || !catalogLoaded}
-                        // Unread filters look like none, so nothing is offered until they are read.
-                        models={filtersRead ? allModels.filter((m) => usable.has(m.id) && !chosen.includes(m.id)) : []}
+                        // No failed read here, so an empty list is one still being read until all reads are in.
+                        loading={!filtersRead || !accessRead || !catalogLoaded}
+                        // Unread filters look like none, and an unread plan answer hides paid models, so nothing is offered until both are read.
+                        models={filtersRead && accessRead ? allModels.filter((m) => usable.has(m.id) && !chosen.includes(m.id)) : []}
                         onChange={(_field, modelId) => {
-                            if (!modelId || locked) {
+                            if (!modelId || !editable) {
                                 return;
                             }
 
-                            const fills = chosen.length + 1 >= limit;
+                            if (saving) {
+                                queuedPick.current = modelId;
 
-                            // The picker stays unless this add fills the list; then the new entry's remove button takes focus. A refused
-                            // add rolls its entry back and brings the picker back, so focus returns to it.
-                            save(
-                                (list) => (list.includes(modelId) || list.length >= limit ? list : [...list, modelId]),
-                                fills ? controlKey(modelId, "remove") : "",
-                                "",
-                            );
+                                return;
+                            }
+
+                            addBackup(modelId);
                         }}
                         value={undefined}
                     />

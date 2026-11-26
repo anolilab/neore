@@ -8,16 +8,21 @@ import { BackupModelsSetting } from "./default-models-settings";
 
 const state = vi.hoisted(() => {
     return {
+        accessFailed: false,
+        accessRead: true,
         catalog: [] as GatewayModel[],
         catalogFailed: false,
         catalogLoaded: true,
         conflict: false,
         excluded: new Set<string>(),
         hold: false,
+        /** Components showing the settings, told when a save changes them (as the cache's subscribers are). */
+        listeners: new Set<() => void>(),
         lastPatch: undefined as unknown,
         release: () => undefined as void,
         preferencesFailed: false,
         preferencesRead: true,
+        refetchAccess: vi.fn(),
         refetchCatalog: vi.fn(),
         refetchPreferences: vi.fn(),
         refuse: false,
@@ -52,7 +57,15 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
                 };
             }
 
-            return { data: { canRunPaidModels: true } };
+            if (options.query === "access") {
+                return {
+                    data: state.accessRead ? { canRunPaidModels: true } : undefined,
+                    isError: state.accessFailed,
+                    refetch: state.refetchAccess,
+                };
+            }
+
+            return { data: undefined };
         },
     };
 });
@@ -70,7 +83,7 @@ vi.mock("@/lib/lunora/crpc", () => {
                         },
                         getPaidModelAccess: {
                             queryOptions: () => {
-                                return {};
+                                return { query: "access" };
                             },
                         },
                     },
@@ -99,8 +112,16 @@ vi.mock("@/hooks/use-model-filter-rules", () => {
     return { useFilteredModels: (models: GatewayModel[]) => models.filter((model) => !state.excluded.has(model.id)) };
 });
 
+const notify = () => {
+    for (const listener of state.listeners) {
+        listener();
+    }
+};
+
 // A save applies at once, as the optimistic cache update does; a refused one is rolled back before it rejects.
-vi.mock("@/features/auth/hooks/use-user-settings", () => {
+vi.mock("@/features/auth/hooks/use-user-settings", async () => {
+    const { useSyncExternalStore } = await import("react");
+
     return {
         useUpdateUserSettings: () => {
             return {
@@ -109,7 +130,7 @@ vi.mock("@/features/auth/hooks/use-user-settings", () => {
 
                     state.lastPatch = build(state.settings);
                     state.settings = { ...state.settings, ...(state.lastPatch as typeof state.settings) };
-                    state.rerender();
+                    notify();
 
                     if (state.hold) {
                         await new Promise<void>((resolve) => {
@@ -119,7 +140,7 @@ vi.mock("@/features/auth/hooks/use-user-settings", () => {
 
                     if (state.refuse) {
                         state.settings = state.reread ?? before;
-                        state.rerender();
+                        notify();
 
                         // The stored list changed in another tab: the re-read (the test swaps `state.settings`) follows the refusal.
                         throw Object.assign(new Error("refused"), state.conflict ? { code: "CONFLICT" } : {});
@@ -128,7 +149,16 @@ vi.mock("@/features/auth/hooks/use-user-settings", () => {
             };
         },
         useUserSettings: () => {
-            return { data: state.settings };
+            return {
+                data: useSyncExternalStore(
+                    (listener) => {
+                        state.listeners.add(listener);
+
+                        return () => state.listeners.delete(listener);
+                    },
+                    () => state.settings,
+                ),
+            };
         },
     };
 });
@@ -145,6 +175,8 @@ const show = (offered: GatewayModel[] = MODELS) => {
 };
 
 beforeEach(() => {
+    state.accessFailed = false;
+    state.accessRead = true;
     state.catalog = MODELS;
     state.catalogFailed = false;
     state.catalogLoaded = true;
@@ -153,6 +185,7 @@ beforeEach(() => {
     state.lastPatch = undefined;
     state.preferencesFailed = false;
     state.preferencesRead = true;
+    state.refetchAccess = vi.fn();
     state.refetchCatalog = vi.fn();
     state.refetchPreferences = vi.fn();
     state.refuse = false;
@@ -521,6 +554,107 @@ describe("BackupModelsSetting", () => {
 
         expect(screen.getByRole("combobox", { name: "Add a backup model" }).textContent).toContain("No models available");
         expect(screen.queryByText("Loading models…")).toBeNull();
+    });
+
+    it("labels the picker as loading while the plan answer is pending, since paid models would be missing", () => {
+        state.accessRead = false;
+        show();
+
+        const picker = screen.getByRole("combobox", { name: "Add a backup model" });
+
+        expect(picker.textContent).toContain("Loading models…");
+        expect(picker.hasAttribute("disabled") || picker.dataset.disabled !== undefined).toBe(true);
+        expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    it("says the models to add could not be loaded when the plan answer fails to read, and retries only that read", async () => {
+        state.accessRead = false;
+        state.accessFailed = true;
+        show();
+
+        expect(screen.getByRole("alert").textContent).toContain("Couldn't load the models you can add.");
+        expect(screen.queryByRole("combobox")).toBeNull();
+
+        await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+        expect(state.refetchAccess).toHaveBeenCalledTimes(1);
+        expect(state.refetchPreferences).not.toHaveBeenCalled();
+        expect(state.refetchCatalog).not.toHaveBeenCalled();
+    });
+
+    it("saves a model picked while a save runs once that save has settled", async () => {
+        state.settings = { backupModels: ["openai/first", "openai/second"] };
+        state.hold = true;
+        show();
+
+        await userEvent.click(screen.getByRole("button", { name: "Move Second up" }));
+
+        expect(screen.getByRole("group", { name: "Backup models" }).getAttribute("aria-busy")).toBe("true");
+
+        await userEvent.click(screen.getByRole("combobox", { name: "Add another backup model" }));
+        await userEvent.click(await screen.findByRole("option", { name: "Third" }));
+
+        // Held: the pick has not been sent, and has not been dropped.
+        expect(state.lastPatch).toEqual({ backupModels: ["openai/second", "openai/first"], backupModelsBase: ["openai/first", "openai/second"] });
+
+        // The first save settles; the queued one is sent then, on the list the first left.
+        state.hold = false;
+        state.release();
+
+        await waitFor(() => expect(state.settings?.backupModels).toEqual(["openai/second", "openai/first", "openai/third"]));
+        expect(state.lastPatch).toEqual({
+            backupModels: ["openai/second", "openai/first", "openai/third"],
+            backupModelsBase: ["openai/second", "openai/first"],
+        });
+
+        // The add filled the list: once its save has settled, focus is on the new entry.
+        const remove = await screen.findByRole("button", { name: "Remove Third" });
+
+        await waitFor(() => expect(document.activeElement).toBe(remove));
+        expect(screen.getByRole("group", { name: "Backup models" }).getAttribute("aria-busy")).toBe("false");
+    });
+
+    it("does not save a queued pick the list holds by the time the save settles", async () => {
+        state.settings = { backupModels: ["openai/first", "openai/second"] };
+        state.hold = true;
+        show();
+
+        await userEvent.click(screen.getByRole("button", { name: "Remove Second" }));
+        await userEvent.click(screen.getByRole("combobox", { name: "Add another backup model" }));
+        await userEvent.click(await screen.findByRole("option", { name: "Third" }));
+
+        // Another tab adds the same model while the save is held.
+        state.settings = { backupModels: ["openai/first", "openai/third"] };
+        state.rerender();
+        state.hold = false;
+        state.release();
+
+        await waitFor(() => expect(screen.getByRole("group", { name: "Backup models" }).getAttribute("aria-busy")).toBe("false"));
+        expect(state.lastPatch).toEqual({ backupModels: ["openai/first"], backupModelsBase: ["openai/first", "openai/second"] });
+        expect(state.settings?.backupModels).toEqual(["openai/first", "openai/third"]);
+    });
+
+    it("does not save a queued pick once the list has filled by the time the save settles", async () => {
+        const fourth = model("openai/fourth", "Fourth");
+
+        state.catalog = [...MODELS, fourth];
+        state.settings = { backupModels: ["openai/first", "openai/second"] };
+        state.hold = true;
+        show([...MODELS, fourth]);
+
+        await userEvent.click(screen.getByRole("button", { name: "Move Second up" }));
+        await userEvent.click(screen.getByRole("combobox", { name: "Add another backup model" }));
+        await userEvent.click(await screen.findByRole("option", { name: "Fourth" }));
+
+        // Another tab fills the list while the save is held.
+        state.settings = { backupModels: ["openai/second", "openai/first", "openai/third"] };
+        state.rerender();
+        state.hold = false;
+        state.release();
+
+        await waitFor(() => expect(screen.getByRole("group", { name: "Backup models" }).getAttribute("aria-busy")).toBe("false"));
+        expect(state.lastPatch).toEqual({ backupModels: ["openai/second", "openai/first"], backupModelsBase: ["openai/first", "openai/second"] });
+        expect(state.settings?.backupModels).toEqual(["openai/second", "openai/first", "openai/third"]);
     });
 
     it("explains a conflict at the list until the next edit starts", async () => {
