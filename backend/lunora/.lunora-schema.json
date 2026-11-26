@@ -21,6 +21,7 @@
     "backfill-message-typed-text",
     "drop-agent-option-fields",
     "session-options-to-session-state",
+    "unique-user-email-canonical",
     "widen-not-typed-steer-collaborator",
     "widen-not-typed-steer-drafts"
   ],
@@ -10930,6 +10931,12 @@
     "mcpEventWatermarks": {
       "commitOrdered": false,
       "fields": {
+        "prunedThrough": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "seq": {
           "kind": "number",
           "nullable": false,
@@ -33492,6 +33499,12 @@
           "optional": false,
           "unique": false
         },
+        "emailCanonical": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "emailVerified": {
           "kind": "boolean",
           "nullable": false,
@@ -33547,6 +33560,12 @@
             "isAnonymous"
           ],
           "unique": false
+        },
+        "emailCanonical": {
+          "fields": [
+            "emailCanonical"
+          ],
+          "unique": true
         },
         "email_name": {
           "fields": [

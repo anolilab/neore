@@ -50,7 +50,7 @@ const THREAD_EVENT_BATCH = 200;
 const threadOf = (data: Record<string, unknown>): string | undefined => (typeof data["threadId"] === "string" ? data["threadId"] : undefined);
 
 /** The thread a stored payload (JSON text) names: a payload that is not a JSON object names none. */
-const storedThreadOf = (data: string): string | undefined => {
+export const storedThreadOf = (data: string): string | undefined => {
     let parsed: unknown;
 
     try {
@@ -109,7 +109,7 @@ export const recordMcpEvent = async (ctx: LogWriteCtx, input: RecordEventInput):
 
     await ctx.db.insert("mcpEvents", {
         createdAt: ctx.now,
-        data: boundedPayload(JSON.stringify(input.data), threadId),
+        data: boundedPayload(JSON.stringify(input.data), threadOf(input.data)),
         eventId: input.eventId,
         name: input.name,
         seq,
@@ -172,8 +172,10 @@ export const hasMcpEventsOfThread = async (ctx: Pick<MutationCtx, "db">, userId:
  * with it: the poll hides a locked or trashed thread's events only while the thread exists, so they must not outlive it.
  */
 export const deleteMcpEventsOfThread = async (ctx: Pick<MutationCtx, "db">, userId: string, threadId: string): Promise<boolean> => {
-    // One row past the batch says whether more follow: a batch that ends the thread's events is not reported as more.
+    // One row past the batch says whether more follow: a batch that ends the thread's events is not reported as more. From the primary:
+    // a lagging replica's short page would end the cleanup while events remain, and the thread row would then go with them.
     const { page } = await ctx.db.mcpEvents.findMany({
+        consistency: "primary",
         limit: THREAD_EVENT_BATCH + 1,
         where: { threadId, userId },
     });
@@ -221,7 +223,7 @@ export const copyMergedMcpEvents = async (ctx: LogWriteCtx, rows: Record<string,
 
         await ctx.db.insert("mcpEvents", {
             createdAt: ctx.now,
-            data: boundedPayload(row["data"] as string, threadId),
+            data: boundedPayload(row["data"] as string, storedThreadOf(row["data"] as string)),
             eventId,
             name: row["name"] as string,
             seq,

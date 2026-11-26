@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { pollEvents, type StoredEvent } from "./events-poll";
+import { POLL_BYTE_BUDGET, pollEvents, type StoredEvent } from "./events-poll";
 
 const NOW = 1_000_000;
 const LARGE = 300 * 1024;
@@ -20,7 +20,7 @@ const logOf = (events: StoredEvent[]) => {
     return {
         after: async (afterSeq: number, limit: number) => events.filter((row) => row.seq > afterSeq).slice(0, limit),
         latestSeq: async () => events.length,
-        oldestSeq: async () => events[0]?.seq,
+        prunedThrough: async () => 0,
     };
 };
 
@@ -59,5 +59,23 @@ describe("a poll whose events are large", () => {
 
         expect(outcome.events.length).toBeLessThan(20);
         expect(outcome.hasMore).toBe(true);
+    });
+
+    it("keeps the whole serialized answer within the byte budget, envelope and separators included", async () => {
+        const escaped = Array.from({ length: 40 }, (_, index) => {
+            return { ...large(index + 1), data: { blob: "\\".repeat(8177), threadId: "open" } };
+        });
+        const outcome = await pollEvents(logOf(escaped), { fromSeq: 0, maxEvents: 50, name: "run.completed", now: NOW });
+        const answer = JSON.stringify({
+            events: outcome.events.map((event) => {
+                return { ...event, data: JSON.stringify(event.data) };
+            }),
+            hasMore: outcome.hasMore,
+            nextSeq: outcome.nextSeq,
+            truncated: outcome.truncated,
+        });
+
+        expect(outcome.hasMore).toBe(true);
+        expect(new TextEncoder().encode(answer).byteLength).toBeLessThanOrEqual(POLL_BYTE_BUDGET);
     });
 });

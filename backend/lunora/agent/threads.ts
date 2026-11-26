@@ -868,15 +868,22 @@ export const softDeleteThread = internalMutation
 
 export const restoreThread = internalMutation
     .input({ threadId: v.id("threads") })
-    .output(v.from(vThreadDocument))
+    .output(v.object({ before: v.from(vThreadDocument), restored: v.boolean(), thread: v.from(vThreadDocument) }))
     .mutation(async ({ args, ctx }) => {
         const oldThread = await ctx.db.get("threads", args.threadId);
 
         assert(oldThread, `Thread ${args.threadId} not found`);
 
+        // A chat that is already live is not restored again: an overlapping restore reports `restored: false`, so only one of them
+        // records the restore in history.
+        if (oldThread.deleted !== true) {
+            return { before: publicThread(oldThread), restored: false, thread: publicThread(oldThread) };
+        }
+
         // A chat's events go with the trash, but the trash's leftover batches may not have run. A restored chat must not show them, so
-        // restore refuses while any remain: `undoDeleteThread` drains them first, in its own transaction. Events recorded since are kept.
-        if (oldThread.deleted === true && oldThread.userId !== undefined && (await hasMcpEventsOfThread(ctx, oldThread.userId, args.threadId))) {
+        // restore refuses while any remain: `undoDeleteThread` drains them first, in its own transaction. The drain removes every event of
+        // the trashed chat, including any recorded while it sat in the trash, so none survives a restore.
+        if (oldThread.userId !== undefined && (await hasMcpEventsOfThread(ctx, oldThread.userId, args.threadId))) {
             throw new LunoraError("CONFLICT", "This chat's activity is still being cleared from the trash. Try restoring it again in a moment.");
         }
 
@@ -896,7 +903,7 @@ export const restoreThread = internalMutation
         const newThread = (await ctx.db.get("threads", args.threadId))!;
 
         // Re-add to aggregates when restored
-        return publicThread(newThread);
+        return { before: publicThread(oldThread), restored: true, thread: publicThread(newThread) };
     });
 
 // Thread settings update

@@ -13,6 +13,8 @@ const DEPLOY_FILES = [
     "scripts/worker-bundle.ts",
     "scripts/check-web-size.ts",
     "scripts/check-web-bundle.ts",
+    "scripts/data-migrations.ts",
+    "scripts/run-data-migrations.ts",
     "scripts/profile-worker-startup.ts",
     "scripts/vitest/time-sharding.ts",
     "scripts/vitest/time-sharding.test.ts",

@@ -104,7 +104,8 @@ import { deleteShardRoute, setShardRoute } from "./shard-routes";
 import { SEARCH_INTERNAL_FIELDS } from "../agent/thread-search-plan";
 import { countUserTurns } from "../agent/thread-search-triggers";
 import { copyMergedRunWebhooks } from "../run-webhooks/table-writes";
-import { copyMergedMcpEvents } from "../public-api/events-log";
+import { copyMergedMcpEvents, deleteMcpEventsOfThread, storedThreadOf } from "../public-api/events-log";
+import { runAfterOnShard } from "./shard-scheduler";
 
 /** Rows moved per round trip. */
 export const MERGE_PAGE_SIZE = 100;
@@ -179,8 +180,29 @@ export const shardLocalTables = (source: unknown = schema): string[] => {
         .filter((name) => name !== "threads")
         .toSorted((a, b) => a.localeCompare(b));
     const messages = tables.indexOf("messages");
+    const withThreads = messages === -1 ? tables : tables.toSpliced(messages, 0, "threads");
+    const events = withThreads.indexOf("mcpEvents");
+    const threads = withThreads.indexOf("threads");
 
-    return messages === -1 ? tables : tables.toSpliced(messages, 0, "threads");
+    // `mcpEvents` right after `threads`: an Event is copied only once its thread is on the new shard (`threadOnNewShard`).
+    if (events === -1 || threads === -1) {
+        return withThreads;
+    }
+
+    const rest = withThreads.toSpliced(events, 1);
+
+    return rest.toSpliced(rest.indexOf("threads") + 1, 0, "mcpEvents");
+};
+
+/**
+ * Whether an Event's thread is on the new shard. A copied Event names its thread, and a thread the guest deleted before its copy
+ * leaves none, so the Event is not copied: the clear removes it from the guest's shard with the rest. An Event with no thread is
+ * copied. Thread ids are unique, so the thread here is the guest's own.
+ */
+const threadOnNewShard = async (db: ReturnType<typeof rawDb>, data: string): Promise<boolean> => {
+    const threadId = storedThreadOf(data);
+
+    return threadId === undefined || (await db.get("threads", threadId)) !== null;
 };
 
 /**
@@ -1461,46 +1483,24 @@ export const importShardRows = internalMutation
             const fresh: Record<string, unknown>[] = [];
 
             for (const row of guestRows) {
-                if ((await storedClaim(ctx.db, IMPORT_MARKER_SCOPE, markerKey(args.from, args.table, row._id as string))) === null) {
+                const marked = (await storedClaim(ctx.db, IMPORT_MARKER_SCOPE, markerKey(args.from, args.table, row._id as string))) !== null;
+
+                if (!marked && (await threadOnNewShard(db, row["data"] as string))) {
                     fresh.push(row);
-                }
-            }
-
-            // The event ids the new account already holds: a copy skipped for one of them is the account's own row, never the copy.
-            const alreadyHeld = new Set<string>();
-
-            for (const row of fresh) {
-                const held = await ctx.db.mcpEvents.findFirst({
-                    consistency: "primary",
-                    where: { eventId: row["eventId"] as string, userId: args.to },
-                });
-
-                if (held !== null) {
-                    alreadyHeld.add(row["eventId"] as string);
                 }
             }
 
             const imported = await copyMergedMcpEvents(ctx, fresh, args.to);
 
-            // The marker names the copy's own row on the new shard (`result`): a copy has a new id, so the reconcile takes it back there
-            // (`dropRowsGoneFromGuest`). A row the expiry skipped, or one the account already held, has none, so the reconcile never
-            // deletes the account's own event.
+            // The marker records that the row was handled, so its copy is not made again. Events are never taken back by the copy's id:
+            // `dropRowsGoneFromGuest` keeps them, and a deleted thread's copies go with its thread copy.
             for (const row of fresh) {
-                const eventId = row["eventId"] as string;
-                const copy = alreadyHeld.has(eventId)
-                    ? null
-                    : await ctx.db.mcpEvents.findFirst({
-                          consistency: "primary",
-                          where: { eventId, userId: args.to },
-                      });
-
                 await ctx.db.insert("idempotencyClaims", {
                     claimedAt: now,
                     expiresAt: IMPORT_MARKER_EXPIRES_AT,
                     key: markerKey(args.from, args.table, row._id as string),
                     scope: IMPORT_MARKER_SCOPE,
                     userId: args.to,
-                    ...(copy !== null && { result: copy._id as string }),
                 });
             }
 
@@ -1809,19 +1809,8 @@ export const dropRowsGoneFromGuest = internalMutation
         // One at a time: an audited table's delete writes its history row to D1.
         for (const id of args.ids) {
             if (args.table === "mcpEvents") {
-                // A copied Event lives under its own row id here, and its marker names that row. An event is never edited, so the copy
-                // goes as it is.
-                const record = await ctx.db
-                    .query("idempotencyClaims")
-                    .withIndex("by_scope_key", (q) => q.eq("scope", IMPORT_MARKER_SCOPE).eq("key", markerKey(args.from, args.table, id)))
-                    .first();
-                const copyId = record?.result;
-
-                if (typeof copyId === "string" && (await db.get("mcpEvents", copyId)) !== null) {
-                    await db.delete("mcpEvents", copyId);
-                    dropped += 1;
-                }
-
+                // A user never deletes an Event, so a guest row that is gone was expired by the guest's retention or erased with the
+                // account. The copy keeps its own window. A deleted thread's Events go with its copy (the thread take-back above).
                 continue;
             }
 
@@ -1837,12 +1826,64 @@ export const dropRowsGoneFromGuest = internalMutation
                 .first();
 
             if (marker !== null && marker.result === (await rowDigest(args.table, existing))) {
+                // The thread's Events were copied with it. Its id is the guest's, so the new account holds those Events only as the
+                // merge's copies. One batch per call: the rest goes to `drainTakenBackThread`, on the new shard, without this merge's
+                // lease, since the merge can finish before the drain runs.
+                if (args.table === "threads" && !(await deleteMcpEventsOfThread(ctx, args.to, id))) {
+                    await runAfterOnShard(
+                        ctx.scheduler,
+                        0,
+                        internal.lib.account_merge.drainTakenBackThread,
+                        { from: args.from, threadId: id, to: args.to },
+                        args.to,
+                    );
+
+                    continue;
+                }
+
                 await db.delete(args.table, id);
                 dropped += 1;
             }
         }
 
         return { dropped, fenced: false };
+    });
+
+/**
+ * The rest of a taken-back thread's copied Events, one batch per call, on the new shard (`dropRowsGoneFromGuest` removes the first). It
+ * needs no merge lease: the merge can finish before it runs. The thread copy stays until none of its Events are left, so the thread's
+ * Events stay hidden meanwhile. The copy goes only while it is still the unchanged copy its marker records; an account-edited copy is
+ * kept with its Events.
+ */
+export const drainTakenBackThread = internalMutation
+    .input({ from: v.string(), threadId: v.string(), to: v.string() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const db = rawDb(ctx);
+        const copy = (await db.get("threads", args.threadId)) as Record<string, unknown> | null;
+
+        if (copy === null) {
+            return null;
+        }
+
+        const marker = await ctx.db
+            .query("idempotencyClaims")
+            .withIndex("by_scope_key", (q) => q.eq("scope", IMPORT_MARKER_SCOPE).eq("key", markerKey(args.from, "threads", args.threadId)))
+            .first();
+
+        if (marker === null || marker.result !== (await rowDigest("threads", copy))) {
+            return null;
+        }
+
+        if (!(await deleteMcpEventsOfThread(ctx, args.to, args.threadId))) {
+            await runAfterOnShard(ctx.scheduler, 0, internal.lib.account_merge.drainTakenBackThread, args, args.to);
+
+            return null;
+        }
+
+        await db.delete("threads", args.threadId);
+
+        return null;
     });
 
 /**

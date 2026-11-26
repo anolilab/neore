@@ -14,6 +14,7 @@ interface Call {
 }
 
 const DEDUP_ID_PATTERN = /^post-hog-retry:req-1:.+/;
+const OWNER_SWEEP_STEP = /^erase-pins-on-owner-shards(?:-again)?-\d+$/;
 
 /** Runs the real handler against a context whose steps record calls; the PostHog step returns `postHog`, or throws it when it is an Error. */
 const runWorkflow = async (
@@ -72,6 +73,11 @@ const runWorkflow = async (
 
         if (auditFails && current === "log-audit-posthog-failed") {
             throw new Error("audit failed");
+        }
+
+        // The owner sweeps report one page each, with no owner shards fenced and no further page.
+        if (OWNER_SWEEP_STEP.test(current)) {
+            return { cursor: null, hasMore: false, owners: [] };
         }
 
         // Batched steps are drained until `hasMore` is false; everything else returns null.

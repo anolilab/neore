@@ -1677,6 +1677,8 @@ export const schema = defineSchema({
      * sequence still never restarts. One row per user; removed with the user (`public-api/gdpr.ts`).
      */
     mcpEventWatermarks: defineTable({
+        /** The highest seq the retention sweep has expired for this user. A poll reports a gap only behind it: a chat's removal leaves none. */
+        prunedThrough: v.optional(v.number()),
         seq: v.number(),
         userId: v.string(),
     })
@@ -4336,6 +4338,8 @@ export const schema = defineSchema({
         /** The Creem subscription that set `baseTier`; a cancel of any other one leaves it alone. */
         creemSubscriptionId: v.optional(v.string()),
         email: v.string(),
+        /** `@lunora/auth`'s case- and Unicode-folded copy of `email`, added to the user table by its plugin. */
+        emailCanonical: v.optional(v.string()),
         emailVerified: v.boolean(),
         image: v.optional(v.string()),
         isAnonymous: v.optional(v.boolean()),
@@ -4346,6 +4350,8 @@ export const schema = defineSchema({
         userId: v.optional(v.string()),
     })
         .global()
+        // Unique: `@lunora/auth` relies on it to reject a concurrent sign-up that repeats a folded address.
+        .index("emailCanonical", ["emailCanonical"], { unique: true })
         .index("email_name", ["email", "name"])
         .index("name", ["name"])
         .index("role", ["role"])

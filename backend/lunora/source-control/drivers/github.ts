@@ -558,7 +558,7 @@ const THREADS_QUERY = `query ($owner: String!, $name: String!, $number: Int!, $a
         pageInfo { endCursor hasNextPage }
         nodes {
           id isResolved isOutdated path line startLine diffSide viewerCanResolve viewerCanUnresolve
-          comments(first: ${THREAD_COMMENTS}) { totalCount pageInfo { endCursor hasNextPage } nodes { fullDatabaseId author { login } body createdAt } }
+          comments(first: ${THREAD_COMMENTS}) { totalCount pageInfo { endCursor hasNextPage } nodes { fullDatabaseId url author { login } body createdAt } }
         }
       }
     }
@@ -569,7 +569,7 @@ const THREADS_QUERY = `query ($owner: String!, $name: String!, $number: Int!, $a
 const COMMENTS_QUERY = `query ($id: ID!, $after: String) {
   node(id: $id) {
     ... on PullRequestReviewThread {
-      comments(first: ${COMMENT_PAGE_SIZE}, after: $after) { pageInfo { endCursor hasNextPage } nodes { fullDatabaseId author { login } body createdAt } }
+      comments(first: ${COMMENT_PAGE_SIZE}, after: $after) { pageInfo { endCursor hasNextPage } nodes { fullDatabaseId url author { login } body createdAt } }
     }
   }
 }`;
@@ -583,6 +583,7 @@ const threadCommentSchema = z.object({
     body: z.string(),
     createdAt: z.string(),
     fullDatabaseId: z.union([z.string(), z.number()]),
+    url: z.string().nullable().optional(),
 });
 
 const threadSchema = z.object({
@@ -612,6 +613,7 @@ const commentsOf = (nodes: unknown[]): ThreadComment[] =>
     nodes.flatMap((node) => {
         const comment = threadCommentSchema.safeParse(node);
         const id = comment.success ? String(comment.data.fullDatabaseId) : "";
+        const url = comment.success ? webUrl(comment.data.url) : null;
 
         return comment.success && COMMENT_ID.test(id)
             ? [
@@ -620,6 +622,7 @@ const commentsOf = (nodes: unknown[]): ThreadComment[] =>
                       body: comment.data.body.slice(0, COMMENT_MAX_CHARS),
                       createdAt: toMs(comment.data.createdAt),
                       id,
+                      ...(url !== null && { url }),
                   },
               ]
             : [];

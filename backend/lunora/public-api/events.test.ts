@@ -36,7 +36,7 @@ const logOf = (rows: StoredEvent[]): EventLogStore => {
     return {
         after: async (afterSeq, limit) => rows.filter((row) => row.seq > afterSeq).slice(0, limit),
         latestSeq: async () => rows.at(-1)?.seq ?? 0,
-        oldestSeq: async () => rows[0]?.seq,
+        prunedThrough: async () => 0,
     };
 };
 
@@ -118,7 +118,7 @@ describe("events/poll over a log", () => {
 
     it("reports truncated and resumes from the oldest kept position when the cursor is older than the window", async () => {
         // Seqs 1 to 4 were pruned by retention; the cursor still names seq 1.
-        const log = logOf([run(5, 500), run(6, 600), run(7, 700)]);
+        const log = { ...logOf([run(5, 500), run(6, 600), run(7, 700)]), prunedThrough: async () => 4 };
         const outcome = await pollEvents(log, { fromSeq: 1, maxEvents: 50, name: RUN_COMPLETED_EVENT, now: NOW });
 
         expect(outcome.truncated).toBe(true);
@@ -304,19 +304,39 @@ describe("the event log's recorder", () => {
 });
 
 describe("events/poll over a log whose rows are all gone", () => {
-    it("reports truncated and resumes at the log's end when the cursor is behind it", async () => {
-        const store: EventLogStore = { after: async () => [], latestSeq: async () => 10, oldestSeq: async () => undefined };
+    it("reports no gap for a cursor behind rows a chat's removal took out, since retention expired none of them", async () => {
+        const store: EventLogStore = { after: async () => [], latestSeq: async () => 10, prunedThrough: async () => 0 };
 
         expect(await pollEvents(store, { fromSeq: 4, maxEvents: 10, name: RUN_COMPLETED_EVENT, now: NOW })).toStrictEqual({
             events: [],
             hasMore: false,
-            nextSeq: 10,
+            nextSeq: 4,
+            truncated: false,
+        });
+    });
+
+    it("does not report a gap when a chat's removal took out the oldest rows, so a poll from zero reads on from the first kept one", async () => {
+        // Seqs 1 and 2 belonged to a chat the user deleted: their rows are gone, but retention expired none of them.
+        const log = { ...logOf([run(3, 300), run(4, 400), run(5, 500)]), prunedThrough: async () => 0 };
+        const outcome = await pollEvents(log, { fromSeq: 0, maxEvents: 50, name: RUN_COMPLETED_EVENT, now: NOW });
+
+        expect(outcome.truncated).toBe(false);
+        expect(outcome.events.map((event) => event.eventId)).toStrictEqual(["run:3", "run:4", "run:5"]);
+    });
+
+    it("reports truncated and resumes at the retention position when the cursor is behind it", async () => {
+        const store: EventLogStore = { after: async () => [], latestSeq: async () => 10, prunedThrough: async () => 8 };
+
+        expect(await pollEvents(store, { fromSeq: 4, maxEvents: 10, name: RUN_COMPLETED_EVENT, now: NOW })).toStrictEqual({
+            events: [],
+            hasMore: false,
+            nextSeq: 8,
             truncated: true,
         });
     });
 
     it("is not truncated for a cursor already at the log's end", async () => {
-        const store: EventLogStore = { after: async () => [], latestSeq: async () => 10, oldestSeq: async () => undefined };
+        const store: EventLogStore = { after: async () => [], latestSeq: async () => 10, prunedThrough: async () => 0 };
 
         expect(await pollEvents(store, { fromSeq: 10, maxEvents: 10, name: RUN_COMPLETED_EVENT, now: NOW })).toStrictEqual({
             events: [],

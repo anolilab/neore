@@ -81,7 +81,7 @@ const CLAIMED_INTENT = Number.MAX_SAFE_INTEGER;
  * none does, none will.
  */
 const isStorageKeyNamed = async (context: Pick<QueryCtx, "db">, storageId: string): Promise<boolean> =>
-    (await context.db.chatFiles.findFirst({ consistency: "primary", where: { discardingAt: null, storageId } })) !== null;
+    (await context.db.chatFiles.findFirst({ consistency: "primary", where: { discardingAt: { isNull: true }, storageId } })) !== null;
 
 /** The record of `storageId` as an object to delete (`chatFileObjectDeletes`), read from the primary. */
 const objectDeleteFor = async (context: Pick<QueryCtx, "db">, storageId: string) =>

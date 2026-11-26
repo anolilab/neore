@@ -9,7 +9,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
-import { authMutation } from "../lib/crpc";
+import { authMutation, rateLimit } from "../lib/crpc";
 
 export const vAccessLevel = v.union(v.literal("read_only"), v.literal("read_write"), v.literal("none"));
 
@@ -42,6 +42,7 @@ export const deleteBotConnectorAccess = async (ctx: Pick<MutationCtx, "db">, bot
 /** Sets one connection's level for one teammate of the caller. A teammate the caller does not own is not found. */
 export const setTeammateConnectorAccess = authMutation
     .input({ botId: v.id("bots"), connectorSlug: v.string().max(SLUG_MAX), level: vAccessLevel })
+    .use(rateLimit("connectors/access"))
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const bot = await ctx.db.get("bots", args.botId);

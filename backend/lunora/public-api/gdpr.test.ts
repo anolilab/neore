@@ -7,6 +7,42 @@ import { collectMcpEventsForExport, deleteUserMcpEvents, EXPORT_EVENT_BYTES, MAX
 const BATCH = 200;
 
 describe("collectMcpEventsForExport", () => {
+    it("stops the scan at the read budget, so rows past it are never read", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+        // Newest 950 rows are about 9 KiB each: the 8 MiB read budget runs out near row 920, before the oldest 50 are reached. Those
+        // are tiny, and the byte budget still has room for them, so a scan that reads past the read budget would keep them.
+        const big = JSON.stringify({ blob: "x".repeat(9000) });
+        const tiny = JSON.stringify({ blob: "t" });
+
+        try {
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < 1000; index += 1) {
+                    const isTiny = index < 50;
+
+                    await context.db.insert("mcpEvents", {
+                        createdAt: 1,
+                        data: isTiny ? tiny : big,
+                        eventId: isTiny ? `run:tiny-${String(index)}` : `run:big-${String(index)}`,
+                        name: "run.completed",
+                        seq: index + 1,
+                        timestamp: 1,
+                        userId: "user",
+                    });
+                }
+            });
+
+            const { events, truncated } = (await harness.run(
+                async (context: any) => await context.runQuery(collectMcpEventsForExport, { userId: "user" }),
+            )) as { events: { eventId: string }[]; truncated: boolean };
+
+            expect(truncated).toBe(true);
+            expect(events.length).toBeGreaterThan(0);
+            expect(events.every((event) => event.eventId.startsWith("run:big-"))).toBe(true);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("keeps the newest events, oldest first, and says the history was cut past the cap", async () => {
         const harness = lunoraTest(schemaWithShardedTables([]) as never);
 

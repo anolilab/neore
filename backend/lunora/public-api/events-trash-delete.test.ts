@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { registerModule } from "../../test/registered-api";
 import { runInShard } from "../lib/shard-context";
 import { schemaWithShardedTables } from "../lib/test-schema";
+import { restoreThread } from "../agent/threads";
 import { drainTrashedThreadEvents, deleteTrashedThreadEvents } from "./events";
 import { hasMcpEventsOfThread, recordMcpEvent } from "./events-log";
 
@@ -16,6 +17,7 @@ vi.mock("../_generated/internal", async (importOriginal) => {
 });
 
 registerModule(registry, "public_api_events", { deleteTrashedThreadEvents, drainTrashedThreadEvents });
+registerModule(registry, "agent_threads", { restoreThread });
 
 const NOW = 1_700_000_000_000;
 /** Events one thread's removal deletes per batch (`THREAD_EVENT_BATCH`). */
@@ -106,6 +108,28 @@ describe("a trashed chat's events", () => {
             )) as number;
 
             expect(left).toBe(3);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("reports a restore only for the call that changes a trashed chat to live", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const outcome = (await runInShard(
+                "user",
+                async () =>
+                    await harness.run(async (context: any) => {
+                        const id = await chatWithEvents(context, true, 0);
+                        const first = (await context.runMutation(restoreThread, { threadId: id })) as { restored: boolean };
+                        const second = (await context.runMutation(restoreThread, { threadId: id })) as { restored: boolean };
+
+                        return { first: first.restored, second: second.restored };
+                    }),
+            )) as { first: boolean; second: boolean };
+
+            expect(outcome).toStrictEqual({ first: true, second: false });
         } finally {
             harness.close();
         }
