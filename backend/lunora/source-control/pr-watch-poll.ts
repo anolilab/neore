@@ -151,7 +151,7 @@ const leaseWatch = async (ctx: Pick<MutationCtx, "db" | "scheduler">, link: Doc<
         ctx.scheduler,
         0,
         internal.source_control.pr_watch_poll.pollWatchedPullRequest,
-        { lease: now, linkId: link._id, startedAt: link.watch?.startedAt ?? now },
+        { lease: now, linkId: link._id, startedAt: link.watch?.startedAt ?? now, ...(link.watchRun !== undefined && { run: link.watchRun }) },
         link.userId,
     );
     // The watchdog: the read's record arms the next poll itself, so this one only matters when the read never records. It does
@@ -192,7 +192,7 @@ const vReadFailure = v.union(
  * its wake count and its lease are untouched: the retry is the watchdog already armed with the lease.
  */
 export const recordWatchFailure = internalMutation
-    .input({ lease: v.number(), linkId: v.id("pullRequestThreads"), startedAt: v.number(), status: vReadFailure })
+    .input({ lease: v.number(), linkId: v.id("pullRequestThreads"), run: v.optional(v.string()), startedAt: v.number(), status: vReadFailure })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const link = await ctx.db.get("pullRequestThreads", args.linkId);
@@ -203,6 +203,7 @@ export const recordWatchFailure = internalMutation
             link.watch === undefined ||
             link.watch.stoppedAt !== undefined ||
             link.watch.startedAt !== args.startedAt ||
+            link.watchRun !== args.run ||
             link.watchCheckedAt !== args.lease
         ) {
             return null;
@@ -218,10 +219,10 @@ export const recordWatchFailure = internalMutation
 
 /**
  * What the host read needs from a running watch, on the user's shard. Null when the watch is gone or over, or when `lease` or
- * `startedAt` is no longer the link's own: the poll is stale and must not reach the host.
+ * `startedAt` or `run` is no longer the link's own: the poll is stale and must not reach the host.
  */
 export const readWatchForPoll = internalQuery
-    .input({ lease: v.number(), linkId: v.id("pullRequestThreads"), startedAt: v.number() })
+    .input({ lease: v.number(), linkId: v.id("pullRequestThreads"), run: v.optional(v.string()), startedAt: v.number() })
     .output(v.union(v.null(), v.object({ number: v.number(), repository: v.string(), reviewId: v.optional(v.string()), userId: v.string() })))
     .query(async ({ args, ctx }) => {
         const link = await ctx.db.get("pullRequestThreads", args.linkId);
@@ -232,6 +233,7 @@ export const readWatchForPoll = internalQuery
             link.watch === undefined ||
             link.watch.stoppedAt !== undefined ||
             link.watch.startedAt !== args.startedAt ||
+            link.watchRun !== args.run ||
             link.watchCheckedAt !== args.lease
         ) {
             return null;
@@ -250,7 +252,7 @@ export const readWatchForPoll = internalQuery
  * - end (closed or cap): stored, stamped `stoppedAt`, and `watchActive` is cleared so the person's slot is free.
  */
 export const recordWatchObservation = internalMutation
-    .input({ lease: v.number(), linkId: v.id("pullRequestThreads"), observation: vObservation, startedAt: v.number() })
+    .input({ lease: v.number(), linkId: v.id("pullRequestThreads"), observation: vObservation, run: v.optional(v.string()), startedAt: v.number() })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const link = await ctx.db.get("pullRequestThreads", args.linkId);
@@ -261,6 +263,7 @@ export const recordWatchObservation = internalMutation
             link.watch === undefined ||
             link.watch.stoppedAt !== undefined ||
             link.watch.startedAt !== args.startedAt ||
+            link.watchRun !== args.run ||
             link.watchCheckedAt !== args.lease
         ) {
             return null;
@@ -406,10 +409,10 @@ const readObservation = async (target: WatchTarget, token: GithubTokenOutcome): 
 
 /** One host read for one watched link, with the person's own token. */
 export const pollWatchedPullRequest = internalAction
-    .input({ lease: v.number(), linkId: v.id("pullRequestThreads"), startedAt: v.number() })
+    .input({ lease: v.number(), linkId: v.id("pullRequestThreads"), run: v.optional(v.string()), startedAt: v.number() })
     .output(v.null())
     .action(async ({ args, ctx }) => {
-        const key = { lease: args.lease, linkId: args.linkId, startedAt: args.startedAt };
+        const key = { lease: args.lease, linkId: args.linkId, startedAt: args.startedAt, ...(args.run !== undefined && { run: args.run }) };
 
         await runWatchPoll({
             fail: async (status) => await ctx.runMutation(internal.source_control.pr_watch_poll.recordWatchFailure, { ...key, status }),

@@ -5,6 +5,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { setPullRequestWatch } from "./pr-watch";
 import { insertThread } from "../agent/table-writes";
 import { runInShard } from "../lib/shard-context";
 import schema from "../schema";
@@ -93,7 +94,7 @@ const pollLink = async (linkId: string): Promise<void> => {
     });
 };
 
-const record = async (linkId: string, args: { lease?: number; observation: PullRequestObservation; startedAt?: number }): Promise<void> => {
+const record = async (linkId: string, args: { lease?: number; observation: PullRequestObservation; run?: string; startedAt?: number }): Promise<void> => {
     await harness.run(async (ctx: any) => {
         await ctx.runMutation(recordWatchObservation, { lease: LEASE, linkId, startedAt: STARTED_AT, ...args });
     });
@@ -462,6 +463,43 @@ describe("observeWatched", () => {
 
         expect(login).toHaveBeenCalledOnce();
         expect(observed).toMatchObject({ checks: "passing", mergeable: "clean", reviews: [{ authorLogin: "bob", id: "r1" }], watcherLogin: "me" });
+    });
+});
+
+describe("a poll taken before a stop and restart", () => {
+    it("does not record after the restart, even with the same start time", async () => {
+        const stoppedWatch = { baselined: true, headSha: "sha-1", startedAt: STARTED_AT };
+        const linkId = await seedWatch({ watch: stoppedWatch, watchRun: "run-1" });
+        const { threadId: linkThread } = await rowOf(linkId);
+        const threadId = String(linkThread);
+
+        // The same poll's identity as it was leased: same start time, same lease, the first run.
+        const stale = { lease: LEASE, run: "run-1" };
+
+        await harness.run(async (ctx: any) => {
+            await ctx.runMutation(setPullRequestWatch, { number: 7, repository: "octo/hello", threadId, userId: OWNER, watching: false });
+            await ctx.runMutation(setPullRequestWatch, { number: 7, repository: "octo/hello", threadId, userId: OWNER, watching: true });
+            // Force the restart's start time and lease to the old values, the worst case for a clock-based identity.
+            const row = await ctx.db.get("pullRequestThreads", linkId);
+
+            await ctx.db.patch("pullRequestThreads", linkId, { watch: { ...row.watch, startedAt: STARTED_AT }, watchCheckedAt: LEASE });
+        });
+
+        const restarted = await rowOf(linkId);
+
+        expect(restarted.watchRun).toBeTypeOf("string");
+        expect(restarted.watchRun).not.toBe("run-1");
+
+        await record(linkId, { ...stale, observation: observation({ headSha: "sha-stale" }) });
+        await harness.run(async (ctx: any) => {
+            await ctx.runMutation(recordWatchFailure, { ...stale, linkId, startedAt: STARTED_AT, status: "host_error" });
+        });
+
+        const after = await rowOf(linkId);
+
+        expect(after.watch.baselined).toBeUndefined();
+        expect(after.watchReadFailure).toBeUndefined();
+        expect(await harness.run(async (ctx: any) => await ctx.runQuery(readWatchForPoll, { ...stale, linkId, startedAt: STARTED_AT }))).toBeNull();
     });
 });
 

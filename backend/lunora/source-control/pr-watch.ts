@@ -99,6 +99,7 @@ export const setPullRequestWatch = internalMutation
             watchCheckedAt: 0,
             watchLeaseUntil: 0,
             watchPending: stored.watchPending ?? [],
+            watchRun: crypto.randomUUID(),
         });
         await runAfterOnShard(ctx.scheduler, 0, internal.source_control.pr_watch_poll.pollWatchLink, { linkId: link._id }, args.userId);
 
