@@ -15,6 +15,8 @@ import { v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
+import { internalQuery } from "../_generated/server";
+import { threadHasLiveGrant } from "../agent/live-grant";
 import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { parseCustomModelId } from "@neore/ai/models";
@@ -36,6 +38,7 @@ export type SideChatRefusal =
 
 type SideChatParent = {
     activeAgent?: { kind?: string; model?: string };
+    /** The last archive time: kept after the chat is reopened, so it does not say whether the chat is archived (see `status`). */
     archivedAt?: number;
     deleted?: boolean;
     deletingAt?: number;
@@ -48,6 +51,7 @@ type SideChatParent = {
     multiChat?: boolean;
     publicAccessToken?: string;
     runner?: string;
+    status?: string;
 };
 
 /** The refusal for a parent thread, or `null` when a side chat may start beside it. Pure, so each rule is pinned by a table. */
@@ -68,7 +72,8 @@ export const sideChatRefusalOf = (parent: SideChatParent | null, ownerOk: boolea
         return "shared_or_temporary";
     }
 
-    if (parent.archivedAt !== undefined) {
+    // Unarchiving sets the status back and keeps `archivedAt` as the time of the last archive, so the status is the test.
+    if (parent.status === "archived") {
         return "archived";
     }
 
@@ -100,6 +105,15 @@ export const sideChatRefusalOf = (parent: SideChatParent | null, ownerOk: boolea
     return null;
 };
 
+/**
+ * Whether anyone else holds a live grant on the thread. Ordinary invited sharing is recorded only as a grant, so the parent's
+ * own flags do not show it: a chat others can read is not forked into a chat only its owner can see.
+ */
+export const sharedWithOthers = internalQuery
+    .input({ threadId: v.id("threads") })
+    .output(v.boolean())
+    .query(async ({ args, ctx }) => await threadHasLiveGrant(ctx, args.threadId));
+
 export const createSideChat = authAction
     .use(rateLimit("chat/create"))
     .input({ threadId: v.string().max(MAX_LENGTH.id) })
@@ -120,6 +134,10 @@ export const createSideChat = authAction
 
         if (gate.hostRun) {
             return { reason: "host_run", status: "refused" as const };
+        }
+
+        if (await ctx.runQuery(internal.chat.side_chat.sharedWithOthers, { threadId })) {
+            return { reason: "shared_or_temporary", status: "refused" as const };
         }
 
         // The last SETTLED row of the active path: a reply still in flight or one that failed is never copied, and a parent
@@ -147,6 +165,9 @@ export const createSideChat = authAction
             ...(parent.customSystemPrompt !== undefined && { customSystemPrompt: parent.customSystemPrompt }),
             ...(parent.reasoningEffort !== undefined && { reasoningEffort: parent.reasoningEffort }),
             ...(parent.statelessMode !== undefined && { statelessMode: parent.statelessMode }),
+            // The team and the enabled features are part of where the chat lives and how it runs, as the rest of the placement is.
+            ...(parent.teamId !== undefined && { teamId: parent.teamId }),
+            ...(parent.enabledFeatures !== undefined && { enabledFeatures: parent.enabledFeatures }),
             title: parent.title ?? "",
             userId,
         });
@@ -178,7 +199,8 @@ export const createSideChat = authAction
             // Re-read just before the copy: a parent locked, deleted or archived meanwhile is not copied. This narrows the race with
             // a delete or lock and does not remove it; a full fence would need a claim the delete and lock paths also honour.
             const current = await ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId });
-            const nowRefused = sideChatRefusalOf(current, current?.userId === userId);
+            const sharedNow = await ctx.runQuery(internal.chat.side_chat.sharedWithOthers, { threadId });
+            const nowRefused = sideChatRefusalOf(current, current?.userId === userId) ?? (sharedNow ? "shared_or_temporary" : null);
 
             if (nowRefused !== null) {
                 await discard();

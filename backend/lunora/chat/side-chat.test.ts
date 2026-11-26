@@ -60,6 +60,7 @@ beforeAll(async () => {
     registerModule(registry, "agent_threads", await import("../agent/threads"));
     registerModule(registry, "chat_context_reset", await import("./context-reset"));
     registerModule(registry, "chat_functions", await import("./functions"));
+    registerModule(registry, "chat_side_chat", await import("./side-chat"));
     registerModule(registry, "lib_document_history", await import("../lib/document-history"));
     registerModule(registry, "chat_thread_state", await import("./thread-state"));
 });
@@ -136,7 +137,9 @@ describe("sideChatRefusalOf", () => {
         expect(sideChatRefusalOf({}, false)).toBe("not_found");
         expect(sideChatRefusalOf({ deleted: true }, true)).toBe("deleted");
         expect(sideChatRefusalOf({ lockedAt: 1 }, true)).toBe("locked");
-        expect(sideChatRefusalOf({ archivedAt: 1 }, true)).toBe("archived");
+        expect(sideChatRefusalOf({ status: "archived" }, true)).toBe("archived");
+        // Reopened: the status is back to active, and `archivedAt` keeps the time of the last archive.
+        expect(sideChatRefusalOf({ archivedAt: 1, model: "openai/gpt-5", status: "active" }, true)).toBeNull();
         expect(sideChatRefusalOf({ runner: "host" }, true)).toBe("host_run");
         expect(sideChatRefusalOf({ groupChat: {} }, true)).toBe("group_or_shared");
         expect(sideChatRefusalOf({ multiChat: true }, true)).toBe("group_or_shared");
@@ -562,5 +565,20 @@ describe("createSideChat", () => {
         const child = await threadRow(outcome.threadId);
 
         expect(child).toMatchObject({ customSystemPrompt: "Answer briefly.", reasoningEffort: 2, statelessMode: true });
+    });
+
+    it("refuses a parent that someone else holds a grant on, and writes nothing", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await withMessages(parentId, OWNER, ["hello"]);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "read", threadId: parentId, userId: "user-c" });
+        });
+
+        expect(await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)).toStrictEqual({
+            reason: "shared_or_temporary",
+            status: "refused",
+        });
+        expect(await sideRelations()).toHaveLength(0);
     });
 });
