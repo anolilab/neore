@@ -18,6 +18,7 @@ import { internalMutation } from "../_generated/server";
 import { withoutUndefined } from "../lib/patch";
 import { skillRowHash, triggerRowHash } from "./entry-hash";
 import { deleteSkillRows } from "../skills/functions";
+import { ensureSlugUnique, validateSlug } from "../skills/validators";
 import { LEASE_MS, markerFor } from "./logic";
 
 const STALE = "STALE_LEASE: this install was taken over by another action";
@@ -72,6 +73,7 @@ export const updateSkillChild = internalMutation
         installId: v.string().max(128),
         instructions: v.string().max(65536),
         name: v.string().max(256),
+        slug: v.string().max(256),
         tags: v.optional(v.array(v.string().max(256))),
         variables: v.optional(v.any()),
         version: v.optional(v.string().max(64)),
@@ -98,9 +100,19 @@ export const updateSkillChild = internalMutation
             throw new LunoraError("CONFLICT", `The skill for "${args.entryKey}" was edited, so it is kept as it is`);
         }
 
+        // The planned slug gets the same checks skill creation gives it: a reserved or malformed slug is refused, and so is one another skill now holds.
+        const slugValidation = validateSlug(args.slug);
+
+        if (!slugValidation.valid) {
+            throw new LunoraError("BAD_REQUEST", slugValidation.errors.join(", "));
+        }
+
+        await ensureSlugUnique(ctx, skill.userId, args.slug, skill._id);
+
         // Pending first: if the write below stops, repair sees a child that matches neither hash and knows an update was half done.
         await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { pendingHash: args.contentHash });
 
+        // The slug is part of the content hash, so the row must take the planned slug or it reads as edited on the next update.
         await ctx.db.patch(
             "skills",
             skill._id as Id<"skills">,
@@ -111,6 +123,7 @@ export const updateSkillChild = internalMutation
                 icon: args.icon,
                 instructions: args.instructions,
                 name: args.name,
+                slug: args.slug,
                 tags: args.tags,
                 updatedAt: ctx.now,
                 variables: args.variables,
