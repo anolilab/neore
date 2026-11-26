@@ -82,6 +82,20 @@ const reviewsByOthers = (observed: PullRequestObservation): { authorLogin: strin
     observed.watcherLogin.trim() === "" ? [] : observed.reviews.filter((review) => !isByWatcher(review, observed.watcherLogin.trim()));
 
 /**
+ * Whether review `id` is newer than the `seen` one by the host's numeric ids. Ids that are not both whole numbers cannot be ordered,
+ * and then the review counts as newer: a spurious wake is acceptable, a missed review is not.
+ */
+const WHOLE_NUMBER = /^\d+$/u;
+
+const isNewerReviewId = (id: string, seen: string | undefined): boolean => {
+    if (seen === undefined || !WHOLE_NUMBER.test(id) || !WHOLE_NUMBER.test(seen)) {
+        return true;
+    }
+
+    return BigInt(id) > BigInt(seen);
+};
+
+/**
  * The review a read leaves as the watch's marker: the newest by someone other than the watcher. With no login the watcher's
  * reviews cannot be told apart, so the newest review of all marks the place: every review at or before it is old, and a later
  * read that has the login alerts only on reviews newer than it.
@@ -177,8 +191,13 @@ export const decideWatch = (previous: PullRequestWatchState, observed: PullReque
         // else, or clear the marker when there is none: the next review by someone else then wakes the thread.
         next.reviewId = review?.id;
 
-        // A truncated list that does not reach the seen review holds only newer ones: a review by someone else is new, not lost.
-        if (observed.reviewsTruncated === true && review !== undefined && !owed.includes("review")) {
+        // A truncated list that does not reach the seen review says nothing by position, so ids decide: a review by someone else
+        // wakes only if it is newer than the seen one (host review ids grow over time), which a deleted marker's older reviews are not.
+        if (
+            observed.reviewsTruncated === true &&
+            !owed.includes("review") &&
+            reviewsByOthers(observed).some((other) => isNewerReviewId(other.id, previous.reviewId))
+        ) {
             owed.push("review");
         }
     } else if (newer.length > 0) {

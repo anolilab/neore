@@ -49,6 +49,11 @@ const MAX_NAME_LENGTH = 200;
 /** Reviews kept when no seen review bounds the list. The host lists newest first and the cut keeps the head: only the oldest are dropped, which the decision never needs. */
 const MAX_REVIEWS = 100;
 
+/** Failures that retrying cannot cure, and how many in a row end the watch. Transient ones (host error, rate limit) retry for good. */
+const TERMINAL_FAILURES = new Set<ReadFailure>(["forbidden", "needs_reconnect", "not_connected", "not_found"]);
+
+export const PR_WATCH_MAX_TERMINAL_FAILURES = 5;
+
 /** A `watchCheckedAt` no poll carries: what a recorded poll leaves behind. */
 const CONSUMED_LEASE = -1;
 
@@ -221,6 +226,12 @@ export const recordWatchFailure = internalMutation
             watchReadFailure: { at: ctx.now, attempts: attempt, status: args.status },
         });
         ctx.log.event("develop.watch_poll_failed", { attempt, linkId: String(link._id), status: args.status });
+
+        // A watch that can never be read (the pull request or repository is gone, access was withdrawn) must not hold a slot for good.
+        if (TERMINAL_FAILURES.has(args.status) && attempt >= PR_WATCH_MAX_TERMINAL_FAILURES) {
+            await ctx.db.patch("pullRequestThreads", link._id, { watch: { ...link.watch, stoppedAt: ctx.now }, watchActive: false });
+            ctx.log.event("develop.watch_ended", { attempt, linkId: String(link._id), reason: "unreadable", status: args.status });
+        }
 
         return null;
     });

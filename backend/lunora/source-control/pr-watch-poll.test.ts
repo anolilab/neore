@@ -466,35 +466,35 @@ describe("observeWatched", () => {
 
     it("keeps the seen review and every newer one past the bound, so the poll records a review wake", async () => {
         const items = Array.from({ length: 150 }, (_, index) => {
-            return { authorLogin: "bob", id: `r${String(150 - index)}` };
+            return { authorLogin: "bob", id: String(150 - index) };
         });
-        const linkId = await seedWatch({ watch: { baselined: true, headSha: "sha-1", reviewId: "r10", startedAt: STARTED_AT } });
-        const { observation: observed } = await observeWatched(request, { ...TARGET, reviewId: "r10" }, dependencies(items, 150));
+        const linkId = await seedWatch({ watch: { baselined: true, headSha: "sha-1", reviewId: "10", startedAt: STARTED_AT } });
+        const { observation: observed } = await observeWatched(request, { ...TARGET, reviewId: "10" }, dependencies(items, 150));
 
         expect(observed.reviews).toHaveLength(141);
-        expect(observed.reviews.at(-1)?.id).toBe("r10");
+        expect(observed.reviews.at(-1)?.id).toBe("10");
 
         await record(linkId, { observation: observed });
 
         const row = await rowOf(linkId);
 
         expect(row.watchPending).toEqual(["review"]);
-        expect(row.watch.reviewId).toBe("r150");
+        expect(row.watch.reviewId).toBe("150");
     });
 
     it("wakes for a review when the seen review lies beyond what the host read", async () => {
         const items = Array.from({ length: 150 }, (_, index) => {
-            return { authorLogin: "bob", id: `r${String(400 - index)}` };
+            return { authorLogin: "bob", id: String(400 - index) };
         });
-        const linkId = await seedWatch({ watch: { baselined: true, headSha: "sha-1", reviewId: "r10", startedAt: STARTED_AT } });
-        const { observation: observed } = await observeWatched(request, { ...TARGET, reviewId: "r10" }, dependencies(items, 400));
+        const linkId = await seedWatch({ watch: { baselined: true, headSha: "sha-1", reviewId: "10", startedAt: STARTED_AT } });
+        const { observation: observed } = await observeWatched(request, { ...TARGET, reviewId: "10" }, dependencies(items, 400));
 
         await record(linkId, { observation: observed });
 
         const row = await rowOf(linkId);
 
         expect(observed.reviewsTruncated).toBe(true);
-        expect(row.watch.reviewId).toBe("r400");
+        expect(row.watch.reviewId).toBe("400");
         expect(row.watchPending).toEqual(["review"]);
     });
 
@@ -546,6 +546,46 @@ describe("a poll taken before a stop and restart", () => {
         expect(after.watch.baselined).toBeUndefined();
         expect(after.watchReadFailure).toBeUndefined();
         expect(await harness.run(async (ctx: any) => await ctx.runQuery(readWatchForPoll, { ...stale, linkId, startedAt: STARTED_AT }))).toBeNull();
+    });
+});
+
+describe("a watch that can never be read", () => {
+    const failTimes = async (linkId: string, times: number, status: string): Promise<void> => {
+        for (let index = 0; index < times; index += 1) {
+            await harness.run(async (ctx: any) => {
+                await ctx.db.patch("pullRequestThreads", linkId, { watchCheckedAt: LEASE });
+                await ctx.runMutation(recordWatchFailure, { lease: LEASE, linkId, startedAt: STARTED_AT, status });
+            });
+        }
+    };
+
+    it("ends after five terminal failures in a row, and not after four", async () => {
+        const linkId = await seedWatch({ watch: { baselined: true, startedAt: STARTED_AT } });
+
+        await failTimes(linkId, 4, "forbidden");
+
+        const four = await rowOf(linkId);
+
+        expect(four.watchActive).toBe(true);
+
+        await failTimes(linkId, 1, "forbidden");
+
+        const five = await rowOf(linkId);
+
+        expect(five.watchActive).toBe(false);
+        expect(five.watch.stoppedAt).toBeGreaterThan(0);
+        expect(five.watchReadFailure).toMatchObject({ attempts: 5, status: "forbidden" });
+    });
+
+    it("keeps retrying a transient failure", async () => {
+        const linkId = await seedWatch({ watch: { baselined: true, startedAt: STARTED_AT } });
+
+        await failTimes(linkId, 7, "rate_limited");
+
+        const row = await rowOf(linkId);
+
+        expect(row.watchActive).toBe(true);
+        expect(row.watch.stoppedAt).toBeUndefined();
     });
 });
 
