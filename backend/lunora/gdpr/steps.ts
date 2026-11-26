@@ -21,7 +21,7 @@ import { callOnShard } from "../lib/cross-shard";
 import { collectOrganizationReplyPages } from "../usage/organization";
 import { collectAcpSessionPages } from "../acp/gdpr";
 import { BROWSER_EXPORT_BYTES, browserExportPageKey, readAllBrowserPages } from "../browser/export-pages";
-import { readAllTaskSuggestionPages, TASK_SUGGESTIONS_EXPORT_BYTES, taskSuggestionsExportPageKey } from "../tasks/export-pages";
+import { readAllTaskSuggestionPages, taskSuggestionsExportPageKey, taskSuggestionsSectionBudget } from "../tasks/export-pages";
 import { collectAllFeedback } from "../feedback/gdpr";
 import { collectAllTriggers } from "../triggers/export-pages";
 import { attachProjectRuleFiles, collectAllOwnedProjects, collectAllRepositories } from "../projects/export-pages";
@@ -897,15 +897,6 @@ export const generateExportFile = internalAction
             throw new Error("The task suggestions' pages were stored without a prefix to read them from");
         }
 
-        const suggestions =
-            browserPrefix === undefined
-                ? { cut: false, taskSuggestions: [] }
-                : await readAllTaskSuggestionPages(
-                      async (page) => await readStoredText(context.storage, taskSuggestionsExportPageKey(browserPrefix, page), { maxBytes: MAX_EXPORT_BYTES }),
-                      taskSuggestionPages,
-                      TASK_SUGGESTIONS_EXPORT_BYTES,
-                      args.taskSuggestionsCut === true,
-                  );
         const browser =
             browserPrefix === undefined || browserPages === undefined
                 ? { actions: [], extensions: [], humanChecks: [], sessions: [] }
@@ -988,8 +979,8 @@ export const generateExportFile = internalAction
             settings: args.settings,
             sharedThreadPins: args.sharedThreadPins ?? [],
             subAgentRuns: activity?.subAgentRuns ?? [],
-            // `taskSuggestionsCut`: the suggestion history passed its share of the file, and the rows after the last stored page (accepted ones first) are left out.
-            tasks: { ...(args.tasks ?? { goals: [], tasks: [] }), taskSuggestions: suggestions.taskSuggestions, taskSuggestionsCut: suggestions.cut },
+            // The suggestion history is added below, once what the rest of the file leaves for it is known.
+            tasks: args.tasks ?? { goals: [], tasks: [] },
             threadFollows: threadFollows.section,
             threadTags: args.threadTags ?? [],
             triggers: { triggers: triggers.triggers },
@@ -1001,10 +992,29 @@ export const generateExportFile = internalAction
             watchedRepositories: args.watchedRepositories ?? { watched: [] },
         };
 
+        const usageBytes = usageJson === undefined ? 0 : textBytes(usageJson);
+        // The task suggestions, every page the workflow stored under the run's prefix (`tasks/export-pages.ts`), read from their objects.
+        // They take what every section above leaves under the file's size limit (usage JSON included), up to their own share: past it the
+        // history is cut and flagged (`taskSuggestionsCut`: the rows after the last page kept, accepted ones first, are left out) and the export is
+        // still written. The chat-file section below takes what is left after them.
+        const suggestions =
+            browserPrefix === undefined
+                ? { cut: false, taskSuggestions: [] }
+                : await readAllTaskSuggestionPages(
+                      async (page) => await readStoredText(context.storage, taskSuggestionsExportPageKey(browserPrefix, page), { maxBytes: MAX_EXPORT_BYTES }),
+                      taskSuggestionPages,
+                      taskSuggestionsSectionBudget(textBytes(JSON.stringify(exportData, null, 2)) + usageBytes, MAX_EXPORT_BYTES),
+                      args.taskSuggestionsCut === true,
+                  );
+
         // The rest of the export, serialized without the chat-file section. The section takes what the rest leaves under the file's size
         // limit (usage JSON included, as it is spliced in), so the file is never written past it: a large history is cut and flagged.
-        const rest = JSON.stringify(exportData, null, 2);
-        const restBytes = textBytes(rest) + (usageJson === undefined ? 0 : textBytes(usageJson));
+        const rest = JSON.stringify(
+            { ...exportData, tasks: { ...exportData.tasks, taskSuggestions: suggestions.taskSuggestions, taskSuggestionsCut: suggestions.cut } },
+            null,
+            2,
+        );
+        const restBytes = textBytes(rest) + usageBytes;
         const chatFileCapped = capChatFiles(chatFileRead.rows, chatFileSectionBudget(restBytes, MAX_EXPORT_BYTES));
         // Cut by the byte cap, by the file's size limit or by the read budget: each way the section says so.
         const chatFiles = { files: chatFileCapped.files, truncated: chatFileCapped.truncated || chatFileRead.truncated };

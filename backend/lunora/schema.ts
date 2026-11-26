@@ -3463,7 +3463,9 @@ export const schema = defineSchema({
         userId: v.string(),
     })
         .shardBy("userId")
-        .index("by_user_and_status_and_createdAt", ["userId", "status", "createdAt"]),
+        .index("by_user_and_status_and_createdAt", ["userId", "status", "createdAt"])
+        // The trim of decided rows keeps the most recently decided (`trimDecidedSuggestions`).
+        .index("by_user_and_status_and_decidedAt", ["userId", "status", "decidedAt"]),
 
     team: defineTable({
         createdAt: v.number(),

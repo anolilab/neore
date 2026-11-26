@@ -68,6 +68,20 @@ export const storeAllTaskSuggestionPages = async (
 };
 
 /**
+ * Held back from the file's size limit for what is written around the suggestion rows and not measured with them: the chat-file
+ * section's frame (written empty when it is cut to nothing), the `[]` of this section becoming a list, and the cut flag turning `true`.
+ */
+const TASK_SUGGESTIONS_SPLICE_SLACK_BYTES = 1024;
+
+/**
+ * The bytes the suggestion history may take in the export file: its own share, and what the rest of the export leaves under the file's
+ * size limit. `restBytes` is the export without the history and without the chat-file section, usage JSON included. Past it the history is
+ * cut to fit and says so, so the file is still written (the chat-file section then takes what is left, as it does after every section).
+ */
+export const taskSuggestionsSectionBudget = (restBytes: number, fileLimit: number): number =>
+    Math.max(0, Math.min(TASK_SUGGESTIONS_EXPORT_BYTES, fileLimit - restBytes - TASK_SUGGESTIONS_SPLICE_SLACK_BYTES));
+
+/**
  * The stored pages read back in order into one section, held to `maxBytes` in the export file: the first page past it, and every one
  * after, is left out and the section is marked cut, so the rest of the export is still written. `cut`: the pages were cut already.
  */

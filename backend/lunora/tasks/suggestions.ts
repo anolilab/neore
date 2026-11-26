@@ -9,12 +9,13 @@
  *
  * Rows are bounded. Pending ones stay within {@link MAX_PENDING_SUGGESTIONS}. A decided row is kept for the history
  * (and the export) only up to {@link MAX_DECIDED_SUGGESTIONS_PER_STATUS} per user and per status: deciding one more
- * deletes that user's oldest rows (by `createdAt`) of the same status above the cap, in the same transaction
- * (`trimDecidedSuggestions`). `taskSuggestions` is not an audited table (`AUDIT_TABLES`), so a plain delete is right.
+ * deletes that user's rows of the same status decided longest ago (by `decidedAt`) above the cap, in the same transaction
+ * (`trimDecidedSuggestions`), never the row just decided. `taskSuggestions` is not an audited table (`AUDIT_TABLES`), so a plain delete is right.
  */
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
+import type { Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
@@ -40,19 +41,28 @@ const TRIM_EXTRA = 10;
 const SUGGESTION_STATUSES = ["pending", "accepted", "dismissed"] as const;
 
 /**
- * Keeps the user's newest {@link MAX_DECIDED_SUGGESTIONS_PER_STATUS} rows of a decided status and deletes the oldest
- * above it, at most {@link TRIM_EXTRA} per call. Reads the newest `cap + TRIM_EXTRA` rows only, never the whole history.
- * Deletes one at a time, as every deletion in this module does.
+ * Keeps the rows of a decided status the person decided most recently, {@link MAX_DECIDED_SUGGESTIONS_PER_STATUS} of them, and
+ * deletes the ones decided longest ago above it, at most {@link TRIM_EXTRA} per call. Ordered by decision time, not by when the
+ * idea was suggested: an idea that waited a long while and is decided now is the newest decision and is kept. Reads the
+ * `cap + TRIM_EXTRA` latest decisions only, never the whole history. Deletes one at a time, as every deletion in this module does.
+ * `keepId`, the row this decision just wrote, is never deleted, whatever the order says.
  */
-const trimDecidedSuggestions = async (ctx: Pick<MutationCtx, "db">, userId: string, status: "accepted" | "dismissed"): Promise<void> => {
+const trimDecidedSuggestions = async (
+    ctx: Pick<MutationCtx, "db">,
+    userId: string,
+    status: "accepted" | "dismissed",
+    keepId: Id<"taskSuggestions">,
+): Promise<void> => {
     const rows = await ctx.db
         .query("taskSuggestions")
-        .withIndex("by_user_and_status_and_createdAt", (q) => q.eq("userId", userId).eq("status", status))
+        .withIndex("by_user_and_status_and_decidedAt", (q) => q.eq("userId", userId).eq("status", status))
         .order("desc")
         .take(MAX_DECIDED_SUGGESTIONS_PER_STATUS + TRIM_EXTRA);
 
     for (const row of rows.slice(MAX_DECIDED_SUGGESTIONS_PER_STATUS)) {
-        await ctx.db.delete("taskSuggestions", row._id);
+        if (row._id !== keepId) {
+            await ctx.db.delete("taskSuggestions", row._id);
+        }
     }
 };
 
@@ -137,7 +147,7 @@ export const acceptTaskSuggestion = authMutation
         );
 
         await ctx.db.patch("taskSuggestions", row._id, { decidedAt: now, status: "accepted", taskId });
-        await trimDecidedSuggestions(ctx, userId, "accepted");
+        await trimDecidedSuggestions(ctx, userId, "accepted", row._id);
 
         ctx.log.event("tasks.accept_suggestion", { recurring, suggestionId: row._id, taskId });
 
@@ -161,7 +171,7 @@ export const dismissTaskSuggestion = authMutation
         }
 
         await ctx.db.patch("taskSuggestions", row._id, { decidedAt: ctx.now, status: "dismissed" });
-        await trimDecidedSuggestions(ctx, ctx.user.userId, "dismissed");
+        await trimDecidedSuggestions(ctx, ctx.user.userId, "dismissed", row._id);
 
         ctx.log.event("tasks.dismiss_suggestion", { suggestionId: row._id });
 

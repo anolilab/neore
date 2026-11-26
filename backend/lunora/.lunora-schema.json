@@ -28184,6 +28184,14 @@
             "createdAt"
           ],
           "unique": false
+        },
+        "by_user_and_status_and_decidedAt": {
+          "fields": [
+            "userId",
+            "status",
+            "decidedAt"
+          ],
+          "unique": false
         }
       },
       "memory": false,

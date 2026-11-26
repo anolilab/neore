@@ -403,10 +403,10 @@ describe("accepting", () => {
         await setSwitch(A, true);
 
         for (let index = 1; index <= MAX_DECIDED_SUGGESTIONS_PER_STATUS; index += 1) {
-            await seedSuggestion(A, { createdAt: index, status: "accepted", title: `Accepted ${String(index)}` });
+            await seedSuggestion(A, { createdAt: index, decidedAt: index + 1000, status: "accepted", title: `Accepted ${String(index)}` });
         }
 
-        await seedSuggestion(A, { createdAt: 500, status: "dismissed", title: "Dismissed" });
+        await seedSuggestion(A, { createdAt: 500, decidedAt: 1500, status: "dismissed", title: "Dismissed" });
         await insert(A, [proposal()]);
         const suggestionId = await pendingId(A);
 
@@ -497,6 +497,10 @@ describe("dismissing", () => {
 
         for (const suggestionId of pendingIds) {
             await as(A).mutation(dismissTaskSuggestion as never, { suggestionId } as never);
+            // The trim orders by decision time: decisions a millisecond apart keep that order.
+            await new Promise((resolve) => {
+                setTimeout(resolve, 2);
+            });
         }
 
         const rows = await rowsOf("taskSuggestions", A);
@@ -509,12 +513,13 @@ describe("dismissing", () => {
         expect(await rowsOf("taskSuggestions", B)).toHaveLength(over);
     });
 
-    it("holds the cap even when the row dismissed is older than the rows kept", async () => {
+    it("keeps the row just decided when it was suggested before every row kept, and removes the one decided longest ago", async () => {
         await setSwitch(A, true);
         await seedSuggestion(A, { createdAt: 1, status: "pending", title: "Old idea" });
 
-        for (let index = 2; index <= MAX_DECIDED_SUGGESTIONS_PER_STATUS + 1; index += 1) {
-            await seedSuggestion(A, { createdAt: index, status: "dismissed", title: `Dismissed ${String(index)}` });
+        // 100 newer ideas, decided earlier than the old one is now.
+        for (let index = 1; index <= MAX_DECIDED_SUGGESTIONS_PER_STATUS; index += 1) {
+            await seedSuggestion(A, { createdAt: index + 1, decidedAt: index + 1000, status: "dismissed", title: `Dismissed ${String(index)}` });
         }
 
         const suggestionId = await pendingId(A);
@@ -525,7 +530,27 @@ describe("dismissing", () => {
         const dismissed = rows.filter((row) => row.status === "dismissed");
 
         expect(dismissed).toHaveLength(MAX_DECIDED_SUGGESTIONS_PER_STATUS);
-        expect(dismissed.some((row) => row.title === "Old idea")).toBe(false);
+        expect(dismissed.some((row) => row.title === "Old idea")).toBe(true);
+        expect(dismissed.some((row) => row.title === "Dismissed 1")).toBe(false);
+        expect(dismissed.some((row) => row.title === "Dismissed 2")).toBe(true);
+    });
+
+    it("keeps an accepted row, with its task, when it is decided after 100 newer ones", async () => {
+        await setSwitch(A, true);
+        await seedSuggestion(A, { createdAt: 1, status: "pending", title: "Old idea" });
+
+        for (let index = 1; index <= MAX_DECIDED_SUGGESTIONS_PER_STATUS; index += 1) {
+            await seedSuggestion(A, { createdAt: index + 1, decidedAt: index + 1000, status: "accepted", title: `Accepted ${String(index)}` });
+        }
+
+        const suggestionId = await pendingId(A);
+        const { taskId } = (await as(A).mutation(acceptTaskSuggestion as never, { suggestionId } as never)) as { taskId: string };
+        const rows = await rowsOf("taskSuggestions", A);
+        const accepted = rows.filter((row) => row.status === "accepted");
+
+        expect(accepted).toHaveLength(MAX_DECIDED_SUGGESTIONS_PER_STATUS);
+        expect(accepted.find((row) => row.title === "Old idea")).toMatchObject({ taskId });
+        expect(accepted.some((row) => row.title === "Accepted 1")).toBe(false);
     });
 
     it("answers NOT_FOUND for another user's suggestion and leaves it pending", async () => {
