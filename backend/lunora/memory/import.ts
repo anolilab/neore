@@ -32,6 +32,7 @@ import {
     MEMORY_FILE_MAX_BYTES,
     MEMORY_FILE_TOO_LARGE_INLINE_MESSAGE,
     MEMORY_FILE_TOO_LARGE_MESSAGE,
+    type MemoryFileEntry,
     MemoryFileError,
     parseMemoryFile,
     type ParsedMemoryFile,
@@ -60,7 +61,7 @@ import {
 } from "./import-logic";
 import { logRedaction, redactMemoryText } from "./redact";
 import { REFLECTION_LIMITS } from "./reflection-logic";
-import { MEMORY_TYPES, vMemoryType } from "./taxonomy";
+import { MEMORY_TYPES, type MemoryType, vMemoryType } from "./taxonomy";
 
 /**
  * Existing memories the near-match dedup reads (`getActiveMemoriesForUser`: by type, then
@@ -368,6 +369,17 @@ export const labelImportedText = async (ctx: ActionCtx, userId: string, text: st
         return { cut, dropped, facts: [] };
     }
 
+    const facts = applyImportLabels(lines, await askImportLabels(ctx, userId, lines));
+
+    return { cut, dropped: dropped + lines.length - facts.length, facts };
+};
+
+/**
+ * The labelling model's answer for the lines: the numbered lines it keeps, each with a type. It is the rule that drops
+ * what is not a durable fact about the person, and sensitive personal information such as a medical diagnosis
+ * (`IMPORT_LABEL_SYSTEM_PROMPT`). One model call; fails closed when no model is allowed.
+ */
+const askImportLabels = async (ctx: ActionCtx, userId: string, lines: ReadonlyArray<string>): Promise<ReadonlyArray<{ line: number; type: MemoryType }>> => {
     const model = await getUtilityModelForUser(ctx, gatewayFetch(ctx), { userId });
     const { output } = await generateText({
         // One short label per kept line, at most `IMPORT_MAX_FACTS` of them.
@@ -384,9 +396,23 @@ export const labelImportedText = async (ctx: ActionCtx, userId: string, text: st
         providerOptions: lowReasoningUtilityOptions(model),
         system: IMPORT_LABEL_SYSTEM_PROMPT,
     });
-    const facts = applyImportLabels(lines, output?.keep ?? []);
 
-    return { cut, dropped: dropped + lines.length - facts.length, facts };
+    return output?.keep ?? [];
+};
+
+/**
+ * The file entries the paste's labelling rule keeps, in file order, each with the type the file gave it. One model
+ * call for the whole batch (an inline file is one batch), so the subrequest count grows by one.
+ */
+const keepLabelledEntries = async (ctx: ActionCtx, userId: string, entries: ReadonlyArray<MemoryFileEntry>): Promise<MemoryFileEntry[]> => {
+    const labels = await askImportLabels(
+        ctx,
+        userId,
+        entries.map(({ memory }) => memory),
+    );
+    const kept = new Set(labels.map(({ line }) => line));
+
+    return entries.filter((_, index) => kept.has(index + 1));
 };
 
 export const previewMemoryImport = authAction
@@ -414,7 +440,8 @@ export const previewMemoryImport = authAction
  */
 export const importMemoryFile = authAction
     .input({
-        content: v.string().check((content) => content.length <= MEMORY_FILE_MAX_BYTES, { message: MEMORY_FILE_TOO_LARGE_MESSAGE }),
+        // The file's text is the user's memories: masked in the request logs.
+        content: v.sensitive(v.string().check((content) => content.length <= MEMORY_FILE_MAX_BYTES, { message: MEMORY_FILE_TOO_LARGE_MESSAGE })),
         format: v.union(v.literal("text"), v.literal("json")),
     })
     .use(rateLimit("memory/import"))
@@ -452,7 +479,17 @@ export const importMemoryFile = authAction
         const result = { duplicates: parsed.duplicates, imported: 0, invalid: parsed.invalid, tooLong: parsed.tooLong, updated: 0 };
 
         for (const batch of parsed.batches) {
-            const saved = await importFacts(ctx, { app: "other", facts: batch, userId });
+            // The paste's labelling rule (no sensitive personal information, such as a medical diagnosis) holds for a file too.
+            // A model call, so it stays here in the action, once per batch; an inline file is one batch. Counted as invalid.
+            const facts = await keepLabelledEntries(ctx, userId, batch);
+
+            result.invalid += batch.length - facts.length;
+
+            if (facts.length === 0) {
+                continue;
+            }
+
+            const saved = await importFacts(ctx, { app: "other", facts, userId });
 
             result.duplicates += saved.alreadyKnown;
             result.imported += saved.added;

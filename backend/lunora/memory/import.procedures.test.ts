@@ -64,6 +64,8 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
     };
 });
 
+const HIV_RE = /HIV/u;
+const LABEL_LINE_RE = /^(\d+)\. (.*)$/gmu;
 const USER = "user-a";
 const FACT = { memory: "The user is a nurse in Hamburg", type: "identity" as const };
 
@@ -129,6 +131,68 @@ describe("memory import procedures", () => {
 
             return rows.map((row) => row.memory).toSorted(byText);
         };
+
+        // The labelling model: keeps every numbered line of the prompt, except the ones the pattern names.
+        const labelKeeping = (dropped?: RegExp): void => {
+            generateText.mockImplementation(async ({ prompt }: { prompt: string }) => {
+                return {
+                    output: {
+                        keep: [...prompt.matchAll(LABEL_LINE_RE)]
+                            .filter((match) => !dropped?.test(match[2] ?? ""))
+                            .map((match) => {
+                                return { line: Number(match[1]), type: "context" };
+                            }),
+                    },
+                };
+            });
+        };
+
+        beforeEach(() => {
+            labelKeeping();
+        });
+
+        it("drops a sensitive fact as the paste does, counts it, and imports the ordinary one beside it", async () => {
+            expect.assertions(4);
+
+            labelKeeping(HIV_RE);
+
+            await expect(call(importMemoryFile, { content: "The user has HIV\nThe user likes green tea", format: "text" })).resolves.toStrictEqual({
+                duplicates: 0,
+                imported: 1,
+                invalid: 1,
+                tooLong: 0,
+                updated: 0,
+            });
+            await expect(stored()).resolves.toStrictEqual(["The user likes green tea"]);
+            expect(generateText).toHaveBeenCalledTimes(1);
+            expect(generateText.mock.calls[0]?.[0]).toMatchObject({ system: expect.stringContaining("medical diagnoses") });
+        });
+
+        it("drops a sensitive JSON item and keeps the type the file names for the rest", async () => {
+            expect.assertions(2);
+
+            labelKeeping(HIV_RE);
+
+            await expect(
+                call(importMemoryFile, {
+                    content: JSON.stringify([
+                        { content: "The user has HIV", type: "identity" },
+                        { content: "The user is a nurse in Hamburg", type: "identity" },
+                    ]),
+                    format: "json",
+                }),
+            ).resolves.toMatchObject({ imported: 1, invalid: 1 });
+            await expect(rowsOf()).resolves.toMatchObject([{ memory: "The user is a nurse in Hamburg", type: "identity" }]);
+        });
+
+        it("writes nothing when the labelling model is unavailable", async () => {
+            expect.assertions(2);
+
+            generateText.mockRejectedValue(new Error("no model"));
+
+            await expect(call(importMemoryFile, { content: "The user likes green tea", format: "text" })).rejects.toThrow();
+            await expect(stored()).resolves.toStrictEqual([]);
+        });
 
         it("imports a small text file, counting duplicates in the file and against stored memories", async () => {
             expect.assertions(2);
