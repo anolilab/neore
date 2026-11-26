@@ -71,13 +71,23 @@ type ExpiredRequest = { config: { replyKey?: string }; status: string; threadId:
 
 /**
  * A headless pause has no stream for the timeout to close, so an expired pending request ends its run here, as an interactive pause's
- * stream does (`cleanupExpiredStreams`). The end is keyed by the run's own reply key, which the Events log writes once.
+ * stream does (`cleanupExpiredStreams`). The run is failed only once no other request of it is left in the thread: while one remains
+ * (answered, or still open), the run may have resumed, so it is not reported as failed. The end is keyed by the run's reply key.
  */
 const failExpiredHeadlessPauses = async (ctx: PurgeCtx, expired: ReadonlyArray<ExpiredRequest>): Promise<void> => {
     for (const row of expired) {
         const { replyKey } = row.config;
 
-        if (row.status === "pending" && replyKey?.startsWith("headless:")) {
+        if (row.status !== "pending" || replyKey?.startsWith("headless:") !== true) {
+            continue;
+        }
+
+        const remaining = await ctx.db
+            .query("toolApprovalRuns")
+            .withIndex("by_threadId", (q) => q.eq("threadId", row.threadId))
+            .collect();
+
+        if (remaining.every((other) => other.config.replyKey !== replyKey)) {
             await recordRunEnd(ctx, { outcome: "failed", streamId: replyKey, threadId: row.threadId });
         }
     }

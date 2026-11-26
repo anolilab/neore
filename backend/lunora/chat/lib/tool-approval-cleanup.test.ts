@@ -83,6 +83,38 @@ describe("a thread waiting on an expired request", () => {
         expect(ends).toStrictEqual([["run:headless:run-1", "run.failed"]]);
     });
 
+    it("does not fail a headless run while another of its requests is still open, since the run may have resumed", async () => {
+        const threadId = await waiting();
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("toolApprovalRuns", {
+                approvalId: "headless-expired",
+                config: { ...CONFIG, replyKey: "headless:run-2" },
+                createdAt: NOW - PENDING_APPROVAL_TTL_MS - 1,
+                status: "pending",
+                threadId,
+                userId: "u1",
+            });
+            await ctx.db.insert("toolApprovalRuns", {
+                approvalId: "headless-open",
+                config: { ...CONFIG, replyKey: "headless:run-2" },
+                createdAt: NOW,
+                status: "pending",
+                threadId,
+                userId: "u1",
+            });
+        });
+        await harness.run(async (ctx: any) => await purgeExpiredToolApprovalRuns(ctx, NOW));
+
+        const ends = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.mcpEvents.findMany({ limit: 10, where: { userId: "u1" } });
+
+            return page.map((row: { eventId: string }) => row.eventId);
+        });
+
+        expect(ends).toStrictEqual([]);
+    });
+
     it("stops waiting once its last pending request is purged", async () => {
         const threadId = await waiting();
 
