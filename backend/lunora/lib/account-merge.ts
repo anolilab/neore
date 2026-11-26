@@ -1490,41 +1490,17 @@ export const importShardRows = internalMutation
                 }
             }
 
-            // The event ids the new account already holds: a copy skipped for one of them is the account's own row, never the copy.
-            const alreadyHeld = new Set<string>();
-
-            for (const row of fresh) {
-                const held = await ctx.db.mcpEvents.findFirst({
-                    consistency: "primary",
-                    where: { eventId: row["eventId"] as string, userId: args.to },
-                });
-
-                if (held !== null) {
-                    alreadyHeld.add(row["eventId"] as string);
-                }
-            }
-
             const imported = await copyMergedMcpEvents(ctx, fresh, args.to);
 
-            // The marker names the copy's own row on the new shard (`result`): a copy has a new id, so the reconcile takes it back there
-            // (`dropRowsGoneFromGuest`). A row the expiry skipped, or one the account already held, has none, so the reconcile never
-            // deletes the account's own event.
+            // The marker records that the row was handled, so its copy is not made again. Events are never taken back by the copy's id:
+            // `dropRowsGoneFromGuest` keeps them, and a deleted thread's copies go with its thread copy.
             for (const row of fresh) {
-                const eventId = row["eventId"] as string;
-                const copy = alreadyHeld.has(eventId)
-                    ? null
-                    : await ctx.db.mcpEvents.findFirst({
-                          consistency: "primary",
-                          where: { eventId, userId: args.to },
-                      });
-
                 await ctx.db.insert("idempotencyClaims", {
                     claimedAt: now,
                     expiresAt: IMPORT_MARKER_EXPIRES_AT,
                     key: markerKey(args.from, args.table, row._id as string),
                     scope: IMPORT_MARKER_SCOPE,
                     userId: args.to,
-                    ...(copy !== null && { result: copy._id as string }),
                 });
             }
 
