@@ -78,6 +78,11 @@ const deferred = () => {
 
 const HIDE_NAME = /^Hide this side question/;
 
+/** A constructible ResizeObserver for a test to use: jsdom has no layout to resize, so a test fires its callback by hand. */
+function ResizeObserverStub() {
+    return { disconnect: vi.fn(), observe: vi.fn(), unobserve: vi.fn() };
+}
+
 /** The timers the reveal runs on: its settle delay, and the frame that rechecks the hit after a change. */
 const REVEAL_TIMERS = ["setTimeout", "clearTimeout", "requestAnimationFrame", "cancelAnimationFrame"] as const;
 
@@ -117,6 +122,8 @@ describe("AsidePanel", () => {
         addAside.mockReset();
         // A reveal that corrects the window's scroll must not reach jsdom's unimplemented scrollBy.
         vi.stubGlobal("scrollBy", vi.fn());
+        // A ResizeObserver a test can fire by hand, since jsdom has no layout to resize. Constructible, unlike the setup's mock.
+        vi.stubGlobal("ResizeObserver", vi.fn(ResizeObserverStub));
     });
 
     it("is a labelled region and announces the answer in a polite live region", async () => {
@@ -501,6 +508,43 @@ describe("AsidePanel", () => {
             Reflect.deleteProperty(Element.prototype, "scrollIntoView");
             Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
             vi.unstubAllGlobals();
+            vi.useRealTimers();
+        }
+    });
+
+    it("brings the current hit into view again when resizing the panel leaves it out of sight", async () => {
+        vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
+        // Under the sticky find bar, so the first reveal scrolls it.
+        let hitTop = 20;
+        const scroll = vi.fn();
+
+        useAsideStore.setState({ byThread: { "thread-1": [{ answer: "A cat.", id: "a", question: "Why?", status: "answered", token: "tok" }] } });
+        render(<AsidePanel threadId="thread-1" />);
+
+        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
+        Object.defineProperty(Range.prototype, "getBoundingClientRect", { configurable: true, value: () => rectAt(hitTop) });
+
+        try {
+            act(() => {
+                globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+            });
+            fireEvent.change(screen.getByRole("textbox", { name: "Find in side questions" }), { target: { value: "cat" } });
+            await settleReveal();
+            scroll.mockClear();
+
+            // A narrower panel reflows the hit below the visible part, with no DOM change: only the resize observer reports it.
+            hitTop = 900;
+            const onResize = vi.mocked(ResizeObserver).mock.calls.at(-1)?.[0];
+            const observer = vi.mocked(ResizeObserver).mock.results.at(-1)?.value;
+
+            act(() => {
+                onResize?.([], observer);
+            });
+            await settleReveal();
+            expect(scroll).toHaveBeenCalled();
+        } finally {
+            Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+            Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
             vi.useRealTimers();
         }
     });

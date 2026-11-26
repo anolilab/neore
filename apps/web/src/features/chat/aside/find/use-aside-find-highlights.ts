@@ -222,9 +222,22 @@ const useAsideFindHighlights = (
         // An image that loads changes the layout above a hit without touching the DOM. Load does not bubble, hence capture.
         host.addEventListener("load", recheck, { capture: true });
 
+        // A resize reflows the panel and can clip the hit without touching the DOM, so the hit is checked once it settles.
+        const resizer = new ResizeObserver(() => {
+            scheduleReveal();
+        });
+        const scroller = scrollerOf(host);
+
+        resizer.observe(host);
+
+        if (scroller) {
+            resizer.observe(scroller);
+        }
+
         return () => {
             observer.disconnect();
             host.removeEventListener("load", recheck, { capture: true });
+            resizer.disconnect();
             cancelAnimationFrame(frame);
             clearTimeout(revealTimer);
             clearHighlights(ASIDE_HIGHLIGHTS);
