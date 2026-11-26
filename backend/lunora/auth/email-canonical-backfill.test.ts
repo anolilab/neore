@@ -3,7 +3,7 @@
  * per call from that completed check, never by picking one of two accounts that fold to one address. The deploy's runner
  * drives these calls here.
  */
-import { canonicalEmail } from "@lunora/auth";
+import { canonicalEmail, resolveAuthOptions } from "@lunora/auth";
 import { lunoraTest } from "@lunora/testing";
 import { describe, expect, it, vi } from "vitest";
 
@@ -49,6 +49,8 @@ const userIdOf = async (ctx: any, email: string): Promise<Id<"user">> => ((await
 interface CountOptions {
     /** Runs after the real conditional patch; may throw. */
     afterPatchIf?: () => void;
+    /** Runs before each read of `user` rows, with its query; may run other calls meanwhile. */
+    beforeFindMany?: (query: { cursor?: unknown }) => Promise<void>;
     /** Emulates D1's cap on the rows one statement answers: Lunora asks for a page's `limit` plus one. */
     d1RowCap?: number;
     /** Makes the holder check see nothing, as when a sign-up takes an address between that check and the write. */
@@ -87,6 +89,7 @@ const counted = (ctx: any, options: CountOptions = {}) => {
             const query = { ...input, cursor: unpad(input.cursor) };
 
             spent.queries.push(query);
+            await options.beforeFindMany?.(query);
             const isHolderCheck = typeof query.where?.emailCanonical === "object" && query.where.emailCanonical !== null && "in" in query.where.emailCanonical;
             let result: { continueCursor?: string | null; isDone: boolean; page: unknown[] };
 
@@ -487,6 +490,130 @@ describe("the user.emailCanonical backfill", () => {
         expect(run.exitCode).toBe(1);
         expect(run.output).toContain("1 address(es) belong to more than one account");
         expect(rows.filter(([email, canonical]) => email !== "eve@example.com" && canonical !== undefined)).toStrictEqual([]);
+    });
+
+    it("refuses a later account once an account the check already read takes its address through the auth plugin", async () => {
+        expect.assertions(3);
+
+        // The plugin's own update hook, as `createAuth` wraps it: an email change writes the folded address with it.
+        const { databaseHooks } = resolveAuthOptions({ baseURL: "http://localhost:8788", secret: "s".repeat(40) });
+        const changeEmail = async (ctx: any, id: Id<"user">, email: string): Promise<void> => {
+            const hooked = (await databaseHooks!.user!.update!.before!({ email } as never, null)) as { data: Record<string, unknown> };
+
+            await ctx.db.patch("user", id, { ...hooked.data, email, updatedAt: NOW });
+        };
+
+        const { answers, rows, target } = await withHarness(async (ctx) => {
+            for (const email of ["Alpha@Example.com", "Bravo@Example.com", "Charlie@Example.com"]) {
+                await ctx.db.insert("user", userRow(email));
+            }
+
+            // One row per call: the account the first call reads then takes the address of one a later call reads.
+            const opened = await checkEmailCanonicalPage(counted(ctx).ctx, { pageRows: 1, pages: 1 });
+
+            if (opened.status !== "checking") {
+                throw new Error(`the check answered ${opened.status}`);
+            }
+
+            const [changed] = opened.unfilledIds;
+            const { page } = await ctx.db.user.findMany({});
+            const later = (page as { _id: Id<"user">; email: string }[]).find((row) => row._id !== changed)!;
+
+            await changeEmail(ctx, changed!, later.email.toLowerCase());
+
+            const ids = [...opened.unfilledIds];
+            let answer = opened;
+
+            while (answer.status === "checking") {
+                answer = (await checkEmailCanonicalPage(counted(ctx).ctx, { pageRows: 1, pages: 1, token: opened.token })) as typeof opened;
+                ids.push(...answer.unfilledIds);
+            }
+
+            const roles = new Map<string, string>([
+                [changed!, "changed"],
+                [later._id, "later"],
+            ]);
+            const fills = new Map<string, string>();
+
+            for (const id of ids) {
+                const { status } = await fillEmailCanonicalBatch(counted(ctx).ctx, { ids: [id], token: opened.token });
+
+                fills.set(roles.get(id) ?? "other", status);
+            }
+
+            return { answers: Object.fromEntries(fills), rows: await canonicals(ctx), target: later.email };
+        });
+
+        expect(answers).toStrictEqual({ changed: "progress", later: "conflict", other: "progress" });
+        // The changed account holds the address since its change; the later one stays unfilled.
+        expect(rows.filter(([email]) => email === target || email === target.toLowerCase())).toStrictEqual([
+            [target.toLowerCase(), target.toLowerCase()],
+            [target, undefined],
+        ]);
+        expect(new Set(rows.flatMap(([, canonical]) => (canonical === undefined ? [] : [canonical]))).size).toBe(2);
+    });
+
+    it("lets a continuation that lost to a newer one under the same token save nothing, so the completed check still fills", async () => {
+        expect.assertions(3);
+
+        const { fill, rows, stale } = await withHarness(async (ctx) => {
+            for (let index = 0; index < 3; index += 1) {
+                await ctx.db.insert("user", userRow(`racer${String(index)}@example.com`));
+            }
+
+            const opened = await checkEmailCanonicalPage(counted(ctx).ctx, { pageRows: 1, pages: 1 });
+
+            if (opened.status !== "checking") {
+                throw new Error(`the check answered ${opened.status}`);
+            }
+
+            const { token } = opened;
+            const ids = [...opened.unfilledIds];
+            // A retry of the same request: while the first continuation waits on its read, the retry and the calls after
+            // it run the check to its end.
+            const runAhead = async (): Promise<void> => {
+                for (;;) {
+                    const answer = await checkEmailCanonicalPage(counted(ctx).ctx, { pageRows: 1, pages: 1, token });
+
+                    if (answer.status !== "checked" && answer.status !== "checking") {
+                        throw new Error(`the check answered ${answer.status}`);
+                    }
+
+                    ids.push(...answer.unfilledIds);
+
+                    if (answer.status === "checked") {
+                        return;
+                    }
+                }
+            };
+            let ranAhead = false;
+            const late = await checkEmailCanonicalPage(
+                counted(ctx, {
+                    beforeFindMany: async () => {
+                        if (ranAhead) {
+                            return;
+                        }
+
+                        ranAhead = true;
+                        await runAhead();
+                    },
+                }).ctx,
+                { pageRows: 1, pages: 1, token },
+            );
+            const fills = [];
+
+            for (const id of ids) {
+                const { filled } = await fillEmailCanonicalBatch(counted(ctx).ctx, { ids: [id], token });
+
+                fills.push(filled);
+            }
+
+            return { fill: fills, rows: await canonicals(ctx), stale: late };
+        });
+
+        expect(stale).toStrictEqual({ scanned: 0, status: "checked", token: expect.any(String), unfilledIds: [] });
+        expect(fill).toStrictEqual([1, 1, 1]);
+        expect(rows.every(([email, canonical]) => canonical === canonicalEmail(email))).toBe(true);
     });
 
     it("carries a cursor longer than 512 characters from one check call to the next", async () => {
