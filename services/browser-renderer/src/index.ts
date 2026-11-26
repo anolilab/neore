@@ -849,14 +849,18 @@ const actHeld = async (
 
                 // Playwright's own size first; a reconnected session may carry none, so then the page's, which page script can
                 // overwrite: kept only as two finite positive numbers.
-                const viewport = viewportOf(
-                    page.viewportSize() ??
-                        (await page
-                            .evaluate(() => {
-                                return { height: window.innerHeight as unknown, width: window.innerWidth as unknown };
-                            })
-                            .catch(() => null)),
-                );
+                // Only a person's view of the page (`reconnectOnly`) carries the size: the agent's answer stays as it was.
+                const viewport =
+                    reconnectOnly === true
+                        ? viewportOf(
+                              page.viewportSize() ??
+                                  (await page
+                                      .evaluate(() => {
+                                          return { height: window.innerHeight as unknown, width: window.innerWidth as unknown };
+                                      })
+                                      .catch(() => null)),
+                          )
+                        : null;
 
                 result = { screenshot: base64, screenshotFormat: "jpeg", success: true, title, url: currentUrl, ...(viewport !== null && { viewport }) };
                 break;
