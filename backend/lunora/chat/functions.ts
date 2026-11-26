@@ -3992,8 +3992,9 @@ export const getFullThreadForExport = authQuery
             ? await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadRelationship.parentThreadId as Id<"threads"> })
             : null;
 
-        // A locked parent is not exported: the proof covers this thread only.
-        if (threadRelationship && parentThread?.userId === userId && !isThreadLocked(parentThread)) {
+        // A locked parent is not exported: the proof covers this thread only. A side chat already holds its own copy of the
+        // parent's settled history (`side-chat.ts`), so its parent is not prefixed again.
+        if (threadRelationship && threadRelationship.branchType !== "side" && parentThread?.userId === userId && !isThreadLocked(parentThread)) {
             const parentMessages = await agent.listMessages(context, {
                 paginationOpts: { cursor: null, numItems: 10_000 },
                 threadId: threadRelationship.parentThreadId,

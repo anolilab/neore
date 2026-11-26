@@ -142,6 +142,11 @@ export const createSideChat = authAction
             ...(placement.capOrganizationId === undefined && parent.capOrganizationId !== undefined && { capOrganizationId: parent.capOrganizationId }),
             ...(parent.projectId !== undefined && { projectId: parent.projectId }),
             model: parent.model,
+            // The run settings the parent's replies use, so the side chat answers the same way.
+            ...(parent.autoModel !== undefined && { autoModel: parent.autoModel }),
+            ...(parent.customSystemPrompt !== undefined && { customSystemPrompt: parent.customSystemPrompt }),
+            ...(parent.reasoningEffort !== undefined && { reasoningEffort: parent.reasoningEffort }),
+            ...(parent.statelessMode !== undefined && { statelessMode: parent.statelessMode }),
             title: parent.title ?? "",
             userId,
         });

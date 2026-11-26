@@ -419,4 +419,15 @@ describe("createSideChat", () => {
         expect(await sideRelations()).toHaveLength(0);
         expect(await harness.run(async (ctx: any) => await ctx.db.query("threads").collect())).toHaveLength(1);
     });
+
+    it("gives the side chat the parent's run settings", async () => {
+        const parentId = await parentWith(OWNER, { customSystemPrompt: "Answer briefly.", reasoningEffort: 2, statelessMode: true });
+
+        await withMessages(parentId, OWNER, ["hello"]);
+
+        const outcome = (await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)) as { status: string; threadId: string };
+        const child = await threadRow(outcome.threadId);
+
+        expect(child).toMatchObject({ customSystemPrompt: "Answer briefly.", reasoningEffort: 2, statelessMode: true });
+    });
 });
