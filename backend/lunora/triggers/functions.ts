@@ -112,7 +112,7 @@ const eventSourceInputMatchesTable: EventSourceInputMatchesTable = true;
 void eventSourceInputMatchesTable;
 
 /** A `custom:<provider>/<model>` names one of the caller's own endpoints; a missing, disabled or browser-only one would fail every run. */
-const assertCustomModelRunnable = async (context: Pick<MutationCtx, "runQuery">, model: string, userId: string): Promise<void> => {
+export const assertCustomModelRunnable = async (context: Pick<MutationCtx, "runQuery">, model: string, userId: string): Promise<void> => {
     const custom = parseCustomModelId(model);
 
     if (custom && !(await context.runQuery(internal.chat.custom_providers.isCustomProviderRunnable, { providerId: custom.providerId, userId }))) {
@@ -157,7 +157,7 @@ const checkedEventSource = async (
  * expression fires every minute (`getNextCronTime` reads garbage as a wildcard),
  * and each run is a paid agent turn.
  */
-const assertCronExpression = (cronExpression: string): void => {
+export const assertCronExpression = (cronExpression: string): void => {
     if (!isHourlyOrSlowerCronExpression(cronExpression)) {
         throw new LunoraError(
             "BAD_REQUEST",

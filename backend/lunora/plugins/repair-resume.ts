@@ -17,13 +17,13 @@ import { authAction } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { assertSelectionImportable, BundleImportError, runBundleImport } from "../skills/bundle-plan";
 import { planFor } from "../skills/bundle";
-import { checkPluginFile } from "./install-action";
+import { assertNoToolConfig, checkPluginFile } from "./install-action";
 import { childOps } from "./install-ops";
 import { repairRows } from "./repair";
 import { vPluginItemKind } from "./validators";
 
 export const beginRepair = internalMutation
-    .input({ pluginSlug: v.string().max(64), userId: v.string().max(128) })
+    .input({ contentHash: v.string().max(128), pluginSlug: v.string().max(64), userId: v.string().max(128) })
     .output(
         v.object({
             generation: v.number(),
@@ -33,12 +33,13 @@ export const beginRepair = internalMutation
             status: v.union(v.literal("installed"), v.literal("needs-repair")),
         }),
     )
-    .mutation(async ({ args, ctx }) => await beginRepairRows(ctx, args.userId, args.pluginSlug));
+    .mutation(async ({ args, ctx }) => await beginRepairRows(ctx, args.userId, args.pluginSlug, args.contentHash));
 
 export const beginRepairRows = async (
     ctx: MutationCtx,
     userId: string,
     pluginSlug: string,
+    contentHash: string,
 ): Promise<{
     generation: number;
     installId: string;
@@ -46,12 +47,18 @@ export const beginRepairRows = async (
     missing: Array<{ entryKey: string; intentId: string; kind: "group" | "skill" | "trigger" }>;
     status: "installed" | "needs-repair";
 }> => {
-    const result = await repairRows(ctx, userId, pluginSlug);
     const install = await ctx.db.pluginInstalls.findFirst({ where: { pluginSlug, userId } });
 
     if (!install) {
         throw new LunoraError("NOT_FOUND", `The plugin "${pluginSlug}" is not installed`);
     }
+
+    // Repair may only use the file this install was made from (or last updated to). Any other file would create children from different content.
+    if (install.contentHash !== contentHash) {
+        throw new LunoraError("CONFLICT", "This is not the file the plugin was installed from. Preview it again to repair it.");
+    }
+
+    const result = await repairRows(ctx, userId, pluginSlug);
 
     const installId = install._id as string;
 
@@ -85,6 +92,10 @@ export const repairPlugin = authAction
         }),
     )
     .action(async ({ args, ctx }) => {
+        if (ctx.user.activeOrganization) {
+            throw new LunoraError("UNPROCESSABLE", "Organization plugin installs are not available yet");
+        }
+
         const { header, hash } = await checkPluginFile(args.markdown);
 
         if (header.slug !== args.pluginSlug || hash !== args.contentHash) {
@@ -92,13 +103,14 @@ export const repairPlugin = authAction
         }
 
         const { userId } = ctx.user;
-        const begun = await ctx.runMutation(internal.plugins.repair_resume.beginRepair, { pluginSlug: args.pluginSlug, userId });
+        const begun = await ctx.runMutation(internal.plugins.repair_resume.beginRepair, { contentHash: hash, pluginSlug: args.pluginSlug, userId });
 
         if (begun.missing.length === 0) {
             return { created: [], status: begun.status };
         }
 
         const { entries } = await planFor(ctx, args.markdown, undefined);
+        assertNoToolConfig(entries);
         const missingKeys = new Set(begun.missing.map((entry) => entry.entryKey));
         const intentByKey = new Map(begun.missing.map((entry) => [entry.entryKey, entry.intentId] as const));
 
