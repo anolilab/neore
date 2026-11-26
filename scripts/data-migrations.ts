@@ -25,9 +25,37 @@ const literalText = (node: ts.Node | undefined): string | undefined =>
 const unwrapped = (node: ts.Expression): ts.Expression =>
     ts.isAsExpression(node) || ts.isSatisfiesExpression(node) || ts.isParenthesizedExpression(node) ? unwrapped(node.expression) : node;
 
-/** The module's top-level `const NAME = "literal"` declarations, which a `table` may name. */
-const constStrings = (file: ts.SourceFile): Map<string, string> => {
-    const found = new Map<string, string>();
+/**
+ * Reads the string a name stands for: the value of the module's top-level `const NAME = "literal"` the name is bound to,
+ * by the checker's scopes, so a local binding of the same spelling never reads as the top-level one.
+ */
+interface Constants {
+    /** The string `name` (an identifier) is bound to, if that is a top-level string constant. */
+    ofIdentifier: (name: ts.Identifier) => string | undefined;
+    /** The same for the value of a shorthand property (`{ table }`). */
+    ofShorthand: (member: ts.ShorthandPropertyAssignment) => string | undefined;
+}
+
+/** `source` as `MIGRATIONS_MODULE` in a program of that one file (no lib, nothing resolved), and its constants. */
+const parsedModule = (source: string): { constants: Constants; file: ts.SourceFile } => {
+    const parsed = ts.createSourceFile(MIGRATIONS_MODULE, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const options: ts.CompilerOptions = { noLib: true, noResolve: true, types: [] };
+    const host: ts.CompilerHost = {
+        fileExists: (name) => name === MIGRATIONS_MODULE,
+        getCanonicalFileName: (name) => name,
+        getCurrentDirectory: () => "",
+        getDefaultLibFileName: () => "lib.d.ts",
+        getNewLine: () => "\n",
+        getSourceFile: (name) => (name === MIGRATIONS_MODULE ? parsed : undefined),
+        readFile: (name) => (name === MIGRATIONS_MODULE ? source : undefined),
+        useCaseSensitiveFileNames: () => true,
+        writeFile: () => {},
+    };
+    const program = ts.createProgram({ host, options, rootNames: [MIGRATIONS_MODULE] });
+    // The program's own instance, so the checker knows every node the scan visits.
+    const file = program.getSourceFile(MIGRATIONS_MODULE) ?? parsed;
+    const checker = program.getTypeChecker();
+    const values = new Map<ts.Declaration, string>();
 
     for (const statement of file.statements) {
         if (ts.isVariableStatement(statement) && (statement.declarationList.flags & ts.NodeFlags.Const) !== 0) {
@@ -35,20 +63,32 @@ const constStrings = (file: ts.SourceFile): Map<string, string> => {
                 const value = declaration.initializer === undefined ? undefined : literalText(unwrapped(declaration.initializer));
 
                 if (ts.isIdentifier(declaration.name) && value !== undefined) {
-                    found.set(declaration.name.text, value);
+                    values.set(declaration, value);
                 }
             }
         }
     }
 
-    return found;
+    const valueOf = (symbol: ts.Symbol | undefined): string | undefined => {
+        const declarations = symbol?.declarations ?? [];
+
+        return declarations.length === 1 ? values.get(declarations[0]!) : undefined;
+    };
+
+    return {
+        constants: {
+            ofIdentifier: (name) => valueOf(checker.getSymbolAtLocation(name)),
+            ofShorthand: (member) => valueOf(checker.getShorthandAssignmentValueSymbol(member)),
+        },
+        file,
+    };
 };
 
-/** A literal string, or a top-level string constant named by `node`. */
-const resolvedText = (node: ts.Expression, constants: ReadonlyMap<string, string>): string | undefined => {
+/** A literal string, or a top-level string constant `node` is bound to. */
+const resolvedText = (node: ts.Expression, constants: Constants): string | undefined => {
     const bare = unwrapped(node);
 
-    return literalText(bare) ?? (ts.isIdentifier(bare) ? constants.get(bare.text) : undefined);
+    return literalText(bare) ?? (ts.isIdentifier(bare) ? constants.ofIdentifier(bare) : undefined);
 };
 
 /** What a definition says about one property: not there, a string the runner can read, or something it cannot. */
@@ -60,7 +100,7 @@ const UNRESOLVED: PropertyValue = { kind: "unresolved" };
  * The value of the `name` property of `call`'s first argument. `literalOnly` refuses a constant. A spread, a computed key
  * the runner cannot read, or a definition that is not an object literal could hide the property: unresolved.
  */
-const definitionProperty = (call: ts.CallExpression, name: string, constants: ReadonlyMap<string, string>, literalOnly: boolean): PropertyValue => {
+const definitionProperty = (call: ts.CallExpression, name: string, constants: Constants, literalOnly: boolean): PropertyValue => {
     const [definition] = call.arguments;
     const read = (node: ts.Expression): PropertyValue => {
         const value = literalOnly ? literalText(node) : resolvedText(node, constants);
@@ -93,18 +133,16 @@ const definitionProperty = (call: ts.CallExpression, name: string, constants: Re
         }
 
         if (key === name) {
-            found = ts.isPropertyAssignment(member)
-                ? read(member.initializer)
-                : ts.isShorthandPropertyAssignment(member) && !literalOnly && constants.has(key)
-                  ? { kind: "string", value: constants.get(key) ?? "" }
-                  : UNRESOLVED;
+            const shorthand = ts.isShorthandPropertyAssignment(member) && !literalOnly ? constants.ofShorthand(member) : undefined;
+
+            found = ts.isPropertyAssignment(member) ? read(member.initializer) : shorthand === undefined ? UNRESOLVED : { kind: "string", value: shorthand };
         }
     }
 
     return found;
 };
 
-const migrationId = (call: ts.CallExpression, file: ts.SourceFile, globalTables: ReadonlySet<string>, constants: ReadonlyMap<string, string>): string => {
+const migrationId = (call: ts.CallExpression, file: ts.SourceFile, globalTables: ReadonlySet<string>, constants: Constants): string => {
     const id = definitionProperty(call, "id", constants, true);
     const { line } = file.getLineAndCharacterOfPosition(call.getStart(file));
     const at = `${MIGRATIONS_MODULE}:${String(line + 1)}`;
@@ -149,8 +187,7 @@ export const globalTablesOf = (baseline: string): Set<string> => {
  * run fails on the root shard, stopping every migration after it.
  */
 export const declaredMigrationIds = (source: string, globalTables: ReadonlySet<string> = new Set()): string[] => {
-    const file = ts.createSourceFile(MIGRATIONS_MODULE, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-    const constants = constStrings(file);
+    const { constants, file } = parsedModule(source);
     const ids: string[] = [];
     const visit = (node: ts.Node): void => {
         if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "defineMigration") {

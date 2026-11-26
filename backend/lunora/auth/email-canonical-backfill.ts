@@ -9,14 +9,15 @@
  * (`email-canonical-backfill-http.ts`, `scripts/data-migrations.ts#runEmailCanonicalBackfill`) in two phases:
  *
  * 1. **check**: every user row, filled or not, page by page. The first call opens a check record (an `idempotencyClaims`
- *    row on the root shard, keyed by a token this server makes) holding the check's start, the next cursor, a digest of
- *    each folded address read so far and the ids of the unfilled rows. Each later call names the token and goes on from
+ *    row on the root shard, keyed by a token this server makes) holding the check's start and the next cursor; beside it,
+ *    under the same token and acquisition, a claim with a digest of each folded address read so far and one claim per
+ *    unfilled id read. Each later call names the token and goes on from
  *    the record's cursor, so no page is skipped or read twice. An address two rows fold to, in one call or across calls,
  *    is refused and the record dropped. Nothing is written to `user`. `.global()` writes are not transactional, so no
  *    account is filled before the whole table is known to fold to distinct addresses: filling one row of a pair would
  *    pick it over the other.
  * 2. **fill**: takes the token of a COMPLETED check and {@link EMAIL_CANONICAL_BATCH} of the ids that check recorded,
- *    and reads only that row, by id. The check's start comes from the record, never from the caller. A row is filled
+ *    and reads only the record, that id's claim and that row, by id. The check's start comes from the record, never from the caller. A row is filled
  *    only while it is still unfilled and unchanged since a moment before the check began ({@link EMAIL_CANONICAL_SETTLE_MS});
  *    a row changed since is skipped, and the caller checks again from the start.
  *
@@ -29,7 +30,7 @@ import { LunoraError, v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
-import { claimFence, claimRow, recordClaimResult, releaseClaim } from "../lib/claim-once";
+import { claimFence, claimRow, holdClaim, recordClaimResult, releaseClaim } from "../lib/claim-once";
 import { MAX_LENGTH } from "../lib/validators";
 
 /** D1 statements one Worker invocation may send on the Free plan. */
@@ -45,8 +46,12 @@ export const D1_RESULT_ROWS = 1000;
  */
 export const EMAIL_CANONICAL_CHECK_ROWS = 500;
 
-/** Check statements one call sends; with a fresh check's first read, 17 of the 50. */
-export const EMAIL_CANONICAL_CHECK_PAGES = 16;
+/**
+ * Check statements one call sends; with a fresh check's first read, 9 of the 50. Each unfilled row read is one claim
+ * written on the root shard, so a call writes at most 4,000 of them: with the claim table's indexes, well inside a
+ * Durable Object transaction's 50,000 written rows.
+ */
+export const EMAIL_CANONICAL_CHECK_PAGES = 8;
 
 /**
  * Ids one fill call takes. A conditional patch (`ctx.db.patchIf`) goes round up to {@link PATCH_IF_ATTEMPTS} times, a read
@@ -73,10 +78,16 @@ export const EMAIL_CANONICAL_SETTLE_MS = 60_000;
 /** The claim scope of a check record; its key is the check's token. */
 export const EMAIL_CANONICAL_CHECK_SCOPE = "email-canonical-check";
 
+/** The claim scope of a check's folded-address digests, apart from the record so a fill never reads them; its key is the check's token. */
+export const EMAIL_CANONICAL_FOLDS_SCOPE = "email-canonical-check-folds";
+
+/** The claim scope of one unfilled id a check recorded; its key is `<token>:<id>`, taken under the record's `claimedAt`. */
+export const EMAIL_CANONICAL_ID_SCOPE = "email-canonical-check-id";
+
 /** How long a check record lasts: a run checks, fills and checks again well within it. */
 export const EMAIL_CANONICAL_CHECK_TTL_MS = 6 * 60 * 60 * 1000;
 
-/** The longest check record kept: about 25,000 accounts. A larger table needs the record split before it can be checked. */
+/** The longest digest record kept: about 75,000 accounts. A larger table needs the record split before it can be checked. */
 export const EMAIL_CANONICAL_RECORD_MAX_LENGTH = 1_500_000;
 
 /** Bytes of a folded address's SHA-256 the record keeps: 64 bits, so two distinct addresses of one table never meet by chance. */
@@ -132,16 +143,16 @@ export interface EmailCanonicalFillOptions {
     token: string;
 }
 
-/** What a check record holds, as JSON in its claim's `result`. */
+/**
+ * What a check record holds, as JSON in its claim's `result`. The digests of the folded addresses read so far are a
+ * claim of their own ({@link EMAIL_CANONICAL_FOLDS_SCOPE}), and each unfilled id read is one more
+ * ({@link EMAIL_CANONICAL_ID_SCOPE}), so a fill reads this small record and its one id, never the whole scan.
+ */
 interface CheckRecord {
     /** The next page's cursor; absent once the scan reached the end. */
     cursor?: string;
     /** Whether the scan reached the end with no address shared. */
     done: boolean;
-    /** A digest of each folded address read, salted with the token. */
-    folds: string[];
-    /** The ids of the unfilled rows read. */
-    ids: string[];
     /** `ctx.now` of the check's first call. */
     startedAt: number;
 }
@@ -163,17 +174,37 @@ const readRecord = async (ctx: BackfillCtx, token: string): Promise<{ claimedAt:
     return row?.result === undefined ? null : { claimedAt: row.claimedAt, record: JSON.parse(row.result) as CheckRecord };
 };
 
+const LAPSED = "The email-canonical check record lapsed; start the check again";
+
 const saveRecord = async (ctx: BackfillCtx, token: string, claimedAt: number, record: CheckRecord): Promise<void> => {
-    const json = JSON.stringify(record);
+    if (!(await recordClaimResult(ctx, EMAIL_CANONICAL_CHECK_SCOPE, token, claimedAt, JSON.stringify(record)))) {
+        throw new LunoraError("BAD_REQUEST", LAPSED);
+    }
+};
+
+/** The digests a check under `token`, taken at `claimedAt`, has read so far. */
+const readFolds = async (ctx: BackfillCtx, token: string, claimedAt: number): Promise<string[]> => {
+    const row = await claimRow(ctx, EMAIL_CANONICAL_FOLDS_SCOPE, token);
+
+    return row?.claimedAt === claimedAt && row.result !== undefined ? (JSON.parse(row.result) as string[]) : [];
+};
+
+const saveFolds = async (ctx: BackfillCtx, token: string, claimedAt: number, folds: ReadonlyArray<string>): Promise<void> => {
+    const json = JSON.stringify(folds);
 
     if (json.length > EMAIL_CANONICAL_RECORD_MAX_LENGTH) {
         throw new LunoraError("BAD_REQUEST", "Too many accounts for one email-canonical check record");
     }
 
-    if (!(await recordClaimResult(ctx, EMAIL_CANONICAL_CHECK_SCOPE, token, claimedAt, json))) {
-        throw new LunoraError("BAD_REQUEST", "The email-canonical check record lapsed; start the check again");
+    if (
+        !(await holdClaim(ctx, EMAIL_CANONICAL_FOLDS_SCOPE, token, claimedAt, EMAIL_CANONICAL_CHECK_TTL_MS)) ||
+        !(await recordClaimResult(ctx, EMAIL_CANONICAL_FOLDS_SCOPE, token, claimedAt, json))
+    ) {
+        throw new LunoraError("BAD_REQUEST", LAPSED);
     }
 };
+
+const idKey = (token: string, id: string): string => `${token}:${id}`;
 
 /**
  * One check call: up to `pages` pages over every user row, filled or not, from the record's cursor. Writes the check
@@ -204,7 +235,7 @@ export const checkEmailCanonicalPage = async (
         }
 
         claimedAt = fence;
-        record = { done: false, folds: [], ids: [], startedAt: ctx.now };
+        record = { done: false, startedAt: ctx.now };
     } else {
         const held = await readRecord(ctx, given);
 
@@ -220,7 +251,8 @@ export const checkEmailCanonicalPage = async (
         token = given;
     }
 
-    const known = new Set(record.folds);
+    const folds = given === undefined ? [] : await readFolds(ctx, token, claimedAt);
+    const known = new Set(folds);
     const counts = new Map<string, number>();
     let next = record.cursor;
     let reachedEnd = false;
@@ -249,15 +281,23 @@ export const checkEmailCanonicalPage = async (
     const conflicts = [...counts].filter(([key, count]) => count > 1 || known.has(digests.get(key)!)).length;
 
     if (conflicts > 0) {
+        // The id claims left behind name a record that is gone, so no fill accepts them; they lapse with the TTL.
+        await releaseClaim(ctx, EMAIL_CANONICAL_FOLDS_SCOPE, token, claimedAt);
         await releaseClaim(ctx, EMAIL_CANONICAL_CHECK_SCOPE, token, claimedAt);
 
         return { conflicts, status: "conflict" };
     }
 
+    await saveFolds(ctx, token, claimedAt, [...folds, ...digests.values()]);
+
+    for (const id of unfilledIds) {
+        if (!(await holdClaim(ctx, EMAIL_CANONICAL_ID_SCOPE, idKey(token, id), claimedAt, EMAIL_CANONICAL_CHECK_TTL_MS))) {
+            throw new LunoraError("BAD_REQUEST", LAPSED);
+        }
+    }
+
     await saveRecord(ctx, token, claimedAt, {
         done: reachedEnd,
-        folds: [...record.folds, ...digests.values()],
-        ids: [...record.ids, ...unfilledIds],
         startedAt: record.startedAt,
         ...(next !== undefined && { cursor: next }),
     });
@@ -277,16 +317,19 @@ export const fillEmailCanonicalBatch = async (ctx: BackfillCtx, { ids, token }: 
         throw new LunoraError("BAD_REQUEST", "A fill needs a completed email-canonical check");
     }
 
-    const { ids: approved, startedAt } = held.record;
+    const { startedAt } = held.record;
 
     if (!Number.isSafeInteger(startedAt) || startedAt > ctx.now) {
         throw new LunoraError("BAD_REQUEST", "The email-canonical check's start time is not in the past");
     }
 
-    const approvedIds = new Set(approved);
+    for (const id of ids) {
+        // An id claim of this check's own acquisition: one a former check under the same token left cannot match.
+        const recorded = await claimRow(ctx, EMAIL_CANONICAL_ID_SCOPE, idKey(token, id));
 
-    if (ids.some((id) => !approvedIds.has(id))) {
-        throw new LunoraError("BAD_REQUEST", "A fill takes only ids its check recorded");
+        if (recorded?.claimedAt !== held.claimedAt) {
+            throw new LunoraError("BAD_REQUEST", "A fill takes only ids its check recorded");
+        }
     }
 
     if (ids.length === 0) {

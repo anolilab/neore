@@ -139,8 +139,9 @@ Write`; without them the deploy fails, hence the switch.
   migrations; each runs whether the other fails, and either failing fails the job. `.global()` writes are not
   transactional, so the runner first checks EVERY account and writes nothing until no address is shared. The server
   keeps the check: its first call opens a record (an `idempotencyClaims` row on the root shard, outside D1's budget,
-  keyed by a token the server makes) with the check's start, the next cursor, a digest of every folded address read and
-  the unfilled ids; each later call names the token and goes on from the record's cursor, and an address two rows fold
+  keyed by a token the server makes) with the check's start and the next cursor; beside it, under the same token and
+  acquisition, a claim with a digest of every folded address read and one claim per unfilled id, so a fill reads the
+  small record and its one id's claim, never the whole scan; each later call names the token and goes on from the record's cursor, and an address two rows fold
   to, in one call or across calls, drops the record and answers 409. A row's key is the fold of its `email` as it is
   now, never its stored `emailCanonical` (a stored value is the fill's holder check's). Pages are 500 rows: Lunora fetches `limit + 1` rows to tell a last page,
   and a D1 statement answers at most 1,000. Only then the fill: one id per call, under the token of a COMPLETED

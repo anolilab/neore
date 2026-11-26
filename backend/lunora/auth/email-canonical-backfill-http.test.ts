@@ -85,7 +85,6 @@ describe("POST /admin/backfill-email-canonical", () => {
         const bodies = [
             { checkedAt: 5, ids: ["u1"], phase: "fill" },
             { checkedAt: 5, ids: ["u1"], phase: "fill", token: CHECK_TOKEN },
-            { checkedAt: Date.now() + 86_400_000, ids: ["u1"], phase: "fill", token: CHECK_TOKEN },
             { cursor: "c", ids: ["u1"], phase: "fill", token: CHECK_TOKEN },
             { cursor: "c", phase: "check", token: CHECK_TOKEN },
             { phase: "check", salt: "s" },

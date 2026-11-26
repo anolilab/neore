@@ -160,6 +160,20 @@ describe("the post-deploy data migrations", () => {
             'targets the .global() table "user"',
         );
         expect(declaredMigrationIds(declare('{ id: "fine", table: MESSAGES }', 'const MESSAGES = "messages";'), global)).toStrictEqual(["fine"]);
+        // An unshadowed top-level constant reads the same inside a function.
+        expect(
+            declaredMigrationIds('const MESSAGES = "messages";\nexport const m = (() => defineMigration({ id: "nested", table: MESSAGES }))();', global),
+        ).toStrictEqual(["nested"]);
+
+        // A local binding of the top-level constant's name: the call gets the local value, so neither reads as the constant.
+        for (const [binding, property] of [
+            ["TABLE", "table: TABLE"],
+            ["table", "table"],
+        ]) {
+            const source = `const ${binding!} = "messages";\nexport const m = (() => {\n    const ${binding!} = "user";\n\n    return defineMigration({ id: "fill", ${property!} });\n})();`;
+
+            expect(() => declaredMigrationIds(source, global), property).toThrow(UNREADABLE_DEFINITION);
+        }
 
         for (const [definition, prelude] of [
             ['{ id: "fill", table: TABLES.user }', 'const TABLES = { user: "user" };'],
