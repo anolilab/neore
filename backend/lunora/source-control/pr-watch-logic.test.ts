@@ -238,6 +238,32 @@ describe("decideWatch", () => {
     });
 });
 
+describe("a seen review beyond a truncated read", () => {
+    const listed = [
+        { authorLogin: "dev", id: "r9" },
+        { authorLogin: "bob", id: "r8" },
+        { authorLogin: "amy", id: "r7" },
+    ];
+
+    it("wakes for a review and marks the newest one by someone else", () => {
+        const decision = decideWatch({ ...baselined, reviewId: "r1" }, { ...quiet, reviews: listed, reviewsTruncated: true }, NOW);
+
+        expect(decision).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "r8" } });
+    });
+
+    it("does not wake when only the watcher's own reviews are listed", () => {
+        const decision = decideWatch({ ...baselined, reviewId: "r1" }, { ...quiet, reviews: [listed[0]!], reviewsTruncated: true }, NOW);
+
+        expect(decision.action).toBe("none");
+    });
+
+    it("still re-baselines silently when the list is complete and the marker is gone", () => {
+        const decision = decideWatch({ ...baselined, reviewId: "r1" }, { ...quiet, reviews: listed }, NOW);
+
+        expect(decision).toMatchObject({ action: "none", state: { reviewId: "r8" } });
+    });
+});
+
 describe("the watcher's own reviews", () => {
     const own = { authorLogin: "Dev", id: "r9" };
 

@@ -482,7 +482,7 @@ describe("observeWatched", () => {
         expect(row.watch.reviewId).toBe("r150");
     });
 
-    it("does not re-baseline when the seen review lies beyond what the host read", async () => {
+    it("wakes for a review when the seen review lies beyond what the host read", async () => {
         const items = Array.from({ length: 150 }, (_, index) => {
             return { authorLogin: "bob", id: `r${String(400 - index)}` };
         });
@@ -493,8 +493,9 @@ describe("observeWatched", () => {
 
         const row = await rowOf(linkId);
 
-        expect(row.watch.reviewId).toBe("r10");
-        expect(row.watchPending).toEqual([]);
+        expect(observed.reviewsTruncated).toBe(true);
+        expect(row.watch.reviewId).toBe("r400");
+        expect(row.watchPending).toEqual(["review"]);
     });
 
     it("reads the login once for a watch that goes on", async () => {

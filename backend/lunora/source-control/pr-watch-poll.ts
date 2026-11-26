@@ -60,6 +60,7 @@ const vObservation = v.object({
     headSha: v.string(),
     mergeable: v.union(v.literal("clean"), v.literal("conflicting"), v.literal("unknown")),
     reviews: v.array(v.object({ authorLogin: v.string(), id: v.string() })),
+    reviewsTruncated: v.optional(v.boolean()),
     state: v.union(v.literal("closed"), v.literal("merged"), v.literal("open")),
     watcherLogin: v.string(),
 });
@@ -412,9 +413,9 @@ export const observeWatched = async (
                 return { authorLogin: review.authorLogin, id: review.id };
             }),
             state: detail.state,
-            // The marker may lie beyond the pages the host read: no review can be judged new or old then, so the watcher is left
-            // unknown, which skips review handling and leaves the marker as it was, instead of re-baselining on a guess.
-            watcherLogin: markerBeyondRead ? "" : watcherLogin,
+            watcherLogin,
+            // The marker lies beyond the pages the host read: what was listed is all newer than it (`decideWatch`).
+            ...(markerBeyondRead && { reviewsTruncated: true }),
         },
     };
 };

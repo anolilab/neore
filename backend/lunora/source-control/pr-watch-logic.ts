@@ -46,6 +46,11 @@ export interface PullRequestObservation {
     mergeable: "clean" | "conflicting" | "unknown";
     /** Every submitted review, newest first, as the host lists them now. */
     reviews: ReadonlyArray<{ authorLogin: string; id: string }>;
+    /**
+     * True when the host holds more reviews than were listed and the list does not reach the seen review: every listed review is
+     * then newer than the seen one, which the decision cannot find by position.
+     */
+    reviewsTruncated?: boolean;
     /** The host's state of the pull request now. */
     state: "closed" | "merged" | "open";
     /** The person's own login. Their reviews never wake them. */
@@ -171,6 +176,11 @@ export const decideWatch = (previous: PullRequestWatchState, observed: PullReque
         // of what this can tell). Nothing can be said about what is new, so re-baseline silently on the newest review by someone
         // else, or clear the marker when there is none: the next review by someone else then wakes the thread.
         next.reviewId = review?.id;
+
+        // A truncated list that does not reach the seen review holds only newer ones: a review by someone else is new, not lost.
+        if (observed.reviewsTruncated === true && review !== undefined && !owed.includes("review")) {
+            owed.push("review");
+        }
     } else if (newer.length > 0) {
         next.reviewId = newer[0]?.id;
 
