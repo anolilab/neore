@@ -13,7 +13,9 @@
 import { v } from "lunorash/server";
 
 import type { Doc } from "../_generated/dataModel";
+import { internal } from "../_generated/internal";
 import { internalMutation } from "../_generated/server";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import { MAX_LENGTH } from "../lib/validators";
 import { PR_WATCH_MAX_WAKES, storedWatchOf } from "./pr-watch-logic";
 
@@ -90,7 +92,14 @@ export const setPullRequestWatch = internalMutation
         // The wake count carries over: a restart must not reset the cap that ends a watch which keeps waking.
         const stored = storedWatchOf({ startedAt: ctx.now, ...(link.watch?.wakes !== undefined && { wakes: link.watch.wakes }) });
 
-        await ctx.db.patch("pullRequestThreads", link._id, { watch: stored.watch, watchActive: true, watchPending: stored.watchPending ?? [] });
+        // A fresh watch is never inside an old watch's read interval (`watchCheckedAt` 0), and its own poll chain starts now.
+        await ctx.db.patch("pullRequestThreads", link._id, {
+            watch: stored.watch,
+            watchActive: true,
+            watchCheckedAt: 0,
+            watchPending: stored.watchPending ?? [],
+        });
+        await runAfterOnShard(ctx.scheduler, 0, internal.source_control.pr_watch_poll.pollWatchLink, { linkId: link._id }, args.userId);
 
         return { status: "ok" as const };
     });

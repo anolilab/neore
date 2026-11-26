@@ -77,6 +77,17 @@ describe("setPullRequestWatch", () => {
         expect(typeof watch.startedAt).toBe("number");
     });
 
+    it("schedules the new watch's own first poll", async () => {
+        const { linkId, threadId } = await seedLink(OWNER, 7, { watchCheckedAt: Date.now() });
+        const before = harness.scheduler.list().length;
+
+        await call({ number: 7, threadId, userId: OWNER, watching: true });
+
+        const jobs = harness.scheduler.list().slice(before) as unknown as { args: { linkId?: string } }[];
+
+        expect(jobs.filter((job) => job.args.linkId === linkId)).toHaveLength(1);
+    });
+
     it("refuses a link that belongs to someone else, and writes nothing", async () => {
         const { linkId, threadId } = await seedLink(OTHER, 7);
 

@@ -6,6 +6,8 @@
  * result only while its lease is still the link's current one and the same watch is still running. A late answer, or one
  * for a watch that was stopped or restarted meanwhile, is dropped.
  *
+ * Each leased watch also schedules its own next poll on its owner's shard (`pollWatchLink`), so a watch is polled whether or
+ * not its shard is active; the sweep is the backstop that restarts a chain that was lost.
  * A failed read changes nothing: the lease stamp alone makes the next try wait for the interval.
  * This file records a wake (`lastWakeAt`, the count and the owed reasons in `watchPending`) and sends nothing: the
  * delivery clears `watchPending` once it has happened.
@@ -13,15 +15,17 @@
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
-import { internalAction, internalMutation, internalQuery } from "../_generated/server";
-import { resolveGithubToken } from "../connectors/lib/github-token";
+import type { Doc } from "../_generated/dataModel";
+import { internalAction, internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
+import { type GithubTokenOutcome, resolveGithubToken } from "../connectors/lib/github-token";
 import { currentUserShard } from "../lib/shard-context";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import { rollupOf } from "./checks-logic";
 import { DEVELOP_DRIVER } from "./develop-driver";
 import { signedInLogin } from "./drivers/github";
 import type { PullRequestObservation } from "./pr-watch-logic";
 import { decideWatch, stateOf, storedWatchOf } from "./pr-watch-logic";
-import { readFromHost } from "./read-host";
+import { readFromHost, type ReadOutcome } from "./read-host";
 import type { CheckRun, CheckState, CheckSummary, MergeState } from "./types";
 
 /** A running watch is read again once its last read is this old. */
@@ -90,37 +94,79 @@ export const dispatchDueWatches = internalMutation
             .withIndex("by_user_and_watchActive", (q) => q.eq("userId", userId).eq("watchActive", true))
             .take(POLL_LIMIT * 2);
         const due = running
-            .filter(
-                (link) =>
-                    link.threadDeleted !== true &&
-                    link.watch !== undefined &&
-                    link.watch.stoppedAt === undefined &&
-                    (link.watchCheckedAt === undefined || now - link.watchCheckedAt >= PR_WATCH_POLL_INTERVAL_MS),
-            )
+            .filter((link) => isDue(link, now))
             .toSorted((a, b) => (a.watchCheckedAt ?? 0) - (b.watchCheckedAt ?? 0))
             .slice(0, POLL_LIMIT);
 
         for (const link of due) {
-            // Stamped first: a sweep that runs again before the read lands skips this link. The stamp is the lease.
-            await ctx.db.patch("pullRequestThreads", link._id, { watchCheckedAt: now });
-            await ctx.scheduler.runAfter(0, internal.source_control.pr_watch_poll.pollWatchedPullRequest, {
-                lease: now,
-                linkId: link._id,
-                startedAt: link.watch?.startedAt ?? now,
-            });
+            await leaseWatch(ctx, link, now);
         }
 
         return { dispatched: due.length };
     });
 
-/** What the host read needs from a running watch, on the user's shard. Null when the watch is gone or over. */
-export const readWatchForPoll = internalQuery
+/** Whether the link holds a running watch whose last read is old enough to read again. */
+const isDue = (link: Doc<"pullRequestThreads">, now: number): boolean =>
+    link.threadDeleted !== true &&
+    link.watchActive === true &&
+    link.watch !== undefined &&
+    link.watch.stoppedAt === undefined &&
+    (link.watchCheckedAt === undefined || now - link.watchCheckedAt >= PR_WATCH_POLL_INTERVAL_MS);
+
+/**
+ * Leases a running watch for one host read and keeps its own next poll scheduled on its owner's shard, so a person whose
+ * shard goes quiet is still polled (the housekeeping sweep only visits active shards and is the backstop). The next poll is
+ * armed here, with the lease, not when the read lands: a read that fails or never lands still has its successor.
+ */
+const leaseWatch = async (ctx: Pick<MutationCtx, "db" | "scheduler">, link: Doc<"pullRequestThreads">, now: number): Promise<void> => {
+    // Stamped first: a sweep or poll that runs again before the read lands skips this link. The stamp is the lease.
+    await ctx.db.patch("pullRequestThreads", link._id, { watchCheckedAt: now });
+    await runAfterOnShard(
+        ctx.scheduler,
+        0,
+        internal.source_control.pr_watch_poll.pollWatchedPullRequest,
+        { lease: now, linkId: link._id, startedAt: link.watch?.startedAt ?? now },
+        link.userId,
+    );
+    await runAfterOnShard(ctx.scheduler, PR_WATCH_POLL_INTERVAL_MS, internal.source_control.pr_watch_poll.pollWatchLink, { linkId: link._id }, link.userId);
+};
+
+/**
+ * The watch's own poll: leases it when it is due and arms the next one. A watch that is stopped, ended or deleted, or that a
+ * sweep or an earlier poll already leased inside the interval, does nothing (the lease holder armed its own successor), so
+ * competing chains converge to one and a poll never runs twice at once.
+ */
+export const pollWatchLink = internalMutation
     .input({ linkId: v.id("pullRequestThreads") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const link = await ctx.db.get("pullRequestThreads", args.linkId);
+
+        if (link !== null && isDue(link, ctx.now)) {
+            await leaseWatch(ctx, link, ctx.now);
+        }
+
+        return null;
+    });
+
+/**
+ * What the host read needs from a running watch, on the user's shard. Null when the watch is gone or over, or when `lease` or
+ * `startedAt` is no longer the link's own: the poll is stale and must not reach the host.
+ */
+export const readWatchForPoll = internalQuery
+    .input({ lease: v.number(), linkId: v.id("pullRequestThreads"), startedAt: v.number() })
     .output(v.union(v.null(), v.object({ number: v.number(), repository: v.string(), reviewId: v.optional(v.string()), userId: v.string() })))
     .query(async ({ args, ctx }) => {
         const link = await ctx.db.get("pullRequestThreads", args.linkId);
 
-        if (link === null || link.watchActive !== true || link.watch === undefined || link.watch.stoppedAt !== undefined) {
+        if (
+            link === null ||
+            link.watchActive !== true ||
+            link.watch === undefined ||
+            link.watch.stoppedAt !== undefined ||
+            link.watch.startedAt !== args.startedAt ||
+            link.watchCheckedAt !== args.lease
+        ) {
             return null;
         }
 
@@ -178,67 +224,102 @@ export const recordWatchObservation = internalMutation
         return null;
     });
 
+export interface WatchTarget {
+    number: number;
+    repository: string;
+    reviewId?: string;
+    userId: string;
+}
+
+/** The steps of one poll, apart from where they run, so their order is pinned by a test. */
+export interface WatchPollSteps {
+    /** The watch's target while this poll's lease and watch are still the link's own; null once they are not. */
+    read: () => Promise<WatchTarget | null>;
+    readHost: (target: WatchTarget, token: GithubTokenOutcome) => Promise<ReadOutcome<{ observation: PullRequestObservation }>>;
+    record: (observation: PullRequestObservation) => Promise<unknown>;
+    token: (userId: string) => Promise<GithubTokenOutcome>;
+}
+
+/**
+ * One poll: reads the target, gets the token, and reads the target AGAIN right before the host call, so a watch stopped or
+ * restarted while the token was fetched costs no host request. The answer is recorded only while its lease still matches
+ * (`recordWatchObservation`), which drops a result for a watch stopped during the call.
+ */
+export const runWatchPoll = async (steps: WatchPollSteps): Promise<void> => {
+    const target = await steps.read();
+
+    if (target === null) {
+        return;
+    }
+
+    const token = await steps.token(target.userId);
+
+    if ((await steps.read()) === null) {
+        return;
+    }
+
+    const outcome = await steps.readHost(target, token);
+
+    if (outcome.status === "ok") {
+        await steps.record(outcome.observation);
+    }
+};
+
+const readObservation = async (target: WatchTarget, token: GithubTokenOutcome): Promise<ReadOutcome<{ observation: PullRequestObservation }>> =>
+    await readFromHost(DEVELOP_DRIVER, token, async (request): Promise<{ observation: PullRequestObservation }> => {
+        const ref = { number: target.number, repository: target.repository };
+        const detail = await DEVELOP_DRIVER.getPullRequest(request, ref);
+        const watcherLogin = await signedInLogin(request);
+
+        // A pull request that is no longer open ends the watch: nothing else about it is read.
+        if (detail.state !== "open") {
+            return {
+                observation: {
+                    checks: "pending",
+                    failingCheckNames: [],
+                    headSha: detail.headSha,
+                    mergeable: "unknown",
+                    reviews: [],
+                    state: detail.state,
+                    watcherLogin,
+                },
+            };
+        }
+
+        const [summary, reviews] = await Promise.all([
+            DEVELOP_DRIVER.listChecks(request, ref, detail.headSha),
+            DEVELOP_DRIVER.listReviews(request, ref, target.reviewId === undefined ? undefined : { seenId: target.reviewId }),
+        ]);
+        const { failing, status } = checksOf(summary);
+
+        return {
+            observation: {
+                checks: status,
+                failingCheckNames: failing.slice(0, MAX_FAILING_NAMES).map((check) => check.name.slice(0, MAX_NAME_LENGTH)),
+                headSha: detail.headSha,
+                mergeable: mergeableOf(detail.mergeState),
+                reviews: reviews.items.slice(0, MAX_REVIEWS).map((review) => {
+                    return { authorLogin: review.authorLogin, id: review.id };
+                }),
+                state: detail.state,
+                watcherLogin,
+            },
+        };
+    });
+
 /** One host read for one watched link, with the person's own token. */
 export const pollWatchedPullRequest = internalAction
     .input({ lease: v.number(), linkId: v.id("pullRequestThreads"), startedAt: v.number() })
     .output(v.null())
     .action(async ({ args, ctx }) => {
-        const target = await ctx.runQuery(internal.source_control.pr_watch_poll.readWatchForPoll, { linkId: args.linkId });
+        const key = { lease: args.lease, linkId: args.linkId, startedAt: args.startedAt };
 
-        if (target === null) {
-            return null;
-        }
-
-        const token = await resolveGithubToken(ctx, target.userId);
-        const outcome = await readFromHost(DEVELOP_DRIVER, token, async (request): Promise<{ observation: PullRequestObservation }> => {
-            const ref = { number: target.number, repository: target.repository };
-            const detail = await DEVELOP_DRIVER.getPullRequest(request, ref);
-            const watcherLogin = await signedInLogin(request);
-
-            // A pull request that is no longer open ends the watch: nothing else about it is read.
-            if (detail.state !== "open") {
-                return {
-                    observation: {
-                        checks: "pending",
-                        failingCheckNames: [],
-                        headSha: detail.headSha,
-                        mergeable: "unknown",
-                        reviews: [],
-                        state: detail.state,
-                        watcherLogin,
-                    },
-                };
-            }
-
-            const [summary, reviews] = await Promise.all([
-                DEVELOP_DRIVER.listChecks(request, ref, detail.headSha),
-                DEVELOP_DRIVER.listReviews(request, ref, target.reviewId === undefined ? undefined : { seenId: target.reviewId }),
-            ]);
-            const { failing, status } = checksOf(summary);
-
-            return {
-                observation: {
-                    checks: status,
-                    failingCheckNames: failing.slice(0, MAX_FAILING_NAMES).map((check) => check.name.slice(0, MAX_NAME_LENGTH)),
-                    headSha: detail.headSha,
-                    mergeable: mergeableOf(detail.mergeState),
-                    reviews: reviews.items.slice(0, MAX_REVIEWS).map((review) => {
-                        return { authorLogin: review.authorLogin, id: review.id };
-                    }),
-                    state: detail.state,
-                    watcherLogin,
-                },
-            };
+        await runWatchPoll({
+            read: async () => await ctx.runQuery(internal.source_control.pr_watch_poll.readWatchForPoll, key),
+            readHost: readObservation,
+            record: async (observation) => await ctx.runMutation(internal.source_control.pr_watch_poll.recordWatchObservation, { ...key, observation }),
+            token: async (userId) => await resolveGithubToken(ctx, userId),
         });
-
-        if (outcome.status === "ok") {
-            await ctx.runMutation(internal.source_control.pr_watch_poll.recordWatchObservation, {
-                lease: args.lease,
-                linkId: args.linkId,
-                observation: outcome.observation,
-                startedAt: args.startedAt,
-            });
-        }
 
         return null;
     });

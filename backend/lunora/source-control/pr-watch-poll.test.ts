@@ -3,12 +3,20 @@
  * recorded exactly as `decideWatch` says, only while its lease and its watch are still current.
  */
 import { lunoraTest } from "@lunora/testing";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { insertThread } from "../agent/table-writes";
 import { runInShard } from "../lib/shard-context";
 import schema from "../schema";
-import { PR_WATCH_POLL_INTERVAL_MS, checksOf, dispatchDueWatches, recordWatchObservation } from "./pr-watch-poll";
+import {
+    PR_WATCH_POLL_INTERVAL_MS,
+    checksOf,
+    dispatchDueWatches,
+    pollWatchLink,
+    readWatchForPoll,
+    recordWatchObservation,
+    runWatchPoll,
+} from "./pr-watch-poll";
 import type { CheckRun } from "./types";
 import { decideWatch, PR_WATCH_MAX_WAKES, PR_WATCH_WAKE_COOLDOWN_MS, stateOf, storedWatchOf } from "./pr-watch-logic";
 import type { PullRequestObservation } from "./pr-watch-logic";
@@ -157,6 +165,115 @@ describe("dispatchDueWatches", () => {
         const result = await harness.run(async (ctx: any) => await runInShard(OWNER, () => ctx.runMutation(dispatchDueWatches, {})));
 
         expect(result.dispatched).toBe(10);
+    });
+});
+
+describe("pollWatchLink", () => {
+    const run = async (linkId: string): Promise<void> => {
+        await harness.run(async (ctx: any) => {
+            await ctx.runMutation(pollWatchLink, { linkId });
+        });
+    };
+
+    it("leases a due watch and arms its next poll, with no sweep and no shard activity", async () => {
+        const linkId = await seedWatch({ watchCheckedAt: undefined });
+        const before = harness.scheduler.list().length;
+
+        await run(linkId);
+
+        const jobs = harness.scheduler.list().slice(before) as unknown as { args: Record<string, unknown> }[];
+        const { watchCheckedAt: lease } = await rowOf(linkId);
+
+        expect(jobs).toHaveLength(2);
+        expect(jobs.some((job) => job.args.lease === lease && job.args.startedAt === STARTED_AT)).toBe(true);
+        expect(jobs.some((job) => job.args.lease === undefined && job.args.linkId === linkId)).toBe(true);
+    });
+
+    it("does nothing for a watch read inside the interval, a stopped watch or a missing link", async () => {
+        const fresh = await seedWatch({ watchCheckedAt: Date.now() }, 1);
+        const stopped = await seedWatch({ watch: { startedAt: STARTED_AT, stoppedAt: 2000 }, watchActive: false, watchCheckedAt: undefined }, 2);
+        const before = harness.scheduler.list().length;
+
+        await run(fresh);
+        await run(stopped);
+
+        expect(harness.scheduler.list()).toHaveLength(before);
+    });
+});
+
+describe("a poll that went stale before the host read", () => {
+    const TARGET = { number: 7, repository: "octo/hello", userId: OWNER };
+    const TOKEN = {
+        accessToken: "t",
+        renew: async () => {
+            return { accessToken: "t" };
+        },
+    } as never;
+    const key = (linkId: string) => {
+        return { lease: LEASE, linkId, startedAt: STARTED_AT };
+    };
+
+    const readFor = async (linkId: string, override: Record<string, unknown> = {}) =>
+        await harness.run(async (ctx: any) => await ctx.runQuery(readWatchForPoll, { ...key(linkId), ...override }));
+
+    it("reads as null once the watch is stopped, the lease moved or the watch restarted", async () => {
+        const live = await seedWatch();
+
+        expect(await readFor(live)).toMatchObject({ number: 7, repository: "octo/hello" });
+        expect(await readFor(live, { lease: LEASE + 1 })).toBeNull();
+        expect(await readFor(live, { startedAt: STARTED_AT + 1 })).toBeNull();
+
+        const stopped = await seedWatch({ watch: { startedAt: STARTED_AT, stoppedAt: 2000 }, watchActive: false }, 2);
+
+        expect(await readFor(stopped)).toBeNull();
+    });
+
+    it("makes no host call when the watch was stopped while the token was fetched", async () => {
+        const readHost = vi.fn();
+        const saved = vi.fn();
+        const read = vi.fn().mockResolvedValueOnce(TARGET).mockResolvedValueOnce(null);
+
+        await runWatchPoll({ read, readHost, record: saved, token: async () => TOKEN });
+
+        expect(read).toHaveBeenCalledTimes(2);
+        expect(readHost).not.toHaveBeenCalled();
+        expect(saved).not.toHaveBeenCalled();
+    });
+
+    it("makes no host call for a watch already stopped, and none for a token it never asked for", async () => {
+        const readHost = vi.fn();
+        const token = vi.fn();
+
+        await runWatchPoll({ read: async () => null, readHost, record: vi.fn(), token });
+
+        expect(token).not.toHaveBeenCalled();
+        expect(readHost).not.toHaveBeenCalled();
+    });
+
+    it("reads the host and records the observation while the watch is still current", async () => {
+        const answer = observation();
+        const readHost = vi.fn().mockResolvedValue({ observation: answer, status: "ok" });
+        const saved = vi.fn();
+
+        await runWatchPoll({ read: async () => TARGET, readHost, record: saved, token: async () => TOKEN });
+
+        expect(readHost).toHaveBeenCalledOnce();
+        expect(saved).toHaveBeenCalledWith(answer);
+    });
+
+    it("records nothing when the host read failed", async () => {
+        const saved = vi.fn();
+
+        await runWatchPoll({
+            read: async () => TARGET,
+            readHost: async () => {
+                return { status: "rate_limited" };
+            },
+            record: saved,
+            token: async () => TOKEN,
+        });
+
+        expect(saved).not.toHaveBeenCalled();
     });
 });
 
