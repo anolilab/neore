@@ -16,7 +16,7 @@ import { v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalQuery } from "../_generated/server";
-import { threadHasLiveGrant } from "../agent/live-grant";
+import { threadSharedWithOthers } from "../agent/live-grant";
 import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { parseCustomModelId } from "@neore/ai/models";
@@ -106,13 +106,18 @@ export const sideChatRefusalOf = (parent: SideChatParent | null, ownerOk: boolea
 };
 
 /**
- * Whether anyone else holds a live grant on the thread. Ordinary invited sharing is recorded only as a grant, so the parent's
- * own flags do not show it: a chat others can read is not forked into a chat only its owner can see.
+ * Whether anyone other than the owner holds a grant on the thread that is still in force. Ordinary invited sharing is recorded
+ * only as a grant, so the parent's own flags do not show it: a chat others can read is not forked into a chat only its owner
+ * can see. An expired grant, or the owner's own, gives nobody else access, so it does not count.
  */
 export const sharedWithOthers = internalQuery
     .input({ threadId: v.id("threads") })
     .output(v.boolean())
-    .query(async ({ args, ctx }) => await threadHasLiveGrant(ctx, args.threadId));
+    .query(async ({ args, ctx }) => {
+        const thread = await ctx.db.get("threads", args.threadId);
+
+        return thread?.userId !== undefined && (await threadSharedWithOthers(ctx, args.threadId, thread.userId, Date.now()));
+    });
 
 export const createSideChat = authAction
     .use(rateLimit("chat/create"))

@@ -615,4 +615,17 @@ describe("createSideChat", () => {
         expect(copied).not.toContain("tool-call");
         expect(copied).not.toContain("second question");
     });
+
+    it("forks a parent whose only grant has expired, since nobody else can read it through that grant", async () => {
+        const parentId = await parentWith(OWNER);
+
+        await withMessages(parentId, OWNER, ["hello"]);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("threadAccess", { expiresAt: 1, grantedAt: 0, grantedBy: OWNER, permission: "read", threadId: parentId, userId: "user-c" });
+        });
+
+        const outcome = (await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)) as { status: string };
+
+        expect(outcome.status).toBe("ok");
+    });
 });
