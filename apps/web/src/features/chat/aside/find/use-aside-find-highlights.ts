@@ -222,22 +222,27 @@ const useAsideFindHighlights = (
         // An image that loads changes the layout above a hit without touching the DOM. Load does not bubble, hence capture.
         host.addEventListener("load", recheck, { capture: true });
 
-        // A resize reflows the panel and can clip the hit without touching the DOM, so the hit is checked once it settles.
-        const resizer = new ResizeObserver(() => {
-            scheduleReveal();
-        });
+        // A resize can clip the hit without touching the DOM, so the hit is checked once it settles. Only the scroll box's own
+        // size is watched: the panel grows with each streamed token, and that growth must not pull the reader back to the hit.
+        // Without a scroll box, the window's resize stands in for it.
         const scroller = scrollerOf(host);
-
-        resizer.observe(host);
+        const resizer = scroller
+            ? new ResizeObserver(() => {
+                  scheduleReveal();
+              })
+            : undefined;
 
         if (scroller) {
-            resizer.observe(scroller);
+            resizer?.observe(scroller);
+        } else {
+            globalThis.addEventListener("resize", scheduleReveal);
         }
 
         return () => {
             observer.disconnect();
             host.removeEventListener("load", recheck, { capture: true });
-            resizer.disconnect();
+            resizer?.disconnect();
+            globalThis.removeEventListener("resize", scheduleReveal);
             cancelAnimationFrame(frame);
             clearTimeout(revealTimer);
             clearHighlights(ASIDE_HIGHLIGHTS);
