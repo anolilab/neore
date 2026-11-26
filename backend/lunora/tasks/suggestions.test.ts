@@ -7,6 +7,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { browserExportPrefix } from "../browser/export-pages";
+import { containsSecret } from "../lib/secret-redaction";
 import schema from "../schema";
 import {
     readAllTaskSuggestionPages,
@@ -16,7 +17,7 @@ import {
     taskSuggestionsExportPageKey,
 } from "./export-pages";
 import { collectTaskSuggestionsForExport, deleteUserTasks, storeTaskSuggestionsExportPage } from "./gdpr";
-import { MAX_PENDING_SUGGESTIONS, TASK_SCHEDULE_MAX } from "./logic";
+import { MAX_PENDING_SUGGESTIONS, TASK_INSTRUCTIONS_MAX, TASK_SCHEDULE_MAX, TASK_TITLE_MAX } from "./logic";
 import { acceptTaskSuggestion, dismissTaskSuggestion, eraseUserTaskSuggestions, insertTaskSuggestions, listTaskSuggestions } from "./suggestions";
 
 const { sessionFrom, users } = vi.hoisted(() => {
@@ -316,6 +317,22 @@ describe("storing", () => {
                 proposal({ title: "Clean" }),
             ]),
         ).resolves.toEqual({ inserted: 1 });
+
+        expect(await rowsOf("taskSuggestions", A)).toMatchObject([{ title: "Clean" }]);
+    });
+
+    it("drops a proposal whose secret straddles the length cut, though the part left would pass the filter", async () => {
+        await setSwitch(A, true);
+
+        // Built from parts so the repo holds no key-shaped literal. Only "sk-" and 8 body characters fit before the cut.
+        const key = ["sk", "-", "12345678", "90abcdefghijklmnopqrstuvwxyz"].join("");
+        const instructions = `${"a".repeat(TASK_INSTRUCTIONS_MAX - 11 - 1)} ${key}`;
+        const title = `${"b".repeat(TASK_TITLE_MAX - 11 - 1)} ${key}`;
+
+        expect(instructions.length).toBeGreaterThan(TASK_INSTRUCTIONS_MAX);
+        expect(containsSecret(instructions.slice(0, TASK_INSTRUCTIONS_MAX))).toBe(false);
+        expect(containsSecret(title.slice(0, TASK_TITLE_MAX))).toBe(false);
+        await expect(insert(A, [proposal({ instructions }), proposal({ title }), proposal({ title: "Clean" })])).resolves.toEqual({ inserted: 1 });
 
         expect(await rowsOf("taskSuggestions", A)).toMatchObject([{ title: "Clean" }]);
     });

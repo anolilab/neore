@@ -170,13 +170,17 @@ export const insertTaskSuggestions = internalMutation
                 break;
             }
 
-            const title = normalizeTaskText(suggestion.title).slice(0, TASK_TITLE_MAX);
-            const instructions = normalizeTaskText(suggestion.instructions).slice(0, TASK_INSTRUCTIONS_MAX);
+            const fullTitle = normalizeTaskText(suggestion.title);
+            const fullInstructions = normalizeTaskText(suggestion.instructions);
 
             // The words come from the person's messages: a proposal that carries a secret is dropped, never stored.
-            if (!title || !instructions || containsSecret(title) || containsSecret(instructions)) {
+            // The check runs on the whole text, before the cut: a key that straddles the limit would leave only a part the detector misses.
+            if (!fullTitle || !fullInstructions || containsSecret(fullTitle) || containsSecret(fullInstructions)) {
                 continue;
             }
+
+            const title = fullTitle.slice(0, TASK_TITLE_MAX);
+            const instructions = fullInstructions.slice(0, TASK_INSTRUCTIONS_MAX);
 
             const cronExpression = normalizeTaskText(suggestion.cronExpression);
 
