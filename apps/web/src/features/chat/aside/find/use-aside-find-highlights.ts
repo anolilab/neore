@@ -244,7 +244,12 @@ const useAsideFindHighlights = (
 
                 apply();
 
-                if (!sameOffset(beforeOffset, appliedOffset) || !isSameHit(before, applied)) {
+                // Reveal a hit that came into existence, or the same hit moving along the panel. A different occurrence that
+                // takes the selected index was not moved by the reader, so it is highlighted without a scroll.
+                const appeared = before === undefined && applied !== undefined;
+                const moved = isSameHit(before, applied) && !sameOffset(beforeOffset, appliedOffset);
+
+                if (appeared || moved) {
                     scheduleReveal();
                 }
             });
