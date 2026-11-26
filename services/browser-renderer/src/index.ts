@@ -1155,8 +1155,17 @@ app.post("/login", async (c) => {
         await new Promise((resolve) => {
             setTimeout(resolve, LOGIN_BUSY_STEP_MS);
         });
-        // Bounded by what is left of the wait, so a lock slow to answer never runs the sign-in past its deadline.
-        refused = await holds.take(sessionId, until - Date.now());
+        // Bounded by what is left of the wait, so a lock slow to answer never runs the sign-in past its deadline. Too
+        // little left to ask, or a lock that did not answer in it: the session was busy, and that is what is said.
+        const left = until - Date.now();
+
+        if (left < LOGIN_BUSY_STEP_MS) {
+            break;
+        }
+
+        const retried = await holds.take(sessionId, left);
+
+        refused = retried === "unreachable" ? "busy" : retried;
     }
 
     if (refused === "retired") {
