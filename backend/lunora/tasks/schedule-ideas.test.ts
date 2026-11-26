@@ -102,6 +102,12 @@ const row = async (threadId: string, role: "assistant" | "user", text: string, f
     );
 };
 
+/**
+ * The instant every test runs at: midday UTC, so neither the sweep's `ctx.now` nor the day a test works out for its
+ * assertions can fall on the other side of midnight. The harness reads `ctx.now` from `Date.now()`, so faking `Date` moves both.
+ */
+const NOW = Date.UTC(2026, 10, 26, 12, 0, 0);
+
 const today = (): string => scheduleIdeasDay(Date.now());
 
 const run = async (userId = USER, day = today()) => await harness.action(async (ctx: any) => await ctx.runAction(generateScheduleIdeas, { day, userId }));
@@ -145,6 +151,8 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
     harness = lunoraTest(schema as never);
     order = 0;
     enqueued.length = 0;
@@ -153,6 +161,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    vi.useRealTimers();
     generateText.mockReset();
     getUtilityModel.mockReset();
 });
@@ -566,8 +575,10 @@ describe("the day a job was queued for", () => {
     it("is the day it claims when it is delivered after midnight, leaving the next day free", async () => {
         await settings();
         await row(await thread(), "user", "remind me to water the plants every morning");
-        const queuedFor = scheduleIdeasDay(Date.now() - DAY);
+        // Queued at 12:00 UTC the day before; delivered now, a day later (`ctx.now` is `NOW`).
+        const queuedFor = scheduleIdeasDay(NOW - DAY);
 
+        expect(queuedFor).not.toBe(today());
         await deliver(`schedule-ideas:${USER}:${queuedFor}`, USER, queuedFor);
 
         expect(generateText).toHaveBeenCalledOnce();
