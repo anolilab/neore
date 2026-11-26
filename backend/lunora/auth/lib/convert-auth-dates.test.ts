@@ -12,7 +12,7 @@ import { runD1GlobalTableMigrations } from "@lunora/d1";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildAuthOptions } from "../../auth";
-import { ensureAuthDatesConverted, RECHECK_AFTER_MS, resetAuthDateConversionForTests, RETRY_AFTER_MS, ROLLOUT_WINDOW_MS } from "./convert-auth-dates";
+import { ensureAuthDatesConverted, RECHECK_AFTER_MS, resetAuthDateConversionForTests, RETRY_AFTER_MS } from "./convert-auth-dates";
 
 const { default: schema } = await vi.importActual<typeof import("../../schema")>("../../schema");
 
@@ -67,48 +67,33 @@ describe(ensureAuthDatesConverted, () => {
         expect(session.createdAt).toBe(Date.parse(CREATED));
     });
 
-    it("converts dates written during the rollout window, then stops for every isolate", async () => {
-        expect.assertions(5);
+    it("converts dates an older isolate writes after the first run, on the next re-check", async () => {
+        expect.assertions(3);
 
         let clock = 1_000_000;
         const now = (): number => clock;
-        const insertUser = (id: string): void => {
-            database
-                .prepare(`INSERT INTO "user" ("_creationTime", "id", "name", "email", "emailVerified", "createdAt", "updatedAt") VALUES (?, ?, ?, ?, ?, ?, ?)`)
-                .run(1, id, id, `${id}@example.com`, 1, CREATED, CREATED);
-        };
         const createdAt = (id: string): unknown =>
             (database.prepare(`SELECT "createdAt" FROM "user" WHERE "id" = ?`).get(id) as { createdAt: unknown }).createdAt;
 
         await ensureAuthDatesConverted(exec, buildAuthOptions(), now);
 
-        // An isolate still on the previous version writes a text date after this one's first pass.
-        insertUser("late");
+        // An isolate still on the previous version writes a text date after this one's first run.
+        database
+            .prepare(`INSERT INTO "user" ("_creationTime", "id", "name", "email", "emailVerified", "createdAt", "updatedAt") VALUES (?, ?, ?, ?, ?, ?, ?)`)
+            .run(1, "late", "Late", "late@example.com", 1, CREATED, CREATED);
+
+        const all = vi.spyOn(exec, "all");
+
         clock += RECHECK_AFTER_MS - 1;
         await ensureAuthDatesConverted(exec, buildAuthOptions(), now);
 
+        expect(all).not.toHaveBeenCalled();
         expect(createdAt("late")).toBe(CREATED);
 
         clock += 1;
         await ensureAuthDatesConverted(exec, buildAuthOptions(), now);
 
         expect(createdAt("late")).toBe(Date.parse(CREATED));
-
-        // A pass a full window after the first success is the last one.
-        clock += ROLLOUT_WINDOW_MS;
-        await ensureAuthDatesConverted(exec, buildAuthOptions(), now);
-
-        expect((database.prepare(`SELECT "final" FROM "authDateConversionMarker"`).get() as { final: unknown }).final).toBe(1);
-
-        // A fresh isolate reads the marker and converts nothing more.
-        resetAuthDateConversionForTests();
-        insertUser("after");
-        const all = vi.spyOn(exec, "all");
-
-        await ensureAuthDatesConverted(exec, buildAuthOptions(), now);
-
-        expect(createdAt("after")).toBe(CREATED);
-        expect(all).toHaveBeenCalledOnce();
     });
 
     it("never rejects, and retries a failure only after the back-off", async () => {
