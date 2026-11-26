@@ -150,6 +150,19 @@ describe("ThreadOptionsMenu", () => {
             expect(sideChat.showError).not.toHaveBeenCalled();
         });
 
+        it("starts a side chat from a middle click, with the button passed on, and not from other aux buttons", () => {
+            sideChat.result = { status: "ok", threadId: "side1" };
+            renderMenu();
+            const item = screen.getByRole("menuitem", { name: "Side chat" });
+
+            fireEvent(item, new MouseEvent("auxclick", { bubbles: true, button: 2, cancelable: true }));
+            expect(sideChat.openChat).not.toHaveBeenCalled();
+
+            fireEvent(item, new MouseEvent("auxclick", { bubbles: true, button: 1, cancelable: true }));
+            expect(sideChat.openChat).toHaveBeenCalledTimes(1);
+            expect(sideChat.openChat).toHaveBeenCalledWith("side1", expect.objectContaining({ button: 1 }), "t1");
+        });
+
         it.each([
             ["archived", "An archived chat cannot start a side chat."],
             ["custom_endpoint", "A chat on a custom endpoint cannot start a side chat."],

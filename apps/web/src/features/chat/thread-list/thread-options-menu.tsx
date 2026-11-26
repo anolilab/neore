@@ -82,6 +82,28 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
         }
     };
 
+    // The click is copied now: the event is spent when the action answers. The click and the saved setting pick where the chat opens.
+    const startFrom = (event: { button: number; ctrlKey: boolean; detail: number; metaKey: boolean }) => {
+        const click = { button: event.button, ctrlKey: event.ctrlKey, detail: event.detail, metaKey: event.metaKey };
+
+        startSideChat(
+            { threadId },
+            {
+                onError: (error: Error) => {
+                    console.error("Failed to start a side chat:", error);
+                    showError(error);
+                },
+                onSuccess: (result) => {
+                    if (result.status === "ok") {
+                        openChat(result.threadId, click, threadId);
+                    } else {
+                        showError(sideChatRefusal(result.reason));
+                    }
+                },
+            },
+        );
+    };
+
     const showFollowChoices = !isLocked && follow.error === null && follow.state !== undefined;
 
     // The menu's items are portaled; a click in them bubbles through React to the row, which must not open.
@@ -135,27 +157,15 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
                     {!isHostRun && !isLocked && (
                         <DropdownMenuItem
                             disabled={isStartingSideChat}
-                            onClick={(event) => {
-                                // Copied now: the event is spent when the action answers. The click and the saved setting pick where the chat opens.
-                                const click = { button: event.button, ctrlKey: event.ctrlKey, detail: event.detail, metaKey: event.metaKey };
+                            onAuxClick={(event) => {
+                                if (event.button !== 1) {
+                                    return;
+                                }
 
-                                startSideChat(
-                                    { threadId },
-                                    {
-                                        onError: (error: Error) => {
-                                            console.error("Failed to start a side chat:", error);
-                                            showError(error);
-                                        },
-                                        onSuccess: (result) => {
-                                            if (result.status === "ok") {
-                                                openChat(result.threadId, click, threadId);
-                                            } else {
-                                                showError(sideChatRefusal(result.reason));
-                                            }
-                                        },
-                                    },
-                                );
+                                event.preventDefault();
+                                startFrom(event);
                             }}
+                            onClick={startFrom}
                         >
                             {t`Side chat`}
                         </DropdownMenuItem>
