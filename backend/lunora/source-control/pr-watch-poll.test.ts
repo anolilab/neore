@@ -452,6 +452,50 @@ describe("observeWatched", () => {
         expect(decision).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "r120" } });
     });
 
+    const dependencies = (items: { authorLogin: string; id: string }[], total: number) => {
+        return {
+            driver: {
+                getPullRequest: vi.fn().mockResolvedValue(detail("open")),
+                listChecks: vi.fn().mockResolvedValue({ checks: [], required: { complete: true, patterns: [] }, total: 0 }),
+                listReviews: vi.fn().mockResolvedValue({ items, total }),
+            } as never,
+            login: async () => "me",
+        };
+    };
+
+    it("keeps the seen review and every newer one past the bound, so the poll records a review wake", async () => {
+        const items = Array.from({ length: 150 }, (_, index) => {
+            return { authorLogin: "bob", id: `r${String(150 - index)}` };
+        });
+        const linkId = await seedWatch({ watch: { baselined: true, headSha: "sha-1", reviewId: "r10", startedAt: STARTED_AT } });
+        const { observation: observed } = await observeWatched(request, { ...TARGET, reviewId: "r10" }, dependencies(items, 150));
+
+        expect(observed.reviews).toHaveLength(141);
+        expect(observed.reviews.at(-1)?.id).toBe("r10");
+
+        await record(linkId, { observation: observed });
+
+        const row = await rowOf(linkId);
+
+        expect(row.watchPending).toEqual(["review"]);
+        expect(row.watch.reviewId).toBe("r150");
+    });
+
+    it("does not re-baseline when the seen review lies beyond what the host read", async () => {
+        const items = Array.from({ length: 150 }, (_, index) => {
+            return { authorLogin: "bob", id: `r${String(400 - index)}` };
+        });
+        const linkId = await seedWatch({ watch: { baselined: true, headSha: "sha-1", reviewId: "r10", startedAt: STARTED_AT } });
+        const { observation: observed } = await observeWatched(request, { ...TARGET, reviewId: "r10" }, dependencies(items, 400));
+
+        await record(linkId, { observation: observed });
+
+        const row = await rowOf(linkId);
+
+        expect(row.watch.reviewId).toBe("r10");
+        expect(row.watchPending).toEqual([]);
+    });
+
     it("reads the login once for a watch that goes on", async () => {
         const login = vi.fn().mockResolvedValue("me");
         const driver = {

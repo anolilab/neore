@@ -46,7 +46,7 @@ const SCAN_PAGES = 4;
 /** Failing check names kept in an observation, and their length: the names are text the host sent. */
 const MAX_FAILING_NAMES = 10;
 const MAX_NAME_LENGTH = 200;
-/** Reviews kept in an observation. The host lists newest first and the cut keeps the head: only the oldest are dropped, which the decision never needs. */
+/** Reviews kept when no seen review bounds the list. The host lists newest first and the cut keeps the head: only the oldest are dropped, which the decision never needs. */
 const MAX_REVIEWS = 100;
 
 const NOT_PASSING = new Set<CheckState>(["cancelled", "failure"]);
@@ -388,6 +388,11 @@ export const observeWatched = async (
         dependencies.driver.listReviews(request, ref, target.reviewId === undefined ? undefined : { seenId: target.reviewId }),
     ]);
     const { failing, status } = checksOf(summary);
+    const { items, total } = reviews;
+    const seenAt = target.reviewId === undefined ? -1 : items.findIndex((review) => review.id === target.reviewId);
+    // Through the seen review, however many are newer (those are what the decision needs); with none seen, the newest bound.
+    const kept = seenAt === -1 ? items.slice(0, MAX_REVIEWS) : items.slice(0, seenAt + 1);
+    const markerBeyondRead = target.reviewId !== undefined && seenAt === -1 && items.length < total;
 
     return {
         observation: {
@@ -395,11 +400,13 @@ export const observeWatched = async (
             failingCheckNames: failing.slice(0, MAX_FAILING_NAMES).map((check) => check.name.slice(0, MAX_NAME_LENGTH)),
             headSha: detail.headSha,
             mergeable: mergeableOf(detail.mergeState),
-            reviews: reviews.items.slice(0, MAX_REVIEWS).map((review) => {
+            reviews: kept.map((review) => {
                 return { authorLogin: review.authorLogin, id: review.id };
             }),
             state: detail.state,
-            watcherLogin,
+            // The marker may lie beyond the pages the host read: no review can be judged new or old then, so the watcher is left
+            // unknown, which skips review handling and leaves the marker as it was, instead of re-baselining on a guess.
+            watcherLogin: markerBeyondRead ? "" : watcherLogin,
         },
     };
 };
