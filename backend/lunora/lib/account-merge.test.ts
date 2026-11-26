@@ -1299,6 +1299,37 @@ describe("reassignGlobalRows", () => {
         }
     });
 
+    it("re-points an owner's shared-pin routes to the new account when the owner moves, so a collaborator's route still finds the thread", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                await context.db.insert("sharedPinRoutes", { createdAt: 1, ownerId: "owner-a", threadId: "thread-1", userId: "collaborator" });
+            });
+
+            // The owner's merge runs the same global pass with the owner as the moving account.
+            const { generation } = (await harness.run(
+                async (context: any) => await context.runMutation(acquireMergeLease, { from: "owner-a", to: "owner-n" }),
+            )) as { generation: number };
+
+            for (let call = 1; call <= 20; call += 1) {
+                const { done } = (await harness.run(
+                    async (context: any) => await context.runMutation(reassignGlobalRows, { from: "owner-a", generation, to: "owner-n" }),
+                )) as { done: boolean };
+
+                if (done) {
+                    break;
+                }
+            }
+
+            const rows = await harness.run(async (context: any) => await context.db.sharedPinRoutes.findMany({ where: { userId: "collaborator" } }));
+
+            expect(rows.page.map((row: any) => [row.ownerId, row.threadId, row.userId])).toStrictEqual([["owner-n", "thread-1", "collaborator"]]);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("moves a guest's grant revisions to the new account, keeping the higher count where both have one for a thread", async () => {
         const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
 
