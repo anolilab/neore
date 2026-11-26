@@ -58,6 +58,8 @@ while read -r _ sha _ _; do
     esac
 done
 [ -n "$pushed" ] || skip "nothing but deletions is pushed"
+# Docs and data only since the base: no type can change, so the type check has nothing to read. The format check above still ran.
+[ -n "$(git diff --name-only "$base" HEAD -- '*.ts' '*.tsx' '*.mts' '*.cts' '*.js' '*.jsx' '*.mjs' '*.cjs' 'package.json' 'tsconfig*.json' 'pnpm-lock.yaml' 'pnpm-workspace.yaml')" ] || skip "only docs or data changed since the base"
 git diff --quiet HEAD -- || skip "the working tree has uncommitted changes"
 [ -z "$(git ls-files --others --exclude-standard -- '*.ts' '*.tsx' '*.mts' '*.cts')" ] || skip "there are untracked TypeScript files"
 # tsrs ships binaries for these platforms only (none for Windows on Arm). Decided by
