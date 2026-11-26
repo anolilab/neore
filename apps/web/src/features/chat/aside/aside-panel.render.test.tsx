@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ASIDE_FIND_EVENT } from "@/features/keyboard/lib/aside-find-target";
@@ -687,7 +687,50 @@ describe("AsidePanel", () => {
         render(<AsidePanel threadId="thread-1" />);
 
         Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
-        // The new earlier hit sits well out of view, so a reveal for it would scroll: only the identity check keeps it still.
+        // The new earlier hit sits well out of view. The selected hit does not move, so nothing scrolls.
+        Object.defineProperty(Range.prototype, "getBoundingClientRect", {
+            configurable: true,
+            value: function rectOfHit(this: Range) {
+                // eslint-disable-next-line unicorn/no-this-outside-of-class -- the rect depends on which range is asked, which only the receiver says
+                return rectAt(this.startContainer.textContent?.includes("too") ? 900 : hitTop);
+            },
+        });
+
+        try {
+            act(() => {
+                globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+            });
+            fireEvent.change(screen.getByRole("textbox", { name: "Find in side questions" }), { target: { value: "cat" } });
+            await settleReveal();
+            expect(within(screen.getByRole("search")).getByRole("status").textContent).toBe("1 of 1");
+            scroll.mockClear();
+
+            // An earlier entry's answer adds a hit above the selected one. The selection stays on its own hit, now second of two.
+            act(() => {
+                useAsideStore.setState({
+                    byThread: { "thread-1": [{ answer: "A cat too.", id: "z", question: "Above?", status: "answered", token: "tok-z" }, answered] },
+                });
+            });
+            await settleReveal();
+            expect(within(screen.getByRole("search")).getByRole("status").textContent).toBe("2 of 2");
+            expect(scroll).not.toHaveBeenCalled();
+        } finally {
+            Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+            Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
+            vi.useRealTimers();
+        }
+    });
+
+    it("does not scroll when the selected entry is dismissed and the hit that takes its place is out of view", async () => {
+        vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
+        const hitTop = 20;
+        const scroll = vi.fn();
+        const answered = { answer: "A cat.", id: "a", question: "Why?", status: "answered", token: "tok" } as const;
+
+        useAsideStore.setState({ byThread: { "thread-1": [answered] } });
+        render(<AsidePanel threadId="thread-1" />);
+
+        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
         Object.defineProperty(Range.prototype, "getBoundingClientRect", {
             configurable: true,
             value: function rectOfHit(this: Range) {
@@ -704,10 +747,11 @@ describe("AsidePanel", () => {
             await settleReveal();
             scroll.mockClear();
 
-            // An earlier entry's answer adds a hit above the selected one, so the same index now names that new hit.
+            // The selected entry is replaced by one whose hit sits far below. Its selection falls back to the nearest index,
+            // a different hit, and only the identity check keeps the panel from scrolling to it.
             act(() => {
                 useAsideStore.setState({
-                    byThread: { "thread-1": [{ answer: "A cat too.", id: "z", question: "Above?", status: "answered", token: "tok-z" }, answered] },
+                    byThread: { "thread-1": [{ answer: "A cat too.", id: "z", question: "Below?", status: "answered", token: "tok-z" }] },
                 });
             });
             await settleReveal();

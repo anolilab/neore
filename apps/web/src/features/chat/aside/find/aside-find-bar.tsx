@@ -21,7 +21,9 @@ const AsideFindBar: FC = () => {
     const { t } = useLingui();
     const [isOpen, setIsOpen] = useState(false);
     const [query, setQuery] = useState("");
+    // The step the reader asked for. It can name another hit once an earlier answer adds one, so the counter shows `position`.
     const [index, setIndex] = useState(0);
+    const [position, setPosition] = useState(0);
     const [matchCount, setMatchCount] = useState(0);
     // Bumped by every navigation, so stepping onto the same hit scrolls back to it.
     const [revealKey, setRevealKey] = useState(0);
@@ -30,9 +32,13 @@ const AsideFindBar: FC = () => {
     const returnFocusRef = useRef<HTMLElement | null>(null);
 
     const deferredQuery = useDeferredValue(query);
-    const activeIndex = clampIndex(index, matchCount);
+    const activeIndex = clampIndex(position, matchCount);
+    const handleMatches = useCallback((count: number, found: number) => {
+        setMatchCount(count);
+        setPosition(found);
+    }, []);
 
-    useAsideFindHighlights(barRef, isOpen, deferredQuery, activeIndex, revealKey, setMatchCount);
+    useAsideFindHighlights(barRef, isOpen, deferredQuery, index, revealKey, handleMatches);
 
     useEffect(() => {
         const open = () => {
@@ -92,7 +98,10 @@ const AsideFindBar: FC = () => {
 
     const step = useCallback(
         (direction: -1 | 1) => {
-            setIndex(stepIndex(activeIndex, matchCount, direction));
+            const next = stepIndex(activeIndex, matchCount, direction);
+
+            setIndex(next);
+            setPosition(next);
             setRevealKey((key) => key + 1);
         },
         [activeIndex, matchCount],
@@ -105,6 +114,7 @@ const AsideFindBar: FC = () => {
     const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
         setQuery(event.target.value);
         setIndex(0);
+        setPosition(0);
         setRevealKey((key) => key + 1);
     };
 

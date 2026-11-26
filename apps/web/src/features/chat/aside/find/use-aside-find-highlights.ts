@@ -153,7 +153,7 @@ const revealIfOutOfSight = (range: Range | undefined, host: Element): void => {
     // A token too wide for the panel runs past its right edge, which the vertical check alone does not see.
     const beyondSides = rect.left < bounds.left || rect.right > bounds.right;
 
-    if (!isOutsideViewport(rect, bounds) && !beyondSides && !isClippedWithin(rect, target, scroller ?? document.documentElement)) {
+    if (!beyondSides && !isOutsideViewport(rect, bounds) && !isClippedWithin(rect, target, scroller ?? document.documentElement)) {
         return;
     }
 
@@ -177,10 +177,37 @@ const revealIfOutOfSight = (range: Range | undefined, host: Element): void => {
     revealWithinBoxes(range, target, scroller ?? document.documentElement);
 };
 
+/** The entry a hit's row belongs to. */
+const entryOf = (range: Range | undefined): string | undefined =>
+    range?.startContainer.parentElement?.closest<HTMLElement>(`[${CSS.escape(ASIDE_ENTRY_ATTRIBUTE)}]`)?.dataset.asideEntryId;
+
+/**
+ * Which hit a selection is: its entry, and its place among that entry's hits. A flat index names another hit once an
+ * earlier entry gains or loses one, so the selection is kept as this and followed through each rescan.
+ */
+interface Anchor {
+    entryId: string | undefined;
+    occurrence: number;
+}
+
+const anchorAt = (all: Range[], position: number): Anchor => {
+    const entryId = entryOf(all[position]);
+
+    return { entryId, occurrence: all.slice(0, position).filter((range) => entryOf(range) === entryId).length };
+};
+
+/** Where the anchored hit sits in the rescanned list, or undefined when its entry is gone. */
+const positionOf = (all: Range[], anchor: Anchor): number | undefined => {
+    const positions = all.flatMap((range, position) => (entryOf(range) === anchor.entryId ? [position] : []));
+
+    return positions.length > 0 ? positions[Math.min(anchor.occurrence, positions.length - 1)] : undefined;
+};
+
 /**
  * Paints the side-question matches under the side find's own highlight names, so the thread find's highlights are never
- * touched, and reports how many there are. Re-scans while answers arrive, and reveals the current hit whenever a new
- * answer brings it into existence or moves it. The host is the panel section the bar sits in.
+ * touched, and reports how many there are and where the selection sits among them. Re-scans while answers arrive, and
+ * reveals the current hit whenever a new answer brings it into existence or moves it. The host is the panel section the
+ * bar sits in.
  */
 const useAsideFindHighlights = (
     anchorRef: RefObject<HTMLElement | null>,
@@ -188,7 +215,7 @@ const useAsideFindHighlights = (
     query: string,
     index: number,
     revealKey: number,
-    onCount: (count: number) => void,
+    onMatches: (count: number, position: number) => void,
 ): void => {
     useEffect(() => {
         if (!active) {
@@ -209,13 +236,17 @@ const useAsideFindHighlights = (
         let revealTimer: ReturnType<typeof setTimeout> | undefined;
         let applied: Range | undefined;
         let appliedOffset: Offset | undefined;
+        // Seeded from the index the reader stepped to on the first scan, then followed through every later scan.
+        let anchor: Anchor | undefined;
 
         const apply = (): Range | undefined => {
             const all = collectAsideRanges(host, query);
-            const current = all.length > 0 ? all[clampIndex(index, all.length)] : undefined;
+            const position = (anchor === undefined ? undefined : positionOf(all, anchor)) ?? (all.length > 0 ? clampIndex(index, all.length) : undefined);
+            const current = position === undefined ? undefined : all[position];
 
+            anchor = position === undefined ? undefined : anchorAt(all, position);
             setHighlights(all, current, ASIDE_HIGHLIGHTS);
-            onCount(all.length);
+            onMatches(all.length, position ?? 0);
             applied = current;
             appliedOffset = offsetWithin(current, host);
 
@@ -286,7 +317,7 @@ const useAsideFindHighlights = (
             clearTimeout(revealTimer);
             clearHighlights(ASIDE_HIGHLIGHTS);
         };
-    }, [active, query, index, revealKey, onCount, anchorRef]);
+    }, [active, query, index, revealKey, onMatches, anchorRef]);
 };
 
 export default useAsideFindHighlights;
