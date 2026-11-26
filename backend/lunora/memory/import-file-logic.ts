@@ -102,20 +102,22 @@ type Prepared = { memory: string; status: "ok" } | { status: "blank" } | { statu
  */
 const MEMORY_FILE_ENTRY_PREPARE_MAX_CHARS = MEMORY_FILE_ENTRY_MAX_CHARS * 10;
 
-/** One raw entry as a memory: wrapping removed, whitespace collapsed, secrets redacted, then its length checked. */
+/**
+ * One raw entry as a memory: wrapping removed, whitespace collapsed, secrets redacted, then its length checked. The raw
+ * length is checked first, before any unwrapping: the tag stripper rescans each time a removal forms a new tag, so a
+ * long entry of nested tag fragments would cost thousands of passes.
+ */
 const prepareEntry = (raw: string): Prepared => {
-    const unwrapped = unwrapImportLine(raw);
-
     if (raw.trim() === "") {
         return { status: "blank" };
     }
 
-    if (unwrapped === "") {
-        return { status: "invalid" };
+    if (raw.length > MEMORY_FILE_ENTRY_PREPARE_MAX_CHARS) {
+        return { status: "tooLong" };
     }
 
-    if (unwrapped.length > MEMORY_FILE_ENTRY_PREPARE_MAX_CHARS) {
-        return { status: "tooLong" };
+    if (unwrapImportLine(raw) === "") {
+        return { status: "invalid" };
     }
 
     const cleaned = redactImportText(raw);

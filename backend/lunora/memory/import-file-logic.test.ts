@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { importDedupKey } from "./import-logic";
+import { importDedupKey, unwrapImportLine } from "./import-logic";
 import {
     MEMORY_FILE_BATCH_SIZE,
     MEMORY_FILE_DEFAULT_TYPE,
@@ -11,6 +11,13 @@ import {
     parseMemoryFile,
     toBatches,
 } from "./import-file-logic";
+
+// Passes every call through; lets a test see whether an entry reached the unwrapping step.
+vi.mock("./import-logic", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("./import-logic")>();
+
+    return { ...actual, unwrapImportLine: vi.fn(actual.unwrapImportLine) };
+});
 
 /** Assembled at runtime so the file holds no literal that reads as a real credential. */
 const KEY = ["sk", "-", "Zq8LmV2xR7tYw4KpN3bC9dF6"].join("");
@@ -133,6 +140,32 @@ describe("parseMemoryFile: text", () => {
 
         expect(line).toHaveLength(MEMORY_FILE_ENTRY_MAX_CHARS - 1);
         expect(parseMemoryFile(`${line}\nThe user likes green tea`, "text")).toMatchObject({ entries: 1, tooLong: 1, total: 2 });
+    });
+
+    it("counts a 180 KB entry of nested tag fragments as too long without unwrapping it", () => {
+        const crafted = "<pasted_<pasted_memories>memories>".repeat(5300);
+        const unwrap = vi.mocked(unwrapImportLine);
+
+        expect(crafted.length).toBeGreaterThan(180_000);
+        unwrap.mockClear();
+
+        const started = performance.now();
+        const parsed = parseMemoryFile(`${crafted}\nThe user likes green tea`, "text");
+        const elapsed = performance.now() - started;
+
+        expect(parsed).toMatchObject({ entries: 1, tooLong: 1, total: 2 });
+        // Only the short line reached the unwrapping step.
+        expect(unwrap).toHaveBeenCalledTimes(1);
+        expect(unwrap).toHaveBeenCalledWith("The user likes green tea");
+        expect(elapsed).toBeLessThan(400);
+    });
+
+    it("still imports a normal entry just under the raw-length guard that shrinks through redaction", () => {
+        const line = `The user likes green tea. My key is sk-${"Zq8LmV2xR7tYw4KpN3bC".repeat(200)} and nothing else`;
+
+        expect(line.length).toBeGreaterThan(MEMORY_FILE_ENTRY_MAX_CHARS * 5);
+        expect(line.length).toBeLessThanOrEqual(MEMORY_FILE_ENTRY_MAX_CHARS * 10);
+        expect(parseMemoryFile(line, "text")).toMatchObject({ entries: 1, tooLong: 0, total: 1 });
     });
 
     it("refuses a file with only blank lines", () => {
