@@ -1802,6 +1802,47 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_userId_createdAt", ["userId", "createdAt"]),
 
+    // The parsed, redacted entries of one job's batch. Never the raw file; deleted when the job ends.
+    memoryImportBatches: defineTable({
+        entries: v.array(
+            v.object({
+                memory: v.string(),
+                type: v.union(v.literal("identity"), v.literal("preference"), v.literal("context"), v.literal("activity"), v.literal("experience")),
+            }),
+        ),
+        index: v.number(),
+        jobId: v.id("memoryImportJobs"),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_jobId_index", ["jobId", "index"])
+        .index("by_userId", ["userId"]),
+
+    // One background import of a large memory file. The job reads its parsed entries from `memoryImportBatches`, one
+    // batch per queue message, and drops them when it ends. See `memory/import-job.ts`.
+    memoryImportJobs: defineTable({
+        batchCount: v.number(),
+        // The batch a delivery claimed, so a redelivery of the same batch finds the claim taken.
+        claimedBatch: v.optional(v.number()),
+        createdAt: v.number(),
+        done: v.number(),
+        duplicates: v.number(),
+        error: v.optional(v.string()),
+        imported: v.number(),
+        invalid: v.number(),
+        // The batch that runs next; only that batch may be claimed.
+        nextBatch: v.number(),
+        status: v.union(v.literal("preparing"), v.literal("queued"), v.literal("running"), v.literal("done"), v.literal("failed")),
+        tooLong: v.number(),
+        // Entries read from the file: kept, duplicate, too long and invalid.
+        total: v.number(),
+        updated: v.number(),
+        updatedAt: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId_createdAt", ["userId", "createdAt"]),
+
     // Per-user scheduling state for nightly reflection. See `memory/reflection.ts`.
     memoryReflectionState: defineTable({
         lastActiveAt: v.number(),

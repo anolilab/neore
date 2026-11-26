@@ -1,6 +1,8 @@
 /**
- * Memories, reflection digests and reflection state in the GDPR export and
- * account deletion.
+ * Memories and reflection digests in the GDPR export; those, the reflection state and the background import jobs (with
+ * their stored entries) in account deletion. The import's job and batch rows are erased, never exported: they are a
+ * short-lived copy of a file the user supplied, deleted when the job ends, and their entries become memories, which are
+ * exported. (Chat import's job rows are handled the same way, `chat-import/gdpr.ts`.)
  *
  * Wired into `gdpr/workflows/export-workflow.ts` ("collect-memories") and
  * `gdpr/workflows/deletion-workflow.ts` ("delete-user-memory-reflection", after
@@ -75,13 +77,22 @@ export const deleteUserMemoryReflectionData = internalMutation
     .input({ userId: v.string() })
     .output(v.object({ hasMore: v.boolean() }))
     .mutation(async ({ args: { userId }, ctx }) => {
-        const [digests, states] = await Promise.all([
+        const [digests, states, importJobs, importBatches] = await Promise.all([
             ctx.db
                 .query("memoryDigests")
                 .withIndex("by_userId_createdAt", (q) => q.eq("userId", userId))
                 .take(BATCH),
             ctx.db
                 .query("memoryReflectionState")
+                .withIndex("by_userId", (q) => q.eq("userId", userId))
+                .take(BATCH),
+            // A background file import: its stored entries are the user's memories, so they go first.
+            ctx.db
+                .query("memoryImportJobs")
+                .withIndex("by_userId_createdAt", (q) => q.eq("userId", userId))
+                .take(BATCH),
+            ctx.db
+                .query("memoryImportBatches")
                 .withIndex("by_userId", (q) => q.eq("userId", userId))
                 .take(BATCH),
         ]);
@@ -97,7 +108,9 @@ export const deleteUserMemoryReflectionData = internalMutation
         await Promise.all([
             ...digests.map((row) => ctx.db.delete("memoryDigests", row._id)),
             ...states.map((row) => ctx.db.delete("memoryReflectionState", row._id)),
+            ...importJobs.map((row) => ctx.db.delete("memoryImportJobs", row._id)),
+            ...importBatches.map((row) => ctx.db.delete("memoryImportBatches", row._id)),
         ]);
 
-        return { hasMore: digests.length >= BATCH || states.length >= BATCH };
+        return { hasMore: digests.length >= BATCH || states.length >= BATCH || importJobs.length >= BATCH || importBatches.length >= BATCH };
     });

@@ -23,6 +23,9 @@ export const IMPORTED_IMPORTANCE = 60;
 
 export const IMPORT_MEMORY_OFF_MESSAGE = "Turn on memory before bringing in memories";
 
+/** Why a memory import is refused, or stops, while the account is being deleted. */
+export const IMPORT_ACCOUNT_DELETING_MESSAGE = "The account is being deleted, so nothing more is imported.";
+
 /** Longest paste accepted. */
 export const IMPORT_MAX_INPUT_CHARS = 20_000;
 
