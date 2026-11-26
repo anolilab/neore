@@ -260,12 +260,13 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     }
 
                     return { cursor: groupCursor, hasMore: groupHasMore, owners: [...new Set(groupOwners)], resume: groupResume };
-                })) as { cursor: string | null; hasMore: boolean; owners: string[]; resume: SweepResume | null };
+                })) as Partial<{ cursor: string | null; hasMore: boolean; owners: string[]; resume: SweepResume | null }> | null | undefined;
 
-                owners.push(...result.owners);
-                cursor = result.cursor;
-                resume = result.resume;
-                hasMore = result.hasMore;
+                // A group a previous build cached has no `resume`: it is read as none, so the next action is passed `null`, never `undefined`.
+                owners.push(...(result?.owners ?? []));
+                cursor = result?.cursor ?? null;
+                resume = result?.resume ?? null;
+                hasMore = result?.hasMore === true;
                 group += 1;
             }
 

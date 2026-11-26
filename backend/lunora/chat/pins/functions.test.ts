@@ -10,7 +10,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "../../_generated/dataModel";
 import { resolveThreadReadAccess } from "../../agent/thread-read-access";
 import { BATCH } from "../../gdpr/batch";
-import { beginAccountMove, endAccountMove, unfencePinsOnShard } from "../../lib/account-moves";
+import { beginAccountMove, endAccountMove, fencePinsOnShard, unfencePinsOnShard } from "../../lib/account-moves";
+import { sweepRoutePage } from "../../gdpr/owner-sweep";
+import { accountDeletionWorkflowConfig } from "../../gdpr/workflows/deletion-workflow";
 import schema from "../../schema";
 import {
     createDocumentPin,
@@ -872,7 +874,8 @@ describe("the thread owner's merge, and the erasure replayed in order", () => {
         await harness.run(async (context: any) => await context.runMutation(restoreSharedPinRoutes, args));
         await harness.run(async (context: any) => await context.runMutation(restoreSharedPinRoutes, args));
 
-        const owners = (await routesOfCollaborator()).map((route: any) => route.ownerId).sort();
+        const routes = await routesOfCollaborator();
+        const owners = routes.map((route: any) => route.ownerId as string).toSorted((a, b) => a.localeCompare(b));
 
         expect(owners).toStrictEqual(["owner-z", OWNER]);
     });
@@ -958,5 +961,108 @@ describe("the thread owner's merge, and the erasure replayed in order", () => {
 
         expect(pins).toHaveLength(0);
         expect(await routesOfCollaborator()).toHaveLength(0);
+    });
+});
+
+describe("the erasure workflow, replayed against the real pin mutations", () => {
+    it("runs the workflow's own steps in order, and refuses a pin write committed before the route drain, leaving no pin without a route", async () => {
+        await grantWrite();
+        await as("user-collaborator").mutation(createPin as never, { messageId: "m-workflow-before", messageRole: "assistant", threadId } as never);
+
+        // The marker the workflow's first step sets: from here the collaborator's pin writes are refused.
+        await harness.run(async (context: any) => await beginAccountMove(context, "user-collaborator", "erasing", Date.now()));
+
+        const steps: string[] = [];
+        const window: { refused?: boolean } = {};
+
+        const collaboratorRoutes = async () =>
+            await harness.run(async (context: any) => {
+                const { page } = await context.db.sharedPinRoutes.findMany({ where: { userId: "user-collaborator" } });
+
+                return page as { ownerId: string; threadId: string }[];
+            });
+
+        // The workflow's own steps; each real call below is what the step's internal function does, on the harness's one shard.
+        const answer = async (ref: string) => {
+            steps.push(ref);
+
+            if (ref.endsWith(":erasePinsOnOwnerShards")) {
+                const page = await collaboratorRoutes();
+                const { owners } = await sweepRoutePage(
+                    page,
+                    {
+                        eraseBatch: async (route) =>
+                            await harness.run(
+                                async (context: any) =>
+                                    await context.runMutation(eraseUserPinsOnThread, { threadId: route.threadId, userId: "user-collaborator" }),
+                            ),
+                        fence: async () => await harness.run(async (context: any) => await fencePinsOnShard(context, "user-collaborator", Date.now())),
+                    },
+                    { budget: 39 },
+                );
+
+                return { cursor: null, hasMore: false, owners, resume: null, routes: page.length };
+            }
+
+            if (ref.endsWith(":releasePinFences")) {
+                await harness.run(async (context: any) => await unfencePinsOnShard(context, "user-collaborator"));
+
+                return null;
+            }
+
+            if (ref.endsWith(":deleteUserSharedPinRoutes")) {
+                // Between the second sweep and the drain, the erased account writes a pin: the window this replay closes.
+                try {
+                    await as("user-collaborator").mutation(createPin as never, { messageId: "m-workflow-window", messageRole: "assistant", threadId } as never);
+                    window.refused = false;
+                } catch (error) {
+                    window.refused = MOVED_ACCOUNT_ERROR.test(String((error as Error).message));
+                }
+
+                await harness.run(async (context: any) => {
+                    const { page } = await context.db.sharedPinRoutes.findMany({ where: { userId: "user-collaborator" } });
+
+                    for (const route of page) {
+                        await context.db.delete("sharedPinRoutes", route._id);
+                    }
+                });
+
+                return { hasMore: false };
+            }
+
+            return { cursor: null, hasMore: false, owners: [] };
+        };
+
+        const workflowRun = async (reference: unknown) => await answer((reference as { __lunoraRef: string }).__lunoraRef);
+
+        await accountDeletionWorkflowConfig.handler({
+            event: { instanceId: "instance-replay" },
+            params: { requestId: "request-replay", userEmail: "user@example.com", userId: "user-collaborator" },
+            run: workflowRun,
+            step: {
+                do: async (_name: string, callback: () => Promise<unknown>) => await callback(),
+                sleep: async () => {},
+            },
+        } as never);
+
+        // The real order: both sweeps, the fence release, then the drain. The window write fell between the second sweep and the drain.
+        const secondSweep = steps.lastIndexOf(steps.find((ref) => ref.endsWith(":erasePinsOnOwnerShards")) ?? "");
+        const drain = steps.indexOf(steps.find((ref) => ref.endsWith(":deleteUserSharedPinRoutes")) ?? "");
+        const release = steps.indexOf(steps.find((ref) => ref.endsWith(":releasePinFences")) ?? "");
+
+        expect(secondSweep).toBeGreaterThan(-1);
+        expect(release).toBeGreaterThan(secondSweep);
+        expect(drain).toBeGreaterThan(release);
+
+        expect(window.refused).toBe(true);
+
+        const pins = await harness.run(async (context: any) => {
+            const rows: { userId: string }[] = await context.db.query("threadPins").collect();
+
+            return rows.filter((row) => row.userId === "user-collaborator");
+        });
+
+        expect(pins).toHaveLength(0);
+        expect(await collaboratorRoutes()).toHaveLength(0);
     });
 });

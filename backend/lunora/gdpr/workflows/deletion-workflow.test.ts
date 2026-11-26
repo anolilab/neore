@@ -697,6 +697,28 @@ describe("account deletion workflow: the owner fences outlive the route drain", 
         expect(releaseRun?.args).toStrictEqual({ owners: ["owner-a", "owner-b"], userId: USER });
     });
 
+    it("passes the next action a null resume when a page from an older build carries none", async () => {
+        // An action result from an older build has no `resume`: the workflow must pass `null` on, not `undefined`, to the next action.
+        answer = (ref, round) => {
+            if (ref !== "gdpr_steps:erasePinsOnOwnerShards") {
+                return { cursor: null, hasMore: false, owners: [], resume: null, routes: 0 };
+            }
+
+            if (round === 1) {
+                return { cursor: "c1", hasMore: true, owners: ["owner-a"], resume: undefined, routes: 1 };
+            }
+
+            return { cursor: null, hasMore: false, owners: [], resume: null, routes: 0 };
+        };
+
+        await execute();
+
+        const sweeps = runs().filter((entry) => entry.ref === "gdpr_steps:erasePinsOnOwnerShards");
+
+        expect(sweeps.slice(0, 2).map((entry) => entry.args["resume"])).toStrictEqual([null, null]);
+        expect(stepNames()).toContain("erase-pins-on-owner-shards-0");
+    });
+
     it("ends a step once its time budget is spent, and carries the cursor into the next step", async () => {
         // Each sweep action takes a step's whole time budget, so every group covers a single page.
         let clock = 0;
