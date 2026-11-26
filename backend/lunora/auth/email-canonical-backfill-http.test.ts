@@ -116,6 +116,10 @@ describe("POST /admin/backfill-email-canonical", () => {
         const responses = await Promise.all(bodies.map(async (body) => await handler(post(`Bearer ${TOKEN}`, body))));
 
         expect(responses.map((response) => response.status)).toStrictEqual(bodies.map(() => 400));
+        // A code the production log can print, which shows no message.
+        const answers = (await Promise.all(responses.map(async (response) => await response.json()))) as { code?: string }[];
+
+        expect(answers.map((answer) => answer.code)).toStrictEqual(bodies.map(() => "BAD_REQUEST"));
         expect(check).not.toHaveBeenCalled();
         expect(fill).not.toHaveBeenCalled();
     });

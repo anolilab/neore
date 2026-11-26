@@ -98,7 +98,10 @@ export const createEmailCanonicalBackfillHandler =
         const call = parseBackfillRequest(await request.text());
 
         if (call === undefined) {
-            return Response.json({ error: "Expected a check (phase, token?) or a fill (phase, token, ids) call" }, { headers: NO_STORE, status: 400 });
+            return Response.json(
+                { code: "BAD_REQUEST", error: "Expected a check (phase, token?) or a fill (phase, token, ids) call" },
+                { headers: NO_STORE, status: 400 },
+            );
         }
 
         const result =

@@ -31,6 +31,7 @@ import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { claimFence, claimRow, holdClaim, recordClaimResult, releaseClaim } from "../lib/claim-once";
+import { isUniqueViolation } from "../lib/error-helpers";
 import { MAX_LENGTH } from "../lib/validators";
 
 /** D1 statements one Worker invocation may send on the Free plan. */
@@ -384,6 +385,10 @@ export const fillEmailCanonicalBatch = async (ctx: BackfillCtx, { ids, token }: 
         } catch (error) {
             // A sign-up that took this address since the check: the unique index refused the write. Anything else (the
             // audit insert, the network, the conditional patch's own `occ`) is not a conflict and is not swallowed.
+            if (!isUniqueViolation(error)) {
+                throw error;
+            }
+
             const holder = await ctx.db.user.findFirst({ consistency: "primary", where: { emailCanonical: canonical } });
 
             if (holder === null || holder._id === id) {

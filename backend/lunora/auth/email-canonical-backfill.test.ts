@@ -726,12 +726,12 @@ describe("the user.emailCanonical backfill", () => {
 
         const rounds = 2 * (PATCH_IF_ATTEMPTS - 1);
 
-        // The row by id and the holder check, then the patch's rounds: applied with its audit insert; lost every round and
-        // looked up its holder; applied with its audit insert, which failed, and looked up its holder.
+        // The row by id and the holder check, then the patch's rounds: applied with its audit insert; lost every round; applied
+        // with its audit insert, which failed. Neither failure is a unique violation, so neither looks up a holder.
         expect(spent).toStrictEqual([
             { filled: 1, statements: 2 + rounds + 1 },
-            { error: expect.stringContaining("lost the row to concurrent writes"), statements: 2 + 2 * PATCH_IF_ATTEMPTS + 1 },
-            { error: "audit write failed", statements: 2 + rounds + 1 + 1 },
+            { error: expect.stringContaining("lost the row to concurrent writes"), statements: 2 + 2 * PATCH_IF_ATTEMPTS },
+            { error: "audit write failed", statements: 2 + rounds + 1 },
         ]);
         expect(Math.max(...spent.map(({ statements }) => statements))).toBeLessThanOrEqual(EMAIL_CANONICAL_FILL_WORST);
         expect(EMAIL_CANONICAL_FILL_WORST).toBeLessThanOrEqual(INVOCATION_D1_QUERIES);
@@ -791,10 +791,31 @@ describe("the user.emailCanonical backfill", () => {
                 outcomes.push((error as Error).message);
             });
 
+            // Another account takes the address after the holder check, while the write fails for its own reason: still not
+            // a duplicate.
+            try {
+                const result = await fillEmailCanonicalBatch(
+                    counted(ctx, {
+                        patchIf: async () => {
+                            const { email } = (await ctx.db.get("user", ids[1]!))!;
+
+                            await ctx.db.insert("user", userRow(email.toUpperCase(), { emailCanonical: email.toLowerCase() }));
+
+                            throw new Error("D1 overloaded");
+                        },
+                    }).ctx,
+                    { ids: [ids[1]!], token },
+                );
+
+                outcomes.push(result.status);
+            } catch (error) {
+                outcomes.push((error as Error).message);
+            }
+
             return outcomes;
         });
 
-        expect(failures).toStrictEqual(["audit write failed", "D1 unavailable"]);
+        expect(failures).toStrictEqual(["audit write failed", "D1 unavailable", "D1 overloaded"]);
     });
 
     it("reads a check page and a fill's row through an index, never sorting the unfilled rows", async () => {
