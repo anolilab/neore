@@ -267,8 +267,14 @@ const attemptMergedArchive = async (ctx: MutationCtx, args: MergedArchiveArgs): 
     }
 
     // A merge that certainly predates the chat's last archive was covered by it: a reopened chat is not archived again for it. The
-    // merge time is known only to the second, so a merge in the archive's second is not treated as covered.
-    if (thread.archivedAt !== undefined && link.mergedBefore !== undefined && link.mergedBefore <= thread.archivedAt) {
+    // host's bound is exclusive (the merge came before it), so it may equal the archive's time. The recording time is inclusive (the
+    // merge came no later than it), so it must fall strictly before the archive. The host's bound is known only to the second; the
+    // recording time is kept even without a host time, and matters when the archive's bounded settlement left this merge owed.
+    const { archivedAt } = thread;
+    const coveredByHost = link.mergedBefore !== undefined && archivedAt !== undefined && link.mergedBefore <= archivedAt;
+    const coveredByRecording = link.mergeRecordedAt !== undefined && archivedAt !== undefined && link.mergeRecordedAt < archivedAt;
+
+    if (coveredByHost || coveredByRecording) {
         return "link-declined";
     }
 
@@ -319,6 +325,9 @@ const runMergedArchive = async (ctx: MutationCtx, args: MergedArchiveArgs): Prom
 
     if (outcome === "archived") {
         ctx.log.event("chat.auto_archive", { archived: 1, reason: "merged_pull_request" });
+    } else {
+        // A kept chat is visible too: busy (a run, a request waiting on the owner, an open link) or declined (a guard or the setting).
+        ctx.log.event("chat.merged_archive_kept", { outcome });
     }
 
     if (outcome === "busy") {
@@ -363,7 +372,7 @@ const archiveOwedMergesOf = async (ctx: MutationCtx, userId: string, threadId: I
 
 /**
  * Archives a chat linked to a pull request that has just merged, when the owner turned on `autoArchiveMergedChats`.
- * Called by `source-control` for each link the merge owes (`recordPullRequestMerged`), so a chat the person reopens later
+ * Called by `source-control` for each link the merge owes (`recordMergedPullRequest`), so a chat the person reopens later
  * is not archived again. The same guards as the idle archive keep the thread, re-read here. The answer says what to do
  * with the owed link: `archived` and `declined` are final, and settle the link in this transaction; `busy` (a run, a
  * request waiting on the owner, or a live guest link) is not, so the next read tries again.

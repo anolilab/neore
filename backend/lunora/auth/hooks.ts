@@ -179,7 +179,7 @@ const cascadeDelete = async (ctx: MutationCtx, user: Id<"user">): Promise<void> 
  * it after the merge; a grant written under the guest from then on finds no account and is refused.
  */
 export const deleteMergedGuest = internalMutation
-    .input({ generation: v.number(), userId: v.string() })
+    .input({ generation: v.number(), sharedStore: v.optional(v.boolean()), userId: v.string() })
     .output(
         v.object({
             deleted: v.boolean(),
@@ -231,7 +231,7 @@ export const deleteMergedGuest = internalMutation
             return { deleted: false, grantsRemain: true };
         }
 
-        const rowsRemain = await firstTableWithGuestRows(ctx, guestId);
+        const rowsRemain = await firstTableWithGuestRows(ctx, guestId, args.sharedStore === true);
 
         if (rowsRemain !== null) {
             return { deleted: false, rowsRemain };

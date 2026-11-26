@@ -6,7 +6,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
-import { recordPullRequestMerged, recordStatusRead } from "./pr-threads";
+import { recordPullRequestMergedPage, recordStatusRead } from "./pr-threads";
 
 const OWNER = "user-owner";
 const REPOSITORY = "octo/hello";
@@ -124,7 +124,7 @@ describe("recordStatusRead", () => {
     });
 });
 
-describe("recordPullRequestMerged", () => {
+describe("recordPullRequestMergedPage", () => {
     it("stores the host's merge time on the link when a later read finds the merge", async () => {
         const HOST_MERGED_AT = 1000;
         const linkId = await harness.run(async (ctx: any) => {
@@ -150,7 +150,14 @@ describe("recordPullRequestMerged", () => {
         });
 
         await harness.run(async (ctx: any) => {
-            await ctx.runMutation(recordPullRequestMerged, { mergedAt: HOST_MERGED_AT, number: 9, repository: REPOSITORY, userId: OWNER });
+            // One link fits one page: the walk ends on the first.
+            await ctx.runMutation(recordPullRequestMergedPage, {
+                cursor: null,
+                mergedAt: HOST_MERGED_AT,
+                number: 9,
+                repository: REPOSITORY,
+                userId: OWNER,
+            });
         });
 
         const link = await harness.run(async (ctx: any) => await ctx.db.get("pullRequestThreads", linkId));

@@ -346,7 +346,7 @@ for a schema table that is neither policed nor listed:
 | `chat_functions.softDeleteThread` | mutation | authMutation + RL | threads | refused while impersonating (trashing withdraws the guest link and held notes); row.userId == caller | ok |
 | `chat_functions.terminateBrowserSession` | mutation | authMutation + RL | — | row.userId == caller | ok |
 | `chat_functions.testMCPServerConnection` | action | authAction + RL | — | caller-scoped (ctx.user) | **fixed** (medium) — SSRF guard (`assertSafeMcpUrl`) on the URL |
-| `chat_functions.undoDeleteThread` | mutation | authMutation + RL | threads | refused while impersonating; row.userId == caller | ok |
+| `chat_functions.undoDeleteThread` | action | authAction + RL | threads | refused while impersonating; row.userId == caller (checked before the drain and the restore, which run as separate transactions) | ok |
 | `chat_functions.unpinThread` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `chat_functions.updateBrowserSettings` | mutation | authMutation + RL | aiUserPreferences | caller-scoped (ctx.user) | ok |
 | `chat_functions.setBrowserClickMode` | mutation | authMutation + RL | aiUserPreferences | caller-scoped (ctx.user) | ok — new; chooses how the caller's agent clicks (`browserClickMode`); a real-click mode (`pointer`, `all`) is refused while impersonating (`refuseImpersonation`), going back to `page` is not |
@@ -437,7 +437,7 @@ for a schema table that is neither policed nor listed:
 | `connectors_mcp_servers.listMcpServerSignIns` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `connectors_mcp_servers.signOutMcpServer` | action | authAction + RL | — | caller-scoped (ctx.user) | ok |
 | `connectors_mcp_servers.startMcpServerOAuth` | action | authAction + RL | — | caller-scoped (ctx.user) | ok |
-| `connectors_access.setTeammateConnectorAccess` | mutation | authMutation | — | owner-checked: the teammate must be one of the caller's bots | ok |
+| `connectors_access.setTeammateConnectorAccess` | mutation | authMutation + RL (`connectors/access`) | — | owner-checked: the teammate must be one of the caller's bots | ok |
 | `connectors_oauth.completeConnectorOAuth` | action | authAction + RL | — | caller-scoped (ctx.user) | ok |
 | `connectors_oauth.startConnectorOAuth` | action | authAction + RL | — | state bound to ctx.user | ok |
 | `connectors_user_connectors.disconnectConnector` | action | authAction + RL | userConnectors | owner helper | ok |

@@ -40,6 +40,11 @@ const workflowContext = () => {
 
         rounds.set(entry.ref, round);
 
+        // The owner sweep reports the owner shards it fenced; the fake reports none unless a test says so.
+        if (entry.ref === "gdpr_steps:erasePinsOnOwnerShards") {
+            return { owners: [], ...(answer(entry.ref, round, args) as object) };
+        }
+
         return answer(entry.ref, round, args);
     };
 
@@ -77,7 +82,7 @@ beforeEach(() => {
     failOn = undefined;
     rounds.clear();
     answer = () => {
-        return { cursor: null, hasMore: false };
+        return { cursor: null, hasMore: false, owners: [] };
     };
 });
 
@@ -409,7 +414,8 @@ const replayingContext = (
                 }
 
                 if (!isProgress) {
-                    return { cursor: null, hasMore: false };
+                    // The owner sweeps report the owner shards they fenced; this fake fenced none.
+                    return { cursor: null, hasMore: false, owners: [] };
                 }
 
                 const from = args["fromStatus"] as string[] | undefined;
@@ -595,22 +601,22 @@ describe("account deletion workflow: the owner-shard sweep", () => {
         // The first sweep reports no routes; the grace wait and the second sweep still run.
         await execute();
 
-        expect(stepNames()).toContain("erase-pins-on-owner-shards");
+        expect(stepNames()).toContain("erase-pins-on-owner-shards-0");
         expect(stepNames()).toContain("erase-pins-grace");
-        expect(stepNames()).toContain("erase-pins-on-owner-shards-again");
+        expect(stepNames()).toContain("erase-pins-on-owner-shards-again-0");
         expect(sleeps).toContain("2 minutes");
     });
 
     it("sweeps the owner shards, waits the grace period, sweeps again, and only then drains the routes", async () => {
         // The first sweep finds a shared-pin route, so its owner shard is fenced and swept again.
         answer = (ref) =>
-            ref === "gdpr_steps:erasePinsOnOwnerShards" ? { cursor: null, hasMore: false, routes: 1 } : { cursor: null, hasMore: false, owners: [] };
+            ref === "gdpr_steps:erasePinsOnOwnerShards" ? { cursor: null, hasMore: false, owners: ["owner-a"] } : { cursor: null, hasMore: false, owners: [] };
         await execute();
 
         const names = stepNames();
-        const first = names.indexOf("erase-pins-on-owner-shards");
+        const first = names.indexOf("erase-pins-on-owner-shards-0");
         const grace = names.indexOf("erase-pins-grace");
-        const again = names.indexOf("erase-pins-on-owner-shards-again");
+        const again = names.indexOf("erase-pins-on-owner-shards-again-0");
         const drain = names.indexOf("delete-user-shared-pin-routes");
 
         // Each step runs once, in this order: a pin that commits after the first sweep is found by the second, while its route still exists.
@@ -619,5 +625,73 @@ describe("account deletion workflow: the owner-shard sweep", () => {
         expect(grace).toBeLessThan(again);
         expect(again).toBeLessThan(drain);
         expect(sleeps).toContain("2 minutes");
+    });
+});
+
+describe("account deletion workflow: the owner fences outlive the route drain", () => {
+    it("lifts the fences before the routes are drained, on every owner either sweep fenced", async () => {
+        // Both sweeps fence owner shards; the replay fake reports the owners it fenced.
+        answer = (ref) => {
+            if (ref === "gdpr_steps:erasePinsOnOwnerShards") {
+                return { cursor: null, hasMore: false, owners: ["owner-a", "owner-b"] };
+            }
+
+            return { cursor: null, hasMore: false, owners: [] };
+        };
+
+        await execute();
+
+        const names = stepNames();
+        const drain = names.indexOf("delete-user-shared-pin-routes");
+        const release = names.indexOf("release-pin-fences-0");
+
+        // The owners are known only while their routes exist, so the release comes after the second sweep and before the drain removes them.
+        const again = names.indexOf("erase-pins-on-owner-shards-again-0");
+
+        expect(release).toBeGreaterThan(-1);
+        expect(release).toBeGreaterThan(again);
+        expect(release).toBeLessThan(drain);
+
+        const releaseRun = runs().find((entry) => entry.ref === "gdpr_steps:releasePinFences");
+
+        expect(releaseRun?.args).toStrictEqual({ owners: ["owner-a", "owner-b"], userId: USER });
+    });
+
+    it("does not lift the fences in the second sweep, so no write is admitted between the sweeps and the drain", async () => {
+        await execute();
+
+        const secondSweep = runs().find((entry) => entry.ref === "gdpr_steps:erasePinsOnOwnerShards" && entry.dedupId?.includes("again"));
+
+        expect(secondSweep?.args).not.toHaveProperty("release");
+    });
+
+    it("pages each owner sweep, one step per page, carrying the cursor forward, and releases every owner it fenced", async () => {
+        // Each pass has two pages: the first returns a cursor, the second is the last. Both passes fence owners on each page.
+        answer = (ref, _round, args) => {
+            if (ref !== "gdpr_steps:erasePinsOnOwnerShards") {
+                return { cursor: null, hasMore: false, owners: [] };
+            }
+
+            if (args["cursor"] === null) {
+                return { cursor: "page-2", hasMore: true, owners: ["owner-a"] };
+            }
+
+            return { cursor: null, hasMore: false, owners: ["owner-b"] };
+        };
+
+        await execute();
+
+        const names = stepNames();
+
+        expect(names).toContain("erase-pins-on-owner-shards-1");
+        expect(names).toContain("erase-pins-on-owner-shards-again-1");
+
+        const sweeps = runs().filter((entry) => entry.ref === "gdpr_steps:erasePinsOnOwnerShards");
+
+        expect(sweeps.map((entry) => entry.args["cursor"])).toStrictEqual([null, "page-2", null, "page-2"]);
+
+        const releaseRun = runs().find((entry) => entry.ref === "gdpr_steps:releasePinFences");
+
+        expect(releaseRun?.args).toStrictEqual({ owners: ["owner-a", "owner-b"], userId: USER });
     });
 });

@@ -111,18 +111,53 @@ export const noteMergeAttemptRow = async (ctx: Pick<MutationCtx, "db">, linkId: 
     }
 };
 
+/** Links of one chat read when its archive settles the owed merges: one transaction, so a bound. */
+const OWED_SETTLE_ROW_LIMIT = 500;
+
 /**
  * Settles every owed merge link of the chat, whichever pull request it names. Every archive of the chat calls this (`markThreadArchived`),
  * so reopening an archived chat cannot archive it again for a merge it already covered. Read over the chat's own links.
  */
 export const settleOwedMergesOf = async (ctx: Pick<MutationCtx, "db">, userId: string, threadId: Id<"threads">, at: number): Promise<void> => {
-    await someLinkOfThread(ctx, userId, threadId, async (row) => {
+    // Bounded: an archive is one transaction. A merge past this many links is still refused on a reopen when the host bounded it
+    // (`agent/auto-archive.ts`, the reopen guard), so the bound does not let it archive the chat again. One row past the bound
+    // tells whether the read was whole.
+    const rows = await ctx.db
+        .query("pullRequestThreads")
+        .withIndex("by_user_and_threadId", (q) => q.eq("userId", userId).eq("threadId", threadId))
+        .take(OWED_SETTLE_ROW_LIMIT + 1);
+
+    for (const row of rows.slice(0, OWED_SETTLE_ROW_LIMIT)) {
         if (row.mergedAt !== undefined && row.mergeSettledAt === undefined) {
             await settleMergedLinkRow(ctx, row._id, at);
         }
+    }
 
-        return false;
-    });
+    // Cleared only when every link was read: a chat past the bound may still owe a merge, so the sweep keeps reading it.
+    if (rows.length <= OWED_SETTLE_ROW_LIMIT) {
+        await setThreadMergeOwed(ctx, threadId, false);
+    }
+};
+
+/**
+ * Flags a chat as owing a merge archive, or clears the flag. Either change empties the chat's owed-merge scan (`mergeOwedScan`): a
+ * newly owed merge must be found by the next scan, and a cleared chat has nothing left to scan. A chat that is gone is left alone.
+ */
+export const setThreadMergeOwed = async (ctx: Pick<MutationCtx, "db">, threadId: Id<"threads">, owed: boolean): Promise<void> => {
+    const thread = await ctx.db.get("threads", threadId);
+
+    if (thread === null) {
+        return;
+    }
+
+    const scanning = (thread.mergeOwedScan ?? "") !== "";
+
+    // Written only on a change, so a settled chat with no flag costs no write.
+    if (owed && (thread.mergeOwed !== true || scanning)) {
+        await ctx.db.patch("threads", threadId, { mergeOwed: true, mergeOwedScan: "" });
+    } else if (!owed && (thread.mergeOwed === true || scanning)) {
+        await ctx.db.patch("threads", threadId, { mergeOwed: false, mergeOwedScan: "" });
+    }
 };
 
 /**

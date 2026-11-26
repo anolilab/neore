@@ -12,6 +12,14 @@
  * resumes from each shard's cursor, so it is retried after a pause. `failed`, or output that cannot be read, stops the
  * job at once.
  *
+ * First it fills `user.emailCanonical` through D1 (`POST /admin/backfill-email-canonical`): a check of every account, page
+ * by page, that no address is shared by two, then the fill, one batch per call, then a check again until it is done. The
+ * check's token and the ids travel only in the request and response bodies, never in the log. `user` is a
+ * `.global()` table, which `lunora migrate up` does not reach. It stops at its own deadline, well before the step's
+ * timeout; what it filled stays filled, and the next deploy goes on. The backfill and the shard migrations are
+ * independent, so each runs whether or not the other fails; the job fails if either does. A migration declared on a
+ * `.global()` table fails the step before anything runs.
+ *
  * Run: pnpm exec tsx scripts/run-data-migrations.ts
  */
 import { spawnSync } from "node:child_process";
@@ -19,10 +27,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { declaredMigrationIds, MIGRATIONS_MODULE, runDataMigrations } from "./data-migrations";
+import { declaredMigrationIds, globalTablesOf, MIGRATIONS_MODULE, runDataMigrations, runEmailCanonicalBackfill, SCHEMA_BASELINE } from "./data-migrations";
 
 /** The CLI pretty-prints every shard's outcome to stdout. */
 const MAX_OUTPUT_BYTES = 256 * 1024 * 1024;
+
+/** How long one backfill call may take; it sends at most 50 D1 statements. */
+const BACKFILL_CALL_TIMEOUT_MS = 60_000;
 
 const backendUrl = process.env.BACKEND_URL ?? "";
 
@@ -35,15 +46,50 @@ const backend = join(import.meta.dirname, "..", "backend");
 let ids: string[];
 
 try {
-    ids = declaredMigrationIds(readFileSync(join(import.meta.dirname, "..", MIGRATIONS_MODULE), "utf8"));
+    ids = declaredMigrationIds(
+        readFileSync(join(import.meta.dirname, "..", MIGRATIONS_MODULE), "utf8"),
+        globalTablesOf(readFileSync(join(import.meta.dirname, "..", SCHEMA_BASELINE), "utf8")),
+    );
 } catch (error) {
     console.error(`::error::${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
 }
 
+const backfilled = await runEmailCanonicalBackfill({
+    call: async (request) => {
+        const response = await fetch(new URL("/admin/backfill-email-canonical", backendUrl), {
+            body: JSON.stringify(request),
+            headers: { authorization: `Bearer ${process.env.LUNORA_ADMIN_TOKEN ?? ""}`, "content-type": "application/json" },
+            method: "POST",
+            signal: AbortSignal.timeout(BACKFILL_CALL_TIMEOUT_MS),
+        });
+        const retryAfter = Number(response.headers.get("retry-after"));
+
+        const text = await response.text().catch(() => "");
+        let body: unknown;
+
+        try {
+            body = JSON.parse(text);
+        } catch {
+            // A refusal that is not JSON still says why; the runner prints it outside production only.
+            body = text === "" ? undefined : { message: text };
+        }
+
+        return {
+            body,
+            retryAfterSeconds: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
+            status: response.status,
+        };
+    },
+    error: console.error,
+    log: console.log,
+    production: process.env.STAGE === "production",
+    sleep,
+});
+
 console.log(`running ${String(ids.length)} data migration(s)`);
 
-process.exitCode = await runDataMigrations(ids, {
+const migrated = await runDataMigrations(ids, {
     error: console.error,
     log: console.log,
     production: process.env.STAGE === "production",
@@ -57,3 +103,5 @@ process.exitCode = await runDataMigrations(ids, {
         }),
     sleep,
 });
+
+process.exitCode = backfilled === 0 && migrated === 0 ? 0 : 1;

@@ -37,13 +37,16 @@ import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as v
 import { systemDb } from "../lib/rls/scope";
 import { readPasscodeRow } from "./thread-passcode";
 import { clearAwaitingInput, patchThread } from "./table-writes";
+import { deleteMcpEventsOfThread, hasMcpEventsOfThread } from "../public-api/events-log";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import { deletePullRequestLinksOfThread, setLinksThreadDeleted } from "../source-control/pr-thread-links";
 import { deleteThreadSummaries } from "./thread-summaries";
 import { SEARCH_INTERNAL_FIELDS } from "./thread-search-plan";
 
 export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
     // The palette-search vector ids are internal (`agent/thread-search.ts`): no client reads them.
-    const result = omit(thread, ["parentThreadIds", ...SEARCH_INTERNAL_FIELDS]);
+    // The owed-merge flag and its saved scan place are the sweep's bookkeeping (`source-control/pr-state.ts`): no client reads them.
+    const result = omit(thread, ["parentThreadIds", ...SEARCH_INTERNAL_FIELDS, "mergeOwed", "mergeOwedScan"]);
 
     // `vThreadDoc` types `projectId` as a plain string, and `Id<"projects">` is a
     // branded `string`, so the widening needs no cast — the branch stays only to
@@ -606,6 +609,11 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
         const thread = await context.db.get("threads", args.threadId);
 
         if (thread) {
+            // The thread's Events (`public-api/events-log.ts`), one batch per call; the thread goes once none are left.
+            if (thread.userId !== undefined && !(await deleteMcpEventsOfThread(context, thread.userId, args.threadId))) {
+                return { cursor: messages.continueCursor, isDone: false };
+            }
+
             // The pull requests it was attached to or opened name it; a link to a deleted thread is a dead one.
             await deletePullRequestLinksOfThread(context, thread.userId, args.threadId);
 
@@ -833,6 +841,19 @@ export const softDeleteThread = internalMutation
             deletedAt: ctx.now,
             updatedAt: ctx.now,
         });
+
+        // The chat's run and approval events go with it, as its delete removes them: a poll that passed a hidden event has moved its
+        // cursor on, so a restored chat could never get it back. One batch here; the rest by a scheduled batch (`deleteTrashedThreadEvents`).
+        if (oldThread.userId !== undefined && !(await deleteMcpEventsOfThread(ctx, oldThread.userId, args.threadId))) {
+            await runAfterOnShard(
+                ctx.scheduler,
+                0,
+                internal.public_api.events.deleteTrashedThreadEvents,
+                { threadId: args.threadId, userId: oldThread.userId },
+                oldThread.userId,
+            );
+        }
+
         await setLinksThreadDeleted(ctx, oldThread.userId, args.threadId, true);
         // A coding agent's turn does not outlive the thread it writes into, nor does a goal.
         await endHostThread(ctx, oldThread, ctx.now);
@@ -848,16 +869,31 @@ export const softDeleteThread = internalMutation
 
 export const restoreThread = internalMutation
     .input({ threadId: v.id("threads") })
-    .output(v.from(vThreadDocument))
+    .output(v.object({ before: v.from(vThreadDocument), restored: v.boolean(), thread: v.from(vThreadDocument) }))
     .mutation(async ({ args, ctx }) => {
         const oldThread = await ctx.db.get("threads", args.threadId);
 
         assert(oldThread, `Thread ${args.threadId} not found`);
+
+        // A chat that is already live is not restored again: an overlapping restore reports `restored: false`, so only one of them
+        // records the restore in history.
+        if (oldThread.deleted !== true) {
+            return { before: publicThread(oldThread), restored: false, thread: publicThread(oldThread) };
+        }
+
+        // A chat's events go with the trash, but the trash's leftover batches may not have run. A restored chat must not show them, so
+        // restore refuses while any remain: `undoDeleteThread` drains them first, in its own transaction. The drain removes every event of
+        // the trashed chat, including any recorded while it sat in the trash, so none survives a restore.
+        if (oldThread.userId !== undefined && (await hasMcpEventsOfThread(ctx, oldThread.userId, args.threadId))) {
+            throw new LunoraError("CONFLICT", "This chat's activity is still being cleared from the trash. Try restoring it again in a moment.");
+        }
+
         await patchRow(ctx.db, "threads", oldThread, {
             deleted: false,
             deletedAt: undefined,
             updatedAt: ctx.now,
         });
+
         await setLinksThreadDeleted(ctx, oldThread.userId, args.threadId, false);
 
         // The session the delete ended, if this is a coding agent's thread, can take turns again.
@@ -868,7 +904,7 @@ export const restoreThread = internalMutation
         const newThread = (await ctx.db.get("threads", args.threadId))!;
 
         // Re-add to aggregates when restored
-        return publicThread(newThread);
+        return { before: publicThread(oldThread), restored: true, thread: publicThread(newThread) };
     });
 
 // Thread settings update

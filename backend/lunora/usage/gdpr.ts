@@ -657,7 +657,7 @@ export const persistUsageRowsPage = internalMutation
         if (kept) {
             if (kept.closed === undefined) {
                 // Every rows piece is written with its totals, so a piece without them is not one this code wrote.
-                throw new Error("An export piece has no totals; the export is restarted");
+                throw new LunoraError("INTERNAL", "An export piece has no totals; the export is restarted");
             }
 
             return {

@@ -138,27 +138,33 @@ const pairedDevice = async (userId: string, offers: unknown[] = [CLAUDE, CODEX])
     return { deviceId, secret };
 };
 
-const addRow = async (threadId: string, order: number, role: "assistant" | "user", text: string) =>
-    await run(
-        async (ctx) =>
-            await ctx.db.insert("messages", {
-                message: role === "user" ? { content: text, role } : { content: [{ text, type: "text" as const }], role },
-                order,
-                status: "success",
-                stepOrder: role === "user" ? 0 : 1,
-                text,
-                threadId,
-                tool: false,
-                userId: ownerId,
-            }),
-    );
+const messageRow = (threadId: string, order: number, role: "assistant" | "user", text: string) => {
+    return {
+        message: role === "user" ? { content: text, role } : { content: [{ text, type: "text" as const }], role },
+        order,
+        status: "success",
+        stepOrder: role === "user" ? 0 : 1,
+        text,
+        threadId,
+        tool: false,
+        userId: ownerId,
+    };
+};
 
-/** `turns` question/answer pairs, each `size` characters a side. */
+const addRow = async (threadId: string, order: number, role: "assistant" | "user", text: string) =>
+    await run(async (ctx) => await ctx.db.insert("messages", messageRow(threadId, order, role, text)));
+
+/**
+ * `turns` question/answer pairs, each `size` characters a side. The rows go in one run: a run per row is a transaction each, and a
+ * long conversation is thousands of rows.
+ */
 const converse = async (threadId: string, turns: number, size = 40, startAt = 0) => {
-    for (let index = 0; index < turns; index += 1) {
-        await addRow(threadId, startAt + index, "user", `question ${index} ${"q".repeat(size)}`);
-        await addRow(threadId, startAt + index, "assistant", `answer ${index} ${"a".repeat(size)}`);
-    }
+    await run(async (ctx) => {
+        for (let index = 0; index < turns; index += 1) {
+            await ctx.db.insert("messages", messageRow(threadId, startAt + index, "user", `question ${index} ${"q".repeat(size)}`));
+            await ctx.db.insert("messages", messageRow(threadId, startAt + index, "assistant", `answer ${index} ${"a".repeat(size)}`));
+        }
+    });
 };
 
 const cloudThread = async (turns = 3): Promise<string> => {

@@ -62,6 +62,8 @@ export interface PullRequestAgentDependencies {
     isLinked: (ref: PullRequestRef) => Promise<boolean>;
     /** The thread's links, as far as the read goes: `complete` is `false` past its bound. */
     linked: () => Promise<{ complete: boolean; links: LinkedPullRequest[] }>;
+    /** Starts or stops the watch that wakes this thread for the pull request (`pr-watch.ts`). Writes nothing on the host. */
+    setWatch: (ref: PullRequestRef, watching: boolean) => Promise<{ status: "already" | "not_linked" | "ok" | "too_many" }>;
     token: () => Promise<GithubTokenOutcome>;
 }
 
@@ -78,6 +80,14 @@ export const agentDependenciesFor = (ctx: Pick<ActionCtx, "runMutation" | "runQu
                 userId,
             }),
         linked: async () => await ctx.runQuery(internal.source_control.pr_agent.linkedPullRequestsOfThread, { threadId, userId }),
+        setWatch: async (ref, watching) =>
+            await ctx.runMutation(internal.source_control.pr_watch.setPullRequestWatch, {
+                number: ref.number,
+                repository: ref.repository,
+                threadId,
+                userId,
+                watching,
+            }),
         token: async () => await resolveGithubToken(ctx, userId),
     };
 };
@@ -266,6 +276,20 @@ const THREAD_CURSOR = /^(?<page>[\w=+/-]{0,500})#(?<skip>\d{1,3})$/u;
 
 /** The most threads any host's page of review threads holds (the host API's own page ceiling). */
 const MAX_THREADS_PER_HOST_PAGE = 100;
+
+/**
+ * Starts or stops the watch on a linked pull request. The thread's link is checked the same way as a read, so a
+ * pull request that is not linked is refused before anything is written.
+ */
+export const watchPullRequestForAgent = async (dependencies: PullRequestAgentDependencies, wanted: WantedPullRequest, watching: boolean) => {
+    const picked = await target(dependencies, wanted);
+
+    if (picked.status !== "ok") {
+        return picked;
+    }
+
+    return await dependencies.setWatch(picked.ref, watching);
+};
 
 export const parseThreadCursor = (cursor: string | null | undefined): { page: string | null; skip: number } | null => {
     if (cursor === null || cursor === undefined) {

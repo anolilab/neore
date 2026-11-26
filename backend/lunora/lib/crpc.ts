@@ -115,7 +115,7 @@ export function rateLimit<C>(name: RateLimitName): Middleware<C, C> {
         await rateLimitGuard({
             ...ctx,
             rateLimitKey: name,
-            user: user ? { plan: user.plan, userId: user.userId } : null,
+            user: user ? { isAdmin: user.isAdmin, plan: user.plan, userId: user.userId } : null,
         } as never);
 
         return next();

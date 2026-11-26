@@ -220,33 +220,61 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             await context.step.sleep(`pin-writes-wait-${String(round)}`, "1 minute");
         }
 
-        // The pins this user made on other owners' threads are removed from those owners' shards first: their routes are the only way to find them.
-        await context.step.do(
-            "erase-pins-on-owner-shards",
-            async () =>
-                await context.run(
-                    internal.gdpr.steps.erasePinsOnOwnerShards,
-                    { userId: args.userId },
-                    { dedupId: stepDedupId(scope, "erase-pins-on-owner-shards") },
-                ),
-        );
+        // One pass over every page of owner shards: a step per page, so no step result carries every owner. Returns the owners of all pages.
+        const sweepOwnerShards = async (label: string): Promise<string[]> => {
+            const owners: string[] = [];
+            let cursor: string | null = null;
 
-        // A pin mutation can run longer than its lease, so a pin can commit after the sweep above. The owner shards are swept again after a
-        // grace period, before the routes go below: a late pin still has its route, since the route is written before the pin. This narrows
-        // the gap; it does not close it, since no wall-clock bound on a mutation is enforced. The wait runs even when the first sweep found no
-        // route: a write admitted before the erasure can create one after that sweep. The first sweep's result is not read, so a result an
-        // earlier build persisted (null) replays without failing.
+            for (let round = 0; ; round += 1) {
+                const page = (await context.step.do(
+                    `${label}-${String(round)}`,
+                    async () =>
+                        await context.run(
+                            internal.gdpr.steps.erasePinsOnOwnerShards,
+                            { cursor, userId: args.userId },
+                            { dedupId: stepDedupId(scope, label, round) },
+                        ),
+                )) as { cursor: string | null; hasMore: boolean; owners: string[] };
+
+                owners.push(...page.owners);
+
+                if (!page.hasMore) {
+                    return owners;
+                }
+
+                cursor = page.cursor;
+            }
+        };
+
+        // The pins this user made on other owners' threads are removed from those owners' shards first: their routes are the only way to find them.
+        const firstOwners = await sweepOwnerShards("erase-pins-on-owner-shards");
+
+        // Owner shards named by a route are fenced before their sweep. A pin write on a fenced shard is refused in its own transaction, and a
+        // write that committed before its fence is swept. So a pin on a known owner shard cannot outlive the erasure. The grace sweep still
+        // runs: it picks up a pin on a shard whose route was written after the first route read. That gap has no fence, so it stays a timing
+        // assumption (not a guarantee).
         await context.step.sleep("erase-pins-grace", "2 minutes");
-        await context.step.do(
-            "erase-pins-on-owner-shards-again",
-            async () =>
-                await context.run(
-                    internal.gdpr.steps.erasePinsOnOwnerShards,
-                    // The second sweep lifts the owner shards' fences: nothing after it can be refused a write it should keep.
-                    { release: true, userId: args.userId },
-                    { dedupId: stepDedupId(scope, "erase-pins-on-owner-shards-again") },
-                ),
-        );
+
+        const secondOwners = await sweepOwnerShards("erase-pins-on-owner-shards-again");
+
+        // The owner shards are lifted now, from every owner both passes fenced, and before the routes go: the owners live only in those
+        // routes, so a fresh instance that restarts after the drain could not find them. Once lifted, a pin write of the account is still
+        // refused, because the erasing marker stays live until the erasure ends and every write checks it before its insert
+        // (`lib/account-moves.ts`). Batches keep each call's input small.
+        const owners = [...new Set([...firstOwners, ...secondOwners])];
+        const releaseBatch = 200;
+
+        for (let batch = 0; batch * releaseBatch < owners.length; batch += 1) {
+            await context.step.do(
+                `release-pin-fences-${String(batch)}`,
+                async () =>
+                    await context.run(
+                        internal.gdpr.steps.releasePinFences,
+                        { owners: owners.slice(batch * releaseBatch, (batch + 1) * releaseBatch), userId: args.userId },
+                        { dedupId: stepDedupId(scope, "release-pin-fences", batch) },
+                    ),
+            );
+        }
 
         await context.step.do(
             "delete-user-thread-metadata",
@@ -522,6 +550,15 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     internal.run_webhooks.gdpr.deleteUserRunWebhooks,
                     { userId: args.userId },
                     { dedupId: stepDedupId(scope, "delete-user-run-webhooks", round) },
+                ),
+        );
+        await drain(
+            "delete-user-mcp-events",
+            async (round) =>
+                await context.run(
+                    internal.public_api.gdpr.deleteUserMcpEvents,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-mcp-events", round) },
                 ),
         );
         await drain(
@@ -831,6 +868,18 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     internal.gdpr.steps.deletion_steps.deleteUserFollowRows,
                     { userId: args.userId },
                     { dedupId: stepDedupId(scope, "delete-user-follow-rows-final", round) },
+                ),
+        );
+
+        // An Event recorded before the sessions were revoked can land after the first Events drain, as a follow row can. The
+        // final drain takes what is left once no new one is admitted.
+        await drain(
+            "delete-user-mcp-events-final",
+            async (round) =>
+                await context.run(
+                    internal.public_api.gdpr.deleteUserMcpEvents,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-mcp-events-final", round) },
                 ),
         );
 

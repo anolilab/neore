@@ -104,6 +104,8 @@ import { deleteShardRoute, setShardRoute } from "./shard-routes";
 import { SEARCH_INTERNAL_FIELDS } from "../agent/thread-search-plan";
 import { countUserTurns } from "../agent/thread-search-triggers";
 import { copyMergedRunWebhooks } from "../run-webhooks/table-writes";
+import { copyMergedMcpEvents, deleteMcpEventsOfThread, storedThreadOf } from "../public-api/events-log";
+import { runAfterOnShard } from "./shard-scheduler";
 
 /** Rows moved per round trip. */
 export const MERGE_PAGE_SIZE = 100;
@@ -123,6 +125,12 @@ export const AUDITED_MERGE_PAGE_SIZE = 16;
  */
 export const CLEAR_PAGE_BYTES = 512 * 1024;
 
+/**
+ * Events read per copy page. A page is read whole and then cut to {@link CLEAR_PAGE_BYTES}, so a page of large events would be read
+ * twice; a small page bounds that re-read to a few rows, where the default page would reread up to a hundred.
+ */
+export const EVENT_COPY_PAGE_SIZE = 10;
+
 const pageSizeFor = (table: string): number => (table in AUDIT_TABLES ? AUDITED_MERGE_PAGE_SIZE : MERGE_PAGE_SIZE);
 
 /** The column a user-sharded table is sharded on, which names the row's owner. Undefined for a table that is not user-sharded. */
@@ -138,9 +146,10 @@ const KEEP_NEW_USERS = new Set(["aiUserPreferences", "userSettings"]);
 /**
  * Tables whose rows are copied for the guest alone: another user's row on the guest's shard stays where it is, so the
  * clear takes only the guest's rows of these, even when the two shards are separate stores. A webhook is one row per user,
- * copied by its own rule (`copyMergedRunWebhooks`), so the account's own one is never doubled.
+ * copied by its own rule (`copyMergedRunWebhooks`), so the account's own one is never doubled. The Events log and its
+ * watermark are copied for the guest only too (`mcpEvents` keeps the guest's events; the watermark is not copied).
  */
-const COPIED_FOR_GUEST_ONLY = new Set([...KEEP_NEW_USERS, "runWebhooks"]);
+const COPIED_FOR_GUEST_ONLY = new Set([...KEEP_NEW_USERS, "mcpEvents", "mcpEventWatermarks", "runWebhooks"]);
 
 /** The claim scope of the store probe: a marker written on the new account's shard and looked for on the guest's. */
 export const MERGE_PROBE_SCOPE = "guest-merge-probe";
@@ -171,8 +180,29 @@ export const shardLocalTables = (source: unknown = schema): string[] => {
         .filter((name) => name !== "threads")
         .toSorted((a, b) => a.localeCompare(b));
     const messages = tables.indexOf("messages");
+    const withThreads = messages === -1 ? tables : tables.toSpliced(messages, 0, "threads");
+    const events = withThreads.indexOf("mcpEvents");
+    const threads = withThreads.indexOf("threads");
 
-    return messages === -1 ? tables : tables.toSpliced(messages, 0, "threads");
+    // `mcpEvents` right after `threads`: an Event is copied only once its thread is on the new shard (`threadOnNewShard`).
+    if (events === -1 || threads === -1) {
+        return withThreads;
+    }
+
+    const rest = withThreads.toSpliced(events, 1);
+
+    return rest.toSpliced(rest.indexOf("threads") + 1, 0, "mcpEvents");
+};
+
+/**
+ * Whether an Event's thread is on the new shard. A copied Event names its thread, and a thread the guest deleted before its copy
+ * leaves none, so the Event is not copied: the clear removes it from the guest's shard with the rest. An Event with no thread is
+ * copied. Thread ids are unique, so the thread here is the guest's own.
+ */
+const threadOnNewShard = async (db: ReturnType<typeof rawDb>, data: string): Promise<boolean> => {
+    const threadId = storedThreadOf(data);
+
+    return threadId === undefined || (await db.get("threads", threadId)) !== null;
 };
 
 /**
@@ -339,6 +369,26 @@ export const listShardRowsPage = internalQuery
     .query(async ({ args, ctx }) => {
         if (!onGuestShard(args.from)) {
             return NO_ROWS;
+        }
+
+        // The Events log is read in sequence order: the copy numbers each guest event after the last one it wrote, so the pages must
+        // come in seq order, not by creation time (a page boundary would otherwise put a later event before an earlier one). An event's
+        // payload can be large, so the page is cut at the byte budget as the other tables' are, and the next page starts after the last row sent.
+        if (args.table === "mcpEvents") {
+            // Only the guest's own events: a shared store also holds the other users' logs, which the copy never moves.
+            const readEvents = async (limit: number) =>
+                await ctx.db.mcpEvents.findMany({
+                    consistency: "primary",
+                    cursor: args.cursor,
+                    limit,
+                    orderBy: [{ seq: "asc" }],
+                    where: { userId: args.from },
+                });
+            const full = await readEvents(EVENT_COPY_PAGE_SIZE);
+            const fits = withinClearBytes(full.page as unknown as Record<string, unknown>[]).length;
+            const result = fits < full.page.length ? await readEvents(fits) : full;
+
+            return { continueCursor: result.isDone ? null : (result.continueCursor ?? null), isDone: result.isDone, page: result.page };
         }
 
         const read = async (size: number) => await rawDb(ctx).query(args.table).paginate({ cursor: args.cursor, numItems: size });
@@ -700,6 +750,7 @@ const vMergeProgressFields = {
     route: v.optional(v.number()),
     routeThread: v.optional(v.string()),
     run: v.number(),
+    sharedStore: v.optional(v.boolean()),
     table: v.string(),
 };
 
@@ -1421,6 +1472,63 @@ export const importShardRows = internalMutation
             return { fenced: false, held: 0, imported, present: guestRows.map((row) => row._id as string) };
         }
 
+        // The guest's Events are copied by their ids, so a page the copy repeats adds nothing, and each is renumbered after the
+        // account's own (its `seq` means nothing there). The guest's watermark is not copied: the account's is rebuilt from the
+        // events appended. Every guest row is confirmed here, so the clear may delete it once it is on the new shard.
+        if (args.table === "mcpEvents") {
+            const guestRows = rows.filter((row) => row["userId"] === args.from);
+            // A row with an import marker was copied by an earlier import. Its copy may since have left the new shard (retention
+            // prunes it), and a copy is not made again: that would restamp the event and make it readable for a further window. The
+            // marker never lapses, as the other import markers do.
+            const fresh: Record<string, unknown>[] = [];
+
+            for (const row of guestRows) {
+                const marked = (await storedClaim(ctx.db, IMPORT_MARKER_SCOPE, markerKey(args.from, args.table, row._id as string))) !== null;
+
+                if (!marked && (await threadOnNewShard(db, row["data"] as string))) {
+                    fresh.push(row);
+                }
+            }
+
+            const imported = await copyMergedMcpEvents(ctx, fresh, args.to);
+
+            // The marker records that the row was handled, so its copy is not made again. Events are never taken back by the copy's id:
+            // `dropRowsGoneFromGuest` keeps them, and a deleted thread's copies go with its thread copy.
+            for (const row of fresh) {
+                await ctx.db.insert("idempotencyClaims", {
+                    claimedAt: now,
+                    expiresAt: IMPORT_MARKER_EXPIRES_AT,
+                    key: markerKey(args.from, args.table, row._id as string),
+                    scope: IMPORT_MARKER_SCOPE,
+                    userId: args.to,
+                });
+            }
+
+            // The clear's own record for every row of its page, copied now or earlier, as the generic import writes it: the copy is on
+            // the new shard before the guest's row goes.
+            if (args.clearing === true) {
+                for (const row of guestRows) {
+                    const key = markerKey(args.from, args.table, row._id as string);
+
+                    if ((await storedClaim(ctx.db, MERGE_CLEARED_SCOPE, key)) === null) {
+                        await ctx.db.insert("idempotencyClaims", {
+                            claimedAt: now,
+                            expiresAt: IMPORT_MARKER_EXPIRES_AT,
+                            key,
+                            scope: MERGE_CLEARED_SCOPE,
+                            userId: args.to,
+                        });
+                    }
+                }
+            }
+
+            return { fenced: false, held: 0, imported, present: guestRows.map((row) => row._id as string) };
+        }
+
+        if (args.table === "mcpEventWatermarks") {
+            return { fenced: false, held: 0, imported: 0, present: rows.filter((row) => row["userId"] === args.from).map((row) => row._id as string) };
+        }
+
         let imported = 0;
         let held = 0;
         let usageWritten = false;
@@ -1700,6 +1808,12 @@ export const dropRowsGoneFromGuest = internalMutation
 
         // One at a time: an audited table's delete writes its history row to D1.
         for (const id of args.ids) {
+            if (args.table === "mcpEvents") {
+                // A user never deletes an Event, so a guest row that is gone was expired by the guest's retention or erased with the
+                // account. The copy keeps its own window. A deleted thread's Events go with its copy (the thread take-back above).
+                continue;
+            }
+
             const existing = (await db.get(args.table, id)) as Record<string, unknown> | null;
 
             if (existing === null) {
@@ -1712,12 +1826,64 @@ export const dropRowsGoneFromGuest = internalMutation
                 .first();
 
             if (marker !== null && marker.result === (await rowDigest(args.table, existing))) {
+                // The thread's Events were copied with it. Its id is the guest's, so the new account holds those Events only as the
+                // merge's copies. One batch per call: the rest goes to `drainTakenBackThread`, on the new shard, without this merge's
+                // lease, since the merge can finish before the drain runs.
+                if (args.table === "threads" && !(await deleteMcpEventsOfThread(ctx, args.to, id))) {
+                    await runAfterOnShard(
+                        ctx.scheduler,
+                        0,
+                        internal.lib.account_merge.drainTakenBackThread,
+                        { from: args.from, threadId: id, to: args.to },
+                        args.to,
+                    );
+
+                    continue;
+                }
+
                 await db.delete(args.table, id);
                 dropped += 1;
             }
         }
 
         return { dropped, fenced: false };
+    });
+
+/**
+ * The rest of a taken-back thread's copied Events, one batch per call, on the new shard (`dropRowsGoneFromGuest` removes the first). It
+ * needs no merge lease: the merge can finish before it runs. The thread copy stays until none of its Events are left, so the thread's
+ * Events stay hidden meanwhile. The copy goes only while it is still the unchanged copy its marker records; an account-edited copy is
+ * kept with its Events.
+ */
+export const drainTakenBackThread = internalMutation
+    .input({ from: v.string(), threadId: v.string(), to: v.string() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const db = rawDb(ctx);
+        const copy = (await db.get("threads", args.threadId)) as Record<string, unknown> | null;
+
+        if (copy === null) {
+            return null;
+        }
+
+        const marker = await ctx.db
+            .query("idempotencyClaims")
+            .withIndex("by_scope_key", (q) => q.eq("scope", IMPORT_MARKER_SCOPE).eq("key", markerKey(args.from, "threads", args.threadId)))
+            .first();
+
+        if (marker === null || marker.result !== (await rowDigest("threads", copy))) {
+            return null;
+        }
+
+        if (!(await deleteMcpEventsOfThread(ctx, args.to, args.threadId))) {
+            await runAfterOnShard(ctx.scheduler, 0, internal.lib.account_merge.drainTakenBackThread, args, args.to);
+
+            return null;
+        }
+
+        await db.delete("threads", args.threadId);
+
+        return null;
     });
 
 /**
@@ -1863,12 +2029,15 @@ export const resolvePinsLeft = internalMutation
  * the shard's own SQLite: no D1 statement and no subrequest. The `.global()` tables naming a user are skipped: they are
  * no shard's rows (none is shard-local in the deploy; the test harness keeps them on the shard).
  */
-export const firstTableWithGuestRows = async (ctx: { db: unknown }, guestId: string): Promise<string | null> => {
+export const firstTableWithGuestRows = async (ctx: { db: unknown }, guestId: string, sharedStore = false): Promise<string | null> => {
     if (!onGuestShard(guestId)) {
         return null;
     }
 
-    const facades = ctx.db as Record<string, { findMany: (options: { limit: number; where: { userId: string } }) => Promise<{ page: unknown[] }> }>;
+    const facades = ctx.db as Record<
+        string,
+        { findMany: (options: { consistency: "primary"; limit: number; where: Record<string, string> }) => Promise<{ page: unknown[] }> }
+    >;
     const globalUserTables = new Set([...Object.keys(GLOBAL_USER_COLUMNS), ...Object.keys(GLOBAL_USER_TABLES_NOT_REASSIGNED)]);
 
     for (const table of shardLocalTables()) {
@@ -1878,8 +2047,18 @@ export const firstTableWithGuestRows = async (ctx: { db: unknown }, guestId: str
 
         let rows: unknown[];
 
-        if (KEEP_NEW_USERS.has(table)) {
-            const { page } = await facades[table]!.findMany({ limit: 1, where: { userId: guestId } });
+        // On a store the new account shares, every other user's rows are there too: only the guest's own rows of an owned
+        // table count, and a table with no owner column holds none of the guest's. A table copied for the guest alone is
+        // the same on any store: another user's rows there are not the merge's to move, so they never hold up the deletion.
+        if (sharedStore || COPIED_FOR_GUEST_ONLY.has(table)) {
+            const ownerField = shardOwnerField(table);
+
+            if (ownerField === undefined) {
+                continue;
+            }
+
+            // From the primary: a replica that lags the copy could say the guest's rows are gone while they are still there.
+            const { page } = await facades[table]!.findMany({ consistency: "primary", limit: 1, where: { [ownerField]: guestId } });
 
             rows = page;
         } else {
@@ -2307,6 +2486,12 @@ export interface MergeProgress {
     routeThread?: string;
     /** Runs taken so far. */
     run: number;
+    /**
+     * Whether the two keys serve one store ({@link probeSharedStore}), probed by the merge's first clear page and kept here, so
+     * every later run, and the guest's deletion, decide alike. Absent until then. Only the clear reads it, so only the clear's
+     * probe can fail a run.
+     */
+    sharedStore?: boolean;
     /** The table the copy, the clear or the reconcile stopped in; another phase ignores it. */
     table: string;
 }
@@ -2438,7 +2623,8 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
             return await stopKeepingGuest(context, state, { forGood: true });
         }
 
-        // Probed once per run, so every page of the run clears alike; the probe's calls are counted against the run's budget.
+        // Probed once per merge, here, by the first clear page: every later page and run decides alike from the progress record. Its
+        // calls count against the run's budget.
         if (context.sharedStore === undefined) {
             context.sharedStore = await probeSharedStore(call, references, from, to);
             state.calls -= PROBE_CALLS;
@@ -2657,7 +2843,7 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
             pinsRemain?: boolean;
             rowsRemain?: string;
             sharedShard?: boolean;
-        } = await call(references.deleteGuest, { generation, userId: from }, from);
+        } = await call(references.deleteGuest, { generation, sharedStore: context.sharedStore === true, userId: from }, from);
 
         if (result.fenced === true) {
             state.superseded = true;
@@ -2987,7 +3173,15 @@ export const mergeGuestInto = async (
         stopped: false,
         superseded: false,
     };
-    const context: MergeContext = { call, from, generation, references, tables, to };
+    const context: MergeContext = {
+        call,
+        from,
+        generation,
+        references,
+        tables,
+        to,
+        ...(resume?.sharedStore !== undefined && { sharedStore: resume.sharedStore }),
+    };
     let done = false;
     /** Ends the run before its first step: a newer delivery, an erasure, or a pin write still in flight. */
     let early: { busyUntil?: number; stopped?: boolean; superseded?: boolean } | null = null;
@@ -2999,6 +3193,7 @@ export const mergeGuestInto = async (
             moved: state.moved,
             phase: state.phase,
             ...(state.route > 0 && { route: state.route }),
+            ...(context.sharedStore !== undefined && { sharedStore: context.sharedStore }),
             ...(state.phase === "repins" && state.routeThread !== null && { routeThread: state.routeThread }),
             run: run + 1,
             table: tables[state.index] ?? "",

@@ -188,6 +188,7 @@ describe("dispatchLinkedPullRequestChecks owed merges", () => {
                 userId: OWNER,
             });
             const threadId = await ctx.db.insert("threads", {
+                mergeOwed: true,
                 mode: "text",
                 model: "gpt-4o",
                 status: "active",
@@ -225,6 +226,7 @@ describe("dispatchLinkedPullRequestChecks owed merges", () => {
                 userId: OWNER,
             });
             const threadId = await ctx.db.insert("threads", {
+                mergeOwed: true,
                 mode: "text",
                 model: "gpt-4o",
                 status: "active",
@@ -262,6 +264,190 @@ describe("dispatchLinkedPullRequestChecks owed merges", () => {
         // Only the owed merge is read; the open link is not, since keep-open is off. The merged link itself was checked.
         expect(dispatched).toEqual([1]);
         expect(mergedStateCheckedAt[0]).toBeTypeOf("number");
+    });
+
+    it("does not read the links of a chat that owes no merge: its merge is settled", async () => {
+        const { dispatched } = await harness.run(async (ctx: any) => {
+            await ctx.db.insert("userSettings", {
+                autoArchiveAfterDays: 30,
+                autoArchiveMergedChats: true,
+                autoArchiveMergedChatsSince: 0,
+                userId: OWNER,
+            });
+            // No `mergeOwed` flag: the flag is set with every owed link, so a chat without it has no owed merge for the sweep to read.
+            const threadId = await ctx.db.insert("threads", {
+                mode: "text",
+                model: "gpt-4o",
+                status: "active",
+                title: "Settled",
+                updatedAt: Date.now(),
+                userId: OWNER,
+            });
+
+            await ctx.db.insert("pullRequestThreads", {
+                ...NOW_LINK,
+                kind: "attached",
+                mergedAt: 1000,
+                mergeSettledAt: 2000,
+                number: 1,
+                repository: "acme/app",
+                state: "merged",
+                threadId,
+                userId: OWNER,
+            });
+            const result = await runInShard(OWNER, () => ctx.runMutation(dispatchLinkedPullRequestChecks, {}));
+
+            return { dispatched: [result.dispatched] };
+        });
+
+        expect(dispatched).toEqual([0]);
+    });
+
+    it("retries an owed merge of a chat flagged before the flag existed, and flags the chat from then on", async () => {
+        const { dispatched, flagged } = await harness.run(async (ctx: any) => {
+            await ctx.db.insert("userSettings", {
+                autoArchiveAfterDays: 30,
+                autoArchiveMergedChats: true,
+                autoArchiveMergedChatsSince: 0,
+                userId: OWNER,
+            });
+            // No `mergeOwed` on the chat: a merge recorded before the flag existed.
+            const threadId = await ctx.db.insert("threads", {
+                mode: "text",
+                model: "gpt-4o",
+                status: "active",
+                title: "Unflagged",
+                updatedAt: Date.now(),
+                userId: OWNER,
+            });
+
+            await ctx.db.insert("pullRequestThreads", {
+                ...NOW_LINK,
+                kind: "attached",
+                mergedAt: 1000,
+                number: 1,
+                repository: "acme/app",
+                state: "merged",
+                threadId,
+                userId: OWNER,
+            });
+            const result = await runInShard(OWNER, () => ctx.runMutation(dispatchLinkedPullRequestChecks, {}));
+            const thread = await ctx.db.get("threads", threadId);
+
+            return { dispatched: [result.dispatched], flagged: [thread?.mergeOwed] };
+        });
+
+        expect(dispatched).toEqual([1]);
+        expect(flagged).toEqual([true]);
+    });
+
+    it("clears the flag of a chat with more than 100 links once none of them owes a merge, and reads no host state for it", async () => {
+        const { dispatched, flag } = await harness.run(async (ctx: any) => {
+            await ctx.db.insert("userSettings", {
+                autoArchiveAfterDays: 30,
+                autoArchiveMergedChats: true,
+                autoArchiveMergedChatsSince: 0,
+                keepOpenPullRequestChats: true,
+                userId: OWNER,
+            });
+            // Flagged, though every merge settled past the archive's bounded read: the flag must not keep the sweep reading the chat.
+            const threadId = await ctx.db.insert("threads", {
+                mergeOwed: true,
+                mode: "text",
+                model: "gpt-4o",
+                status: "active",
+                title: "Large",
+                updatedAt: Date.now(),
+                userId: OWNER,
+            });
+
+            for (let index = 0; index < 105; index += 1) {
+                await ctx.db.insert("pullRequestThreads", {
+                    ...NOW_LINK,
+                    kind: "linked",
+                    mergedAt: 1000,
+                    mergeSettledAt: 2000,
+                    number: 3000 + index,
+                    repository: "octo/other",
+                    state: "merged",
+                    threadId,
+                    userId: OWNER,
+                });
+            }
+
+            await ctx.db.insert("pullRequestThreads", {
+                ...NOW_LINK,
+                kind: "attached",
+                number: 2,
+                repository: "acme/app",
+                state: "open",
+                threadId,
+                userId: OWNER,
+            });
+            const result = await runInShard(OWNER, () => ctx.runMutation(dispatchLinkedPullRequestChecks, {}));
+            const thread = await ctx.db.get("threads", threadId);
+
+            return { dispatched: [result.dispatched], flag: [thread?.mergeOwed] };
+        });
+
+        // Nothing owes a merge, so the open link is stamped rather than read from the host, and the flag is cleared.
+        expect(dispatched).toEqual([0]);
+        expect(flag).toEqual([false]);
+    });
+
+    it("scans a chat past one page of links across sweeps, saving its place, and keeps the chat flagged until the scan ends", async () => {
+        const { dispatched, flag, scan } = await harness.run(async (ctx: any) => {
+            await ctx.db.insert("userSettings", {
+                autoArchiveAfterDays: 30,
+                autoArchiveMergedChats: true,
+                autoArchiveMergedChatsSince: 0,
+                keepOpenPullRequestChats: true,
+                userId: OWNER,
+            });
+            const threadId = await ctx.db.insert("threads", {
+                mergeOwed: true,
+                mode: "text",
+                model: "gpt-4o",
+                status: "active",
+                title: "Huge",
+                updatedAt: Date.now(),
+                userId: OWNER,
+            });
+
+            for (let index = 0; index < 600; index += 1) {
+                await ctx.db.insert("pullRequestThreads", {
+                    ...NOW_LINK,
+                    kind: "linked",
+                    mergedAt: 1000,
+                    mergeSettledAt: 2000,
+                    number: 4000 + index,
+                    repository: "octo/other",
+                    state: "merged",
+                    threadId,
+                    userId: OWNER,
+                });
+            }
+
+            await ctx.db.insert("pullRequestThreads", {
+                ...NOW_LINK,
+                kind: "attached",
+                number: 2,
+                repository: "acme/app",
+                state: "open",
+                threadId,
+                userId: OWNER,
+            });
+            const result = await runInShard(OWNER, () => ctx.runMutation(dispatchLinkedPullRequestChecks, {}));
+            const thread = await ctx.db.get("threads", threadId);
+
+            return { dispatched: [result.dispatched], flag: [thread?.mergeOwed], scan: [thread?.mergeOwedScan] };
+        });
+
+        // One page of 500 is not the whole chat: the scan is saved, the chat stays flagged, and its open link is read this sweep.
+        expect(dispatched).toEqual([1]);
+        expect(flag).toEqual([true]);
+        expect(scan[0]).toBeTypeOf("string");
+        expect(scan[0]).not.toBe("");
     });
 });
 

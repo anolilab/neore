@@ -16,6 +16,7 @@ import type { QueryCtx } from "../_generated/server";
 import { meetsThreadPermission, resolveThreadReadAccess } from "../agent/thread-read-access";
 import { BROWSER_LIVE_VIEW_API_TOKEN, CLOUDFLARE_ACCOUNT_ID } from "../env";
 import { authAction, authMutation, authQuery, internalMutation, internalQuery, rateLimit } from "../lib/crpc";
+import { MAX_LENGTH } from "../lib/validators";
 import { throwForbidden, throwThreadNotFound } from "../lib/error-helpers";
 import { hmacSha256Hex, timingSafeEqual } from "../lib/crypto";
 import { fetchWithDeadline } from "../lib/fetch-timeout";
@@ -228,7 +229,7 @@ const leaseClaimIds = async (lease: { claim: string; renewing?: string }): Promi
  */
 export const getThreadBrowser = authQuery
     /** `claim`: a view's own claim. The answer then says whether the lease is that view's, not only the caller's. */
-    .input({ claim: v.optional(v.string()), threadId: v.id("threads") })
+    .input({ claim: v.optional(v.string().max(MAX_LENGTH.short)), threadId: v.id("threads") })
     .output(
         v.union(
             v.object({ kind: v.literal("denied"), now: v.number(), revision: v.optional(v.number()) }),
@@ -664,7 +665,7 @@ export const settleControlClaim = internalMutation
  */
 export const takeControl = authAction
     /** `renews`: the claim of the view this refreshes (its URL expired unconnected), so a renewal is told from a takeover. */
-    .input({ renews: v.optional(v.string()), threadId: v.id("threads") })
+    .input({ renews: v.optional(v.string().max(MAX_LENGTH.short)), threadId: v.id("threads") })
     .use(rateLimit("browser/liveView"))
     .output(
         v.union(
@@ -815,7 +816,7 @@ export const takeControl = authAction
  * `claim` is not the lease's: another of their tabs took control since, and this view must close.
  */
 export const keepControl = authMutation
-    .input({ claim: v.string(), threadId: v.id("threads") })
+    .input({ claim: v.string().max(MAX_LENGTH.short), threadId: v.id("threads") })
     .use(rateLimit("browser/control"))
     .output(v.union(v.null(), v.object({ until: v.number() })))
     .mutation(async ({ args: { claim, threadId }, ctx }) => {
@@ -891,7 +892,7 @@ const returnLease = async (
  * of the person's tabs took over, or the lease ran out), so the view does not say it handed anything back.
  */
 export const handBack = authMutation
-    .input({ claim: v.string(), reason: v.union(v.literal("handed_back"), v.literal("left")), threadId: v.id("threads") })
+    .input({ claim: v.string().max(MAX_LENGTH.short), reason: v.union(v.literal("handed_back"), v.literal("left")), threadId: v.id("threads") })
     .output(v.boolean())
     .mutation(async ({ args: { claim, reason, threadId }, ctx }) => {
         const db = systemDb(ctx);
@@ -937,7 +938,7 @@ export const releaseControl = internalMutation
  * interactive view lets them follow any link, so a redirect is no different from a click.
  */
 export const navigateInControl = authAction
-    .input({ claim: v.string(), threadId: v.id("threads"), url: v.string().max(2048) })
+    .input({ claim: v.string().max(MAX_LENGTH.short), threadId: v.id("threads"), url: v.string().max(2048) })
     .use(rateLimit("browser/control"))
     .output(
         v.union(
