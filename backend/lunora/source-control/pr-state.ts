@@ -198,6 +198,8 @@ export const dispatchLinkedPullRequestChecks = internalMutation
 
             if (owedLink) {
                 mergeOwed = thread !== null && mergedOn;
+                // Known for the chat's other links, so they read no scan of their own.
+                owesMerge.set(String(link.threadId), mergeOwed);
             } else if (!idleDue && thread !== null && mergedOn && thread.mergeOwed === true) {
                 // Only a chat flagged as owing a merge is read for one: the flag is set with every owed link (`pr-threads.ts`).
                 const key = String(link.threadId);
