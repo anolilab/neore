@@ -248,6 +248,16 @@ describe("BackupModelsSetting", () => {
         expect(document.activeElement).toBe(screen.getByRole("button", { name: "Move Second up" }));
     });
 
+    it("does not offer a model the user's filters exclude, which the save would refuse", async () => {
+        state.excluded = new Set(["openai/second"]);
+        show();
+
+        await userEvent.click(screen.getByRole("combobox", { name: "Add a backup model" }));
+
+        expect(await screen.findByRole("option", { name: "First" })).toBeDefined();
+        expect(screen.queryByRole("option", { name: "Second" })).toBeNull();
+    });
+
     it("moves focus to the next backup's remove button when one is removed", async () => {
         state.settings = { backupModels: ["openai/first", "openai/second", "openai/third"] };
         show();

@@ -159,7 +159,6 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
     const { data: access } = useQuery(crpc.auth.functions.getPaidModelAccess.queryOptions({}, { live: false }));
     // The backend's own answer, not a client-side guess; the save re-checks it.
     const canRunPaidModels = access?.canRunPaidModels === true;
-    const offerable = offerableBackupModels(allModels, canRunPaidModels, providersWithKey);
     // A retry skips what is not a text model, outside the plan, or excluded by the user's filters. A feature flag only
     // hides a model from the picker, so a saved one it hides still answers and is not marked unavailable.
     const catalog = useGatewayModels();
@@ -316,7 +315,7 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
                         emptyLabel={t`Choose a model`}
                         field="backupModels"
                         label={chosen.length === 0 ? t`Add a backup model` : t`Add another backup model`}
-                        models={offerable.filter((m) => !chosen.includes(m.id))}
+                        models={allModels.filter((m) => usable.has(m.id) && !chosen.includes(m.id))}
                         onChange={(_field, modelId) => {
                             if (!modelId) {
                                 return;
