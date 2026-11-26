@@ -3,7 +3,7 @@
  * recorded exactly as `decideWatch` says, only while its lease and its watch are still current.
  */
 import { lunoraTest } from "@lunora/testing";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import { setPullRequestWatch } from "./pr-watch";
 import { HostApiError } from "./origin-fetch";
@@ -508,12 +508,13 @@ describe("observeWatched", () => {
         expect(decision).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "r120" } });
     });
 
-    const dependencies = (items: { authorLogin: string; id: string }[], total: number) => {
+    const dependencies = (items: { authorLogin: string; id: string }[], total: number, reviewExists: Mock = vi.fn().mockResolvedValue(undefined)) => {
         return {
             driver: {
                 getPullRequest: vi.fn().mockResolvedValue(detail("open")),
                 listChecks: vi.fn().mockResolvedValue({ checks: [], required: { complete: true, patterns: [] }, total: 0 }),
                 listReviews: vi.fn().mockResolvedValue({ items, total }),
+                reviewExists,
             } as never,
             login: async () => "me",
         };
@@ -537,20 +538,51 @@ describe("observeWatched", () => {
         expect(row.watch.reviewId).toBe("150");
     });
 
-    it("wakes for a review when the seen review lies beyond what the host read", async () => {
+    describe("when the seen review lies beyond what the host read", () => {
         const items = Array.from({ length: 150 }, (_, index) => {
             return { authorLogin: "bob", id: String(400 - index) };
         });
-        const linkId = await seedWatch({ watch: { baselined: true, headSha: "sha-1", reviewId: "10", startedAt: STARTED_AT } });
-        const { observation: observed } = await observeWatched(request, { ...TARGET, reviewId: "10" }, dependencies(items, 400));
+        const run = async (reviewExists: Mock) => {
+            const linkId = await seedWatch({ watch: { baselined: true, headSha: "sha-1", reviewId: "50", startedAt: STARTED_AT } });
+            const { observation: observed } = await observeWatched(request, { ...TARGET, reviewId: "50" }, dependencies(items, 400, reviewExists));
 
-        await record(linkId, { observation: observed });
+            await record(linkId, { observation: observed });
 
-        const row = await rowOf(linkId);
+            return { observed, reviewExists, row: await rowOf(linkId) };
+        };
 
-        expect(observed.reviewsTruncated).toBe(true);
-        expect(row.watch.reviewId).toBe("400");
-        expect(row.watchPending).toEqual(["review"]);
+        it("wakes for a review when the seen review is proven to exist, even if its id is higher than a listed review's", async () => {
+            const { observed, reviewExists, row } = await run(vi.fn().mockResolvedValue(undefined));
+
+            expect(reviewExists).toHaveBeenCalledExactlyOnceWith(expect.anything(), { number: 7, repository: "octo/hello" }, "50");
+            expect(observed.seenReviewBeyondRead).toBe("present");
+            expect(row.watch.reviewId).toBe("400");
+            expect(row.watchPending).toEqual(["review"]);
+        });
+
+        it("re-baselines silently when the seen review was deleted", async () => {
+            const { observed, row } = await run(vi.fn().mockRejectedValue(new HostApiError("not found", 404)));
+
+            expect(observed.seenReviewBeyondRead).toBe("gone");
+            expect(row.watch.reviewId).toBe("400");
+            expect(row.watchPending).toEqual([]);
+        });
+
+        it("neither wakes nor moves the marker when the lookup fails for another reason", async () => {
+            for (const error of [new HostApiError("slow down", 403, true), new HostApiError("boom", 500)]) {
+                const { observed, row } = await run(vi.fn().mockRejectedValue(error));
+
+                expect(observed.seenReviewBeyondRead).toBe("unknown");
+                expect(row.watch.reviewId).toBe("50");
+                expect(row.watchPending).toEqual([]);
+            }
+        });
+
+        it("lets a 401 on the lookup go up so the token is renewed", async () => {
+            await expect(
+                observeWatched(request, { ...TARGET, reviewId: "50" }, dependencies(items, 400, vi.fn().mockRejectedValue(new HostApiError("no", 401)))),
+            ).rejects.toBeInstanceOf(HostApiError);
+        });
     });
 
     it("records a readable pull request and wakes for checks and a new review when only the login lookup is refused, and counts no read failure", async () => {

@@ -47,10 +47,11 @@ export interface PullRequestObservation {
     /** Every submitted review, newest first, as the host lists them now. */
     reviews: ReadonlyArray<{ authorLogin: string; id: string }>;
     /**
-     * True when the host holds more reviews than were listed and the list does not reach the seen review: every listed review is
-     * then newer than the seen one, which the decision cannot find by position.
+     * Set only when the host holds more reviews than were listed and the list does not reach the seen review: what a direct read of
+     * the seen review found. `present`: it exists beyond the read, so every listed review is newer. `gone`: it was deleted. `unknown`:
+     * the read failed, so nothing can be said and the marker stays where it is.
      */
-    reviewsTruncated?: boolean;
+    seenReviewBeyondRead?: "gone" | "present" | "unknown";
     /** The host's state of the pull request now. */
     state: "closed" | "merged" | "open";
     /** The person's own login. Their reviews never wake them. */
@@ -80,20 +81,6 @@ const isByWatcher = (review: { authorLogin: string }, watcherLogin: string): boo
  */
 const reviewsByOthers = (observed: PullRequestObservation): { authorLogin: string; id: string }[] =>
     observed.reviews.filter((review) => !isByWatcher(review, observed.watcherLogin.trim()));
-
-/**
- * Whether review `id` is newer than the `seen` one by the host's numeric ids. Ids that are not both whole numbers cannot be ordered,
- * and then the review counts as newer: a spurious wake is acceptable, a missed review is not.
- */
-const WHOLE_NUMBER = /^\d+$/u;
-
-const isNewerReviewId = (id: string, seen: string | undefined): boolean => {
-    if (seen === undefined || !WHOLE_NUMBER.test(id) || !WHOLE_NUMBER.test(seen)) {
-        return true;
-    }
-
-    return BigInt(id) > BigInt(seen);
-};
 
 /** The review a read leaves as the watch's marker: the newest by someone other than the watcher. */
 const newestReviewByOthers = (observed: PullRequestObservation): { authorLogin: string; id: string } | undefined => reviewsByOthers(observed)[0];
@@ -172,19 +159,15 @@ export const decideWatch = (previous: PullRequestWatchState, observed: PullReque
 
     const { left, newer } = newerReviewsByOthers(observed, previous.reviewId);
 
-    if (left) {
-        // The seen review left the host's list (deleted, or older than the pages the read went back through: its bound is the limit
-        // of what this can tell). Nothing can be said about what is new, so re-baseline silently on the newest review by someone
-        // else, or clear the marker when there is none: the next review by someone else then wakes the thread.
+    if (left && observed.seenReviewBeyondRead === "unknown") {
+        // The seen review could not be looked up: it neither wakes nor moves, so the next read decides with it still in place.
+    } else if (left) {
+        // The seen review is not in the list. Complete list, or the review was found deleted: nothing newer can be told by position, so
+        // re-baseline silently on the newest review by someone else, or clear the marker when there is none (the next review by someone
+        // else then wakes the thread). `present`: it exists beyond the read, so every listed review by someone else is newer.
         next.reviewId = review?.id;
 
-        // A truncated list that does not reach the seen review says nothing by position, so ids decide: a review by someone else
-        // wakes only if it is newer than the seen one (host review ids grow over time), which a deleted marker's older reviews are not.
-        if (
-            observed.reviewsTruncated === true &&
-            !owed.includes("review") &&
-            reviewsByOthers(observed).some((other) => isNewerReviewId(other.id, previous.reviewId))
-        ) {
+        if (observed.seenReviewBeyondRead === "present" && review !== undefined && !owed.includes("review")) {
             owed.push("review");
         }
     } else if (newer.length > 0) {

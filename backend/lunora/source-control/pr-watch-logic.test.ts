@@ -244,33 +244,34 @@ describe("a seen review beyond a truncated read", () => {
         { authorLogin: "bob", id: "108" },
         { authorLogin: "amy", id: "107" },
     ];
+    const marked = { ...baselined, reviewId: "50" };
 
-    it("wakes for a review and marks the newest one by someone else", () => {
-        const decision = decideWatch({ ...baselined, reviewId: "101" }, { ...quiet, reviews: listed, reviewsTruncated: true }, NOW);
+    it("wakes for a review and marks the newest one by someone else when the seen review is proven to exist", () => {
+        const decision = decideWatch(marked, { ...quiet, reviews: listed, seenReviewBeyondRead: "present" }, NOW);
 
         expect(decision).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "108" } });
     });
 
-    it("does not wake for older reviews when the seen one was deleted, and re-baselines on the newest", () => {
-        const decision = decideWatch({ ...baselined, reviewId: "150" }, { ...quiet, reviews: listed, reviewsTruncated: true }, NOW);
+    it("re-baselines silently when the seen review was found deleted", () => {
+        const decision = decideWatch(marked, { ...quiet, reviews: listed, seenReviewBeyondRead: "gone" }, NOW);
 
         expect(decision).toMatchObject({ action: "none", state: { reviewId: "108" } });
     });
 
-    it("wakes for a review newer than the seen one even when the seen one is deleted", () => {
-        const decision = decideWatch({ ...baselined, reviewId: "107" }, { ...quiet, reviews: listed, reviewsTruncated: true }, NOW);
+    it("neither wakes nor moves the marker when the seen review could not be looked up", () => {
+        const decision = decideWatch(marked, { ...quiet, reviews: listed, seenReviewBeyondRead: "unknown" }, NOW);
 
-        expect(decision).toMatchObject({ action: "wake", reasons: ["review"] });
+        expect(decision).toMatchObject({ action: "none", state: { reviewId: "50" } });
     });
 
-    it("does not wake when only the watcher's own reviews are listed", () => {
-        const decision = decideWatch({ ...baselined, reviewId: "101" }, { ...quiet, reviews: [listed[0]!], reviewsTruncated: true }, NOW);
+    it("does not wake for the watcher's own reviews alone, even when the seen review exists", () => {
+        const decision = decideWatch(marked, { ...quiet, reviews: [listed[0]!], seenReviewBeyondRead: "present" }, NOW);
 
         expect(decision.action).toBe("none");
     });
 
     it("still re-baselines silently when the list is complete and the marker is gone", () => {
-        const decision = decideWatch({ ...baselined, reviewId: "101" }, { ...quiet, reviews: listed }, NOW);
+        const decision = decideWatch(marked, { ...quiet, reviews: listed }, NOW);
 
         expect(decision).toMatchObject({ action: "none", state: { reviewId: "108" } });
     });

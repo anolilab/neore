@@ -67,7 +67,7 @@ const vObservation = v.object({
     headSha: v.string(),
     mergeable: v.union(v.literal("clean"), v.literal("conflicting"), v.literal("unknown")),
     reviews: v.array(v.object({ authorLogin: v.string(), id: v.string() })),
-    reviewsTruncated: v.optional(v.boolean()),
+    seenReviewBeyondRead: v.optional(v.union(v.literal("gone"), v.literal("present"), v.literal("unknown"))),
     state: v.union(v.literal("closed"), v.literal("merged"), v.literal("open")),
     watcherLogin: v.string(),
 });
@@ -416,7 +416,7 @@ export const runWatchPoll = async (steps: WatchPollSteps): Promise<void> => {
 
 /** What `observeWatched` calls out to, so a test can count the calls. */
 export interface ObserveDependencies {
-    driver: Pick<HostDriver, "getPullRequest" | "listChecks" | "listReviews">;
+    driver: Pick<HostDriver, "getPullRequest" | "listChecks" | "listReviews" | "reviewExists">;
     login: (request: HostRequest) => Promise<string>;
 }
 
@@ -432,6 +432,33 @@ const readLogin = async (dependencies: ObserveDependencies, request: HostRequest
         }
 
         return { failure: failureOf(error), name: "" };
+    }
+};
+
+/**
+ * What a direct read of the seen review finds: it exists (beyond the pages read), it was deleted (not found), or the read failed
+ * for another reason, so nothing is known. A 401 goes up so the token is renewed once, like any other read.
+ */
+const seenReviewState = async (
+    dependencies: ObserveDependencies,
+    request: HostRequest,
+    ref: { number: number; repository: string },
+    reviewId: string | undefined,
+): Promise<"gone" | "present" | "unknown"> => {
+    if (reviewId === undefined) {
+        return "unknown";
+    }
+
+    try {
+        await dependencies.driver.reviewExists(request, ref, reviewId);
+
+        return "present";
+    } catch (error) {
+        if (!(error instanceof HostApiError) || error.status === 401) {
+            throw error;
+        }
+
+        return failureOf(error) === "not_found" ? "gone" : "unknown";
     }
 };
 
@@ -491,8 +518,8 @@ export const observeWatched = async (
             }),
             state: detail.state,
             watcherLogin,
-            // The marker lies beyond the pages the host read: what was listed is all newer than it (`decideWatch`).
-            ...(markerBeyondRead && { reviewsTruncated: true }),
+            // The marker lies beyond the pages the host read: what a direct read of it found decides what the list means (`decideWatch`).
+            ...(markerBeyondRead && { seenReviewBeyondRead: await seenReviewState(dependencies, request, ref, target.reviewId) }),
         },
     };
 };

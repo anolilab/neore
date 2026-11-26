@@ -134,6 +134,11 @@ export interface HostDriver {
     /** Opens a pull request that reverts a merged one; the host's rules may refuse it. */
     revertPullRequest: (request: HostRequest, ref: PullRequestRef, revert: PullRequestEdit) => Promise<RevertPullRequestResult>;
     /** Turns auto-merge on (merging `headSha` with `method` once the host's rules are met) or off. */
+    /**
+     * Whether one submitted review still exists, by id, in ONE request. Resolves when it does; a review that is gone rejects with the host's
+     * not-found error, like any other read. Used to tell a seen review beyond the window of `listReviews` from a deleted one.
+     */
+    reviewExists: (request: HostRequest, ref: PullRequestRef, reviewId: string) => Promise<void>;
     setAutoMerge: (request: HostRequest, ref: PullRequestRef, enabled: boolean, method: MergeMethod, headSha: string) => Promise<void>;
     setThreadResolved: (request: HostRequest, threadId: string, resolved: boolean) => Promise<void>;
     setViewed: (request: HostRequest, ref: PullRequestRef, path: string, viewed: boolean) => Promise<void>;

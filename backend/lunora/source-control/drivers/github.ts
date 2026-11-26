@@ -935,6 +935,11 @@ const setViewed = async (request: HostRequest, ref: PullRequestRef, path: string
     );
 };
 
+/** One review by id: a 404 (a deleted review) rejects like any other read, and the caller tells it from a failure by its status. */
+const reviewExists = async (request: HostRequest, ref: PullRequestRef, reviewId: string): Promise<void> => {
+    await request(`${repoPath(ref)}/pulls/${ref.number}/reviews/${encodeURIComponent(reviewId)}`);
+};
+
 const reviewSchema = z.object({ html_url: z.string().optional(), id: z.number(), state: z.string() });
 
 /** One `POST .../reviews`: every comment, the verdict and the commit in the same call. */
@@ -1820,6 +1825,7 @@ export const githubDriver: HostDriver = {
     rerunGroupOf,
     rerunnableOfGroup,
     revertPullRequest,
+    reviewExists,
     setAutoMerge,
     setThreadResolved,
     setViewed,
