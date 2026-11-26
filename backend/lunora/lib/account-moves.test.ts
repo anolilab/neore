@@ -219,6 +219,34 @@ describe("the pin-write lease", () => {
             harness.close();
         }
     });
+
+    it("judges a writer's own lease by the wall clock, so a write that stalled past its lease is refused whatever time it started at", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            // Each writer has an account row, so the only reason a refusal can come from is its lease.
+            const [stalled, live] = (await harness.run(async (context: any) => {
+                const ids: string[] = [];
+
+                for (const name of ["stalled", "live"]) {
+                    ids.push(await context.db.insert("user", { createdAt: 0, email: `${name}@example.com`, emailVerified: true, name, updatedAt: 0 }));
+                }
+
+                await context.db.insert("pinWriteLeases", { expiresAt: Date.now() - 1000, userId: ids[0], writerId: "w-stalled" });
+                await context.db.insert("pinWriteLeases", { expiresAt: Date.now() + 60_000, userId: ids[1], writerId: "w-live" });
+
+                return ids;
+            })) as [string, string];
+
+            // The write started before its lease ran out, so its own start time still sees the lease as live. The check must not use it.
+            const started = Date.now() - 120_000;
+
+            expect(await harness.run(async (context: any) => await refusesPinWrite(context, stalled, started, "w-stalled"))).toBe(true);
+            expect(await harness.run(async (context: any) => await refusesPinWrite(context, live, started, "w-live"))).toBe(false);
+        } finally {
+            harness.close();
+        }
+    });
 });
 
 describe("an erasure against a guest merge", () => {

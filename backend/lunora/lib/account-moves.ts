@@ -168,8 +168,10 @@ export const refusesPinWrite = async (context: Pick<QueryCtx, "db">, userId: str
     }
 
     const leases = await leasesOf(context, userId);
+    // The wall clock, whatever `now` the caller started with: a write that stalled past its lease must see that lease as expired.
+    const current = Date.now();
 
-    return leases.every((lease) => lease.writerId !== writerId || lease.expiresAt <= now);
+    return leases.every((lease) => lease.writerId !== writerId || lease.expiresAt <= current);
 };
 
 /**

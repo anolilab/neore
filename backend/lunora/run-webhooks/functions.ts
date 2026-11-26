@@ -48,18 +48,31 @@ const refuseImpersonation = (impersonatedBy: string | null | undefined): void =>
  * would be lost, so a write takes the same fence pins use (`lib/account-moves.ts`): refused once the account is marked as
  * merging or erased, and otherwise holding the account's lease, which the merge waits out before it copies.
  */
-const refuseWhileMoving = async (ctx: Parameters<typeof admitPinWriteAs>[0], userId: string, now: number): Promise<void> => {
+const WEBHOOK_MOVING_ERROR = "The run webhook cannot be changed while this account is being moved or erased.";
+
+/** Takes the account's lease for one webhook write. The final check (`confirmWebhookWrite`) runs right before the write itself. */
+const admitWebhookWrite = async (ctx: Parameters<typeof admitPinWriteAs>[0], userId: string, now: number): Promise<string> => {
     const writerId = await admitPinWriteAs(ctx, userId, now);
 
-    // A move that started after the first check is caught here, before the save: its wait sees the lease taken above, so the refused
-    // save gives the lease back and the move is not held up.
-    if (writerId === null || (await refusesPinWrite(ctx, userId, now))) {
-        if (writerId !== null) {
-            await releasePinWrite(ctx, userId, writerId);
-        }
-
-        throw new LunoraError("FORBIDDEN", "The run webhook cannot be changed while this account is being moved or erased.");
+    if (writerId === null) {
+        throw new LunoraError("FORBIDDEN", WEBHOOK_MOVING_ERROR);
     }
+
+    return writerId;
+};
+
+/**
+ * The last check, naming the write's own lease, so a lease that lapsed while the write waited is refused too. A move that began after
+ * admission is caught here: its wait sees the lease taken above, and the refused write gives that lease back so the move is not held up.
+ */
+const confirmWebhookWrite = async (ctx: Parameters<typeof admitPinWriteAs>[0], userId: string, writerId: string): Promise<void> => {
+    if (!(await refusesPinWrite(ctx, userId, Date.now(), writerId))) {
+        return;
+    }
+
+    await releasePinWrite(ctx, userId, writerId);
+
+    throw new LunoraError("FORBIDDEN", WEBHOOK_MOVING_ERROR);
 };
 
 /** The user's row, if any. Reads are bounded by the one-row-per-user rule. */
@@ -120,9 +133,10 @@ export const saveRunWebhook = authMutation
         const secret = generateRunWebhookSecret();
         const secretCiphertext = await encryptKey(secret, "tool-keys");
 
-        await refuseWhileMoving(context, userId, context.now);
-
+        const writerId = await admitWebhookWrite(context, userId, context.now);
         const existing = await ownRow(context, userId);
+
+        await confirmWebhookWrite(context, userId, writerId);
 
         if (existing) {
             await context.db.patch("runWebhooks", existing._id, { enabled: args.enabled, updatedAt: context.now, url: args.url });
@@ -158,13 +172,14 @@ export const rotateRunWebhookSecret = authMutation
         const secret = generateRunWebhookSecret();
         const secretCiphertext = await encryptKey(secret, "tool-keys");
 
-        await refuseWhileMoving(context, context.user.userId, context.now);
-
+        const writerId = await admitWebhookWrite(context, context.user.userId, context.now);
         const existing = await ownRow(context, context.user.userId);
 
         if (!existing) {
             throw new LunoraError("NOT_FOUND", "Save a webhook URL first.");
         }
+
+        await confirmWebhookWrite(context, context.user.userId, writerId);
 
         await context.db.patch("runWebhooks", existing._id, {
             secretCiphertext,

@@ -24,11 +24,13 @@ import {
     finishRouteCleanup,
     getThreadPins,
     isPinShapeValid,
+    PENDING_RESTORE_BATCH,
+    PENDING_RESTORE_WORST,
     reassignUserPinsOnThread,
     restoreSharedPinRoutes,
     withSharedPinRoute,
 } from "./functions";
-import { eraseSharedPinRoutesBatch, materializePendingPinRoutesBatch } from "../gdpr";
+import { ERASE_DRAIN_ROWS, ERASE_DRAIN_WORST, eraseSharedPinRoutesBatch, MATERIALIZE_WORST, materializePendingPinRoutesBatch } from "../gdpr";
 
 let OWNER = "";
 let COLLABORATOR = "";
@@ -815,13 +817,16 @@ describe("a refused write's owed route restore is durable", () => {
     });
 
     it("the cron pass reaches every owed row, not only the first batch, across passes", async () => {
-        for (let index = 0; index < 51; index += 1) {
+        // One more row than a pass takes, so the second pass is needed to reach the last one.
+        const rows = PENDING_RESTORE_BATCH + 1;
+
+        for (let index = 0; index < rows; index += 1) {
             await insertOwed({ dispatchedAt: Date.now() - 120_000 - index });
         }
 
         const sent = [...(await cronPass()), ...(await cronPass())].map((entry) => (entry.args as { owedId: string }).owedId);
 
-        expect(new Set(sent).size).toBe(51);
+        expect(new Set(sent).size).toBe(rows);
     });
 
     it("a restore settles only its own row: another write's row for the same thread and collaborator keeps its own deadline", async () => {
@@ -1295,5 +1300,173 @@ describe("the erasure workflow, replayed against the real pin mutations", () => 
 
         expect(pins).toHaveLength(0);
         expect(await collaboratorRoutes()).toHaveLength(0);
+    });
+});
+
+describe("the owed restore reads its row, and each drain stays inside the statement budget", () => {
+    const MERGED = "user-merged";
+    const ELSEWHERE = "user-elsewhere";
+
+    const insertOwed = async (overrides: { ownerId?: string; until?: number; userId?: string } = {}) =>
+        (await harness.run(
+            async (context: any) =>
+                await context.db.insert("pendingPinRestores", {
+                    dispatchedAt: 1,
+                    ownerId: OWNER,
+                    routeCreatedAt: 1,
+                    threadId,
+                    until: Date.now() + 60_000,
+                    userId: COLLABORATOR,
+                    ...overrides,
+                }),
+        )) as string;
+
+    const restore = async (args: { owedId?: string; until: number; userId: string }) =>
+        await harness.run(async (context: any) => await context.runMutation(restoreSharedPinRoutes, { createdAt: 1, threadId, ...args }));
+
+    const routesFor = async (userId: string) =>
+        await harness.run(async (context: any) => {
+            const { page } = await context.db.sharedPinRoutes.findMany({ consistency: "primary", where: { userId } });
+
+            return (page as { ownerId: string }[]).map((route) => route.ownerId);
+        });
+
+    const owedFor = async (userId: string) =>
+        await harness.run(async (context: any) => {
+            const { page } = await context.db.pendingPinRestores.findMany({ consistency: "primary", where: { userId } });
+
+            return (page as { _id: string }[]).map((row) => row._id);
+        });
+
+    it("a restore whose owed row is gone writes nothing, and does not fall back to the message's account", async () => {
+        const owedId = await insertOwed();
+
+        await harness.run(async (context: any) => await context.db.delete("pendingPinRestores", owedId as never));
+        await restore({ owedId, until: Date.now() + 60_000, userId: COLLABORATOR });
+
+        expect(await routesFor(COLLABORATOR)).toStrictEqual([]);
+    });
+
+    it("takes the account from the row, so a row a merge re-pointed restores the route for the new account", async () => {
+        // The message still names the old guest; the merge has re-pointed the row to the account it converted to.
+        const owedId = await insertOwed({ userId: MERGED });
+
+        await restore({ owedId, until: Date.now() + 60_000, userId: COLLABORATOR });
+
+        expect(await routesFor(MERGED)).toStrictEqual([OWNER]);
+        expect(await routesFor(COLLABORATOR)).toStrictEqual([]);
+        expect(await owedFor(MERGED)).toStrictEqual([]);
+    });
+
+    it("leaves a row that names another owner for the cron, which sends it to the owner it names", async () => {
+        const owedId = await insertOwed({ ownerId: ELSEWHERE });
+
+        await restore({ owedId, until: Date.now() + 60_000, userId: COLLABORATOR });
+
+        expect(await routesFor(COLLABORATOR)).toStrictEqual([]);
+        expect(await owedFor(COLLABORATOR)).toStrictEqual([owedId]);
+    });
+
+    it("after its deadline, keeps the route while an import into the account is in flight, before its pin is visible", async () => {
+        const owedId = await insertOwed({ until: Date.now() - 1, userId: MERGED });
+
+        await harness.run(async (context: any) => await context.db.insert("accountMoves", { createdAt: Date.now(), kind: "importing", userId: MERGED }));
+        await restore({ owedId, until: Date.now() - 1, userId: COLLABORATOR });
+
+        expect(await routesFor(MERGED)).toStrictEqual([OWNER]);
+        expect(await owedFor(MERGED)).toStrictEqual([]);
+    });
+
+    it("after its deadline with no pin and no import, settles the row and adds no route", async () => {
+        const owedId = await insertOwed({ until: Date.now() - 1, userId: MERGED });
+
+        await restore({ owedId, until: Date.now() - 1, userId: COLLABORATOR });
+
+        expect(await routesFor(MERGED)).toStrictEqual([]);
+        expect(await owedFor(MERGED)).toStrictEqual([]);
+    });
+
+    it("finds the owner's route past the first page of the collaborator's routes, so no duplicate is written", async () => {
+        // More routes than one page holds for this collaborator and thread; the owner's route is the last one written.
+        await harness.run(async (context: any) => {
+            for (let index = 0; index < 100; index += 1) {
+                await context.db.insert("sharedPinRoutes", { createdAt: 1, ownerId: `user-other-${index}`, threadId, userId: COLLABORATOR });
+            }
+
+            await context.db.insert("sharedPinRoutes", { createdAt: 1, ownerId: OWNER, threadId, userId: COLLABORATOR });
+        });
+        const owedId = await insertOwed();
+
+        await restore({ owedId, until: Date.now() + 60_000, userId: COLLABORATOR });
+
+        const owners = await routesFor(COLLABORATOR);
+
+        const ownerRoutes = owners.filter((ownerId) => ownerId === OWNER);
+
+        expect(ownerRoutes).toHaveLength(1);
+    });
+
+    it("keeps each drain's worst case under the Worker's 50-statement budget", () => {
+        expect(ERASE_DRAIN_WORST).toBeLessThan(50);
+        expect(MATERIALIZE_WORST).toBeLessThan(50);
+        expect(PENDING_RESTORE_WORST).toBeLessThan(50);
+    });
+
+    it("the erasure drain clears more rows than one call takes, one bounded call at a time", async () => {
+        const routes = ERASE_DRAIN_ROWS * 2 + 5;
+
+        await harness.run(async (context: any) => {
+            for (let index = 0; index < routes; index += 1) {
+                await context.db.insert("sharedPinRoutes", { createdAt: 1, ownerId: `user-drain-${index}`, threadId, userId: COLLABORATOR });
+            }
+
+            for (let index = 0; index < 4; index += 1) {
+                await context.db.insert("pendingPinRestores", {
+                    dispatchedAt: 1,
+                    ownerId: COLLABORATOR,
+                    routeCreatedAt: 1,
+                    threadId,
+                    until: 1,
+                    userId: `user-owed-${index}`,
+                });
+            }
+        });
+
+        let calls = 0;
+        let hasMore = true;
+
+        while (hasMore && calls < 50) {
+            const result = await harness.run(async (context: any) => await eraseSharedPinRoutesBatch(context, COLLABORATOR));
+
+            hasMore = result.hasMore;
+            calls += 1;
+        }
+
+        expect(hasMore).toBe(false);
+        expect(calls).toBeGreaterThan(1);
+        expect(await routesFor(COLLABORATOR)).toStrictEqual([]);
+    });
+
+    it("the materialize drain settles every owed row across calls, each call bounded", async () => {
+        // More rows than one materialize call takes, so the drain has to run again.
+        const rows = 20;
+
+        for (let index = 0; index < rows; index += 1) {
+            await insertOwed({ ownerId: `user-materialize-${index}`, userId: COLLABORATOR });
+        }
+
+        let hasMore = true;
+        let calls = 0;
+
+        while (hasMore && calls < 50) {
+            const result = await harness.run(async (context: any) => await materializePendingPinRoutesBatch(context, COLLABORATOR));
+
+            hasMore = result.hasMore;
+            calls += 1;
+        }
+
+        expect(hasMore).toBe(false);
+        expect(await owedFor(COLLABORATOR)).toStrictEqual([]);
+        expect(await routesFor(COLLABORATOR)).toHaveLength(rows);
     });
 });

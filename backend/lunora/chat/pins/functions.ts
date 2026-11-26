@@ -5,6 +5,7 @@ import { internal } from "../../_generated/internal";
 import type { MutationCtx } from "../../_generated/server";
 import {
     admitPinWriteAs,
+    hasAccountMove,
     isAccountMoving,
     isErasing,
     otherPinWritesInFlight,
@@ -293,7 +294,23 @@ export const restoreSharedPinRoutes = internalMutation
             return null;
         }
 
+        // The owed row, not the message, names the account, the deadline and the route time: a merge may have re-pointed the row since the job
+        // was sent. A row already gone was settled by another path (an erasure may have drained it), so nothing is written.
         const owed = args.owedId === undefined ? null : await context.db.pendingPinRestores.findFirst({ consistency: "primary", where: { _id: args.owedId } });
+
+        if (args.owedId !== undefined && owed === null) {
+            return null;
+        }
+
+        // A row that names another owner waits for the cron, which sends it to the owner it names now.
+        if (owed !== null && owed.ownerId !== thread.userId) {
+            return null;
+        }
+
+        const userId = owed?.userId ?? args.userId;
+        const until = owed?.until ?? args.until;
+        const createdAt = owed?.routeCreatedAt ?? args.createdAt;
+
         const settle = async (): Promise<null> => {
             if (owed !== null) {
                 await context.db.delete("pendingPinRestores", owed._id);
@@ -303,34 +320,35 @@ export const restoreSharedPinRoutes = internalMutation
         };
 
         // An owner keeps no route to their own thread.
-        if (thread.userId === args.userId) {
+        if (thread.userId === userId) {
             return await settle();
         }
 
-        if (Date.now() >= args.until) {
+        // After the deadline, the route goes only with a pin that still needs it. An import into the account (a merge is moving its pins in)
+        // is not finished, so its pin is not yet visible: the route stays until the import ends.
+        if (Date.now() >= until) {
             const pins = await context.db
                 .query("threadPins")
-                .withIndex("by_user_and_thread", (q) => q.eq("userId", args.userId).eq("threadId", args.threadId))
+                .withIndex("by_user_and_thread", (q) => q.eq("userId", userId).eq("threadId", args.threadId))
                 .take(1);
 
-            if (pins.length === 0) {
+            if (pins.length === 0 && !(await hasAccountMove(context, userId, "importing"))) {
                 return await settle();
             }
         }
 
-        const { page } = await context.db.sharedPinRoutes.findMany({
+        // Looked up for this owner, so a route the owner already has is found wherever it sits in the collaborator's routes.
+        const route = await context.db.sharedPinRoutes.findFirst({
             consistency: "primary",
-            limit: ROUTE_CLEANUP_BATCH,
-            where: { threadId: args.threadId, userId: args.userId },
+            where: { ownerId: thread.userId, threadId: args.threadId, userId },
         });
 
-        // Adds the route only if the owner it names is not already there, so a retry does not duplicate it.
-        if (page.every((route) => route.ownerId !== thread.userId)) {
+        if (route === null) {
             await context.db.insert("sharedPinRoutes", {
-                createdAt: args.createdAt,
+                createdAt,
                 ownerId: thread.userId,
                 threadId: args.threadId,
-                userId: args.userId,
+                userId,
             });
         }
 
@@ -339,8 +357,13 @@ export const restoreSharedPinRoutes = internalMutation
 
 /** A pending restore the queue has not run within this long is dispatched by the cron pass below. */
 const PENDING_RESTORE_GRACE_MS = 60 * 1000;
-/** Owed restores one cron pass dispatches. */
-const PENDING_RESTORE_BATCH = 50;
+
+/**
+ * Owed restores one cron pass dispatches. Per row the pass patches the row (a read and a write, two statements) on top of its page read,
+ * so 1 + 2 * PENDING_RESTORE_BATCH stays under the Worker's 50-statement budget.
+ */
+export const PENDING_RESTORE_BATCH = 20;
+export const PENDING_RESTORE_WORST = 1 + 2 * PENDING_RESTORE_BATCH;
 
 /**
  * The root cron's pass over the owed restores (`pendingPinRestores`). It takes the rows dispatched least recently and sends each to the owner
