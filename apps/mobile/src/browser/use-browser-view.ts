@@ -11,7 +11,7 @@ import { settleQuietly } from "@/offline/quietly";
 import type { BrowserFrame, BrowserStatus } from "./browser-api";
 import { handBackBrowser, keepBrowserControl, navigateBrowser, readBrowserStatus, readFrame, takeBrowserControl, watchBrowserStatus } from "./browser-api";
 import type { ViewState } from "./browser-view-state";
-import { frameMessage, frameTrigger, grantEndOnDevice, isOlderStatus, shouldReadFrame, viewStateOf } from "./browser-view-state";
+import { frameMessage, frameTrigger, grantEndOnDevice, isOlderStatus, otherLeaseEndOnDevice, shouldReadFrame, viewStateOf } from "./browser-view-state";
 import type { ControlSession, ControlState } from "./control-session";
 import { createControlSession, forgetClaim, rememberClaim, rememberedClaim, viewNameFor } from "./control-session";
 import { startFrameReader } from "./frame-reader";
@@ -112,6 +112,16 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
             reread: () => settleQuietly(async () => accept(await readBrowserStatus(getClient(), threadId))),
         });
     }, [grantEnd, status, threadId]);
+
+    const otherLeaseEnd = otherLeaseEndOnDevice(status, answer?.receivedAt ?? 0);
+
+    useEffect(() => {
+        if (otherLeaseEnd === undefined) {
+            return undefined;
+        }
+
+        return watchGrantEnd({ endsAt: otherLeaseEnd, reread: () => settleQuietly(async () => accept(await readBrowserStatus(getClient(), threadId))) });
+    }, [otherLeaseEnd, threadId]);
 
     const view = viewStateOf(status, error, status !== undefined && expiredAnswer === status);
     const isHolding = control.kind === "holding";

@@ -79,6 +79,7 @@ export const forgetClaim = (key: string, claim: string): void => {
 
 export const createControlSession = ({
     api,
+    deviceNow = Date.now,
     every = (ms, run) => {
         const timer = setInterval(run, ms);
 
@@ -90,6 +91,8 @@ export const createControlSession = ({
     onReleased = () => {},
 }: {
     api: ControlApi;
+    /** This device's clock, for when the lease ends unless renewed. */
+    deviceNow?: () => number;
     every?: (ms: number, run: () => void) => () => void;
     /** The claim this phone last held on the thread, kept across screens: see {@link rememberClaim}. */
     lastClaim?: string;
@@ -105,6 +108,12 @@ export const createControlSession = ({
     let lastClaim = initialClaim;
     /** Counts takes: an answer to one that was left (released, suspended, or followed by another) holds nothing. */
     let attempt = 0;
+
+    /**
+     * When the lease ends on this device's clock unless a renewal lands: a lease that runs out writes nothing, so no
+     * status comes to say so while renewals keep failing.
+     */
+    let endsAt = 0;
 
     const set = (next: ControlState): void => {
         state = next;
@@ -129,6 +138,7 @@ export const createControlSession = ({
             return;
         }
 
+        endsAt = deviceNow() + CONTROL_LEASE_MS;
         set({ ...state, until: answer.until });
     };
 
@@ -240,10 +250,20 @@ export const createControlSession = ({
             lastClaim = answer.claim;
             onClaim(answer.claim);
             set({ claim: answer.claim, claimId: answer.claimId, kind: "holding", until: answer.until });
+            endsAt = deviceNow() + CONTROL_LEASE_MS;
             stopKeeping = every(CONTROL_KEEP_INTERVAL_MS, () => {
-                if (state.kind === "holding") {
-                    settleQuietly(keep(state.claim));
+                if (state.kind !== "holding") {
+                    return;
                 }
+
+                // No renewal landed for a whole lease: it has ended on the server, so the phone stops showing it.
+                if (deviceNow() >= endsAt) {
+                    stop(CONTROL_ENDED);
+
+                    return;
+                }
+
+                settleQuietly(keep(state.claim));
             });
         },
     };

@@ -10,6 +10,7 @@ import {
     isOlderStatus,
     NO_BROWSER,
     NOT_READABLE,
+    otherLeaseEndOnDevice,
     shouldReadFrame,
     viewStateOf,
 } from "./browser-view-state";
@@ -98,5 +99,14 @@ describe("frame reads while the phone holds control", () => {
     it("are not spent on the phone's own renewals, which move only the activity clock", () => {
         expect(frameTrigger(running({ idleUntil: 600 }), true)).toBe(frameTrigger(running(), true));
         expect(frameTrigger(running({ currentUrl: "https://example.com/next" }), true)).not.toBe(frameTrigger(running(), true));
+    });
+});
+
+describe(otherLeaseEndOnDevice, () => {
+    it("names when another person's lease ends on this device's clock, so the page is read again then", () => {
+        expect(otherLeaseEndOnDevice(running({ control: { byYou: false, until: 160 }, now: 100 }), 5000)).toBe(5060);
+        expect(otherLeaseEndOnDevice(running({ control: { byYou: true, until: 160 }, now: 100 }), 5000)).toBeUndefined();
+        expect(otherLeaseEndOnDevice(running({ control: { byYou: false, until: 100 }, now: 100 }), 5000)).toBeUndefined();
+        expect(otherLeaseEndOnDevice(running(), 5000)).toBeUndefined();
     });
 });

@@ -1,7 +1,8 @@
 /**
  * Waits for a grantee's grant to end on this device's clock. A grant ends without a write, so no live answer comes then:
  * the screen stops showing the page at its end (`onEnd`), then reads the status once (`reread`) to learn whether the
- * grant was renewed, which pushes nothing either. Outside React, so the timing is tested without a screen.
+ * grant was renewed, which pushes nothing either. Another person's lease that runs out is waited for the same way,
+ * with only the read. Outside React, so the timing is tested without a screen.
  */
 export const watchGrantEnd = ({
     after = (ms, run) => {
@@ -11,13 +12,13 @@ export const watchGrantEnd = ({
     },
     endsAt,
     now = Date.now,
-    onEnd,
+    onEnd = () => {},
     reread,
 }: {
     after?: (ms: number, run: () => void) => () => void;
     endsAt: number;
     now?: () => number;
-    onEnd: () => void;
+    onEnd?: () => void;
     reread: () => void;
 }): () => void =>
     after(Math.max(0, endsAt - now()), () => {

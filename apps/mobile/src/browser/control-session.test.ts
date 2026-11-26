@@ -185,4 +185,37 @@ describe(createControlSession, () => {
         forgetClaim("u:t", "c-2");
         expect(rememberedClaim("u:t")).toBeUndefined();
     });
+
+    it("stops showing control once a whole lease passed with no renewal landing", async () => {
+        const clock = { at: NOW };
+        const ticks: (() => void)[] = [];
+        const session = createControlSession({
+            api: {
+                handBack: vi.fn(async () => true),
+                keep: vi.fn(async () => {
+                    throw new TypeError("Network request failed");
+                }),
+                navigate: vi.fn(async () => {
+                    return { status: "ok" as const };
+                }),
+                take: vi.fn(async () => OK),
+            },
+            deviceNow: () => clock.at,
+            every: (_ms, run) => {
+                ticks.push(run);
+
+                return () => {};
+            },
+            onChange: () => {},
+        });
+
+        await session.take();
+        clock.at += CONTROL_LEASE_MS - 1;
+        ticks[0]?.();
+        expect(session.state().kind).toBe("holding");
+
+        clock.at += 1;
+        ticks[0]?.();
+        expect(session.state()).toStrictEqual({ kind: "idle", message: CONTROL_ENDED });
+    });
 });

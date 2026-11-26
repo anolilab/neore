@@ -97,6 +97,18 @@ export const grantEndOnDevice = (status: BrowserStatus | undefined, receivedAt: 
     return receivedAt + (status.accessUntil - status.now) - GRANT_END_MARGIN_MS;
 };
 
+/**
+ * When another person's lease on the browser ends, on this device's clock: a lease that runs out writes nothing, so the
+ * screen reads the status again then to show the page. None while no one else holds it.
+ */
+export const otherLeaseEndOnDevice = (status: BrowserStatus | undefined, receivedAt: number): number | undefined => {
+    if (status?.kind !== "running" || status.control === undefined || status.control.byYou || status.control.until <= status.now) {
+        return undefined;
+    }
+
+    return receivedAt + (status.control.until - status.now);
+};
+
 /** A frame is read only for a screen that shows the page, in front, online. */
 export const shouldReadFrame = (view: ViewState, { isActive, isOffline }: { isActive: boolean; isOffline: boolean }): boolean =>
     view.kind === "ready" && isActive && !isOffline;
