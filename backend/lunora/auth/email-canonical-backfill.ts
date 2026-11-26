@@ -283,6 +283,22 @@ export const checkEmailCanonicalPage = async (
     }
 
     const digests = new Map(await Promise.all([...counts.keys()].map(async (key) => [key, await digestOf(token, key)] as const)));
+
+    if (given !== undefined) {
+        // Two continuations under one token (a retried request) can run side by side. Only the one whose cursor the
+        // record still holds may decide or save: a call that lost to a newer one would put back folds and a cursor
+        // that call already moved past, or read its rows again and take them for a pair.
+        const now = await readRecord(ctx, token);
+
+        if (now?.claimedAt !== claimedAt) {
+            throw new LunoraError("BAD_REQUEST", LAPSED);
+        }
+
+        if (now.record.done || now.record.cursor !== record.cursor) {
+            return { scanned: 0, status: now.record.done ? "checked" : "checking", token, unfilledIds: [] };
+        }
+    }
+
     const conflicts = [...counts].filter(([key, count]) => count > 1 || known.has(digests.get(key)!)).length;
 
     if (conflicts > 0) {

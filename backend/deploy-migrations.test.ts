@@ -173,12 +173,31 @@ describe("the post-deploy data migrations", () => {
             ['{ id: "fill", table: pick() }', ""],
             ['{ id: "fill", table: "us" + "er" }', ""],
             ['{ id: "fill", table: "messages", ...override }', 'const override = { table: "user" };'],
-            ['{ id: "fill", ["table"]: "messages" }', ""],
+            ['{ id: "fill", [TABLE]: "messages" }', 'const TABLE = "table";'],
+            [`{ id: "fill", [\`ta\${"ble"}\`]: "messages" }`, ""],
+            ['{ id: "fill", table: "messages", ["table"]: "user" }', ""],
             ['{ id: "fill" }', ""],
             ["definition", 'const definition = { id: "fill", table: "user" };'],
         ]) {
             expect(() => declaredMigrationIds(declare(definition!, prelude), global), definition).toThrow(UNREADABLE_DEFINITION);
         }
+    });
+
+    it("read a computed key with a literal name as Lunora's codegen does, and still refuse a .global() table under one", () => {
+        const global = new Set(["user"]);
+
+        expect(
+            declaredMigrationIds(
+                [
+                    'export const a = defineMigration({ ["id"]: "computed-string", ["table"]: "messages" });',
+                    'export const b = defineMigration({ [`id`]: "computed-template", [`table`]: "messages", 1: "numeric key" });',
+                ].join("\n"),
+                global,
+            ),
+        ).toStrictEqual(["computed-string", "computed-template"]);
+        expect(() => declaredMigrationIds('export const c = defineMigration({ id: "fill-user", ["table"]: "user" });', global)).toThrow(
+            `${MIGRATIONS_MODULE}:1: migration "fill-user" targets the .global() table "user"`,
+        );
     });
 
     it("are all declared in the one module the runner reads", () => {
