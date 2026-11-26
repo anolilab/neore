@@ -3,7 +3,8 @@
  * assistant to list its memory, pastes the answer, reviews a preview and saves the
  * facts they kept. Two stateless actions: nothing is stored until the save, and the
  * saved rows are ordinary `memories` (source `imported`), so the memory export and
- * account deletion cover them. Rules for the paste live in `./import-logic.ts`.
+ * account deletion cover them. Rules for the paste live in `./import-logic.ts`. A small text or JSON file takes the same
+ * write path in one call (`importMemoryFile`; its rules are in `./import-file-logic.ts`).
  */
 import { generateText, Output } from "ai";
 import { LunoraError, v } from "lunorash/server";
@@ -26,6 +27,15 @@ import {
     type WordSetCache,
 } from "./dedup";
 import { runBeliefRevision } from "./extract";
+import {
+    MEMORY_FILE_INLINE_MAX_ENTRIES,
+    MEMORY_FILE_MAX_BYTES,
+    MEMORY_FILE_TOO_LARGE_INLINE_MESSAGE,
+    MEMORY_FILE_TOO_LARGE_MESSAGE,
+    MemoryFileError,
+    parseMemoryFile,
+    type ParsedMemoryFile,
+} from "./import-file-logic";
 import {
     applyImportLabels,
     buildImportLabelPrompt,
@@ -395,6 +405,63 @@ export const previewMemoryImport = authAction
         ctx.log.event("memory.import_preview", { cut: preview.cut, dropped: preview.dropped, facts: preview.facts.length, userId: ctx.user.userId });
 
         return preview;
+    });
+
+/**
+ * Imports a small text or JSON file inline: parsed and bounded by `parseMemoryFile`, then written one batch at a time
+ * through `importFacts`, so the embedding, redaction, dedup and per-user write rules are the paste import's. A file with
+ * more than `MEMORY_FILE_INLINE_MAX_ENTRIES` entries is refused for now.
+ */
+export const importMemoryFile = authAction
+    .input({
+        content: v.string().check((content) => content.length <= MEMORY_FILE_MAX_BYTES, { message: MEMORY_FILE_TOO_LARGE_MESSAGE }),
+        format: v.union(v.literal("text"), v.literal("json")),
+    })
+    .use(rateLimit("memory/import"))
+    .output(
+        v.object({
+            duplicates: v.number(),
+            imported: v.number(),
+            invalid: v.number(),
+            tooLong: v.number(),
+            updated: v.number(),
+        }),
+    )
+    .action(async ({ args, ctx }) => {
+        const { userId } = ctx.user;
+
+        await requireMemoryEnabled(ctx, userId);
+
+        let parsed: ParsedMemoryFile;
+
+        try {
+            parsed = parseMemoryFile(args.content, args.format);
+        } catch (error) {
+            if (error instanceof MemoryFileError) {
+                throw new LunoraError("BAD_REQUEST", error.message);
+            }
+
+            throw error;
+        }
+
+        if (parsed.entries > MEMORY_FILE_INLINE_MAX_ENTRIES) {
+            throw new LunoraError("BAD_REQUEST", MEMORY_FILE_TOO_LARGE_INLINE_MESSAGE);
+        }
+
+        // Duplicates inside the file were left out by the parse; those against stored memories are counted by the write.
+        const result = { duplicates: parsed.duplicates, imported: 0, invalid: parsed.invalid, tooLong: parsed.tooLong, updated: 0 };
+
+        for (const batch of parsed.batches) {
+            const saved = await importFacts(ctx, { app: "other", facts: batch, userId });
+
+            result.duplicates += saved.alreadyKnown;
+            result.imported += saved.added;
+            result.updated += saved.updated;
+        }
+
+        ctx.log.event("memory.import_file", { ...result, format: args.format, userId });
+
+        return result;
     });
 
 export const saveImportedMemories = authAction

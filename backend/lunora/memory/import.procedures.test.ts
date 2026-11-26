@@ -7,8 +7,9 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
+import { importMemoryFile, previewMemoryImport, saveImportedMemories } from "./import";
+import { MEMORY_FILE_INLINE_MAX_ENTRIES, MEMORY_FILE_MAX_BYTES } from "./import-file-logic";
 import { IMPORT_MAX_FACTS, IMPORT_MAX_INPUT_CHARS } from "./import-logic";
-import { previewMemoryImport, saveImportedMemories } from "./import";
 
 const { generateText, registry, sessionFrom } = vi.hoisted(() => {
     return {
@@ -117,6 +118,121 @@ describe("memory import procedures", () => {
             code: "VALIDATION_ERROR",
         });
         expect(generateText).not.toHaveBeenCalled();
+    });
+
+    describe("importMemoryFile", () => {
+        const byText = (a: string, b: string): number => a.localeCompare(b);
+        const rowsOf = async (): Promise<{ memory: string; source: string; type: string }[]> =>
+            await harness.run(async (ctx: any) => await ctx.db.query("memories").collect());
+        const stored = async (): Promise<string[]> => {
+            const rows = await rowsOf();
+
+            return rows.map((row) => row.memory).toSorted(byText);
+        };
+
+        it("imports a small text file, counting duplicates in the file and against stored memories", async () => {
+            expect.assertions(2);
+
+            await call(saveImportedMemories, { app: "claude", facts: [FACT] });
+
+            const text = `- ${FACT.memory.toUpperCase()}\n- The user likes green tea\n- the user LIKES green  tea\nToo short\n${"x ".repeat(300)}`;
+
+            await expect(call(importMemoryFile, { content: text, format: "text" })).resolves.toStrictEqual({
+                duplicates: 2,
+                imported: 1,
+                invalid: 1,
+                tooLong: 1,
+                updated: 0,
+            });
+            await expect(stored()).resolves.toStrictEqual([FACT.memory, "The user likes green tea"].toSorted(byText));
+        });
+
+        it("skips a stored memory repeated in full-width letters", async () => {
+            expect.assertions(2);
+
+            await call(saveImportedMemories, { app: "claude", facts: [{ memory: "The user likes green tea", type: "preference" }] });
+
+            await expect(call(importMemoryFile, { content: "Ｔｈｅ ｕｓｅｒ ｌｉｋｅｓ ｇｒｅｅｎ ｔｅａ", format: "text" })).resolves.toMatchObject({
+                duplicates: 1,
+                imported: 0,
+            });
+            await expect(stored()).resolves.toStrictEqual(["The user likes green tea"]);
+        });
+
+        it("imports a JSON file as source imported, with the type it names", async () => {
+            expect.assertions(2);
+
+            await expect(
+                call(importMemoryFile, {
+                    content: JSON.stringify([{ content: "The user is a nurse in Hamburg", type: "identity" }, "The user likes tea"]),
+                    format: "json",
+                }),
+            ).resolves.toMatchObject({ imported: 2 });
+
+            const rows = await rowsOf();
+
+            expect(rows.map((row) => `${row.source}:${row.type}`).toSorted(byText)).toStrictEqual(["imported:context", "imported:identity"]);
+        });
+
+        it("writes a file of exactly the inline limit whole", async () => {
+            expect.assertions(1);
+
+            const count = MEMORY_FILE_INLINE_MAX_ENTRIES;
+            const content = Array.from({ length: count }, (_, index) => `The user has hobby number ${String(index)}`).join("\n");
+
+            await expect(call(importMemoryFile, { content, format: "text" })).resolves.toMatchObject({ imported: count });
+        });
+
+        it("refuses a file over the inline limit with a message about later support, and writes nothing", async () => {
+            expect.assertions(2);
+
+            const content = Array.from({ length: MEMORY_FILE_INLINE_MAX_ENTRIES + 1 }, (_, index) => `The user has hobby number ${String(index)}`).join("\n");
+
+            await expect(call(importMemoryFile, { content, format: "text" })).rejects.toMatchObject({
+                code: "BAD_REQUEST",
+                message: expect.stringContaining("later change"),
+            });
+            await expect(stored()).resolves.toStrictEqual([]);
+        });
+
+        it("refuses a malformed or wrongly shaped file with a clear error", async () => {
+            expect.assertions(3);
+
+            await expect(call(importMemoryFile, { content: "{ nope", format: "json" })).rejects.toMatchObject({
+                code: "BAD_REQUEST",
+                message: "The file is not valid JSON.",
+            });
+            await expect(call(importMemoryFile, { content: '{"a":1}', format: "json" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+            await expect(call(importMemoryFile, { content: "\n\n", format: "text" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        });
+
+        it("refuses an oversize file and an unknown format at the boundary", async () => {
+            expect.assertions(2);
+
+            await expect(call(importMemoryFile, { content: "x".repeat(MEMORY_FILE_MAX_BYTES + 1), format: "text" })).rejects.toMatchObject({
+                code: "VALIDATION_ERROR",
+                message: expect.stringContaining("larger than 1 MB"),
+            });
+            await expect(call(importMemoryFile, { content: "The user likes tea", format: "csv" })).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+        });
+
+        it("refuses while memory is off, and shares the import's hourly limit", async () => {
+            expect.assertions(2);
+
+            await harness.run(async (ctx: any) => {
+                const settings = await ctx.db.query("userSettings").first();
+
+                await ctx.db.patch("userSettings", settings._id, { memoryEnabled: false });
+            });
+
+            await expect(call(importMemoryFile, { content: "The user likes tea", format: "text" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+            for (let index = 0; index < 9; index += 1) {
+                await call(importMemoryFile, { content: "The user likes tea", format: "text" }).catch(() => {});
+            }
+
+            await expect(call(importMemoryFile, { content: "The user likes tea", format: "text" })).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
+        });
     });
 
     it("shares one hourly limit between preview and save", async () => {

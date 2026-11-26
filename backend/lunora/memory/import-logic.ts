@@ -77,8 +77,9 @@ const LINE_PREFIX_RE = /^(?:(?:[-*•·–>#]+|\d{1,3}[.)](?=\s)|\[[ x]\])\s*)+/
 const DATA_TAG_RE = /<\/?(?:pasted_memories|existing_memory|new_fact)\b[^>]*>?/giu;
 const EMPHASIS_RE = /\*\*|__|`/g;
 const WHITESPACE_RE = /\s+/g;
+
 // Every line ending a paste may carry: CRLF, a bare CR or LF, vertical tab, form feed, and the Unicode line and paragraph separators.
-const LINE_BREAK_RE = /\r\n?|[\n\v\f\u{2028}\u{2029}]/u;
+export const LINE_BREAK_RE = /\r\n?|[\n\v\f\u{2028}\u{2029}]/u;
 
 /**
  * Shapes that are a secret or sensitive identifier whatever words surround them:
@@ -107,8 +108,12 @@ const SENSITIVE_RES: ReadonlyArray<RegExp> = [
 
 export const looksSensitive = (line: string): boolean => SENSITIVE_RES.some((re) => re.test(line));
 
-/** Two lines that differ only in case or spacing are the same fact. */
-export const importDedupKey = (line: string): string => line.toLowerCase().replaceAll(WHITESPACE_RE, " ").trim();
+/**
+ * The one text normalisation for exact-match dedup: Unicode compatibility forms (NFKC: full-width letters, ligatures),
+ * then case, then whitespace. Two lines with the same key are the same fact; the save's exact-text check and the file
+ * import both use it, so they never disagree.
+ */
+export const importDedupKey = (line: string): string => line.normalize("NFKC").toLowerCase().replaceAll(WHITESPACE_RE, " ").trim();
 
 /** Prompt tags removed until none is left: one removal can join the text around it into a new tag. */
 const stripDataTags = (text: string): string => {
@@ -118,7 +123,7 @@ const stripDataTags = (text: string): string => {
 };
 
 /** One line with wrapping removed and whitespace collapsed, not yet capped. Tags go last, after every step that could form one. */
-const unwrapImportLine = (raw: string): string =>
+export const unwrapImportLine = (raw: string): string =>
     stripDataTags(raw.trim().replace(LINE_PREFIX_RE, "").replaceAll(EMPHASIS_RE, "").replaceAll(WHITESPACE_RE, " ").trim()).trim();
 
 /** One line as stored: wrapping removed, whitespace collapsed, capped. Empty when nothing is left. */
@@ -129,7 +134,7 @@ export const cleanImportLine = (raw: string): string => stripDataTags(unwrapImpo
  * unwrapped, since removing emphasis can join a token split by it (`github_**pat_…`), and only then cut to length, so
  * a cut never leaves the head of a token too short to be recognised.
  */
-const redactImportLine = (raw: string): string | null => {
+export const redactImportLine = (raw: string): string | null => {
     const redacted = redactMemoryText(raw);
     const cleaned = redacted === null ? null : redactMemoryText(unwrapImportLine(redacted));
 

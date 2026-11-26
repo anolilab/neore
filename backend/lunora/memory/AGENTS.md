@@ -31,7 +31,7 @@
   of the same save. A merge whose text another own row holds confirms that row. Vector lookups (2 calls each, at most
   half) and belief revisions (1 each) share `IMPORT_DEDUP_CALL_BUDGET`, so a save stays under the Free plan's 50
   subrequests (`import.test.ts` counts a worst case). The 1000-row window widens to 5000 once, on the first fact
-  matched by words.
+  matched by words. A file import (`importMemoryFile`, `import-file-logic.ts`) is bounded, batched, keyed by `importDedupKey`.
 - **One decision per fact** for extraction and the import: `decideFact` (`dedup.ts`) confirms a match at 0.95 or more,
   revises only when the caller passes `revise` (extraction passes none for a pinned or other-day match), and saves the
   fact as new when a revision fails, is refused (`acceptMerge`) or carries no merged text.
