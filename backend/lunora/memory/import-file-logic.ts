@@ -209,12 +209,16 @@ const QUOTE_CLOSERS: ReadonlyMap<string, string> = new Map([
     ["«", "»"],
 ]);
 
-/** Where a value opened at `from` is closed on this line by one of the characters `closers` (the index after it), or `-1`. */
+/**
+ * Where a value opened at `from` is closed on this line by one of the characters `closers` (the index after it), or `-1`.
+ * In a single-quoted value (`closers` is `'`) YAML writes a literal apostrophe as `''`, so a doubled one is read as part
+ * of the value and the scan goes on. One forward pass.
+ */
 const closingQuoteOnLine = (line: string, from: number, closers: string): number => {
     for (let index = from; index < line.length; index += 1) {
         const char = line[index] as string;
 
-        if (char === "\\") {
+        if (char === "\\" || (closers === "'" && char === "'" && line[index + 1] === "'")) {
             index += 1;
         } else if (closers.includes(char)) {
             return index + 1;

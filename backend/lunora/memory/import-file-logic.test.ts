@@ -125,6 +125,22 @@ describe("parseMemoryFile: text", () => {
         expect(parsed).toMatchObject({ entries: 1, invalid: 1, total: 2 });
     });
 
+    it("reads a doubled apostrophe as part of a single-quoted secret value, so an unclosed one is refused and skipped", () => {
+        const input = `DB_PASSWORD: 'it''s blue${NEXT_LINE}`; // secret-scanner:allow
+        const error = refusal(`The user lives in Lisbon\n${input}`, "text");
+
+        expect(error).toMatchObject({ code: "secret_continues", message: expect.stringContaining("Line 2 holds a password or key") });
+        expect(error?.message).not.toMatch(SECRET_WORDS);
+        expect(parseMemoryFile(JSON.stringify(["The user lives in Lisbon", input]), "json")).toMatchObject({ entries: 1, invalid: 1, total: 2 });
+    });
+
+    it("keeps a single-quoted secret value with a doubled apostrophe that closes on its line, redacted as before", () => {
+        const parsed = parseMemoryFile("DB_PASSWORD: 'it''s blue'\nThe user likes tea", "text"); // secret-scanner:allow
+
+        expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user likes tea"]);
+        expect(parsed).toMatchObject({ entries: 1, invalid: 1, total: 2 });
+    });
+
     it("refuses a secret whose label is split by emphasis, reading the line as it will be stored, with the right line number", () => {
         const error = refusal('The user lives in Lisbon\nThe user likes tea\nDB_**PASSWORD**="alpha\nbeta-gamma-7731"', "text"); // secret-scanner:allow
 
@@ -563,9 +579,8 @@ describe("limits", () => {
         const line = `${factOfLength(MEMORY_FILE_ENTRY_MAX_CHARS)}\n`;
         const atLimit = line.repeat(Math.floor(MEMORY_FILE_MAX_BYTES / line.length)).padEnd(MEMORY_FILE_MAX_BYTES, "\n");
 
-        // Too many entries for the entry limit, but past the size check: the size is not what refuses it.
         expect(atLimit).toHaveLength(MEMORY_FILE_MAX_BYTES);
-        expect(refusal(atLimit, "text")?.code).not.toBe("too_large");
+        expect(refusal(atLimit, "text")).toBeUndefined();
         expect(refusal(`${atLimit}\n`, "text")).toMatchObject({ code: "too_large" });
     });
 
