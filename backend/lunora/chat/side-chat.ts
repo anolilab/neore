@@ -173,6 +173,8 @@ export const createSideChat = authAction
             // The team and the enabled features are part of where the chat lives and how it runs, as the rest of the placement is.
             ...(parent.teamId !== undefined && { teamId: parent.teamId }),
             ...(parent.enabledFeatures !== undefined && { enabledFeatures: parent.enabledFeatures }),
+            // An imported conversation keeps its import marker: quick approval does not trust what an outside file brought in.
+            ...(parent.createdBy?.startsWith("import:") === true && { createdBy: parent.createdBy }),
             title: parent.title ?? "",
             userId,
         });
@@ -235,6 +237,11 @@ export const createSideChat = authAction
             // The copy carries any context reset (`/clear`): the child is cut at it as the parent is.
             if (parent.hasContextReset) {
                 await ctx.runMutation(internal.chat.context_reset.markForkedContextReset, { threadId: newThreadId });
+            }
+
+            // A handed-over conversation stays handed over in the copy, so the side chat's tools are not auto-approved on it.
+            if (parent.hasHandoff) {
+                await ctx.runMutation(internal.chat.context_reset.markForkedHandoff, { threadId: newThreadId });
             }
 
             const createdThread = await ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId: newThreadId });

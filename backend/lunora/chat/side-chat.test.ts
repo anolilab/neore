@@ -647,4 +647,16 @@ describe("createSideChat", () => {
 
         expect(outcome.status).toBe("ok");
     });
+
+    it("keeps the import and handoff markers on the side chat, so its tools are not auto-approved on handed-over history", async () => {
+        const parentId = await parentWith(OWNER, { createdBy: "import:chat-export", hasHandoff: true });
+
+        await withMessages(parentId, OWNER, ["hello"]);
+
+        const outcome = (await as(OWNER).action(createSideChat as never, { threadId: parentId } as never)) as { status: string; threadId: string };
+        const child = await threadRow(outcome.threadId);
+
+        expect(outcome.status).toBe("ok");
+        expect(child).toMatchObject({ createdBy: "import:chat-export", hasHandoff: true });
+    });
 });
