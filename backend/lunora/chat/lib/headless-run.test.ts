@@ -9,6 +9,7 @@ import { getSystemPrompt } from "@neore/ai/prompts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { mappedReferences } from "../../../test/registered-api";
+import type { MockRunContext } from "../../../test/mock-run-context";
 
 // A reference is read as its dispatch key, which the fake ctx below switches on.
 vi.mock("../../_generated/api", async (importOriginal) => mappedReferences(await importOriginal(), (reference) => reference.__lunoraRef));
@@ -236,7 +237,7 @@ describe("runHeadlessAgent personalization", () => {
     it("records one failure for a run that fails on a thread it set up, once, whichever step threw", async () => {
         seen.failAt = "round";
         seen.met = [false];
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext;
 
         await expect(
             runHeadlessAgent(ctx as never, {
@@ -624,7 +625,7 @@ describe("runHeadlessAgent thread tags", () => {
         });
 
     it("creates a new thread with its tags, so no later write is needed to tell it apart", async () => {
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext;
 
         await run(ctx);
 
@@ -636,7 +637,7 @@ describe("runHeadlessAgent thread tags", () => {
     });
 
     it("leaves tags out of the creation when the caller gave none, and still sets the bot", async () => {
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext;
 
         await run(ctx, { botId: "bot-1", thread: { title: "Chat" } });
 
@@ -648,7 +649,7 @@ describe("runHeadlessAgent thread tags", () => {
     });
 
     it("gives a new thread of a bot the bot's mode before it names the bot", async () => {
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext;
 
         seen.botMode = "supervised";
 
@@ -668,7 +669,7 @@ describe("runHeadlessAgent thread tags", () => {
     });
 
     it("creates a new thread with the run's organization, so no linked thread exists without it", async () => {
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext;
 
         await run(ctx, { organizationId: "org-a" });
 
@@ -690,7 +691,7 @@ describe("runHeadlessAgent thread tags", () => {
     });
 
     it("never moves an existing thread into another organization", async () => {
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext;
 
         await run(ctx, { organizationId: "org-b", thread: { threadId: "thread-1" } });
 
@@ -840,7 +841,7 @@ describe("runHeadlessAgent tool allowlist", () => {
     });
 
     it("builds a new thread's tools under the mode of the bot its lead thread leads to, and stamps nothing", async () => {
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext;
 
         seen.botMode = "supervised";
 
@@ -863,7 +864,7 @@ describe("runHeadlessAgent tool allowlist", () => {
     });
 
     it("builds its tools supervised when the bot's mode cannot be read, and starts a new thread of the bot supervised", async () => {
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext;
 
         seen.botModeFails = true;
 
@@ -1046,7 +1047,7 @@ describe("runHeadlessAgent failure on a thread it continues", () => {
     ] as const)("wakes the thread when %s fails", async (_label, failAt) => {
         seen.failAt = failAt;
         seen.met = [false];
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext;
 
         await expect(
             runHeadlessAgent(ctx as never, {
@@ -1235,7 +1236,7 @@ describe("runHeadlessAgent pauseForApproval", () => {
     it("labels the saved MCP calls with their real server before recording the request, as an interactive pause does", async () => {
         seen.saved = [approvalRequest];
 
-        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = fakeCtx() as unknown as MockRunContext;
 
         await run(ctx, { pauseForApproval: { subAgentRunId: RUN_ID } });
 
