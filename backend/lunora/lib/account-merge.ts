@@ -1851,14 +1851,14 @@ export const dropRowsGoneFromGuest = internalMutation
 
             if (marker !== null && marker.result === (await rowDigest(args.table, existing))) {
                 // The thread's Events were copied with it. Its id is the guest's, so the new account holds those Events only as the
-                // merge's copies. One batch per call: the copy and its marker stay until none are left, and a retry, scheduled on the
-                // new shard, takes the next batch and finds the same marker.
+                // merge's copies. One batch per call: the rest goes to `drainTakenBackThread`, on the new shard, without this merge's
+                // lease, since the merge can finish before the drain runs.
                 if (args.table === "threads" && !(await deleteMcpEventsOfThread(ctx, args.to, id))) {
                     await runAfterOnShard(
                         ctx.scheduler,
                         0,
-                        internal.lib.account_merge.dropRowsGoneFromGuest,
-                        { from: args.from, generation: args.generation, ids: [id], table: args.table, to: args.to },
+                        internal.lib.account_merge.drainTakenBackThread,
+                        { from: args.from, threadId: id, to: args.to },
                         args.to,
                     );
 
@@ -1871,6 +1871,43 @@ export const dropRowsGoneFromGuest = internalMutation
         }
 
         return { dropped, fenced: false };
+    });
+
+/**
+ * The rest of a taken-back thread's copied Events, one batch per call, on the new shard (`dropRowsGoneFromGuest` removes the first). It
+ * needs no merge lease: the merge can finish before it runs. The thread copy stays until none of its Events are left, so the thread's
+ * Events stay hidden meanwhile. The copy goes only while it is still the unchanged copy its marker records; an account-edited copy is
+ * kept with its Events.
+ */
+export const drainTakenBackThread = internalMutation
+    .input({ from: v.string(), threadId: v.string(), to: v.string() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const db = rawDb(ctx);
+        const copy = (await db.get("threads", args.threadId)) as Record<string, unknown> | null;
+
+        if (copy === null) {
+            return null;
+        }
+
+        const marker = await ctx.db
+            .query("idempotencyClaims")
+            .withIndex("by_scope_key", (q) => q.eq("scope", IMPORT_MARKER_SCOPE).eq("key", markerKey(args.from, "threads", args.threadId)))
+            .first();
+
+        if (marker === null || marker.result !== (await rowDigest("threads", copy))) {
+            return null;
+        }
+
+        if (!(await deleteMcpEventsOfThread(ctx, args.to, args.threadId))) {
+            await runAfterOnShard(ctx.scheduler, 0, internal.lib.account_merge.drainTakenBackThread, args, args.to);
+
+            return null;
+        }
+
+        await db.delete("threads", args.threadId);
+
+        return null;
     });
 
 /**

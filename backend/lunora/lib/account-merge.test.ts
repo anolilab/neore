@@ -21,6 +21,7 @@ import {
     deleteShardRows,
     dropImportMarkersPage,
     dropRowsGoneFromGuest,
+    drainTakenBackThread,
     importShardRows,
     listRowsMissingOnGuest,
     listShardRowsPage,
@@ -2361,6 +2362,7 @@ describe("mergeGuestInto across two real shards", () => {
         claimHeld: { fn: claimHeld, kind: "query" },
         claimKey: { fn: claimKey, kind: "mutation" },
         deleteShardRows: { fn: deleteShardRows, kind: "mutation" },
+        drainTakenBackThread: { fn: drainTakenBackThread, kind: "mutation" },
         dropImportMarkersPage: { fn: dropImportMarkersPage, kind: "mutation" },
         dropRowsGoneFromGuest: { fn: dropRowsGoneFromGuest, kind: "mutation" },
         handOverOrganizationContributors: { fn: handOverOrganizationContributors, kind: "mutation" },
@@ -2818,11 +2820,11 @@ describe("mergeGuestInto across two real shards", () => {
                 await context.db.delete("threads", threadId);
             });
 
-            // One call takes one batch (200): the thread copy stays, with its marker, until the rest is taken back by the retry.
+            // One leased call takes one batch (200): the thread copy stays, with its marker, while Events remain.
             const first = (await merge.shards.user.run(
                 async (context: any) => await asLeaseHolder(context, dropRowsGoneFromGuest, { ids: [threadId], table: "threads" }),
             )) as { dropped: number };
-            const state = (await merge.shards.user.run(async (context: any) => {
+            const midway = (await merge.shards.user.run(async (context: any) => {
                 const copy = await context.db.threads.findFirst({ consistency: "primary", where: { _id: threadId } });
                 const { page } = await context.db.mcpEvents.findMany({ limit: 300, where: { userId: "user" } });
 
@@ -2830,8 +2832,23 @@ describe("mergeGuestInto across two real shards", () => {
             })) as { events: number; thread: boolean };
 
             expect(first.dropped).toBe(0);
-            expect(state.thread).toBe(true);
-            expect(state.events).toBe(5);
+            expect(midway.thread).toBe(true);
+            expect(midway.events).toBe(5);
+
+            // The merge has finished by now, so the rest is taken back without a lease: the drain runs until the thread copy is gone.
+            for (let pass = 0; pass < 3; pass += 1) {
+                await merge.shards.user.run(async (context: any) => await context.runMutation(drainTakenBackThread, { from: "guest", threadId, to: "user" }));
+            }
+
+            const state = (await merge.shards.user.run(async (context: any) => {
+                const copy = await context.db.threads.findFirst({ consistency: "primary", where: { _id: threadId } });
+                const { page } = await context.db.mcpEvents.findMany({ limit: 300, where: { userId: "user" } });
+
+                return { events: page.length, thread: copy !== null };
+            })) as { events: number; thread: boolean };
+
+            expect(state.thread).toBe(false);
+            expect(state.events).toBe(0);
         } finally {
             merge.close();
         }
