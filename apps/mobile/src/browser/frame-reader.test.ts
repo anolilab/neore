@@ -2,9 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { FRAME_MIN_GAP_MS, FRAME_REFRESH_MS, startFrameReader } from "./frame-reader";
 
-const setup = (start = 100_000) => {
-    const clock = { at: start };
+const setup = () => {
+    const clock = { at: 100_000 };
     const ticks: (() => void)[] = [];
+    const waits: { ms: number; run: () => void }[] = [];
     const cancel = vi.fn();
     const pending: { reject: (error: unknown) => void; resolve: (value: string) => void }[] = [];
     const read = vi.fn(
@@ -15,32 +16,30 @@ const setup = (start = 100_000) => {
     );
     const onAnswer = vi.fn();
     const onFailure = vi.fn();
-    const last = { at: -Infinity };
-    const startReader = () =>
-        startFrameReader({
-            every: (ms, run) => {
-                expect(ms).toBe(FRAME_REFRESH_MS);
-                ticks.push(run);
+    const reader = startFrameReader({
+        after: (ms, run) => {
+            waits.push({ ms, run });
 
-                return cancel;
-            },
-            lastReadAt: last.at,
-            now: () => clock.at,
-            onAnswer,
-            onFailure,
-            onRead: (at) => {
-                last.at = at;
-            },
-            read,
-        });
+            return () => {};
+        },
+        every: (ms, run) => {
+            expect(ms).toBe(FRAME_REFRESH_MS);
+            ticks.push(run);
 
-    return { cancel, clock, last, onAnswer, onFailure, pending, read, start: startReader, tick: () => ticks.at(-1)?.() };
+            return cancel;
+        },
+        now: () => clock.at,
+        onAnswer,
+        onFailure,
+        read,
+    });
+
+    return { cancel, clock, onAnswer, onFailure, pending, read, reader, tick: () => ticks.at(-1)?.(), waits };
 };
 
 describe(startFrameReader, () => {
     it("reads at once, then on every interval, and stops the timer when stopped", async () => {
-        const { cancel, onAnswer, pending, read, start, tick } = setup();
-        const stop = start();
+        const { cancel, onAnswer, pending, read, reader, tick } = setup();
 
         expect(read).toHaveBeenCalledTimes(1);
         pending[0]?.resolve("first");
@@ -49,14 +48,13 @@ describe(startFrameReader, () => {
         tick();
         expect(read).toHaveBeenCalledTimes(2);
 
-        stop();
+        reader.stop();
         expect(cancel).toHaveBeenCalled();
     });
 
     it("never replaces a read still out: a read slower than the interval still paints, and the next starts after it", async () => {
-        const { onAnswer, pending, read, start, tick } = setup();
+        const { onAnswer, pending, read, tick } = setup();
 
-        start();
         tick();
         expect(read).toHaveBeenCalledTimes(1);
 
@@ -67,41 +65,49 @@ describe(startFrameReader, () => {
         expect(read).toHaveBeenCalledTimes(2);
     });
 
-    it("drops a read that answers or fails after the reader stopped", async () => {
-        const { onAnswer, onFailure, pending, start } = setup();
-        const stop = start();
+    it("keeps an agent action's request made while a read is out, and reads once it answered", async () => {
+        const { clock, onAnswer, pending, read, reader } = setup();
 
-        stop();
-        pending[0]?.reject(new Error("late"));
-        await Promise.resolve();
-
-        expect(onAnswer).not.toHaveBeenCalled();
-        expect(onFailure).not.toHaveBeenCalled();
-    });
-
-    it("hands a failed read to its handler", async () => {
-        const { onFailure, pending, start } = setup();
-        const error = new TypeError("Network request failed");
-
-        start();
-        pending[0]?.reject(error);
-
-        await vi.waitFor(() => expect(onFailure).toHaveBeenCalledWith(error));
-    });
-
-    it("skips the first read of a reader started a moment after the last read (an agent action), but keeps the timer", () => {
-        const { clock, read, start, tick } = setup();
-
-        start()();
-        clock.at += FRAME_MIN_GAP_MS - 1;
-        start();
+        reader.request();
+        reader.request();
         expect(read).toHaveBeenCalledTimes(1);
 
-        tick();
-        expect(read).toHaveBeenCalledTimes(2);
-
         clock.at += FRAME_MIN_GAP_MS;
-        start();
-        expect(read).toHaveBeenCalledTimes(3);
+        pending[0]?.resolve("first");
+        await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(2));
+        // The read out was not thrown away for the newer one.
+        expect(onAnswer).toHaveBeenCalledWith("first");
+    });
+
+    it("waits out the gap for a request made just after a read, then reads", async () => {
+        const { clock, pending, read, reader, waits } = setup();
+
+        pending[0]?.resolve("first");
+        await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(1));
+        await Promise.resolve();
+
+        clock.at += 1000;
+        reader.request();
+        expect(read).toHaveBeenCalledTimes(1);
+        expect(waits[0]?.ms).toBe(FRAME_MIN_GAP_MS - 1000);
+
+        waits[0]?.run();
+        expect(read).toHaveBeenCalledTimes(2);
+    });
+
+    it("drops a read that answers or fails after the reader stopped, and hands a failure to its handler otherwise", async () => {
+        const first = setup();
+
+        first.reader.stop();
+        first.pending[0]?.reject(new Error("late"));
+        await Promise.resolve();
+        expect(first.onAnswer).not.toHaveBeenCalled();
+        expect(first.onFailure).not.toHaveBeenCalled();
+
+        const second = setup();
+        const error = new TypeError("Network request failed");
+
+        second.pending[0]?.reject(error);
+        await vi.waitFor(() => expect(second.onFailure).toHaveBeenCalledWith(error));
     });
 });

@@ -11,9 +11,10 @@ import { settleQuietly } from "@/offline/quietly";
 import type { BrowserFrame, BrowserStatus } from "./browser-api";
 import { handBackBrowser, keepBrowserControl, navigateBrowser, readBrowserStatus, readFrame, takeBrowserControl, watchBrowserStatus } from "./browser-api";
 import type { ViewState } from "./browser-view-state";
-import { frameMessage, frameTrigger, grantEndOnDevice, isOlderStatus, otherLeaseEndOnDevice, shouldReadFrame, viewStateOf } from "./browser-view-state";
+import { frameMessage, frameTrigger, GRANT_END_MARGIN_MS, grantEndOnDevice, isOlderStatus, otherLeaseEndOnDevice, shouldReadFrame, viewStateOf } from "./browser-view-state";
 import type { ControlSession, ControlState } from "./control-session";
 import { createControlSession, forgetClaim, rememberClaim, rememberedClaim, viewNameFor } from "./control-session";
+import type { FrameReader } from "./frame-reader";
 import { startFrameReader } from "./frame-reader";
 import { watchGrantEnd } from "./grant-end";
 
@@ -39,6 +40,9 @@ export interface BrowserView {
 }
 
 const NOT_SHOWN = "The page could not be shown right now.";
+
+/** The subscription errors that say the caller no longer reads the chat, as `offline/message-read.ts` reads them. */
+const ACCESS_REFUSALS = new Set(["FORBIDDEN", "NOT_FOUND", "THREAD_LOCKED", "UNAUTHORIZED"]);
 
 type Answer = { receivedAt: number; status: BrowserStatus } | undefined;
 
@@ -89,13 +93,25 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
             onReleased: (claim) => forgetClaim(key, claim),
         });
     });
-    const lastRead = useRef(-Infinity);
+    const reader = useRef<FrameReader | undefined>(undefined);
+    /** The trigger the running reader last read for: a change is an agent action or a page the person opened. */
+    const readFor = useRef<string | undefined>(undefined);
     const [nudge, setNudge] = useState(0);
     const status = answer?.status;
 
     const accept = accepting(setAnswer, setError);
 
-    useEffect(() => watchBrowserStatus(getClient(), threadId, accept, setError), [threadId]);
+    // Only a refusal of the chat hides the page; any other subscription error (a lost connection resumes on its own,
+    // a server hiccup) leaves the last page and its "Last synced" time on screen.
+    useEffect(
+        () =>
+            watchBrowserStatus(getClient(), threadId, accept, (failure) => {
+                if (failure.code !== undefined && ACCESS_REFUSALS.has(failure.code)) {
+                    setError(failure.message);
+                }
+            }),
+        [threadId],
+    );
 
     // A grant ends without a write, so no new answer comes: the screen stops at its end, then reads once to learn
     // whether it was renewed (a renewal pushes nothing either).
@@ -110,6 +126,8 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
             endsAt: grantEnd,
             onEnd: () => setExpiredAnswer(status),
             reread: () => settleQuietly(async () => accept(await readBrowserStatus(getClient(), threadId))),
+            // The grant still holds until its real end: a read before it would answer it again, and loop.
+            rereadAt: grantEnd + GRANT_END_MARGIN_MS,
         });
     }, [grantEnd, status, threadId]);
 
@@ -170,8 +188,7 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
             return undefined;
         }
 
-        return startFrameReader<BrowserFrame>({
-            lastReadAt: lastRead.current,
+        const started = startFrameReader<BrowserFrame>({
             onAnswer: (read) => {
                 reportRead("succeeded");
                 setFrameNote(frameMessage(read));
@@ -191,12 +208,28 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
 
                 setFrameNote(NOT_SHOWN);
             },
-            onRead: (at) => {
-                lastRead.current = at;
-            },
             read: async () => await readFrame(getClient(), threadId),
         });
-    }, [browserId, isReading, nudge, reportRead, threadId, trigger]);
+
+        reader.current = started;
+
+        return () => {
+            started.stop();
+            reader.current = undefined;
+            readFor.current = undefined;
+        };
+    }, [browserId, isReading, reportRead, threadId]);
+
+    // An agent action, or a page the person opened, asks the running reader for a read; one still out is kept.
+    const readKey = `${trigger ?? ""}|${nudge}`;
+
+    useEffect(() => {
+        if (readFor.current !== undefined && readFor.current !== readKey) {
+            reader.current?.request();
+        }
+
+        readFor.current = readKey;
+    }, [readKey]);
 
     const isShown = view.kind === "ready" && frame !== undefined && frame.browserId === browserId;
 

@@ -14,14 +14,24 @@ export const watchGrantEnd = ({
     now = Date.now,
     onEnd = () => {},
     reread,
+    rereadAt = endsAt,
 }: {
     after?: (ms: number, run: () => void) => () => void;
     endsAt: number;
     now?: () => number;
     onEnd?: () => void;
     reread: () => void;
-}): () => void =>
-    after(Math.max(0, endsAt - now()), () => {
-        onEnd();
-        reread();
-    });
+    /** When to read again, if later than `endsAt` (the page goes early, the read waits for the real end). */
+    rereadAt?: number;
+}): () => void => {
+    const cancels = [
+        after(Math.max(0, endsAt - now()), onEnd),
+        after(Math.max(0, rereadAt - now()), reread),
+    ];
+
+    return () => {
+        for (const cancel of cancels) {
+            cancel();
+        }
+    };
+};
