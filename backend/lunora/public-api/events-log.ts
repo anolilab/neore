@@ -139,8 +139,10 @@ export const hasMcpEventsOfThread = async (ctx: Pick<MutationCtx, "db">, userId:
  * with it: the poll hides a locked or trashed thread's events only while the thread exists, so they must not outlive it.
  */
 export const deleteMcpEventsOfThread = async (ctx: Pick<MutationCtx, "db">, userId: string, threadId: string): Promise<boolean> => {
-    // One row past the batch says whether more follow: a batch that ends the thread's events is not reported as more.
+    // One row past the batch says whether more follow: a batch that ends the thread's events is not reported as more. From the primary:
+    // a lagging replica's short page would end the cleanup while events remain, and the thread row would then go with them.
     const { page } = await ctx.db.mcpEvents.findMany({
+        consistency: "primary",
         limit: THREAD_EVENT_BATCH + 1,
         where: { threadId, userId },
     });
