@@ -16,12 +16,13 @@ import { internal } from "../_generated/internal";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { currentUserShard } from "../lib/shard-context";
+import { rollupOf } from "./checks-logic";
 import { DEVELOP_DRIVER } from "./develop-driver";
 import { signedInLogin } from "./drivers/github";
 import type { PullRequestObservation } from "./pr-watch-logic";
 import { decideWatch, stateOf, storedWatchOf } from "./pr-watch-logic";
 import { readFromHost } from "./read-host";
-import type { CheckRun, MergeState } from "./types";
+import type { CheckRun, CheckState, CheckSummary, MergeState } from "./types";
 
 /** A running watch is read again once its last read is this old. */
 export const PR_WATCH_POLL_INTERVAL_MS = 3 * 60 * 1000;
@@ -33,6 +34,8 @@ const MAX_NAME_LENGTH = 200;
 /** Reviews kept in an observation: the newest ones, as the host lists them. */
 const MAX_REVIEWS = 100;
 
+const NOT_PASSING = new Set<CheckState>(["cancelled", "failure"]);
+
 const vObservation = v.object({
     checks: v.union(v.literal("failing"), v.literal("passing"), v.literal("pending")),
     failingCheckNames: v.array(v.string()),
@@ -43,17 +46,23 @@ const vObservation = v.object({
     watcherLogin: v.string(),
 });
 
-const checksOf = (checks: CheckRun[]): { failing: CheckRun[]; status: PullRequestObservation["checks"] } => {
-    // A check the rules do not require does not wake the thread; one whose requirement is unknown counts as required.
-    const failing = checks.filter((check) => check.state === "failure" && check.required !== false);
+/**
+ * What the head's checks add up to for a watch, by the same rollup the status chip reads (`checks-logic.ts`): "failing" while a
+ * required (or unknown) check failed, "pending" while one is running or a required check has not reported yet (or the host
+ * holds more checks than were listed), "passing" only when every required check reported and passed. A check the rules do not
+ * require never counts.
+ */
+export const checksOf = (summary: CheckSummary): { failing: CheckRun[]; status: PullRequestObservation["checks"] } => {
+    const failing = summary.checks.filter((check) => NOT_PASSING.has(check.state) && check.required !== false);
+    const rollup = rollupOf(summary.checks, summary.total, summary.required);
 
-    if (failing.length > 0) {
+    if (rollup.state === "failing") {
         return { failing, status: "failing" };
     }
 
-    const running = checks.some((check) => check.state === "pending" && check.required !== false);
+    const settled = rollup.state === "none" || rollup.state === "passing";
 
-    return { failing, status: running ? "pending" : "passing" };
+    return { failing, status: settled && rollup.complete ? "passing" : "pending" };
 };
 
 const mergeableOf = (state: MergeState | undefined): PullRequestObservation["mergeable"] => {
@@ -205,7 +214,7 @@ export const pollWatchedPullRequest = internalAction
                 DEVELOP_DRIVER.listChecks(request, ref, detail.headSha),
                 DEVELOP_DRIVER.listReviews(request, ref, target.reviewId === undefined ? undefined : { seenId: target.reviewId }),
             ]);
-            const { failing, status } = checksOf(summary.checks);
+            const { failing, status } = checksOf(summary);
 
             return {
                 observation: {

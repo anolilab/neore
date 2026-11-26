@@ -8,7 +8,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { insertThread } from "../agent/table-writes";
 import { runInShard } from "../lib/shard-context";
 import schema from "../schema";
-import { PR_WATCH_POLL_INTERVAL_MS, dispatchDueWatches, recordWatchObservation } from "./pr-watch-poll";
+import { PR_WATCH_POLL_INTERVAL_MS, checksOf, dispatchDueWatches, recordWatchObservation } from "./pr-watch-poll";
+import type { CheckRun } from "./types";
 import { decideWatch, PR_WATCH_MAX_WAKES, PR_WATCH_WAKE_COOLDOWN_MS, stateOf, storedWatchOf } from "./pr-watch-logic";
 import type { PullRequestObservation } from "./pr-watch-logic";
 
@@ -80,6 +81,50 @@ const record = async (linkId: string, args: { lease?: number; observation: PullR
         await ctx.runMutation(recordWatchObservation, { lease: LEASE, linkId, startedAt: STARTED_AT, ...args });
     });
 };
+
+const check = (name: string, state: CheckRun["state"], required: boolean | null = true): CheckRun => {
+    return { id: null, name, required, state, url: null };
+};
+
+describe("checksOf", () => {
+    it("is pending, not passing, while a required check has not reported", () => {
+        const summary = { checks: [check("build", "success")], required: { complete: true, patterns: ["build", "lint"] }, total: 1 };
+
+        expect(checksOf(summary).status).toBe("pending");
+    });
+
+    it("is pending while the host holds more checks than were listed", () => {
+        const summary = { checks: [check("build", "success")], required: { complete: true, patterns: ["build"] }, total: 40 };
+
+        expect(checksOf(summary).status).toBe("pending");
+    });
+
+    it("is failing, with the names, when a reported check failed, even with another required check missing", () => {
+        const summary = {
+            checks: [check("build", "failure"), check("docs", "failure", false), check("test", "success")],
+            required: { complete: true, patterns: ["build", "test", "lint"] },
+            total: 3,
+        };
+
+        expect(checksOf(summary)).toMatchObject({ failing: [{ name: "build" }], status: "failing" });
+    });
+
+    it("is passing only when every required check reported and passed", () => {
+        const summary = {
+            checks: [check("build", "success"), check("lint", "success"), check("docs", "pending", false)],
+            required: { complete: true, patterns: ["build", "lint"] },
+            total: 3,
+        };
+
+        expect(checksOf(summary)).toEqual({ failing: [], status: "passing" });
+    });
+
+    it("is pending while a required check is still running", () => {
+        const summary = { checks: [check("build", "pending")], required: { complete: true, patterns: ["build"] }, total: 1 };
+
+        expect(checksOf(summary).status).toBe("pending");
+    });
+});
 
 describe("dispatchDueWatches", () => {
     it("leases a watch never read, and skips one read inside the interval", async () => {
