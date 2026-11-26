@@ -288,8 +288,8 @@ export const recordClaimResult = async (ctx: ClaimCtx, scope: string, key: strin
 /**
  * Replaces the `result` of the claim `claimedAt` with `next` only while it still reads `expected`, in one conditional write,
  * so of two callers that read the same `result` exactly one moves it on. `next: null` lapses the claim instead: every read
- * ignores it from then on, and a fenced {@link releaseClaim} removes it. `false` when the claim is gone or its `result`
- * has moved on.
+ * ignores it from then on, and a fenced {@link releaseClaim} removes it. `false` when the claim is gone, lapsed, or its
+ * `result` has moved on.
  */
 export const swapClaimResult = async (
     ctx: ClaimCtx,
@@ -307,7 +307,8 @@ export const swapClaimResult = async (
 
     const { applied } = await ctx.db.patchIf("idempotencyClaims", existing._id, {
         patch: next === null ? { expiresAt: 0 } : { result: next },
-        where: { claimedAt, result: expected },
+        // The expiry it read too: a lapse (`expiresAt: 0`) by another caller makes this write miss, so nothing moves a lapsed claim on.
+        where: { claimedAt, expiresAt: existing.expiresAt, result: expected },
     });
 
     return applied;
