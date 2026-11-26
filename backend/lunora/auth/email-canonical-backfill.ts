@@ -186,7 +186,11 @@ const saveRecord = async (ctx: BackfillCtx, token: string, claimedAt: number, re
 const readFolds = async (ctx: BackfillCtx, token: string, claimedAt: number): Promise<string[]> => {
     const row = await claimRow(ctx, EMAIL_CANONICAL_FOLDS_SCOPE, token);
 
-    return row?.claimedAt === claimedAt && row.result !== undefined ? (JSON.parse(row.result) as string[]) : [];
+    if (row?.claimedAt !== claimedAt || row.result === undefined) {
+        throw new LunoraError("BAD_REQUEST", LAPSED);
+    }
+
+    return JSON.parse(row.result) as string[];
 };
 
 const saveFolds = async (ctx: BackfillCtx, token: string, claimedAt: number, folds: ReadonlyArray<string>): Promise<void> => {
@@ -207,8 +211,8 @@ const saveFolds = async (ctx: BackfillCtx, token: string, claimedAt: number, fol
 const idKey = (token: string, id: string): string => `${token}:${id}`;
 
 /**
- * One check call: up to `pages` pages over every user row, filled or not, from the record's cursor. Writes the check
- * record only, never a `user` row. Every row's key is the fold of its `email` as it is now, whatever its stored column
+ * One check call: up to `pages` pages over every user row, filled or not, from the record's cursor. Writes the check's
+ * claims only, never a `user` row. Every row's key is the fold of its `email` as it is now, whatever its stored column
  * says; a stored value a row would collide with is the fill's holder check's to find.
  */
 export const checkEmailCanonicalPage = async (
