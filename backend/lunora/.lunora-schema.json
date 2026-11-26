@@ -4831,6 +4831,12 @@
             }
           }
         },
+        "controlClaims": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "currentUrl": {
           "kind": "string",
           "nullable": false,

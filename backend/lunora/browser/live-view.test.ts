@@ -9,6 +9,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import type { Id } from "../_generated/dataModel";
 import { registeredApi, registerModule } from "../../test/registered-api";
 import { createThreadAccess, deleteThreadAccess, updateThreadAccess } from "../agent/sharing";
+import { patchRow } from "../lib/patch";
 import { applyLimit } from "../lib/rate-limiter-mutations";
 import { internalMutation, internalQuery } from "../lib/crpc";
 import schema from "../schema";
@@ -1874,6 +1875,36 @@ describe("a still frame of the browser", () => {
         });
 
         await expect(frame(OWNER)).resolves.toStrictEqual({ status: "controlled" });
+    });
+
+    it("drops a frame when another person's lease taken during the shot was replaced by the caller's own claim", async () => {
+        await addSession();
+        fetchMock.mockImplementation(async () => answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" }));
+        renderer.mockImplementationOnce(async () => {
+            const taken = await as(WRITER).action(takeControl as never, { threadId } as never);
+
+            await as(WRITER).mutation(handBack as never, { claim: (taken as { claim: string }).claim, reason: "handed_back", threadId } as never);
+            await as(OWNER).action(takeControl as never, { threadId } as never);
+
+            return shot();
+        });
+
+        await expect(frame(OWNER)).resolves.toStrictEqual({ status: "unavailable" });
+    });
+
+    it("keeps a frame when the agent only cleared an ended lease while it was taken", async () => {
+        await addSession({ control: { by: "someone-else", claim: "old", ended: "handed_back", since: NOW - 60_000, until: NOW - 1000 } });
+        renderer.mockImplementationOnce(async () => {
+            await harness.run(async (ctx: any) => {
+                const row = await ctx.db.query("browserSessions").first();
+
+                await patchRow(ctx.db, "browserSessions", row, { control: undefined });
+            });
+
+            return shot();
+        });
+
+        await expect(frame(OWNER)).resolves.toMatchObject({ status: "ok" });
     });
 
     it("says ended for a frame of another browser than the one asked for, which the agent never drove", async () => {

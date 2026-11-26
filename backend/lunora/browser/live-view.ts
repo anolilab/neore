@@ -311,16 +311,13 @@ export const getReaderBrowser = internalQuery
             v.object({ kind: v.literal("none") }),
             v.object({
                 canControl: v.boolean(),
+                /** How many fresh leases were taken on the row (`controlClaims`): a change between two reads is a lease taken in between. */
+                controlClaims: v.number(),
                 /** Someone other than the caller drives the browser. */
                 controlledByOther: v.boolean(),
                 /** The caller holds a lease they have not handed back; with `claim`, the lease that claim names. */
                 inControl: v.boolean(),
                 kind: v.literal("watchable"),
-                /**
-                 * When the newest lease of someone other than the caller began, ended or not (the row keeps an ended lease
-                 * until the agent looks): a read that sees it change knows another person drove the browser in between.
-                 */
-                otherLeaseSince: v.optional(v.number()),
                 providerSessionId: v.string(),
                 /** The revision of the caller's grant this read saw; none for the owner. */
                 revision: v.optional(v.number()),
@@ -334,18 +331,15 @@ export const getReaderBrowser = internalQuery
             return { kind: browser.kind };
         }
 
-        const lease = browser.session.control;
-        const otherLeaseSince = lease !== undefined && !(await holdsLease(browser.session, userId)) ? lease.since : undefined;
-
         return {
             canControl: browser.canControl,
+            controlClaims: browser.session.controlClaims ?? 0,
             controlledByOther: browser.control !== undefined && !browser.control.byCaller,
             inControl:
                 browser.control?.byCaller === true &&
                 browser.session.control?.ended === undefined &&
                 (claim === undefined || browser.session.control?.claim === claim),
             kind: browser.kind,
-            ...(otherLeaseSince !== undefined && { otherLeaseSince }),
             providerSessionId: browser.providerSessionId,
             ...(browser.revision !== undefined && { revision: browser.revision }),
         };
@@ -579,6 +573,7 @@ export const claimControl = internalMutation
         await patchRow(ctx.db, "browserSessions", browser.session, {
             ...activeNow(browser.session, ctx.now),
             control: { by, claim, since: ctx.now, until },
+            controlClaims: (browser.session.controlClaims ?? 0) + 1,
         });
 
         return {

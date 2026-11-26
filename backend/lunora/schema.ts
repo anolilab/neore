@@ -539,6 +539,11 @@ export const schema = defineSchema({
                 until: v.number(),
             }),
         ),
+        /**
+         * How many fresh control leases were taken on this row, by anyone (`browser/live-view.ts#claimControl`): a frame
+         * read that sees it change knows a person took control while its shot ran, even once the lease ended and was cleared.
+         */
+        controlClaims: v.optional(v.number()),
         currentUrl: v.optional(v.string()),
         /** When the action that wrote `currentUrl` started, so an older action finishing later does not overwrite it. */
         currentUrlStartedAt: v.optional(v.number()),

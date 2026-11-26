@@ -118,9 +118,16 @@ export const readBrowserFrame = authAction
             return { status: "ended" as const };
         }
 
-        // Another person took control and handed it back while the shot was taken: what they typed may be on it.
-        if (after.controlledByOther || after.otherLeaseSince !== browser.otherLeaseSince) {
+        if (after.controlledByOther) {
             return { status: "controlled" as const };
+        }
+
+        // A lease was taken while the shot ran (another person's, ended since, or one of the caller's that replaced it):
+        // what was typed then may be on it.
+        if (after.controlClaims !== browser.controlClaims) {
+            ctx.log.event("browser.frame_read", { ok: false, reason: "claimed_during_shot" });
+
+            return { status: after.inControl ? ("unavailable" as const) : ("controlled" as const) };
         }
 
         // The caller's grant was removed and given again meanwhile: the shot may be from when they had none.
