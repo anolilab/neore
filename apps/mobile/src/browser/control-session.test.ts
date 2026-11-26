@@ -5,7 +5,7 @@ import type { ControlApi, ControlState } from "./control-session";
 import { CONTROL_ELSEWHERE, CONTROL_ENDED, CONTROL_OFFLINE, createControlSession, forgetClaim, rememberClaim, rememberedClaim } from "./control-session";
 
 const NOW = 1_000_000;
-const OK = { claim: "c-1", claimId: "id-1", connectBy: NOW, status: "ok" as const, until: NOW + CONTROL_LEASE_MS, url: "https://live.test/v" };
+const OK = { claim: "c-1", claimId: "id-1", status: "ok" as const, until: NOW + CONTROL_LEASE_MS };
 
 const setup = (overrides: Partial<ControlApi> = {}) => {
     const ticks: (() => void)[] = [];
