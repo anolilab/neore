@@ -183,6 +183,21 @@ describe("saved backup model list", () => {
         expect(await read()).toMatchObject({ backupModel: BACKUP, backupModels: [BACKUP] });
     });
 
+    it("refuses a list built on one that is no longer stored, and keeps the stored list", async () => {
+        await saveList([BACKUP, SECOND]);
+        // Another tab removed SECOND; this one still shows both and adds THIRD to them.
+        await saveList([BACKUP]);
+
+        await expect(
+            asUser().mutation(updateUserSettings as never, { backupModels: [BACKUP, SECOND, THIRD], backupModelsBase: [BACKUP, SECOND] } as never),
+        ).rejects.toThrow("changed elsewhere");
+        expect(await savedList()).toEqual([BACKUP]);
+
+        await asUser().mutation(updateUserSettings as never, { backupModels: [BACKUP, THIRD], backupModelsBase: [BACKUP] } as never);
+        expect(await read()).toMatchObject({ backupModels: [BACKUP, THIRD] });
+        expect(await read()).not.toHaveProperty("backupModelsBase");
+    });
+
     it("lets a saved entry that has since become unusable be reordered or removed", async () => {
         await saveList([BACKUP, SECOND]);
         await asUser().mutation(updateAIUserPreferences as never, { modelFilterRules: { blockedModels: [SECOND] } } as never);

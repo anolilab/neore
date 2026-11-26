@@ -30,6 +30,7 @@
         "./auth/shortcut": "./lunora/auth/lib/shortcut.ts",
         "./bots/tool-selectors": "./lunora/bots/tool-selectors.ts",
         "./chat-upload-codes": "./lunora/lib/chat-upload-codes.ts",
+        "./chat/backup-models": "./lunora/chat/lib/backup-model.ts",
         "./chat/fields": "./lunora/chat/fields.ts",
         "./chat/goals": "./lunora/chat/goals/shared.ts",
         "./chat/low-risk-trust": "./lunora/chat/lib/low-risk-trust.ts",
