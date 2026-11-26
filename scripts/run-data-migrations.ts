@@ -22,7 +22,6 @@
  * Run: pnpm exec tsx scripts/run-data-migrations.ts
  */
 import { spawnSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -84,7 +83,6 @@ const backfilled = await runEmailCanonicalBackfill({
     error: console.error,
     log: console.log,
     production: process.env.STAGE === "production",
-    salt: () => randomBytes(16).toString("hex"),
     sleep,
 });
 

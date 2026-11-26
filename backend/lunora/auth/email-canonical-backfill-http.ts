@@ -4,13 +4,15 @@
  * until `checked`, then fill calls over the unfilled ids the check answered, then a check again, which answers `done` when
  * nothing is left. The body names the phase:
  *
- *     { "phase": "check", "salt": "<random>", "cursor": "<from the last check>" }
- *     { "phase": "fill", "checkedAt": <from the check's first answer>, "ids": ["<up to 8 of the check's unfilledIds>"] }
+ *     { "phase": "check" }                                   a new check; answers its token
+ *     { "phase": "check", "token": "<from the check>" }      the check's next pages, from the cursor the server keeps
+ *     { "phase": "fill", "token": "<of a completed check>", "ids": ["<one of that check's unfilledIds>"] }
  *
- * A call without a body is a check from the start with a salt of its own: it never writes.
+ * A call without a body is a new check. The server keeps the check's cursor, start time and the ids it read: a fill names
+ * the check only, and takes only ids that check recorded, at the time it began. A body with any other key is refused.
  *
- * A check answers salted digests of the canonical addresses it read, so the caller can find a pair two calls split, and the ids
- * of the unfilled rows; never an address. The deploy's log prints counts only. `conflict` answers 409, with no row written by that call.
+ * A check answers the ids of the unfilled rows it read, never an address. The deploy's log prints counts only. `conflict`
+ * answers 409, with no row written by that call.
  */
 import type { HttpActionCtx } from "lunorash/server";
 
@@ -19,29 +21,31 @@ import type { AdminBearerDependencies } from "./admin-bearer";
 import { NO_STORE, refuseUnlessAdminBearer } from "./admin-bearer";
 import type { Id } from "../_generated/dataModel";
 import type { EmailCanonicalCheckResult, EmailCanonicalFillResult } from "./email-canonical-backfill";
+import { MAX_LENGTH } from "../lib/validators";
 import { EMAIL_CANONICAL_BATCH } from "./email-canonical-backfill";
 
 /** The limit this route draws on; see `RATE_LIMIT_CONFIGS`. */
 export const EMAIL_CANONICAL_RATE_LIMIT_KEY = "admin/backfillEmailCanonical";
 
-/** The longest cursor, salt or id the route accepts. */
-const MAX_TOKEN_LENGTH = 512;
+/** The longest token or id the route accepts. */
+const MAX_TOKEN_LENGTH = MAX_LENGTH.id;
 
-export type EmailCanonicalBackfillRequest = { checkedAt: number; ids: Id<"user">[]; phase: "fill" } | { cursor?: string; phase: "check"; salt: string };
+const CHECK_KEYS = new Set(["phase", "token"]);
+const FILL_KEYS = new Set(["ids", "phase", "token"]);
+
+export type EmailCanonicalBackfillRequest = { ids: Id<"user">[]; phase: "fill"; token: string } | { phase: "check"; token?: string };
 
 export interface EmailCanonicalBackfillDependencies extends AdminBearerDependencies {
-    check: (input: { cursor?: string; salt: string }) => Promise<EmailCanonicalCheckResult>;
-    fillBatch: (input: { checkedAt: number; ids: Id<"user">[] }) => Promise<EmailCanonicalFillResult>;
+    check: (input: { token?: string }) => Promise<EmailCanonicalCheckResult>;
+    fillBatch: (input: { ids: Id<"user">[]; token: string }) => Promise<EmailCanonicalFillResult>;
 }
 
 const shortString = (value: unknown): value is string => typeof value === "string" && value.length > 0 && value.length <= MAX_TOKEN_LENGTH;
 
-const randomSalt = (): string => [...crypto.getRandomValues(new Uint8Array(16))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-
-/** The call `body` asks for, or `undefined` when it is not one. An empty body is a check from the start. */
+/** The call `body` asks for, or `undefined` when it is not one. An empty body is a new check. */
 export const parseBackfillRequest = (text: string): EmailCanonicalBackfillRequest | undefined => {
     if (text.trim() === "") {
-        return { phase: "check", salt: randomSalt() };
+        return { phase: "check" };
     }
 
     let body: unknown;
@@ -52,33 +56,31 @@ export const parseBackfillRequest = (text: string): EmailCanonicalBackfillReques
         return undefined;
     }
 
-    if (typeof body !== "object" || body === null) {
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
         return undefined;
     }
 
-    const { checkedAt, cursor, ids, phase, salt } = body as Record<string, unknown>;
+    const record = body as Record<string, unknown>;
+    const keys = Object.keys(record);
+    const { ids, phase, token } = record;
 
-    if (cursor !== undefined && !shortString(cursor)) {
-        return undefined;
-    }
+    if (phase === "check" && keys.every((key) => CHECK_KEYS.has(key))) {
+        if (token === undefined) {
+            return { phase };
+        }
 
-    const at = cursor === undefined ? {} : { cursor };
-
-    if (phase === "check" && shortString(salt)) {
-        return { phase, salt, ...at };
+        return shortString(token) ? { phase, token } : undefined;
     }
 
     if (
         phase === "fill" &&
-        cursor === undefined &&
-        typeof checkedAt === "number" &&
-        Number.isSafeInteger(checkedAt) &&
-        checkedAt > 0 &&
+        keys.every((key) => FILL_KEYS.has(key)) &&
+        shortString(token) &&
         Array.isArray(ids) &&
         ids.length <= EMAIL_CANONICAL_BATCH &&
         ids.every((id) => shortString(id))
     ) {
-        return { checkedAt, ids: ids as Id<"user">[], phase };
+        return { ids: ids as Id<"user">[], phase, token };
     }
 
     return undefined;
@@ -96,13 +98,13 @@ export const createEmailCanonicalBackfillHandler =
         const call = parseBackfillRequest(await request.text());
 
         if (call === undefined) {
-            return Response.json({ error: "Expected a check (phase, salt) or a fill (phase, checkedAt, ids) call" }, { headers: NO_STORE, status: 400 });
+            return Response.json({ error: "Expected a check (phase, token?) or a fill (phase, token, ids) call" }, { headers: NO_STORE, status: 400 });
         }
 
         const result =
             call.phase === "check"
-                ? await dependencies.check({ cursor: call.cursor, salt: call.salt })
-                : await dependencies.fillBatch({ checkedAt: call.checkedAt, ids: call.ids });
+                ? await dependencies.check({ ...(call.token !== undefined && { token: call.token }) })
+                : await dependencies.fillBatch({ ids: call.ids, token: call.token });
 
         return Response.json(result, { headers: NO_STORE, status: result.status === "conflict" ? 409 : 200 });
     };

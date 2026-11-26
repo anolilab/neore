@@ -5,13 +5,12 @@ import type { EmailCanonicalCheckResult, EmailCanonicalFillResult } from "./emai
 import { createEmailCanonicalBackfillHandler } from "./email-canonical-backfill-http";
 
 const TOKEN = "admin-token-for-tests";
-const HEX_SALT = /^[0-9a-f]{32}$/u;
+const CHECK_TOKEN = "check-token-for-tests";
 
 const handlerWith = (options: { check?: EmailCanonicalCheckResult; fill?: EmailCanonicalFillResult; token?: string; underLimit?: boolean } = {}) => {
-    const check = vi.fn(async (_input: { cursor?: string; salt: string }) => options.check ?? { status: "done" as const });
+    const check = vi.fn(async (_input: { token?: string }) => options.check ?? { status: "done" as const });
     const fill = vi.fn(
-        async (_input: { checkedAt: number; ids: string[] }) =>
-            options.fill ?? { conflicts: 0, filled: 3, processed: 3, skipped: 0, status: "progress" as const },
+        async (_input: { ids: string[]; token: string }) => options.fill ?? { conflicts: 0, filled: 1, processed: 1, skipped: 0, status: "progress" as const },
     );
     const rateLimit = vi.fn(async () => (options.underLimit === false ? { ok: false, retryAfter: 90_000 } : { ok: true }));
     const handler = createEmailCanonicalBackfillHandler({ adminToken: () => options.token ?? TOKEN, check, fillBatch: fill, rateLimit });
@@ -55,42 +54,63 @@ describe("POST /admin/backfill-email-canonical", () => {
         expect(check).not.toHaveBeenCalled();
     });
 
-    it("runs a check from the start, which never writes, for a call without a body", async () => {
+    it("starts a check, which never writes, for a call without a body", async () => {
         const { check, fill, handler } = handlerWith();
         const response = await handler(post(`Bearer ${TOKEN}`));
 
         expect(response.status).toBe(200);
         expect(response.headers.get("cache-control")).toBe("no-store");
         expect(await response.json()).toStrictEqual({ status: "done" });
-        expect(check).toHaveBeenCalledWith({ cursor: undefined, salt: expect.stringMatching(HEX_SALT) });
+        expect(check).toHaveBeenCalledWith({});
         expect(fill).not.toHaveBeenCalled();
     });
 
-    it("passes a check's cursor and salt, and a fill's ids and start, through", async () => {
-        const checking = { checkedAt: 5, cursor: "c2", digests: ["ab"], scanned: 1, status: "checking" as const, unfilledIds: ["u1" as Id<"user">] };
+    it("passes a check's token, and a fill's token and ids, through", async () => {
+        const checking = { scanned: 1, status: "checking" as const, token: CHECK_TOKEN, unfilledIds: ["u1" as Id<"user">] };
         const { check, fill, handler } = handlerWith({ check: checking });
 
-        const checked = await handler(post(`Bearer ${TOKEN}`, { cursor: "c1", phase: "check", salt: "s" }));
-        const filled = await handler(post(`Bearer ${TOKEN}`, { checkedAt: 5, ids: ["u1", "u2"], phase: "fill" }));
+        const started = await handler(post(`Bearer ${TOKEN}`, { phase: "check" }));
+        const checked = await handler(post(`Bearer ${TOKEN}`, { phase: "check", token: CHECK_TOKEN }));
+        const filled = await handler(post(`Bearer ${TOKEN}`, { ids: ["u1"], phase: "fill", token: CHECK_TOKEN }));
 
+        expect(await started.json()).toStrictEqual(checking);
         expect(await checked.json()).toStrictEqual(checking);
-        expect(check).toHaveBeenCalledWith({ cursor: "c1", salt: "s" });
-        expect(await filled.json()).toStrictEqual({ conflicts: 0, filled: 3, processed: 3, skipped: 0, status: "progress" });
-        expect(fill).toHaveBeenCalledWith({ checkedAt: 5, ids: ["u1", "u2"] });
+        expect(check.mock.calls).toStrictEqual([[{}], [{ token: CHECK_TOKEN }]]);
+        expect(await filled.json()).toStrictEqual({ conflicts: 0, filled: 1, processed: 1, skipped: 0, status: "progress" });
+        expect(fill).toHaveBeenCalledWith({ ids: ["u1"], token: CHECK_TOKEN });
+    });
+
+    it("refuses a fill that names its own check time or cursor, so only the server's check binds it", async () => {
+        const { check, fill, handler } = handlerWith();
+        const bodies = [
+            { checkedAt: 5, ids: ["u1"], phase: "fill" },
+            { checkedAt: 5, ids: ["u1"], phase: "fill", token: CHECK_TOKEN },
+            { checkedAt: Date.now() + 86_400_000, ids: ["u1"], phase: "fill", token: CHECK_TOKEN },
+            { cursor: "c", ids: ["u1"], phase: "fill", token: CHECK_TOKEN },
+            { cursor: "c", phase: "check", token: CHECK_TOKEN },
+            { phase: "check", salt: "s" },
+        ];
+
+        const responses = await Promise.all(bodies.map(async (body) => await handler(post(`Bearer ${TOKEN}`, body))));
+
+        expect(responses.map((response) => response.status)).toStrictEqual(bodies.map(() => 400));
+        expect(check).not.toHaveBeenCalled();
+        expect(fill).not.toHaveBeenCalled();
     });
 
     it("answers 400 to a call it cannot read, and runs nothing", async () => {
         const { check, fill, handler } = handlerWith();
         const bodies = [
             "{",
+            "[]",
             { phase: "fill" },
-            { phase: "check" },
-            { checkedAt: "5", ids: [], phase: "fill" },
-            { checkedAt: 5, phase: "fill" },
-            { checkedAt: 5, ids: Array.from({ length: 9 }, (_, index) => `u${String(index)}`), phase: "fill" },
-            { checkedAt: 5, ids: [7], phase: "fill" },
-            { checkedAt: 5, cursor: "c", ids: [], phase: "fill" },
-            { cursor: 3, phase: "check", salt: "s" },
+            { ids: ["u1"], phase: "fill" },
+            { phase: "fill", token: CHECK_TOKEN },
+            { ids: ["u1", "u2"], phase: "fill", token: CHECK_TOKEN },
+            { ids: [7], phase: "fill", token: CHECK_TOKEN },
+            { ids: ["u1"], phase: "fill", token: "t".repeat(129) },
+            { phase: "check", token: 3 },
+            { phase: "check", token: "" },
             { phase: "drop" },
         ];
 
@@ -103,7 +123,7 @@ describe("POST /admin/backfill-email-canonical", () => {
 
     it("answers 409 on a conflict", async () => {
         const { handler } = handlerWith({ fill: { conflicts: 2, filled: 0, processed: 0, skipped: 0, status: "conflict" } });
-        const response = await handler(post(`Bearer ${TOKEN}`, { checkedAt: 5, ids: ["u1"], phase: "fill" }));
+        const response = await handler(post(`Bearer ${TOKEN}`, { ids: ["u1"], phase: "fill", token: CHECK_TOKEN }));
 
         expect(response.status).toBe(409);
         expect(await response.json()).toStrictEqual({ conflicts: 2, filled: 0, processed: 0, skipped: 0, status: "conflict" });

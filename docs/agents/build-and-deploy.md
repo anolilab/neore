@@ -137,16 +137,21 @@ Write`; without them the deploy fails, hence the switch.
   D1 table through an internal mutation behind an admin route the same step calls: `user.emailCanonical` is filled by
   `POST /admin/backfill-email-canonical` (`backend/lunora/auth/email-canonical-backfill.ts`), before the shard
   migrations; each runs whether the other fails, and either failing fails the job. `.global()` writes are not
-  transactional, so the runner first checks EVERY account, page by page from a cursor it carries, and writes nothing
-  until no address is shared: each check call refuses a pair it reads itself and answers salted digests, so the runner
-  finds a pair two calls split; it also answers the unfilled ids. Only then the fill, up to 8 of those ids per call,
-  read by primary key (the `emailCanonical IS NULL` read sorts every unfilled row, so it never pages the fill),
-  filling a row only while it is unchanged since a minute before the check began; rows changed since wait for another
-  round (up to 3), which starts with a check again. Two accounts whose addresses fold to one stop it with a count (409),
-  with neither filled: merge or rename one. A fill call plans 26 of the 50 statements and stops after the first fill
-  that shows a raced write, because the conditional patch's retry rounds are neither capped nor reported
-  (`lunora-upstream.md`). Three answers in a row that move nothing fail it; a fill whose rows all changed is not one. The log prints
-  counts only, never a digest, an id or a cursor; a refused call prints its code, and outside production its
+  transactional, so the runner first checks EVERY account and writes nothing until no address is shared. The server
+  keeps the check: its first call opens a record (an `idempotencyClaims` row on the root shard, outside D1's budget,
+  keyed by a token the server makes) with the check's start, the next cursor, a digest of every folded address read and
+  the unfilled ids; each later call names the token and goes on from the record's cursor, and an address two rows fold
+  to, in one call or across calls, drops the record and answers 409. A row's key is the fold of its `email` as it is
+  now, never only its stored `emailCanonical`. Pages are 500 rows: Lunora fetches `limit + 1` rows to tell a last page,
+  and a D1 statement answers at most 1,000. Only then the fill: one id per call, under the token of a COMPLETED
+  check and only among its ids, with the start time from the record (a body with `checkedAt` or `cursor` is refused,
+  and a record whose start lies ahead of the clock too); a row is filled only while it is unchanged since a minute
+  before the check began; rows changed since wait for another round (up to 3), which starts with a new check. One id
+  per call because `patchIf` makes up to 16 rounds of a read and a guarded write with no lower cap: worst case 36 of
+  the 50 statements (`EMAIL_CANONICAL_FILL_WORST`). Two accounts whose addresses fold to one stop it with a count
+  (409), with neither filled: merge or rename one. Three answers in a row that move nothing fail it; a fill whose row
+  changed is not one. A run makes at most 12,000 calls; one that stops there fails the step, and the next deploy goes
+  on. The log prints counts only, never a token or an id; a refused call prints its code, and outside production its
   message with URLs replaced.
 - **A Worker that passes the size cap can still fail Cloudflare's startup check** ("Script startup
   exceeded CPU time limit", error 10021): the module-level code of the whole bundle may take 1 s of

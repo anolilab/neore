@@ -1,6 +1,7 @@
 /**
- * `user.emailCanonical` is filled through D1 (`user` is `.global()`): a check of every account first, then the fill one batch
- * per call, never by picking one of two accounts that fold to one address. The deploy's runner drives these calls here.
+ * `user.emailCanonical` is filled through D1 (`user` is `.global()`): a check of every account first, then the fill one id
+ * per call from that completed check, never by picking one of two accounts that fold to one address. The deploy's runner
+ * drives these calls here.
  */
 import { canonicalEmail } from "@lunora/auth";
 import { lunoraTest } from "@lunora/testing";
@@ -13,18 +14,24 @@ import schema from "../schema";
 import {
     checkEmailCanonical,
     checkEmailCanonicalPage,
+    D1_RESULT_ROWS,
     EMAIL_CANONICAL_BATCH,
-    EMAIL_CANONICAL_FILL_PLAN,
-    EMAIL_CANONICAL_FILL_STATEMENTS,
-    EMAIL_CANONICAL_RETRY_HEADROOM,
+    EMAIL_CANONICAL_CHECK_PAGES,
+    EMAIL_CANONICAL_CHECK_ROWS,
+    EMAIL_CANONICAL_CHECK_SCOPE,
+    EMAIL_CANONICAL_FILL_WORST,
     EMAIL_CANONICAL_SETTLE_MS,
     fillEmailCanonical,
     fillEmailCanonicalBatch,
+    INVOCATION_D1_QUERIES,
+    PATCH_IF_ATTEMPTS,
 } from "./email-canonical-backfill";
 
 const NOW = 1_800_000_000_000;
 const CREATION_INDEX_SEEK = /^SEARCH user USING INDEX user__by_creation \(_creationTime>\?\)$/u;
 const PRIMARY_KEY_SEARCH = /^SEARCH user USING INDEX sqlite_autoindex_user_1 \(id=\?\)( \| USE TEMP B-TREE FOR ORDER BY)?$/u;
+/** Past the 512 characters the route once capped a cursor at. */
+const LONG_CURSOR_PAD = "c".repeat(700);
 
 const userRow = (email: string, extra: Record<string, unknown> = {}) => {
     return { createdAt: 1, email, emailVerified: true, name: email, updatedAt: 1, ...extra };
@@ -39,28 +46,31 @@ const canonicals = async (ctx: any): Promise<[string, string | undefined][]> => 
         .toSorted(([a], [b]) => a.localeCompare(b));
 };
 
-/** The ids of the unfilled rows, in creation order, as a check answers them. */
-const unfilledIds = async (ctx: any): Promise<Id<"user">[]> => {
-    const { page } = await ctx.db.user.findMany({});
-
-    return (page as { _id: Id<"user">; emailCanonical?: string }[]).filter((row) => row.emailCanonical === undefined).map((row) => row._id);
-};
+const userIdOf = async (ctx: any, email: string): Promise<Id<"user">> => ((await ctx.db.user.findFirst({ where: { email } })) as { _id: Id<"user"> })._id;
 
 interface CountOptions {
     /** Runs after the real conditional patch; may throw. */
     afterPatchIf?: () => void;
+    /** Emulates D1's cap on the rows one statement answers: Lunora asks for a page's `limit` plus one. */
+    d1RowCap?: number;
     /** Makes the holder check see nothing, as when a sign-up takes an address between that check and the write. */
     hideHolders?: boolean;
+    /** Hands out every cursor padded past 512 characters, as a long keyset cursor would be. */
+    longCursors?: boolean;
     /** Runs before the real conditional patch, with its arguments; may throw instead. */
     patchIf?: (ctx: any, id: string, call: number) => Promise<void>;
+    /** Rounds the conditional patch goes before it applies, each charged a read and a write; at {@link PATCH_IF_ATTEMPTS} it throws `occ`. */
+    patchRounds?: number;
 }
 
 /**
- * `ctx` with its D1 statements counted as the deploy pays them (a read is one, a fill {@link EMAIL_CANONICAL_FILL_STATEMENTS}),
- * the rows its reads return, and the clock at {@link NOW}.
+ * `ctx` with its D1 statements counted as the deploy pays them (a read is one; a conditional patch two per round and its
+ * audit insert one), the rows its reads return, and the clock at {@link NOW}. Shard-local claim reads and writes pass
+ * through uncounted: they are not D1's.
  */
 const counted = (ctx: any, options: CountOptions = {}) => {
     const spent = { patches: 0, rowsRead: 0, statements: 0 };
+    const unpad = (cursor: unknown) => (typeof cursor === "string" && options.longCursors === true ? cursor.slice(LONG_CURSOR_PAD.length) : cursor);
     const user = {
         findFirst: async (query: unknown) => {
             spent.statements += 1;
@@ -71,42 +81,76 @@ const counted = (ctx: any, options: CountOptions = {}) => {
 
             return row;
         },
-        findMany: async (query: { where?: { emailCanonical?: unknown } }) => {
+        findMany: async (input: { cursor?: string; limit?: number; where?: { emailCanonical?: unknown } }) => {
             spent.statements += 1;
 
+            const query = { ...input, cursor: unpad(input.cursor) };
             const isHolderCheck = typeof query.where?.emailCanonical === "object" && query.where.emailCanonical !== null && "in" in query.where.emailCanonical;
-            const result = options.hideHolders === true && isHolderCheck ? { isDone: true, page: [] } : await ctx.db.user.findMany(query);
+            let result: { continueCursor?: string | null; isDone: boolean; page: unknown[] };
+
+            if (options.hideHolders === true && isHolderCheck) {
+                result = { isDone: true, page: [] };
+            } else if (options.d1RowCap !== undefined && query.limit !== undefined && query.limit + 1 > options.d1RowCap) {
+                // D1 answers no more than the cap, so the row past the page that would say "more" never arrives.
+                const { page } = await ctx.db.user.findMany({ ...query, limit: Math.min(query.limit, options.d1RowCap) });
+
+                result = { continueCursor: null, isDone: true, page };
+            } else {
+                result = await ctx.db.user.findMany(query);
+            }
 
             spent.rowsRead += result.page.length;
 
-            return result;
+            return options.longCursors === true && typeof result.continueCursor === "string"
+                ? { ...result, continueCursor: `${LONG_CURSOR_PAD}${result.continueCursor}` }
+                : result;
         },
     };
-    const db = {
-        patchIf: async (table: string, id: string, args: unknown) => {
-            spent.patches += 1;
-            spent.statements += EMAIL_CANONICAL_FILL_STATEMENTS;
-            await options.patchIf?.(ctx, id, spent.patches);
+    const patchIf = async (table: string, id: string, args: unknown) => {
+        const rounds = options.patchRounds ?? 1;
 
-            const result = await ctx.db.patchIf(table, id, args);
+        spent.patches += 1;
+        spent.statements += 2 * Math.min(rounds, PATCH_IF_ATTEMPTS);
 
-            options.afterPatchIf?.();
+        if (rounds >= PATCH_IF_ATTEMPTS) {
+            throw new Error(`patchIf on "user" lost the row to concurrent writes ${String(PATCH_IF_ATTEMPTS)} times in a row`);
+        }
 
-            return result;
-        },
-        user,
+        await options.patchIf?.(ctx, id, spent.patches);
+
+        const result = await ctx.db.patchIf(table, id, args);
+
+        // The audit trigger's `documentHistory` insert, charged before it can fail.
+        spent.statements += result.applied ? 1 : 0;
+        options.afterPatchIf?.();
+
+        return result;
     };
+    const db = new Proxy(ctx.db, {
+        get: (target, key) => {
+            if (key === "user") {
+                return user;
+            }
+
+            if (key === "patchIf") {
+                return patchIf;
+            }
+
+            const value = Reflect.get(target, key);
+
+            return typeof value === "function" ? value.bind(target) : value;
+        },
+    });
 
     return { ctx: { db, now: NOW } as never, spent };
 };
 
 /** The deploy's runner against the real check and fill, with fake pauses; each call's statements are recorded. */
 const runBackfill = async (ctx: any, options: CountOptions & { pageRows?: number; pages?: number } = {}) => {
-    const perCall: number[] = [];
+    const perCall: { phase: string; statements: number }[] = [];
     const printed: string[] = [];
     const requests: BackfillRequest[] = [];
     const totals = { patches: 0, rowsRead: 0 };
-    let salt = 0;
     const exitCode = await runEmailCanonicalBackfill({
         call: async (request): Promise<BackfillCall> => {
             const run = counted(ctx, options);
@@ -115,10 +159,10 @@ const runBackfill = async (ctx: any, options: CountOptions & { pageRows?: number
 
             const body =
                 request.phase === "check"
-                    ? await checkEmailCanonicalPage(run.ctx, { cursor: request.cursor, pageRows: options.pageRows, pages: options.pages, salt: request.salt })
-                    : await fillEmailCanonicalBatch(run.ctx, { checkedAt: request.checkedAt, ids: request.ids as Id<"user">[] });
+                    ? await checkEmailCanonicalPage(run.ctx, { pageRows: options.pageRows, pages: options.pages, token: request.token })
+                    : await fillEmailCanonicalBatch(run.ctx, { ids: request.ids as Id<"user">[], token: request.token });
 
-            perCall.push(run.spent.statements);
+            perCall.push({ phase: request.phase, statements: run.spent.statements });
             totals.patches += run.spent.patches;
             totals.rowsRead += run.spent.rowsRead;
 
@@ -131,15 +175,41 @@ const runBackfill = async (ctx: any, options: CountOptions & { pageRows?: number
             printed.push(line);
         },
         production: false,
-        salt: () => {
-            salt += 1;
-
-            return `salt-${String(salt)}`;
-        },
         sleep: async () => {},
     });
 
     return { exitCode, output: printed.join("\n"), perCall, requests, totals };
+};
+
+/** A check run to its end over `ctx`: its token and the unfilled ids it recorded. */
+const completedCheck = async (ctx: any): Promise<{ ids: Id<"user">[]; token: string }> => {
+    const ids: Id<"user">[] = [];
+    let token: string | undefined;
+
+    for (;;) {
+        const answer = await checkEmailCanonicalPage(counted(ctx).ctx, { ...(token !== undefined && { token }) });
+
+        if (answer.status !== "checked" && answer.status !== "checking") {
+            throw new Error(`the check answered ${answer.status}`);
+        }
+
+        ids.push(...answer.unfilledIds);
+        token = answer.token;
+
+        if (answer.status === "checked") {
+            return { ids, token };
+        }
+    }
+};
+
+const refusal = async (work: Promise<unknown>): Promise<string> => {
+    try {
+        await work;
+    } catch (error) {
+        return (error as { code?: string }).code ?? (error as Error).message;
+    }
+
+    return "not refused";
 };
 
 const withHarness = async <T>(body: (ctx: any) => Promise<T>): Promise<T> => {
@@ -174,24 +244,29 @@ describe("the user.emailCanonical backfill", () => {
         expect(canonicalEmail("  José@Example.com")).toBe("josé@example.com");
     });
 
-    it("is a no-op once every row is filled: one read, no write", async () => {
-        expect.assertions(2);
+    it("is a no-op once every row is filled: one read, no write, no check record", async () => {
+        expect.assertions(3);
 
-        const { output, perCall } = await withHarness(async (ctx) => {
+        const { claims, run } = await withHarness(async (ctx) => {
             await ctx.db.insert("user", userRow("Bob@Example.com"));
             await runBackfill(ctx);
 
-            return await runBackfill(ctx);
+            const before: unknown[] = await ctx.db.query("idempotencyClaims").collect();
+            const result = await runBackfill(ctx);
+            const after: unknown[] = await ctx.db.query("idempotencyClaims").collect();
+
+            return { claims: after.length - before.length, run: result };
         });
 
-        expect(perCall).toStrictEqual([1]);
-        expect(output).toBe("backfill-email-canonical: done, filled 0 over 1 call(s)");
+        expect(run.perCall).toStrictEqual([{ phase: "check", statements: 1 }]);
+        expect(run.output).toBe("backfill-email-canonical: done, filled 0 over 1 call(s)");
+        expect(claims).toBe(0);
     });
 
-    it("fills past one batch and past 25 rows in batches, each call within the statement budget", async () => {
-        expect.assertions(3);
+    it("fills past 25 rows, one id per fill call, each call within the statement budget", async () => {
+        expect.assertions(4);
 
-        const total = 3 * EMAIL_CANONICAL_BATCH + 5;
+        const total = 30;
         const { rows, run } = await withHarness(async (ctx) => {
             for (let index = 0; index < total; index += 1) {
                 await ctx.db.insert("user", userRow(`Person${String(index).padStart(2, "0")}@Example.com`));
@@ -204,15 +279,84 @@ describe("the user.emailCanonical backfill", () => {
 
         expect(run.exitCode).toBe(0);
         expect(rows.every(([email, canonical]) => canonical === canonicalEmail(email))).toBe(true);
-        expect(Math.max(...run.perCall)).toBeLessThanOrEqual(EMAIL_CANONICAL_FILL_PLAN);
+        expect(run.requests.filter((request) => request.phase === "fill")).toHaveLength(total);
+        expect(Math.max(...run.perCall.map(({ statements }) => statements))).toBeLessThanOrEqual(INVOCATION_D1_QUERIES);
     });
 
-    it("keeps its plan under the 50 statements a Worker invocation may send, with headroom for retry rounds", () => {
-        expect(EMAIL_CANONICAL_FILL_PLAN).toBeLessThanOrEqual(30);
-        expect(EMAIL_CANONICAL_FILL_PLAN + 1 + 2 * EMAIL_CANONICAL_RETRY_HEADROOM).toBeLessThanOrEqual(50);
-        expect(EMAIL_CANONICAL_RETRY_HEADROOM).toBeGreaterThanOrEqual(8);
-        // The runner sends this many ids per fill; the route refuses more.
-        expect(EMAIL_CANONICAL_FILL_IDS).toBe(EMAIL_CANONICAL_BATCH);
+    it("asks D1 for a check page plus the row that says more, within its 1,000-row answer", () => {
+        expect(EMAIL_CANONICAL_CHECK_ROWS + 1).toBeLessThanOrEqual(D1_RESULT_ROWS);
+        expect(1 + EMAIL_CANONICAL_CHECK_PAGES).toBeLessThanOrEqual(INVOCATION_D1_QUERIES);
+    });
+
+    it("checks every row of a table past one page under D1's row cap, never taking a full page for the end", async () => {
+        expect.assertions(2);
+
+        const total = D1_RESULT_ROWS + 1;
+        const answers = await withHarness(async (ctx) => {
+            for (let index = 0; index < total; index += 1) {
+                await ctx.db.insert("user", userRow(`capped${String(index).padStart(4, "0")}@example.com`));
+            }
+
+            const seen: { scanned: number; status: string }[] = [];
+            let token: string | undefined;
+
+            for (let call = 0; call < 5; call += 1) {
+                const answer = await checkEmailCanonicalPage(counted(ctx, { d1RowCap: D1_RESULT_ROWS }).ctx, {
+                    pages: 1,
+                    ...(token !== undefined && { token }),
+                });
+
+                if (answer.status !== "checked" && answer.status !== "checking") {
+                    throw new Error(answer.status);
+                }
+
+                seen.push({ scanned: answer.scanned, status: answer.status });
+                token = answer.token;
+
+                if (answer.status === "checked") {
+                    break;
+                }
+            }
+
+            return seen;
+        });
+
+        expect(answers.reduce((sum, { scanned }) => sum + scanned, 0)).toBe(total);
+        expect(answers.at(-1)?.status).toBe("checked");
+    });
+
+    it.each([
+        ["exactly one page", 3, ["checked"]],
+        ["one row past a page", 4, ["checking", "checked"]],
+    ])("reads a table of %s to its end through Lunora's isDone and continueCursor", async (_label, total, statuses) => {
+        expect.assertions(2);
+
+        const answers = await withHarness(async (ctx) => {
+            for (let index = 0; index < total; index += 1) {
+                await ctx.db.insert("user", userRow(`edge${String(index)}@example.com`));
+            }
+
+            const seen: { ids: number; status: string }[] = [];
+            let token: string | undefined;
+
+            for (;;) {
+                const answer = await checkEmailCanonicalPage(counted(ctx).ctx, { pageRows: 3, pages: 1, ...(token !== undefined && { token }) });
+
+                if (answer.status !== "checked" && answer.status !== "checking") {
+                    throw new Error(answer.status);
+                }
+
+                seen.push({ ids: answer.unfilledIds.length, status: answer.status });
+                token = answer.token;
+
+                if (answer.status === "checked") {
+                    return seen;
+                }
+            }
+        });
+
+        expect(answers.map(({ status }) => status)).toStrictEqual(statuses);
+        expect(answers.reduce((sum, { ids }) => sum + ids, 0)).toBe(total);
     });
 
     it("refuses two unfilled rows that fold to one address in one check call and writes neither", async () => {
@@ -231,6 +375,23 @@ describe("the user.emailCanonical backfill", () => {
         expect(run.exitCode).toBe(1);
         expect(run.output).toContain("1 address(es) belong to more than one account");
         expect(rows.every(([, canonical]) => canonical === undefined)).toBe(true);
+    });
+
+    it("refuses a filled row whose stored canonical is stale and an unfilled row whose address folds to the filled row's", async () => {
+        expect.assertions(3);
+
+        const { rows, run } = await withHarness(async (ctx) => {
+            await ctx.db.insert("user", userRow("Kim@Example.com", { emailCanonical: "kim-before-a-rename@example.com" }));
+            await ctx.db.insert("user", userRow("kim@example.com"));
+
+            const result = await runBackfill(ctx);
+
+            return { rows: await canonicals(ctx), run: result };
+        });
+
+        expect(run.exitCode).toBe(1);
+        expect(run.output).toContain("1 address(es) belong to more than one account");
+        expect(rows).toContainEqual(["kim@example.com", undefined]);
     });
 
     it("refuses a pair the check reads in different calls, past one call's window, before any write", async () => {
@@ -279,10 +440,27 @@ describe("the user.emailCanonical backfill", () => {
         expect(rows.filter(([email, canonical]) => email !== "eve@example.com" && canonical !== undefined)).toStrictEqual([]);
     });
 
-    it("reads each row a bounded number of times over a whole run, and a fill call only its batch", async () => {
-        expect.assertions(3);
+    it("carries a cursor longer than 512 characters from one check call to the next", async () => {
+        expect.assertions(2);
 
-        const total = 5 * EMAIL_CANONICAL_BATCH;
+        const { rows, run } = await withHarness(async (ctx) => {
+            for (let index = 0; index < 5; index += 1) {
+                await ctx.db.insert("user", userRow(`long${String(index)}@example.com`));
+            }
+
+            const result = await runBackfill(ctx, { longCursors: true, pageRows: 2, pages: 1 });
+
+            return { rows: await canonicals(ctx), run: result };
+        });
+
+        expect(run.exitCode).toBe(0);
+        expect(rows.every(([email, canonical]) => canonical === canonicalEmail(email))).toBe(true);
+    });
+
+    it("reads each row a bounded number of times over a whole run, and a fill call only its row", async () => {
+        expect.assertions(2);
+
+        const total = 12;
         const run = await withHarness(async (ctx) => {
             for (let index = 0; index < total; index += 1) {
                 await ctx.db.insert("user", userRow(`reader${String(index).padStart(2, "0")}@example.com`));
@@ -292,9 +470,121 @@ describe("the user.emailCanonical backfill", () => {
         });
 
         expect(run.exitCode).toBe(0);
-        // The first read, the check, every batch once, and the closing check's one read; no rescan per call.
+        // The first read, the check, every row once by id, and the closing check's one read; no rescan per call.
         expect(run.totals.rowsRead).toBeLessThanOrEqual(2 * total + 2);
-        expect(run.requests.filter((request) => request.phase === "fill")).toHaveLength(total / EMAIL_CANONICAL_BATCH);
+    });
+
+    describe("a fill is bound to a completed check", () => {
+        it("refuses a fill under a token no check made, and writes nothing", async () => {
+            expect.assertions(2);
+
+            const { code, rows } = await withHarness(async (ctx) => {
+                await ctx.db.insert("user", userRow("lone@example.com"));
+
+                const id = await userIdOf(ctx, "lone@example.com");
+
+                return {
+                    code: await refusal(fillEmailCanonicalBatch(counted(ctx).ctx, { ids: [id], token: "no-check-made-this-token" })),
+                    rows: await canonicals(ctx),
+                };
+            });
+
+            expect(code).toBe("BAD_REQUEST");
+            expect(rows).toStrictEqual([["lone@example.com", undefined]]);
+        });
+
+        it("refuses a fill from a check that has not read the whole table yet", async () => {
+            expect.assertions(2);
+
+            const { code, rows } = await withHarness(async (ctx) => {
+                for (let index = 0; index < 3; index += 1) {
+                    await ctx.db.insert("user", userRow(`half${String(index)}@example.com`));
+                }
+
+                const first = await checkEmailCanonicalPage(counted(ctx).ctx, { pageRows: 1, pages: 1 });
+
+                if (first.status !== "checking") {
+                    throw new Error(first.status);
+                }
+
+                return {
+                    code: await refusal(fillEmailCanonicalBatch(counted(ctx).ctx, { ids: first.unfilledIds, token: first.token })),
+                    rows: await canonicals(ctx),
+                };
+            });
+
+            expect(code).toBe("BAD_REQUEST");
+            expect(rows.every(([, canonical]) => canonical === undefined)).toBe(true);
+        });
+
+        it("refuses an id the check did not record, and writes nothing", async () => {
+            expect.assertions(2);
+
+            const { code, rows } = await withHarness(async (ctx) => {
+                await ctx.db.insert("user", userRow("checked@example.com"));
+
+                const { token } = await completedCheck(ctx);
+                const late = await ctx.db.insert("user", userRow("late@example.com"));
+
+                return { code: await refusal(fillEmailCanonicalBatch(counted(ctx).ctx, { ids: [late], token })), rows: await canonicals(ctx) };
+            });
+
+            expect(code).toBe("BAD_REQUEST");
+            expect(rows).toContainEqual(["late@example.com", undefined]);
+        });
+
+        it("refuses a check record whose start time lies in the future", async () => {
+            expect.assertions(2);
+
+            const { code, rows } = await withHarness(async (ctx) => {
+                await ctx.db.insert("user", userRow("future@example.com"));
+
+                const { ids, token } = await completedCheck(ctx);
+                const claim = await ctx.db
+                    .query("idempotencyClaims")
+                    .withIndex("by_scope_key", (q: any) => q.eq("scope", EMAIL_CANONICAL_CHECK_SCOPE).eq("key", token))
+                    .first();
+
+                await ctx.db.patch("idempotencyClaims", claim._id, { result: JSON.stringify({ ...JSON.parse(claim.result), startedAt: NOW + 1 }) });
+
+                return { code: await refusal(fillEmailCanonicalBatch(counted(ctx).ctx, { ids, token })), rows: await canonicals(ctx) };
+            });
+
+            expect(code).toBe("BAD_REQUEST");
+            expect(rows).toStrictEqual([["future@example.com", undefined]]);
+        });
+
+        it("refuses to go on with a check under a token it does not know, or one already complete", async () => {
+            expect.assertions(2);
+
+            const codes = await withHarness(async (ctx) => {
+                await ctx.db.insert("user", userRow("again@example.com"));
+
+                const { token } = await completedCheck(ctx);
+
+                return [
+                    await refusal(checkEmailCanonicalPage(counted(ctx).ctx, { token: "no-check-knows-this-token" })),
+                    await refusal(checkEmailCanonicalPage(counted(ctx).ctx, { token })),
+                ];
+            });
+
+            expect(codes[0]).toBe("BAD_REQUEST");
+            expect(codes[1]).toBe("BAD_REQUEST");
+        });
+
+        it("drops the check record when the check finds a shared address, so no fill can follow it", async () => {
+            expect.assertions(1);
+
+            const claims = await withHarness(async (ctx) => {
+                await ctx.db.insert("user", userRow("Lee@Example.com"));
+                await ctx.db.insert("user", userRow("lee@example.com"));
+                await checkEmailCanonicalPage(counted(ctx).ctx);
+
+                return await ctx.db.query("idempotencyClaims").collect();
+            });
+
+            expect(claims.filter((claim: { scope: string }) => claim.scope === EMAIL_CANONICAL_CHECK_SCOPE)).toStrictEqual([]);
+        });
     });
 
     it("leaves a row changed since the check began, and fills it in a later round once it settled", async () => {
@@ -304,12 +594,20 @@ describe("the user.emailCanonical backfill", () => {
             await ctx.db.insert("user", userRow("old@example.com"));
             await ctx.db.insert("user", userRow("Fresh@example.com", { updatedAt: NOW - EMAIL_CANONICAL_SETTLE_MS + 1 }));
 
-            const fill = await fillEmailCanonicalBatch(counted(ctx).ctx, { checkedAt: NOW, ids: await unfilledIds(ctx) });
+            const { token } = await completedCheck(ctx);
+            const answers = [];
 
-            return { first: fill, rows: await canonicals(ctx) };
+            for (const email of ["old@example.com", "Fresh@example.com"]) {
+                answers.push(await fillEmailCanonicalBatch(counted(ctx).ctx, { ids: [await userIdOf(ctx, email)], token }));
+            }
+
+            return { first: answers, rows: await canonicals(ctx) };
         });
 
-        expect(first).toStrictEqual({ conflicts: 0, filled: 1, processed: 2, skipped: 1, status: "progress" });
+        expect(first).toStrictEqual([
+            { conflicts: 0, filled: 1, processed: 1, skipped: 0, status: "progress" },
+            { conflicts: 0, filled: 0, processed: 1, skipped: 1, status: "progress" },
+        ]);
         expect(rows).toStrictEqual([
             ["Fresh@example.com", undefined],
             ["old@example.com", "old@example.com"],
@@ -318,50 +616,78 @@ describe("the user.emailCanonical backfill", () => {
         const settled = await withHarness(async (ctx) => {
             await ctx.db.insert("user", userRow("Fresh@example.com", { updatedAt: NOW - EMAIL_CANONICAL_SETTLE_MS }));
 
-            return await fillEmailCanonicalBatch(counted(ctx).ctx, { checkedAt: NOW, ids: await unfilledIds(ctx) });
+            const { ids, token } = await completedCheck(ctx);
+
+            return await fillEmailCanonicalBatch(counted(ctx).ctx, { ids, token });
         });
 
         expect(settled.filled).toBe(1);
     });
 
-    it("stops a fill call after a write that other writes raced, and the next call goes on with the ids after it", async () => {
-        expect.assertions(3);
+    it("charges every round of a contended conditional patch, and a fill call still fits the 50 statements", async () => {
+        expect.assertions(5);
 
-        const { first, rows, second } = await withHarness(async (ctx) => {
-            for (let index = 0; index < EMAIL_CANONICAL_BATCH; index += 1) {
-                await ctx.db.insert("user", userRow(`raced${String(index)}@example.com`));
+        const spent = await withHarness(async (ctx) => {
+            const outcomes: { error?: string; filled?: number; statements: number }[] = [];
+
+            for (const [email, options] of [
+                // Applies on the last round it may take.
+                ["late@example.com", { patchRounds: PATCH_IF_ATTEMPTS - 1 }],
+                // Loses every round: `occ`, then the holder lookup.
+                ["lost@example.com", { patchRounds: PATCH_IF_ATTEMPTS }],
+                // Applies on the last round, then the audit insert fails: the holder lookup too.
+                [
+                    "audited@example.com",
+                    {
+                        afterPatchIf: () => {
+                            throw new Error("audit write failed");
+                        },
+                        patchRounds: PATCH_IF_ATTEMPTS - 1,
+                    },
+                ],
+            ] as const) {
+                await ctx.db.insert("user", userRow(email));
+
+                const { token } = await completedCheck(ctx);
+                const id = await userIdOf(ctx, email);
+                const run = counted(ctx, options);
+
+                try {
+                    const answer = await fillEmailCanonicalBatch(run.ctx, { ids: [id], token });
+
+                    outcomes.push({ filled: answer.filled, statements: run.spent.statements });
+                } catch (error) {
+                    outcomes.push({ error: (error as Error).message, statements: run.spent.statements });
+                }
             }
 
-            // A write that leaves `updatedAt`, `email` and `emailCanonical` as they were (a role change does), landing on the
-            // second fill: the conditional patch goes round again, and how often is not reported.
-            const raced = counted(ctx, {
-                patchIf: async (inner, id, call) => {
-                    if (call === 2) {
-                        await inner.db.patch("user", id, { role: "admin" });
-                    }
-                },
-            });
-            const ids = await unfilledIds(ctx);
-            const firstCall = await fillEmailCanonicalBatch(raced.ctx, { checkedAt: NOW, ids });
-            const secondCall = await fillEmailCanonicalBatch(counted(ctx).ctx, { checkedAt: NOW, ids: ids.slice(firstCall.processed) });
-
-            return { first: firstCall, rows: await canonicals(ctx), second: secondCall };
+            return outcomes;
         });
 
-        expect(first).toStrictEqual({ conflicts: 0, filled: 2, processed: 2, skipped: 0, status: "progress" });
-        expect(second).toMatchObject({ filled: EMAIL_CANONICAL_BATCH - 2, processed: EMAIL_CANONICAL_BATCH - 2 });
-        expect(rows.every(([email, canonical]) => canonical === canonicalEmail(email))).toBe(true);
+        expect(spent[0]).toMatchObject({ filled: 1 });
+        expect(spent[1]?.error).toContain("lost the row to concurrent writes");
+        expect(spent[2]?.error).toBe("audit write failed");
+        expect(Math.max(...spent.map(({ statements }) => statements))).toBeLessThanOrEqual(EMAIL_CANONICAL_FILL_WORST);
+        expect(EMAIL_CANONICAL_FILL_WORST).toBeLessThanOrEqual(INVOCATION_D1_QUERIES);
+    });
+
+    it("sends the runner's fill batches at the backend's size, which a worst-case patch leaves room for", () => {
+        expect(EMAIL_CANONICAL_FILL_IDS).toBe(EMAIL_CANONICAL_BATCH);
+        expect(EMAIL_CANONICAL_BATCH * (2 * PATCH_IF_ATTEMPTS + 1) + 3).toBeLessThanOrEqual(INVOCATION_D1_QUERIES);
     });
 
     it("answers a conflict, not an error, when a sign-up takes an address between the check and the write", async () => {
         expect.assertions(2);
 
         const { result, rows } = await withHarness(async (ctx) => {
-            await ctx.db.insert("user", userRow("frank@example.com", { emailCanonical: "frank@example.com" }));
             await ctx.db.insert("user", userRow("FRANK@example.com"));
 
+            const { ids, token } = await completedCheck(ctx);
+
+            await ctx.db.insert("user", userRow("frank@example.com", { emailCanonical: "frank@example.com" }));
+
             return {
-                result: await fillEmailCanonicalBatch(counted(ctx, { hideHolders: true }).ctx, { checkedAt: NOW, ids: await unfilledIds(ctx) }),
+                result: await fillEmailCanonicalBatch(counted(ctx, { hideHolders: true }).ctx, { ids, token }),
                 rows: await canonicals(ctx),
             };
         });
@@ -377,6 +703,7 @@ describe("the user.emailCanonical backfill", () => {
             await ctx.db.insert("user", userRow("gina@example.com"));
             await ctx.db.insert("user", userRow("hank@example.com"));
 
+            const { ids, token } = await completedCheck(ctx);
             const outcomes: string[] = [];
 
             // The write lands, then the audit insert fails: the holder is the row itself.
@@ -386,7 +713,7 @@ describe("the user.emailCanonical backfill", () => {
                         throw new Error("audit write failed");
                     },
                 }).ctx,
-                { checkedAt: NOW, ids: await unfilledIds(ctx) },
+                { ids: [ids[0]!], token },
             ).catch((error: unknown) => {
                 outcomes.push((error as Error).message);
             });
@@ -398,7 +725,7 @@ describe("the user.emailCanonical backfill", () => {
                         throw new Error("D1 unavailable");
                     },
                 }).ctx,
-                { checkedAt: NOW, ids: await unfilledIds(ctx) },
+                { ids: [ids[1]!], token },
             ).catch((error: unknown) => {
                 outcomes.push((error as Error).message);
             });
@@ -408,24 +735,8 @@ describe("the user.emailCanonical backfill", () => {
 
         expect(failures).toStrictEqual(["audit write failed", "D1 unavailable"]);
     });
-    it("does not take a column stored as null for a raced write", async () => {
-        expect.assertions(1);
 
-        const result = await withHarness(async (ctx) => {
-            for (let index = 0; index < EMAIL_CANONICAL_BATCH; index += 1) {
-                const id = await ctx.db.insert("user", userRow(`nulled${String(index)}@example.com`, { role: "admin" }));
-
-                // `auth/admin.ts` clears a role this way; the column then reads back as null.
-                await ctx.db.patch("user", id, { role: null });
-            }
-
-            return await fillEmailCanonicalBatch(counted(ctx).ctx, { checkedAt: NOW, ids: await unfilledIds(ctx) });
-        });
-
-        expect(result).toStrictEqual({ conflicts: 0, filled: EMAIL_CANONICAL_BATCH, processed: EMAIL_CANONICAL_BATCH, skipped: 0, status: "progress" });
-    });
-
-    it("reads a check page and a fill's rows through an index, never sorting the unfilled rows", async () => {
+    it("reads a check page and a fill's row through an index, never sorting the unfilled rows", async () => {
         expect.assertions(2);
 
         const plans = await withHarness(async (ctx) => {
@@ -433,13 +744,13 @@ describe("the user.emailCanonical backfill", () => {
                 await ctx.db.insert("user", userRow(`planned${String(index)}@example.com`));
             }
 
-            const ids = await unfilledIds(ctx);
+            const id = await userIdOf(ctx, "planned0@example.com");
             const { continueCursor } = await ctx.db.user.findMany({ limit: 1 });
             const plan = async (query: unknown): Promise<string> => ((await ctx.db.explain("user", query)) as { plan: string[] }).plan.join(" | ");
 
             return {
-                check: await plan({ consistency: "primary", cursor: continueCursor, limit: 1000 }),
-                fill: await plan({ consistency: "primary", limit: ids.length, where: { _id: { in: ids } } }),
+                check: await plan({ consistency: "primary", cursor: continueCursor, limit: EMAIL_CANONICAL_CHECK_ROWS }),
+                fill: await plan({ consistency: "primary", limit: 1, where: { _id: { in: [id] } } }),
             };
         });
 
@@ -452,17 +763,17 @@ describe("the user.emailCanonical backfill", () => {
         expect.assertions(4);
 
         const answers = await withHarness(async (ctx) => {
-            await ctx.db.insert("user", userRow("Ivy@example.com"));
+            await ctx.db.insert("user", userRow("Ivy@example.com", { updatedAt: Date.now() - 2 * EMAIL_CANONICAL_SETTLE_MS }));
             await ctx.db.insert("user", userRow("kept@example.com", { emailCanonical: "kept@example.com" }));
 
-            const checked = await ctx.runMutation(checkEmailCanonical, { salt: "s" });
-            const filled = await ctx.runMutation(fillEmailCanonical, { checkedAt: checked.checkedAt + EMAIL_CANONICAL_SETTLE_MS, ids: checked.unfilledIds });
-            const done = await ctx.runMutation(checkEmailCanonical, { cursor: undefined, salt: "s" });
+            const checked = await ctx.runMutation(checkEmailCanonical, {});
+            const filled = await ctx.runMutation(fillEmailCanonical, { ids: checked.unfilledIds, token: checked.token });
+            const done = await ctx.runMutation(checkEmailCanonical, {});
 
             await ctx.db.insert("user", userRow("JOE@example.com"));
             await ctx.db.insert("user", userRow("joe@example.com"));
 
-            return { checked, conflict: await ctx.runMutation(checkEmailCanonical, { salt: "s" }), done, filled };
+            return { checked, conflict: await ctx.runMutation(checkEmailCanonical, {}), done, filled };
         });
 
         expect(answers.checked).toMatchObject({ scanned: 2, status: "checked" });
