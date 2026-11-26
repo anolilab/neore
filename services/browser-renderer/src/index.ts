@@ -47,6 +47,8 @@ const actionSchema = z.object({
     direction: z.enum(["up", "down"]).optional(),
     expectTarget: z.string().optional(), // click: the `target` of the element the person was shown; refused when it differs
     fullPage: z.boolean().optional(),
+    // A person's view of the page: a session that cannot be reconnected is gone (404, nothing run), never replaced by a new browser.
+    reconnectOnly: z.boolean().optional(),
     selector: z.string().optional(),
     sessionId: z.string().optional(), // Reconnect to an existing browser session
     strictVisibility: z.boolean().optional(), // click: refuse an element opacity hides too (an approved click); an ordinary click ignores opacity
@@ -289,6 +291,8 @@ interface ActionResult {
     typedSelector?: string;
     typedText?: string;
     url?: string;
+    /** A screenshot's viewport, in CSS pixels: the size the image shows, when it is not of the full page. */
+    viewport?: { height: number; width: number };
 }
 
 const PAGE_TIMEOUT = 30_000;
@@ -345,6 +349,26 @@ const openBrowser = async (
     const browser = await launch(env.BROWSER, { keep_alive: KEEP_ALIVE_MS });
 
     return { browser, isLaunched: true, sessionId: browser.sessionId() };
+};
+
+/** The `code` of a reconnect-only action's answer when its session could not be reconnected: nothing was launched or run. */
+const SESSION_GONE = "SESSION_GONE";
+
+class SessionGoneError extends Error {}
+
+/**
+ * Reconnects to `sessionId` and nothing else: a person's view of the page must never start a browser the agent would
+ * then pay for, nor stand in for one the provider reaped.
+ */
+const reconnectOnlyTo = async (
+    env: Env,
+    sessionId: string,
+): Promise<{ browser: import("@cloudflare/playwright").Browser; isLaunched: false; sessionId: string }> => {
+    try {
+        return { browser: await connect(env.BROWSER, sessionId), isLaunched: false, sessionId };
+    } catch {
+        throw new SessionGoneError();
+    }
 };
 
 /** The session's page (a reconnected session keeps its page), guarded and with the default timeout. */
@@ -483,9 +507,26 @@ const act = async (env: Env, body: z.infer<typeof actionSchema>, keep?: (work: P
 
 const actHeld = async (
     env: Env,
-    { action, clickMode, direction, expectTarget, fullPage, selector, sessionId, strictVisibility, text, url, visibleOnly }: z.infer<typeof actionSchema>,
+    {
+        action,
+        clickMode,
+        direction,
+        expectTarget,
+        fullPage,
+        reconnectOnly,
+        selector,
+        sessionId,
+        strictVisibility,
+        text,
+        url,
+        visibleOnly,
+    }: z.infer<typeof actionSchema>,
     holds: ReturnType<typeof holdsOf>,
 ): Promise<Response> => {
+    if (reconnectOnly === true && !sessionId) {
+        return Response.json({ error: "A reconnect-only action needs the session it reconnects to", success: false }, { headers: NOT_RUN, status: 400 });
+    }
+
     // Validate URL for navigate action (SSRF protection)
     if (action === "navigate" && url) {
         const urlError = validateUrl(url);
@@ -500,8 +541,19 @@ const actHeld = async (
     let isLaunched: boolean;
 
     try {
-        ({ browser, isLaunched, sessionId: activeSessionId } = await openBrowser(env, sessionId));
+        ({
+            browser,
+            isLaunched,
+            sessionId: activeSessionId,
+        } = reconnectOnly === true && sessionId ? await reconnectOnlyTo(env, sessionId) : await openBrowser(env, sessionId));
     } catch (error) {
+        if (error instanceof SessionGoneError) {
+            return Response.json(
+                { code: SESSION_GONE, error: "The browser session is gone; nothing was run", success: false },
+                { headers: NOT_RUN, status: 404 },
+            );
+        }
+
         return Response.json(
             {
                 error: `Failed to launch browser: ${error instanceof Error ? error.message : String(error)}`,
@@ -757,7 +809,14 @@ const actHeld = async (
                 const title = await page.title();
                 const currentUrl = page.url();
 
-                result = { screenshot: base64, screenshotFormat: "jpeg", success: true, title, url: currentUrl };
+                // Read from the page: a reconnected session may carry no viewport size of Playwright's own.
+                const viewport = await page
+                    .evaluate(() => {
+                        return { height: window.innerHeight, width: window.innerWidth };
+                    })
+                    .catch(() => null);
+
+                result = { screenshot: base64, screenshotFormat: "jpeg", success: true, title, url: currentUrl, ...(viewport !== null && { viewport }) };
                 break;
             }
 

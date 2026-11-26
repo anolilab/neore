@@ -456,11 +456,23 @@ const activeNow = (session: Doc<"browserSessions">, now: number): { lastActivity
  * that view closed meanwhile), and one that succeeds drops it ({@link settleControlClaim}).
  */
 export const claimControl = internalMutation
-    .input({ threadId: v.id("threads"), userId: v.string() })
+    /**
+     * `exclusive`: another view of the caller's that holds the lease is not taken over (`held`), as another person's is
+     * not. `mine`: the claim the asking view holds, so its own lease (one it lost track of) is never `held` from it.
+     */
+    .input({ exclusive: v.optional(v.boolean()), mine: v.optional(v.string()), threadId: v.id("threads"), userId: v.string() })
     .output(
         v.union(
             v.object({
-                kind: v.union(v.literal("busy"), v.literal("denied"), v.literal("none"), v.literal("read_only"), v.literal("taken"), v.literal("unavailable")),
+                kind: v.union(
+                    v.literal("busy"),
+                    v.literal("denied"),
+                    v.literal("held"),
+                    v.literal("none"),
+                    v.literal("read_only"),
+                    v.literal("taken"),
+                    v.literal("unavailable"),
+                ),
             }),
             v.object({
                 claim: v.string(),
@@ -481,7 +493,7 @@ export const claimControl = internalMutation
             }),
         ),
     )
-    .mutation(async ({ args: { threadId, userId }, ctx }) => {
+    .mutation(async ({ args: { exclusive, mine, threadId, userId }, ctx }) => {
         const browser = await readerBrowser(ctx, threadId, userId, ctx.now, { primary: true });
 
         if (browser.kind !== "watchable") {
@@ -494,6 +506,16 @@ export const claimControl = internalMutation
 
         if (browser.control !== undefined && !browser.control.byCaller) {
             return { kind: "taken" as const };
+        }
+
+        // Another of the caller's views drives the browser (not handed back): an exclusive claim leaves it to that view.
+        if (
+            exclusive === true &&
+            browser.control !== undefined &&
+            browser.session.control?.ended === undefined &&
+            (mine === undefined || !claimNames(browser.session.control, mine))
+        ) {
+            return { kind: "held" as const };
         }
 
         // An agent action still runs, on the browser the row names or on one it reads as reaped (the renderer may reconnect to it).
@@ -664,8 +686,13 @@ export const settleControlClaim = internalMutation
  * the claim after the provider minted it, and is never returned to a caller who no longer holds the lease.
  */
 export const takeControl = authAction
-    /** `renews`: the claim of the view this refreshes (its URL expired unconnected), so a renewal is told from a takeover. */
-    .input({ renews: v.optional(v.string().max(MAX_LENGTH.short)), threadId: v.id("threads") })
+    /**
+     * `renews`: the claim of the view this refreshes (its URL expired unconnected), so a renewal is told from a takeover.
+     * `exclusive`: never take the lease over from another of the caller's views (`held`), for a client (the phone) that
+     * must not pull control out from under a tab the person is driving; the view's own lease (`renews` names it) is not
+     * another view's.
+     */
+    .input({ exclusive: v.optional(v.boolean()), renews: v.optional(v.string().max(MAX_LENGTH.short)), threadId: v.id("threads") })
     .use(rateLimit("browser/liveView"))
     .output(
         v.union(
@@ -684,15 +711,20 @@ export const takeControl = authAction
                 until: v.number(),
                 url: v.string(),
             }),
-            v.object({ status: v.union(v.literal("busy"), v.literal("ended"), v.literal("taken"), v.literal("unavailable")) }),
+            v.object({ status: v.union(v.literal("busy"), v.literal("ended"), v.literal("held"), v.literal("taken"), v.literal("unavailable")) }),
         ),
     )
-    .action(async ({ args: { renews, threadId }, ctx }) => {
+    .action(async ({ args: { exclusive, renews, threadId }, ctx }) => {
         const { impersonatedBy, userId } = ctx.user;
 
         refuseImpersonation(impersonatedBy);
 
-        const claim = await ctx.runMutation(internal.browser.live_view.claimControl, { threadId, userId });
+        const claim = await ctx.runMutation(internal.browser.live_view.claimControl, {
+            threadId,
+            userId,
+            ...(exclusive === true && { exclusive }),
+            ...(renews !== undefined && { mine: renews }),
+        });
 
         if (claim.kind === "denied") {
             return throwThreadNotFound();

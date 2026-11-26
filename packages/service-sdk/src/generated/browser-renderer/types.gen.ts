@@ -118,6 +118,10 @@ export type BrowserActionRequest = {
      * Reconnect to an existing browser session
      */
     sessionId?: string;
+    /**
+     * Only reconnect to sessionId: a session that is gone answers 404 SESSION_GONE, and no new browser is launched
+     */
+    reconnectOnly?: boolean;
 };
 
 export type BrowserActionResponse = {
@@ -130,6 +134,13 @@ export type BrowserActionResponse = {
      */
     screenshot?: string;
     screenshotFormat?: string;
+    /**
+     * A screenshot's viewport in CSS pixels
+     */
+    viewport?: {
+        height: number;
+        width: number;
+    };
     /**
      * Extracted text content
      */

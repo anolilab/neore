@@ -127,8 +127,10 @@ const stallingBrowser = (close: () => Promise<void>, sessionId: string) => {
 interface Body {
     action?: string;
     budgetMs?: number;
+    fullPage?: boolean;
     origin?: string;
     password?: string;
+    reconnectOnly?: boolean;
     sessionId?: string;
     url?: string;
     username?: string;
@@ -623,6 +625,67 @@ describe("the session hold every isolate shares", () => {
 
         expect(response.status).toBe(503);
         await expect(response.json()).resolves.toStrictEqual({ error: expect.stringContaining("result is withheld"), success: false });
+    });
+
+    it("answers 404 SESSION_GONE for a reconnect-only action whose session is gone, and launches nothing", async () => {
+        const launchBrowser = vi.fn();
+        const env = {
+            BROWSER: {
+                connectSession: async () => {
+                    throw new Error("no such session");
+                },
+                launch: launchBrowser,
+            },
+            NODE_ENV: "test",
+            SESSION_LOCK: lockNamespace().namespace,
+        };
+        const response = await post(env as never, "/action", { action: "screenshot", reconnectOnly: true, sessionId: "reaped" });
+
+        expect(response.status).toBe(404);
+        expect(response.headers.get("x-browser-action")).toBe("not-run");
+        await expect(response.json()).resolves.toMatchObject({ code: "SESSION_GONE", success: false });
+        expect(launchBrowser).not.toHaveBeenCalled();
+    });
+
+    it("gives a reconnected session's screenshot the page's own viewport, after a scroll too", async () => {
+        const { env, pending } = binding();
+        const page = {
+            context: () => {
+                return { route: async () => undefined };
+            },
+            evaluate: async () => {
+                return { height: 844, width: 390 };
+            },
+            screenshot: vi.fn(async () => new Uint8Array([1, 2, 3])),
+            setDefaultTimeout: () => undefined,
+            title: async () => "A page",
+            url: () => "https://example.com/scrolled#below",
+            // A reconnected session: Playwright knows no viewport size of its own.
+            viewportSize: () => null,
+        };
+        const answer = post(env, "/action", { action: "screenshot", fullPage: false, reconnectOnly: true, sessionId: "kept" });
+
+        await vi.advanceTimersByTimeAsync(0);
+        pending[0]?.({ close: async () => undefined, contexts: () => [{ pages: () => [page] }], sessionId: () => "kept" });
+
+        const response = await answer;
+
+        await expect(response.json()).resolves.toMatchObject({
+            screenshot: "AQID",
+            sessionId: "kept",
+            success: true,
+            url: "https://example.com/scrolled#below",
+            viewport: { height: 844, width: 390 },
+        });
+        expect(page.screenshot).toHaveBeenCalledWith(expect.objectContaining({ fullPage: false }));
+    });
+
+    it("refuses a reconnect-only action that names no session, before any browser opens", async () => {
+        const { env, started } = binding();
+        const response = await post(env, "/action", { action: "screenshot", reconnectOnly: true });
+
+        expect(response.status).toBe(400);
+        expect(started).toStrictEqual([]);
     });
 
     it("answers 410 with SESSION_RETIRED, not a busy 409, for a session retired for good", async () => {

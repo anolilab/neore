@@ -26,6 +26,7 @@ Everything is re-exported from the package root, `@neore/client-runtime`:
 | `ws-ticket`          | `createWsTicketMinter`: POSTs the bearer to `/_lunora/ws-ticket` and returns the single-use ticket the socket authenticates with                                |
 | `shard-routing`      | A shared thread or page lives on its owner's shard: `registerThreadShard`, `notePageShard`, `shardKeyForArgs`, `shardOptionsFor`, `resetShardRegistry`          |
 | `token-refresh`      | `tokenRefreshDelayMs`: when to renew the RPC bearer                                                                                                             |
+| `browser-control`    | How a view of the thread's cloud browser reads the lease: `leaseHolder`, `isTakenOverByOwnView`, `controlRefusalText`, `CONTROL_KEEP_INTERVAL_MS`, `CONTROL_LEASE_MS` |
 | `hydrate-auth-token` | `seedHydratedAuthToken`: hands the browser client the token fetched during SSR                                                                                  |
 | `session-read`       | Retry policy for the session read: `readWithRetry`, `BROWSER_SESSION_READ_POLICY`, `SessionReadFailedError`, `isSessionReadRequest`, `isSessionChangingRequest` |
 | `sign-in-lock`       | Tracks in-flight credential requests so a guest is not minted over an account being signed in                                                                   |

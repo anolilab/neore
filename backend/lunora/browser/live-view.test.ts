@@ -14,6 +14,7 @@ import { internalMutation, internalQuery } from "../lib/crpc";
 import schema from "../schema";
 import { getBrowserActions } from "../chat/functions";
 import { logAction } from "./functions";
+import { MAX_FRAME_BASE64, readBrowserFrame } from "./frame";
 import { controlHolder, getThreadBrowser, handBack, keepControl, navigateInControl, openLiveView, takeControl } from "./live-view";
 import { releaseControlHttpAction } from "./release-http";
 import { runInShard } from "../lib/shard-context";
@@ -1794,5 +1795,145 @@ describe("opening a page while in control", () => {
         const after = await session();
 
         expect(after.control).not.toHaveProperty("navigatingUntil");
+    });
+});
+
+describe("a still frame of the browser", () => {
+    const frame = async (userId: string): Promise<any> => await as(userId).action(readBrowserFrame as never, { threadId } as never);
+    const shot = (fields: Record<string, unknown> = {}) => {
+        return {
+            data: { screenshot: "aGVsbG8=", screenshotFormat: "jpeg", sessionId: "s-1", success: true, viewport: { height: 720, width: 1280 }, ...fields },
+            response: { ok: true, status: 200 },
+        };
+    };
+    const session = async (): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.query("browserSessions").first());
+
+    it("gives a reader the viewport, reconnecting only to the row's browser, and writes nothing", async () => {
+        await addSession({ lastActivityAt: NOW - 1000 });
+        renderer.mockResolvedValueOnce(shot());
+
+        await expect(frame(READER)).resolves.toStrictEqual({ image: "aGVsbG8=", status: "ok", takenAt: NOW, viewport: { height: 720, width: 1280 } });
+        expect(renderer.mock.calls[0]?.[0]).toMatchObject({ body: { action: "screenshot", fullPage: false, reconnectOnly: true, sessionId: "s-1" } });
+        // A watching phone keeps no browser alive and holds no agent action off.
+        await expect(session()).resolves.toMatchObject({ lastActivityAt: NOW - 1000 });
+        await expect(session()).resolves.not.toHaveProperty("inUseHolds");
+    });
+
+    it("refuses a stranger and a locked chat without asking the renderer", async () => {
+        await addSession();
+
+        await expect(frame(STRANGER)).rejects.toMatchObject({ code: "NOT_FOUND" });
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { lockedAt: 1 }));
+        await expect(frame(OWNER)).rejects.toMatchObject({ code: "NOT_FOUND" });
+        expect(renderer).not.toHaveBeenCalled();
+    });
+
+    it("says ended, not unavailable, when no browser runs or the provider reaped it, and launches none", async () => {
+        await expect(frame(OWNER)).resolves.toStrictEqual({ status: "ended" });
+        expect(renderer).not.toHaveBeenCalled();
+
+        await addSession();
+        renderer.mockResolvedValueOnce({ data: undefined, error: { code: "SESSION_GONE", success: false }, response: { ok: false, status: 404 } });
+
+        await expect(frame(OWNER)).resolves.toStrictEqual({ status: "ended" });
+    });
+
+    it("shows nobody else the page while another person drives it, before and after the shot", async () => {
+        await addSession();
+        fetchMock.mockImplementation(async () => answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" }));
+        await as(WRITER).action(takeControl as never, { threadId } as never);
+
+        await expect(frame(OWNER)).resolves.toStrictEqual({ status: "controlled" });
+        expect(renderer).not.toHaveBeenCalled();
+        // The holder sees their own page.
+        renderer.mockResolvedValueOnce(shot());
+        await expect(frame(WRITER)).resolves.toMatchObject({ status: "ok" });
+    });
+
+    it("drops a frame when another person took control while it was taken", async () => {
+        await addSession();
+        fetchMock.mockImplementation(async () => answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" }));
+        renderer.mockImplementationOnce(async () => {
+            await as(WRITER).action(takeControl as never, { threadId } as never);
+
+            return shot();
+        });
+
+        await expect(frame(OWNER)).resolves.toStrictEqual({ status: "controlled" });
+    });
+
+    it("refuses a frame too large for the answer, and a renderer that failed", async () => {
+        await addSession();
+        renderer.mockResolvedValueOnce(shot({ screenshot: "a".repeat(MAX_FRAME_BASE64 + 1) }));
+
+        await expect(frame(OWNER)).resolves.toStrictEqual({ status: "unavailable" });
+
+        renderer.mockResolvedValueOnce({ data: undefined, error: { success: false }, response: { ok: false, status: 500 } });
+        await expect(frame(OWNER)).resolves.toStrictEqual({ status: "unavailable" });
+    });
+});
+
+describe("a phone that takes control", () => {
+    const take = async (userId: string, exclusive?: true): Promise<any> =>
+        await as(userId).action(takeControl as never, { threadId, ...(exclusive && { exclusive }) } as never);
+
+    beforeEach(() => {
+        fetchMock.mockImplementation(async () => answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" }));
+    });
+
+    it("drives the browser, and the person's other views see its claim at once", async () => {
+        await addSession();
+        const phone = await take(OWNER, true);
+
+        expect(phone).toMatchObject({ status: "ok" });
+        // The web card of the same person: the lease is theirs, under the phone's claim, not the card's.
+        await expect(statusFor(OWNER)).resolves.toMatchObject({ control: { byYou: true, claimIds: [phone.claimId] } });
+        await expect(statusFor(WRITER)).resolves.toMatchObject({ control: { byYou: false } });
+
+        renderer.mockResolvedValueOnce({ data: { sessionId: "s-1", success: true, url: "https://example.com/next" }, response: { ok: true } });
+        await expect(
+            as(OWNER).action(navigateInControl as never, { claim: phone.claim, threadId, url: "https://example.com/next" } as never),
+        ).resolves.toMatchObject({ status: "ok" });
+    });
+
+    it("is refused, saying so, while the web holds the claim, and the web keeps it", async () => {
+        await addSession();
+        const web = await take(OWNER);
+
+        await expect(take(OWNER, true)).resolves.toStrictEqual({ status: "held" });
+        await expect(heldClaim()).resolves.toBe(web.claim);
+        await expect(keep(OWNER, web.claim)).resolves.toMatchObject({ until: expect.any(Number) });
+        // Another person's lease is refused as before.
+        await giveBack(OWNER, "handed_back", web.claim);
+        await take(WRITER);
+        await expect(take(OWNER, true)).resolves.toStrictEqual({ status: "taken" });
+    });
+
+    it("takes back its own lease, which it names, but never another view's", async () => {
+        await addSession();
+        const phone = await take(OWNER, true);
+        const again: any = await as(OWNER).action(takeControl as never, { exclusive: true, renews: phone.claim, threadId } as never);
+
+        expect(again).toMatchObject({ status: "ok" });
+        await expect(heldClaim()).resolves.toBe(again.claim);
+        // Naming a claim that is not the lease's does not get past another view's.
+        await expect(as(OWNER).action(takeControl as never, { exclusive: true, renews: phone.claim, threadId } as never)).resolves.toStrictEqual({
+            status: "held",
+        });
+    });
+
+    it("gives the claim back when it leaves, or within one lease interval when it sends nothing", async () => {
+        await addSession();
+        const phone = await take(OWNER, true);
+
+        await expect(giveBack(OWNER, "left", phone.claim)).resolves.toBe(true);
+        await expect(statusFor(OWNER)).resolves.not.toHaveProperty("control");
+
+        // A phone that dies without a word: the lease lapses after one interval, and the agent may act again.
+        const silent = await take(OWNER, true);
+
+        vi.setSystemTime(NOW + CONTROL_IDLE_MS);
+        await expect(keep(OWNER, silent.claim)).resolves.toBeNull();
+        await expect(statusFor(OWNER)).resolves.not.toHaveProperty("control");
     });
 });
