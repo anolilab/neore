@@ -20,7 +20,7 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import { threadSharedWithOthers } from "../agent/live-grant";
 import { isTeamMember } from "../auth/lib/team-helpers";
 import { publicThread } from "../agent/threads";
-import { patchThread } from "../agent/table-writes";
+import { insertThread, patchThread } from "../agent/table-writes";
 import { vThreadCreateFields, vThreadDoc as vThreadDocument } from "../agent/validators";
 import { vWorkerPolicy } from "../sub-agents/validators";
 import { authAction, rateLimit } from "../lib/crpc";
@@ -126,7 +126,7 @@ export const sharedWithOthers = internalQuery
     .query(async ({ args, ctx }) => {
         const thread = await ctx.db.get("threads", args.threadId);
 
-        return thread?.userId !== undefined && (await threadSharedWithOthers(ctx, args.threadId, thread.userId, Date.now()));
+        return thread?.userId !== undefined && (await threadSharedWithOthers(ctx, args.threadId, thread.userId, ctx.now));
     });
 
 /**
@@ -142,7 +142,7 @@ export const createSideChatThread = internalMutation
             return null;
         }
 
-        const insertedId = await ctx.db.insert("threads", { createdAt: ctx.now, ...args, status: "active" });
+        const insertedId = await insertThread(ctx.db, { createdAt: ctx.now, ...args, status: "active" } as Parameters<typeof insertThread>[1]);
 
         return publicThread((await ctx.db.get("threads", insertedId as Id<"threads">))!);
     });
