@@ -32,7 +32,7 @@ export const MAX_IDEA_SOURCE_CHARS = 12_000;
 /** Most ideas the model may return, and the most one run stores. */
 export const MAX_IDEA_PROPOSALS = 3;
 
-/** The claim that a user's day was taken. A little over a day, so the purge never lets a day be taken twice. */
+/** The claim that a user's day was taken. Kept two days, longer than the day it guards, so the purge never lets a day be taken twice. */
 export const SCHEDULE_IDEAS_CLAIM_SCOPE = "schedule-ideas";
 export const SCHEDULE_IDEAS_CLAIM_TTL_MS = 2 * DAY_MS;
 

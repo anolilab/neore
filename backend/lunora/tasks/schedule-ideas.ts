@@ -8,8 +8,8 @@
  * - **Once a day**: `prepareScheduleIdeas` takes the day's claim (`idempotencyClaims`) in the same mutation that reads the
  *   messages, so a redelivery, or a sweep that enqueued twice before the job ran, does nothing a second time. The job is
  *   also queued `once`, a paid call that is never made twice. A day whose model call fails is not retried until tomorrow.
- * - **Input**: the person's typed words only (`messages.typedText` of user rows), from chats that are not temporary,
- *   locked, deleted, stateless or run on a host; never an assistant reply, tool output, file or attachment.
+ * - **Input**: the person's typed words only (`messages.typedText` of user rows), from the chats `readable` allows;
+ *   never an assistant reply, tool output, file or attachment.
  *   Bounded in `schedule-ideas-logic.ts`. A message with a privacy marker or a secret is left out.
  * - **Logs** carry counts only, never message text.
  */
@@ -56,7 +56,8 @@ const jobsAllowed = async (ctx: Parameters<typeof readScheduleIdeasEnabled>[0], 
 const isUserRole = (message: unknown): boolean => typeof message === "object" && message !== null && (message as { role?: unknown }).role === "user";
 
 /**
- * Chats the person typed in: the composer's `chat` tag alone. A run thread (`task`, `trigger`, `eval`,
+ * Chats the person typed in: the composer's `chat` tag alone (both ways a chat is started write it; an untagged thread is
+ * server-made, a prompt-optimiser or headless run). A run thread (`task`, `trigger`, `eval`,
  * `sub-agent`, `worker`), a host or local-model chat, a pull request thread and a messenger chat carry another tag,
  * and a messenger or bridged chat also names its connection, external id or source; their user-role rows hold a
  * prompt a job wrote or words another person sent, not the owner's own. Temporary, locked, deleted, stateless and
@@ -64,8 +65,6 @@ const isUserRole = (message: unknown): boolean => typeof message === "object" &&
  */
 const readable = (thread: Doc<"threads">): boolean => {
     const tags = thread.tags ?? [];
-    // Exactly the composer's tag: both ways a chat is started (`/chat/start` and `createThread`) write it, while a thread
-    // made with no tag is a server-made one (a prompt-optimiser or headless run) whose user rows are not the person's words.
     const typedHere = tags.length === 1 && tags[0] === "chat";
 
     return (
