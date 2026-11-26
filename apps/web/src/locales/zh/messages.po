@@ -130,7 +130,7 @@ msgstr "（仅附件）"
 msgid "(broken link: what it links to could not be found)"
 msgstr "（链接已损坏：找不到其目标）"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:116
+#: src/features/settings/components/chat/default-models-settings.tsx:119
 msgid "(default)"
 msgstr "（默认）"
 
@@ -2569,6 +2569,10 @@ msgstr "添加 {0}"
 msgid "Add {shapeLabel}"
 msgstr "添加{shapeLabel}"
 
+#: src/features/settings/components/chat/default-models-settings.tsx:237
+msgid "Add a backup model"
+msgstr "添加备用模型"
+
 #: src/features/pages/components/page-comments-panel.tsx:146
 msgid "Add a comment"
 msgstr "添加评论"
@@ -2627,6 +2631,10 @@ msgstr "启用双重验证，为你的账号增加一层安全保护。"
 #: src/features/onboarding/components/setup-checklist.tsx:132
 msgid "Add an SSH server"
 msgstr "添加 SSH 服务器"
+
+#: src/features/settings/components/chat/default-models-settings.tsx:237
+msgid "Add another backup model"
+msgstr "再添加一个备用模型"
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:261
 msgid "Add at least one deployment name"
@@ -5115,9 +5123,12 @@ msgstr "请输入备用码"
 msgid "Backup Codes"
 msgstr "备用码"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:167
 #: src/features/settings/lib/settings-keywords.ts:73
 msgid "Backup model"
+msgstr "备用模型"
+
+#: src/features/settings/components/chat/default-models-settings.tsx:175
+msgid "Backup models"
 msgstr "备用模型"
 
 #: src/features/marketing/data/models-data.ts:83
@@ -6800,6 +6811,10 @@ msgstr "中文（繁体）"
 msgid "Choose .md or .zip"
 msgstr "选择 .md 或 .zip"
 
+#: src/features/settings/components/chat/default-models-settings.tsx:235
+msgid "Choose a model"
+msgstr "选择模型"
+
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:430
 msgid "Choose a model for each kind of work the assistant hands to a sub-agent. A role with a model is offered to the assistant; one without stays off."
 msgstr "为助手交给子代理的每类工作选择模型。设置了模型的角色会提供给助手；未设置的保持关闭。"
@@ -6832,15 +6847,15 @@ msgstr "请至少选择一项权限"
 msgid "Choose bundle file"
 msgstr "选择捆绑包文件"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:283
+#: src/features/settings/components/chat/default-models-settings.tsx:359
 msgid "Choose default image models"
 msgstr "选择默认图像模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:239
+#: src/features/settings/components/chat/default-models-settings.tsx:315
 msgid "Choose default text models"
 msgstr "选择默认文本模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:325
+#: src/features/settings/components/chat/default-models-settings.tsx:401
 msgid "Choose default video models"
 msgstr "选择默认视频模型"
 
@@ -10486,51 +10501,51 @@ msgstr "默认模型"
 msgid "Default Model"
 msgstr "默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:340
+#: src/features/settings/components/chat/default-models-settings.tsx:416
 msgid "Default model for animating a single image"
 msgstr "用于让单张图片动起来的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:243
+#: src/features/settings/components/chat/default-models-settings.tsx:319
 msgid "Default model for chat and text generation"
 msgstr "用于聊天和文本生成的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:309
+#: src/features/settings/components/chat/default-models-settings.tsx:385
 msgid "Default model for combining multiple reference images"
 msgstr "用于组合多张参考图的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:362
+#: src/features/settings/components/chat/default-models-settings.tsx:438
 msgid "Default model for editing or transforming existing video"
 msgstr "用于编辑或转换现有视频的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:287
+#: src/features/settings/components/chat/default-models-settings.tsx:363
 msgid "Default model for generating images from text prompts"
 msgstr "用于根据文本提示词生成图像的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:351
+#: src/features/settings/components/chat/default-models-settings.tsx:427
 msgid "Default model for generating video from multiple images"
 msgstr "用于根据多张图片生成视频的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:329
+#: src/features/settings/components/chat/default-models-settings.tsx:405
 msgid "Default model for generating video from text prompts"
 msgstr "用于根据文本提示词生成视频的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:254
+#: src/features/settings/components/chat/default-models-settings.tsx:330
 msgid "Default model for image understanding and analysis"
 msgstr "用于图像理解与分析的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:298
+#: src/features/settings/components/chat/default-models-settings.tsx:374
 msgid "Default model for transforming existing images"
 msgstr "用于转换现有图像的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:373
+#: src/features/settings/components/chat/default-models-settings.tsx:449
 msgid "Default model for video generation from mixed inputs"
 msgstr "用于根据混合输入生成视频的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:265
+#: src/features/settings/components/chat/default-models-settings.tsx:341
 msgid "Default model for video understanding and transcription"
 msgstr "用于视频理解与转录的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:225
+#: src/features/settings/components/chat/default-models-settings.tsx:301
 msgid "Default model updated"
 msgstr "默认模型已更新"
 
@@ -14492,9 +14507,9 @@ msgstr "取消置顶对话失败"
 msgid "Failed to update agent settings"
 msgstr "更新智能体设置失败"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:158
-msgid "Failed to update backup model"
-msgstr "更新备用模型失败"
+#: src/features/settings/components/chat/default-models-settings.tsx:168
+msgid "Failed to update backup models"
+msgstr "无法更新备用模型"
 
 #: src/features/settings/components/chat/agent-settings.tsx:80
 msgid "Failed to update browser click settings"
@@ -14508,7 +14523,7 @@ msgstr "更新配置失败"
 msgid "Failed to update connection"
 msgstr "更新连接失败"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:219
+#: src/features/settings/components/chat/default-models-settings.tsx:295
 msgid "Failed to update default model"
 msgstr "更新默认模型失败"
 
@@ -17671,9 +17686,9 @@ msgstr "如果问题仍然存在，请联系支持。"
 msgid "If you turn it on, the next run is {0}."
 msgstr "如果你将其开启，下次运行时间为 {0}。"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:163
-msgid "If your chosen model is unavailable, the reply is retried once on this model"
-msgstr "如果你选择的模型不可用，将在此模型上重试一次回复"
+#: src/features/settings/components/chat/default-models-settings.tsx:177
+msgid "If your chosen model is unavailable, the reply is retried on these models in order"
+msgstr "如果你选择的模型不可用，将按顺序在这些模型上重试回复"
 
 #: src/features/skills/components/bundle-import-dialog.tsx:123
 msgid "Ignored, not available here:"
@@ -17696,7 +17711,7 @@ msgstr "插画"
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:131
 #: src/features/marketing/components/landing-footer.tsx:165
-#: src/features/settings/components/chat/default-models-settings.tsx:282
+#: src/features/settings/components/chat/default-models-settings.tsx:358
 #: src/features/settings/components/chat/models-settings.tsx:41
 #: src/features/settings/lib/settings-keywords.ts:74
 #: src/features/settings/lib/settings-keywords.ts:75
@@ -17790,17 +17805,17 @@ msgstr "图像已置顶"
 msgid "Image to apply the style to (or use input from previous node)"
 msgstr "要应用风格的图像（或使用上一个节点的输入）"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:301
+#: src/features/settings/components/chat/default-models-settings.tsx:377
 #: src/features/settings/lib/settings-keywords.ts:75
 msgid "Image to image"
 msgstr "图生图"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:257
+#: src/features/settings/components/chat/default-models-settings.tsx:333
 #: src/features/settings/lib/settings-keywords.ts:71
 msgid "Image to text"
 msgstr "图生文"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:343
+#: src/features/settings/components/chat/default-models-settings.tsx:419
 #: src/features/settings/lib/settings-keywords.ts:78
 msgid "Image to video"
 msgstr "图生视频"
@@ -17875,12 +17890,12 @@ msgstr "此聊天中的图像（{0}）"
 msgid "Images that require current knowledge, web search context, or complex reasoning about the subject matter"
 msgstr "需要最新知识、网页搜索上下文或对主题进行复杂推理的图像"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:312
+#: src/features/settings/components/chat/default-models-settings.tsx:388
 #: src/features/settings/lib/settings-keywords.ts:76
 msgid "Images to image"
 msgstr "多图生图"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:354
+#: src/features/settings/components/chat/default-models-settings.tsx:430
 #: src/features/settings/lib/settings-keywords.ts:79
 msgid "Images to video"
 msgstr "多图生视频"
@@ -20282,7 +20297,7 @@ msgstr "正在加载你的服务器、连接器和电脑…"
 #: src/features/settings/components/chat/agent-settings.tsx:90
 #: src/features/settings/components/chat/api-keys-settings.tsx:462
 #: src/features/settings/components/chat/custom-providers-settings.tsx:343
-#: src/features/settings/components/chat/default-models-settings.tsx:185
+#: src/features/settings/components/chat/default-models-settings.tsx:261
 #: src/features/settings/components/chat/native-providers-settings.tsx:396
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:291
 #: src/features/settings/components/chat/trigger-settings.tsx:974
@@ -21652,7 +21667,7 @@ msgstr "Mistral 最小的 3B 多模态模型"
 msgid "mix"
 msgstr "混合"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:376
+#: src/features/settings/components/chat/default-models-settings.tsx:452
 #: src/features/settings/lib/settings-keywords.ts:81
 msgid "Mixed to video"
 msgstr "混合转视频"
@@ -22071,10 +22086,12 @@ msgid "Move {label} up in starred"
 msgstr "将{label}在星标中上移"
 
 #: src/features/projects/components/project-rule-files.tsx:280
+#: src/features/settings/components/chat/default-models-settings.tsx:209
 msgid "Move {name} down"
 msgstr "下移 {name}"
 
 #: src/features/projects/components/project-rule-files.tsx:277
+#: src/features/settings/components/chat/default-models-settings.tsx:200
 msgid "Move {name} up"
 msgstr "上移 {name}"
 
@@ -23362,7 +23379,7 @@ msgstr "无麦克风"
 msgid "No microphone found."
 msgstr "未找到麦克风。"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:93
+#: src/features/settings/components/chat/default-models-settings.tsx:96
 msgid "No models available"
 msgstr "没有可用的模型"
 
@@ -23784,7 +23801,6 @@ msgstr "无"
 
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:19
 #: src/features/chat/thread/ask-user-questions.tsx:87
-#: src/features/settings/components/chat/default-models-settings.tsx:165
 #: src/features/skills/components/skill-form-dialog.tsx:320
 #: src/features/skills/components/skill-form-dialog.tsx:334
 msgid "None"
@@ -28688,6 +28704,7 @@ msgstr "从屏蔽列表中移除 {modelId}"
 
 #: src/features/pages/components/page-share-dialog.tsx:185
 #: src/features/projects/components/project-repositories.tsx:359
+#: src/features/settings/components/chat/default-models-settings.tsx:218
 msgid "Remove {name}"
 msgstr "移除 {name}"
 
@@ -33930,8 +33947,8 @@ msgstr "系统"
 msgid "System (default)"
 msgstr "系统（默认）"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:81
-#: src/features/settings/components/chat/default-models-settings.tsx:119
+#: src/features/settings/components/chat/default-models-settings.tsx:84
+#: src/features/settings/components/chat/default-models-settings.tsx:122
 msgid "System default"
 msgstr "系统默认"
 
@@ -34429,7 +34446,7 @@ msgstr "文本"
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:130
 #: src/features/marketing/components/landing-footer.tsx:164
-#: src/features/settings/components/chat/default-models-settings.tsx:238
+#: src/features/settings/components/chat/default-models-settings.tsx:314
 #: src/features/settings/components/chat/models-settings.tsx:45
 #: src/features/settings/lib/settings-keywords.ts:70
 #: src/features/settings/lib/settings-keywords.ts:71
@@ -34525,7 +34542,7 @@ msgstr "答案必须包含的文本（不区分大小写）"
 msgid "Text the answer must not contain"
 msgstr "答案不得包含的文本"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:290
+#: src/features/settings/components/chat/default-models-settings.tsx:366
 #: src/features/settings/lib/settings-keywords.ts:74
 msgid "Text to image"
 msgstr "文本转图像"
@@ -34542,12 +34559,12 @@ msgstr "要朗读的文本"
 msgid "Text to Speech"
 msgstr "文本转语音"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:246
+#: src/features/settings/components/chat/default-models-settings.tsx:322
 #: src/features/settings/lib/settings-keywords.ts:70
 msgid "Text to text"
 msgstr "文本转文本"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:332
+#: src/features/settings/components/chat/default-models-settings.tsx:408
 #: src/features/settings/lib/settings-keywords.ts:77
 msgid "Text to video"
 msgstr "文本转视频"
@@ -37797,6 +37814,10 @@ msgstr "取消归档"
 msgid "Unarchive thread"
 msgstr "取消归档对话"
 
+#: src/features/settings/components/chat/default-models-settings.tsx:197
+msgid "Unavailable"
+msgstr "不可用"
+
 #: src/features/admin/components/ban-user-dialog.tsx:89
 #: src/features/admin/components/ban-user-dialog.tsx:99
 #: src/features/admin/components/user-cell.tsx:137
@@ -38091,6 +38112,10 @@ msgstr "无标题工作流"
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:18
 msgid "up"
 msgstr "向上"
+
+#: src/features/settings/components/chat/default-models-settings.tsx:233
+msgid "Up to {limit}, tried in the order listed"
+msgstr "最多 {limit} 个，按列表顺序尝试"
 
 #: src/features/workflow/components/version-history.tsx:150
 msgid "Up to {MAX_HISTORY_ENTRIES} versions saved"
@@ -39035,7 +39060,7 @@ msgstr "视频"
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:132
 #: src/features/marketing/components/landing-footer.tsx:166
-#: src/features/settings/components/chat/default-models-settings.tsx:324
+#: src/features/settings/components/chat/default-models-settings.tsx:400
 #: src/features/settings/components/chat/models-settings.tsx:46
 #: src/features/settings/lib/settings-keywords.ts:77
 #: src/features/settings/lib/settings-keywords.ts:78
@@ -39114,12 +39139,12 @@ msgstr "视频结果"
 msgid "Video thumbnail"
 msgstr "视频缩略图"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:268
+#: src/features/settings/components/chat/default-models-settings.tsx:344
 #: src/features/settings/lib/settings-keywords.ts:72
 msgid "Video to text"
 msgstr "视频转文本"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:365
+#: src/features/settings/components/chat/default-models-settings.tsx:441
 #: src/features/settings/lib/settings-keywords.ts:80
 msgid "Video to video"
 msgstr "视频转视频"

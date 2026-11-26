@@ -15,18 +15,21 @@ import {
     DEFAULT_VIDEO_TO_VIDEO_MODEL,
 } from "@neore/ai/constants";
 import type { GatewayModel } from "@neore/ai/models";
+import { MAX_BACKUP_MODELS, storedBackupModels } from "@neore/backend/chat/backup-models";
 import { ProviderIcon } from "@neore/ui/components/ai-elements/provider-icon";
+import { Button } from "@neore/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Label } from "@neore/ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
 import { Separator } from "@neore/ui/components/separator";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { ArrowDown, ArrowUp, X } from "lucide-react";
 import type { FC } from "react";
 import { useId } from "react";
 import { toast } from "sonner";
 
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
-import { offerableBackupModels } from "@/features/settings/lib/backup-model-options";
+import { moveBackupModel, offerableBackupModels } from "@/features/settings/lib/backup-model-options";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -137,38 +140,111 @@ export const ModelSelect = <Field extends string>({
     );
 };
 
-/** The model a reply is retried on, once, when the chosen model fails with an infrastructure error. */
-const BackupModelSetting: FC<{ disabled?: boolean; models: GatewayModel[]; providersWithKey: ReadonlySet<string> }> = ({
+/**
+ * The models a reply is retried on, in order, when the chosen model fails with an infrastructure error. A saved model
+ * the list no longer offers (retired, or now outside the plan) stays listed as unavailable, so it can still be removed.
+ */
+const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[]; providersWithKey: ReadonlySet<string> }> = ({
     disabled,
     models: allModels,
     providersWithKey,
 }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
+    const labelId = useId();
     const { data: access } = useQuery(crpc.auth.functions.getPaidModelAccess.queryOptions({}, { live: false }));
     // The backend's own answer, not a client-side guess; the save re-checks it.
-    const models = offerableBackupModels(allModels, access?.canRunPaidModels === true, providersWithKey);
+    const offerable = offerableBackupModels(allModels, access?.canRunPaidModels === true, providersWithKey);
     const { data: userSettings } = useUserSettings();
     const { isPending, updateLatest } = useUpdateUserSettings();
+    const chosen = storedBackupModels(userSettings);
+    const busy = disabled || isPending;
+    const limit = MAX_BACKUP_MODELS;
 
-    const handleChange = (_field: "backupModel", modelId: string | null) => {
-        // "" clears it: a patch cannot carry an absent value.
-        updateLatest(() => {
-            return { backupModel: modelId ?? "" };
-        }).catch(() => toast.error(t`Failed to update backup model`));
+    // Built from the cached settings when its turn comes, so two quick edits never undo each other.
+    const save = (edit: (backupModels: string[]) => string[]) => {
+        updateLatest((current) => {
+            return { backupModels: edit(storedBackupModels(current)) };
+        }).catch(() => toast.error(t`Failed to update backup models`));
     };
 
     return (
-        <ModelSelect
-            description={t`If your chosen model is unavailable, the reply is retried once on this model`}
-            disabled={disabled || isPending}
-            emptyLabel={t`None`}
-            field="backupModel"
-            label={t`Backup model`}
-            models={models}
-            onChange={handleChange}
-            value={userSettings?.backupModel || undefined}
-        />
+        <div className="space-y-3">
+            <div className="space-y-0.5">
+                <Label className="text-sm font-medium" id={labelId}>
+                    {t`Backup models`}
+                </Label>
+                <p className="text-muted-foreground text-xs">{t`If your chosen model is unavailable, the reply is retried on these models in order`}</p>
+            </div>
+            {chosen.length > 0 && (
+                <ol aria-labelledby={labelId} className="space-y-1">
+                    {chosen.map((id, index) => {
+                        const model = allModels.find((m) => m.id === id);
+                        const name = model?.name ?? id;
+
+                        return (
+                            <li className="flex items-center gap-2" key={id}>
+                                <span className="text-muted-foreground w-4 shrink-0 text-xs tabular-nums">{index + 1}.</span>
+                                <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
+                                    {model && (
+                                        <ProviderIcon
+                                            className="size-3 shrink-0"
+                                            provider={model.provider ?? model.displayProvider ?? ""}
+                                            providerIcon={model.id.split("/", 1)[0] ?? model.displayProvider ?? ""}
+                                        />
+                                    )}
+                                    <span className="truncate">{name}</span>
+                                    {offerable.every((m) => m.id !== id) && <span className="text-muted-foreground shrink-0 text-xs">{t`Unavailable`}</span>}
+                                </span>
+                                <Button
+                                    aria-label={t`Move ${name} up`}
+                                    disabled={busy || index === 0}
+                                    onClick={() => save((list) => moveBackupModel(list, id, -1))}
+                                    size="icon-sm"
+                                    variant="ghost"
+                                >
+                                    <ArrowUp aria-hidden />
+                                </Button>
+                                <Button
+                                    aria-label={t`Move ${name} down`}
+                                    disabled={busy || index === chosen.length - 1}
+                                    onClick={() => save((list) => moveBackupModel(list, id, 1))}
+                                    size="icon-sm"
+                                    variant="ghost"
+                                >
+                                    <ArrowDown aria-hidden />
+                                </Button>
+                                <Button
+                                    aria-label={t`Remove ${name}`}
+                                    disabled={busy}
+                                    onClick={() => save((list) => list.filter((entry) => entry !== id))}
+                                    size="icon-sm"
+                                    variant="ghost"
+                                >
+                                    <X aria-hidden />
+                                </Button>
+                            </li>
+                        );
+                    })}
+                </ol>
+            )}
+            {chosen.length < limit && (
+                <ModelSelect
+                    description={t`Up to ${limit}, tried in the order listed`}
+                    disabled={busy}
+                    emptyLabel={t`Choose a model`}
+                    field="backupModels"
+                    label={chosen.length === 0 ? t`Add a backup model` : t`Add another backup model`}
+                    models={offerable.filter((m) => !chosen.includes(m.id))}
+                    onChange={(_field, modelId) => {
+                        if (modelId) {
+                            save((list) => (list.includes(modelId) || list.length >= limit ? list : [...list, modelId]));
+                        }
+                    }}
+                    value={undefined}
+                />
+            )}
+        </div>
     );
 };
 
@@ -272,7 +348,7 @@ const DefaultModelsSettings: FC = () => {
                         value={defaults.videoToText}
                     />
                     <Separator />
-                    <BackupModelSetting disabled={isPending} models={textModels} providersWithKey={providersWithKey} />
+                    <BackupModelsSetting disabled={isPending} models={textModels} providersWithKey={providersWithKey} />
                 </CardContent>
             </Card>
 

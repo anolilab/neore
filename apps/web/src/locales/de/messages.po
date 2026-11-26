@@ -130,7 +130,7 @@ msgstr "(nur Anhänge)"
 msgid "(broken link: what it links to could not be found)"
 msgstr "(defekter Link: das Ziel wurde nicht gefunden)"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:116
+#: src/features/settings/components/chat/default-models-settings.tsx:119
 msgid "(default)"
 msgstr "(Standard)"
 
@@ -2569,6 +2569,10 @@ msgstr "{0} hinzufügen"
 msgid "Add {shapeLabel}"
 msgstr "{shapeLabel} hinzufügen"
 
+#: src/features/settings/components/chat/default-models-settings.tsx:237
+msgid "Add a backup model"
+msgstr "Backup-Modell hinzufügen"
+
 #: src/features/pages/components/page-comments-panel.tsx:146
 msgid "Add a comment"
 msgstr "Kommentar hinzufügen"
@@ -2627,6 +2631,10 @@ msgstr "Füge deinem Konto eine zusätzliche Sicherheitsebene hinzu, indem du di
 #: src/features/onboarding/components/setup-checklist.tsx:132
 msgid "Add an SSH server"
 msgstr "SSH-Server hinzufügen"
+
+#: src/features/settings/components/chat/default-models-settings.tsx:237
+msgid "Add another backup model"
+msgstr "Weiteres Backup-Modell hinzufügen"
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:261
 msgid "Add at least one deployment name"
@@ -5115,10 +5123,13 @@ msgstr "Sicherungscode ist erforderlich"
 msgid "Backup Codes"
 msgstr "Sicherungscodes"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:167
 #: src/features/settings/lib/settings-keywords.ts:73
 msgid "Backup model"
 msgstr "Backup-Modell"
+
+#: src/features/settings/components/chat/default-models-settings.tsx:175
+msgid "Backup models"
+msgstr "Backup-Modelle"
 
 #: src/features/marketing/data/models-data.ts:83
 #: src/features/marketing/data/models-data.ts:225
@@ -6800,6 +6811,10 @@ msgstr "Chinesisch (Traditionell)"
 msgid "Choose .md or .zip"
 msgstr ".md oder .zip auswählen"
 
+#: src/features/settings/components/chat/default-models-settings.tsx:235
+msgid "Choose a model"
+msgstr "Modell wählen"
+
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:430
 msgid "Choose a model for each kind of work the assistant hands to a sub-agent. A role with a model is offered to the assistant; one without stays off."
 msgstr "Wähle ein Modell für jede Art von Arbeit, die der Assistent an einen Sub-Agenten abgibt. Eine Rolle mit Modell wird dem Assistenten angeboten; eine ohne bleibt aus."
@@ -6832,15 +6847,15 @@ msgstr "Wähle mindestens eine Berechtigung"
 msgid "Choose bundle file"
 msgstr "Bundle-Datei auswählen"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:283
+#: src/features/settings/components/chat/default-models-settings.tsx:359
 msgid "Choose default image models"
 msgstr "Standard-Bildmodelle auswählen"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:239
+#: src/features/settings/components/chat/default-models-settings.tsx:315
 msgid "Choose default text models"
 msgstr "Standard-Textmodelle auswählen"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:325
+#: src/features/settings/components/chat/default-models-settings.tsx:401
 msgid "Choose default video models"
 msgstr "Standard-Videomodelle auswählen"
 
@@ -10486,51 +10501,51 @@ msgstr "Standardmodell"
 msgid "Default Model"
 msgstr "Standardmodell"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:340
+#: src/features/settings/components/chat/default-models-settings.tsx:416
 msgid "Default model for animating a single image"
 msgstr "Standardmodell zum Animieren eines einzelnen Bildes"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:243
+#: src/features/settings/components/chat/default-models-settings.tsx:319
 msgid "Default model for chat and text generation"
 msgstr "Standardmodell für Chat und Textgenerierung"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:309
+#: src/features/settings/components/chat/default-models-settings.tsx:385
 msgid "Default model for combining multiple reference images"
 msgstr "Standardmodell zum Kombinieren mehrerer Referenzbilder"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:362
+#: src/features/settings/components/chat/default-models-settings.tsx:438
 msgid "Default model for editing or transforming existing video"
 msgstr "Standardmodell zum Bearbeiten oder Umwandeln vorhandener Videos"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:287
+#: src/features/settings/components/chat/default-models-settings.tsx:363
 msgid "Default model for generating images from text prompts"
 msgstr "Standardmodell zum Generieren von Bildern aus Text-Prompts"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:351
+#: src/features/settings/components/chat/default-models-settings.tsx:427
 msgid "Default model for generating video from multiple images"
 msgstr "Standardmodell zum Generieren von Videos aus mehreren Bildern"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:329
+#: src/features/settings/components/chat/default-models-settings.tsx:405
 msgid "Default model for generating video from text prompts"
 msgstr "Standardmodell zum Generieren von Videos aus Text-Prompts"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:254
+#: src/features/settings/components/chat/default-models-settings.tsx:330
 msgid "Default model for image understanding and analysis"
 msgstr "Standardmodell für Bildverständnis und -analyse"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:298
+#: src/features/settings/components/chat/default-models-settings.tsx:374
 msgid "Default model for transforming existing images"
 msgstr "Standardmodell zum Umwandeln vorhandener Bilder"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:373
+#: src/features/settings/components/chat/default-models-settings.tsx:449
 msgid "Default model for video generation from mixed inputs"
 msgstr "Standardmodell für Videogenerierung aus gemischten Eingaben"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:265
+#: src/features/settings/components/chat/default-models-settings.tsx:341
 msgid "Default model for video understanding and transcription"
 msgstr "Standardmodell für Videoverständnis und Transkription"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:225
+#: src/features/settings/components/chat/default-models-settings.tsx:301
 msgid "Default model updated"
 msgstr "Standardmodell aktualisiert"
 
@@ -14492,9 +14507,9 @@ msgstr "Anheften des Threads konnte nicht aufgehoben werden"
 msgid "Failed to update agent settings"
 msgstr "Agent-Einstellungen konnten nicht aktualisiert werden"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:158
-msgid "Failed to update backup model"
-msgstr "Das Backup-Modell konnte nicht aktualisiert werden"
+#: src/features/settings/components/chat/default-models-settings.tsx:168
+msgid "Failed to update backup models"
+msgstr "Die Backup-Modelle konnten nicht aktualisiert werden"
 
 #: src/features/settings/components/chat/agent-settings.tsx:80
 msgid "Failed to update browser click settings"
@@ -14508,7 +14523,7 @@ msgstr "Konfiguration konnte nicht aktualisiert werden"
 msgid "Failed to update connection"
 msgstr "Verbindung konnte nicht aktualisiert werden"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:219
+#: src/features/settings/components/chat/default-models-settings.tsx:295
 msgid "Failed to update default model"
 msgstr "Standardmodell konnte nicht aktualisiert werden"
 
@@ -17671,9 +17686,9 @@ msgstr "Wenn dieses Problem weiterhin besteht, wende dich bitte an den Support."
 msgid "If you turn it on, the next run is {0}."
 msgstr "Wenn du es einschaltest, ist die nächste Ausführung {0}."
 
-#: src/features/settings/components/chat/default-models-settings.tsx:163
-msgid "If your chosen model is unavailable, the reply is retried once on this model"
-msgstr "Ist das gewählte Modell nicht verfügbar, wird die Antwort einmal mit diesem Modell wiederholt"
+#: src/features/settings/components/chat/default-models-settings.tsx:177
+msgid "If your chosen model is unavailable, the reply is retried on these models in order"
+msgstr "Ist das gewählte Modell nicht verfügbar, wird die Antwort der Reihe nach mit diesen Modellen wiederholt"
 
 #: src/features/skills/components/bundle-import-dialog.tsx:123
 msgid "Ignored, not available here:"
@@ -17696,7 +17711,7 @@ msgstr "Illustration"
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:131
 #: src/features/marketing/components/landing-footer.tsx:165
-#: src/features/settings/components/chat/default-models-settings.tsx:282
+#: src/features/settings/components/chat/default-models-settings.tsx:358
 #: src/features/settings/components/chat/models-settings.tsx:41
 #: src/features/settings/lib/settings-keywords.ts:74
 #: src/features/settings/lib/settings-keywords.ts:75
@@ -17790,17 +17805,17 @@ msgstr "Bild angeheftet"
 msgid "Image to apply the style to (or use input from previous node)"
 msgstr "Bild, auf das der Stil angewendet wird (oder Eingabe des vorherigen Nodes verwenden)"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:301
+#: src/features/settings/components/chat/default-models-settings.tsx:377
 #: src/features/settings/lib/settings-keywords.ts:75
 msgid "Image to image"
 msgstr "Bild zu Bild"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:257
+#: src/features/settings/components/chat/default-models-settings.tsx:333
 #: src/features/settings/lib/settings-keywords.ts:71
 msgid "Image to text"
 msgstr "Bild zu Text"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:343
+#: src/features/settings/components/chat/default-models-settings.tsx:419
 #: src/features/settings/lib/settings-keywords.ts:78
 msgid "Image to video"
 msgstr "Bild zu Video"
@@ -17875,12 +17890,12 @@ msgstr "Bilder in diesem Chat ({0})"
 msgid "Images that require current knowledge, web search context, or complex reasoning about the subject matter"
 msgstr "Bilder, die aktuelles Wissen, Websuche-Kontext oder komplexes Reasoning über das Motiv erfordern"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:312
+#: src/features/settings/components/chat/default-models-settings.tsx:388
 #: src/features/settings/lib/settings-keywords.ts:76
 msgid "Images to image"
 msgstr "Bilder zu Bild"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:354
+#: src/features/settings/components/chat/default-models-settings.tsx:430
 #: src/features/settings/lib/settings-keywords.ts:79
 msgid "Images to video"
 msgstr "Bilder zu Video"
@@ -20282,7 +20297,7 @@ msgstr "Deine Server, Connectoren und Computer werden geladen…"
 #: src/features/settings/components/chat/agent-settings.tsx:90
 #: src/features/settings/components/chat/api-keys-settings.tsx:462
 #: src/features/settings/components/chat/custom-providers-settings.tsx:343
-#: src/features/settings/components/chat/default-models-settings.tsx:185
+#: src/features/settings/components/chat/default-models-settings.tsx:261
 #: src/features/settings/components/chat/native-providers-settings.tsx:396
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:291
 #: src/features/settings/components/chat/trigger-settings.tsx:974
@@ -21652,7 +21667,7 @@ msgstr "Mistrals kleinstes multimodales 3B-Modell"
 msgid "mix"
 msgstr "mischen"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:376
+#: src/features/settings/components/chat/default-models-settings.tsx:452
 #: src/features/settings/lib/settings-keywords.ts:81
 msgid "Mixed to video"
 msgstr "Gemischt zu Video"
@@ -22071,10 +22086,12 @@ msgid "Move {label} up in starred"
 msgstr "{label} in Markierungen nach oben verschieben"
 
 #: src/features/projects/components/project-rule-files.tsx:280
+#: src/features/settings/components/chat/default-models-settings.tsx:209
 msgid "Move {name} down"
 msgstr "{name} nach unten verschieben"
 
 #: src/features/projects/components/project-rule-files.tsx:277
+#: src/features/settings/components/chat/default-models-settings.tsx:200
 msgid "Move {name} up"
 msgstr "{name} nach oben verschieben"
 
@@ -23362,7 +23379,7 @@ msgstr "Kein Mikrofon"
 msgid "No microphone found."
 msgstr "Kein Mikrofon gefunden."
 
-#: src/features/settings/components/chat/default-models-settings.tsx:93
+#: src/features/settings/components/chat/default-models-settings.tsx:96
 msgid "No models available"
 msgstr "Keine Modelle verfügbar"
 
@@ -23784,7 +23801,6 @@ msgstr "keine"
 
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:19
 #: src/features/chat/thread/ask-user-questions.tsx:87
-#: src/features/settings/components/chat/default-models-settings.tsx:165
 #: src/features/skills/components/skill-form-dialog.tsx:320
 #: src/features/skills/components/skill-form-dialog.tsx:334
 msgid "None"
@@ -28688,6 +28704,7 @@ msgstr "{modelId} von der Sperrliste entfernen"
 
 #: src/features/pages/components/page-share-dialog.tsx:185
 #: src/features/projects/components/project-repositories.tsx:359
+#: src/features/settings/components/chat/default-models-settings.tsx:218
 msgid "Remove {name}"
 msgstr "{name} entfernen"
 
@@ -33930,8 +33947,8 @@ msgstr "System"
 msgid "System (default)"
 msgstr "System (Standard)"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:81
-#: src/features/settings/components/chat/default-models-settings.tsx:119
+#: src/features/settings/components/chat/default-models-settings.tsx:84
+#: src/features/settings/components/chat/default-models-settings.tsx:122
 msgid "System default"
 msgstr "Systemstandard"
 
@@ -34429,7 +34446,7 @@ msgstr "Text"
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:130
 #: src/features/marketing/components/landing-footer.tsx:164
-#: src/features/settings/components/chat/default-models-settings.tsx:238
+#: src/features/settings/components/chat/default-models-settings.tsx:314
 #: src/features/settings/components/chat/models-settings.tsx:45
 #: src/features/settings/lib/settings-keywords.ts:70
 #: src/features/settings/lib/settings-keywords.ts:71
@@ -34525,7 +34542,7 @@ msgstr "Text, den die Antwort enthalten muss (ohne Beachtung der Groß-/Kleinsch
 msgid "Text the answer must not contain"
 msgstr "Text, den die Antwort nicht enthalten darf"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:290
+#: src/features/settings/components/chat/default-models-settings.tsx:366
 #: src/features/settings/lib/settings-keywords.ts:74
 msgid "Text to image"
 msgstr "Text zu Bild"
@@ -34542,12 +34559,12 @@ msgstr "Text zu Sprache"
 msgid "Text to Speech"
 msgstr "Text zu Sprache"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:246
+#: src/features/settings/components/chat/default-models-settings.tsx:322
 #: src/features/settings/lib/settings-keywords.ts:70
 msgid "Text to text"
 msgstr "Text zu Text"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:332
+#: src/features/settings/components/chat/default-models-settings.tsx:408
 #: src/features/settings/lib/settings-keywords.ts:77
 msgid "Text to video"
 msgstr "Text zu Video"
@@ -37797,6 +37814,10 @@ msgstr "Archivierung aufheben"
 msgid "Unarchive thread"
 msgstr "Thread aus dem Archiv holen"
 
+#: src/features/settings/components/chat/default-models-settings.tsx:197
+msgid "Unavailable"
+msgstr "Nicht verfügbar"
+
 #: src/features/admin/components/ban-user-dialog.tsx:89
 #: src/features/admin/components/ban-user-dialog.tsx:99
 #: src/features/admin/components/user-cell.tsx:137
@@ -38091,6 +38112,10 @@ msgstr "Unbenannter Workflow"
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:18
 msgid "up"
 msgstr "hoch"
+
+#: src/features/settings/components/chat/default-models-settings.tsx:233
+msgid "Up to {limit}, tried in the order listed"
+msgstr "Bis zu {limit}, in der angezeigten Reihenfolge versucht"
 
 #: src/features/workflow/components/version-history.tsx:150
 msgid "Up to {MAX_HISTORY_ENTRIES} versions saved"
@@ -39035,7 +39060,7 @@ msgstr "Video"
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:132
 #: src/features/marketing/components/landing-footer.tsx:166
-#: src/features/settings/components/chat/default-models-settings.tsx:324
+#: src/features/settings/components/chat/default-models-settings.tsx:400
 #: src/features/settings/components/chat/models-settings.tsx:46
 #: src/features/settings/lib/settings-keywords.ts:77
 #: src/features/settings/lib/settings-keywords.ts:78
@@ -39114,12 +39139,12 @@ msgstr "Videoergebnis"
 msgid "Video thumbnail"
 msgstr "Video-Vorschaubild"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:268
+#: src/features/settings/components/chat/default-models-settings.tsx:344
 #: src/features/settings/lib/settings-keywords.ts:72
 msgid "Video to text"
 msgstr "Video zu Text"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:365
+#: src/features/settings/components/chat/default-models-settings.tsx:441
 #: src/features/settings/lib/settings-keywords.ts:80
 msgid "Video to video"
 msgstr "Video zu Video"
