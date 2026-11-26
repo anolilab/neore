@@ -1,6 +1,7 @@
 import { MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH } from "@neore/ai/constants";
 import { v } from "lunorash/server";
 
+import { MAX_BACKUP_MODELS } from "../chat/lib/backup-model";
 import { MAX_SEARCH_DOMAIN_BLOCKLIST } from "../chat/tools/search-domains";
 import { MAX_LENGTH } from "../lib/validators";
 import { MAX_MODEL_NICKNAME_LENGTH, MAX_MODEL_NICKNAMES } from "./lib/model-nicknames";
@@ -39,7 +40,13 @@ export const userSettingsFieldsWithoutUserId = {
         }),
     ),
     autoReadReplies: v.optional(v.boolean()), // Speak every finished assistant reply aloud. OPT-IN: absent means off.
-    backupModel: v.optional(v.string().max(MAX_LENGTH.short)), // Model a reply is retried on once when the chosen model fails with an infrastructure error. "" or absent = none. Checked against the registry in `settingsUpsert`.
+    backupModel: v.optional(v.string().max(MAX_LENGTH.short)), // The single backup model saved before `backupModels`; a write of it alone also sets `backupModels`. "" clears it.
+    // Models a reply is retried on, in order, when the chosen model fails with an infrastructure error. Empty = none. Checked against the registry in `settingsUpsert`.
+    backupModels: v.optional(
+        v.array(v.string().max(MAX_LENGTH.short)).check((value) => value.length <= MAX_BACKUP_MODELS, {
+            message: `At most ${MAX_BACKUP_MODELS} backup models`,
+        }),
+    ),
     // Appearance: cap long chat code blocks at 24 lines with an expand toggle. Absent means ON.
     capLongCodeBlocks: v.optional(v.boolean()),
     // In-app toasts for chat events (`features/notifications/lib/chat-toasts.ts`). Absent means ON.

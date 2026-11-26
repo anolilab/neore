@@ -3,7 +3,7 @@ import { v } from "lunorash/server";
 import { LunoraError } from "lunorash/server";
 
 import { api } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { ActionCtx as ActionContext, MutationCtx as MutationContext, QueryCtx as QueryContext } from "../_generated/server";
 
 import { internal } from "../_generated/internal";
@@ -36,7 +36,7 @@ import { MAX_LENGTH } from "../lib/validators";
 import { liveTrustedServers } from "../chat/lib/low-risk-trust";
 import { callerRestrictsFull } from "../chat/lib/new-chat-mode";
 import { normalizeSearchDomainBlocklist } from "../chat/tools/search-domains";
-import { backupFilterRejection, eligibleBackupModel } from "../chat/lib/backup-model";
+import { backupFilterRejection, eligibleBackupModel, MAX_BACKUP_MODELS, storedBackupModels } from "../chat/lib/backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "../chat/lib/paid-model";
 import { normalizeModelNicknames } from "./lib/model-nicknames";
 import { changesPersonalization, PERSONALIZATION_FIELDS } from "./lib/personalization";
@@ -153,6 +153,68 @@ const applyRateLimit = async (context: ActionContext | MutationContext, limitNam
  */
 export type SettingsTable = "aiUserPreferences" | "userSettings";
 
+/**
+ * Refuses a backup list a chat reply could not use: more than `MAX_BACKUP_MODELS`, a repeat, or a model that is not a
+ * registry text model, that the user's model filters exclude, or that their plan cannot run. An entry already saved is
+ * not checked again, so a list holding one that has since been retired can still be reordered or shortened; runs skip
+ * it (`resolveBackupModelIds`).
+ */
+const assertBackupModelsAllowed = async (context: MutationContext, userId: string, backupModels: string[], saved: string[]): Promise<void> => {
+    if (backupModels.length > MAX_BACKUP_MODELS) {
+        throw new LunoraError("BAD_REQUEST", `At most ${MAX_BACKUP_MODELS} backup models`);
+    }
+
+    if (new Set(backupModels).size !== backupModels.length) {
+        throw new LunoraError("BAD_REQUEST", "A backup model is listed twice");
+    }
+
+    const added = backupModels.filter((id) => !saved.includes(id));
+
+    if (added.length === 0) {
+        return;
+    }
+
+    const preferences = await context.db
+        .query("aiUserPreferences")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .unique();
+    let plan: Awaited<ReturnType<typeof readUserRunPlan>> | undefined;
+
+    for (const id of added) {
+        const backup = eligibleBackupModel(id, "");
+
+        if (!backup) {
+            throw new LunoraError("BAD_REQUEST", "Not a model that can be used as a backup");
+        }
+
+        // The user's model filters as they stand: the gateway would answer MODEL_BLOCKED for a backup they exclude.
+        const excluded = backupFilterRejection(backup, preferences?.modelFilterRules ?? undefined);
+
+        if (excluded) {
+            throw new LunoraError("BAD_REQUEST", `Your model filters exclude this backup model: ${excluded}`);
+        }
+
+        // The run's own gate (`canRunPaidModel`): a backup the plan cannot run would be dropped at run time.
+        const allowed = await allowsPaidModel(
+            backup,
+            async () => {
+                plan ??= await readUserRunPlan(context, userId);
+
+                return plan;
+            },
+            async () => {
+                const entry = (preferences?.providerApiKeys as Record<string, { enabled?: boolean; encryptedKey?: string }> | undefined)?.[backup.provider];
+
+                return Boolean(entry?.enabled && entry.encryptedKey);
+            },
+        );
+
+        if (!allowed) {
+            throw new LunoraError("BAD_REQUEST", paidModelRefusal(backup.name ?? backup.id, byokPaysFor(backup)));
+        }
+    }
+};
+
 const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, ctx: context }: { args: Record<string, unknown>; ctx: MutationContext }) => {
     const user = await getSessionUser(context);
     const userId = user?.userId;
@@ -238,40 +300,19 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
             toStore.searchDomainBlocklist = domains;
         }
 
-        // A backup model must be one a chat reply can run on; "" clears it.
-        if (typeof toStore.backupModel === "string" && toStore.backupModel !== "") {
-            const backup = eligibleBackupModel(toStore.backupModel, "");
+        // The backup list and the single value saved before it are kept in step: a write of either sets both, so a reader
+        // of either sees the same first backup. An older client writes `backupModel` alone, and that edits only the first
+        // entry: a model replaces it (and leaves its later place), "" removes it, and the rest of the list stays.
+        if (Array.isArray(toStore.backupModels) || typeof toStore.backupModel === "string") {
+            const saved = storedBackupModels(settings as Doc<"userSettings"> | null);
+            const single = toStore.backupModel as string;
+            const backupModels = Array.isArray(toStore.backupModels)
+                ? (toStore.backupModels as string[])
+                : [single, ...saved.slice(1).filter((id) => id !== single)].filter(Boolean);
 
-            if (!backup) {
-                throw new LunoraError("BAD_REQUEST", "Not a model that can be used as a backup");
-            }
-
-            const preferences = await context.db
-                .query("aiUserPreferences")
-                .withIndex("by_userId", (q) => q.eq("userId", userId))
-                .unique();
-
-            // The user's model filters as they stand: the gateway would answer MODEL_BLOCKED for a backup they exclude.
-            const excluded = backupFilterRejection(backup, preferences?.modelFilterRules ?? undefined);
-
-            if (excluded) {
-                throw new LunoraError("BAD_REQUEST", `Your model filters exclude this backup model: ${excluded}`);
-            }
-
-            // The run's own gate (`canRunPaidModel`): a backup the plan cannot run would be dropped at run time.
-            const allowed = await allowsPaidModel(
-                backup,
-                async () => await readUserRunPlan(context, userId),
-                async () => {
-                    const entry = (preferences?.providerApiKeys as Record<string, { enabled?: boolean; encryptedKey?: string }> | undefined)?.[backup.provider];
-
-                    return Boolean(entry?.enabled && entry.encryptedKey);
-                },
-            );
-
-            if (!allowed) {
-                throw new LunoraError("BAD_REQUEST", paidModelRefusal(backup.name ?? backup.id, byokPaysFor(backup)));
-            }
+            await assertBackupModelsAllowed(context, userId, backupModels, saved);
+            toStore.backupModels = backupModels;
+            toStore.backupModel = backupModels[0] ?? "";
         }
 
         if (toStore.modelNicknames && typeof toStore.modelNicknames === "object") {
@@ -1116,7 +1157,12 @@ export const getSearchDomainBlocklistQuery = internalQuery
         return userSettings?.searchDomainBlocklist ?? [];
     });
 
-export const getUserSettings = query.input({}).query(async (options) => await settingsGet("userSettings", options));
+export const getUserSettings = query.input({}).query(async (options) => {
+    const settings = await settingsGet("userSettings", options);
+
+    // A row saved before the list existed holds only `backupModel`; a reader of the list gets the backup it names.
+    return settings && { ...settings, backupModels: storedBackupModels(settings) };
+});
 
 export const updateAIUserPreferences = authMutation
     .use(rateLimit("settings/update"))
@@ -1191,7 +1237,7 @@ export const getUserPreferencesQuery = internalQuery
         v.object({
             aboutMe: v.optional(v.string()),
             autoCompactThreshold: v.optional(v.number()),
-            backupModel: v.optional(v.string()),
+            backupModels: v.array(v.string()),
             customInstructions: v.optional(v.string()),
             dictationLanguage: v.optional(v.string()),
             language: v.optional(v.string()),
@@ -1218,7 +1264,7 @@ export const getUserPreferencesQuery = internalQuery
             return {
                 aboutMe: userSettings?.aboutMe ?? undefined,
                 autoCompactThreshold: userSettings?.autoCompactThreshold || undefined, // 0 and absent are both off
-                backupModel: userSettings?.backupModel ?? undefined,
+                backupModels: storedBackupModels(userSettings),
                 customInstructions: userSettings?.customInstructions ?? undefined,
                 dictationLanguage: userSettings?.dictationLanguage ?? undefined,
                 language: userSettings?.language ?? undefined,
@@ -1237,7 +1283,7 @@ export const getUserPreferencesQuery = internalQuery
         } catch {
             return {
                 aboutMe: undefined,
-                backupModel: undefined,
+                backupModels: [],
                 customInstructions: undefined,
                 dictationLanguage: undefined,
                 language: undefined,

@@ -43,7 +43,7 @@ import {
     LEFT_ORGANIZATION_MESSAGE,
     loadModelFilterRules,
     loadUserProviderKeys,
-    resolveBackupModelId,
+    resolveBackupModelIds,
     resolveRunModel,
     retrieveMemoryContext,
     setChainSource,
@@ -352,14 +352,14 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         const existingThreadId = "threadId" in options.thread ? options.thread.threadId : undefined;
         const personal = options.personalization === "full";
         const modelFilterRules = await loadModelFilterRules(ctx, userId);
-        const backupModelId = await resolveBackupModelId(ctx, userId, prefs.backupModel, model, modelFilterRules);
+        const backupModelIds = await resolveBackupModelIds(ctx, userId, prefs.backupModels, model, modelFilterRules);
         // The tools the call carries: after the allowlist, so a run it strips bare is sized for a backup that cannot call tools.
         const runTools = applyToolAllowlist(toolResult.tools, toolAllowlist);
         // Listed only while the run still offers `instruction_read`: the cap, the bot's selection, a skill, the permissions or the
         // allowlist may have removed it like any other tool.
         const instructions = Object.hasOwn(runTools, INSTRUCTION_READ_TOOL) ? (options.projectInstructions?.instructions ?? []) : [];
         const agent = await getAgent(model, {
-            backupModelId,
+            backupModelIds,
             customProvider,
             gateway: gatewayFetch(ctx),
             language: prefs.language,
@@ -384,7 +384,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         const shouldAutoContinue = options.maxSteps === undefined;
         const generateArgs: Record<string, unknown> = {
             ...buildRunStreamArgs({
-                backupModelId,
+                backupModelIds,
                 hasTools: Object.keys(runTools).length > 0,
                 model,
                 reasoningEffort: options.reasoningEffort ?? skill?.config?.reasoningEffort,

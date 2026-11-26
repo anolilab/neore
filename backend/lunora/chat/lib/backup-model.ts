@@ -8,11 +8,26 @@ import {
     type ModelFilterRules,
 } from "@neore/ai/models";
 
+/** How many backup models a user can list; a failed call tries them in order. */
+export const MAX_BACKUP_MODELS = 3;
+
 /**
- * The registry row of the user's backup model (`userSettings.backupModel`), when
- * it can serve a chat reply in place of `primaryModel`: a known, enabled text
- * model the gateway can reach, and not the primary itself. A stored id can go
- * stale (a model is retired), so this is checked on write and again per run.
+ * The user's backup models in order: `backupModels` once it has been saved (an empty list is "none"), otherwise the
+ * single `backupModel` saved before the list existed ("" is none).
+ */
+export const storedBackupModels = (settings: { backupModel?: string | null; backupModels?: ReadonlyArray<string> | null } | null | undefined): string[] => {
+    if (Array.isArray(settings?.backupModels)) {
+        return [...settings.backupModels];
+    }
+
+    return settings?.backupModel ? [settings.backupModel] : [];
+};
+
+/**
+ * The registry row of a backup model, when it can serve a chat reply in place of
+ * `primaryModel`: a known, enabled text model the gateway can reach, and not the
+ * primary itself. A stored id can go stale (a model is retired), so this is
+ * checked on write and again per run.
  */
 export const eligibleBackupModel = (backupModel: string | undefined, primaryModel: string): ModelDefinition | undefined => {
     if (!backupModel || backupModel === primaryModel) {
@@ -26,6 +41,24 @@ export const eligibleBackupModel = (backupModel: string | undefined, primaryMode
     }
 
     return definition;
+};
+
+/** The registry rows of `backupModels` that can serve a reply on `primaryModel`, in order, each model once. */
+export const eligibleBackupModels = (backupModels: ReadonlyArray<string>, primaryModel: string): ModelDefinition[] => {
+    const seen = new Set<string>();
+    const eligible: ModelDefinition[] = [];
+
+    for (const id of backupModels) {
+        const definition = seen.has(id) ? undefined : eligibleBackupModel(id, primaryModel);
+
+        seen.add(id);
+
+        if (definition) {
+            eligible.push(definition);
+        }
+    }
+
+    return eligible.slice(0, MAX_BACKUP_MODELS);
 };
 
 /**

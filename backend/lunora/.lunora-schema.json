@@ -34055,6 +34055,18 @@
           "optional": true,
           "unique": false
         },
+        "backupModels": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
+        },
         "capLongCodeBlocks": {
           "kind": "boolean",
           "nullable": false,

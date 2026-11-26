@@ -17,7 +17,7 @@ vi.mock("../../_generated/internal", async (importOriginal) => mappedReferences(
 
 const seen = vi.hoisted(() => {
     return {
-        backups: [] as (string | undefined)[],
+        backups: [] as (ReadonlyArray<string> | undefined)[],
         /** The bot's permission mode `bots_functions:getBotPermissionModeForRun` answers, and the arguments it was asked with. */
         botMode: null as "auto" | "full" | "supervised" | null,
         botModeFails: false,
@@ -52,7 +52,7 @@ vi.mock("./get-agent", () => {
         default: async (
             _model: string,
             options: {
-                backupModelId?: string;
+                backupModelIds?: ReadonlyArray<string>;
                 language?: string;
                 location?: string;
                 modelFilterRules?: unknown;
@@ -62,7 +62,7 @@ vi.mock("./get-agent", () => {
             },
         ) => {
             seen.tools.push(Object.keys(options.tools ?? {}));
-            seen.backups.push(options.backupModelId);
+            seen.backups.push(options.backupModelIds);
             seen.filters.push(options.modelFilterRules);
 
             const instructions = getSystemPrompt(options.timezone, options.location, options.language, options.personalization);
@@ -486,7 +486,7 @@ describe("runHeadlessAgent backup model", () => {
         ctx.runQuery.mockImplementation(async (reference: string, args: unknown) => {
             const result = await base(reference, args);
 
-            return reference === "auth_functions:getUserPreferencesQuery" ? { ...(result as object), backupModel } : result;
+            return reference === "auth_functions:getUserPreferencesQuery" ? { ...(result as object), backupModels: backupModel ? [backupModel] : [] } : result;
         });
 
         return ctx;
@@ -509,10 +509,10 @@ describe("runHeadlessAgent backup model", () => {
         seen.backups = [];
     });
 
-    it("gives the agent the user's backup model, so an unattended run survives an outage too", async () => {
+    it("gives the agent the user's backup models, so an unattended run survives an outage too", async () => {
         await run(ctxWith(BACKUP));
 
-        expect(seen.backups).toEqual([BACKUP]);
+        expect(seen.backups).toEqual([[BACKUP]]);
     });
 
     it("hands the user's privacy routing rules to the agent that builds the primary and the backup gateway models", async () => {
@@ -526,7 +526,7 @@ describe("runHeadlessAgent backup model", () => {
         }
 
         expect(seen.filters).toEqual([{ requireZDR: true }]);
-        expect(seen.backups).toEqual([BACKUP]);
+        expect(seen.backups).toEqual([[BACKUP]]);
     });
 
     it("gives none when the user's stored model filters exclude it, though the caller passes no rules", async () => {
@@ -538,13 +538,13 @@ describe("runHeadlessAgent backup model", () => {
             seen.filterRules = undefined;
         }
 
-        expect(seen.backups).toEqual([undefined]);
+        expect(seen.backups).toEqual([[]]);
     });
 
     it("gives none when the user set none", async () => {
         await run(ctxWith(undefined));
 
-        expect(seen.backups).toEqual([undefined]);
+        expect(seen.backups).toEqual([[]]);
     });
 });
 
@@ -573,7 +573,7 @@ describe("runHeadlessAgent context sizing for a backup", () => {
 
             const result = await base(reference, args);
 
-            return reference === "auth_functions:getUserPreferencesQuery" ? { ...(result as object), backupModel: NO_TOOLS_BACKUP } : result;
+            return reference === "auth_functions:getUserPreferencesQuery" ? { ...(result as object), backupModels: [NO_TOOLS_BACKUP] } : result;
         });
 
         await runHeadlessAgent(ctx as never, {

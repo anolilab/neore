@@ -1,10 +1,23 @@
 import { MODEL_REGISTRY } from "@neore/ai/models";
 import { describe, expect, it } from "vitest";
 
-import { attachmentsIn, backupCanServe, eligibleBackupModel } from "./backup-model";
+import { attachmentsIn, backupCanServe, eligibleBackupModel, storedBackupModels } from "./backup-model";
 
 const textModels = MODEL_REGISTRY.filter((m) => m.enabled !== false && m.provider !== "external" && (m.mode ?? "text") === "text");
 const [first, second] = textModels;
+
+describe("storedBackupModels", () => {
+    it("reads the single value saved before the list, until a list is saved", () => {
+        expect(storedBackupModels({ backupModel: "a" })).toEqual(["a"]);
+        expect(storedBackupModels({ backupModel: "a", backupModels: ["b", "c"] })).toEqual(["b", "c"]);
+        expect(storedBackupModels({ backupModel: "a", backupModels: [] })).toEqual([]);
+    });
+
+    it("is empty for no settings or a blank single value", () => {
+        expect(storedBackupModels(null)).toEqual([]);
+        expect(storedBackupModels({ backupModel: "" })).toEqual([]);
+    });
+});
 
 describe("eligibleBackupModel", () => {
     it("accepts an enabled text model that is not the primary", () => {
