@@ -71,7 +71,7 @@ const procedureAt = (module: keyof typeof MODULES, name: string): never => {
 const OWNER = "owner-a";
 const ANALYST = { description: "Analyst skill", instructions: "Be the analyst.", name: "analyst", slug: "analyst" };
 
-const body = () => buildBundleMarkdown({ description: "", items: [{ kind: "skill", skill: ANALYST }], name: "Daily brief" });
+const body = () => buildBundleMarkdown({ description: "", items: [{ key: "analyst", kind: "skill", skill: ANALYST }], name: "Daily brief" });
 const pluginFile = (contentHash: string) => withPluginHeader(body(), { contentHash, slug: "daily-brief", version: "1.0.0" });
 
 describe("repair through the action", () => {
@@ -129,5 +129,28 @@ describe("repair through the action", () => {
                 pluginSlug: "daily-brief",
             } as never),
         ).rejects.toThrow("not the file");
+    });
+    it("refuses a repair with a different file that names the same plugin, even with a valid hash of its own", async () => {
+        await as().action(procedureAt("plugins_install_action", "installPlugin"), { contentHash: hash, markdown: pluginFile(hash) } as never);
+
+        const otherBody = buildBundleMarkdown({
+            description: "",
+            items: [{ key: "analyst", kind: "skill", skill: { ...ANALYST, instructions: "Something else entirely." } }],
+            name: "Daily brief",
+        });
+        const otherHash = await bodyHash(otherBody);
+        const otherFile = withPluginHeader(otherBody, { contentHash: otherHash, slug: "daily-brief", version: "1.0.0" });
+
+        await expect(
+            as().action(procedureAt("plugins_repair_resume", "repairPlugin"), {
+                contentHash: otherHash,
+                markdown: otherFile,
+                pluginSlug: "daily-brief",
+            } as never),
+        ).rejects.toThrow("not the file");
+
+        const skills = await run(async (context) => (await context.db.skills.findMany({ where: { userId: OWNER } })).page);
+
+        expect(skills.map((skill: { instructions: string }) => skill.instructions)).toEqual([ANALYST.instructions]);
     });
 });
