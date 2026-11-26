@@ -237,6 +237,65 @@ describe("setPullRequestWatch", () => {
         expect(await watchOf(other)).toBeUndefined();
     });
 
+    it("a stop reaches the older link that holds the running watch, not a newer idle one", async () => {
+        const { linkId: older, threadId } = await seedLink(OWNER, 7, { watch: { startedAt: 1 }, watchActive: true });
+        const newer = await harness.run(async (ctx: any) =>
+            String(
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 2,
+                    kind: "opened",
+                    number: 7,
+                    repository: REPOSITORY,
+                    threadId,
+                    title: "newer",
+                    url: "https://github.com/octo/hello/pull/7",
+                    userId: OWNER,
+                }),
+            ),
+        );
+
+        expect(await call({ number: 7, threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "already" });
+        expect(await call({ number: 7, threadId, userId: OWNER, watching: false })).toStrictEqual({ status: "ok" });
+        expect(await watchOf(older)).toMatchObject({ stoppedAt: expect.any(Number) });
+        expect(await watchOf(newer)).toBeUndefined();
+    });
+
+    it("finds a newer live link even when more than 20 older deleted links of the thread come before it", async () => {
+        const { threadId } = await seedLink(OWNER, 7, { threadDeleted: true });
+
+        const live = await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 25; index += 1) {
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 1,
+                    kind: "linked",
+                    number: 7,
+                    repository: REPOSITORY,
+                    threadDeleted: true,
+                    threadId,
+                    title: "old",
+                    url: "https://github.com/octo/hello/pull/7",
+                    userId: OWNER,
+                });
+            }
+
+            return String(
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 2,
+                    kind: "linked",
+                    number: 7,
+                    repository: REPOSITORY,
+                    threadId,
+                    title: "live",
+                    url: "https://github.com/octo/hello/pull/7",
+                    userId: OWNER,
+                }),
+            );
+        });
+
+        expect(await call({ number: 7, threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "ok" });
+        expect(await watchOf(live)).toMatchObject({ startedAt: expect.any(Number) });
+    });
+
     it("counts legacy running watches, once the backfill has flagged them, against the limit", async () => {
         for (let number = 100; number < 100 + MAX_ACTIVE_PULL_REQUEST_WATCHES; number += 1) {
             await seedLink(OWNER, number, { watch: { startedAt: 1 } });

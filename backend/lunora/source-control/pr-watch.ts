@@ -33,9 +33,9 @@ export const setPullRequestWatch = internalMutation
     })
     .output(v.object({ status: v.union(v.literal("already"), v.literal("capped"), v.literal("not_linked"), v.literal("ok"), v.literal("too_many")) }))
     .mutation(async ({ args, ctx }) => {
-        // One exact, bounded read: the person's links of this thread to this pull request. Deleted rows are skipped
-        // (any number of them up to the bound). Should more than one live row match (a run can open a second link), the newest
-        // is used, so the same row is chosen on every read.
+        // One exact, bounded read: the newest rows of the person's links of this thread to this pull request. Deleted rows are
+        // skipped. Should several live rows match (a run can open a second link), the one holding a running watch wins, so a
+        // stop always reaches it; otherwise the newest live row. Creation time, then id, orders them whatever order the index returned.
         const threadId = ctx.db.normalizeId("threads", args.threadId);
         const rows =
             threadId === null
@@ -45,11 +45,10 @@ export const setPullRequestWatch = internalMutation
                       .withIndex("by_user_and_repository_number_threadId", (q) =>
                           q.eq("userId", args.userId).eq("repository", args.repository).eq("number", args.number).eq("threadId", threadId),
                       )
+                      .order("desc")
                       .take(LINK_LOOKUP_BOUND);
-        // Newest by creation time, the id breaking a tie within one millisecond, whatever order the index returned them in.
-        const link: Doc<"pullRequestThreads"> | undefined = rows
-            .filter((row) => row.threadDeleted !== true)
-            .toSorted((a, b) => b._creationTime - a._creationTime || (a._id < b._id ? 1 : -1))[0];
+        const live = rows.filter((row) => row.threadDeleted !== true).toSorted((a, b) => b._creationTime - a._creationTime || (a._id < b._id ? 1 : -1));
+        const link: Doc<"pullRequestThreads"> | undefined = live.find((row) => row.watch !== undefined && row.watch.stoppedAt === undefined) ?? live[0];
 
         if (link === undefined) {
             return { status: "not_linked" as const };
