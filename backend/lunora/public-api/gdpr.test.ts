@@ -7,6 +7,37 @@ import { collectMcpEventsForExport, deleteUserMcpEvents, EXPORT_EVENT_BYTES, MAX
 const BATCH = 200;
 
 describe("collectMcpEventsForExport", () => {
+    it("stops the scan at the read budget, so a log of near-cap payloads is not read whole", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+        // About 9 KiB each: the read budget (8 MiB) runs out well before the 1000-row scan limit.
+        const data = JSON.stringify({ blob: "x".repeat(9 * 1024) });
+
+        try {
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < 1000; index += 1) {
+                    await context.db.insert("mcpEvents", {
+                        createdAt: 1,
+                        data,
+                        eventId: `run:big-${String(index)}`,
+                        name: "run.completed",
+                        seq: index + 1,
+                        timestamp: 1,
+                        userId: "user",
+                    });
+                }
+            });
+
+            const { events, truncated } = (await harness.run(
+                async (context: any) => await context.runQuery(collectMcpEventsForExport, { userId: "user" }),
+            )) as { events: unknown[]; truncated: boolean };
+
+            expect(truncated).toBe(true);
+            expect(events.length).toBeLessThan(1000);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("keeps the newest events, oldest first, and says the history was cut past the cap", async () => {
         const harness = lunoraTest(schemaWithShardedTables([]) as never);
 

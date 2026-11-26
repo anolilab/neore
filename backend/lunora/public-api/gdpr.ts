@@ -32,6 +32,12 @@ export const EXPORT_EVENT_BYTES = 512 * 1024;
 export const EXPORT_SCAN_LIMIT = 1000;
 
 /**
+ * The bytes of event rows one export may read, kept or skipped, as the export serializes them. Stored payloads run to 16 KiB, so the row
+ * limit alone lets one query read about 16 MiB; this matches the poll's read budget, so the section is cut before the transaction's limit.
+ */
+export const EXPORT_READ_BUDGET = 8 * 1024 * 1024;
+
+/**
  * The user's newest Events, up to {@link MAX_EXPORT_EVENTS}, oldest first, for the export. The data is the event's stored payload,
  * as recorded: the thread it concerns and its outcome or request, never a secret.
  */
@@ -52,6 +58,7 @@ export const collectMcpEventsForExport = internalQuery
         const encoder = new TextEncoder();
         const newest: Doc<"mcpEvents">[] = [];
         let bytes = 0;
+        let read = 0;
         let truncated = false;
         let cursor: string | undefined;
         let more = true;
@@ -80,6 +87,15 @@ export const collectMcpEventsForExport = internalQuery
                 // bytes understate the size.
                 const shaped = { createdAt: row.createdAt, data: row.data, eventId: row.eventId, name: row.name, seq: row.seq, timestamp: row.timestamp };
                 const size = encoder.encode(JSON.stringify(shaped)).byteLength;
+
+                // Every row read counts, kept or skipped. Past the read budget the scan stops, and the section says it was cut.
+                if (read + size > EXPORT_READ_BUDGET) {
+                    truncated = true;
+                    more = false;
+                    break;
+                }
+
+                read += size;
 
                 // An event that does not fit is left out, and the older ones that do fit are still kept: the section never exceeds the
                 // budget, and the gap it leaves is what `truncated` says.
