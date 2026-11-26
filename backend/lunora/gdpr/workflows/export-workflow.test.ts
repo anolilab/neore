@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { BROWSER_EXPORT_PAGES } from "../../browser/export-pages";
 import { UsageExportError, usageObjectKey } from "../usage-export-steps";
 import { GRANT_REVISIONS_EXPORT_PAGES } from "../../agent/export-pages";
+import { TASK_SUGGESTIONS_EXPORT_PAGES } from "../../tasks/export-pages";
 import { dataExportWorkflowConfig, exportFailureMessage } from "./export-workflow";
 
 const PARAMS = { requestId: "request-1", userEmail: "user@example.com", userId: "user-1" };
@@ -234,6 +235,50 @@ describe("data export workflow: grant revisions", () => {
         expect(progressWith("failed").map((call) => call.args["errorMessage"])).toStrictEqual([
             "Your sharing history is too large to export in one file; contact support",
         ]);
+        expect(stepNames.length).toBeLessThan(1024);
+    });
+});
+
+describe("data export workflow: task suggestions", () => {
+    it("stores every page a step at a time under the run's prefix, and hands the export file only how many there are", async () => {
+        let page = 0;
+
+        stubs["tasks_gdpr:storeTaskSuggestionsExportPage"] = () => {
+            page += 1;
+
+            return page < 3 ? { bytes: 100, next: `cursor-${String(page)}` } : { bytes: 100 };
+        };
+
+        await execute();
+
+        const stores = ran("tasks_gdpr:storeTaskSuggestionsExportPage");
+        const generated = ran("gdpr_steps:generateExportFile")[0]?.args;
+        const prefix = generated?.["browserPrefix"] as string;
+
+        // No step result or dispatch body carries a suggestion: the workflow never reads them itself.
+        expect(ran("tasks_gdpr:collectTaskSuggestionsForExport")).toStrictEqual([]);
+        expect(stores.map((call) => call.args["cursor"])).toStrictEqual([undefined, "cursor-1", "cursor-2"]);
+        expect(stores.map((call) => call.args["key"])).toStrictEqual([0, 1, 2].map((index) => `${prefix}task-suggestions-${String(index)}.json`));
+        expect(stepNames).toEqual(expect.arrayContaining(["collect-task-suggestions-0", "collect-task-suggestions-1", "collect-task-suggestions-2"]));
+        expect(generated).toMatchObject({ taskSuggestionPages: 3, taskSuggestionsCut: false });
+        expect(generated?.["tasks"]).not.toHaveProperty("taskSuggestions");
+        expect(progressWith("completed")).toHaveLength(1);
+        // The pages sit under the run's prefix, so its cleanup deletes them with the browser pages.
+        expect(ran("browser_gdpr:deleteBrowserExportPages").map((call) => call.args["prefix"])).toStrictEqual([prefix]);
+        // The run's record is opened first, so a run killed before its cleanup leaves pages the sweep finds.
+        expect(stepNames.indexOf("open-export-run")).toBeLessThan(stepNames.indexOf("collect-task-suggestions-0"));
+    });
+
+    it("still completes, with the history marked cut, when it runs past the page cap", async () => {
+        stubs["tasks_gdpr:storeTaskSuggestionsExportPage"] = () => {
+            return { next: "more" };
+        };
+
+        await execute();
+
+        expect(ran("tasks_gdpr:storeTaskSuggestionsExportPage")).toHaveLength(TASK_SUGGESTIONS_EXPORT_PAGES);
+        expect(ran("gdpr_steps:generateExportFile")[0]?.args).toMatchObject({ taskSuggestionPages: TASK_SUGGESTIONS_EXPORT_PAGES, taskSuggestionsCut: true });
+        expect(progressWith("completed")).toHaveLength(1);
         expect(stepNames.length).toBeLessThan(1024);
     });
 });
