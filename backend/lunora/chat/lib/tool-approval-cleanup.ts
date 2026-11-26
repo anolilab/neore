@@ -65,14 +65,14 @@ const releaseExpiredPauses = async (ctx: Pick<MutationCtx, "db">, expired: Reado
     }
 };
 
-/**
- * A headless pause has no stream for the timeout to close, so an expired pending request ends its run here, as an interactive pause's
- * stream does (`cleanupExpiredStreams`). The end is keyed by the run's own reply key, which the Events log writes once.
- */
 type PurgeCtx = Pick<MutationCtx, "db" | "now" | "scheduler">;
 
 type ExpiredRequest = { config: { replyKey?: string }; status: string; threadId: string };
 
+/**
+ * A headless pause has no stream for the timeout to close, so an expired pending request ends its run here, as an interactive pause's
+ * stream does (`cleanupExpiredStreams`). The end is keyed by the run's own reply key, which the Events log writes once.
+ */
 const failExpiredHeadlessPauses = async (ctx: PurgeCtx, expired: ReadonlyArray<ExpiredRequest>): Promise<void> => {
     for (const row of expired) {
         const { replyKey } = row.config;
