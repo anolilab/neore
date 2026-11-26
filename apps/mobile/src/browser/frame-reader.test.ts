@@ -53,16 +53,18 @@ describe(startFrameReader, () => {
         expect(cancel).toHaveBeenCalled();
     });
 
-    it("paints only the newest read: an older one that answers late is dropped", async () => {
-        const { onAnswer, pending, start, tick } = setup();
+    it("never replaces a read still out: a read slower than the interval still paints, and the next starts after it", async () => {
+        const { onAnswer, pending, read, start, tick } = setup();
 
         start();
         tick();
-        pending[1]?.resolve("newer");
-        pending[0]?.resolve("older");
+        expect(read).toHaveBeenCalledTimes(1);
 
-        await vi.waitFor(() => expect(onAnswer).toHaveBeenCalledWith("newer"));
-        expect(onAnswer).not.toHaveBeenCalledWith("older");
+        pending[0]?.resolve("slow");
+        await vi.waitFor(() => expect(onAnswer).toHaveBeenCalledWith("slow"));
+
+        tick();
+        expect(read).toHaveBeenCalledTimes(2);
     });
 
     it("drops a read that answers or fails after the reader stopped", async () => {

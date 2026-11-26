@@ -30,10 +30,11 @@ export const readFrame = async (client: BrowserClient, threadId: string): Promis
 
 /**
  * The phone never takes the lease over from another of the person's views (`exclusive`): it is refused (`held`) while
- * the web drives the browser. `renews`: the claim this phone held, so its own lease is not refused.
+ * the web drives the browser. `view`: this screen's own name, and `renews`: the claim it held, so its own lease (one
+ * whose answer was lost too) is not refused.
  */
-export const takeBrowserControl = async (client: BrowserClient, threadId: string, renews?: string): Promise<TakeAnswer> =>
-    await client.action(api.browser.live_view.takeControl, { exclusive: true, threadId: thread(threadId), ...renews !== undefined && { renews } });
+export const takeBrowserControl = async (client: BrowserClient, threadId: string, view: string, renews?: string): Promise<TakeAnswer> =>
+    await client.action(api.browser.live_view.takeControl, { exclusive: true, threadId: thread(threadId), view, ...renews !== undefined && { renews } });
 
 // Mutations pass `onlineOnly`: a renewal or hand back held for later would act on a lease long over.
 export const keepBrowserControl = async (client: BrowserClient, threadId: string, claim: string): Promise<{ until: number } | null> =>

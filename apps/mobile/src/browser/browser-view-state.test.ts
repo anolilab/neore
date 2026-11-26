@@ -5,6 +5,7 @@ import {
     CONTROLLED_BY_OTHER,
     frameMessage,
     frameTrigger,
+    GRANT_END_MARGIN_MS,
     grantEndOnDevice,
     isOlderStatus,
     NO_BROWSER,
@@ -73,7 +74,8 @@ describe("a grantee's answers", () => {
     it("stops showing the page once the grant ran out, on this device's clock", () => {
         const status = running({ accessUntil: 160, now: 100 });
 
-        expect(grantEndOnDevice(status, 5000)).toBe(5060);
+        // Early by the margin: the answer's way here must not keep the page up past the end.
+        expect(grantEndOnDevice(status, 5000)).toBe(5060 - GRANT_END_MARGIN_MS);
         expect(grantEndOnDevice(running(), 5000)).toBeUndefined();
         expect(viewStateOf(status, undefined, true)).toStrictEqual({ kind: "ended", message: NOT_READABLE });
     });

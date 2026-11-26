@@ -82,13 +82,19 @@ export const isOlderStatus = (current: BrowserStatus | undefined, next: BrowserS
     return current.kind === "denied" && next.kind !== "denied";
 };
 
+/**
+ * How much earlier than the grant's end on this device's clock the page goes: the answer's way here made it arrive
+ * late, and that delay must not keep the page up past the end.
+ */
+export const GRANT_END_MARGIN_MS = 2000;
+
 /** When the grant `status` was read under ends, on this device's clock (it came at `receivedAt`); none for the owner. */
 export const grantEndOnDevice = (status: BrowserStatus | undefined, receivedAt: number): number | undefined => {
     if (status === undefined || status.kind === "denied" || status.accessUntil === undefined) {
         return undefined;
     }
 
-    return receivedAt + (status.accessUntil - status.now);
+    return receivedAt + (status.accessUntil - status.now) - GRANT_END_MARGIN_MS;
 };
 
 /** A frame is read only for a screen that shows the page, in front, online. */

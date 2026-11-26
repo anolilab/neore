@@ -1,3 +1,4 @@
+import { randomUUID } from "expo-crypto";
 import { useIsFocused } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 
@@ -12,7 +13,7 @@ import { handBackBrowser, keepBrowserControl, navigateBrowser, readBrowserStatus
 import type { ViewState } from "./browser-view-state";
 import { frameMessage, frameTrigger, grantEndOnDevice, isOlderStatus, shouldReadFrame, viewStateOf } from "./browser-view-state";
 import type { ControlSession, ControlState } from "./control-session";
-import { createControlSession, forgetClaim, rememberClaim, rememberedClaim } from "./control-session";
+import { createControlSession, forgetClaim, rememberClaim, rememberedClaim, viewNameFor } from "./control-session";
 import { startFrameReader } from "./frame-reader";
 import { watchGrantEnd } from "./grant-end";
 
@@ -80,7 +81,7 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
                 handBack: async (claim, reason) => await handBackBrowser(client, threadId, claim, reason),
                 keep: async (claim) => await keepBrowserControl(client, threadId, claim),
                 navigate: async (claim, url) => await navigateBrowser(client, threadId, claim, url),
-                take: async (renews) => await takeBrowserControl(client, threadId, renews),
+                take: async (renews) => await takeBrowserControl(client, threadId, viewNameFor(key, randomUUID), renews),
             },
             lastClaim: rememberedClaim(key),
             onChange: setControl,
@@ -117,9 +118,19 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
     const browserId = status?.kind === "running" ? status.browserId : undefined;
 
     useEffect(() => {
-        if (status !== undefined) {
-            session.noteLease(status.kind === "running" ? status.control : undefined, status.now);
+        if (status === undefined) {
+            return;
         }
+
+        // The person may no longer drive the browser (access ended, or a grant lowered to read): the claim goes back at
+        // once, so the agent need not wait out the lease. `handBack` takes no thread decision, so it still ends it.
+        if (status.kind !== "running" || !status.canControl) {
+            session.release("left");
+
+            return;
+        }
+
+        session.noteLease(status.control, status.now);
     }, [session, status]);
 
     useEffect(() => {

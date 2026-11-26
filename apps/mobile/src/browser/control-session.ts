@@ -49,6 +49,23 @@ const heldClaims = new Map<string, string>();
 
 export const rememberedClaim = (key: string): string | undefined => heldClaims.get(key);
 
+/** The phone's own name for its view of a thread's browser, per account and thread, sent with every take. */
+const viewNames = new Map<string, string>();
+
+export const viewNameFor = (key: string, create: () => string): string => {
+    const known = viewNames.get(key);
+
+    if (known !== undefined) {
+        return known;
+    }
+
+    const name = create();
+
+    viewNames.set(key, name);
+
+    return name;
+};
+
 export const rememberClaim = (key: string, claim: string): void => {
     heldClaims.set(key, claim);
 };

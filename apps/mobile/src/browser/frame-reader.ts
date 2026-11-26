@@ -1,7 +1,7 @@
 /**
  * Reads the browser's frame while a screen shows it: once at the start (unless one was read a moment ago) and then on a
- * timer. Only the newest read may answer: one that answers after a newer read began, or after the reader stopped, is
- * dropped. Outside React, so the timing is tested without a screen.
+ * timer that skips a tick while a read is still out. Only the newest read may answer: one that answers after the
+ * reader stopped is dropped. Outside React, so the timing is tested without a screen.
  */
 import { settleQuietly } from "@/offline/quietly";
 
@@ -37,9 +37,12 @@ export const startFrameReader = <T>({
 }: FrameReaderOptions<T>): () => void => {
     let generation = 0;
     let isStopped = false;
+    /** A read still out: the timer waits for it rather than replace it, so a slow read is never dropped for the next. */
+    let isReading = false;
 
     const run = (): void => {
         onRead(now());
+        isReading = true;
         generation += 1;
 
         const mine = generation;
@@ -56,6 +59,10 @@ export const startFrameReader = <T>({
                     onFailure(error);
                 }
             }
+
+            if (mine === generation) {
+                isReading = false;
+            }
         });
     };
 
@@ -63,7 +70,11 @@ export const startFrameReader = <T>({
         run();
     }
 
-    const cancel = every(FRAME_REFRESH_MS, run);
+    const cancel = every(FRAME_REFRESH_MS, () => {
+        if (!isReading) {
+            run();
+        }
+    });
 
     return () => {
         isStopped = true;
