@@ -294,6 +294,27 @@ describe("AsidePanel", () => {
         expect(screen.getByText("2 of 2")).toBeTruthy();
     });
 
+    it("does not close the bar for an Escape that only cancels an IME candidate", () => {
+        useAsideStore.setState({
+            byThread: {
+                "thread-1": [{ answer: "Safe to repeat: idempotent calls.", id: "a", question: "What is idempotent?", status: "answered", token: "tok" }],
+            },
+        });
+        render(<AsidePanel threadId="thread-1" />);
+
+        act(() => {
+            globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+        });
+        const input = screen.getByRole("textbox", { name: "Find in side questions" });
+
+        fireEvent.keyDown(input, { isComposing: true, key: "Escape" });
+        expect(screen.getByRole("textbox", { name: "Find in side questions" })).toBeTruthy();
+
+        // A plain Escape still closes the bar, so the no-close above is not just a dead handler.
+        fireEvent.keyDown(input, { key: "Escape" });
+        expect(screen.queryByRole("textbox", { name: "Find in side questions" })).toBeNull();
+    });
+
     it("brings the current hit into view once the layout has settled, and not for a query that changed first", () => {
         vi.useFakeTimers();
 
@@ -789,6 +810,47 @@ describe("AsidePanel", () => {
             fireEvent.change(screen.getByRole("textbox", { name: "Find in side questions" }), { target: { value: "cat" } });
 
             // Before that reveal runs, the entry is dismissed and its place is taken by a hit far below.
+            await act(async () => {
+                useAsideStore.setState({
+                    byThread: { "thread-1": [{ answer: "A cat too.", id: "z", question: "Below?", status: "answered", token: "tok-z" }] },
+                });
+            });
+            await settleReveal();
+            expect(scroll).not.toHaveBeenCalled();
+        } finally {
+            Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+            Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
+            vi.useRealTimers();
+        }
+    });
+
+    it("does not scroll to the hit that replaces a dismissed selection when the dismissal lands inside the reveal delay", async () => {
+        vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
+        const hitTop = 20;
+        const scroll = vi.fn();
+        const answered = { answer: "A cat.", id: "a", question: "Why?", status: "answered", token: "tok" } as const;
+
+        useAsideStore.setState({ byThread: { "thread-1": [answered] } });
+        render(<AsidePanel threadId="thread-1" />);
+
+        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
+        Object.defineProperty(Range.prototype, "getBoundingClientRect", {
+            configurable: true,
+            value: function rectOfHit(this: Range) {
+                // eslint-disable-next-line unicorn/no-this-outside-of-class -- the rect depends on which range is asked, which only the receiver says
+                return rectAt(this.startContainer.textContent?.includes("too") ? 900 : hitTop);
+            },
+        });
+
+        try {
+            act(() => {
+                globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+            });
+            fireEvent.change(screen.getByRole("textbox", { name: "Find in side questions" }), { target: { value: "cat" } });
+            // The reveal is due in 150 ms. The dismissal lands 5 ms before it, so the rescan frame, 16 ms on, comes too late.
+            act(() => {
+                vi.advanceTimersByTime(145);
+            });
             await act(async () => {
                 useAsideStore.setState({
                     byThread: { "thread-1": [{ answer: "A cat too.", id: "z", question: "Below?", status: "answered", token: "tok-z" }] },

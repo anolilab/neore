@@ -135,6 +135,31 @@ export const revealWithinBoxes = (range: Range | undefined, target: Element, vie
 };
 
 /**
+ * Scrolls the panel by what still hides the hit: below the sticky bar's band, past the panel's bottom, or past either side.
+ */
+const keepInPanel = (
+    range: Range | undefined,
+    target: Element,
+    bounds: Pick<DOMRect, "bottom" | "left" | "right" | "top">,
+    scroller: HTMLElement | undefined,
+): void => {
+    const settled = hitRect(range, target);
+    const shiftY =
+        settled.top < bounds.top + STICKY_BAR_CLEARANCE_PX ? settled.top - (bounds.top + STICKY_BAR_CLEARANCE_PX) : Math.max(0, settled.bottom - bounds.bottom);
+    const shiftX = shiftToFit(settled.left, settled.right, bounds.left, bounds.right);
+
+    if (shiftX === 0 && shiftY === 0) {
+        return;
+    }
+
+    if (scroller) {
+        scroller.scrollBy({ behavior: "instant", left: shiftX, top: shiftY });
+    } else {
+        window.scrollBy({ behavior: "instant", left: shiftX, top: shiftY });
+    }
+};
+
+/**
  * Brings the hit into view if it is out of sight. The hit's own rectangle decides, not its block's: a long answer can
  * carry the selected hit at its far edge while the block itself is partly on screen. jsdom lays out no ranges, so it
  * falls back to the block there.
@@ -159,22 +184,11 @@ const revealIfOutOfSight = (range: Range | undefined, host: Element): void => {
 
     // Instant, so the hit is measured where the scroll has left it.
     target.scrollIntoView({ behavior: "instant", block: "center" });
-
-    // Centring can leave the hit past the panel's edges: scroll the panel by what is still hidden, on both axes.
-    const settled = hitRect(range, target);
-    const shiftY =
-        settled.top < bounds.top + STICKY_BAR_CLEARANCE_PX ? settled.top - (bounds.top + STICKY_BAR_CLEARANCE_PX) : Math.max(0, settled.bottom - bounds.bottom);
-    const shiftX = shiftToFit(settled.left, settled.right, bounds.left, bounds.right);
-
-    if (shiftX !== 0 || shiftY !== 0) {
-        if (scroller) {
-            scroller.scrollBy({ behavior: "instant", left: shiftX, top: shiftY });
-        } else {
-            window.scrollBy({ behavior: "instant", left: shiftX, top: shiftY });
-        }
-    }
+    keepInPanel(range, target, bounds, scroller);
 
     revealWithinBoxes(range, target, scroller ?? document.documentElement);
+    // A scroll box can move the hit under the sticky bar or past the panel's edge, so the panel is checked once more.
+    keepInPanel(range, target, bounds, scroller);
 };
 
 /** The entry a hit's row belongs to. */
@@ -311,7 +325,17 @@ const useAsideFindHighlights = (
             });
         };
 
-        const observer = new MutationObserver(recheck);
+        const observer = new MutationObserver(() => {
+            // The rescan runs a frame later. A reveal still pending for a dismissed entry must not fire before it, or it would
+            // scroll to the hit that takes the entry's place.
+            const entryId = selection.current.anchor?.entryId;
+
+            if (entryId !== undefined && !host.querySelector(`[${CSS.escape(ASIDE_ENTRY_ATTRIBUTE)}="${CSS.escape(entryId)}"]`)) {
+                clearTimeout(revealTimer);
+            }
+
+            recheck();
+        });
 
         observer.observe(host, { characterData: true, childList: true, subtree: true });
         // An image that loads changes the layout above a hit without touching the DOM. Load does not bubble, hence capture.

@@ -82,7 +82,8 @@ const AsideFindBar: FC = () => {
         }
 
         const handleEscape = (event: globalThis.KeyboardEvent) => {
-            if (event.key !== "Escape") {
+            // An Escape that cancels an IME candidate belongs to the input method, not to the bar.
+            if (event.key !== "Escape" || event.isComposing) {
                 return;
             }
 
