@@ -1024,7 +1024,7 @@ msgstr "{days} 天"
 msgid "{days}d ago"
 msgstr "{days} 天前"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:241
+#: src/features/settings/components/personalization/memory-file-import.tsx:243
 msgid "{done} of {total} entries processed"
 msgstr "已处理 {done} / {total} 条"
 
@@ -6195,7 +6195,7 @@ msgstr "取消深度工作"
 msgid "Cancel Export"
 msgstr "取消导出"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:303
+#: src/features/settings/components/personalization/memory-file-import.tsx:310
 msgid "Cancel import"
 msgstr "取消导入"
 
@@ -6815,7 +6815,7 @@ msgstr "中文（繁体）"
 msgid "Choose .md or .zip"
 msgstr "选择 .md 或 .zip"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:253
+#: src/features/settings/components/personalization/memory-file-import.tsx:260
 msgid "Choose a .txt file with one memory per line, or a .json file with a list of memories. The file can be up to {maxSize}."
 msgstr "请选择每行一条记忆的 .txt 文件，或包含记忆列表的 .json 文件。文件大小最多为 {maxSize}。"
 
@@ -15167,7 +15167,7 @@ msgstr "文件大小超过 {maxSize}"
 msgid "File size too large. Maximum 5MB allowed."
 msgstr "文件过大，最大允许 5MB。"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:257
+#: src/features/settings/components/personalization/memory-file-import.tsx:264
 msgid "File to import"
 msgstr "要导入的文件"
 
@@ -18027,7 +18027,7 @@ msgstr "从 ChatGPT、Google Gemini、Claude、Neore 数据导出，或本地 Cl
 msgid "Import failed"
 msgstr "导入失败"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:270
+#: src/features/settings/components/personalization/memory-file-import.tsx:277
 msgid "Import file"
 msgstr "导入文件"
 
@@ -18035,7 +18035,7 @@ msgstr "导入文件"
 msgid "Import files"
 msgstr "导入文件"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:289
+#: src/features/settings/components/personalization/memory-file-import.tsx:296
 msgid "Import finished."
 msgstr "导入完成。"
 
@@ -18049,7 +18049,7 @@ msgstr "从仓库导入"
 msgid "Import from this computer"
 msgstr "从此电脑导入"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:250
+#: src/features/settings/components/personalization/memory-file-import.tsx:257
 msgid "Import memories from a file"
 msgstr "从文件导入记忆"
 
@@ -18065,11 +18065,11 @@ msgstr "导入 Notion 导出文件（.zip）"
 msgid "Import one kind of export at a time."
 msgstr "每次只能导入一种导出。"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:295
+#: src/features/settings/components/personalization/memory-file-import.tsx:302
 msgid "Import progress"
 msgstr "导入进度"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:286
+#: src/features/settings/components/personalization/memory-file-import.tsx:293
 msgid "Import result"
 msgstr "导入结果"
 
@@ -18119,7 +18119,7 @@ msgstr "已导入 {added} 个 Notion 页面；跳过了 {skipped} 个附件。"
 msgid "Imported {added} Notion page(s)."
 msgstr "已导入 {added} 个 Notion 页面。"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:243
+#: src/features/settings/components/personalization/memory-file-import.tsx:250
 msgid "Imported {imported} · Updated {updated} · Duplicates {duplicates} · Too long {tooLong} · Invalid {invalid}"
 msgstr "已导入 {imported} · 已更新 {updated} · 重复 {duplicates} · 过长 {tooLong} · 无效 {invalid}"
 
@@ -18142,7 +18142,7 @@ msgstr "已导入技能“{0}”"
 msgid "Importing from {0}..."
 msgstr "正在从 {0} 导入..."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:288
+#: src/features/settings/components/personalization/memory-file-import.tsx:295
 msgid "Importing memories…"
 msgstr "正在导入记忆…"
 
@@ -35357,7 +35357,7 @@ msgstr "主机软件已过时"
 msgid "The icons could not be loaded."
 msgstr "无法加载图标。"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:244
+#: src/features/settings/components/personalization/memory-file-import.tsx:251
 msgid "The import stopped before it finished."
 msgstr "导入在完成前已停止。"
 
@@ -37653,7 +37653,7 @@ msgstr "要关闭自动合并吗？"
 msgid "Turn on memory"
 msgstr "开启记忆"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:275
+#: src/features/settings/components/personalization/memory-file-import.tsx:282
 msgid "Turn on memory to import a file."
 msgstr "请先开启记忆，再导入文件。"
 

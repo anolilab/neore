@@ -1023,7 +1023,7 @@ msgstr "{days} days"
 msgid "{days}d ago"
 msgstr "{days}d ago"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:241
+#: src/features/settings/components/personalization/memory-file-import.tsx:243
 msgid "{done} of {total} entries processed"
 msgstr "{done} of {total} entries processed"
 
@@ -6194,7 +6194,7 @@ msgstr "Cancel deep work"
 msgid "Cancel Export"
 msgstr "Cancel Export"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:303
+#: src/features/settings/components/personalization/memory-file-import.tsx:310
 msgid "Cancel import"
 msgstr "Cancel import"
 
@@ -6814,7 +6814,7 @@ msgstr "Chinese (Traditional)"
 msgid "Choose .md or .zip"
 msgstr "Choose .md or .zip"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:253
+#: src/features/settings/components/personalization/memory-file-import.tsx:260
 msgid "Choose a .txt file with one memory per line, or a .json file with a list of memories. The file can be up to {maxSize}."
 msgstr "Choose a .txt file with one memory per line, or a .json file with a list of memories. The file can be up to {maxSize}."
 
@@ -15166,7 +15166,7 @@ msgstr "File size exceeds {maxSize}"
 msgid "File size too large. Maximum 5MB allowed."
 msgstr "File size too large. Maximum 5MB allowed."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:257
+#: src/features/settings/components/personalization/memory-file-import.tsx:264
 msgid "File to import"
 msgstr "File to import"
 
@@ -18026,7 +18026,7 @@ msgstr "Import conversations from ChatGPT, Google Gemini, Claude, a Neore data e
 msgid "Import failed"
 msgstr "Import failed"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:270
+#: src/features/settings/components/personalization/memory-file-import.tsx:277
 msgid "Import file"
 msgstr "Import file"
 
@@ -18034,7 +18034,7 @@ msgstr "Import file"
 msgid "Import files"
 msgstr "Import files"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:289
+#: src/features/settings/components/personalization/memory-file-import.tsx:296
 msgid "Import finished."
 msgstr "Import finished."
 
@@ -18048,7 +18048,7 @@ msgstr "Import from repository"
 msgid "Import from this computer"
 msgstr "Import from this computer"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:250
+#: src/features/settings/components/personalization/memory-file-import.tsx:257
 msgid "Import memories from a file"
 msgstr "Import memories from a file"
 
@@ -18064,11 +18064,11 @@ msgstr "Import Notion export (.zip)"
 msgid "Import one kind of export at a time."
 msgstr "Import one kind of export at a time."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:295
+#: src/features/settings/components/personalization/memory-file-import.tsx:302
 msgid "Import progress"
 msgstr "Import progress"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:286
+#: src/features/settings/components/personalization/memory-file-import.tsx:293
 msgid "Import result"
 msgstr "Import result"
 
@@ -18118,7 +18118,7 @@ msgstr "Imported {added} Notion page(s); skipped {skipped} attachment(s)."
 msgid "Imported {added} Notion page(s)."
 msgstr "Imported {added} Notion page(s)."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:243
+#: src/features/settings/components/personalization/memory-file-import.tsx:250
 msgid "Imported {imported} · Updated {updated} · Duplicates {duplicates} · Too long {tooLong} · Invalid {invalid}"
 msgstr "Imported {imported} · Updated {updated} · Duplicates {duplicates} · Too long {tooLong} · Invalid {invalid}"
 
@@ -18141,7 +18141,7 @@ msgstr "Imported skill \"{0}\""
 msgid "Importing from {0}..."
 msgstr "Importing from {0}..."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:288
+#: src/features/settings/components/personalization/memory-file-import.tsx:295
 msgid "Importing memories…"
 msgstr "Importing memories…"
 
@@ -35356,7 +35356,7 @@ msgstr "the host software is out of date"
 msgid "The icons could not be loaded."
 msgstr "The icons could not be loaded."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:244
+#: src/features/settings/components/personalization/memory-file-import.tsx:251
 msgid "The import stopped before it finished."
 msgstr "The import stopped before it finished."
 
@@ -37652,7 +37652,7 @@ msgstr "Turn off auto-merge?"
 msgid "Turn on memory"
 msgstr "Turn on memory"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:275
+#: src/features/settings/components/personalization/memory-file-import.tsx:282
 msgid "Turn on memory to import a file."
 msgstr "Turn on memory to import a file."
 

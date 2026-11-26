@@ -75,7 +75,7 @@ const readFileText = async (file: File): Promise<string | undefined> => {
  * file again: the size check here only saves sending a file it would refuse.
  */
 const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported }) => {
-    const { t } = useLingui();
+    const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const fileId = useId();
     const helpId = useId();
@@ -94,7 +94,7 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
     // latest job, which may be one that ended days ago.
     const [watched, setWatched] = useState<WatchedJob | undefined>(undefined);
 
-    const maxSize = `${String(MEMORY_FILE_MAX_BYTES / 1000)} KB`;
+    const maxSize = `${i18n.number(MEMORY_FILE_MAX_BYTES / 1000)} KB`;
 
     const { data: progress, refetch: refetchProgress } = useQuery({
         ...crpc.memory.import_job.getMemoryImportProgress.queryOptions({}),
@@ -119,8 +119,8 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
     const endedKey = jobEnded ? `${job.jobId}:${job.status}` : undefined;
     const errorKey = importError ? `error:${importError}` : undefined;
     const outcomeKey = result ? "result" : (endedKey ?? errorKey);
-    const done = job?.done ?? 0;
-    const total = job?.total ?? watched?.total ?? 0;
+    const processed = job?.done ?? 0;
+    const entries = job?.total ?? watched?.total ?? 0;
     const disabled = !memoryEnabled || running;
 
     useEffect(() => {
@@ -238,8 +238,15 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
     };
 
     const finished = result !== undefined || job?.status === "done";
+    const done = i18n.number(processed);
+    const total = i18n.number(entries);
     const progressText = t`${done} of ${total} entries processed`;
-    const { duplicates, imported, invalid, tooLong, updated } = job ?? result ?? NO_COUNTS;
+    const shownCounts = job ?? result ?? NO_COUNTS;
+    const imported = i18n.number(shownCounts.imported);
+    const updated = i18n.number(shownCounts.updated);
+    const duplicates = i18n.number(shownCounts.duplicates);
+    const tooLong = i18n.number(shownCounts.tooLong);
+    const invalid = i18n.number(shownCounts.invalid);
     const countsText = t`Imported ${imported} · Updated ${updated} · Duplicates ${duplicates} · Too long ${tooLong} · Invalid ${invalid}`;
     const jobError = job?.status === "failed" ? (job.error ?? t`The import stopped before it finished.`) : undefined;
     const alertText = importError ?? jobError;
@@ -291,7 +298,7 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
                 </div>
                 {jobRunning && (
                     <div className="space-y-1">
-                        <Progress getAriaValueText={() => progressText} max={Math.max(total, 1)} value={done}>
+                        <Progress getAriaValueText={() => progressText} max={Math.max(entries, 1)} value={processed}>
                             <ProgressLabel className="sr-only">{t`Import progress`}</ProgressLabel>
                             <ProgressTrack>
                                 <ProgressIndicator />

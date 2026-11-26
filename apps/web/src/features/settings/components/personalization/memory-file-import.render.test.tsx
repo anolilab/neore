@@ -38,6 +38,7 @@ vi.mock("@lingui/react/macro", () => {
     return {
         useLingui: () => {
             return {
+                i18n: { number: (value: number) => value.toLocaleString("en-US") },
                 t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values),
             };
         },
