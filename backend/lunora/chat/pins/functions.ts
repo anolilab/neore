@@ -236,46 +236,23 @@ const scheduleRouteCleanup = async (
 };
 
 /**
- * Puts a route back for a write that may still need it. A restore that fails is retried by the scheduler until the writes that need
- * it run out (`until`). A refused write rethrows, which rolls back a scheduled job, so its restore goes by a queue send then, which a
- * rollback does not undo.
+ * Puts a route back for a write that may still need it. A refused write's restore is owed durably: its row (`owedId`, written before the routes
+ * go) is what the cron pass dispatches, and the queue send here is only the fast path. A send that fails is logged, not thrown, so the refusal
+ * still surfaces. Any other restore is in the cleanup's own transaction, so the scheduler retries it until the writes that need it run out.
  */
 const restoreRoutes = async (
     context: MutationCtx,
     threadId: Id<"threads">,
     userId: string,
-    routes: ReadonlyArray<{ createdAt: number }>,
+    createdAt: number,
     until: number,
-    survivesRollback: boolean,
+    owedId: Id<"pendingPinRestores"> | null,
 ): Promise<void> => {
-    const first = routes[0];
+    const args = { createdAt, threadId, until, userId };
 
-    if (first === undefined) {
-        return;
-    }
-
-    const args = { createdAt: first.createdAt, threadId, until, userId };
-
-    if (survivesRollback) {
-        // The row is written first, and the queue send is only the fast path. A send that fails is logged, not thrown, so the refusal
-        // still surfaces; the cron dispatches the row, and the erasure turns it into a route before its second sweep.
-        const thread = await systemDb(context).get("threads", threadId);
-
-        if (thread?.userId === undefined || thread.userId === userId) {
-            return;
-        }
-
-        await context.db.insert("pendingPinRestores", {
-            ownerId: thread.userId,
-            routeCreatedAt: first.createdAt,
-            threadId,
-            until,
-            userId,
-            writtenAt: Date.now(),
-        });
-
+    if (owedId !== null) {
         try {
-            await enqueueJob(internal.chat.pins.functions.restoreSharedPinRoutes, args);
+            await enqueueJob(internal.chat.pins.functions.restoreSharedPinRoutes, { ...args, owedId });
         } catch (error) {
             chatLogger.error("[pins] restore queue send failed; the cron will dispatch the owed restore", error);
         }
@@ -301,6 +278,8 @@ const restoreRoutes = async (
 export const restoreSharedPinRoutes = internalMutation
     .input({
         createdAt: v.number(),
+        // The owed row this restore settles. Only that row: another write's row for the same thread and collaborator has its own deadline.
+        owedId: v.optional(v.id("pendingPinRestores")),
         threadId: v.id("threads"),
         until: v.number(),
         userId: v.string().max(MAX_LENGTH.id),
@@ -309,19 +288,15 @@ export const restoreSharedPinRoutes = internalMutation
     .mutation(async ({ args, ctx: context }) => {
         const thread = await systemDb(context).get("threads", args.threadId);
 
-        // Not on this shard: a merge moved it. The owed rows stay for the cron, which sends them to the owner they name now.
+        // Not on this shard: a merge moved it. The owed row stays for the cron, which sends it to the owner it names now.
         if (thread?.userId === undefined) {
             return null;
         }
 
-        const { page: owed } = await context.db.pendingPinRestores.findMany({
-            consistency: "primary",
-            limit: ROUTE_CLEANUP_BATCH,
-            where: { threadId: args.threadId, userId: args.userId },
-        });
+        const owed = args.owedId === undefined ? null : await context.db.pendingPinRestores.findFirst({ consistency: "primary", where: { _id: args.owedId } });
         const settle = async (): Promise<null> => {
-            for (const row of owed) {
-                await context.db.delete("pendingPinRestores", row._id);
+            if (owed !== null) {
+                await context.db.delete("pendingPinRestores", owed._id);
             }
 
             return null;
@@ -368,15 +343,18 @@ const PENDING_RESTORE_GRACE_MS = 60 * 1000;
 const PENDING_RESTORE_BATCH = 50;
 
 /**
- * The root cron's pass over the owed restores (`pendingPinRestores`). Each row written more than a minute ago is dispatched to the owner it
- * names, where `restoreSharedPinRoutes` settles it. The restore is idempotent, so a row the queue already ran is dispatched once more at most.
+ * The root cron's pass over the owed restores (`pendingPinRestores`). It takes the rows dispatched least recently and sends each to the owner
+ * it names, where `restoreSharedPinRoutes` settles it. A row still there after its dispatch goes to the back of the line, so a row that cannot
+ * settle yet (its thread is not on the owner's shard) does not hold back the rows behind it. Idempotent: a row the queue already settled is
+ * gone, and a dispatch that repeats the restore changes nothing.
  */
 export const dispatchPendingPinRestores = async (context: MutationCtx): Promise<void> => {
+    const now = Date.now();
     const { page } = await context.db.pendingPinRestores.findMany({
         consistency: "primary",
         limit: PENDING_RESTORE_BATCH,
-        orderBy: [{ writtenAt: "asc" }],
-        where: { writtenAt: { lte: Date.now() - PENDING_RESTORE_GRACE_MS } },
+        orderBy: [{ dispatchedAt: "asc" }],
+        where: { dispatchedAt: { lte: now - PENDING_RESTORE_GRACE_MS } },
     });
 
     for (const row of page) {
@@ -384,9 +362,10 @@ export const dispatchPendingPinRestores = async (context: MutationCtx): Promise<
             context.scheduler,
             0,
             internal.chat.pins.functions.restoreSharedPinRoutes,
-            { createdAt: row.routeCreatedAt, threadId: row.threadId, until: row.until, userId: row.userId },
+            { createdAt: row.routeCreatedAt, owedId: row._id, threadId: row.threadId, until: row.until, userId: row.userId },
             row.ownerId,
         );
+        await context.db.patch("pendingPinRestores", row._id, { dispatchedAt: now });
     }
 };
 
@@ -442,6 +421,37 @@ export const dropRoutesWithoutPins = async (
 
     // A guest merge can leave more than one route for the same user and thread, and a survivor is a link: every route goes.
     const { page } = await context.db.sharedPinRoutes.findMany({ consistency: "primary", limit: ROUTE_CLEANUP_BATCH, where: { threadId, userId } });
+    const first = page[0];
+
+    if (first === undefined) {
+        return;
+    }
+
+    // A refused write takes its routes back, so the restore it may owe is written first. A failure after the deletes below then cannot lose
+    // it. The thread must be on this shard: without it the routes stay, since no restore could reach them. An owner needs no restore.
+    let owedId: Id<"pendingPinRestores"> | null = null;
+
+    if (refusal) {
+        const thread = await systemDb(context).get("threads", threadId);
+
+        if (thread?.userId === undefined) {
+            return;
+        }
+
+        if (thread.userId !== userId) {
+            const written = Date.now();
+
+            owedId = await context.db.insert("pendingPinRestores", {
+                dispatchedAt: written,
+                ownerId: thread.userId,
+                routeCreatedAt: first.createdAt,
+                threadId,
+                // Provisional: the deadline is set below, once the writes still in flight are known.
+                until: written + PIN_WRITE_LEASE_MS,
+                userId,
+            });
+        }
+    }
 
     for (const route of page) {
         await context.db.delete("sharedPinRoutes", route._id);
@@ -455,10 +465,20 @@ export const dropRoutesWithoutPins = async (
     if (await otherPinWritesInFlight(context, userId, writerId, now)) {
         const until = (await pinWritesInFlightUntil(context, userId, now)) ?? now + PIN_WRITE_LEASE_MS;
 
-        await restoreRoutes(context, threadId, userId, page, until, refusal);
+        if (owedId !== null) {
+            // The row gets the deadline of the writes still in flight, which the restore waits for.
+            await context.db.patch("pendingPinRestores", owedId, { until });
+        }
+
+        await restoreRoutes(context, threadId, userId, first.createdAt, until, owedId);
         await scheduleRouteCleanup(context, threadId, userId, { delayMs: PIN_WRITE_LEASE_MS, survivesRollback: refusal });
 
         return;
+    }
+
+    // Nothing is in flight, so no route is needed and the row that owed one is settled.
+    if (owedId !== null) {
+        await context.db.delete("pendingPinRestores", owedId);
     }
 
     if (page.length < ROUTE_CLEANUP_BATCH) {
@@ -480,8 +500,20 @@ export const finishRouteCleanup = async (context: MutationCtx, threadId: Id<"thr
     if (!thread) {
         const movedTo = await pinRouteOwnerOf(context.db, userId, threadId);
 
-        if (movedTo !== null && movedTo !== currentUserShard()) {
+        if (movedTo === null) {
+            return;
+        }
+
+        if (movedTo !== currentUserShard()) {
             await runAfterOnShard(context.scheduler, 0, internal.chat.pins.functions.finishPinRouteCleanup, { threadId, userId }, movedTo);
+
+            return;
+        }
+
+        // The route still names this shard, which no longer holds the thread: the owner's merge has cleared it but not yet re-pointed the
+        // route. Wait for that merge and try again; once it has ended, nothing more is due here.
+        if (await isAccountMoving(context, movedTo, Date.now())) {
+            await runAfterOnShard(context.scheduler, PIN_WRITE_LEASE_MS, internal.chat.pins.functions.finishPinRouteCleanup, { threadId, userId }, movedTo);
         }
 
         return;
@@ -551,12 +583,18 @@ export const withSharedPinRoute = async <T>(
         return await write();
     } catch (error) {
         if (error instanceof LunoraError && error.code === "FORBIDDEN") {
-            // This write's own lease goes first, so it does not hold back its own cleanup.
-            if (writerId !== null) {
-                await releasePinWrite(context, userId, writerId);
-            }
+            // The refusal is what the caller must see. A cleanup that fails is logged and left: the route it did not take back is harmless
+            // (no pin reads it), and the erasure drains it.
+            try {
+                // This write's own lease goes first, so it does not hold back its own cleanup.
+                if (writerId !== null) {
+                    await releasePinWrite(context, userId, writerId);
+                }
 
-            await dropRoutesWithoutPins(context, threadId, userId, writerId, true);
+                await dropRoutesWithoutPins(context, threadId, userId, writerId, true);
+            } catch (cleanupError) {
+                chatLogger.error("[pins] a refused write's route cleanup failed; the refusal is returned", cleanupError);
+            }
         }
 
         throw error;
@@ -675,7 +713,7 @@ export const createPin = authMutation
             async () => {
                 // The last check, after the route write and right before the insert. No external call sits between them, so an erasure
                 // that fences this shard either runs before this check (the write is refused) or after the insert (its sweep sees the pin).
-                if (await refusesPinWrite(context, userId, now)) {
+                if (await refusesPinWrite(context, userId, now, writerId)) {
                     throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
                 }
 
@@ -760,7 +798,7 @@ export const createDocumentPin = authMutation
             now,
             async () => {
                 // The last check, as in `createPin`: after the route write, right before the insert.
-                if (await refusesPinWrite(context, userId, now)) {
+                if (await refusesPinWrite(context, userId, now, writerId)) {
                     throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
                 }
 

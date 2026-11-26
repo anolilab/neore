@@ -229,6 +229,14 @@ export const deleteMergedGuest = internalMutation
             return { deleted: false, pinsRemain: true };
         }
 
+        // A route restore still owed to the guest's pins names the guest until it settles (`chat/pins/functions.ts`). The guest waits for it,
+        // so the restore cannot land on the new account after the guest is gone with its pin.
+        const { page: owed } = await ctx.db.pendingPinRestores.findMany({ consistency: "primary", limit: 1, where: { userId: args.userId } });
+
+        if (owed.length > 0) {
+            return { deleted: false, pinsRemain: true };
+        }
+
         // A grant or a count still under the guest: the merge's `global` step moves it first.
         if (await guestHoldsGrantRows(ctx, guestId)) {
             return { deleted: false, grantsRemain: true };

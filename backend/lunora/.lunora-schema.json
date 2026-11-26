@@ -14559,6 +14559,12 @@
     "pendingPinRestores": {
       "commitOrdered": false,
       "fields": {
+        "dispatchedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
         "ownerId": {
           "kind": "string",
           "nullable": false,
@@ -14589,15 +14595,15 @@
           "nullable": false,
           "optional": false,
           "unique": false
-        },
-        "writtenAt": {
-          "kind": "number",
-          "nullable": false,
-          "optional": false,
-          "unique": false
         }
       },
       "indexes": {
+        "by_dispatched": {
+          "fields": [
+            "dispatchedAt"
+          ],
+          "unique": false
+        },
         "by_owner": {
           "fields": [
             "ownerId"
@@ -14620,12 +14626,6 @@
           "fields": [
             "userId",
             "threadId"
-          ],
-          "unique": false
-        },
-        "by_written": {
-          "fields": [
-            "writtenAt"
           ],
           "unique": false
         }

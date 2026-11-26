@@ -664,7 +664,8 @@ describe("a refused pin write takes back the route it wrote", () => {
 
     it("ignores its own lease, and removes the route once no other write is in flight", async () => {
         const routes = await harness.run(async (context: any) => {
-            await context.db.insert("pinWriteLeases", { expiresAt: 1000, userId: "user-collaborator", writerId: "writer-self" });
+            // Live, so the write's own exclusion is what lets the route go: an expired lease would pass without it.
+            await context.db.insert("pinWriteLeases", { expiresAt: Date.now() + 60_000, userId: "user-collaborator", writerId: "writer-self" });
 
             await withSharedPinRoute(
                 context,
@@ -695,39 +696,40 @@ describe("a pin write renews the writer's lease before its move check", () => {
 });
 
 describe("a refused write's owed route restore is durable", () => {
-    const owedRestore = (overrides: { until?: number; writtenAt?: number } = {}) => {
+    const owedRestore = (overrides: { dispatchedAt?: number; until?: number } = {}) => {
         return {
+            dispatchedAt: overrides.dispatchedAt ?? Date.now(),
             ownerId: OWNER,
             routeCreatedAt: 1,
             threadId,
             until: overrides.until ?? Date.now() + 60_000,
             userId: "user-collaborator",
-            writtenAt: overrides.writtenAt ?? Date.now(),
         };
     };
+    const insertOwed = async (overrides: { dispatchedAt?: number; until?: number } = {}) =>
+        (await harness.run(async (context: any) => await context.db.insert("pendingPinRestores", owedRestore(overrides)))) as string;
     const owedRows = async () => {
         const { page } = await harness.run(async (context: any) => await context.db.pendingPinRestores.findMany({ where: { userId: "user-collaborator" } }));
 
-        return page;
+        return page as { _id: string }[];
     };
     const routesNow = async () => {
         const { page } = await harness.run(async (context: any) => await context.db.sharedPinRoutes.findMany({ where: { userId: "user-collaborator" } }));
 
-        return page;
+        return page as { ownerId: string }[];
     };
-
-    it("the cron pass dispatches a row a minute old to the owner it names, and leaves a fresh one for the queue", async () => {
-        await harness.run(async (context: any) => {
-            await context.db.insert("pendingPinRestores", owedRestore({ writtenAt: Date.now() - 120_000 }));
-            await context.db.insert("pendingPinRestores", owedRestore({ writtenAt: Date.now() }));
-        });
-
-        const scheduled: unknown[][] = [];
+    const restoreFor = async (owedId: string, until = Date.now() + 60_000) =>
+        await harness.run(
+            async (context: any) => await context.runMutation(restoreSharedPinRoutes, { createdAt: 1, owedId, threadId, until, userId: "user-collaborator" }),
+        );
+    /** One cron pass; returns the scheduled restores it sent, as `[args, shard]` pairs. */
+    const cronPass = async () => {
+        const scheduled: { args: Record<string, unknown>; shard: unknown }[] = [];
 
         await harness.run(async (context: any) => {
             const scheduler = {
-                runAfter: async (...args: unknown[]) => {
-                    scheduled.push(args);
+                runAfter: async (_delay: number, _target: unknown, args: Record<string, unknown>, options: { shardKey: unknown }) => {
+                    scheduled.push({ args, shard: options.shardKey });
 
                     return "job";
                 },
@@ -736,66 +738,111 @@ describe("a refused write's owed route restore is durable", () => {
             await dispatchPendingPinRestores({ ...context, scheduler });
         });
 
-        expect(scheduled).toHaveLength(1);
-        expect(scheduled[0]?.[2]).toStrictEqual({ createdAt: 1, threadId, until: expect.any(Number), userId: "user-collaborator" });
-        expect(scheduled[0]?.[3]).toMatchObject({ shardKey: OWNER });
-    });
+        return scheduled;
+    };
 
-    it("a restore that puts the route back settles the row it covers", async () => {
-        await harness.run(async (context: any) => await context.db.insert("pendingPinRestores", owedRestore()));
+    it("a refused write with nothing in flight takes its route, and leaves no owed row behind", async () => {
+        await harness.run(async (context: any) => {
+            await context.db.insert("sharedPinRoutes", { createdAt: 1, ownerId: OWNER, threadId, userId: "user-collaborator" });
+            await dropRoutesWithoutPins(context, threadId, "user-collaborator", null, true);
+        });
 
-        await harness.run(
-            async (context: any) =>
-                await context.runMutation(restoreSharedPinRoutes, { createdAt: 1, threadId, until: Date.now() + 60_000, userId: "user-collaborator" }),
-        );
-
-        const routes = await routesNow();
-
-        expect(routes.map((route: any) => route.ownerId)).toStrictEqual([OWNER]);
+        expect(await routesNow()).toHaveLength(0);
         expect(await owedRows()).toHaveLength(0);
     });
 
-    it("a restore past the deadline with no pin settles the row, and adds no route", async () => {
-        await harness.run(async (context: any) => await context.db.insert("pendingPinRestores", owedRestore({ until: Date.now() - 1 })));
+    it("a refused write keeps its routes when the thread is not on this shard, since no owed restore could reach them", async () => {
+        await harness.run(async (context: any) => {
+            await context.db.insert("sharedPinRoutes", { createdAt: 1, ownerId: OWNER, threadId, userId: "user-collaborator" });
+            await context.db.delete("threads", threadId);
+            await dropRoutesWithoutPins(context, threadId, "user-collaborator", null, true);
+        });
 
-        await harness.run(
-            async (context: any) =>
-                await context.runMutation(restoreSharedPinRoutes, { createdAt: 1, threadId, until: Date.now() - 1, userId: "user-collaborator" }),
-        );
+        expect(await routesNow()).toHaveLength(1);
+        expect(await owedRows()).toHaveLength(0);
+    });
+
+    it("the cron pass sends a row dispatched long ago to the owner it names, with its own row id, and not one dispatched a moment ago", async () => {
+        const stale = await insertOwed({ dispatchedAt: Date.now() - 120_000 });
+
+        await insertOwed({ dispatchedAt: Date.now() });
+
+        const scheduled = await cronPass();
+
+        expect(scheduled).toHaveLength(1);
+        expect(scheduled[0]?.args).toStrictEqual({ createdAt: 1, owedId: stale, threadId, until: expect.any(Number), userId: "user-collaborator" });
+        expect(scheduled[0]?.shard).toBe(OWNER);
+        // Sent once: its dispatch time is now, so the next pass waits a grace period before it sends it again.
+        expect(await cronPass()).toHaveLength(0);
+    });
+
+    it("the cron pass reaches every owed row, not only the first batch, across passes", async () => {
+        for (let index = 0; index < 51; index += 1) {
+            await insertOwed({ dispatchedAt: Date.now() - 120_000 - index });
+        }
+
+        const sent = [...(await cronPass()), ...(await cronPass())].map((entry) => (entry.args as { owedId: string }).owedId);
+
+        expect(new Set(sent).size).toBe(51);
+    });
+
+    it("a restore settles only its own row: another write's row for the same thread and collaborator keeps its own deadline", async () => {
+        const mine = await insertOwed({ until: Date.now() - 1 });
+        const other = await insertOwed({ until: Date.now() + 60_000 });
+
+        // Past its deadline with no pin: nothing needs this route, so its own row settles and no route is added.
+        await restoreFor(mine, Date.now() - 1);
+
+        const rows = await owedRows();
+
+        expect(rows.map((row) => row._id)).toStrictEqual([other]);
+        expect(await routesNow()).toHaveLength(0);
+    });
+
+    it("a restore that puts the route back settles its row", async () => {
+        const owed = await insertOwed();
+
+        await restoreFor(owed);
+
+        const routes = await routesNow();
+
+        expect(routes.map((route) => route.ownerId)).toStrictEqual([OWNER]);
+        expect(await owedRows()).toHaveLength(0);
+    });
+
+    it("a restore past the deadline with no pin settles its row, and adds no route", async () => {
+        const owed = await insertOwed({ until: Date.now() - 1 });
+
+        await restoreFor(owed, Date.now() - 1);
 
         expect(await routesNow()).toHaveLength(0);
         expect(await owedRows()).toHaveLength(0);
     });
 
     it("a thread that is not on this shard keeps its row for the cron, which sends it to the owner it names", async () => {
-        await harness.run(async (context: any) => {
-            await context.db.insert("pendingPinRestores", owedRestore());
-            await context.db.delete("threads", threadId);
-        });
+        const owed = await insertOwed();
 
-        await harness.run(
-            async (context: any) =>
-                await context.runMutation(restoreSharedPinRoutes, { createdAt: 1, threadId, until: Date.now() + 60_000, userId: "user-collaborator" }),
-        );
+        await harness.run(async (context: any) => await context.db.delete("threads", threadId));
+        await restoreFor(owed);
 
         expect(await owedRows()).toHaveLength(1);
         expect(await routesNow()).toHaveLength(0);
     });
 
     it("the erasure turns the owed row into the collaborator's route before its second sweep, and removes the row", async () => {
-        await harness.run(async (context: any) => await context.db.insert("pendingPinRestores", owedRestore()));
+        await insertOwed();
 
         const result = await harness.run(async (context: any) => await materializePendingPinRoutesBatch(context, "user-collaborator"));
 
         expect(result).toStrictEqual({ hasMore: false });
         const routes = await routesNow();
 
-        expect(routes.map((route: any) => route.ownerId)).toStrictEqual([OWNER]);
+        expect(routes.map((route) => route.ownerId)).toStrictEqual([OWNER]);
         expect(await owedRows()).toHaveLength(0);
     });
 
     it("the erasure's route drain removes the owed rows that name the erased account", async () => {
-        await harness.run(async (context: any) => await context.db.insert("pendingPinRestores", owedRestore()));
+        await insertOwed();
 
         await harness.run(async (context: any) => await eraseSharedPinRoutesBatch(context, "user-collaborator"));
 
@@ -847,7 +894,7 @@ describe("the route cleanup and the erasure's owner sweep", () => {
         expect(await routesOf("user-collaborator")).toHaveLength(0);
     });
 
-    it("puts the routes back when another write is still in flight after they were taken", async () => {
+    it("takes none of the routes while another write is in flight, so there is nothing to put back", async () => {
         const routes = await harness.run(async (context: any) => {
             for (let index = 0; index < 3; index += 1) {
                 await context.db.insert("sharedPinRoutes", { createdAt: 1, ownerId: OWNER, threadId, userId: "user-collaborator" });
@@ -1193,10 +1240,13 @@ describe("the erasure workflow, replayed against the real pin mutations", () => 
         } as never);
 
         // The real order: both sweeps, the fence release, then the drain. The window write fell between the second sweep and the drain.
-        const secondSweep = steps.lastIndexOf(steps.find((ref) => ref.endsWith(":erasePinsOnOwnerShards")) ?? "");
+        // Both sweeps ran: exactly two calls to the sweep, the second one the last before the release.
+        const sweeps = steps.flatMap((ref, index) => (ref.endsWith(":erasePinsOnOwnerShards") ? [index] : []));
+        const secondSweep = sweeps.at(-1) ?? -1;
         const drain = steps.indexOf(steps.find((ref) => ref.endsWith(":deleteUserSharedPinRoutes")) ?? "");
         const release = steps.indexOf(steps.find((ref) => ref.endsWith(":releasePinFences")) ?? "");
 
+        expect(sweeps).toHaveLength(2);
         expect(secondSweep).toBeGreaterThan(-1);
         expect(release).toBeGreaterThan(secondSweep);
         expect(drain).toBeGreaterThan(release);
