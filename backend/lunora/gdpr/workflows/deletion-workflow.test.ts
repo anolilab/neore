@@ -7,9 +7,10 @@
  * names are identifiers in the durable log, so the order and the names are what
  * these tests pin.
  */
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ROOT_SHARD_KEY } from "../../lib/shard-context";
+import { SWEEP_STEP_MS } from "../owner-sweep";
 import { accountDeletionWorkflowConfig } from "./deletion-workflow";
 
 const USER = "user-1";
@@ -42,7 +43,7 @@ const workflowContext = () => {
 
         // The owner sweep reports the owner shards it fenced; the fake reports none unless a test says so.
         if (entry.ref === "gdpr_steps:erasePinsOnOwnerShards") {
-            return { owners: [], routes: 0, ...(answer(entry.ref, round, args) as object) };
+            return { owners: [], resume: null, routes: 0, ...(answer(entry.ref, round, args) as object) };
         }
 
         return answer(entry.ref, round, args);
@@ -694,6 +695,43 @@ describe("account deletion workflow: the owner fences outlive the route drain", 
         const releaseRun = runs().find((entry) => entry.ref === "gdpr_steps:releasePinFences");
 
         expect(releaseRun?.args).toStrictEqual({ owners: ["owner-a", "owner-b"], userId: USER });
+    });
+
+    it("ends a step once its time budget is spent, and carries the cursor into the next step", async () => {
+        // Each sweep action takes a step's whole time budget, so every group covers a single page.
+        let clock = 0;
+        const now = vi.spyOn(Date, "now").mockImplementation(() => clock);
+
+        try {
+            answer = (ref, round) => {
+                if (ref !== "gdpr_steps:erasePinsOnOwnerShards") {
+                    return { cursor: null, hasMore: false, owners: [], resume: null, routes: 0 };
+                }
+
+                clock += SWEEP_STEP_MS;
+
+                if (round <= 2) {
+                    return { cursor: `c${String(round)}`, hasMore: true, owners: [`owner-${String(round)}`], resume: null, routes: 1 };
+                }
+
+                return { cursor: null, hasMore: false, owners: [], resume: null, routes: 0 };
+            };
+
+            await execute();
+
+            const names = stepNames();
+
+            expect(names).toContain("erase-pins-on-owner-shards-2");
+
+            const firstSweep = runs()
+                .filter((entry) => entry.ref === "gdpr_steps:erasePinsOnOwnerShards")
+                .slice(0, 3)
+                .map((entry) => entry.args["cursor"]);
+
+            expect(firstSweep).toStrictEqual([null, "c1", "c2"]);
+        } finally {
+            now.mockRestore();
+        }
     });
 
     it("starts a new step once a step has covered its budget of routes, and resumes from the cursor it stopped at", async () => {

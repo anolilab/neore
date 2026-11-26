@@ -27,6 +27,7 @@ import { internalMutation } from "../_generated/server";
 import { guestHoldsGrantRows } from "../agent/grant-revision";
 import { guestHasFollowRows } from "../chat/follows/follow-writes";
 import { guestHasPinRoutes } from "../chat/pins/pin-route-writes";
+import { reclaimPinWriteLeases } from "../lib/account-moves";
 import { ADMIN } from "../env";
 import { dropMergeGeneration, dropPinsLeft, firstTableWithGuestRows, mergeGenerationCurrent, onGuestShard } from "../lib/account-merge";
 import { authLogger } from "../lib/logger";
@@ -186,6 +187,7 @@ export const deleteMergedGuest = internalMutation
             fenced: v.optional(v.boolean()),
             followsRemain: v.optional(v.boolean()),
             grantsRemain: v.optional(v.boolean()),
+            leasesRemain: v.optional(v.boolean()),
             pinsRemain: v.optional(v.boolean()),
             rowsRemain: v.optional(v.string()),
             sharedShard: v.optional(v.boolean()),
@@ -235,6 +237,12 @@ export const deleteMergedGuest = internalMutation
 
         if (rowsRemain !== null) {
             return { deleted: false, rowsRemain };
+        }
+
+        // Pin-write lease rows still name the guest: a batch goes now, and the merge calls again while any remains. The merge has waited
+        // for every live lease and admits none now, since the guest is marked, so each row left is expired.
+        if (await reclaimPinWriteLeases(ctx, args.userId)) {
+            return { deleted: false, leasesRemain: true };
         }
 
         await cascadeDelete(ctx, guestId);

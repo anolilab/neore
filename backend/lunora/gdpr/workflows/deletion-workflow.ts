@@ -24,7 +24,7 @@ import { gdprLogger } from "../../lib/logger";
 import { ROOT_SHARD_KEY } from "../../lib/shard-context";
 import { onUserShard } from "../../lib/workflow-shard";
 import { stepDedupId } from "./dedup-id";
-import { SWEEP_ROUTES_PER_STEP } from "../owner-sweep";
+import { SWEEP_ROUTES_PER_STEP, SWEEP_STEP_MS, type SweepResume } from "../owner-sweep";
 import { DELETION_CONFIRMATION_CLAIM_TTL_MS, DELETION_CONFIRMATION_EMAIL_SCOPE, POSTHOG_FAILED_MESSAGE } from "../constants";
 
 export interface DeletionParams {
@@ -227,6 +227,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         const sweepOwnerShards = async (label: string): Promise<string[]> => {
             const owners: string[] = [];
             let cursor: string | null = null;
+            let resume: SweepResume | null = null;
             let hasMore = true;
             let group = 0;
 
@@ -234,31 +235,36 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 const groupLabel = `${label}-${String(group)}`;
                 const result = (await context.step.do(groupLabel, async () => {
                     const groupOwners: string[] = [];
+                    const startedAt = Date.now();
                     let groupCursor: string | null = cursor;
+                    let groupResume: SweepResume | null = resume;
                     let groupHasMore = true;
                     let routes = 0;
-
                     let round = 0;
 
-                    while (groupHasMore && routes < SWEEP_ROUTES_PER_STEP) {
+                    // A group ends when it has covered its routes, or its time, whichever comes first: it then returns the cursor and resume
+                    // point it stopped at, and the next group carries on from there.
+                    while (groupHasMore && routes < SWEEP_ROUTES_PER_STEP && Date.now() - startedAt < SWEEP_STEP_MS) {
                         const page = (await context.run(
                             internal.gdpr.steps.erasePinsOnOwnerShards,
-                            { cursor: groupCursor, userId: args.userId },
+                            { cursor: groupCursor, resume: groupResume, userId: args.userId },
                             { dedupId: stepDedupId(scope, groupLabel, round) },
-                        )) as { cursor: string | null; hasMore: boolean; owners: string[]; routes: number };
+                        )) as { cursor: string | null; hasMore: boolean; owners: string[]; resume: SweepResume | null; routes: number };
 
                         groupOwners.push(...page.owners);
                         routes += page.routes;
                         groupCursor = page.cursor;
+                        groupResume = page.resume ?? null;
                         groupHasMore = page.hasMore;
                         round += 1;
                     }
 
-                    return { cursor: groupCursor, hasMore: groupHasMore, owners: [...new Set(groupOwners)] };
-                })) as { cursor: string | null; hasMore: boolean; owners: string[] };
+                    return { cursor: groupCursor, hasMore: groupHasMore, owners: [...new Set(groupOwners)], resume: groupResume };
+                })) as { cursor: string | null; hasMore: boolean; owners: string[]; resume: SweepResume | null };
 
                 owners.push(...result.owners);
                 cursor = result.cursor;
+                resume = result.resume;
                 hasMore = result.hasMore;
                 group += 1;
             }

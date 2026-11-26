@@ -18,6 +18,12 @@ export const SWEEP_ROUTES_PER_ACTION = 15;
 /** Routes per durable step. Each step's owner list is bounded by this, so no step result grows with the account. */
 export const SWEEP_ROUTES_PER_STEP = 1000;
 
+/**
+ * Elapsed time after which a durable step stops and returns its cursor, well under the workflow's default step timeout. A step with
+ * slow shard calls then ends early, and the next step carries on from the cursor it stopped at.
+ */
+export const SWEEP_STEP_MS = 3 * 60_000;
+
 export type SweptRoute = { ownerId: string; threadId: string };
 
 export type SweepCalls = {
@@ -27,17 +33,31 @@ export type SweepCalls = {
     fence: (ownerId: string) => Promise<void>;
 };
 
+/** Where a sweep action stopped inside a page: the route it has not finished, which the next action resumes from. */
+export type SweepResume = { ownerId: string; threadId: string };
+
 /**
- * Sweeps one page of routes. Returns the distinct owners it fenced and the number of shard calls made, so the caller can check
- * the page against `SWEEP_CALL_BUDGET`. Every route is swept in full; a page is never cut short, so the caller's cursor is always
- * a page boundary and a resume needs no state from inside a page.
+ * Sweeps the routes of one page from `start`, within `budget` shard calls. A route starts only if its fence and one erase batch both fit,
+ * and a route with more batches stops between batches once the next would not fit. Returns the distinct owners it fenced, the calls it
+ * made, and the route it stopped at (`unfinished`, null when the page is done). Each erase deletes pins, so a stopped route always
+ * leaves progress behind for the next action.
  */
-export const sweepRoutePage = async (routes: ReadonlyArray<SweptRoute>, calls: SweepCalls): Promise<{ owners: string[]; shardCalls: number }> => {
+export const sweepRoutePage = async (
+    routes: ReadonlyArray<SweptRoute>,
+    calls: SweepCalls,
+    { budget, start = 0 }: { budget: number; start?: number },
+): Promise<{ owners: string[]; shardCalls: number; unfinished: SweptRoute | null }> => {
     const fenced = new Set<string>();
     let shardCalls = 0;
 
-    for (const route of routes) {
-        if (!fenced.has(route.ownerId)) {
+    for (const route of routes.slice(start)) {
+        const fenceCost = fenced.has(route.ownerId) ? 0 : 1;
+
+        if (shardCalls + fenceCost + 1 > budget) {
+            return { owners: [...fenced], shardCalls, unfinished: route };
+        }
+
+        if (fenceCost === 1) {
             fenced.add(route.ownerId);
             await calls.fence(route.ownerId);
             shardCalls += 1;
@@ -46,12 +66,16 @@ export const sweepRoutePage = async (routes: ReadonlyArray<SweptRoute>, calls: S
         let more = true;
 
         while (more) {
+            if (shardCalls + 1 > budget) {
+                return { owners: [...fenced], shardCalls, unfinished: route };
+            }
+
             const batch = await calls.eraseBatch(route);
 
-            more = batch.hasMore;
             shardCalls += 1;
+            more = batch.hasMore;
         }
     }
 
-    return { owners: [...fenced], shardCalls };
+    return { owners: [...fenced], shardCalls, unfinished: null };
 };

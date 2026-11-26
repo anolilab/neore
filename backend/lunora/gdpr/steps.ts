@@ -18,7 +18,7 @@ import {
 } from "../agent/export-pages";
 import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
 import { callOnShard } from "../lib/cross-shard";
-import { SWEEP_ROUTES_PER_ACTION, sweepRoutePage, type SweptRoute } from "./owner-sweep";
+import { SWEEP_CALL_BUDGET, SWEEP_ROUTES_PER_ACTION, sweepRoutePage } from "./owner-sweep";
 import { collectOrganizationReplyPages } from "../usage/organization";
 import { collectAcpSessionPages } from "../acp/gdpr";
 import { BROWSER_EXPORT_BYTES, browserExportPageKey, readAllBrowserPages } from "../browser/export-pages";
@@ -53,8 +53,6 @@ const ORGANIZATION_REPLY_EXPORT_BYTES = 4 * 1024 * 1024;
 const USAGE_OBJECT_WRAPPER_BYTES = 1024;
 
 const TRAILING_SLASH = /\/$/;
-
-/** Shared-pin routes one owner-shard sweep step reads at most, so the erasure's step count stays under the workflow's cap. */
 
 export const collectProfile = internalQuery
     .input({ userId: v.string() })
@@ -464,41 +462,60 @@ export const collectSharedPins = internalAction.input({ userId: v.string() }).ac
  * Erases the caller's pins on the threads other people own, from each owner's shard, before the routes that find them are removed
  * (`gdpr/workflows/deletion-workflow.ts`). A collaborator's pins are written on the owner's shard, so the caller's own shard holds none.
  *
- * One bounded page of routes per call, within `SWEEP_CALL_BUDGET` shard calls (`gdpr/owner-sweep.ts`): the workflow repeats the call from the
- * returned `cursor` while `hasMore`. A page boundary is always a safe resume point, since every route of a page is swept before the call returns.
+ * One bounded page of routes per call, within `SWEEP_CALL_BUDGET` shard calls (`gdpr/owner-sweep.ts`). When the budget runs out inside
+ * a route, the call returns that route as `resume` with the same page `cursor`, and the next call starts there. A page is only left
+ * behind once every route on it is done, so the cursor is always a safe resume point.
  */
 export const erasePinsOnOwnerShards = internalAction
-    .input({ cursor: v.union(v.string(), v.null()), userId: v.string() })
+    .input({
+        cursor: v.union(v.string(), v.null()),
+        resume: v.union(v.object({ ownerId: v.string(), threadId: v.string() }), v.null()),
+        userId: v.string(),
+    })
     .output(
         v.object({
             cursor: v.union(v.string(), v.null()),
             hasMore: v.boolean(),
             owners: v.array(v.string()),
+            resume: v.union(v.object({ ownerId: v.string(), threadId: v.string() }), v.null()),
             routes: v.number(),
         }),
     )
-    .action(async ({ args: { cursor, userId }, ctx: context }) => {
+    .action(async ({ args: { cursor, resume, userId }, ctx: context }) => {
         const result = await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, {
             cursor,
             limit: SWEEP_ROUTES_PER_ACTION,
             userId,
         });
 
+        // Resumes at the route it stopped at. A route no longer on the page was removed since (a refused write took it back), so the page
+        // is swept from its start: every route on it is idempotent to sweep again.
+        const found = resume === null ? -1 : result.page.findIndex((route) => route.threadId === resume.threadId && route.ownerId === resume.ownerId);
+
         // Each owner shard is fenced before it is swept, and stays fenced until the routes are gone (`releasePinFences`): a pin write of
         // this account on that shard is refused in its own transaction for the whole erasure, so nothing it commits can escape the sweep.
-        const { owners } = await sweepRoutePage(result.page as SweptRoute[], {
-            eraseBatch: async (route) =>
-                await callOnShard(
-                    internal.chat.pins.functions.eraseUserPinsOnThread,
-                    { threadId: route.threadId as Id<"threads">, userId },
-                    { shardKey: route.ownerId },
-                ),
-            fence: async (ownerId) => {
-                await callOnShard(internal.lib.account_moves.fencePinsOnShardFor, { userId }, { shardKey: ownerId });
+        // The read above is one call of the budget, so the sweep gets the rest.
+        const { owners, unfinished } = await sweepRoutePage(
+            result.page,
+            {
+                eraseBatch: async (route) =>
+                    await callOnShard(
+                        internal.chat.pins.functions.eraseUserPinsOnThread,
+                        { threadId: route.threadId as Id<"threads">, userId },
+                        { shardKey: route.ownerId },
+                    ),
+                fence: async (ownerId) => {
+                    await callOnShard(internal.lib.account_moves.fencePinsOnShardFor, { userId }, { shardKey: ownerId });
+                },
             },
-        });
+            { budget: SWEEP_CALL_BUDGET - 1, start: Math.max(0, found) },
+        );
 
-        return { cursor: result.continueCursor, hasMore: !result.isDone, owners, routes: result.page.length };
+        if (unfinished !== null) {
+            return { cursor, hasMore: true, owners, resume: { ownerId: unfinished.ownerId, threadId: unfinished.threadId }, routes: result.page.length };
+        }
+
+        return { cursor: result.continueCursor, hasMore: !result.isDone, owners, resume: null, routes: result.page.length };
     });
 
 /**

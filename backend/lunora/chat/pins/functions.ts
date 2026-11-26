@@ -18,6 +18,7 @@ import { MAX_LENGTH } from "../../lib/validators";
 import { systemDb } from "../../lib/rls/scope";
 import { threadGateOutcome, throwUnlessGranted } from "../lib/thread-gate";
 import { pinRouteOwnerOf } from "./pin-route-writes";
+import { runAfterOnShard } from "../../lib/shard-scheduler";
 import { isPinnableDocumentKind } from "./pinnable";
 
 /** The highest image index an image pin may name; a reply has far fewer images. */
@@ -265,6 +266,13 @@ export const dropRoutesWithoutPins = async (
         return;
     }
 
+    // A write in flight may still be using these routes, so none is taken while one is: the cleanup waits, and no delete has to be undone.
+    if (await otherPinWritesInFlight(context, userId, writerId, Date.now())) {
+        await scheduleRouteCleanup(context, threadId, userId, { delayMs: PIN_WRITE_LEASE_MS, survivesRollback: refusal });
+
+        return;
+    }
+
     // A guest merge can leave more than one route for the same user and thread, and a survivor is a link: every route goes.
     const { page } = await context.db.sharedPinRoutes.findMany({ consistency: "primary", limit: ROUTE_CLEANUP_BATCH, where: { threadId, userId } });
 
@@ -272,9 +280,10 @@ export const dropRoutesWithoutPins = async (
         await context.db.delete("sharedPinRoutes", route._id);
     }
 
-    // A write admitted before the delete may have read its route and still be about to insert its pin, on a route that is now gone. So
-    // the batch goes back, and the job removes it once no write is in flight. A write admitted after the delete finds no route and
-    // writes its own. The clock is read here, not taken from the mutation's start: a lease that ran out during a slow mutation is out.
+    // The check above is not atomic with the delete: a write admitted after it may have read its route before the delete. That write
+    // comes back for a restore, and the batch goes back with it, so the job removes it once no write is in flight. Residual: a failed
+    // restore insert after this delete cannot be rolled back, since global rows are not part of the shard's transaction. The clock is
+    // read here, not taken from the mutation's start: a lease that ran out during a slow mutation is out.
     if (await otherPinWritesInFlight(context, userId, writerId, Date.now())) {
         for (const route of page) {
             await context.db.insert("sharedPinRoutes", { createdAt: route.createdAt, ownerId: route.ownerId, threadId, userId });
@@ -304,14 +313,19 @@ export const finishRouteCleanup = async (context: MutationCtx, threadId: Id<"thr
         return;
     }
 
-    // The thread's owner is merging: the thread and its pins are moving to another shard, and this shard's view is partial until the
-    // merge ends. The routes name the owner, and the merge re-points them, so this job takes none.
-    if (thread.userId !== undefined && (await isAccountMoving(context, thread.userId, Date.now()))) {
+    // Nothing to remove: an owner keeps no route to their own thread, so a cleanup there schedules no further pass.
+    const routeOwner = await pinRouteOwnerOf(context.db, userId, threadId);
+
+    if (routeOwner === null) {
         return;
     }
 
-    // Nothing to remove: an owner keeps no route to their own thread, so a cleanup there schedules no further pass.
-    if ((await pinRouteOwnerOf(context.db, userId, threadId)) === null) {
+    // The thread's owner is merging: the thread and its pins are moving to another shard, and this shard's view is partial until the
+    // merge ends. The merge re-points the route to the new owner, so the pass waits and runs on the route's owner, which holds the thread
+    // by then. It does not return here, since no further pass would ever run.
+    if (thread.userId !== undefined && (await isAccountMoving(context, thread.userId, Date.now()))) {
+        await runAfterOnShard(context.scheduler, PIN_WRITE_LEASE_MS, internal.chat.pins.functions.finishPinRouteCleanup, { threadId, userId }, routeOwner);
+
         return;
     }
 

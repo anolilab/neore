@@ -1743,6 +1743,38 @@ describe("deleteMergedGuest", () => {
             return await context.runMutation(deleteMergedGuest, { generation, userId });
         });
 
+    it("keeps the guest while its pin-write leases remain, and clears them a batch per call", async () => {
+        const harness = harnessWithUsers();
+
+        try {
+            const guest = await insertUser(harness, true);
+
+            // More than one batch of lease rows, as a guest with many pin writes leaves behind.
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < 45; index += 1) {
+                    await context.db.insert("pinWriteLeases", { expiresAt: 0, userId: guest, writerId: `writer-${String(index)}` });
+                }
+            });
+
+            expect(await deleteGuest(harness, guest)).toStrictEqual({ deleted: false, leasesRemain: true });
+            await expect(userExists(harness, guest)).resolves.toBe(true);
+
+            let result: { deleted: boolean; leasesRemain?: boolean } = { deleted: false, leasesRemain: true };
+
+            for (let call = 0; call < 5 && result.leasesRemain === true; call += 1) {
+                result = await deleteGuest(harness, guest);
+            }
+
+            expect(result).toStrictEqual({ deleted: true });
+
+            const leases = await harness.run(async (context: any) => await context.db.pinWriteLeases.findMany({ where: { userId: guest } }));
+
+            expect(leases.page).toHaveLength(0);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("takes the guest's pins-left signal with it", async () => {
         const harness = harnessWithUsers();
 
