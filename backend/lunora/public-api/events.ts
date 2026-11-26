@@ -14,7 +14,7 @@ import { isThreadLocked } from "../lib/thread-lock";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { pollEvents as pollLog } from "./events-poll";
 import type { EventLogStore } from "./events-poll";
-import { deleteMcpEventsOfThread, EVENT_WAKE_MAX_ATTEMPTS, EVENT_WAKE_RETRY_MS, RETENTION_MS } from "./events-log";
+import { deleteMcpEventsOfThread, EVENT_WAKE_MAX_ATTEMPTS, EVENT_WAKE_RETRY_MS, RETENTION_MS, recordRunEnd } from "./events-log";
 import { noteRetentionWake } from "../lib/shard-housekeeping";
 import { currentUserShard } from "../lib/shard-context";
 import { runAfterOnShard } from "../lib/shard-scheduler";
@@ -251,6 +251,19 @@ export const retryEventWake = internalMutation
             { attempt: args.attempt + 1, dueAt: args.dueAt, userId: args.userId },
             args.userId,
         );
+
+        return null;
+    });
+
+/**
+ * How a headless run ended, for its thread's owner (`chat/lib/headless-run.ts`). A headless run has no stream row, so its own reply key
+ * stands for the stream in the event's id: one run, one end, however often it is written.
+ */
+export const recordHeadlessRunEnd = internalMutation
+    .input({ outcome: v.union(v.literal("succeeded"), v.literal("failed")), runKey: v.string(), threadId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await recordRunEnd({ db: ctx.db, now: ctx.now, scheduler: ctx.scheduler }, { outcome: args.outcome, streamId: args.runKey, threadId: args.threadId });
 
         return null;
     });

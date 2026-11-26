@@ -437,7 +437,16 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         const callOptions = options.freshContext ? { contextOptions: { recentMessages: 0 } } : undefined;
         // A generation that fails on a thread this run continues wakes it if the owner snoozed it, as a chat run that fails
         // does; the first generation and every later goal round go through here. The generation's own error is the one thrown.
+        // The run's end in the owner's Events log, keyed by its own reply key. A log write that fails is logged, never the run's failure.
+        const recordEnd = async (outcome: "succeeded" | "failed"): Promise<void> => {
+            await ctx.runMutation(internal.public_api.events.recordHeadlessRunEnd, { outcome, runKey: replyKey, threadId }).catch((eventError: unknown) => {
+                console.error("[headless-run] could not record the run's end in the Events log", { eventError, threadId });
+            });
+        };
+
         const wakeOnFailure = async (error: unknown): Promise<never> => {
+            await recordEnd("failed");
+
             if (existingThreadId !== undefined) {
                 await ctx
                     .runMutation(internal.agent.threads.updateThread, { failed: true, patch: {}, threadId: threadId as Id<"threads"> })
@@ -597,6 +606,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
 
         if (!options.goal) {
             extract(text);
+            await recordEnd("succeeded");
 
             return { costMicrodollars: first.priced, text, threadId, totalTokens: result.totalUsage?.totalTokens };
         }
@@ -615,6 +625,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         });
 
         extract(outcome.result.text);
+        await recordEnd("succeeded");
 
         return {
             costMicrodollars: outcome.costMicrodollars || undefined,
