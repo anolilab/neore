@@ -285,7 +285,8 @@ export const lastSettledMessageId = internalQuery
         const settled = candidates.findLast((rows) => {
             const last = rows.at(-1)?.row;
 
-            return last !== undefined && last.status === "success" && !last.tool && !isTool(last.message as Message);
+            // A row with no message body is not a prompt or a finished reply, so it is skipped rather than read as one.
+            return last !== undefined && last.status === "success" && !last.tool && last.message !== undefined && !isTool(last.message as Message);
         });
 
         return settled?.at(-1)?._id ?? null;
