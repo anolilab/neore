@@ -227,6 +227,7 @@ const OWNER_TABLES = [
     "subAgentRuns",
     "systemPromptPresets",
     "taskRuns",
+    "taskSuggestions",
     "tasks",
     "temporaryThreads",
     "threadFollows",
