@@ -503,7 +503,7 @@ describe("AsidePanel", () => {
 
             expect(scroll).toHaveBeenCalledTimes(1);
             // The hit ends at 520, 120 below the panel's visible bottom at 400.
-            expect(scrollBy).toHaveBeenCalledWith({ behavior: "instant", top: 120 });
+            expect(scrollBy).toHaveBeenCalledWith({ behavior: "instant", left: 0, top: 120 });
         } finally {
             Reflect.deleteProperty(Element.prototype, "scrollIntoView");
             Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
@@ -667,6 +667,8 @@ describe("AsidePanel", () => {
             fireEvent.change(screen.getByRole("textbox", { name: "Find in side questions" }), { target: { value: "cat" } });
             await settleReveal();
             expect(scroll).toHaveBeenCalled();
+            // The panel is shifted left by the part of the hit that runs past the window's right edge, not left to the browser.
+            expect(window.scrollBy).toHaveBeenCalledWith({ behavior: "instant", left: 176, top: 0 });
         } finally {
             Reflect.deleteProperty(Element.prototype, "scrollIntoView");
             Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");

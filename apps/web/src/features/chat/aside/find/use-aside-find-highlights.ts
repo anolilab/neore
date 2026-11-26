@@ -160,16 +160,17 @@ const revealIfOutOfSight = (range: Range | undefined, host: Element): void => {
     // Instant, so the hit is measured where the scroll has left it.
     target.scrollIntoView({ behavior: "instant", block: "center" });
 
-    // Centring a block taller than the panel can leave the hit past the panel's edge. Scroll the panel by what is still hidden.
+    // Centring can leave the hit past the panel's edges: scroll the panel by what is still hidden, on both axes.
     const settled = hitRect(range, target);
-    const correction =
+    const shiftY =
         settled.top < bounds.top + STICKY_BAR_CLEARANCE_PX ? settled.top - (bounds.top + STICKY_BAR_CLEARANCE_PX) : Math.max(0, settled.bottom - bounds.bottom);
+    const shiftX = shiftToFit(settled.left, settled.right, bounds.left, bounds.right);
 
-    if (correction !== 0) {
+    if (shiftX !== 0 || shiftY !== 0) {
         if (scroller) {
-            scroller.scrollBy({ behavior: "instant", top: correction });
+            scroller.scrollBy({ behavior: "instant", left: shiftX, top: shiftY });
         } else {
-            window.scrollBy({ behavior: "instant", top: correction });
+            window.scrollBy({ behavior: "instant", left: shiftX, top: shiftY });
         }
     }
 
