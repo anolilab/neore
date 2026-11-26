@@ -717,10 +717,12 @@ export const takeControl = authAction
      * `exclusive`: never take the lease over from another of the caller's views (`held`), for a client (the phone) that
      * must not pull control out from under a tab the person is driving; the view's own lease (`renews` names it) is not
      * another view's. `view`: the client's own name for the view (the phone's screen), kept beside the lease, so a take
-     * whose answer was lost is not refused as another view's when that view asks again.
+     * whose answer was lost is not refused as another view's when that view asks again. `leaseOnly`: the lease alone,
+     * for a client that frames no view (the phone): no interactive view is minted, and the answer carries no `url`.
      */
     .input({
         exclusive: v.optional(v.boolean()),
+        leaseOnly: v.optional(v.boolean()),
         renews: v.optional(v.string().max(MAX_LENGTH.short)),
         threadId: v.id("threads"),
         view: v.optional(v.string().max(MAX_LENGTH.short)),
@@ -737,16 +739,16 @@ export const takeControl = authAction
             v.object({
                 claim: v.string(),
                 claimId: v.string(),
-                connectBy: v.number(),
+                connectBy: v.optional(v.number()),
                 release: v.optional(v.string()),
                 status: v.literal("ok"),
                 until: v.number(),
-                url: v.string(),
+                url: v.optional(v.string()),
             }),
             v.object({ status: v.union(v.literal("busy"), v.literal("ended"), v.literal("held"), v.literal("taken"), v.literal("unavailable")) }),
         ),
     )
-    .action(async ({ args: { exclusive, renews, threadId, view }, ctx }) => {
+    .action(async ({ args: { exclusive, leaseOnly, renews, threadId, view }, ctx }) => {
         const { impersonatedBy, userId } = ctx.user;
 
         refuseImpersonation(impersonatedBy);
@@ -793,23 +795,28 @@ export const takeControl = authAction
             return { status };
         };
 
-        if (CLOUDFLARE_ACCOUNT_ID === "" || BROWSER_LIVE_VIEW_API_TOKEN === "") {
-            return await refuse("unavailable", "not_configured");
-        }
+        // A client that frames no view takes the lease alone: no interactive view (a credential) is minted for it.
+        let url: string | undefined;
 
-        const request = liveViewRequest(CLOUDFLARE_ACCOUNT_ID, BROWSER_LIVE_VIEW_API_TOKEN, claim.providerSessionId, true);
-        const response = await fetchWithDeadline(request.url, request.init).catch(() => undefined);
+        if (leaseOnly !== true) {
+            if (CLOUDFLARE_ACCOUNT_ID === "" || BROWSER_LIVE_VIEW_API_TOKEN === "") {
+                return await refuse("unavailable", "not_configured");
+            }
 
-        if (!response?.ok) {
-            await response?.body?.cancel().catch(() => undefined);
+            const request = liveViewRequest(CLOUDFLARE_ACCOUNT_ID, BROWSER_LIVE_VIEW_API_TOKEN, claim.providerSessionId, true);
+            const response = await fetchWithDeadline(request.url, request.init).catch(() => undefined);
 
-            return await refuse(response?.status === 404 || response?.status === 410 ? "ended" : "unavailable", `provider_${response?.status ?? "error"}`);
-        }
+            if (!response?.ok) {
+                await response?.body?.cancel().catch(() => undefined);
 
-        const url = liveViewUrlFrom(await response.json().catch(() => null));
+                return await refuse(response?.status === 404 || response?.status === 410 ? "ended" : "unavailable", `provider_${response?.status ?? "error"}`);
+            }
 
-        if (url === undefined) {
-            return await refuse("unavailable", "bad_url");
+            url = liveViewUrlFrom(await response.json().catch(() => null));
+
+            if (url === undefined) {
+                return await refuse("unavailable", "bad_url");
+            }
         }
 
         // The provider call takes time: a grant removed or lowered, a chat locked or trashed, a lease handed back, taken
@@ -869,11 +876,10 @@ export const takeControl = authAction
         return {
             claim: claim.claim,
             claimId: await claimIdOf(claim.claim),
-            connectBy: Date.now() + LIVE_VIEW_CONNECT_DEADLINE_MS,
             ...(release !== undefined && { release }),
             status: "ok" as const,
             until: claim.until,
-            url,
+            ...(url !== undefined && { connectBy: Date.now() + LIVE_VIEW_CONNECT_DEADLINE_MS, url }),
         };
     });
 

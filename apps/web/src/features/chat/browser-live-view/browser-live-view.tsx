@@ -122,7 +122,7 @@ type NavigationAnswer = { error: string; status: "refused" } | { status: "closed
 
 type Answer =
     | { status: "busy" | "controlled" | "ended" | "held" | "taken" | "unavailable" }
-    | { claim?: string; claimId?: string; connectBy: number; release?: string; status: "ok"; until?: number; url: string };
+    | { claim?: string; claimId?: string; connectBy?: number; release?: string; status: "ok"; until?: number; url?: string };
 
 /**
  * The claim this tab holds, on the server's clock. Its lease was written before `writtenBy` (when `takeControl`
@@ -151,7 +151,8 @@ const sendReleaseBeacon = (release: string, reason: "handed_back" | "left"): boo
  * status read drops the card, or the provider may not see it at all, and either way the click must not do nothing.
  */
 const viewFrom = (asked: Asked, result: Answer, now: number): View => {
-    if (result.status === "ok") {
+    // A view is only ever asked for with its URL (`leaseOnly` is the phone's): an answer without one has nothing to show.
+    if (result.status === "ok" && result.url !== undefined) {
         return { ...asked, connected: false, kind: "open", stale: now >= asked.connectBy, url: result.url };
     }
 
@@ -422,7 +423,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     const tookControl = (attempt: number, result: Answer): void => {
         const current = mounted.current && attempts.current === attempt && wantedControl.current === attempt;
 
-        if (result.status === "ok" && result.claim !== undefined && result.until !== undefined) {
+        if (result.status === "ok" && result.claim !== undefined && result.until !== undefined && result.connectBy !== undefined) {
             if (current) {
                 setClaim({
                     claim: result.claim,

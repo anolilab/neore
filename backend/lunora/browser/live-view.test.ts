@@ -1996,6 +1996,17 @@ describe("a phone that takes control", () => {
         });
     });
 
+    it("takes the lease alone when it asks for no view: nothing is minted at the provider and no URL is returned", async () => {
+        await addSession();
+        const phone: any = await as(OWNER).action(takeControl as never, { exclusive: true, leaseOnly: true, threadId, view: "phone-1" } as never);
+
+        expect(phone).toMatchObject({ claim: expect.any(String), claimId: expect.any(String), status: "ok" });
+        expect(phone).not.toHaveProperty("url");
+        expect(phone).not.toHaveProperty("connectBy");
+        expect(fetchMock).not.toHaveBeenCalled();
+        await expect(statusFor(OWNER)).resolves.toMatchObject({ control: { byYou: true, claimIds: [phone.claimId] } });
+    });
+
     it("takes back a lease whose answer it lost by naming its own view, but never another view's", async () => {
         await addSession();
         const viewTake = async (view: string): Promise<any> => await as(OWNER).action(takeControl as never, { exclusive: true, threadId, view } as never);
