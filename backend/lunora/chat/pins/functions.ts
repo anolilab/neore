@@ -19,6 +19,7 @@ import { MAX_LENGTH } from "../../lib/validators";
 import { systemDb } from "../../lib/rls/scope";
 import { threadGateOutcome, throwUnlessGranted } from "../lib/thread-gate";
 import { pinRouteOwnerOf } from "./pin-route-writes";
+import { currentUserShard } from "../../lib/shard-context";
 import { runAfterOnShard, runAfterWithRetry } from "../../lib/shard-scheduler";
 import { isPinnableDocumentKind } from "./pinnable";
 
@@ -234,19 +235,25 @@ const scheduleRouteCleanup = async (
 };
 
 /**
- * Puts a batch of routes back for a write that may still need them. A restore that fails is retried by the scheduler, so it lands unless
- * the writes that need it run out first. A refused write rethrows, which rolls back a scheduled job, so its restore goes by a queue send,
- * which a rollback does not undo.
+ * Puts a route back for a write that may still need it. A restore that fails is retried by the scheduler until the writes that need
+ * it run out (`until`). A refused write rethrows, which rolls back a scheduled job, so its restore goes by a queue send then, which a
+ * rollback does not undo.
  */
 const restoreRoutes = async (
     context: MutationCtx,
     threadId: Id<"threads">,
     userId: string,
-    routes: ReadonlyArray<{ createdAt: number; ownerId: string }>,
+    routes: ReadonlyArray<{ createdAt: number }>,
     until: number,
     survivesRollback: boolean,
 ): Promise<void> => {
-    const args = { routes: routes.map((route) => ({ createdAt: route.createdAt, ownerId: route.ownerId })), threadId, until, userId };
+    const first = routes[0];
+
+    if (first === undefined) {
+        return;
+    }
+
+    const args = { createdAt: first.createdAt, threadId, until, userId };
 
     if (survivesRollback) {
         await enqueueJob(internal.chat.pins.functions.restoreSharedPinRoutes, args);
@@ -263,21 +270,37 @@ const restoreRoutes = async (
 };
 
 /**
- * Restores the routes a cleanup took while a write was still in flight (`restoreRoutes`). Does nothing once `until` has passed: the
- * writes that needed the routes have run out, and the erasure's drain may already have run. Adds only the owners the thread has no route
- * for, so a retry after a partial restore does not duplicate one.
+ * Restores the route a cleanup took while a write was still in flight (`restoreRoutes`). The route names the thread's owner as it is now,
+ * not the owner it named when it was deleted, since a merge may have moved the thread. A thread that is no longer on this shard is left
+ * alone: the merge that moved it re-points the routes it kept. After `until`, a route is restored only while a pin of the collaborator
+ * still needs it: a pin that survived is one the erasure did not sweep, and without one nothing needs the route, while the erasure's drain
+ * may already have run.
  */
 export const restoreSharedPinRoutes = internalMutation
     .input({
-        routes: v.array(v.object({ createdAt: v.number(), ownerId: v.string() })),
+        createdAt: v.number(),
         threadId: v.id("threads"),
         until: v.number(),
         userId: v.string().max(MAX_LENGTH.id),
     })
     .output(v.null())
     .mutation(async ({ args, ctx: context }) => {
-        if (Date.now() >= args.until) {
+        const thread = await systemDb(context).get("threads", args.threadId);
+
+        // An owner keeps no route to their own thread.
+        if (thread?.userId === undefined || thread.userId === args.userId) {
             return null;
+        }
+
+        if (Date.now() >= args.until) {
+            const pins = await context.db
+                .query("threadPins")
+                .withIndex("by_user_and_thread", (q) => q.eq("userId", args.userId).eq("threadId", args.threadId))
+                .take(1);
+
+            if (pins.length === 0) {
+                return null;
+            }
         }
 
         const { page } = await context.db.sharedPinRoutes.findMany({
@@ -285,18 +308,15 @@ export const restoreSharedPinRoutes = internalMutation
             limit: ROUTE_CLEANUP_BATCH,
             where: { threadId: args.threadId, userId: args.userId },
         });
-        const present = new Set(page.map((route) => route.ownerId));
 
-        for (const route of args.routes) {
-            if (!present.has(route.ownerId)) {
-                await context.db.insert("sharedPinRoutes", {
-                    createdAt: route.createdAt,
-                    ownerId: route.ownerId,
-                    threadId: args.threadId,
-                    userId: args.userId,
-                });
-                present.add(route.ownerId);
-            }
+        // Adds the route only if the owner it names is not already there, so a retry does not duplicate it.
+        if (page.every((route) => route.ownerId !== thread.userId)) {
+            await context.db.insert("sharedPinRoutes", {
+                createdAt: args.createdAt,
+                ownerId: thread.userId,
+                threadId: args.threadId,
+                userId: args.userId,
+            });
         }
 
         return null;
@@ -378,8 +398,15 @@ export const dropRoutesWithoutPins = async (
 export const finishRouteCleanup = async (context: MutationCtx, threadId: Id<"threads">, userId: string): Promise<void> => {
     const thread = await systemDb(context).get("threads", threadId);
 
-    // This shard cannot see the pins of a thread that moved off it, so it cannot tell whether any are left: the routes stay.
+    // This shard cannot see the pins of a thread that moved off it, so it takes no route here. The merge that moved it re-points the route
+    // after the clear, so the route may name the new owner by now: the pass follows it there, where the thread is.
     if (!thread) {
+        const movedTo = await pinRouteOwnerOf(context.db, userId, threadId);
+
+        if (movedTo !== null && movedTo !== currentUserShard()) {
+            await runAfterOnShard(context.scheduler, 0, internal.chat.pins.functions.finishPinRouteCleanup, { threadId, userId }, movedTo);
+        }
+
         return;
     }
 

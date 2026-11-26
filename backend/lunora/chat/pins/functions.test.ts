@@ -857,43 +857,79 @@ describe("the thread owner's merge, and the erasure replayed in order", () => {
         expect(await routesOfCollaborator()).toHaveLength(0);
     });
 
-    it("restores a route a write still needs, adds only the owners the thread has none for, and does nothing twice", async () => {
+    it("restores the route to the thread's owner once, however often the restore runs", async () => {
         await grantWrite();
         await as("user-collaborator").mutation(createPin as never, { messageId: "m-restore", messageRole: "assistant", threadId } as never);
+        await harness.run(async (context: any) => {
+            const { page } = await context.db.sharedPinRoutes.findMany({ where: { userId: "user-collaborator" } });
 
-        const args = {
-            routes: [
-                { createdAt: 1, ownerId: OWNER },
-                { createdAt: 2, ownerId: "owner-z" },
-            ],
-            threadId,
-            until: Date.now() + 60_000,
-            userId: "user-collaborator",
-        };
+            for (const route of page) {
+                await context.db.delete("sharedPinRoutes", route._id);
+            }
+        });
+
+        const args = { createdAt: 1, threadId, until: Date.now() + 60_000, userId: "user-collaborator" };
 
         await harness.run(async (context: any) => await context.runMutation(restoreSharedPinRoutes, args));
         await harness.run(async (context: any) => await context.runMutation(restoreSharedPinRoutes, args));
 
         const routes = await routesOfCollaborator();
-        const owners = routes.map((route: any) => route.ownerId as string).toSorted((a, b) => a.localeCompare(b));
 
-        expect(owners).toStrictEqual(["owner-z", OWNER]);
+        expect(routes.map((route: any) => route.ownerId)).toStrictEqual([OWNER]);
     });
 
-    it("does nothing once the writes that needed the routes have run out", async () => {
+    it("does nothing once the writes that needed the route have run out, unless a pin of the collaborator still needs it", async () => {
         await grantWrite();
+        const restore = async (until: number) =>
+            await harness.run(
+                async (context: any) => await context.runMutation(restoreSharedPinRoutes, { createdAt: 1, threadId, until, userId: "user-collaborator" }),
+            );
 
-        await harness.run(
-            async (context: any) =>
-                await context.runMutation(restoreSharedPinRoutes, {
-                    routes: [{ createdAt: 1, ownerId: OWNER }],
-                    threadId,
-                    until: Date.now() - 1,
-                    userId: "user-collaborator",
-                }),
-        );
+        // No pin: nothing needs the route once the writes have run out.
+        await restore(Date.now() - 1);
 
         expect(await routesOfCollaborator()).toHaveLength(0);
+
+        // A pin that survived: it still needs its route, so the restore goes on after the deadline.
+        await as("user-collaborator").mutation(createPin as never, { messageId: "m-survived", messageRole: "assistant", threadId } as never);
+        await harness.run(async (context: any) => {
+            const { page } = await context.db.sharedPinRoutes.findMany({ where: { userId: "user-collaborator" } });
+
+            for (const route of page) {
+                await context.db.delete("sharedPinRoutes", route._id);
+            }
+        });
+
+        await restore(Date.now() - 1);
+
+        expect(await routesOfCollaborator()).toHaveLength(1);
+    });
+
+    it("follows the route to its owner's shard when the thread has left this one", async () => {
+        await grantWrite();
+
+        const pinId = await as("user-collaborator").mutation(createPin as never, { messageId: "m-moved", messageRole: "assistant", threadId } as never);
+
+        // The thread has left this shard: its pins and the thread row went with the merge, and the route names the new owner's shard.
+        await harness.run(async (context: any) => await context.db.delete("threadPins", pinId as never));
+        await harness.run(async (context: any) => await context.db.delete("threads", threadId));
+
+        const scheduled: unknown[][] = [];
+
+        await harness.run(async (context: any) => {
+            const scheduler = {
+                runAfter: async (...args: unknown[]) => {
+                    scheduled.push(args);
+
+                    return "job";
+                },
+            };
+
+            await finishRouteCleanup({ ...context, scheduler }, threadId, "user-collaborator");
+        });
+
+        expect(scheduled).toHaveLength(1);
+        expect(scheduled[0]?.[3]).toMatchObject({ shardKey: OWNER });
     });
 
     it("reschedules the merging owner's cleanup on the route's owner shard, so the pass runs where the thread goes", async () => {
