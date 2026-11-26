@@ -23,7 +23,7 @@ import { enqueueJob } from "../lib/job-queue";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { readMemoryEnabled } from "./functions";
 import { importFacts, keepLabelledEntries } from "./import";
-import { IMPORT_MEMORY_OFF_MESSAGE } from "./import-logic";
+import { IMPORT_ACCOUNT_DELETING_MESSAGE, IMPORT_MEMORY_OFF_MESSAGE } from "./import-logic";
 import { vMemoryType } from "./taxonomy";
 
 /** Past the longest a batch may take (the queue's dispatch timeout, and the retry that follows a failed one). */
@@ -62,10 +62,23 @@ const failJob = async (ctx: MutationCtx, job: Doc<"memoryImportJobs">, error: st
     await dropBatches(ctx, job._id);
 };
 
-/** Queues a batch of a job and schedules the reaper for it. */
-const startBatch = async (ctx: MutationCtx, job: Doc<"memoryImportJobs">, index: number): Promise<void> => {
-    await enqueueJob(internal.memory.import_job.runMemoryImportBatch, { index, jobId: job._id }, { shardKey: job.userId });
+/** Deletes the job and every stored batch of it. */
+const deleteJob = async (ctx: MutationCtx, job: Doc<"memoryImportJobs">): Promise<void> => {
+    await dropBatches(ctx, job._id);
+    await ctx.db.delete("memoryImportJobs", job._id);
+};
+
+/**
+ * Schedules the reaper for a batch nobody has claimed. The caller enqueues the batch after this mutation commits (the
+ * scheduled reaper is committed with it), so the message never outruns the state it needs.
+ */
+const armQueuedReaper = async (ctx: MutationCtx, job: Doc<"memoryImportJobs">, index: number): Promise<void> => {
     await runAfterOnShard(ctx.scheduler, STALE_IMPORT_BATCH_MS, internal.memory.import_job.reapMemoryImportJob, { batch: index, jobId: job._id }, job.userId);
+};
+
+/** Puts a batch on the jobs queue. Only after the mutation that made it the job's next batch has committed. */
+const enqueueBatch = async (userId: string, jobId: Id<"memoryImportJobs">, index: number): Promise<void> => {
+    await enqueueJob(internal.memory.import_job.runMemoryImportBatch, { index, jobId }, { shardKey: userId });
 };
 
 /**
@@ -83,6 +96,10 @@ export const prepareImportJob = internalMutation
     })
     .output(v.id("memoryImportJobs"))
     .mutation(async ({ args, ctx }) => {
+        if (await isAccountDeletionUnderway(ctx, args.userId)) {
+            throw new LunoraError("FORBIDDEN", IMPORT_ACCOUNT_DELETING_MESSAGE);
+        }
+
         if (!(await readMemoryEnabled(ctx, args.userId))) {
             throw new LunoraError("FORBIDDEN", IMPORT_MEMORY_OFF_MESSAGE);
         }
@@ -143,6 +160,10 @@ export const storeImportBatches = internalMutation
             throw new LunoraError("BAD_REQUEST", "The import is no longer preparing.");
         }
 
+        if (await isAccountDeletionUnderway(ctx, args.userId)) {
+            throw new LunoraError("FORBIDDEN", IMPORT_ACCOUNT_DELETING_MESSAGE);
+        }
+
         for (const [offset, entries] of args.batches.entries()) {
             await ctx.db.insert("memoryImportBatches", { entries, index: args.firstIndex + offset, jobId: args.jobId, userId: args.userId });
         }
@@ -150,10 +171,13 @@ export const storeImportBatches = internalMutation
         return null;
     });
 
-/** Starts a prepared job: its first batch goes on the jobs queue. */
+/**
+ * Starts a prepared job: it becomes `queued` with its first batch next. The caller then enqueues batch 0, after this
+ * commits. A job whose account is being deleted is removed with its batches instead, and `false` comes back.
+ */
 export const beginImportJob = internalMutation
     .input({ jobId: v.id("memoryImportJobs"), userId: v.string() })
-    .output(v.null())
+    .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         const job = await ctx.db.get("memoryImportJobs", args.jobId);
 
@@ -161,10 +185,16 @@ export const beginImportJob = internalMutation
             throw new LunoraError("BAD_REQUEST", "The import is no longer preparing.");
         }
 
-        await ctx.db.patch("memoryImportJobs", job._id, { status: "queued", updatedAt: Date.now() });
-        await startBatch(ctx, job, 0);
+        if (await isAccountDeletionUnderway(ctx, job.userId)) {
+            await deleteJob(ctx, job);
 
-        return null;
+            return false;
+        }
+
+        await ctx.db.patch("memoryImportJobs", job._id, { status: "queued", updatedAt: Date.now() });
+        await armQueuedReaper(ctx, job, 0);
+
+        return true;
     });
 
 /**
@@ -183,7 +213,8 @@ export const claimImportBatch = internalMutation
         }
 
         if (await isAccountDeletionUnderway(ctx, job.userId)) {
-            await failJob(ctx, job, CANCELLED_MESSAGE);
+            // Nothing of the user's is kept: the job row names them, and the erasure may have passed it by.
+            await deleteJob(ctx, job);
 
             return null;
         }
@@ -206,18 +237,31 @@ export const claimImportBatch = internalMutation
         }
 
         await ctx.db.patch("memoryImportJobs", job._id, { claimedBatch: args.index, status: "running", updatedAt: Date.now() });
+        // Timed from now, not from the enqueue: the message may have waited in the queue.
+        await runAfterOnShard(
+            ctx.scheduler,
+            STALE_IMPORT_BATCH_MS,
+            internal.memory.import_job.reapMemoryImportJob,
+            { batch: args.index, claimed: true, jobId: job._id },
+            job.userId,
+        );
 
         return { entries: batch.entries, userId: job.userId };
     });
 
-/** Adds a claimed batch's counts, deletes its entries, and queues the next batch or finishes the job. */
+/**
+ * Adds a claimed batch's counts, deletes its entries, and hands back the next batch for the caller to enqueue (`null`
+ * when the job is over). A job that ended while the batch ran (cancelled, or reaped) still takes the counts of what the
+ * batch saved, since those memories stay: it keeps its status, starts nothing, and counts the batch once (`nextBatch`
+ * moves past it).
+ */
 export const completeImportBatch = internalMutation
     .input({ duplicates: v.number(), imported: v.number(), index: v.number(), invalid: v.number(), jobId: v.id("memoryImportJobs"), updated: v.number() })
-    .output(v.null())
+    .output(v.union(v.null(), v.number()))
     .mutation(async ({ args, ctx }) => {
         const job = await ctx.db.get("memoryImportJobs", args.jobId);
 
-        if (!job || job.status !== "running" || job.nextBatch !== args.index || job.claimedBatch !== args.index) {
+        if (!job || (job.status !== "running" && job.status !== "failed") || job.nextBatch !== args.index || job.claimedBatch !== args.index) {
             return null;
         }
 
@@ -230,9 +274,9 @@ export const completeImportBatch = internalMutation
             await ctx.db.delete("memoryImportBatches", batch._id);
         }
 
-        const last = args.index + 1 >= job.batchCount;
         const counts = {
-            done: job.done + (batch?.entries.length ?? 0),
+            // The four counts are what the batch's entries became; the rows are gone once the job ended.
+            done: job.done + (batch?.entries.length ?? args.duplicates + args.imported + args.invalid + args.updated),
             duplicates: job.duplicates + args.duplicates,
             imported: job.imported + args.imported,
             invalid: job.invalid + args.invalid,
@@ -240,16 +284,22 @@ export const completeImportBatch = internalMutation
             updatedAt: Date.now(),
         };
 
-        if (last) {
+        if (job.status === "failed") {
+            await ctx.db.patch("memoryImportJobs", job._id, { ...counts, nextBatch: args.index + 1 });
+
+            return null;
+        }
+
+        if (args.index + 1 >= job.batchCount) {
             await ctx.db.patch("memoryImportJobs", job._id, { ...counts, status: "done" });
 
             return null;
         }
 
         await ctx.db.patch("memoryImportJobs", job._id, { ...counts, nextBatch: args.index + 1 });
-        await startBatch(ctx, job, args.index + 1);
+        await armQueuedReaper(ctx, job, args.index + 1);
 
-        return null;
+        return args.index + 1;
     });
 
 /** Ends the job's current batch as failed. A late call for a batch that is no longer current changes nothing. */
@@ -266,9 +316,13 @@ export const failImportBatch = internalMutation
         return null;
     });
 
-/** Fails a job that is stuck on `batch` (or still preparing, `-1`): its delivery died without reporting. */
+/**
+ * Fails a job that is stuck on `batch` (or still preparing, `-1`): its delivery died without reporting. Without
+ * `claimed` it is the reaper of a message nobody has claimed; with it, the reaper armed by the claim, which fails only
+ * a batch still running.
+ */
 export const reapMemoryImportJob = internalMutation
-    .input({ batch: v.number(), jobId: v.id("memoryImportJobs") })
+    .input({ batch: v.number(), claimed: v.optional(v.boolean()), jobId: v.id("memoryImportJobs") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const job = await ctx.db.get("memoryImportJobs", args.jobId);
@@ -277,8 +331,9 @@ export const reapMemoryImportJob = internalMutation
             return null;
         }
 
-        const stuck =
-            args.batch === PREPARING ? job.status === "preparing" : (job.status === "queued" || job.status === "running") && job.nextBatch === args.batch;
+        const onBatch = (job.status === "queued" || job.status === "running") && job.nextBatch === args.batch;
+        const isClaimed = job.claimedBatch === args.batch;
+        const stuck = args.batch === PREPARING ? job.status === "preparing" : onBatch && isClaimed === (args.claimed === true);
 
         if (stuck) {
             await failJob(ctx, job, STALLED_MESSAGE);
@@ -298,13 +353,17 @@ export const runMemoryImportBatch = internalAction
             return null;
         }
 
+        let next: number | null;
+
         try {
             // Entries the labelling rule drops count as invalid, as for an inline file.
             const facts = await keepLabelledEntries(ctx, claim.userId, claim.entries);
             const saved =
-                facts.length === 0 ? { added: 0, alreadyKnown: 0, updated: 0 } : await importFacts(ctx, { app: "other", facts, userId: claim.userId });
+                facts.length === 0
+                    ? { added: 0, alreadyKnown: 0, updated: 0 }
+                    : await importFacts(ctx, { app: "other", facts, refuseDuringDeletion: true, userId: claim.userId });
 
-            await ctx.runMutation(internal.memory.import_job.completeImportBatch, {
+            next = await ctx.runMutation(internal.memory.import_job.completeImportBatch, {
                 duplicates: saved.alreadyKnown,
                 imported: saved.added,
                 index: args.index,
@@ -320,12 +379,24 @@ export const runMemoryImportBatch = internalAction
                 jobId: args.jobId,
                 message: error instanceof LunoraError ? error.message : FAILED_MESSAGE,
             });
+
+            return null;
+        }
+
+        if (next !== null) {
+            // After the completion committed: the next batch is already the job's `nextBatch`, so its delivery finds it claimable.
+            try {
+                await enqueueBatch(claim.userId, args.jobId, next);
+            } catch (error) {
+                console.error(`[memory/import-job] Batch ${String(next)} of job ${args.jobId} was not queued:`, error);
+                await ctx.runMutation(internal.memory.import_job.failImportBatch, { index: next, jobId: args.jobId, message: FAILED_MESSAGE });
+            }
         }
 
         return null;
     });
 
-/** Stops the caller's active import. A batch already running finishes without counting. */
+/** Stops the caller's active import. A batch already running still adds its counts when it finishes: its memories stay. */
 export const cancelMemoryImport = authMutation
     .input({ jobId: v.id("memoryImportJobs") })
     .use(rateLimit("memory/update"))

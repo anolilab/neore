@@ -16,6 +16,7 @@ import type { ActionCtx } from "../_generated/server";
 import { getUtilityModelForUser, loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { lowReasoningUtilityOptions } from "../chat/lib/reasoning-options";
 import { authAction, rateLimit } from "../lib/crpc";
+import { enqueueJob } from "../lib/job-queue";
 import { gatewayFetch } from "../lib/services";
 import {
     decideFact,
@@ -48,6 +49,7 @@ import {
     IMPORT_DEDUP_CALL_BUDGET,
     IMPORT_LOOKUP_CALL_SHARE,
     IMPORT_LOOKUP_CALLS,
+    IMPORT_ACCOUNT_DELETING_MESSAGE,
     IMPORT_MEMORY_OFF_MESSAGE,
     IMPORT_WIDE_WINDOW_ROWS,
     isLongEnoughFact,
@@ -103,7 +105,10 @@ interface PlannedFact {
  * already remembered is confirmed, not repeated, so importing the same list twice adds nothing.
  * Every count is taken from what the one write applied, never from what the planning expected.
  */
-export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts: ReadonlyArray<ImportedFact>; userId: string }): Promise<ImportResult> => {
+export const importFacts = async (
+    ctx: ActionCtx,
+    args: { app: ImportApp; facts: ReadonlyArray<ImportedFact>; refuseDuringDeletion?: boolean; userId: string },
+): Promise<ImportResult> => {
     await requireMemoryEnabled(ctx, args.userId);
 
     const facts = sanitizeImportedFacts(args.facts);
@@ -300,6 +305,7 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
         facts: writes.map(({ fact, merge, supersede }) => {
             return { memory: fact.memory, merge, supersede, type: fact.type };
         }),
+        ...(args.refuseDuringDeletion === true && { refuseDuringDeletion: true }),
         userId: args.userId,
     });
 
@@ -498,7 +504,12 @@ export const importMemoryFile = authAction
                     });
                 }
 
-                await ctx.runMutation(internal.memory.import_job.beginImportJob, { jobId, userId });
+                if (!(await ctx.runMutation(internal.memory.import_job.beginImportJob, { jobId, userId }))) {
+                    throw new LunoraError("FORBIDDEN", IMPORT_ACCOUNT_DELETING_MESSAGE);
+                }
+
+                // After the start committed, so the delivery finds the job queued with batch 0 next.
+                await enqueueJob(internal.memory.import_job.runMemoryImportBatch, { index: 0, jobId }, { shardKey: userId });
             } catch (error) {
                 // Ends the job, so it neither blocks the next import nor leaves entries behind.
                 await ctx
