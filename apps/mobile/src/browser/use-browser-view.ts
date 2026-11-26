@@ -159,8 +159,19 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
     // again, in case every read at the end failed.
     const isExpired = status !== undefined && expiredAnswer === status;
 
+    /** The offline provider's tick when the grant ran out: only a later tick reads again (the end's own read is timed). */
+    const expiredAtTick = useRef<number | undefined>(undefined);
+
     useEffect(() => {
         if (!isExpired) {
+            expiredAtTick.current = undefined;
+
+            return undefined;
+        }
+
+        if (expiredAtTick.current === undefined || expiredAtTick.current === refreshTick) {
+            expiredAtTick.current = refreshTick;
+
             return undefined;
         }
 
@@ -192,6 +203,13 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
             session.suspend();
         }
     }, [isOffline, session]);
+
+    // The page went (a refusal of the chat, or the grant ran out) with no new status: the claim goes back too.
+    useEffect(() => {
+        if (view.kind === "ended") {
+            session.release("left");
+        }
+    }, [session, view.kind]);
 
     // Left, backgrounded or unmounted: the claim goes back at once, so the agent need not wait out the lease.
     useEffect(() => {

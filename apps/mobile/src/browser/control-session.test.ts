@@ -276,4 +276,72 @@ describe(createControlSession, () => {
         expect(take).toHaveBeenCalledTimes(1);
         expect(session.state()).toStrictEqual({ kind: "idle" });
     });
+
+    it("keeps a newer take's claim when an older, abandoned take answers last", async () => {
+        const first = Promise.withResolvers<typeof OK>();
+        const take = vi.fn().mockImplementationOnce(async () => await first.promise).mockResolvedValueOnce({ ...OK, claim: "c-2", claimId: "id-2" });
+        const onClaim = vi.fn();
+        const session = createControlSession({
+            api: {
+                handBack: vi.fn(async () => true),
+                keep: vi.fn(async () => null),
+                navigate: vi.fn(async () => {
+                    return { status: "ok" as const };
+                }),
+                take,
+            },
+            every: () => () => {},
+            onChange: () => {},
+            onClaim,
+        });
+        const abandoned = session.take();
+
+        await vi.waitFor(() => expect(take).toHaveBeenCalledTimes(1));
+        session.release("left");
+        await session.take();
+        first.resolve(OK);
+        await abandoned;
+
+        expect(onClaim).toHaveBeenLastCalledWith("c-2");
+        expect(session.state()).toMatchObject({ claim: "c-2", kind: "holding" });
+    });
+
+    it("sends one renewal at a time, and times the lease from when the renewal was sent", async () => {
+        const clock = { at: NOW };
+        const ticks: (() => void)[] = [];
+        const answer = Promise.withResolvers<{ until: number }>();
+        const keep = vi.fn(async () => await answer.promise);
+        const session = createControlSession({
+            api: {
+                handBack: vi.fn(async () => true),
+                keep,
+                navigate: vi.fn(async () => {
+                    return { status: "ok" as const };
+                }),
+                take: vi.fn(async () => OK),
+            },
+            deviceNow: () => clock.at,
+            every: (_ms, run) => {
+                ticks.push(run);
+
+                return () => {};
+            },
+            onChange: () => {},
+        });
+
+        await session.take();
+        clock.at = NOW + 30_000;
+        ticks[0]?.();
+        ticks[0]?.();
+        expect(keep).toHaveBeenCalledTimes(1);
+
+        // The answer is slow: the lease still ends a whole lease after the renewal was SENT.
+        clock.at = NOW + 60_000;
+        answer.resolve({ until: NOW + 150_000 });
+        await vi.waitFor(() => expect(session.state()).toMatchObject({ until: NOW + 150_000 }));
+
+        clock.at = NOW + 30_000 + CONTROL_LEASE_MS;
+        ticks[0]?.();
+        expect(session.state()).toStrictEqual({ kind: "idle", message: CONTROL_ENDED });
+    });
 });

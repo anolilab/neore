@@ -116,7 +116,10 @@ export const createControlSession = ({
      * status comes to say so while renewals keep failing.
      */
     let endsAt = 0;
+    let isKeeping = false;
 
+    /** Read through a call: `state` changes while a take awaits, which a narrowed `state.kind` would hide. */
+    const isHolding = (): boolean => state.kind === "holding";
     const set = (next: ControlState): void => {
         state = next;
         onChange(next);
@@ -127,7 +130,17 @@ export const createControlSession = ({
         set(message === undefined ? { kind: "idle" } : { kind: "idle", message });
     };
     const keep = async (claim: string): Promise<void> => {
+        // One renewal at a time, timed from when it was sent: the server set its end then, not when the answer came.
+        if (isKeeping) {
+            return;
+        }
+
+        isKeeping = true;
+
+        const sentAt = deviceNow();
         const answer = await withCatch(async () => await api.keep(claim), () => "failed" as const);
+
+        isKeeping = false;
 
         // A renewal that did not go out changes nothing: the next one tries again, or the lease ends on the server.
         if (answer === "failed" || state.kind !== "holding" || state.claim !== claim) {
@@ -140,8 +153,8 @@ export const createControlSession = ({
             return;
         }
 
-        endsAt = deviceNow() + CONTROL_LEASE_MS;
-        set({ ...state, until: answer.until });
+        endsAt = Math.max(endsAt, sentAt + CONTROL_LEASE_MS);
+        set({ ...state, until: Math.max(state.until, answer.until) });
     };
 
     return {
@@ -244,8 +257,12 @@ export const createControlSession = ({
                 if (answer?.status === "ok") {
                     const { claim } = answer;
 
-                    lastClaim = claim;
-                    onClaim(claim);
+                    // Only while no newer take holds the lease: its claim is the one to name, never this stale one.
+                    if (!isHolding()) {
+                        lastClaim = claim;
+                        onClaim(claim);
+                    }
+
                     settleQuietly(async () => {
                         if (await api.handBack(claim, "left")) {
                             onReleased(claim);
