@@ -381,6 +381,13 @@ const reconnectOnlyTo = async (
     }
 };
 
+/** The session's page as {@link pageOf} sets it up, or `undefined` when it has none: none is opened. */
+const existingPageOf = async (browser: import("@cloudflare/playwright").Browser): Promise<import("@cloudflare/playwright").Page | undefined> => {
+    const page = browser.contexts()[0]?.pages()[0];
+
+    return page === undefined ? undefined : await pageOf(browser);
+};
+
 /** The session's page (a reconnected session keeps its page), guarded and with the default timeout. */
 const pageOf = async (browser: import("@cloudflare/playwright").Browser): Promise<import("@cloudflare/playwright").Page> => {
     const page = browser.contexts()[0]?.pages()[0] ?? (await browser.newPage());
@@ -394,6 +401,10 @@ const pageOf = async (browser: import("@cloudflare/playwright").Browser): Promis
 const BUSY_SIGNING_IN = "The browser session is signing in with a saved login; try again once that is done";
 
 const BUSY_IN_USE = "The browser session is busy with another call; try the sign-in again once it is done";
+
+/** How long a sign-in waits for a session another call holds before it is refused, and how often it asks again. */
+const LOGIN_BUSY_WAIT_MS = 3000;
+const LOGIN_BUSY_STEP_MS = 250;
 
 const LOCK_UNREACHABLE = "The browser session's lock did not answer in time, so nothing was run; try it again in a moment";
 
@@ -610,7 +621,12 @@ const actHeld = async (
             );
         }
 
-        const page = await pageOf(browser);
+        // A person's view of the page never opens one: a browser with no page has nothing to show.
+        const page = reconnectOnly === true ? await existingPageOf(browser) : await pageOf(browser);
+
+        if (page === undefined) {
+            return Response.json({ error: "The browser has no page open; nothing was run", success: false }, { headers: NOT_RUN, status: 422 });
+        }
 
         let result: ActionResult;
 
@@ -1116,7 +1132,16 @@ app.post("/login", async (c) => {
         afterAnswer(c, work);
     });
     // Taken before it connects, and refused while any other call holds the session: nothing is typed unheld.
-    const refused = sessionId ? await holds.take(sessionId) : null;
+    let refused = sessionId ? await holds.take(sessionId) : null;
+
+    // Another call holds the session: wait a moment for it (a person's frame of the page lets go within a second or
+    // two), within the sign-in's budget, then refuse as before.
+    for (const until = Math.min(Date.now() + LOGIN_BUSY_WAIT_MS, deadline); refused === "busy" && sessionId && Date.now() + LOGIN_BUSY_STEP_MS < until;) {
+        await new Promise((resolve) => {
+            setTimeout(resolve, LOGIN_BUSY_STEP_MS);
+        });
+        refused = await holds.take(sessionId);
+    }
 
     if (refused === "retired") {
         return retiredAnswer("nothing was typed");

@@ -561,7 +561,17 @@ describe("the session hold every isolate shares", () => {
         post(env, "/action", { action: "extract", sessionId: "busy" }, other).catch(() => undefined);
         await vi.advanceTimersByTimeAsync(0);
 
-        const login = await post(env, "/login", { ...LOGIN, sessionId: "busy" });
+        let isAnswered = false;
+        const answer = post(env, "/login", { ...LOGIN, sessionId: "busy" }).finally(() => {
+            isAnswered = true;
+        });
+
+        // It waits a moment for the other call (a person's frame lets go within a second or two), then refuses.
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(isAnswered).toBe(false);
+        await vi.advanceTimersByTimeAsync(3000);
+
+        const login = await answer;
 
         expect(login.status).toBe(409);
         expect(started).toStrictEqual(["connect"]);
@@ -728,6 +738,21 @@ describe("the session hold every isolate shares", () => {
 
         await expect(response.json()).resolves.toMatchObject({ screenshot: Buffer.alloc(10).toString("base64"), success: true });
         expect(page.screenshot).toHaveBeenLastCalledWith(expect.objectContaining({ quality: 40 }));
+    });
+
+    it("opens no page for a reconnect-only action on a browser that has none, and runs nothing", async () => {
+        const { env, pending } = binding();
+        const newPage = vi.fn();
+        const answer = post(env, "/action", { action: "screenshot", reconnectOnly: true, sessionId: "empty" });
+
+        await vi.advanceTimersByTimeAsync(0);
+        pending[0]?.({ close: async () => undefined, contexts: () => [{ pages: () => [] }], newPage, sessionId: () => "empty" });
+
+        const response = await answer;
+
+        expect(response.status).toBe(422);
+        expect(response.headers.get("x-browser-action")).toBe("not-run");
+        expect(newPage).not.toHaveBeenCalled();
     });
 
     it("refuses a reconnect-only action that names no session, before any browser opens", async () => {

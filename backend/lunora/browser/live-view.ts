@@ -316,7 +316,14 @@ export const getReaderBrowser = internalQuery
                 /** The caller holds a lease they have not handed back; with `claim`, the lease that claim names. */
                 inControl: v.boolean(),
                 kind: v.literal("watchable"),
+                /**
+                 * When the newest lease of someone other than the caller began, ended or not (the row keeps an ended lease
+                 * until the agent looks): a read that sees it change knows another person drove the browser in between.
+                 */
+                otherLeaseSince: v.optional(v.number()),
                 providerSessionId: v.string(),
+                /** The revision of the caller's grant this read saw; none for the owner. */
+                revision: v.optional(v.number()),
             }),
         ),
     )
@@ -327,6 +334,9 @@ export const getReaderBrowser = internalQuery
             return { kind: browser.kind };
         }
 
+        const lease = browser.session.control;
+        const otherLeaseSince = lease !== undefined && !(await holdsLease(browser.session, userId)) ? lease.since : undefined;
+
         return {
             canControl: browser.canControl,
             controlledByOther: browser.control !== undefined && !browser.control.byCaller,
@@ -335,7 +345,9 @@ export const getReaderBrowser = internalQuery
                 browser.session.control?.ended === undefined &&
                 (claim === undefined || browser.session.control?.claim === claim),
             kind: browser.kind,
+            ...(otherLeaseSince !== undefined && { otherLeaseSince }),
             providerSessionId: browser.providerSessionId,
+            ...(browser.revision !== undefined && { revision: browser.revision }),
         };
     });
 

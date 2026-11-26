@@ -92,6 +92,14 @@ export const readBrowserFrame = authAction
             return { status: "unavailable" as const };
         }
 
+        // The renderer reconnects only to the browser asked for; one that answers for another (an older renderer that
+        // launched a new browser) shows a page the agent never drove.
+        if (result.sessionId !== browser.providerSessionId) {
+            ctx.log.event("browser.frame_read", { ok: false, reason: "session_mismatch" });
+
+            return { status: "ended" as const };
+        }
+
         if (result.screenshot.length > MAX_FRAME_BASE64) {
             ctx.log.event("browser.frame_read", { ok: false, reason: "too_large" });
 
@@ -110,8 +118,14 @@ export const readBrowserFrame = authAction
             return { status: "ended" as const };
         }
 
-        if (after.controlledByOther) {
+        // Another person took control and handed it back while the shot was taken: what they typed may be on it.
+        if (after.controlledByOther || after.otherLeaseSince !== browser.otherLeaseSince) {
             return { status: "controlled" as const };
+        }
+
+        // The caller's grant was removed and given again meanwhile: the shot may be from when they had none.
+        if (after.revision !== browser.revision) {
+            return { status: "unavailable" as const };
         }
 
         return {

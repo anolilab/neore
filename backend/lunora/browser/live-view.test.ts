@@ -1862,6 +1862,42 @@ describe("a still frame of the browser", () => {
         await expect(frame(OWNER)).resolves.toStrictEqual({ status: "controlled" });
     });
 
+    it("drops a frame when another person took control and handed it back while it was taken", async () => {
+        await addSession();
+        fetchMock.mockImplementation(async () => answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" }));
+        renderer.mockImplementationOnce(async () => {
+            const taken = await as(WRITER).action(takeControl as never, { threadId } as never);
+
+            await as(WRITER).mutation(handBack as never, { claim: (taken as { claim: string }).claim, reason: "handed_back", threadId } as never);
+
+            return shot();
+        });
+
+        await expect(frame(OWNER)).resolves.toStrictEqual({ status: "controlled" });
+    });
+
+    it("says ended for a frame of another browser than the one asked for, which the agent never drove", async () => {
+        await addSession();
+        renderer.mockResolvedValueOnce(shot({ sessionId: "s-launched" }));
+
+        await expect(frame(OWNER)).resolves.toStrictEqual({ status: "ended" });
+    });
+
+    it("drops a frame when the reader's grant changed while it was taken", async () => {
+        await addSession();
+        renderer.mockImplementationOnce(async () => {
+            await harness.run(async (ctx: any) => {
+                const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: READER } });
+
+                await ctx.runMutation(updateThreadAccess, { accessId: grant._id, expiresAt: NOW + 60_000 });
+            });
+
+            return shot();
+        });
+
+        await expect(frame(READER)).resolves.toStrictEqual({ status: "unavailable" });
+    });
+
     it("refuses a frame too large for the answer, and a renderer that failed", async () => {
         await addSession();
         renderer.mockResolvedValueOnce(shot({ screenshot: "a".repeat(MAX_FRAME_BASE64 + 1) }));
