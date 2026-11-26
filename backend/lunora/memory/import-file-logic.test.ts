@@ -36,14 +36,14 @@ const lines = (count: number): string => Array.from({ length: count }, (_, index
 const SECRET_WORDS = /amber|hunter|alpha|battery|horse/u;
 
 const LABEL = "DB_PASSWORD=";
-const VALUE = "hunter2";
+const VALUE = "hunter2"; // secret-scanner:allow
 
 /** A secret whose value does not end on its line: an unclosed quote of either kind, a value on the next line, none. */
 const SECRET_CONTINUES = [
-    'DB_PASSWORD="first line\n"quoted phrase" \nThe continuation phrase is amber-orchid-9472',
-    "DB_PASSWORD='correct horse\nbattery staple in vault'",
-    'DB_TOKEN=\n"alpha beta"',
-    "DB_PASSWORD=\nhunter2",
+    'DB_PASSWORD="first line\n"quoted phrase" \nThe continuation phrase is amber-orchid-9472', // secret-scanner:allow
+    "DB_PASSWORD='correct horse\nbattery staple in vault'", // secret-scanner:allow
+    'DB_TOKEN=\n"alpha beta"', // secret-scanner:allow
+    "DB_PASSWORD=\nhunter2", // secret-scanner:allow
     [`${LABEL}${VALUE}\\`, "battery-staple-in-vault"].join("\n"),
 ];
 
@@ -96,14 +96,14 @@ describe("parseMemoryFile: text", () => {
     });
 
     it("refuses a secret whose label is split by emphasis, reading the line as it will be stored, with the right line number", () => {
-        const error = refusal('The user lives in Lisbon\nThe user likes tea\nDB_**PASSWORD**="alpha\nbeta-gamma-7731"', "text");
+        const error = refusal('The user lives in Lisbon\nThe user likes tea\nDB_**PASSWORD**="alpha\nbeta-gamma-7731"', "text"); // secret-scanner:allow
 
         expect(error).toMatchObject({ code: "secret_continues", message: expect.stringContaining("Line 3 holds a password or key") });
         expect(error?.message).not.toMatch(SECRET_WORDS);
     });
 
     it("refuses a bulleted line whose emphasised label continues", () => {
-        expect(refusal('- **DB_PASSWORD**="alpha\nbeta-gamma-7731"', "text")).toMatchObject({ message: expect.stringContaining("Line 1") });
+        expect(refusal('- **DB_PASSWORD**="alpha\nbeta-gamma-7731"', "text")).toMatchObject({ message: expect.stringContaining("Line 1") }); // secret-scanner:allow
     });
 
     it("still imports an ordinary line with emphasis and no secret label", () => {
@@ -112,8 +112,25 @@ describe("parseMemoryFile: text", () => {
         expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user likes green tea", "The user lives in Lisbon"]);
     });
 
-    it("does not refuse a file over a line past the raw-length guard that holds an unclosed secret label", () => {
-        const long = `DB_PASSWORD="${"x".repeat(MEMORY_FILE_ENTRY_MAX_CHARS * 10)}`;
+    it("refuses a file over a line past the raw-length guard that holds a secret label, naming its line and never the text", () => {
+        const long = `DB_PASSWORD="${"x".repeat(MEMORY_FILE_ENTRY_MAX_CHARS * 10)}`; // secret-scanner:allow
+        const error = refusal(`The user likes green tea\n${long}\nThe continuation phrase is amber-orchid-9472`, "text"); // secret-scanner:allow
+
+        expect(error).toMatchObject({ code: "secret_continues", message: expect.stringContaining("Line 2 holds a password or key") });
+        expect(error?.message).not.toMatch(SECRET_WORDS);
+    });
+
+    it("skips, counted, a JSON item whose line past the raw-length guard holds a secret label", () => {
+        const long = `DB_PASSWORD="${"x".repeat(MEMORY_FILE_ENTRY_MAX_CHARS * 10)}`; // secret-scanner:allow
+        const input = `${long}\nThe continuation phrase is amber-orchid-9472`; // secret-scanner:allow
+        const parsed = parseMemoryFile(JSON.stringify(["The user lives in Lisbon", input, { text: input }]), "json");
+
+        expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user lives in Lisbon"]);
+        expect(parsed).toMatchObject({ entries: 1, invalid: 2, tooLong: 0, total: 3 });
+    });
+
+    it("does not refuse a file over a line past the raw-length guard that holds no secret label", () => {
+        const long = `The user likes tea ${"x".repeat(MEMORY_FILE_ENTRY_MAX_CHARS * 10)}`;
 
         expect(parseMemoryFile(`${long}\nThe user likes green tea`, "text")).toMatchObject({ entries: 1, tooLong: 1, total: 2 });
     });
@@ -130,11 +147,11 @@ describe("parseMemoryFile: text", () => {
     });
 
     it("refuses on a line break other than a newline, and counts the lines before it", () => {
-        expect(refusal(`The user lives in Lisbon\u{2028}DB_PASSWORD=\r\nhunter2`, "text")).toMatchObject({ message: expect.stringContaining("Line 2") });
+        expect(refusal(`The user lives in Lisbon\u{2028}DB_PASSWORD=\r\nhunter2`, "text")).toMatchObject({ message: expect.stringContaining("Line 2") }); // secret-scanner:allow
     });
 
     it("keeps a secret closed on its line, redacted as a paste redacts it, and the line after it", () => {
-        const parsed = parseMemoryFile('Wifi password: "guest"!\nThe user likes tea', "text");
+        const parsed = parseMemoryFile('Wifi password: "guest"!\nThe user likes tea', "text"); // secret-scanner:allow
 
         expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user likes tea"]);
         expect(parsed).toMatchObject({ entries: 1, invalid: 1, total: 2 });
@@ -146,10 +163,10 @@ describe("parseMemoryFile: text", () => {
         expect(parsed).toMatchObject({ entries: 1, invalid: 2, total: 3 });
     });
 
-    it("finishes a 500 KB file of repeated secret labels within a fixed bound", () => {
-        // Each block holds 569 labels whose quoted values close on the same line: a hostile file must not cost more than
-        // one read of its text.
-        const block = `${'TOKEN="'.repeat(569)}" `;
+    it("finishes a 500 KB line of near-labels (a name, no separator) within a fixed bound", () => {
+        // Every word boundary starts a label scan that reaches a secret name and then fails on the missing separator: a
+        // hostile line must not cost more than a bounded read of its text.
+        const block = "a-token a_password a-secret-key ";
         const content = block.repeat(Math.floor(MEMORY_FILE_MAX_BYTES / block.length));
         const started = performance.now();
 
@@ -157,9 +174,18 @@ describe("parseMemoryFile: text", () => {
         expect(performance.now() - started).toBeLessThan(400);
     });
 
+    it("finishes a 500 KB line of repeated secret labels within a fixed bound, and refuses it", () => {
+        const block = `${'TOKEN="'.repeat(569)}" `;
+        const content = block.repeat(Math.floor(MEMORY_FILE_MAX_BYTES / block.length));
+        const started = performance.now();
+
+        expect(refusal(content, "text")).toMatchObject({ code: "secret_continues" });
+        expect(performance.now() - started).toBeLessThan(400);
+    });
+
     it("counts an entry that grows past the limit once its secret is redacted as too long, not cut", () => {
         // A marker is two characters longer than this secret: 499 characters in, 501 out.
-        const line = `${factOfLength(480)} password: abc12xyz`;
+        const line = `${factOfLength(480)} password: abc12xyz`; // secret-scanner:allow
 
         expect(line).toHaveLength(MEMORY_FILE_ENTRY_MAX_CHARS - 1);
         expect(parseMemoryFile(`${line}\nThe user likes green tea`, "text")).toMatchObject({ entries: 1, tooLong: 1, total: 2 });
@@ -184,7 +210,7 @@ describe("parseMemoryFile: text", () => {
     });
 
     it("still imports a normal entry just under the raw-length guard that shrinks through redaction", () => {
-        const line = `The user likes green tea. My key is sk-${"Zq8LmV2xR7tYw4KpN3bC".repeat(200)} and nothing else`;
+        const line = `The user likes green tea. My key is sk-${"Zq8LmV2xR7tYw4KpN3bC".repeat(200)} and nothing else`; // secret-scanner:allow
 
         expect(line.length).toBeGreaterThan(MEMORY_FILE_ENTRY_MAX_CHARS * 5);
         expect(line.length).toBeLessThanOrEqual(MEMORY_FILE_ENTRY_MAX_CHARS * 10);
@@ -231,7 +257,7 @@ describe("parseMemoryFile: JSON", () => {
     });
 
     it("skips, counted, an item whose secret label is split by emphasis and continues past its line", () => {
-        const input = 'DB_**PASSWORD**="alpha\nbeta-gamma-7731"';
+        const input = 'DB_**PASSWORD**="alpha\nbeta-gamma-7731"'; // secret-scanner:allow
         const parsed = parseMemoryFile(JSON.stringify(["The user lives in Lisbon", input, { content: input }]), "json");
 
         expect(parsed.batches.flat().map((entry) => entry.memory)).toStrictEqual(["The user lives in Lisbon"]);

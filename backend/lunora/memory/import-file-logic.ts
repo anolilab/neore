@@ -148,6 +148,15 @@ export const toBatches = <T>(items: ReadonlyArray<T>, size: number): T[][] => {
 
 const SECRET_LABEL = new RegExp(String.raw`\b${SECRET_NAME}["']?[^\S\n]*[:=]`, "giu");
 
+/** The same label without the `g` flag, so a `test` keeps no `lastIndex` between lines. */
+const SECRET_LABEL_ANYWHERE = new RegExp(SECRET_LABEL.source, "iu");
+
+/**
+ * True when a raw line holds a secret label (`DB_PASSWORD=`, `api_token:`) anywhere. One linear scan with no unwrapping:
+ * the label's name is bounded to 40 characters and nothing in it nests, so it cannot backtrack on a line of any length.
+ */
+const carriesSecretLabel = (line: string): boolean => SECRET_LABEL_ANYWHERE.test(line);
+
 /** Where the quote `quote` that opened a value at `from` is closed on this line (the index after it), or `-1`. */
 const closingQuoteOnLine = (line: string, from: number, quote: string): number => {
     for (let index = from; index < line.length; index += 1) {
@@ -218,10 +227,14 @@ const secretContinues = (line: string): boolean => {
 /**
  * The one-based number of the first line of `lines` that {@link secretContinues}, or `undefined`. A line is read as
  * preparation will see it: with emphasis and tags removed, `DB_**PASSWORD**="alpha` names its secret. A line past the
- * raw-length guard is skipped without unwrapping: it is counted too long and never stored.
+ * raw-length guard is never unwrapped, and is counted too long and never stored; but it may be the start of a secret
+ * whose value goes on to the next line, so it is read raw for a secret label ({@link carriesSecretLabel}) and, if it
+ * has one, treated as continuing.
  */
 const firstSecretContinuingLine = (lines: ReadonlyArray<string>): number | undefined => {
-    const index = lines.findIndex((line) => line.length <= MEMORY_FILE_ENTRY_PREPARE_MAX_CHARS && secretContinues(unwrapImportLine(line)));
+    const index = lines.findIndex((line) =>
+        line.length > MEMORY_FILE_ENTRY_PREPARE_MAX_CHARS ? carriesSecretLabel(line) : secretContinues(unwrapImportLine(line)),
+    );
 
     return index === -1 ? undefined : index + 1;
 };
