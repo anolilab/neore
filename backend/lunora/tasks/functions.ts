@@ -207,7 +207,7 @@ const requireUsableSkill = async (ctx: QueryCtx, skillId: Id<"skills">, subject:
     }
 };
 
-interface TaskDefinitionInput {
+export interface TaskDefinitionInput {
     codingAgent?: { agent: "claude_code" | "codex"; branch?: string; openPr?: boolean; repoUrl: string };
     cronExpression?: string;
     dependsOn: Id<"tasks">[];
@@ -409,6 +409,42 @@ const resolveDefinition = async (
         successCriteria,
         title,
     };
+};
+
+/**
+ * The one way a task is created: `createTask` and accepting a suggestion (`tasks/suggestions.ts`) both come here, so
+ * the account, count, definition and schedule rules cannot differ between them.
+ */
+export const insertTask = async (
+    ctx: MutationCtx,
+    { now, organizationId, userId }: { now: number; organizationId?: string; userId: string },
+    input: TaskDefinitionInput,
+): Promise<{ recurring: boolean; taskId: Id<"tasks"> }> => {
+    await requireTaskAccount(ctx, userId);
+
+    const tasks = await loadUserTasks(ctx, userId);
+
+    if (tasks.length >= MAX_TASKS_PER_USER) {
+        throw new LunoraError("BAD_REQUEST", `You can have at most ${String(MAX_TASKS_PER_USER)} tasks`);
+    }
+
+    const definition = await resolveDefinition(ctx, { organizationId, userId }, input, tasks);
+    const taskId = await ctx.db.insert("tasks", {
+        ...definition,
+        attemptCount: 0,
+        createdAt: now,
+        nextRunAt: definition.cronExpression ? nextRecurrenceAt(definition.cronExpression, now) : undefined,
+        status: "todo",
+        updatedAt: now,
+        userId,
+    });
+
+    if (definition.cronExpression) {
+        // The root tick only visits shards with timed work due (`lib/shard-housekeeping.ts`).
+        await noteShardDue(ctx, nextRecurrenceAt(definition.cronExpression, now), userId);
+    }
+
+    return { recurring: Boolean(definition.cronExpression), taskId };
 };
 
 // ─── Queries ─────────────────────────────────────────────────────────────────
@@ -638,34 +674,9 @@ export const createTask = authMutation
     })
     .output(v.object({ taskId: v.id("tasks") }))
     .mutation(async ({ args, ctx }) => {
-        const { userId } = ctx.user;
+        const { recurring, taskId } = await insertTask(ctx, { now: ctx.now, organizationId: ctx.user.activeOrganization?.id, userId: ctx.user.userId }, args);
 
-        await requireTaskAccount(ctx, userId);
-
-        const tasks = await loadUserTasks(ctx, userId);
-
-        if (tasks.length >= MAX_TASKS_PER_USER) {
-            throw new LunoraError("BAD_REQUEST", `You can have at most ${String(MAX_TASKS_PER_USER)} tasks`);
-        }
-
-        const definition = await resolveDefinition(ctx, { organizationId: ctx.user.activeOrganization?.id, userId }, args, tasks);
-        const { now } = ctx;
-        const taskId = await ctx.db.insert("tasks", {
-            ...definition,
-            attemptCount: 0,
-            createdAt: now,
-            nextRunAt: definition.cronExpression ? nextRecurrenceAt(definition.cronExpression, now) : undefined,
-            status: "todo",
-            updatedAt: now,
-            userId,
-        });
-
-        if (definition.cronExpression) {
-            // The root tick only visits shards with timed work due (`lib/shard-housekeeping.ts`).
-            await noteShardDue(ctx, nextRecurrenceAt(definition.cronExpression, now), userId);
-        }
-
-        ctx.log.event("tasks.create_task", { recurring: Boolean(definition.cronExpression), taskId });
+        ctx.log.event("tasks.create_task", { recurring, taskId });
 
         return { taskId };
     });

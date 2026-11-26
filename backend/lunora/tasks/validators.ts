@@ -24,6 +24,9 @@ export const vTaskRunOrigin = v.union(v.literal("manual"), v.literal("dependency
 
 export const vTaskRunStatus = v.union(v.literal("running"), v.literal("passed"), v.literal("failed"), v.literal("error"), v.literal("cancelled"));
 
+/** A suggested task waits (`pending`), became a task (`accepted`), or was turned down (`dismissed`). */
+export const vTaskSuggestionStatus = v.union(v.literal("pending"), v.literal("accepted"), v.literal("dismissed"));
+
 export const vVerdict = v.object({
     pass: v.boolean(),
     reasons: v.array(v.string()),

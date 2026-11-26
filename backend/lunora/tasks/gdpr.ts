@@ -18,16 +18,20 @@ const BATCH = 100;
 /** Runs per task in the export — the newest; older ones are history, not the task. */
 const EXPORT_RUNS_PER_TASK = 50;
 
+/** Suggestions in the export: a user holds at most `MAX_PENDING_SUGGESTIONS` pending plus the ones decided since. */
+const EXPORT_SUGGESTIONS_CAP = 1000;
+
 export const collectTasksForExport = internalQuery
     .input({ userId: v.string() })
     .output(
         v.object({
             goals: v.array(v.any()),
             tasks: v.array(v.any()),
+            taskSuggestions: v.array(v.any()),
         }),
     )
     .query(async ({ args: { userId }, ctx }) => {
-        const [goals, tasks] = await Promise.all([
+        const [goals, tasks, taskSuggestions] = await Promise.all([
             ctx.db
                 .query("goals")
                 .withIndex("by_user_and_status", (q) => q.eq("userId", userId))
@@ -36,6 +40,11 @@ export const collectTasksForExport = internalQuery
                 .query("tasks")
                 .withIndex("by_user_and_status", (q) => q.eq("userId", userId))
                 .take(MAX_TASKS_PER_USER),
+            // Every status; the pending list is capped, and decided rows are erased with the switch.
+            ctx.db
+                .query("taskSuggestions")
+                .withIndex("by_user_and_status_and_createdAt", (q) => q.eq("userId", userId))
+                .take(EXPORT_SUGGESTIONS_CAP),
         ]);
 
         const withRuns = await Promise.all(
@@ -53,14 +62,14 @@ export const collectTasksForExport = internalQuery
             }),
         );
 
-        return { goals, tasks: withRuns };
+        return { goals, tasks: withRuns, taskSuggestions };
     });
 
 export const deleteUserTasks = internalMutation
     .input({ userId: v.string() })
     .output(v.object({ hasMore: v.boolean() }))
     .mutation(async ({ args: { userId }, ctx }) => {
-        const [runs, tasks, goals] = await Promise.all([
+        const [runs, tasks, goals, suggestions] = await Promise.all([
             ctx.db
                 .query("taskRuns")
                 .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -73,13 +82,18 @@ export const deleteUserTasks = internalMutation
                 .query("goals")
                 .withIndex("by_user_and_status", (q) => q.eq("userId", userId))
                 .take(BATCH),
+            ctx.db
+                .query("taskSuggestions")
+                .withIndex("by_user_and_status_and_createdAt", (q) => q.eq("userId", userId))
+                .take(BATCH),
         ]);
 
         await Promise.all([
             ...runs.map((row) => ctx.db.delete("taskRuns", row._id)),
             ...tasks.map((row) => ctx.db.delete("tasks", row._id)),
             ...goals.map((row) => ctx.db.delete("goals", row._id)),
+            ...suggestions.map((row) => ctx.db.delete("taskSuggestions", row._id)),
         ]);
 
-        return { hasMore: [runs, tasks, goals].some((rows) => rows.length >= BATCH) };
+        return { hasMore: [runs, tasks, goals, suggestions].some((rows) => rows.length >= BATCH) };
     });
