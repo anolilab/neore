@@ -109,3 +109,41 @@ describe("a tick facing an Events backlog larger than its rounds", () => {
         }
     });
 });
+
+describe("the retention sweep's record of what it expired", () => {
+    it("records the highest seq it expired for each user, and leaves a newer row's seq out of it", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const now = Date.now();
+
+            await runInShard("user", async () => {
+                await harness.run(async (context: any) => {
+                    await context.db.insert("mcpEventWatermarks", { seq: 4, userId: "user" });
+
+                    for (let seq = 1; seq <= 4; seq += 1) {
+                        await context.db.insert("mcpEvents", {
+                            createdAt: seq <= 3 ? now - 10 * DAY_MS : now,
+                            data: "{}",
+                            eventId: `run:w${String(seq)}`,
+                            name: "run.completed",
+                            seq,
+                            timestamp: now,
+                            userId: "user",
+                        });
+                    }
+                });
+
+                await harness.run(async (context: any) => await context.runMutation(pruneMcpEvents, {}));
+            });
+
+            const watermark = (await harness.run(async (context: any) => await context.db.mcpEventWatermarks.findFirst({ where: { userId: "user" } }))) as {
+                prunedThrough?: number;
+            } | null;
+
+            expect(watermark?.prunedThrough).toBe(3);
+        } finally {
+            harness.close();
+        }
+    });
+});

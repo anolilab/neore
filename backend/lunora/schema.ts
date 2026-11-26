@@ -1677,6 +1677,8 @@ export const schema = defineSchema({
      * sequence still never restarts. One row per user; removed with the user (`public-api/gdpr.ts`).
      */
     mcpEventWatermarks: defineTable({
+        /** The highest seq the retention sweep has expired for this user. A poll reports a gap only behind it: a chat's removal leaves none. */
+        prunedThrough: v.optional(v.number()),
         seq: v.number(),
         userId: v.string(),
     })

@@ -57,8 +57,8 @@ export interface EventLogStore {
     after: (afterSeq: number, limit: number) => Promise<StoredEvent[]>;
     /** The highest seq written, `0` for an empty log. */
     latestSeq: () => Promise<number>;
-    /** The lowest seq still kept, or `undefined` for an empty log. */
-    oldestSeq: () => Promise<number | undefined>;
+    /** The highest seq the retention sweep has expired, `0` when it has expired none. */
+    prunedThrough: () => Promise<number>;
 }
 
 export interface PollQuery {
@@ -104,12 +104,12 @@ export const pollEvents = async (store: EventLogStore, query: PollQuery): Promis
     let from = query.fromSeq;
     let truncated = false;
 
-    // A cursor older than the kept window: resume from the oldest position still held, and say events were skipped. An empty
-    // log holds nothing, so its oldest position is the one after its end: a cursor behind that has been skipped past.
-    const oldest = (await store.oldestSeq()) ?? (await store.latestSeq()) + 1;
+    // Only the retention sweep expires events a client can have missed, so a gap is reported only behind the sweep's position. Rows a
+    // chat's removal or a merge took out leave no gap: the cursor moves past them, as it does past hidden events.
+    const pruned = await store.prunedThrough();
 
-    if (from + 1 < oldest) {
-        from = oldest - 1;
+    if (from < pruned) {
+        from = pruned;
         truncated = true;
     }
 

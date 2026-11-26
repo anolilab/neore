@@ -10930,6 +10930,12 @@
     "mcpEventWatermarks": {
       "commitOrdered": false,
       "fields": {
+        "prunedThrough": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "seq": {
           "kind": "number",
           "nullable": false,

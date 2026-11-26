@@ -20,7 +20,7 @@ const logOf = (events: StoredEvent[]) => {
     return {
         after: async (afterSeq: number, limit: number) => events.filter((row) => row.seq > afterSeq).slice(0, limit),
         latestSeq: async () => events.length,
-        oldestSeq: async () => events[0]?.seq,
+        prunedThrough: async () => 0,
     };
 };
 

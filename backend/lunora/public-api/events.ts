@@ -82,10 +82,10 @@ const storeOn = (ctx: QueryCtx, userId: string): EventLogStore => {
 
             return watermark?.seq ?? 0;
         },
-        oldestSeq: async () => {
-            const oldest = await ctx.db.mcpEvents.findFirst({ consistency: "primary", orderBy: [{ seq: "asc" }], where: { userId } });
+        prunedThrough: async () => {
+            const watermark = await ctx.db.mcpEventWatermarks.findFirst({ consistency: "primary", where: { userId } });
 
-            return oldest?.seq;
+            return watermark?.prunedThrough ?? 0;
         },
     };
 };
@@ -157,8 +157,20 @@ export const pruneMcpEvents = internalMutation.output(v.object({ hasMore: v.bool
     const cutoff = ctx.now - RETENTION_MS;
     const { page } = await ctx.db.mcpEvents.findMany({ limit: PRUNE_BATCH, where: { createdAt: { lt: cutoff } } });
 
+    // The highest seq the sweep expired for each user: the poll's gap check reads it from the watermark.
+    const expired = new Map<string, number>();
+
     for (const row of page) {
         await ctx.db.delete("mcpEvents", row._id);
+        expired.set(row.userId, Math.max(expired.get(row.userId) ?? 0, row.seq));
+    }
+
+    for (const [userId, seq] of expired) {
+        const watermark = await ctx.db.mcpEventWatermarks.findFirst({ consistency: "primary", where: { userId } });
+
+        if (watermark !== null && (watermark.prunedThrough ?? 0) < seq) {
+            await ctx.db.patch("mcpEventWatermarks", watermark._id, { prunedThrough: seq });
+        }
     }
 
     const hasMore = page.length === PRUNE_BATCH;
