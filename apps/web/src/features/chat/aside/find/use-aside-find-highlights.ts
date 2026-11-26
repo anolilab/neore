@@ -184,6 +184,8 @@ const revealIfOutOfSight = (range: Range | undefined, host: Element): void => {
 
     // Instant, so the hit is measured where the scroll has left it.
     target.scrollIntoView({ behavior: "instant", block: "center" });
+
+    // Centring can leave the hit past the panel's edges: scroll the panel by what is still hidden, on both axes.
     keepInPanel(range, target, bounds, scroller);
 
     revealWithinBoxes(range, target, scroller ?? document.documentElement);
