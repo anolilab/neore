@@ -166,23 +166,75 @@ describe("setPullRequestWatch", () => {
         expect(await watchOf(linkId)).toMatchObject({ startedAt: expect.any(Number) });
     });
 
-    it("refuses with not_linked when two live links of the thread match, instead of guessing", async () => {
-        const { threadId } = await seedLink(OWNER, 7);
+    it("finds the live link of a thread that also has several deleted links to the same pull request", async () => {
+        const { linkId, threadId } = await seedLink(OWNER, 7, { threadDeleted: true });
 
         await harness.run(async (ctx: any) => {
-            await ctx.db.insert("pullRequestThreads", {
-                createdAt: 1,
-                kind: "linked",
-                number: 7,
-                repository: REPOSITORY,
-                threadId,
-                title: "twin",
-                url: "https://github.com/octo/hello/pull/7",
-                userId: OWNER,
-            });
+            for (let index = 0; index < 2; index += 1) {
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 1,
+                    kind: "linked",
+                    number: 7,
+                    repository: REPOSITORY,
+                    threadDeleted: true,
+                    threadId,
+                    title: "old",
+                    url: "https://github.com/octo/hello/pull/7",
+                    userId: OWNER,
+                });
+            }
         });
 
-        expect(await call({ number: 7, threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "not_linked" });
+        const live = await harness.run(async (ctx: any) =>
+            String(
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 2,
+                    kind: "linked",
+                    number: 7,
+                    repository: REPOSITORY,
+                    threadId,
+                    title: "live",
+                    url: "https://github.com/octo/hello/pull/7",
+                    userId: OWNER,
+                }),
+            ),
+        );
+
+        expect(linkId).not.toBe(live);
+        expect(await call({ number: 7, threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "ok" });
+        expect(await watchOf(live)).toMatchObject({ startedAt: expect.any(Number) });
+    });
+
+    it("uses the newest of two live links of the thread, the same one on every call, for a start and a stop", async () => {
+        const { linkId: older, threadId } = await seedLink(OWNER, 7);
+        const newer = await harness.run(async (ctx: any) =>
+            String(
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 1,
+                    kind: "opened",
+                    number: 7,
+                    repository: REPOSITORY,
+                    threadId,
+                    title: "twin",
+                    url: "https://github.com/octo/hello/pull/7",
+                    userId: OWNER,
+                }),
+            ),
+        );
+
+        // The newest by creation time, the larger id breaking a tie within one millisecond.
+        const rows = await harness.run(async (ctx: any) => [await ctx.db.get("pullRequestThreads", older), await ctx.db.get("pullRequestThreads", newer)]);
+        const [chosen = "", other = ""] = rows
+            .toSorted((a: any, b: any) => b._creationTime - a._creationTime || (a._id < b._id ? 1 : -1))
+            .map((row: any) => String(row._id));
+
+        expect(await call({ number: 7, threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "ok" });
+        expect(await call({ number: 7, threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "already" });
+        expect(await watchOf(chosen)).toMatchObject({ startedAt: expect.any(Number) });
+        expect(await watchOf(other)).toBeUndefined();
+        expect(await call({ number: 7, threadId, userId: OWNER, watching: false })).toStrictEqual({ status: "ok" });
+        expect(await watchOf(chosen)).toMatchObject({ stoppedAt: expect.any(Number) });
+        expect(await watchOf(other)).toBeUndefined();
     });
 
     it("counts legacy running watches, once the backfill has flagged them, against the limit", async () => {

@@ -20,6 +20,9 @@ import { PR_WATCH_MAX_WAKES, storedWatchOf } from "./pr-watch-logic";
 /** Watches one person may have running at once. Each one is a host read every few minutes. */
 export const MAX_ACTIVE_PULL_REQUEST_WATCHES = 10;
 
+/** Newest rows read for one thread's links to one pull request: a live link and the deleted ones newer than it. */
+const LINK_LOOKUP_BOUND = 20;
+
 export const setPullRequestWatch = internalMutation
     .input({
         number: v.number(),
@@ -30,8 +33,9 @@ export const setPullRequestWatch = internalMutation
     })
     .output(v.object({ status: v.union(v.literal("already"), v.literal("capped"), v.literal("not_linked"), v.literal("ok"), v.literal("too_many")) }))
     .mutation(async ({ args, ctx }) => {
-        // One exact, bounded read: the person's link of this thread to this pull request. A second live match should not
-        // exist; it is refused rather than guessed at.
+        // One exact, bounded read: the person's links of this thread to this pull request. Deleted rows are skipped
+        // (any number of them up to the bound). Should more than one live row match (a run can open a second link), the newest
+        // is used, so the same row is chosen on every read.
         const threadId = ctx.db.normalizeId("threads", args.threadId);
         const rows =
             threadId === null
@@ -41,9 +45,11 @@ export const setPullRequestWatch = internalMutation
                       .withIndex("by_user_and_repository_number_threadId", (q) =>
                           q.eq("userId", args.userId).eq("repository", args.repository).eq("number", args.number).eq("threadId", threadId),
                       )
-                      .take(2);
-        const live = rows.filter((row) => row.threadDeleted !== true);
-        const link: Doc<"pullRequestThreads"> | undefined = live.length === 1 ? live[0] : undefined;
+                      .take(LINK_LOOKUP_BOUND);
+        // Newest by creation time, the id breaking a tie within one millisecond, whatever order the index returned them in.
+        const link: Doc<"pullRequestThreads"> | undefined = rows
+            .filter((row) => row.threadDeleted !== true)
+            .toSorted((a, b) => b._creationTime - a._creationTime || (a._id < b._id ? 1 : -1))[0];
 
         if (link === undefined) {
             return { status: "not_linked" as const };
