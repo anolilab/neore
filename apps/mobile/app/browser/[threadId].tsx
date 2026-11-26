@@ -133,7 +133,7 @@ const BrowserScreen = ({ threadId, userId }: { threadId: string; userId: string 
                         </Text>
                     )
                     : null}
-                {frame === undefined || view.kind === "hidden"
+                {frame === undefined || !isReady
                     ? null
                     : (
                         <Image

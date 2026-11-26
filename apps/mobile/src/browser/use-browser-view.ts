@@ -157,6 +157,9 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
 
                 if (read.status === "ok") {
                     setFrame({ browserId, image: read.image, takenAt: read.takenAt, ...read.viewport !== undefined && { viewport: read.viewport } });
+                } else if (read.status === "ended" || read.status === "controlled") {
+                    // The browser closed, or someone else drives it: the last picture is no longer one to show.
+                    setFrame(undefined);
                 }
             },
             onFailure: (failure) => {
