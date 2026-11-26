@@ -24812,6 +24812,68 @@
           "nullable": false,
           "optional": false,
           "unique": false
+        },
+        "watch": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "baselined": {
+              "kind": "boolean",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "checksHeadSha": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "conflictHeadSha": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "headSha": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "lastWakeAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "reviewId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "startedAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "stoppedAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "wakes": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            }
+          }
         }
       },
       "indexes": {

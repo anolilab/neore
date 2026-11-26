@@ -19,6 +19,7 @@ import {
     rerunFailedForAgent,
     parseThreadCursor,
     readThreadsWithin,
+    watchPullRequestForAgent,
 } from "./pr-agent-host";
 
 const SHA = "b".repeat(40);
@@ -83,6 +84,9 @@ const dependencies = (linked: LinkedPullRequest[] = LINKED): PullRequestAgentDep
         linked: async () => {
             return { complete: true, links: linked };
         },
+        setWatch: async () => {
+            return { status: "ok" as const };
+        },
         token: async () => {
             return {
                 accessToken: TOKEN,
@@ -102,6 +106,42 @@ const longLog = [
 
 afterEach(() => {
     vi.unstubAllGlobals();
+});
+
+describe("watching a linked pull request", () => {
+    it("starts the watch on the one linked pull request the call names", async () => {
+        const starts: { ref: { number: number; repository: string }; watching: boolean }[] = [];
+        const watched = {
+            ...dependencies(),
+            setWatch: async (ref: { number: number; repository: string }, watching: boolean) => {
+                starts.push({ ref, watching });
+
+                return { status: "ok" as const };
+            },
+        };
+
+        const outcome = await watchPullRequestForAgent(watched, {}, true);
+
+        expect(outcome).toEqual({ status: "ok" });
+        expect(starts).toEqual([{ ref: { number: 7, repository: "octo/hello" }, watching: true }]);
+    });
+
+    it("refuses a pull request that is not linked, and writes no watch", async () => {
+        let wrote = false;
+        const watched = {
+            ...dependencies([]),
+            setWatch: async () => {
+                wrote = true;
+
+                return { status: "ok" as const };
+            },
+        };
+
+        const outcome = await watchPullRequestForAgent(watched, { number: 9, repository: "octo/hello" }, true);
+
+        expect(outcome.status).toBe("not_linked");
+        expect(wrote).toBe(false);
+    });
 });
 
 describe("reading the failing checks of a linked pull request", () => {
