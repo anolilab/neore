@@ -631,6 +631,25 @@ describe("a watch that can never be read", () => {
         expect(five.watchReadFailure).toMatchObject({ attempts: 5, status: "forbidden" });
     });
 
+    it("does not end the watch when a transient failure breaks the run of terminal ones", async () => {
+        const linkId = await seedWatch({ watch: { baselined: true, startedAt: STARTED_AT } });
+
+        await failTimes(linkId, 4, "forbidden");
+        await failTimes(linkId, 1, "host_error");
+        await failTimes(linkId, 1, "forbidden");
+
+        const row = await rowOf(linkId);
+
+        expect(row.watchActive).toBe(true);
+        expect(row.watchReadFailure).toMatchObject({ attempts: 1, status: "forbidden" });
+
+        await failTimes(linkId, 4, "forbidden");
+
+        const ended = await rowOf(linkId);
+
+        expect(ended.watchActive).toBe(false);
+    });
+
     it("keeps retrying a transient failure", async () => {
         const linkId = await seedWatch({ watch: { baselined: true, startedAt: STARTED_AT } });
 

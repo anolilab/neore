@@ -8,9 +8,11 @@
  *
  * Each leased watch also schedules its own next poll on its owner's shard (`pollWatchLink`), so a watch is polled whether or
  * not its shard is active; the sweep is the backstop that restarts a chain that was lost.
- * A failed read changes nothing: the lease stamp alone makes the next try wait for the interval.
- * This file records a wake (`lastWakeAt`, the count and the owed reasons in `watchPending`) and sends nothing: the
- * delivery clears `watchPending` once it has happened.
+ * A failed read is noted (`recordWatchFailure`: one event, and the status and run length on the link) but never changes the watch's
+ * decision state; the watchdog poll retries it. Five terminal failures in a row (not found, forbidden, sign-in needed, not
+ * connected) end the watch; a transient one breaks the run.
+ * A wake is recorded as its owed reasons in `watchPending` and sends nothing; `wakes` and `lastWakeAt` keep their stored values,
+ * so the delivery, which clears `watchPending`, is what counts the wake.
  */
 import { v } from "lunorash/server";
 
@@ -218,7 +220,11 @@ export const recordWatchFailure = internalMutation
             return null;
         }
 
-        const attempt = (link.watchReadFailure?.attempts ?? 0) + 1;
+        // Counts the run of failures of one kind: a transient failure after terminal ones (or the reverse) starts a new run at 1, so only
+        // five terminal failures in a row end the watch, and a brief outage between them breaks the run. A landed read resets it to 0.
+        const previous = link.watchReadFailure;
+        const sameRun = previous !== undefined && previous.attempts > 0 && TERMINAL_FAILURES.has(previous.status) === TERMINAL_FAILURES.has(args.status);
+        const attempt = sameRun ? previous.attempts + 1 : 1;
 
         // The lease is consumed (-1 is no poll's lease): a repeat of this poll is rejected, and the retry is the watchdog's.
         await ctx.db.patch("pullRequestThreads", link._id, {
