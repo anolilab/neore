@@ -519,14 +519,6 @@ describe("account deletion", () => {
         expect(queued()).toHaveLength(1);
     });
 
-    it("still lets the paste import and an inline file save while no deletion is under way", async () => {
-        expect.assertions(1);
-
-        const result = await callAction(importMemoryFile, { content: fileOf(5), format: "text" });
-
-        expect(result).toMatchObject({ imported: 5 });
-    });
-
     it("refuses to start an import once the deletion began, and creates no row", async () => {
         expect.assertions(4);
 

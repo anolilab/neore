@@ -1,7 +1,8 @@
 /**
- * Memories, reflection digests, reflection state and background import jobs (with
- * their stored entries) in the GDPR export and account deletion; the import's
- * transient job rows are erased, not exported.
+ * Memories and reflection digests in the GDPR export; those, the reflection state and the background import jobs (with
+ * their stored entries) in account deletion. The import's job and batch rows are erased, never exported: they are a
+ * short-lived copy of a file the user supplied, deleted when the job ends, and their entries become memories, which are
+ * exported. (Chat import's job rows are handled the same way, `chat-import/gdpr.ts`.)
  *
  * Wired into `gdpr/workflows/export-workflow.ts` ("collect-memories") and
  * `gdpr/workflows/deletion-workflow.ts` ("delete-user-memory-reflection", after
