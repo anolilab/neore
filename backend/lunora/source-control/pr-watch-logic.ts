@@ -76,8 +76,13 @@ const isByWatcher = (review: { authorLogin: string }, watcherLogin: string): boo
 const reviewsByOthers = (observed: PullRequestObservation): { authorLogin: string; id: string }[] =>
     observed.watcherLogin.trim() === "" ? [] : observed.reviews.filter((review) => !isByWatcher(review, observed.watcherLogin.trim()));
 
-/** The newest review by someone other than the watcher. */
-const newestReviewByOthers = (observed: PullRequestObservation): { authorLogin: string; id: string } | undefined => reviewsByOthers(observed)[0];
+/**
+ * The review a read leaves as the watch's marker: the newest by someone other than the watcher. With no login the watcher's
+ * reviews cannot be told apart, so the newest review of all marks the place: every review at or before it is old, and a later
+ * read that has the login alerts only on reviews newer than it.
+ */
+const newestReviewByOthers = (observed: PullRequestObservation): { authorLogin: string; id: string } | undefined =>
+    observed.watcherLogin.trim() === "" ? observed.reviews[0] : reviewsByOthers(observed)[0];
 
 /**
  * The reviews by others that are newer than the one the watch last saw. The host lists reviews newest first, so those are
@@ -158,7 +163,9 @@ export const decideWatch = (previous: PullRequestWatchState, observed: PullReque
     const { left, newer } = newerReviewsByOthers(observed, previous.reviewId);
 
     if (observed.watcherLogin.trim() === "") {
-        // The watcher is unknown: the review marker stays as it was and no review wakes.
+        // The watcher is unknown: no review wakes and a marker already set does not move. A watch with none yet is marked at the
+        // newest review, silently, so the next read that has the login does not take every older review for a new one.
+        next.reviewId ??= observed.reviews[0]?.id;
     } else if (left) {
         // The seen review left the host's list (deleted, or older than the pages the read went back through: its bound is the limit
         // of what this can tell). Nothing can be said about what is new, so re-baseline silently on the newest review by someone

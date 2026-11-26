@@ -97,6 +97,7 @@ export const setPullRequestWatch = internalMutation
             watch: stored.watch,
             watchActive: true,
             watchCheckedAt: 0,
+            watchLeaseUntil: 0,
             watchPending: stored.watchPending ?? [],
         });
         await runAfterOnShard(ctx.scheduler, 0, internal.source_control.pr_watch_poll.pollWatchLink, { linkId: link._id }, args.userId);

@@ -9,6 +9,7 @@ import { insertThread } from "../agent/table-writes";
 import { runInShard } from "../lib/shard-context";
 import schema from "../schema";
 import {
+    PR_WATCH_LEASE_MS,
     PR_WATCH_POLL_INTERVAL_MS,
     checksOf,
     dispatchDueWatches,
@@ -84,6 +85,12 @@ const watchField = async (linkId: string, path: string): Promise<any> => {
 };
 
 const rowOf = async (linkId: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get("pullRequestThreads", linkId));
+
+const pollLink = async (linkId: string): Promise<void> => {
+    await harness.run(async (ctx: any) => {
+        await ctx.runMutation(pollWatchLink, { linkId });
+    });
+};
 
 const record = async (linkId: string, args: { lease?: number; observation: PullRequestObservation; startedAt?: number }): Promise<void> => {
     await harness.run(async (ctx: any) => {
@@ -185,11 +192,7 @@ describe("dispatchDueWatches", () => {
 });
 
 describe("pollWatchLink", () => {
-    const run = async (linkId: string): Promise<void> => {
-        await harness.run(async (ctx: any) => {
-            await ctx.runMutation(pollWatchLink, { linkId });
-        });
-    };
+    const run = pollLink;
 
     it("leases a due watch and arms its next poll, with no sweep and no shard activity", async () => {
         const linkId = await seedWatch({ watchCheckedAt: undefined });
@@ -214,6 +217,68 @@ describe("pollWatchLink", () => {
         await run(stopped);
 
         expect(harness.scheduler.list()).toHaveLength(before);
+    });
+});
+
+describe("a poll that takes longer than the interval", () => {
+    const START = 2_000_000_000_000;
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    const jobs = (): { functionPath?: string; scheduledFor: number }[] => harness.scheduler.list() as never;
+
+    it("keeps its lease, records its observation, and the next poll waits for the lease to end", async () => {
+        // The fake scheduler stamps jobs with the real clock; only the mutations see the faked one.
+        const realNow = Date.now();
+
+        vi.useFakeTimers({ now: START, toFake: ["Date"] });
+
+        const linkId = await seedWatch({ watchCheckedAt: undefined, watchLeaseUntil: undefined });
+        const run = async (): Promise<void> => await pollLink(linkId);
+
+        await run();
+
+        const { watchCheckedAt: lease } = await rowOf(linkId);
+        const afterLease = jobs().length;
+
+        // Leased now; the read is slow. Past the interval, neither the poll chain nor the sweep may start another one.
+        vi.setSystemTime(START + PR_WATCH_POLL_INTERVAL_MS + 60_000);
+        await run();
+
+        const swept = await harness.run(async (ctx: any) => await runInShard(OWNER, () => ctx.runMutation(dispatchDueWatches, {})));
+
+        expect(swept.dispatched).toBe(0);
+        expect(jobs()).toHaveLength(afterLease);
+        const held = await rowOf(linkId);
+
+        expect(held.watchCheckedAt).toBe(lease);
+
+        // The slow read lands: its record applies, releases the lease and arms the next poll one interval after the record.
+        const recordedAt = START + PR_WATCH_POLL_INTERVAL_MS + 60_000;
+
+        await record(linkId, { lease, observation: observation({ headSha: "sha-slow" }) });
+
+        const row = await rowOf(linkId);
+        // Within a minute of the interval: the fake scheduler stamps with the real clock, a little apart from this test's.
+        const armed = jobs().filter((job) => Math.abs(job.scheduledFor - (realNow + PR_WATCH_POLL_INTERVAL_MS)) < 60_000);
+
+        expect(row.watch).toMatchObject({ baselined: true, headSha: "sha-slow" });
+        expect(row.watchLeaseUntil).toBe(recordedAt + PR_WATCH_POLL_INTERVAL_MS);
+        expect(jobs()).toHaveLength(afterLease + 1);
+        expect(armed).toHaveLength(1);
+
+        // The watchdog armed with the lease sits a whole lease away, so it cannot start a poll inside the read.
+        expect(jobs().some((job) => Math.abs(job.scheduledFor - (realNow + PR_WATCH_LEASE_MS)) < 60_000)).toBe(true);
+
+        // Before that interval ends nothing is leased; after it, the watch is polled again.
+        await run();
+        expect(jobs()).toHaveLength(afterLease + 1);
+
+        vi.setSystemTime(recordedAt + PR_WATCH_POLL_INTERVAL_MS);
+        await run();
+        expect(jobs().length).toBeGreaterThan(afterLease + 1);
     });
 });
 

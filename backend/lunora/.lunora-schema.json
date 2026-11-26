@@ -24887,6 +24887,12 @@
           "optional": true,
           "unique": false
         },
+        "watchLeaseUntil": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "watchPending": {
           "kind": "array",
           "nullable": false,

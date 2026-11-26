@@ -32,6 +32,12 @@ import type { CheckRun, CheckState, CheckSummary, MergeState } from "./types";
 
 /** A running watch is read again once its last read is this old. */
 export const PR_WATCH_POLL_INTERVAL_MS = 3 * 60 * 1000;
+/**
+ * How long a leased read may take before the watch is polled again: the lease lasts until the read records, or this long if it
+ * never does (a failed or lost read). A slow read therefore keeps its lease and its answer; the poll after it starts only once
+ * the lease has ended.
+ */
+export const PR_WATCH_LEASE_MS = 10 * 60 * 1000;
 /** Watches one sweep leases, so one person's host calls stay bounded whatever the person's limit is. */
 const POLL_LIMIT = 10;
 /** Running watches read per page of the sweep, and pages per sweep. */
@@ -115,7 +121,7 @@ export const dispatchDueWatches = internalMutation
         }
 
         // Oldest read first, so a watch is not starved by the ones read before it.
-        due.sort((a, b) => (a.watchCheckedAt ?? 0) - (b.watchCheckedAt ?? 0));
+        due.sort((a, b) => nextPollAt(a) - nextPollAt(b));
         due.length = Math.min(due.length, POLL_LIMIT);
 
         for (const link of due) {
@@ -125,13 +131,13 @@ export const dispatchDueWatches = internalMutation
         return { dispatched: due.length };
     });
 
-/** Whether the link holds a running watch whose last read is old enough to read again. */
+/** When the watch may next be polled: the end of its lease, or of the interval after its last recorded read. */
+const nextPollAt = (link: Doc<"pullRequestThreads">): number =>
+    link.watchLeaseUntil ?? (link.watchCheckedAt === undefined ? 0 : link.watchCheckedAt + PR_WATCH_POLL_INTERVAL_MS);
+
+/** Whether the link holds a running watch that no read holds the lease of, and whose interval has passed. */
 const isDue = (link: Doc<"pullRequestThreads">, now: number): boolean =>
-    link.threadDeleted !== true &&
-    link.watchActive === true &&
-    link.watch !== undefined &&
-    link.watch.stoppedAt === undefined &&
-    (link.watchCheckedAt === undefined || now - link.watchCheckedAt >= PR_WATCH_POLL_INTERVAL_MS);
+    link.threadDeleted !== true && link.watchActive === true && link.watch !== undefined && link.watch.stoppedAt === undefined && now >= nextPollAt(link);
 
 /**
  * Leases a running watch for one host read and keeps its own next poll scheduled on its owner's shard, so a person whose
@@ -140,7 +146,7 @@ const isDue = (link: Doc<"pullRequestThreads">, now: number): boolean =>
  */
 const leaseWatch = async (ctx: Pick<MutationCtx, "db" | "scheduler">, link: Doc<"pullRequestThreads">, now: number): Promise<void> => {
     // Stamped first: a sweep or poll that runs again before the read lands skips this link. The stamp is the lease.
-    await ctx.db.patch("pullRequestThreads", link._id, { watchCheckedAt: now });
+    await ctx.db.patch("pullRequestThreads", link._id, { watchCheckedAt: now, watchLeaseUntil: now + PR_WATCH_LEASE_MS });
     await runAfterOnShard(
         ctx.scheduler,
         0,
@@ -148,7 +154,9 @@ const leaseWatch = async (ctx: Pick<MutationCtx, "db" | "scheduler">, link: Doc<
         { lease: now, linkId: link._id, startedAt: link.watch?.startedAt ?? now },
         link.userId,
     );
-    await runAfterOnShard(ctx.scheduler, PR_WATCH_POLL_INTERVAL_MS, internal.source_control.pr_watch_poll.pollWatchLink, { linkId: link._id }, link.userId);
+    // The watchdog: the read's record arms the next poll itself, so this one only matters when the read never records. It does
+    // nothing while the lease is still held (a slow read) or already released.
+    await runAfterOnShard(ctx.scheduler, PR_WATCH_LEASE_MS, internal.source_control.pr_watch_poll.pollWatchLink, { linkId: link._id }, link.userId);
 };
 
 /**
@@ -233,13 +241,16 @@ export const recordWatchObservation = internalMutation
 
         // A wake is not delivered yet: its reasons stay pending with the markers the decision set, but the count and the cooldown
         // keep their stored values, so an undelivered wake never uses up the cap. The delivery counts the wake when it happens.
+        const release = { watchLeaseUntil: ctx.now + PR_WATCH_POLL_INTERVAL_MS };
         const stored = storedWatchOf({
             ...decision.state,
             startedAt,
             ...(decision.action === "wake" && { lastWakeAt: previous.lastWakeAt, pending: decision.reasons, wakes: previous.wakes }),
         });
 
-        await ctx.db.patch("pullRequestThreads", link._id, { watch: stored.watch, watchPending: stored.watchPending ?? [] });
+        // The lease ends with the record, whenever the read took: the next poll is armed from here, one interval later.
+        await ctx.db.patch("pullRequestThreads", link._id, { ...release, watch: stored.watch, watchPending: stored.watchPending ?? [] });
+        await runAfterOnShard(ctx.scheduler, PR_WATCH_POLL_INTERVAL_MS, internal.source_control.pr_watch_poll.pollWatchLink, { linkId: link._id }, link.userId);
 
         return null;
     });
