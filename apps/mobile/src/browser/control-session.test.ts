@@ -218,4 +218,33 @@ describe(createControlSession, () => {
         ticks[0]?.();
         expect(session.state()).toStrictEqual({ kind: "idle", message: CONTROL_ENDED });
     });
+
+    it("waits for a hand back still out before a retake, and names no claim it gave back", async () => {
+        const handBack = Promise.withResolvers<boolean>();
+        const take = vi.fn(async () => OK);
+        const session = createControlSession({
+            api: {
+                handBack: vi.fn(async () => await handBack.promise),
+                keep: vi.fn(async () => null),
+                navigate: vi.fn(async () => {
+                    return { status: "ok" as const };
+                }),
+                take,
+            },
+            every: () => () => {},
+            onChange: () => {},
+        });
+
+        await session.take();
+        session.release("left");
+
+        const retaking = session.take();
+
+        await Promise.resolve();
+        expect(take).toHaveBeenCalledTimes(1);
+
+        handBack.resolve(true);
+        await retaking;
+        expect(take).toHaveBeenLastCalledWith(undefined);
+    });
 });

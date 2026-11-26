@@ -106,6 +106,8 @@ export const createControlSession = ({
     let stopKeeping: (() => void) | undefined;
     /** The last claim this phone held, so taking control again is its own renewal and never `held` from itself. */
     let lastClaim = initialClaim;
+    /** The hand back still out, if any. */
+    let releasing: Promise<void> | undefined;
     /** Counts takes: an answer to one that was left (released, suspended, or followed by another) holds nothing. */
     let attempt = 0;
 
@@ -188,11 +190,19 @@ export const createControlSession = ({
             const { claim } = state;
 
             stop();
-            settleQuietly(async () => {
-                if (await api.handBack(claim, reason)) {
-                    onReleased(claim);
+            // A take waits for this: a renewal of a claim whose hand back is still out would be ended by it.
+            releasing = (async () => {
+                if (!await withCatch(async () => await api.handBack(claim, reason), () => false)) {
+                    return;
                 }
-            });
+
+                onReleased(claim);
+
+                if (lastClaim === claim) {
+                    lastClaim = undefined;
+                }
+            })();
+            settleQuietly(releasing);
         },
         state: () => state,
         suspend: () => {
@@ -214,6 +224,10 @@ export const createControlSession = ({
             const mine = attempt;
 
             set({ kind: "taking" });
+
+            // A hand back still out lands first: a claim it gave back is not named as one to renew (a hand back that
+            // failed keeps it, so a lease left on the server is still the phone's own).
+            await releasing;
 
             const answer = await withCatch(async () => await api.take(lastClaim), () => undefined);
 

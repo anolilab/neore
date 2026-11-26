@@ -39,12 +39,13 @@ const setup = () => {
 
 describe(startFrameReader, () => {
     it("reads at once, then on every interval, and stops the timer when stopped", async () => {
-        const { cancel, onAnswer, pending, read, reader, tick } = setup();
+        const { cancel, clock, onAnswer, pending, read, reader, tick } = setup();
 
         expect(read).toHaveBeenCalledTimes(1);
         pending[0]?.resolve("first");
         await vi.waitFor(() => expect(onAnswer).toHaveBeenCalledWith("first"));
 
+        clock.at += FRAME_REFRESH_MS;
         tick();
         expect(read).toHaveBeenCalledTimes(2);
 
@@ -53,14 +54,16 @@ describe(startFrameReader, () => {
     });
 
     it("never replaces a read still out: a read slower than the interval still paints, and the next starts after it", async () => {
-        const { onAnswer, pending, read, tick } = setup();
+        const { clock, onAnswer, pending, read, tick } = setup();
 
+        clock.at += FRAME_REFRESH_MS;
         tick();
         expect(read).toHaveBeenCalledTimes(1);
 
         pending[0]?.resolve("slow");
         await vi.waitFor(() => expect(onAnswer).toHaveBeenCalledWith("slow"));
 
+        clock.at += FRAME_REFRESH_MS;
         tick();
         expect(read).toHaveBeenCalledTimes(2);
     });
@@ -109,5 +112,18 @@ describe(startFrameReader, () => {
 
         second.pending[0]?.reject(error);
         await vi.waitFor(() => expect(second.onFailure).toHaveBeenCalledWith(error));
+    });
+
+    it("holds the gap for the timer too: a tick just after a read waits", async () => {
+        const { clock, pending, read, tick, waits } = setup();
+
+        pending[0]?.resolve("first");
+        await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(1));
+        await Promise.resolve();
+
+        clock.at += 1000;
+        tick();
+        expect(read).toHaveBeenCalledTimes(1);
+        expect(waits.at(-1)?.ms).toBe(FRAME_MIN_GAP_MS - 1000);
     });
 });

@@ -108,9 +108,10 @@ export const startFrameReader = <T>({
 
     run();
 
+    // The timer asks like anything else, so the gap holds for it too; a tick while a read is out is skipped.
     const cancel = every(FRAME_REFRESH_MS, () => {
         if (!isReading) {
-            run();
+            request();
         }
     });
 

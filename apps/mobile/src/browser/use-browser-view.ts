@@ -238,6 +238,11 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
                     // The browser closed, or someone else drives it: the last picture is no longer one to show.
                     setFrame(undefined);
                 }
+
+                // The browser is gone: a lease the phone holds on it would only keep the agent waiting.
+                if (read.status === "ended") {
+                    session.release("left");
+                }
             },
             onFailure: (failure) => {
                 // A refusal is the server's answer, not a lost connection.
@@ -256,7 +261,7 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
             started.stop();
             reader.current = undefined;
         };
-    }, [browserId, isReading, reportRead, threadId]);
+    }, [browserId, isReading, reportRead, session, threadId]);
 
     const isShown = view.kind === "ready" && frame !== undefined && frame.browserId === browserId;
 
