@@ -142,7 +142,7 @@ Write`; without them the deploy fails, hence the switch.
   keyed by a token the server makes) with the check's start, the next cursor, a digest of every folded address read and
   the unfilled ids; each later call names the token and goes on from the record's cursor, and an address two rows fold
   to, in one call or across calls, drops the record and answers 409. A row's key is the fold of its `email` as it is
-  now, never only its stored `emailCanonical`. Pages are 500 rows: Lunora fetches `limit + 1` rows to tell a last page,
+  now, never its stored `emailCanonical` (a stored value is the fill's holder check's). Pages are 500 rows: Lunora fetches `limit + 1` rows to tell a last page,
   and a D1 statement answers at most 1,000. Only then the fill: one id per call, under the token of a COMPLETED
   check and only among its ids, with the start time from the record (a body with `checkedAt` or `cursor` is refused,
   and a record whose start lies ahead of the clock too); a row is filled only while it is unchanged since a minute
@@ -150,8 +150,8 @@ Write`; without them the deploy fails, hence the switch.
   per call because `patchIf` makes up to 16 rounds of a read and a guarded write with no lower cap: worst case 36 of
   the 50 statements (`EMAIL_CANONICAL_FILL_WORST`). Two accounts whose addresses fold to one stop it with a count
   (409), with neither filled: merge or rename one. Three answers in a row that move nothing fail it; a fill whose row
-  changed is not one. A run makes at most 12,000 calls; one that stops there fails the step, and the next deploy goes
-  on. The log prints counts only, never a token or an id; a refused call prints its code, and outside production its
+  changed is not one. A run makes at most 5,000 calls (inside the step's 30 minutes at the route's 3,000 per 15 minutes); one that stops
+  there fails the step, and the next deploy goes on. The log prints counts only, never a token or an id; a refused call prints its code, and outside production its
   message with URLs replaced.
 - **A Worker that passes the size cap can still fail Cloudflare's startup check** ("Script startup
   exceeded CPU time limit", error 10021): the module-level code of the whole bundle may take 1 s of

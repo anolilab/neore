@@ -206,7 +206,7 @@ const saveRecord = async (ctx: BackfillCtx, token: string, claimedAt: number, re
 /**
  * One check call: up to `pages` pages over every user row, filled or not, from the record's cursor. Writes the check
  * record only, never a `user` row. Every row's key is the fold of its `email` as it is now, whatever its stored column
- * says, and also that stored value when it differs: the stored one is what the unique index holds.
+ * says; a stored value a row would collide with is the fill's holder check's to find.
  */
 export const checkEmailCanonicalPage = async (
     ctx: BackfillCtx,
@@ -259,16 +259,13 @@ export const checkEmailCanonicalPage = async (
         const result = await ctx.db.user.findMany({ consistency: "primary", cursor: next, limit: pageRows });
 
         for (const row of result.page) {
-            const stored = row.emailCanonical ?? undefined;
-            const keys = new Set([canonicalEmail(row.email), ...(stored === undefined ? [] : [stored])]);
+            const key = canonicalEmail(row.email);
 
-            if (stored === undefined) {
+            if ((row.emailCanonical ?? undefined) === undefined) {
                 unfilledIds.push(row._id);
             }
 
-            for (const key of keys) {
-                counts.set(key, (counts.get(key) ?? 0) + 1);
-            }
+            counts.set(key, (counts.get(key) ?? 0) + 1);
         }
 
         scanned += result.page.length;

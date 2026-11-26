@@ -321,9 +321,11 @@ export const EMAIL_CANONICAL_BACKFILL = "backfill-email-canonical";
 
 /**
  * Calls one run of the backfill may make, over every phase and round: a fill call takes one id, so this is about how many
- * accounts one deploy fills. A run that stops here fails the step; what it filled stays filled, and the next deploy goes on.
+ * accounts one deploy fills. It stays under what the route's rate limit (3,000 per 15 minutes) lets through within the
+ * deploy step's 30 minutes, so the run stops with its own message rather than the step's timeout. A run that stops here
+ * fails the step; what it filled stays filled, and the next deploy goes on.
  */
-export const EMAIL_CANONICAL_MAX_CALLS = 12_000;
+export const EMAIL_CANONICAL_MAX_CALLS = 5000;
 
 /** Check-then-fill rounds one run makes: a round after the first checks again what an earlier one left. */
 export const EMAIL_CANONICAL_ROUNDS = 3;
