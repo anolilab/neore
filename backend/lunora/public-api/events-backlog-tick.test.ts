@@ -111,6 +111,59 @@ describe("a tick facing an Events backlog larger than its rounds", () => {
 });
 
 describe("the retention sweep's record of what it expired", () => {
+    it("does not record an expired event of a locked chat, since the poll hides it and an expiry there is no gap", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const now = Date.now();
+
+            await runInShard("user", async () => {
+                await harness.run(async (context: any) => {
+                    const lockedThread = (await context.db.insert("threads", {
+                        deleted: false,
+                        lockedAt: now,
+                        mode: "text",
+                        model: "gpt-4o",
+                        status: "active",
+                        title: "Locked",
+                        userId: "user",
+                    })) as string;
+
+                    await context.db.insert("mcpEventWatermarks", { seq: 2, userId: "user" });
+                    await context.db.insert("mcpEvents", {
+                        createdAt: now - 10 * DAY_MS,
+                        data: JSON.stringify({ threadId: lockedThread }),
+                        eventId: "run:locked",
+                        name: "run.completed",
+                        seq: 1,
+                        threadId: lockedThread,
+                        timestamp: now,
+                        userId: "user",
+                    });
+                    await context.db.insert("mcpEvents", {
+                        createdAt: now,
+                        data: "{}",
+                        eventId: "run:kept",
+                        name: "run.completed",
+                        seq: 2,
+                        timestamp: now,
+                        userId: "user",
+                    });
+                });
+
+                await harness.run(async (context: any) => await context.runMutation(pruneMcpEvents, {}));
+            });
+
+            const watermark = (await harness.run(async (context: any) => await context.db.mcpEventWatermarks.findFirst({ where: { userId: "user" } }))) as {
+                prunedThrough?: number;
+            } | null;
+
+            expect(watermark?.prunedThrough ?? 0).toBe(0);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("records the highest seq it expired for each user, and leaves a newer row's seq out of it", async () => {
         const harness = lunoraTest(schemaWithShardedTables([]) as never);
 

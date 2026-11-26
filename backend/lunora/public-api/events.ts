@@ -157,12 +157,36 @@ export const pruneMcpEvents = internalMutation.output(v.object({ hasMore: v.bool
     const cutoff = ctx.now - RETENTION_MS;
     const { page } = await ctx.db.mcpEvents.findMany({ limit: PRUNE_BATCH, where: { createdAt: { lt: cutoff } } });
 
-    // The highest seq the sweep expired for each user: the poll's gap check reads it from the watermark.
+    // The highest seq the sweep expired for each user: the poll's gap check reads it from the watermark. An event of a locked or trashed
+    // chat does not count: the poll hides it, so its expiry is no gap the client could have missed, and reporting one would reveal that
+    // the chat had activity. The predicate is the poll's own (`hiddenByThread`).
     const expired = new Map<string, number>();
+    const hiddenThreads = new Map<string, boolean>();
+    const isHidden = async (threadId: string | undefined): Promise<boolean> => {
+        if (threadId === undefined) {
+            return false;
+        }
+
+        const known = hiddenThreads.get(threadId);
+
+        if (known !== undefined) {
+            return known;
+        }
+
+        const thread = await ctx.db.threads.findFirst({ consistency: "primary", where: { _id: threadId as Id<"threads"> } });
+        const hidden = thread !== null && (isThreadLocked(thread) || thread.deleted === true);
+
+        hiddenThreads.set(threadId, hidden);
+
+        return hidden;
+    };
 
     for (const row of page) {
         await ctx.db.delete("mcpEvents", row._id);
-        expired.set(row.userId, Math.max(expired.get(row.userId) ?? 0, row.seq));
+
+        if (!(await isHidden(row.threadId))) {
+            expired.set(row.userId, Math.max(expired.get(row.userId) ?? 0, row.seq));
+        }
     }
 
     for (const [userId, seq] of expired) {
