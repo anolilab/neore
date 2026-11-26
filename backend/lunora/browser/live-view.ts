@@ -496,6 +496,8 @@ export const claimControl = internalMutation
                 kind: v.literal("ok"),
                 /** A renewal: the claim it replaced, which a failed renewal puts back for the view that still holds it. */
                 previousClaim: v.optional(v.string()),
+                /** A renewal: the view name the lease had (`controlView`), which a failed renewal puts back with its claim. */
+                previousView: v.optional(v.string()),
                 providerSessionId: v.string(),
                 /** An earlier lease ended and the agent was not told yet: a dropped claim puts that note back. */
                 returned: v.optional(v.union(v.literal("browser_closed"), v.literal("handed_back"), v.literal("idle"), v.literal("left"))),
@@ -572,6 +574,7 @@ export const claimControl = internalMutation
                 fresh: false,
                 kind: "ok" as const,
                 previousClaim: current.renewing ?? current.claim,
+                ...(browser.session.controlView !== undefined && { previousView: browser.session.controlView }),
                 providerSessionId: browser.providerSessionId,
                 shardKey: browser.shardKey,
                 until,
@@ -610,11 +613,12 @@ export const dropControlClaim = internalMutation
         claim: v.string(),
         handedBack: v.optional(v.union(v.literal("browser_closed"), v.literal("handed_back"), v.literal("left"))),
         previousClaim: v.optional(v.string()),
+        previousView: v.optional(v.string()),
         returned: v.optional(v.union(v.literal("browser_closed"), v.literal("handed_back"), v.literal("idle"), v.literal("left"))),
         threadId: v.id("threads"),
         userId: v.string(),
     })
-    .mutation(async ({ args: { claim, handedBack, previousClaim, returned, threadId, userId }, ctx }) => {
+    .mutation(async ({ args: { claim, handedBack, previousClaim, previousView, returned, threadId, userId }, ctx }) => {
         const session = await activeThreadSession(ctx.db, threadId);
         const control = session?.control;
 
@@ -631,6 +635,7 @@ export const dropControlClaim = internalMutation
                     ended: handedBack,
                     until: Math.max(ctx.now, control.navigatingUntil ?? 0),
                 },
+                controlView: previousView,
             });
 
             return;
@@ -648,6 +653,8 @@ export const dropControlClaim = internalMutation
                               ended: control.renewingEnded ?? ("left" as const),
                               until: Math.max(ctx.now, control.navigatingUntil ?? 0),
                           },
+                // The view that held the lease keeps its name with it.
+                controlView: previousView,
             });
 
             return;
@@ -775,6 +782,7 @@ export const takeControl = authAction
                 userId,
                 ...(claim.handedBack !== undefined && { handedBack: claim.handedBack }),
                 ...(claim.previousClaim !== undefined && { previousClaim: claim.previousClaim }),
+                ...(claim.previousView !== undefined && { previousView: claim.previousView }),
                 ...(claim.returned !== undefined && { returned: claim.returned }),
             });
         };

@@ -122,12 +122,13 @@ export const readBrowserFrame = authAction
             return { status: "controlled" as const };
         }
 
-        // A lease was taken while the shot ran (another person's, ended since, or one of the caller's that replaced it):
-        // what was typed then may be on it.
+        // A lease was taken while the shot ran (another person's, ended since, or one of the caller's): what was typed then
+        // may be on it.
         if (after.controlClaims !== browser.controlClaims) {
             ctx.log.event("browser.frame_read", { ok: false, reason: "claimed_during_shot" });
 
-            return { status: after.inControl ? ("unavailable" as const) : ("controlled" as const) };
+            // Withheld, never blamed on someone else: the claim may have been the caller's own.
+            return { status: "unavailable" as const };
         }
 
         // The caller's grant was removed and given again meanwhile: the shot may be from when they had none.

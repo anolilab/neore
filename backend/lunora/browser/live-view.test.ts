@@ -1874,7 +1874,7 @@ describe("a still frame of the browser", () => {
             return shot();
         });
 
-        await expect(frame(OWNER)).resolves.toStrictEqual({ status: "controlled" });
+        await expect(frame(OWNER)).resolves.toStrictEqual({ status: "unavailable" });
     });
 
     it("drops a frame when another person's lease taken during the shot was replaced by the caller's own claim", async () => {
@@ -1997,6 +1997,18 @@ describe("a phone that takes control", () => {
         await expect(viewTake("phone-1")).resolves.toMatchObject({ status: "ok" });
         await expect(viewTake("phone-1")).resolves.toMatchObject({ status: "ok" });
         await expect(viewTake("phone-2")).resolves.toStrictEqual({ status: "held" });
+    });
+
+    it("gives the phone's view name back with its lease when a web takeover fails", async () => {
+        await addSession();
+        await as(OWNER).action(takeControl as never, { exclusive: true, threadId, view: "phone-1" } as never);
+        // The web card's takeover: the provider refuses its view, so the phone's lease goes on.
+        fetchMock.mockResolvedValueOnce(answer(500, {}));
+        await expect(take(OWNER)).resolves.toStrictEqual({ status: "unavailable" });
+
+        await expect(as(OWNER).action(takeControl as never, { exclusive: true, threadId, view: "phone-1" } as never)).resolves.toMatchObject({
+            status: "ok",
+        });
     });
 
     it("forgets the phone's view name when the web takes the lease over, so the phone cannot take it back", async () => {
