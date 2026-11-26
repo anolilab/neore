@@ -2719,7 +2719,7 @@ export const schema = defineSchema({
         url: v.string(),
         userId: v.string(),
         // The person asked for this thread to be woken when the pull request fails checks, conflicts or gets a review
-        // (`source-control/pr-watch-logic.ts`). Absent: no watch. Its keys are the decision's state, between reads.
+        // (`source-control/pr-watch-logic.ts`). Absent: no watch. Its keys are the decision's stored keys (`pr-watch-logic.ts#storedWatchOf`); the pending reasons live in `watchPending`.
         watch: v.optional(
             v.object({
                 baselined: v.optional(v.boolean()),
@@ -2734,13 +2734,16 @@ export const schema = defineSchema({
                 wakes: v.optional(v.number()),
             }),
         ),
+        // True exactly while a watch runs, so a person's running watches are counted exactly through an index. Cleared by anything that ends a watch.
+        watchActive: v.optional(v.boolean()),
         // Occurrences seen during a cooldown, delivered once the cooldown has passed (`source-control/pr-watch-logic.ts`).
         // Cleared by a fresh start; a stopped watch keeps whatever it had.
         watchPending: v.optional(v.array(v.union(v.literal("checks"), v.literal("conflict"), v.literal("review")))),
     })
         .shardBy("userId")
         .index("by_user_and_repository_number", ["userId", "repository", "number"])
-        .index("by_user_and_threadId", ["userId", "threadId"]),
+        .index("by_user_and_threadId", ["userId", "threadId"])
+        .index("by_user_and_watchActive", ["userId", "watchActive"]),
 
     // A phone's Expo push token (`notifications/native-push.ts`): one row per token, owned by the account signed in on
     // that phone. Global (D1) and keyed by `token`, so a second account signing in on the same phone moves the row in

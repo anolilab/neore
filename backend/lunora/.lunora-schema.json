@@ -24874,6 +24874,12 @@
             }
           }
         },
+        "watchActive": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "watchPending": {
           "kind": "array",
           "nullable": false,
@@ -24923,6 +24929,13 @@
           "fields": [
             "userId",
             "threadId"
+          ],
+          "unique": false
+        },
+        "by_user_and_watchActive": {
+          "fields": [
+            "userId",
+            "watchActive"
           ],
           "unique": false
         }

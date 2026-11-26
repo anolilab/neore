@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { decideWatch, PR_WATCH_MAX_WAKES, PR_WATCH_WAKE_COOLDOWN_MS, type PullRequestObservation, type PullRequestWatchState } from "./pr-watch-logic";
+import {
+    decideWatch,
+    PR_WATCH_MAX_WAKES,
+    PR_WATCH_WAKE_COOLDOWN_MS,
+    type PullRequestObservation,
+    type PullRequestWatchState,
+    stateOf,
+    storedWatchOf,
+} from "./pr-watch-logic";
 
 const NOW = 1_000_000_000;
 
@@ -108,7 +116,7 @@ describe("decideWatch", () => {
         });
     });
 
-    it("does not wake when the seen review left the list, and keeps the seen review where it was", () => {
+    it("re-baselines silently when the seen review left the list, so a later review still wakes", () => {
         const decision = decideWatch(
             { ...baselined, reviewId: "r5" },
             {
@@ -121,7 +129,21 @@ describe("decideWatch", () => {
             NOW,
         );
 
-        expect(decision).toStrictEqual({ action: "none", state: { ...baselined, headSha: "aaa", reviewId: "r5" } });
+        expect(decision).toStrictEqual({ action: "none", state: { ...baselined, headSha: "aaa", reviewId: "r2" } });
+
+        expect(
+            decideWatch(
+                decision.state,
+                {
+                    ...quiet,
+                    reviews: [
+                        { authorLogin: "reviewer", id: "r3" },
+                        { authorLogin: "reviewer", id: "r2" },
+                    ],
+                },
+                NOW,
+            ),
+        ).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "r3" } });
     });
 
     it("combines every reason seen in one read into one wake", () => {
@@ -168,5 +190,23 @@ describe("decideWatch", () => {
 
     it("does nothing for a quiet read after a baseline", () => {
         expect(decideWatch(baselined, quiet, NOW)).toStrictEqual({ action: "none", state: { ...baselined, headSha: "aaa" } });
+    });
+});
+
+describe("storedWatchOf and stateOf", () => {
+    it("round-trips the decision's state through the row's two stored fields", () => {
+        const state = { baselined: true, checksHeadSha: "a", headSha: "b", lastWakeAt: 5, pending: ["checks", "review"] as const, reviewId: "r1", wakes: 2 };
+        const stored = storedWatchOf({ ...state, pending: [...state.pending], startedAt: 1 });
+
+        expect(stored.watch).toStrictEqual({ baselined: true, checksHeadSha: "a", headSha: "b", lastWakeAt: 5, reviewId: "r1", startedAt: 1, wakes: 2 });
+        expect(stored.watchPending).toStrictEqual(["checks", "review"]);
+        expect(stateOf(stored)).toStrictEqual({ ...state, pending: [...state.pending] });
+    });
+
+    it("keeps no pending key when none is stored", () => {
+        const stored = storedWatchOf({ startedAt: 1, wakes: 1 });
+
+        expect(stored).toStrictEqual({ watch: { startedAt: 1, wakes: 1 }, watchPending: undefined });
+        expect(stateOf({ watch: stored.watch })).toStrictEqual({ wakes: 1 });
     });
 });

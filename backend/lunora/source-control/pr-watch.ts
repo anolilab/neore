@@ -5,18 +5,24 @@
  *
  * Starting a watch takes a fresh baseline: whatever the pull request looks like at the first read is recorded, not
  * reported. A stopped watch keeps its row (`stoppedAt`), so a restart is a new baseline, never a replay of old wakes.
+ *
+ * `watchActive` (indexed) is true exactly while a watch runs, and the person's limit counts it. Anything that ends a
+ * watch must clear it with `stoppedAt`: the stop here, a thread's soft delete (`pr-thread-links.ts`), and the future
+ * caller that acts on a decision of "end".
  */
 import { v } from "lunorash/server";
 
+import type { Doc } from "../_generated/dataModel";
 import { internalMutation } from "../_generated/server";
 import { MAX_LENGTH } from "../lib/validators";
+import { PR_WATCH_MAX_WAKES, storedWatchOf } from "./pr-watch-logic";
 
 /** Watches one person may have running at once. Each one is a host read every few minutes. */
 export const MAX_ACTIVE_PULL_REQUEST_WATCHES = 10;
 
-/** Links read per page when counting a person's active watches. Pages are read until the count is final or the bound is hit. */
-const WATCH_COUNT_PAGE_SIZE = 100;
-const WATCH_COUNT_MAX_PAGES = 50;
+/** Links read per page when looking a link up by its pull request, and the most pages read before giving up. */
+export const LINK_LOOKUP_PAGE_SIZE = 100;
+const LINK_LOOKUP_MAX_PAGES = 50;
 
 export const setPullRequestWatch = internalMutation
     .input({
@@ -26,18 +32,28 @@ export const setPullRequestWatch = internalMutation
         userId: v.string().max(MAX_LENGTH.id),
         watching: v.boolean(),
     })
-    .output(v.object({ status: v.union(v.literal("already"), v.literal("not_linked"), v.literal("ok"), v.literal("too_many")) }))
+    .output(v.object({ status: v.union(v.literal("already"), v.literal("capped"), v.literal("not_linked"), v.literal("ok"), v.literal("too_many")) }))
     .mutation(async ({ args, ctx }) => {
-        // Looked up by the thread, so no number of other links to the same pull request can push this one out of reach.
+        // Looked up by the pull request's index and paged until this thread's live link is found, so no number of other links
+        // to the same pull request (or older links) can hide it.
         const threadId = ctx.db.normalizeId("threads", args.threadId);
-        const links =
-            threadId === null
-                ? []
-                : await ctx.db
-                      .query("pullRequestThreads")
-                      .withIndex("by_user_and_threadId", (q) => q.eq("userId", args.userId).eq("threadId", threadId))
-                      .take(MAX_ACTIVE_PULL_REQUEST_WATCHES * 10);
-        const link = links.find((row) => row.repository === args.repository && row.number === args.number && row.threadDeleted !== true);
+        let link: Doc<"pullRequestThreads"> | undefined;
+        let cursor: string | null = null;
+
+        for (let page = 0; threadId !== null && link === undefined && page < LINK_LOOKUP_MAX_PAGES; page += 1) {
+            const read = await ctx.db
+                .query("pullRequestThreads")
+                .withIndex("by_user_and_repository_number", (q) => q.eq("userId", args.userId).eq("repository", args.repository).eq("number", args.number))
+                .paginate({ cursor, numItems: LINK_LOOKUP_PAGE_SIZE });
+
+            link = read.page.find((row) => row.threadId === threadId && row.threadDeleted !== true);
+
+            if (read.isDone) {
+                break;
+            }
+
+            cursor = read.continueCursor;
+        }
 
         if (link === undefined) {
             return { status: "not_linked" as const };
@@ -50,7 +66,7 @@ export const setPullRequestWatch = internalMutation
                 return { status: "already" as const };
             }
 
-            await ctx.db.patch("pullRequestThreads", link._id, { watch: { ...link.watch, stoppedAt: ctx.now } });
+            await ctx.db.patch("pullRequestThreads", link._id, { watch: { ...link.watch, stoppedAt: ctx.now }, watchActive: false });
 
             return { status: "ok" as const };
         }
@@ -59,34 +75,27 @@ export const setPullRequestWatch = internalMutation
             return { status: "already" as const };
         }
 
-        // Counted over every page of the person's links, up to a bound, and only links whose thread is live.
-        let running = 0;
-        let cursor: string | null = null;
+        // Exact and bounded: the flag is kept in step with every start and stop, and only live threads' watches carry it.
+        const running = await ctx.db
+            .query("pullRequestThreads")
+            .withIndex("by_user_and_watchActive", (q) => q.eq("userId", args.userId).eq("watchActive", true))
+            .take(MAX_ACTIVE_PULL_REQUEST_WATCHES);
 
-        for (let page = 0; page < WATCH_COUNT_MAX_PAGES && running < MAX_ACTIVE_PULL_REQUEST_WATCHES; page += 1) {
-            const read = await ctx.db
-                .query("pullRequestThreads")
-                .withIndex("by_user_and_repository_number", (q) => q.eq("userId", args.userId))
-                .paginate({ cursor, numItems: WATCH_COUNT_PAGE_SIZE });
-
-            running += read.page.filter((row) => row.watch !== undefined && row.watch.stoppedAt === undefined && row.threadDeleted !== true).length;
-
-            if (read.isDone) {
-                break;
-            }
-
-            cursor = read.continueCursor;
-        }
-
-        if (running >= MAX_ACTIVE_PULL_REQUEST_WATCHES) {
+        if (running.length >= MAX_ACTIVE_PULL_REQUEST_WATCHES) {
             return { status: "too_many" as const };
         }
 
+        const carried = link.watch?.wakes ?? 0;
+
+        // A watch that reached its wake cap is over: restarting it would only end it on its next read.
+        if (carried >= PR_WATCH_MAX_WAKES) {
+            return { status: "capped" as const };
+        }
+
         // The wake count carries over: a restart must not reset the cap that ends a watch which keeps waking.
-        await ctx.db.patch("pullRequestThreads", link._id, {
-            watch: { startedAt: ctx.now, ...(link.watch?.wakes !== undefined && { wakes: link.watch.wakes }) },
-            watchPending: [],
-        });
+        const stored = storedWatchOf({ startedAt: ctx.now, ...(link.watch?.wakes !== undefined && { wakes: link.watch.wakes }) });
+
+        await ctx.db.patch("pullRequestThreads", link._id, { watch: stored.watch, watchActive: true, watchPending: stored.watchPending ?? [] });
 
         return { status: "ok" as const };
     });

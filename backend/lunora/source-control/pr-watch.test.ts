@@ -8,7 +8,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { insertThread } from "../agent/table-writes";
 import schema from "../schema";
-import { MAX_ACTIVE_PULL_REQUEST_WATCHES, setPullRequestWatch } from "./pr-watch";
+import { LINK_LOOKUP_PAGE_SIZE, MAX_ACTIVE_PULL_REQUEST_WATCHES, setPullRequestWatch } from "./pr-watch";
+import { setLinksThreadDeleted } from "./pr-thread-links";
 
 const OWNER = "user-a";
 const OTHER = "user-b";
@@ -107,7 +108,7 @@ describe("setPullRequestWatch", () => {
     });
 
     it("a restart keeps the wake count, so stopping and starting again cannot reset the cap", async () => {
-        const { linkId, threadId } = await seedLink(OWNER, 7, { watch: { startedAt: 1, stoppedAt: 2, wakes: 3 } });
+        const { linkId, threadId } = await seedLink(OWNER, 7, { watch: { startedAt: 1, stoppedAt: 2, wakes: 3 }, watchActive: false });
 
         expect(await call({ number: 7, threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "ok" });
 
@@ -120,10 +121,10 @@ describe("setPullRequestWatch", () => {
 
     it("does not count a watch whose thread was deleted against the person's limit", async () => {
         for (let number = 100; number < 100 + MAX_ACTIVE_PULL_REQUEST_WATCHES - 1; number += 1) {
-            await seedLink(OWNER, number, { watch: { startedAt: 1 } });
+            await seedLink(OWNER, number, { watch: { startedAt: 1 }, watchActive: true });
         }
 
-        await seedLink(OWNER, 200, { threadDeleted: true, watch: { startedAt: 1 } });
+        await seedLink(OWNER, 200, { threadDeleted: true, watch: { startedAt: 1, stoppedAt: 2 }, watchActive: false });
 
         const { linkId, threadId } = await seedLink(OWNER, 7);
 
@@ -144,12 +145,80 @@ describe("setPullRequestWatch", () => {
 
     it("refuses a start once the person has the most active watches, and writes nothing", async () => {
         for (let number = 100; number < 100 + MAX_ACTIVE_PULL_REQUEST_WATCHES; number += 1) {
-            await seedLink(OWNER, number, { watch: { startedAt: 1 } });
+            await seedLink(OWNER, number, { watch: { startedAt: 1 }, watchActive: true });
         }
 
         const { linkId, threadId } = await seedLink(OWNER, 7);
 
         expect(await call({ number: 7, threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "too_many" });
         expect(await watchOf(linkId)).toBeUndefined();
+    });
+
+    it("finds a link that lies beyond the first page of links to the same pull request", async () => {
+        for (let index = 0; index < LINK_LOOKUP_PAGE_SIZE + 20; index += 1) {
+            await seedLink(OWNER, 7);
+        }
+
+        // The link read last by the index: not on the first page.
+        const { linkId, threadId } = await harness.run(async (ctx: any) => {
+            const rows = await ctx.db
+                .query("pullRequestThreads")
+                .withIndex("by_user_and_repository_number", (q: any) => q.eq("userId", OWNER).eq("repository", REPOSITORY).eq("number", 7))
+                .collect();
+            const last = rows.at(-1);
+
+            return { linkId: String(last._id), threadId: String(last.threadId) };
+        });
+
+        expect(await call({ number: 7, threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "ok" });
+        expect(await watchOf(linkId)).toMatchObject({ startedAt: expect.any(Number) });
+    });
+
+    it("keeps the flag in step: a start sets it, a stop clears it", async () => {
+        const { linkId, threadId } = await seedLink(OWNER, 7);
+        const flag = async (): Promise<boolean | undefined> =>
+            await harness.run(async (ctx: any) => {
+                const row = await ctx.db.get("pullRequestThreads", linkId);
+
+                return row?.watchActive;
+            });
+
+        await call({ number: 7, threadId, userId: OWNER, watching: true });
+        expect(await flag()).toBe(true);
+        await call({ number: 7, threadId, userId: OWNER, watching: false });
+        expect(await flag()).toBe(false);
+    });
+
+    it("a soft delete stops the thread's watch and frees its slot, and a restore does not restart it", async () => {
+        for (let number = 100; number < 100 + MAX_ACTIVE_PULL_REQUEST_WATCHES - 1; number += 1) {
+            await seedLink(OWNER, number, { watch: { startedAt: 1 }, watchActive: true });
+        }
+
+        const first = await seedLink(OWNER, 7);
+
+        expect(await call({ number: 7, threadId: first.threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "ok" });
+
+        const second = await seedLink(OWNER, 8);
+
+        expect(await call({ number: 8, threadId: second.threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "too_many" });
+
+        await harness.run(async (ctx: any) => await setLinksThreadDeleted(ctx, OWNER, first.threadId as never, true));
+
+        expect(await watchOf(first.linkId)).toMatchObject({ startedAt: expect.any(Number), stoppedAt: expect.any(Number) });
+        expect(await call({ number: 8, threadId: second.threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "ok" });
+
+        await harness.run(async (ctx: any) => await setLinksThreadDeleted(ctx, OWNER, first.threadId as never, false));
+
+        const restored = await harness.run(async (ctx: any) => await ctx.db.get("pullRequestThreads", first.linkId));
+
+        expect(restored.watch.stoppedAt).toStrictEqual(expect.any(Number));
+        expect(restored.watchActive).toBe(false);
+    });
+
+    it("does not restart a capped watch, and writes nothing", async () => {
+        const { linkId, threadId } = await seedLink(OWNER, 7, { watch: { startedAt: 1, stoppedAt: 2, wakes: 5 }, watchActive: false });
+
+        expect(await call({ number: 7, threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "capped" });
+        expect(await watchOf(linkId)).toStrictEqual({ startedAt: 1, stoppedAt: 2, wakes: 5 });
     });
 });

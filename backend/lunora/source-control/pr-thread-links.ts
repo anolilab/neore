@@ -41,15 +41,21 @@ const eachLinkOfThread = async (
     }
 };
 
-/** Marks every link of a thread with whether the thread is deleted: called from the thread's soft delete and restore. */
+/** Marks every link of a thread with whether the thread is deleted: called from the thread's soft delete and restore. A delete also stops the links' running watches. */
 export const setLinksThreadDeleted = async (
-    ctx: Pick<MutationCtx, "db">,
+    ctx: Pick<MutationCtx, "db" | "now">,
     userId: string | undefined,
     threadId: Id<"threads">,
     deleted: boolean,
 ): Promise<void> => {
     await eachLinkOfThread(ctx, userId, threadId, async (link) => {
-        await ctx.db.patch("pullRequestThreads", link._id, { threadDeleted: deleted });
+        // A deleted thread's watch stops, so it frees its slot; restoring the thread does not restart it. The wake count stays.
+        const stopped = deleted && link.watch !== undefined && link.watch.stoppedAt === undefined;
+
+        await ctx.db.patch("pullRequestThreads", link._id, {
+            threadDeleted: deleted,
+            ...(stopped && { watch: { ...link.watch, stoppedAt: ctx.now }, watchActive: false }),
+        });
     });
 };
 

@@ -68,21 +68,24 @@ const newestReviewByOthers = (observed: PullRequestObservation): { authorLogin: 
 
 /**
  * The reviews by others that are newer than the one the watch last saw. The host lists reviews newest first, so those are
- * the entries before the seen one. With no seen review, every review by others is new. A seen review that is no longer
- * listed proves nothing new.
+ * the entries before the seen one. With no seen review, every review by others is new. `left` is true when a seen review
+ * is no longer listed at all: nothing can be said about what is new, so the caller re-baselines instead.
  */
-const newerReviewsByOthers = (observed: PullRequestObservation, seenId: string | undefined): { authorLogin: string; id: string }[] => {
+const newerReviewsByOthers = (
+    observed: PullRequestObservation,
+    seenId: string | undefined,
+): { left: boolean; newer: { authorLogin: string; id: string }[] } => {
     if (seenId === undefined) {
-        return observed.reviews.filter((review) => review.authorLogin !== observed.watcherLogin);
+        return { left: false, newer: observed.reviews.filter((review) => review.authorLogin !== observed.watcherLogin) };
     }
 
     const at = observed.reviews.findIndex((review) => review.id === seenId);
 
-    if (at <= 0) {
-        return [];
+    if (at === -1) {
+        return { left: true, newer: [] };
     }
 
-    return observed.reviews.slice(0, at).filter((review) => review.authorLogin !== observed.watcherLogin);
+    return { left: false, newer: observed.reviews.slice(0, at).filter((review) => review.authorLogin !== observed.watcherLogin) };
 };
 
 /**
@@ -135,10 +138,14 @@ export const decideWatch = (previous: PullRequestWatchState, observed: PullReque
         }
     }
 
-    const newer = newerReviewsByOthers(observed, previous.reviewId);
+    const { left, newer } = newerReviewsByOthers(observed, previous.reviewId);
 
-    // The seen review only moves forward: a review that left the list does not pull it back to an older one.
-    if (newer.length > 0) {
+    if (left) {
+        // The seen review left the host's list: re-baseline silently on the newest one listed, so a later real review is still recognised.
+        if (review !== undefined) {
+            next.reviewId = review.id;
+        }
+    } else if (newer.length > 0) {
         next.reviewId = newer[0]?.id;
 
         if (!owed.includes("review")) {
@@ -160,4 +167,26 @@ export const decideWatch = (previous: PullRequestWatchState, observed: PullReque
         reasons: owed,
         state: { ...next, lastWakeAt: now, pending: undefined, wakes: (previous.wakes ?? 0) + 1 },
     };
+};
+
+type StoredWatchBase = Omit<PullRequestWatchState, "pending">;
+
+/** The `watch` object of a `pullRequestThreads` row: the decision's stored keys plus the watch's own lifecycle. */
+export type StoredWatch = StoredWatchBase & { startedAt: number; stoppedAt?: number };
+
+const withoutUndefined = <T extends Record<string, unknown>>(value: T): T =>
+    Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as T;
+
+/** Maps a decision's state to the row's two stored fields: `watch` (no `pending`) and `watchPending`. */
+export const storedWatchOf = (state: StoredWatch & { pending?: WatchWakeReason[] }): { watch: StoredWatch; watchPending: WatchWakeReason[] | undefined } => {
+    const { pending, ...watch } = state;
+
+    return { watch: withoutUndefined(watch), watchPending: pending };
+};
+
+/** Maps a row's stored fields back to the decision's state. */
+export const stateOf = (row: { watch?: StoredWatch; watchPending?: WatchWakeReason[] }): PullRequestWatchState => {
+    const { baselined, checksHeadSha, conflictHeadSha, headSha, lastWakeAt, reviewId, wakes } = row.watch ?? {};
+
+    return withoutUndefined({ baselined, checksHeadSha, conflictHeadSha, headSha, lastWakeAt, pending: row.watchPending, reviewId, wakes });
 };
