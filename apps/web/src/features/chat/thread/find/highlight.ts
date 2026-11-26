@@ -27,7 +27,7 @@ export const FIND_TEXT_SELECTOR = "[data-find-text]";
  * A range per occurrence of `query` inside one text node of a text part under `root`, in part order. Text under an
  * element matching `skipped` is left out: a find that paints only what it counts passes the controls a part renders
  * (`button`, for one) so their labels are neither counted nor painted. A match split across elements (`foo **bar**`)
- * is not found, so it is neither counted nor painted.
+ * yields no range, so it is not painted. A caller that counts ranges leaves it out too.
  */
 export const collectRanges = (root: Node, query: string, skipped: string = SKIPPED_PARENTS): Range[] => {
     const ranges: Range[] = [];

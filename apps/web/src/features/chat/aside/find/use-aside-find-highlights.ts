@@ -84,21 +84,32 @@ const hitRect = (range: Range | undefined, target: Element): DOMRect =>
     typeof range?.getBoundingClientRect === "function" ? range.getBoundingClientRect() : target.getBoundingClientRect();
 
 /**
- * Scrolls each scroll box between the hit and the panel sideways until the hit lies inside it, innermost first. Scrolling a
- * wide table cell into view can leave the hit past the box's far edge, so the boxes are corrected here.
+ * How far a span lies outside a box: negative before its start, positive past its end, zero when it fits.
  */
-export const revealSideways = (range: Range | undefined, target: Element, viewport: Element): void => {
+const shiftToFit = (start: number, end: number, boxStart: number, boxEnd: number): number => (start < boxStart ? start - boxStart : Math.max(0, end - boxEnd));
+
+/**
+ * Scrolls each scroll box between the hit and the panel until the hit lies inside it, innermost first, along whichever axis
+ * the box clips. Scrolling a block into view can leave the hit past a wide table cell's far edge, or inside a capped code
+ * block's own vertical scroll, so each box is corrected here.
+ */
+export const revealWithinBoxes = (range: Range | undefined, target: Element, viewport: Element): void => {
     for (let node: Element | null = target; node && node !== viewport; node = node.parentElement) {
-        if (!CLIPPING_OVERFLOW.has(getComputedStyle(node).overflowX)) {
+        const style = getComputedStyle(node);
+        const clipsX = CLIPPING_OVERFLOW.has(style.overflowX);
+        const clipsY = CLIPPING_OVERFLOW.has(style.overflowY);
+
+        if (!clipsX && !clipsY) {
             continue;
         }
 
         const box = node.getBoundingClientRect();
         const rect = hitRect(range, target);
-        const left = rect.left < box.left ? rect.left - box.left : Math.max(0, rect.right - box.right);
+        const left = clipsX ? shiftToFit(rect.left, rect.right, box.left, box.right) : 0;
+        const top = clipsY ? shiftToFit(rect.top, rect.bottom, box.top, box.bottom) : 0;
 
-        if (left !== 0) {
-            node.scrollBy({ behavior: "instant", left });
+        if (left !== 0 || top !== 0) {
+            node.scrollBy({ behavior: "instant", left, top });
         }
     }
 };
@@ -140,7 +151,7 @@ const revealIfOutOfSight = (range: Range | undefined, host: Element): void => {
         }
     }
 
-    revealSideways(range, target, scroller ?? document.documentElement);
+    revealWithinBoxes(range, target, scroller ?? document.documentElement);
 };
 
 /**
