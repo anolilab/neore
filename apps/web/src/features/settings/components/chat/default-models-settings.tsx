@@ -257,6 +257,10 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
         }
     };
 
+    // A model picked while a save runs is saved once that save has settled, against the list as it is then: it is
+    // dropped if the list is full by now or already holds it. A later pick replaces an earlier one.
+    const queuedPick = useRef<string | null>(null);
+
     /**
      * Saves `edit` with the list it was built on: the server refuses it when the stored list has changed since (another
      * tab), and the rollback and re-read then show the stored one. Focus goes to `focusOnSuccess`, or to `focusOnFailure`
@@ -275,6 +279,12 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
             .catch((error: unknown) => {
                 const conflict = (error as { code?: unknown } | null)?.code === "CONFLICT";
 
+                if (conflict) {
+                    // The stored list has not been re-read yet, so a pick queued during this save would be built on the old
+                    // one and refused again. The notice tells the user to redo it on the reloaded list.
+                    queuedPick.current = null;
+                }
+
                 toast.error(conflict ? t`Your backup models were changed in another tab. The saved list is shown again.` : t`Failed to update backup models`);
                 setConflictNotice(conflict);
                 focusAfter.current = focusOnFailure;
@@ -289,10 +299,6 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
         // add rolls its entry back and brings the picker back, so focus returns to it.
         save((list) => (list.includes(modelId) || list.length >= limit ? list : [...list, modelId]), fills ? controlKey(modelId, "remove") : "", "");
     };
-
-    // A model picked while a save runs is saved once that save has settled, against the list as it is then: it is
-    // dropped if the list is full by now or already holds it. A later pick replaces an earlier one.
-    const queuedPick = useRef<string | null>(null);
 
     // No dependency list: it returns at once while nothing is queued, and a pick waiting on the save is looked at after
     // every render, so it is sent as soon as the save has settled.

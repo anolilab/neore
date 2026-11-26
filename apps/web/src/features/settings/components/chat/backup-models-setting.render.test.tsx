@@ -30,6 +30,8 @@ const state = vi.hoisted(() => {
         reread: undefined as undefined | { backupModels?: string[] },
         rerender: (() => undefined) as () => void,
         settings: {} as undefined | { backupModels?: string[] },
+        /** How many saves were sent. */
+        updates: 0,
     };
 });
 
@@ -128,6 +130,7 @@ vi.mock("@/features/auth/hooks/use-user-settings", async () => {
                 updateLatest: async (build: (current: typeof state.settings) => typeof state.settings) => {
                     const before = state.settings;
 
+                    state.updates += 1;
                     state.lastPatch = build(state.settings);
                     state.settings = { ...state.settings, ...(state.lastPatch as typeof state.settings) };
                     notify();
@@ -183,6 +186,7 @@ beforeEach(() => {
     state.conflict = false;
     state.hold = false;
     state.lastPatch = undefined;
+    state.updates = 0;
     state.preferencesFailed = false;
     state.preferencesRead = true;
     state.refetchAccess = vi.fn();
@@ -655,6 +659,33 @@ describe("BackupModelsSetting", () => {
         await waitFor(() => expect(screen.getByRole("group", { name: "Backup models" }).getAttribute("aria-busy")).toBe("false"));
         expect(state.lastPatch).toEqual({ backupModels: ["openai/second", "openai/first"], backupModelsBase: ["openai/first", "openai/second"] });
         expect(state.settings?.backupModels).toEqual(["openai/second", "openai/first", "openai/third"]);
+    });
+
+    it("drops a model picked during a save that another tab made conflict, instead of sending it on the old list", async () => {
+        state.settings = { backupModels: ["openai/first", "openai/second"] };
+        state.hold = true;
+        show();
+
+        await userEvent.click(screen.getByRole("button", { name: "Remove First" }));
+        await userEvent.click(screen.getByRole("combobox", { name: "Add another backup model" }));
+        await userEvent.click(await screen.findByRole("option", { name: "Third" }));
+
+        expect(state.updates).toBe(1);
+
+        // The held save is refused with a conflict.
+        state.refuse = true;
+        state.conflict = true;
+        state.hold = false;
+        state.release();
+
+        const notice = await screen.findByRole("status");
+
+        await waitFor(() => expect(screen.getByRole("group", { name: "Backup models" }).getAttribute("aria-busy")).toBe("false"));
+
+        expect(notice.textContent).toBe("Your backup models were changed in another tab. The saved list is shown again.");
+        expect(screen.getAllByRole("status")).toHaveLength(1);
+        expect(state.updates).toBe(1);
+        expect(state.settings?.backupModels).toEqual(["openai/first", "openai/second"]);
     });
 
     it("explains a conflict at the list until the next edit starts", async () => {
