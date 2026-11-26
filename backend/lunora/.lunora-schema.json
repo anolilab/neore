@@ -30022,6 +30022,13 @@
               "nullable": false,
               "optional": false,
               "unique": false,
+              "literal": "\"side\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
               "literal": "\"subagent\""
             }
           ]

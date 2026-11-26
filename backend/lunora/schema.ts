@@ -3720,7 +3720,8 @@ export const schema = defineSchema({
 
     threadRelationships: defineTable({
         branchPoint: v.optional(v.number()),
-        branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("subagent"))),
+        // "side": a side chat started beside its parent (`chat/side-chat.ts`); the parent is read, never written.
+        branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("side"), v.literal("subagent"))),
         createdAt: v.number(),
         parentThreadId: v.id("threads"),
         threadId: v.id("threads"),

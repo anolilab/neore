@@ -843,7 +843,7 @@ export const vThreadRelationship = v.object({
     _creationTime: v.number(),
     _id: v.string(),
     branchPoint: v.optional(v.number()),
-    branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"))),
+    branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("side"))),
     createdAt: v.number(),
     parentThreadId: v.string(),
     threadId: v.string(),
