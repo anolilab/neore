@@ -2,7 +2,9 @@ import { LunoraError } from "lunorash/server";
 
 import type { QueryCtx } from "../_generated/server";
 import { isErasing } from "../lib/account-moves";
-import { currentShard, ROOT_SHARD_KEY } from "../lib/shard-context";
+import { env } from "cloudflare:workers";
+
+import { currentShard, ROOT_SHARD_KEY, servesUser } from "../lib/shard-context";
 import { isShardRoutingEnabled } from "../lib/shard-namespace";
 
 /**
@@ -12,13 +14,11 @@ import { isShardRoutingEnabled } from "../lib/shard-namespace";
  * user on it and it holds all their children. No shard context at all (a unit test) is allowed.
  */
 export const requireOwnerShard = (userId: string, step: string): void => {
-    const shard = currentShard();
+    // The Worker's own `env` carries `SHARD_ROUTING`; `process.env` does not, in a Worker. Read as `cross-shard.ts` does.
+    const routing = env as { ENVIRONMENT?: string; SHARD_ROUTING?: string };
+    const onOwnShard = (currentShard() !== ROOT_SHARD_KEY || !isShardRoutingEnabled(routing)) && servesUser(userId);
 
-    if (shard === ROOT_SHARD_KEY && !isShardRoutingEnabled({ ENVIRONMENT: process.env.ENVIRONMENT, SHARD_ROUTING: process.env.SHARD_ROUTING })) {
-        return;
-    }
-
-    if (shard !== undefined && shard !== userId) {
+    if (!onOwnShard) {
         throw new LunoraError("CONFLICT", `The ${step} must run on the owner's shard`);
     }
 };

@@ -348,8 +348,9 @@ export const finishUninstallRows = async (
         result.removed += 1;
     }
 
-    // Skills first, a few a call; the links and the install wait for the call that settles the last of them.
-    if (allPending.length > SKILLS_PER_CALL) {
+    // Skills first, a few a call; the links and the install wait for a call of their own, so no call adds link deletes on top of
+    // skill deletes and passes the statement limit.
+    if (allPending.length > 0) {
         return { ...result, hasMore: true };
     }
 

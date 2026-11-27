@@ -1,5 +1,6 @@
 import { lunoraTest } from "@lunora/testing";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { env } from "cloudflare:workers";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { deleteAllForThreadIdAsync } from "../agent/threads";
 import { createPluginGroupChat } from "../chat/group/functions";
@@ -76,6 +77,10 @@ describe("uninstall", () => {
             const begun = await uninstallRows(context, OWNER, SLUG);
 
             const finished = await finishUninstallRows(context, begun.installId, begun.generation, { pendingSkills: begun.pendingSkills });
+            // The links and the install go in a call of their own, after the skills.
+            const last = await finishUninstallRows(context, begun.installId, begun.generation, { pendingSkills: [], settled: true });
+
+            expect([finished.hasMore, last.hasMore]).toEqual([true, false]);
 
             return { kept: begun.kept, removed: finished.removed };
         });
@@ -125,15 +130,18 @@ describe("uninstall", () => {
 
     it("runs on the root shard where development collapses every user onto it", async () => {
         await installed();
-        vi.stubEnv("ENVIRONMENT", "development");
-        vi.stubEnv("SHARD_ROUTING", "off");
+        // The guard reads the Worker's own `env` (the test stub of `cloudflare:workers`), where development sets these.
+        const workerEnv = env as Record<string, unknown>;
+
+        Object.assign(workerEnv, { ENVIRONMENT: "development", SHARD_ROUTING: "off" });
 
         try {
             const begun = await runInShard(ROOT_SHARD_KEY, async () => await run(async (context) => await uninstallRows(context, OWNER, SLUG)));
 
             expect(begun.pendingSkills).toHaveLength(1);
         } finally {
-            vi.unstubAllEnvs();
+            delete workerEnv.ENVIRONMENT;
+            delete workerEnv.SHARD_ROUTING;
         }
     });
 
@@ -787,7 +795,8 @@ describe("uninstall", () => {
             expect(await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }))).not.toBeNull();
         }
 
-        expect(answers).toEqual([true, true, false]);
+        // Three calls of three skills, then one for the links and the install.
+        expect(answers).toEqual([true, true, true, false]);
         expect(removed).toBe(9);
 
         for (const skillId of skillIds) {
