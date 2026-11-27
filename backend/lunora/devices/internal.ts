@@ -492,13 +492,10 @@ export const sweepPendingDeviceAlerts = internalMutation
     .input({})
     .output(v.null())
     .mutation(async ({ ctx }) => {
-        const { page } = await ctx.db.devices.findMany({ limit: SWEEP_BATCH, where: { alertPending: true } });
+        // Only devices that have signed in: a cancelled pairing that never did must not take a slot of the page.
+        const { page } = await ctx.db.devices.findMany({ limit: SWEEP_BATCH, where: { alertPending: true, lastSeenAt: { gt: 0 } } });
 
         for (const device of page) {
-            if (device.lastSeenAt === undefined) {
-                continue;
-            }
-
             await announceNewDevice(ctx, device);
         }
 

@@ -1748,6 +1748,37 @@ describe("the pending device alert sweep", () => {
         expect(alerts.map((alert) => alert.title)).toEqual(["Laptop"]);
     });
 
+    it("still tells the owner of a signed-in pairing when more cancelled pairings than one sweep reads are waiting", async () => {
+        const owner = await insertUser();
+
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 205; index += 1) {
+                await ctx.db.insert("devices", {
+                    alertPending: true,
+                    createdAt: Date.now(),
+                    name: `Cancelled ${index}`,
+                    platform: "linux",
+                    userId: owner,
+                });
+            }
+
+            await ctx.db.insert("devices", {
+                alertPending: true,
+                createdAt: Date.now(),
+                lastSeenAt: Date.now(),
+                name: "Laptop",
+                platform: "linux",
+                userId: owner,
+            });
+        });
+
+        await sweep();
+
+        const alerts = await alertsOf(owner);
+
+        expect(alerts.map((alert) => alert.title)).toEqual(["Laptop"]);
+    });
+
     it("does not tell the owner of a pairing that never signed in, as one cancelled on the computer", async () => {
         const owner = await insertUser();
 
