@@ -14,6 +14,9 @@ import { isErasing } from "../lib/account-moves";
 import { noteShardDue } from "../lib/shard-housekeeping";
 import { MAX_SUBSCRIPTIONS } from "./events-webhook";
 
+/** A subscribe whose expiry wake is not written is refused, so the client retries it (`lib/shard-housekeeping.ts`). */
+const WAKE_NOT_WRITTEN = "The subscription's expiry wake could not be written, so it is not stored; retry the subscribe.";
+
 /** Expired rows reclaimed per sweep call. The sweep runs again on the next tick while it reports more. */
 const REAP_BATCH = 200;
 
@@ -90,7 +93,7 @@ export const subscribeOn = async (ctx: Pick<MutationCtx, "db">, input: Subscribe
 
         // A dormant shard is reaped only when the tick reaches it: wake it at this expiry (`lib/shard-housekeeping.ts`).
         if (!(await noteShardDue(ctx, expiresAt + 1, input.userId))) {
-            throw new LunoraError("INTERNAL", "The subscription's expiry wake could not be written, so it is not stored; retry the subscribe.");
+            throw new LunoraError("INTERNAL", WAKE_NOT_WRITTEN);
         }
 
         return { cursorSeq: existing.scanSeq, expiresAt, kind: "granted", truncated: false };
@@ -154,7 +157,7 @@ export const subscribeOn = async (ctx: Pick<MutationCtx, "db">, input: Subscribe
 
     // A dormant shard is reaped only when the tick reaches it: wake it at this expiry (`lib/shard-housekeeping.ts`).
     if (!(await noteShardDue(ctx, expiresAt + 1, input.userId))) {
-        throw new LunoraError("INTERNAL", "The subscription's expiry wake could not be written, so it is not stored; retry the subscribe.");
+        throw new LunoraError("INTERNAL", WAKE_NOT_WRITTEN);
     }
 
     return { cursorSeq: scanSeq, expiresAt, kind: "granted", truncated };

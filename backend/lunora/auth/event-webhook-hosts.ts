@@ -13,13 +13,7 @@ import { internalQuery } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { isErasing } from "../lib/account-moves";
 import { onOwnShard } from "../lib/own-shard";
-import { MAX_APPROVED_HOSTS, normalizeApprovedHost } from "../public-api/events-webhook";
-
-/**
- * The most hosts the owner's list shows. An account may hold more than {@link MAX_APPROVED_HOSTS} after a merge of guests, each
- * of whom approved up to that many, so the list reads past the add cap: the owner sees every host and can remove one back under it.
- */
-const MAX_LISTED_APPROVED_HOSTS = 500;
+import { MAX_APPROVED_HOSTS, MAX_LISTED_APPROVED_HOSTS, normalizeApprovedHost } from "../public-api/events-webhook";
 
 /** Whether `host` is on `userId`'s approved list. The only read the Events code makes of this table. */
 export const isHostApproved = async (ctx: Pick<QueryCtx, "db">, userId: string, host: string): Promise<boolean> => {

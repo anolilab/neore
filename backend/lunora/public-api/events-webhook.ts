@@ -31,6 +31,9 @@ export const MAX_SUBSCRIPTIONS = 100;
 /** Hosts one account may approve. */
 export const MAX_APPROVED_HOSTS = 50;
 
+/** The most hosts the owner's list shows: a merge of guests can leave more than the add cap holds (`auth/event-webhook-hosts.ts`). */
+export const MAX_LISTED_APPROVED_HOSTS = 500;
+
 const MAX_URL_LENGTH = 2048;
 const MAX_HOST_LENGTH = 253;
 

@@ -8,10 +8,7 @@ import { v } from "lunorash/server";
 
 import type { Doc } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
-import { MAX_SUBSCRIPTIONS } from "./events-webhook";
-
-/** Approved hosts exported per account: the list the owner can see, the same ceiling the list uses (`auth/event-webhook-hosts.ts`). */
-const MAX_LISTED_EXPORT_HOSTS = 500;
+import { MAX_LISTED_APPROVED_HOSTS, MAX_SUBSCRIPTIONS } from "./events-webhook";
 
 const BATCH = 200;
 
@@ -176,7 +173,7 @@ export const collectEventWebhooksForExport = internalQuery
         }),
     )
     .query(async ({ args: { userId }, ctx }) => {
-        const { page: hosts } = await ctx.db.eventWebhookHosts.findMany({ consistency: "primary", limit: MAX_LISTED_EXPORT_HOSTS, where: { userId } });
+        const { page: hosts } = await ctx.db.eventWebhookHosts.findMany({ consistency: "primary", limit: MAX_LISTED_APPROVED_HOSTS, where: { userId } });
         const { page: subscriptions } = await ctx.db.eventWebhookSubscriptions.findMany({
             consistency: "primary",
             limit: MAX_SUBSCRIPTIONS,
