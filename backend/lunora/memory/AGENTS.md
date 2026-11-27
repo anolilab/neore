@@ -44,7 +44,7 @@
   a link mutation that fails deletes the vectors it carried. Every wording change (manual edit, import merge,
   `reviseExtractedMemory`, `updateMemoryInternal`, reflection) calls `reembedRewordedMemory` in the writing mutation:
   the old vector is dropped there, then the re-embed is scheduled on the owner's shard and links through the same
-  check. A failed re-embed deletes nothing; the row is found by keyword.
+  check. A failed re-embed deletes nothing; the row is found by keyword. A row retired by any path (`supersedeMemory`: revision, import, compression, reflection merge, promotion, decay, expiry) loses its vector in the same write and keeps its row, a failed delete retried; `deleteMemory` also removes the older rows that point at it through `supersededBy` (100 per write, the rest queued) and its digest entries. Old retired rows that still hold a vector are not swept yet.
 - **No secrets in `memories`.** Every write redacts with `lib/secret-redaction.ts` first: extraction and compression
   facts (`redactMemoryFacts`, before embedding), extraction revisions (planned redacted, and `reviseExtractedMemory`
   again), reflection ops (`redactReflectionOps`), import lines (redacted before the cut to length, again after

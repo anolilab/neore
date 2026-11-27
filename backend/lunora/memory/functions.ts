@@ -401,6 +401,35 @@ export const reembedRewordedMemory = async (ctx: MutationCtx, memoryId: Id<"memo
     await scheduleMemoryReembed(ctx.scheduler, memoryId, userId);
 };
 
+/**
+ * Ends a row's life as a current memory: `supersededBy` points at what replaced it (itself, for a decay, an expiry or a
+ * compression), and its vector goes in the same write, so a retired row never takes a slot in a meaning search. The row
+ * stays as history. The vector delete is a row delete the vector sync follows after commit; a failure of it is logged
+ * and retried (`deleteMemoryVector`), and never undoes the retirement.
+ */
+export const supersedeMemory = async (ctx: MutationCtx, memoryId: Id<"memories">, supersededBy: Id<"memories">, now: number): Promise<void> => {
+    // Read again here: the caller's copy may predate an earlier write of the same mutation, and the row is replaced when its vector link is cleared.
+    const row = await ctx.db.get("memories", memoryId);
+
+    if (!row) {
+        return;
+    }
+
+    const { embeddingId } = row;
+
+    await patchRow(ctx.db, "memories", row, { supersededBy, updatedAt: now, ...(embeddingId && { embeddingId: undefined }) });
+
+    if (!embeddingId) {
+        return;
+    }
+
+    try {
+        await deleteMemoryVector(ctx, { embeddingId, memoryId, userId: row.userId ?? "" });
+    } catch (error) {
+        memoryLogger.error(`Could not drop the vector of retired memory ${memoryId} (embedding ${embeddingId}); the row stays retired`, error);
+    }
+};
+
 /** Retry of a memory vector delete that failed (`deleteMemoryVector`). */
 export const retryMemoryVectorDelete = internalMutation
     .input({
@@ -416,8 +445,111 @@ export const retryMemoryVectorDelete = internalMutation
         return null;
     });
 
+/** Older versions one delete removes per write; a longer chain goes on in a follow-up write. */
+const CHAIN_DELETE_BATCH = 100;
+/** The reflection digests of one user kept at most (`DIGESTS_KEPT` in `reflection.ts`) plus room. */
+const DIGEST_SCAN = 100;
+
+/** Removes a row and, after it, its vector (a vector with no row can be found by a retry; a row pointing at a gone vector cannot). */
+const removeMemoryRow = async (ctx: MutationCtx, row: Doc<"memories">, userId: string): Promise<void> => {
+    await ctx.db.delete("memories", row._id);
+
+    if (row.embeddingId) {
+        await deleteMemoryVector(ctx, { embeddingId: row.embeddingId, memoryId: row._id, userId });
+    }
+};
+
 /**
- * Delete a specific memory owned by the authenticated user.
+ * Takes the deleted memories out of the user's reflection digests. An entry of a deleted id goes; a digest whose entries
+ * all went is removed, one that still has others keeps them (and its other fields).
+ */
+const removeFromDigests = async (ctx: Pick<MutationCtx, "db">, userId: string, ids: ReadonlySet<string>): Promise<void> => {
+    const digests = await ctx.db
+        .query("memoryDigests")
+        .withIndex("by_userId_createdAt", (q) => q.eq("userId", userId))
+        .take(DIGEST_SCAN);
+
+    for (const digest of digests) {
+        const learned = digest.learned.filter((entry) => !ids.has(entry.memoryId));
+
+        if (learned.length === digest.learned.length) {
+            continue;
+        }
+
+        await (learned.length === 0 ? ctx.db.delete("memoryDigests", digest._id) : ctx.db.patch("memoryDigests", digest._id, { learned }));
+    }
+};
+
+/**
+ * Removes the older versions of the memories in `frontier` (ids already deleted, or about to be): every row that was
+ * superseded by one of them, and so on back, with their vectors and digest entries. Rows are found by the pointer the
+ * newer row left in `supersededBy`, so a merge or a promotion by reflection is followed as well as a belief revision.
+ * At most {@link CHAIN_DELETE_BATCH} rows per call; what is left is queued on the owner's shard from the ids still to
+ * walk, and a repeat finds the same rows (a deleted row is gone, the next read starts from the survivors).
+ */
+const eraseOlderVersions = async (
+    ctx: MutationCtx,
+    userId: string,
+    frontier: ReadonlyArray<Id<"memories">>,
+    deleted: ReadonlyArray<string>,
+): Promise<number> => {
+    const removed = new Set<string>(deleted);
+    const pending: Id<"memories">[] = [];
+    const queue = [...frontier];
+    let budget = CHAIN_DELETE_BATCH;
+
+    while (queue.length > 0) {
+        const id = queue.shift() as Id<"memories">;
+
+        if (budget <= 0) {
+            pending.push(id);
+            continue;
+        }
+
+        const older = await ctx.db
+            .query("memories")
+            .withIndex("by_userId_supersededBy", (q) => q.eq("userId", userId).eq("supersededBy", id))
+            .take(budget + 1);
+        // A row retired by itself (decay, expiry, compression) is its own `supersededBy`, never someone's older version.
+        const rows = older.filter((row) => row._id !== id);
+
+        const taken = rows.slice(0, budget);
+
+        for (const row of taken) {
+            await removeMemoryRow(ctx, row, userId);
+            removed.add(row._id);
+            queue.push(row._id);
+            budget -= 1;
+        }
+
+        // More older rows than the budget allowed: this id is walked again in the follow-up.
+        if (rows.length > taken.length) {
+            pending.push(id);
+        }
+    }
+
+    await removeFromDigests(ctx, userId, removed);
+
+    if (pending.length > 0) {
+        await runAfterOnShard(ctx.scheduler, 0, internal.memory.functions.continueMemoryChainDelete, { frontier: pending, userId }, userId);
+    }
+
+    return removed.size - deleted.length;
+};
+
+/** The rest of a long chain's delete (`eraseOlderVersions`). */
+export const continueMemoryChainDelete = internalMutation
+    .input({ frontier: v.array(v.id("memories")), userId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await eraseOlderVersions(ctx, args.userId, args.frontier, []);
+
+        return null;
+    });
+
+/**
+ * Delete a specific memory owned by the authenticated user, and every older version of it: the rows it superseded
+ * (their wording is the same fact, only older) with their vectors, and its entries in the reflection digests.
  */
 export const deleteMemory = authMutation
     .use(rateLimit("memory/update"))
@@ -426,17 +558,14 @@ export const deleteMemory = authMutation
     })
     .output(v.null())
     .mutation(async ({ args: { memoryId }, ctx: context }) => {
-        const memory = await requireOwnMemory(context, memoryId, context.user.userId);
+        const { userId } = context.user;
+        const memory = await requireOwnMemory(context, memoryId, userId);
 
-        await context.db.delete("memories", memory._id);
+        await removeMemoryRow(context, memory, userId);
 
-        // The row goes first: a vector with no row is an orphan a retry can find, a row
-        // pointing at a deleted vector is not.
-        if (memory.embeddingId) {
-            await deleteMemoryVector(context, { embeddingId: memory.embeddingId, memoryId: memory._id, userId: context.user.userId });
-        }
+        const olderVersions = await eraseOlderVersions(context, userId, [memory._id], [memory._id]);
 
-        context.log.event("memory.delete_memory", { hadEmbedding: Boolean(memory.embeddingId) });
+        context.log.event("memory.delete_memory", { hadEmbedding: Boolean(memory.embeddingId), olderVersions });
 
         return null;
     });
@@ -686,7 +815,7 @@ type MemoryInsert = {
  * Inserts one memory and points what it supersedes at it. The backstop for every insert: a fact that is nothing but a
  * secret is not saved (`null`), and what it would have superseded stays active.
  */
-const insertMemory = async (ctx: Pick<MutationCtx, "db">, mem: MemoryInsert, now: number): Promise<Id<"memories"> | null> => {
+const insertMemory = async (ctx: MutationCtx, mem: MemoryInsert, now: number): Promise<Id<"memories"> | null> => {
     const memory = redactMemoryText(mem.memory);
 
     if (memory === null) {
@@ -715,7 +844,7 @@ const insertMemory = async (ctx: Pick<MutationCtx, "db">, mem: MemoryInsert, now
     });
 
     if (mem.supersedes) {
-        await ctx.db.patch("memories", mem.supersedes, { supersededBy: memoryId, updatedAt: now });
+        await supersedeMemory(ctx, mem.supersedes, memoryId, now);
     }
 
     return memoryId;
@@ -805,7 +934,7 @@ export const saveMemoryBatch = internalMutation
         const compressedFrom = args.compressedFrom ?? [];
 
         for (const id of compressedFrom) {
-            await ctx.db.patch("memories", id, { supersededBy: id, updatedAt: now });
+            await supersedeMemory(ctx, id, id, now);
         }
 
         return memoryIds;
@@ -1042,7 +1171,7 @@ export const saveImportedMemoryBatch = internalMutation
                 await ctx.db.patch("memories", known, { lastConfirmedAt: now });
 
                 if (supersedes) {
-                    await ctx.db.patch("memories", supersedes, { supersededBy: known, updatedAt: now });
+                    await supersedeMemory(ctx, supersedes, known, now);
                 }
 
                 kept.add(known);
@@ -1103,7 +1232,8 @@ export const linkMemoryEmbeddings = internalMutation
         for (const link of args.links) {
             const row = await ctx.db.get("memories", link.memoryId);
 
-            if (row?.userId === args.userId && row.memory === link.text) {
+            // A row retired while its re-embed ran takes no vector: it would only crowd the search again.
+            if (row?.userId === args.userId && !row.supersededBy && row.memory === link.text) {
                 if (row.embeddingId && row.embeddingId !== link.embeddingId) {
                     await deleteMemoryVector(ctx, { embeddingId: row.embeddingId, memoryId: link.memoryId, userId: args.userId });
                 }
