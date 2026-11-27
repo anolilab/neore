@@ -24,6 +24,7 @@ import { scheduleFileLinkBackfill } from "./file-link-backfill";
 import { deleteThreadSummaries } from "./thread-summaries";
 import { fileAttachInFlight, fileAttachInThread } from "./file-attach-claim";
 import { followupDispatchInFlight } from "./followup-suggestions";
+import { wakeLeaseHeld } from "../source-control/pr-watch-wake-lease";
 import { clearRecordedTitleAnswers, titleDispatchInFlight } from "./thread-title";
 import { passcodeHashOf, readPasscodeRow, type PasscodeRow, unlockSecret } from "./thread-passcode";
 import { requireOwnedThreadIgnoringLock } from "./thread-read-access";
@@ -124,6 +125,12 @@ export const enableThreadLock = authMutation
         // (`agent/followup-suggestions.ts`). The request is answered within seconds.
         if (await followupDispatchInFlight(context, threadId)) {
             throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
+        }
+
+        // A pull request watch's wake turn is claimed for this chat: the lock waits for it, so no message of a locked chat reaches a
+        // model (`source-control/pr-watch-wake-lease.ts`). It is held from the claim until the turn ends, or lapses if the job dies.
+        if (await wakeLeaseHeld(context, userId, threadId, now)) {
+            throw new LunoraError("CONFLICT", "A pull request watch is waking this chat. Try again in a moment.");
         }
 
         // A file attach of this user is in flight: a file the attach read from this chat must not be locked out from under it

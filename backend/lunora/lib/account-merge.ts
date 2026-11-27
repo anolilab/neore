@@ -239,6 +239,8 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     pageAccess: ["userId", "ownerId", "grantedBy"],
     pageInvites: ["userId", "ownerId", "acceptedBy"],
     passkey: ["userId"],
+    // A route restore still owed to the guest's pins (`chat/pins/functions.ts`): both columns follow the merge, as `sharedPinRoutes` does.
+    pendingPinRestores: ["ownerId", "userId"],
     projectRepositories: ["userId"],
     projectRuleFiles: ["userId"],
     projects: ["userId"],
@@ -2840,6 +2842,7 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
             fenced?: boolean;
             followsRemain?: boolean;
             grantsRemain?: boolean;
+            leasesRemain?: boolean;
             pinsRemain?: boolean;
             rowsRemain?: string;
             sharedShard?: boolean;
@@ -2866,6 +2869,8 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
             // A grant or a count under the guest that its `global` step has not seen (a write that failed before it could
             // undo itself): that step moves it, then the guest step runs again.
             enter(state, "global");
+        } else if (result.leasesRemain === true) {
+            // A batch of the guest's pin-write leases went: this phase runs again, until none is left.
         } else if (result.rowsRemain === undefined) {
             enter(state, "markers");
         } else {

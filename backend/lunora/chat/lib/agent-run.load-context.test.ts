@@ -24,7 +24,12 @@ const deferred = <T>() => {
 
 const NOTES = { instructions: [] as { content: string; description: string; id: string; title: string }[], text: "Project notes" as string | null };
 
-const makeCtx = (prefs: Promise<{ memoryEnabled: boolean }>, settings: Promise<{ projectId?: string } | null>, project = NOTES) => {
+const makeCtx = (
+    prefs: Promise<{ memoryEnabled: boolean; timezone?: string }>,
+    settings: Promise<{ projectId?: string } | null>,
+    project = NOTES,
+    cachedMemories?: unknown[],
+) => {
     const runQuery = vi.fn(async (reference: unknown) => {
         switch (reference) {
             case internal.auth.functions.getDecryptedProviderKeysQuery: {
@@ -37,8 +42,8 @@ const makeCtx = (prefs: Promise<{ memoryEnabled: boolean }>, settings: Promise<{
                 return await settings;
             }
             case internal.lib.action_cache.get: {
-                // The memory cache misses on every call here: the test is about ordering.
-                return { kind: "miss" };
+                // The memory cache misses unless a test hands it what an earlier run stored.
+                return cachedMemories ? { kind: "hit", value: cachedMemories } : { kind: "miss" };
             }
             case internal.projects.functions.getProjectContextForRun: {
                 return project;
@@ -71,6 +76,34 @@ const makeCtx = (prefs: Promise<{ memoryEnabled: boolean }>, settings: Promise<{
 const args = { promptText: "What should I drink?", threadId: "t1", userId: "u1" };
 
 describe(loadRunContext, () => {
+    it("dates a cached memory in the run's own timezone, and states today only for a run without one", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(Date.UTC(2026, 10, 27, 23, 30));
+
+        // Cached by a run in another timezone: it holds the time, never a day.
+        const cached = [
+            { category: "preference", confidence: 1, lastConfirmedAt: Date.UTC(2026, 10, 20, 12), memory: "Likes tea", memoryId: "m1", score: 0.9 },
+        ];
+        const block = async (timezone?: string): Promise<string | undefined> => {
+            const { ctx } = makeCtx(Promise.resolve({ memoryEnabled: true, timezone }), Promise.resolve(null), NOTES, cached);
+
+            const { contextParts } = await loadRunContext(ctx, args);
+
+            return contextParts[0];
+        };
+
+        try {
+            const auckland = await block("Pacific/Auckland");
+
+            expect(auckland).toContain("- [preference] Likes tea (2026-11-21)");
+            expect(auckland).not.toContain("Today is");
+            expect(await block()).toContain("Today is 2026-11-27.");
+            expect(await block()).toContain("- [preference] Likes tea (2026-11-20)");
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("does not search memories for a prompt of two words or fewer", async () => {
         const prefs = deferred<{ memoryEnabled: boolean }>();
         const settings = deferred<{ projectId?: string } | null>();

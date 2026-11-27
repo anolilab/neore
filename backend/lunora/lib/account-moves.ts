@@ -6,9 +6,9 @@
  *
  * A marker belongs to the operation that wrote it: a merge ends only its own marker, so an erasure that overlaps it keeps its fence.
  *
- * A pin write checks the marker, renews the account's lease, and checks the marker again. A refused write renews nothing, so a marked
- * account's retries cannot hold a move back. A write that passed the second check cannot commit unseen: the move waits until no lease
- * is in flight (`pinWritesInFlightUntil`) before it sweeps the pins.
+ * A pin write checks the marker and renews the account's lease. A refused write renews nothing, so a marked account's retries cannot hold
+ * a move back. Every pin write checks the marker again right before its insert (`refusesPinWrite`, `chat/pins/functions.ts`). A write
+ * that passed the check cannot commit unseen: the move waits until no lease is in flight (`pinWritesInFlightUntil`) before it sweeps.
  */
 import { v } from "lunorash/server";
 
@@ -27,6 +27,34 @@ export type AccountMoveKind = "erasing" | "importing" | "merging";
  * flight.
  */
 export const PIN_WRITE_LEASE_MS = 60_000;
+
+/** Expired lease rows a move's end or its reclaim call deletes at most. Each delete is two global statements, so 20 is 40. */
+const LEASE_RECLAIM_BATCH = 20;
+
+/**
+ * Expired lease rows one pin admission deletes at most. An admission runs inside a pin write, which may also refuse and clean up its
+ * routes, so it keeps to 10 (20 statements); the rest are reclaimed by later admissions. Worst case for a refused write is in
+ * `chat/pins/functions.ts` (`REFUSED_WRITE_WORST`).
+ */
+export const ADMISSION_RECLAIM_BATCH = 10;
+
+/**
+ * Every lease row of the account. Lunora returns a read one page at a time, so a lease past the first page is read too: a missed writer
+ * could let a refused write take back a route it still needs, or let an erasure sweep before that write commits.
+ */
+const leasesOf = async (context: Pick<QueryCtx, "db">, userId: string) => {
+    const leases = [];
+    let result = await context.db.pinWriteLeases.findMany({ consistency: "primary", where: { userId } });
+
+    leases.push(...result.page);
+
+    while (!result.isDone) {
+        result = await context.db.pinWriteLeases.findMany({ consistency: "primary", cursor: result.continueCursor ?? undefined, where: { userId } });
+        leases.push(...result.page);
+    }
+
+    return leases;
+};
 
 /** Whether the account's pins are being moved or erased right now. */
 export const isAccountMoving = async (context: Pick<QueryCtx, "db">, userId: string, now: number): Promise<boolean> => {
@@ -68,51 +96,100 @@ export const beginAccountMove = async (context: Pick<MutationCtx, "db">, userId:
 };
 
 /**
- * Renews the account's lease. The account has one lease row; a second one (two first writes at once) is harmless, since the wait reads
- * them all.
+ * Adds the lease of one admitted pin write, and returns its writer id. Each write has its own row, which the move's wait reads until it
+ * expires, and which a refused write's route cleanup reads to see whether another write is still in flight. Rows the account's earlier
+ * writes left past their expiry are reclaimed here, a batch per admission, so one admission's writes stay within its budget.
  */
-export const admitPinWrite = async (context: Pick<MutationCtx, "db">, userId: string, now: number): Promise<void> => {
-    const expiresAt = now + PIN_WRITE_LEASE_MS;
-    const lease = await context.db.pinWriteLeases.findFirst({ consistency: "primary", where: { userId } });
+export const admitPinWrite = async (context: Pick<MutationCtx, "db">, userId: string, now: number): Promise<string> => {
+    const writerId = crypto.randomUUID();
+    const leases = await leasesOf(context, userId);
+    let reclaimed = 0;
 
-    if (lease === null) {
-        await context.db.insert("pinWriteLeases", { expiresAt, userId });
-    } else if (lease.expiresAt < expiresAt) {
-        await context.db.patch("pinWriteLeases", lease._id, { expiresAt });
+    for (const lease of leases) {
+        if (lease.expiresAt > now || reclaimed >= ADMISSION_RECLAIM_BATCH) {
+            continue;
+        }
+
+        await context.db.delete("pinWriteLeases", lease._id);
+        reclaimed += 1;
     }
+
+    await context.db.insert("pinWriteLeases", { expiresAt: now + PIN_WRITE_LEASE_MS, userId, writerId });
+
+    return writerId;
 };
 
 /**
- * Admits a pin write: checks the marker once, then renews the lease. Returns whether the account is moving, in which case the caller
- * refuses the write and renews nothing. An admitted write is not yet safe: it must call `refusesPinWrite` again as the last step before
- * its insert, after its route write (`chat/pins/functions.ts`).
+ * Admits a pin write: checks the marker once, then adds its lease. Returns the writer id, or null when the account is moving, in which
+ * case the write is refused and adds no lease. An admitted write is not yet safe: it must call `refusesPinWrite` again as the last step
+ * before its insert, after its route write (`chat/pins/functions.ts`).
  */
-export const admitPinWriteUnlessMoving = async (context: MutationCtx, userId: string, now: number): Promise<boolean> => {
+export const admitPinWriteAs = async (context: MutationCtx, userId: string, now: number): Promise<string | null> => {
     if (await refusesPinWrite(context, userId, now)) {
-        return true;
+        return null;
     }
 
-    await admitPinWrite(context, userId, now);
+    return await admitPinWrite(context, userId, now);
+};
 
-    return false;
+/** Whether the account's refused write may take back a route: no other admitted pin write of the account can still be in flight. */
+export const otherPinWritesInFlight = async (context: Pick<QueryCtx, "db">, userId: string, writerId: string | null, now: number): Promise<boolean> => {
+    const leases = await leasesOf(context, userId);
+
+    return leases.some((lease) => lease.expiresAt > now && lease.writerId !== writerId);
+};
+
+/** Removes one admitted write's own lease, so the refused write does not hold back its own cleanup. */
+export const releasePinWrite = async (context: Pick<MutationCtx, "db">, userId: string, writerId: string): Promise<void> => {
+    const leases = await leasesOf(context, userId);
+
+    for (const lease of leases) {
+        if (lease.writerId === writerId) {
+            await context.db.delete("pinWriteLeases", lease._id);
+        }
+    }
 };
 
 /**
  * Whether a pin write of the account must be refused on this shard: a move is marking it, or this shard is fenced by an erasure. A
  * pin write calls it once before it renews its lease, and again as the last step before its insert (`chat/pins/functions.ts`).
+ *
+ * The last call names the write (`writerId`). It is refused too when that write's own lease is no longer live, or when the account row is
+ * gone. A move can finish between a write's first check and its insert, and a finished move leaves no marker and no live lease for this
+ * check to see. The account row is what outlives it: the guest's row goes only when its merge or erasure ends it (`auth/hooks.ts`), as a
+ * grant written under a deleted account is refused (`agent/sharing.ts`). Both reads are on the primary.
  */
-export const refusesPinWrite = async (context: Pick<QueryCtx, "db">, userId: string, now: number): Promise<boolean> =>
-    (await isAccountMoving(context, userId, now)) || (await isShardFenced(context, userId));
+export const refusesPinWrite = async (context: Pick<QueryCtx, "db">, userId: string, now: number, writerId: string | null = null): Promise<boolean> => {
+    if ((await isAccountMoving(context, userId, now)) || (await isShardFenced(context, userId))) {
+        return true;
+    }
+
+    if (writerId === null) {
+        return false;
+    }
+
+    const account = await context.db.user.findFirst({ consistency: "primary", where: { _id: context.db.asId("user", userId) } });
+
+    if (account === null) {
+        return true;
+    }
+
+    const leases = await leasesOf(context, userId);
+    // The wall clock, whatever `now` the caller started with: a write that stalled past its lease must see that lease as expired.
+    const current = Date.now();
+
+    return leases.every((lease) => lease.writerId !== writerId || lease.expiresAt <= current);
+};
 
 /**
  * The latest moment a pin write of the account may still be in flight, or null when none can be. A move waits until that moment (an
  * erasure) or re-enqueues itself for it (a guest merge).
  */
 export const pinWritesInFlightUntil = async (context: Pick<QueryCtx, "db">, userId: string, now: number): Promise<number | null> => {
-    const { page } = await context.db.pinWriteLeases.findMany({ consistency: "primary", where: { userId } });
+    const leases = await leasesOf(context, userId);
     let latest = 0;
 
-    for (const lease of page) {
+    for (const lease of leases) {
         latest = lease.expiresAt > now && lease.expiresAt > latest ? lease.expiresAt : latest;
     }
 
@@ -142,12 +219,36 @@ export const endAccountMove = async (context: Pick<MutationCtx, "db">, userId: s
         return;
     }
 
-    const { page: leases } = await context.db.pinWriteLeases.findMany({ consistency: "primary", where: { userId } });
+    // The move waited for every live lease, so what is left is expired: a batch goes now, and admissions reclaim the rest.
+    const leases = await leasesOf(context, userId);
 
-    for (const row of leases) {
+    for (const row of leases.slice(0, LEASE_RECLAIM_BATCH)) {
         await context.db.delete("pinWriteLeases", row._id);
     }
 };
+
+/**
+ * Deletes one batch of the account's lease rows and reports whether more may remain. The erasure repeats it after its marker goes, so
+ * every row of the account is gone before the workflow completes (`gdpr/workflows/deletion-workflow.ts`). One page per call keeps each
+ * call's writes bounded; the rows it removes are expired, since the move waited for every live lease.
+ */
+export const reclaimPinWriteLeases = async (context: Pick<MutationCtx, "db">, userId: string): Promise<boolean> => {
+    const { isDone, page } = await context.db.pinWriteLeases.findMany({ consistency: "primary", limit: LEASE_RECLAIM_BATCH, where: { userId } });
+
+    for (const row of page) {
+        await context.db.delete("pinWriteLeases", row._id);
+    }
+
+    return !isDone;
+};
+
+/** Reclaims one batch of the account's leases, from the erasure's reclaim drain. Idempotent. */
+export const reclaimPinWriteLeasesFor = internalMutation
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.object({ hasMore: v.boolean() }))
+    .mutation(async ({ args, ctx }) => {
+        return { hasMore: await reclaimPinWriteLeases(ctx, args.userId) };
+    });
 
 /** Removes the operation's marker, from a workflow or a job once its pins are moved or erased. Idempotent. */
 export const endAccountMoveFor = internalMutation
@@ -156,7 +257,8 @@ export const endAccountMoveFor = internalMutation
     .mutation(async ({ args, ctx }) => {
         await endAccountMove(ctx, args.userId, args.kind);
 
-        // An erasure also lifts the fence on the account's own shard; the owner shards' fences are lifted by the sweep that set them.
+        // An erasure also lifts the fence on the account's own shard. The owner shards' fences are lifted by the erasure's release step
+        // (`gdpr/steps.ts#releasePinFences`), once both owner sweeps have run.
         if (args.kind === "erasing") {
             await unfencePinsOnShard(ctx, args.userId);
         }
@@ -276,7 +378,7 @@ export const fencePinsOnShardFor = internalMutation
         return null;
     });
 
-/** Lifts the account's fence on the shard the call runs on, once the sweep that set it has finished. */
+/** Lifts the account's fence on the shard the call runs on, once the erasure no longer needs that shard fenced. */
 export const unfencePinsOnShardFor = internalMutation
     .input({ userId: v.string().max(MAX_LENGTH.id) })
     .output(v.null())

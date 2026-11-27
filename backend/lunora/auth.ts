@@ -676,6 +676,7 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
                 precheck: async (userId, codeId) => {
                     await shard.call(internal.devices.internal.checkHeadlessPairing, { codeId, userId }, { shardKey: userId });
                 },
+                // The owner's alert is queued by this registration on the same shard, so it needs no call of its own here.
                 register: async ({ codeId, name, platform, userId }) =>
                     await shard.call(internal.devices.internal.registerHeadlessDevice, { codeId, name, platform, userId }, { shardKey: userId }),
             },

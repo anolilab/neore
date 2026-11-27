@@ -41,7 +41,7 @@ const AnonymousConvertCard: FC<AnonymousConvertCardProperties> = ({ classNames }
                 <div className="flex items-center gap-2">
                     <Shield className="text-sidebar-accent h-4 w-4" />
                     <div className="min-w-0 flex-1">
-                        <p className={cn("text-sidebar-foreground text-xs font-medium", classNames?.title)}>{t`Guest Account`}</p>
+                        <p className={cn("text-foreground text-xs font-medium", classNames?.title)}>{t`Guest Account`}</p>
                         <p className={cn("text-sidebar-muted-foreground text-xs", classNames?.description)}>{t`Convert to save your data`}</p>
                     </div>
                     <Button

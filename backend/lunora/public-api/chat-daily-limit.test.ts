@@ -61,6 +61,7 @@ registerModule(registry, "agent_sharing", await import("../agent/sharing"));
 registerModule(registry, "agent_threads", await import("../agent/threads"));
 registerModule(registry, "auth_functions", await import("../auth/functions"));
 registerModule(registry, "chat_daily_charge", await import("../chat/daily-charge"));
+registerModule(registry, "source_control_pr_watch_wake_lease", await import("../source-control/pr-watch-wake-lease"));
 registerModule(registry, "chat_functions", await import("../chat/functions"));
 registerModule(registry, "chat_start_claim", await import("../chat/start-claim"));
 registerModule(registry, "chat_streaming", await import("../chat/streaming"));

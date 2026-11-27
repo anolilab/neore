@@ -142,6 +142,20 @@ const getArchiveTooltip = (isArchiving: boolean, status: string | undefined): Me
     return status === "archived" ? msg`Unarchive thread` : msg`Archive thread`;
 };
 
+const shortDateFormats = new Map<string, Intl.DateTimeFormat>();
+
+/** One formatter per locale for the "older than a week" date, shared by every row instead of built on each render. */
+const shortDateFormat = (locale: string): Intl.DateTimeFormat => {
+    let format = shortDateFormats.get(locale);
+
+    if (!format) {
+        format = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" });
+        shortDateFormats.set(locale, format);
+    }
+
+    return format;
+};
+
 const ThreadNodeChildren: FC<{
     expandedThreads: Set<string>;
     handleCreateBranch: (threadId: string) => void;
@@ -362,7 +376,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const formatElapsed = (elapsed: Elapsed): string => {
         switch (elapsed.kind) {
             case "date": {
-                return new Intl.DateTimeFormat(i18n.locale, { day: "numeric", month: "short" }).format(elapsed.value);
+                return shortDateFormat(i18n.locale).format(elapsed.value);
             }
             case "day": {
                 const days = elapsed.value;
@@ -665,7 +679,43 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
         threadId: node.threadId,
     };
 
-    const lastActiveAt = node.updatedAt ?? node.lastReplyAt ?? node.createdAt;
+    // The latest of the reply, the update and the creation, as the sections sort by (`derived-sections.ts`).
+    const lastActiveAt = Math.max(node.lastReplyAt ?? 0, node.updatedAt ?? 0, node.createdAt);
+    // Drawn twice, one copy hidden: in the hover-only action strip, and in the row's flow on a touch screen.
+    const renderStopButton = (className: string) =>
+        isStreaming &&
+        !isSelectionMode && (
+            <span className={className} role="presentation">
+                <Tooltip>
+                    <TooltipTrigger
+                        render={
+                            <Button
+                                aria-label={named(t`Stop generating`)}
+                                className="text-muted-foreground hover:text-foreground size-[22px] p-0"
+                                disabled={isStopping}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+
+                                    // Same as the composer's stop: queued prompts wait for the user instead of sending on their own.
+                                    usePromptQueueStore.getState().setPaused(node.threadId, true);
+                                    stopThreadStream(
+                                        { threadId: node.threadId as Id<"threads"> },
+                                        { onError: () => showError(t`Could not stop the reply. Please try again.`) },
+                                    );
+                                }}
+                                size="icon-sm"
+                                type="button"
+                                variant="ghost"
+                            >
+                                <CircleStop aria-hidden="true" className="size-3.5" />
+                            </Button>
+                        }
+                    />
+                    <TooltipContent>{t`Stop generating`}</TooltipContent>
+                </Tooltip>
+            </span>
+        );
     const timeLabel = formatElapsed(describeElapsed(lastActiveAt, clock));
     const isArchived = node.status === "archived";
     const hasTags = node.tags !== undefined && node.tags.length > 0;
@@ -850,6 +900,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
 
                 {/* A touch screen has no hover to reveal the action strip: the options menu shows there by itself, in the row's flow, so it
                     takes room from the title instead of covering it, and the rest of the strip stays hidden. */}
+                {/* A reply in flight keeps its stop button in reach on a touch screen too, beside the options menu. */}
+                {renderStopButton("hidden [@media(hover:none)]:contents")}
                 <ThreadOptionsMenu {...optionsMenuProps} className="hidden [@media(hover:none)]:contents" open={isOptionsMenuOpen && !canHover} />
             </div>
 
@@ -941,36 +993,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
 
             {/* The quick actions. Faded out, not removed, so an open menu keeps its anchor and focus has somewhere to return. */}
             <div className="bg-surface-row-hover absolute top-[calc(var(--density-row-py)-3px)] right-2 flex items-center gap-0.5 rounded-lg p-0.5 opacity-0 transition-opacity group-hover/action-item:opacity-100 focus-within:opacity-100 has-[[data-popup-open]]:opacity-100">
-                {isStreaming && !isSelectionMode && (
-                    <Tooltip>
-                        <TooltipTrigger
-                            render={
-                                <Button
-                                    aria-label={named(t`Stop generating`)}
-                                    className="text-muted-foreground hover:text-foreground size-[22px] p-0"
-                                    disabled={isStopping}
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-
-                                        // Same as the composer's stop: queued prompts wait for the user instead of sending on their own.
-                                        usePromptQueueStore.getState().setPaused(node.threadId, true);
-                                        stopThreadStream(
-                                            { threadId: node.threadId as Id<"threads"> },
-                                            { onError: () => showError(t`Could not stop the reply. Please try again.`) },
-                                        );
-                                    }}
-                                    size="icon-sm"
-                                    type="button"
-                                    variant="ghost"
-                                >
-                                    <CircleStop aria-hidden="true" className="size-3.5" />
-                                </Button>
-                            }
-                        />
-                        <TooltipContent>{t`Stop generating`}</TooltipContent>
-                    </Tooltip>
-                )}
+                {renderStopButton("contents [@media(hover:none)]:hidden")}
 
                 {node.status !== "archived" && (
                     <Tooltip>

@@ -6,6 +6,7 @@
  * the browser pieces (the shared session read, the auth client) stay in the app.
  */
 export * from "./auth-errors";
+export * from "./browser-control";
 export * from "./hydrate-auth-token";
 export * from "./ids";
 export * from "./live-queries";

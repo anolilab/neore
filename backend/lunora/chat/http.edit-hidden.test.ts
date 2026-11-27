@@ -19,6 +19,8 @@ const state = vi.hoisted(() => {
         signIn: "own" as "impersonating" | "own" | "unconfirmed",
         /** The thread keeps no memory (`statelessMode`): its reply saves the prompt again from plain text. */
         stateless: false,
+        /** A pull request watch holds a wake lease on the thread. */
+        wakeHeld: false,
     };
 });
 
@@ -83,6 +85,10 @@ const context = () =>
                 ];
             }
 
+            if (name.includes("wakeLeaseHeldFor")) {
+                return state.wakeHeld;
+            }
+
             if (name.includes("getThreadInternal")) {
                 return { model: "openai/gpt-4.1-mini", statelessMode: state.stateless, userId: state.owner };
             }
@@ -119,6 +125,28 @@ beforeEach(() => {
     state.row = undefined;
     state.stateless = false;
     state.owner = "user-a";
+    state.wakeHeld = false;
+});
+
+describe("editMessageHttpAction while a pull request watch is waking the chat", () => {
+    it("refuses the edit with a conflict before anything is written or charged, and lets it through once the lease is released", async () => {
+        state.wakeHeld = true;
+
+        const refused = await edit("reworded");
+
+        expect(refused.status).toBe(409);
+        await expect(refused.json()).resolves.toMatchObject({ error: "A pull request watch is replying to this chat. Try again in a moment." });
+        expect(state.saved).toStrictEqual([]);
+        expect(state.enqueued).toStrictEqual([]);
+        expect(state.charges).toBe(0);
+
+        state.wakeHeld = false;
+
+        const allowed = await edit("reworded");
+
+        expect(allowed.status).toBe(200);
+        expect(state.saved).toHaveLength(1);
+    });
 });
 
 describe("editMessageHttpAction hidden characters", () => {

@@ -381,7 +381,7 @@ const ThreadSidebar: FC<ThreadSidebarProps> = ({ threadId }) => {
                         </Activity>
                         {isTextModel && (
                             <Activity mode={activeRightSidebarTab === ASIDE_TAB ? "visible" : "hidden"}>
-                                <TabsContent className="absolute inset-0 overflow-y-auto" value={ASIDE_TAB}>
+                                <TabsContent className="absolute inset-0 overflow-y-auto" data-aside-scroll="" value={ASIDE_TAB}>
                                     <AsidePanel threadId={threadId} />
                                 </TabsContent>
                             </Activity>
