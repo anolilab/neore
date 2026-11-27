@@ -80,7 +80,7 @@ const procedureAt = (module: keyof typeof MODULES, name: string): never => {
     return procedure as never;
 };
 
-type PreviewResult = { plan: { action: string; entryKey: string }[] };
+type PreviewResult = { generation: number; installId: string; plan: { action: string; entryKey: string }[] };
 type UpdateResult = { applied: string[]; skipped: { action: string; entryKey: string }[]; version: string };
 
 const OWNER = "owner-a";
@@ -146,6 +146,7 @@ describe("a schedule below an inserted skill, through the action path", () => {
             confirmDowngrade: false,
             contentHash: next.contentHash,
             expectedGeneration: 1,
+            expectedInstallId: preview.installId,
             markdown: next.markdown,
         } as never)) as UpdateResult;
 

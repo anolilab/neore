@@ -72,7 +72,14 @@ const procedureAt = (module: keyof typeof MODULES, name: string): never => {
     return procedure as never;
 };
 
-type PreviewResult = { downgrade: boolean; installedVersion: string; plan: { action: string; entryKey: string }[]; targetVersion: string };
+type PreviewResult = {
+    downgrade: boolean;
+    generation: number;
+    installedVersion: string;
+    installId: string;
+    plan: { action: string; entryKey: string }[];
+    targetVersion: string;
+};
 type UpdateResult = { applied: string[]; skipped: { action: string; entryKey: string }[]; version: string };
 
 const OWNER = "owner-a";
@@ -122,6 +129,11 @@ describe("plugin update action", () => {
 
             return page;
         });
+    const currentInstallId = async (): Promise<string> => {
+        const row = await installRow();
+
+        return row._id;
+    };
     const installRow = async () =>
         await run(async (context) => {
             const { page } = await context.db.pluginInstalls.findMany({ where: { userId: OWNER } });
@@ -138,6 +150,7 @@ describe("plugin update action", () => {
             confirmDowngrade: false,
             contentHash: next.contentHash,
             expectedGeneration: preview.generation,
+            expectedInstallId: preview.installId,
             markdown: next.markdown,
         } as never)) as UpdateResult;
     };
@@ -235,6 +248,7 @@ describe("plugin update action", () => {
             confirmDowngrade: false,
             contentHash,
             expectedGeneration: 1,
+            expectedInstallId: await currentInstallId(),
             markdown,
         } as never)) as UpdateResult;
 
@@ -265,6 +279,7 @@ describe("plugin update action", () => {
             confirmDowngrade: false,
             contentHash,
             expectedGeneration: 1,
+            expectedInstallId: await currentInstallId(),
             markdown,
         } as never)) as UpdateResult;
 
@@ -348,7 +363,13 @@ describe("plugin update action", () => {
         const markdown = withPluginHeader(body, { contentHash, slug: SLUG, version: "1.1.0" });
 
         await expect(
-            as().action(procedureAt("plugins_update", "updatePlugin"), { confirmDowngrade: false, contentHash, expectedGeneration: 1, markdown } as never),
+            as().action(procedureAt("plugins_update", "updatePlugin"), {
+                confirmDowngrade: false,
+                contentHash,
+                expectedGeneration: 1,
+                expectedInstallId: await currentInstallId(),
+                markdown,
+            } as never),
         ).rejects.toThrow("Uninstall the plugin and install the new version");
         expect(await installRow()).toMatchObject({ status: "installed", version: "1.0.0" });
     });
@@ -366,9 +387,68 @@ describe("plugin update action", () => {
                 confirmDowngrade: false,
                 contentHash: next.contentHash,
                 expectedGeneration: preview.generation - 1,
+                expectedInstallId: preview.installId,
                 markdown: next.markdown,
             } as never),
         ).rejects.toThrow("Preview it again");
         expect(await installRow()).toMatchObject({ status: "installed", version: "1.0.0" });
+    });
+
+    it("refuses an old preview after the plugin was uninstalled and installed again", async () => {
+        const next = await fileOf(["analyst", "critic", "reviewer"], "1.1.0");
+        const preview = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown: next.markdown } as never)) as PreviewResult;
+
+        // Uninstall (its rows go) and install again: the new install starts at generation 1 once more.
+        await run(async (context) => {
+            for (const table of ["pluginItems", "skills", "pluginInstalls"] as const) {
+                const { page } = await context.db[table].findMany({ where: { userId: OWNER } });
+
+                for (const row of page) {
+                    await context.db.delete(table, row._id);
+                }
+            }
+        });
+
+        const first = await fileOf(["analyst", "critic"], "1.0.0");
+
+        await as().action(procedureAt("plugins_install_action", "installPlugin"), { contentHash: first.contentHash, markdown: first.markdown } as never);
+
+        const reinstalled = await installRow();
+
+        expect(reinstalled.generation).toBe(preview.generation);
+
+        await expect(
+            as().action(procedureAt("plugins_update", "updatePlugin"), {
+                confirmDowngrade: false,
+                contentHash: next.contentHash,
+                expectedGeneration: preview.generation,
+                expectedInstallId: preview.installId,
+                markdown: next.markdown,
+            } as never),
+        ).rejects.toThrow("Preview it again");
+    });
+
+    it("keeps the install for repair when a step fails after the new children were created", async () => {
+        const next = await fileOf(["analyst", "reviewer"], "1.1.0");
+        const preview = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown: next.markdown } as never)) as PreviewResult;
+        const removeChild = procedureAt("plugins_update_apply", "removeChild") as { handler: (...args: unknown[]) => unknown };
+        const spy = vi.spyOn(removeChild, "handler").mockRejectedValue(new Error("removal failed"));
+
+        try {
+            await expect(
+                as().action(procedureAt("plugins_update", "updatePlugin"), {
+                    confirmDowngrade: false,
+                    contentHash: next.contentHash,
+                    expectedGeneration: preview.generation,
+                    expectedInstallId: preview.installId,
+                    markdown: next.markdown,
+                } as never),
+            ).rejects.toThrow();
+        } finally {
+            spy.mockRestore();
+        }
+
+        // The new child exists, so the old version is not declared complete.
+        expect(await installRow()).toMatchObject({ contentHash: next.contentHash, status: "needs-repair", version: "1.0.0" });
     });
 });

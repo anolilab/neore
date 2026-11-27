@@ -95,6 +95,7 @@ export const previewUpdate = authAction
             downgrade: v.boolean(),
             generation: v.number(),
             installedVersion: v.string(),
+            installId: v.string(),
             plan: v.array(v.object({ action: vAction, entryKey: v.string() })),
             targetVersion: v.string(),
         }),
@@ -132,6 +133,7 @@ export const previewUpdate = authAction
             downgrade: isDowngrade(installed.version, header.version),
             generation: installed.generation,
             installedVersion: installed.version,
+            installId: installed.installId,
             plan,
             targetVersion: header.version,
         };
@@ -148,6 +150,8 @@ export const updatePlugin = authAction
         contentHash: v.string().max(128),
         /** The generation `previewUpdate` returned: the update applies only to the install as that preview saw it. */
         expectedGeneration: v.number(),
+        /** The install `previewUpdate` returned: a reinstall starts again at generation 1, so the generation alone does not name it. */
+        expectedInstallId: v.string().max(128),
         markdown: v.string().max(MAX_LENGTH.document),
     })
     .use(rateLimit("plugins/install"))
@@ -176,7 +180,7 @@ export const updatePlugin = authAction
             throw new LunoraError("NOT_FOUND", `The plugin "${header.slug}" is not installed`);
         }
 
-        if (installed.generation !== args.expectedGeneration) {
+        if (installed.generation !== args.expectedGeneration || installed.installId !== args.expectedInstallId) {
             throw new LunoraError("CONFLICT", "The plugin changed since it was previewed. Preview it again before updating.");
         }
 
@@ -235,6 +239,7 @@ export const updatePlugin = authAction
         });
 
         const applied: string[] = [];
+        let importDone = false;
         const skipped: { action: UpdateAction; entryKey: string }[] = [];
         const removals: { action: UpdateAction; entryKey: string }[] = [];
 
@@ -348,6 +353,7 @@ export const updatePlugin = authAction
                     { keepOnRateLimit: true },
                 );
 
+                importDone = true;
                 applied.push(...created.map((item) => item.key));
             }
 
@@ -376,7 +382,8 @@ export const updatePlugin = authAction
         } catch (error) {
             // Each child step is one mutation, so what was done stays done and running the update again finishes the rest. A rate limit
             // or a rollback that left rows behind keeps the install for repair, with the new file's hash so repair takes the new file.
-            const keepForRepair = error instanceof BundleImportError && (error.resumable || error.leftBehind.length > 0);
+            // Once the new children are committed, a later failure must not declare the old version complete: the install is kept for repair with the new file.
+            const keepForRepair = importDone || (error instanceof BundleImportError && (error.resumable || error.leftBehind.length > 0));
 
             await ctx
                 .runMutation(internal.plugins.update_apply.failUpdate, {
