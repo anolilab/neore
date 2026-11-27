@@ -752,7 +752,7 @@ describe("reading past the first page", () => {
             });
 
             it("finds a late-submitted and a same-second review on the page before a last page of older-submitted reviews", async () => {
-                // Seen review 9700 (page 98) was submitted at second 9700. The last page (100) holds only reviews submitted BEFORE it; page 99
+                // Seen review 9700 (page 97) was submitted at second 9700. The last page (100) holds only reviews submitted BEFORE it; page 99
                 // holds review 9850, created earlier but submitted late, and review 9851, submitted in the marker's own second.
                 const submittedAt = (id: number) => {
                     if (id >= 9901) {
