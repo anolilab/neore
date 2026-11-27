@@ -26,4 +26,25 @@ describe(salientTermsOf, () => {
         expect(salientTermsOf("which parcel ends in 77314")[0]).toEqual({ code: true, term: "77314" });
         expect(salientTermsOf("meet at 5pm")[0]).toEqual({ code: false, term: "meet" });
     });
+
+    it.each([
+        "meeting on 2026-11-27",
+        "due 27.11.2026",
+        "since 11/27/2026",
+        "costs 1,299.00",
+        "pi is 3.14159",
+        "my 21st birthday",
+        "ran 100km",
+        "a 1080p screen",
+    ])("reads %s as no identifier: a date, a decimal, an ordinal or a unit", (searchText) => {
+        expect(salientTermsOf(searchText).some(({ code }) => code)).toBe(false);
+    });
+
+    it.each([
+        ["serial WTU-38817", "38817"],
+        ["ECON-204 notes", "204"],
+        ["boiler E4012", "e4012"],
+    ])("reads %s as an identifier", (searchText, term) => {
+        expect(salientTermsOf(searchText)[0]).toEqual({ code: true, term });
+    });
 });

@@ -56,26 +56,27 @@ export const searchTokensOf = (text: string): string[] => {
 
 /** A word joined of letters and digits, with `-`, `_`, `.`, `/` or `#` inside, such as `KX-2291` or `E4012`. */
 const CHUNK_RE = /[\p{L}\p{N}]+(?:[-_./#][\p{L}\p{N}]+)*/gu;
-const LETTER_RE = /\p{L}/u;
+const SEPARATOR_RE = /[-_./#]/gu;
+/** Letters, then digits: `KX-2291`, `E4012`, `ECON-204`. Digits first is an ordinal or a unit (`21st`, `100km`, `1080p`). */
+const LETTERS_THEN_DIGITS_RE = /^\p{L}+[-_./#]?\p{N}/u;
 const DIGIT_RE = /\p{N}/u;
 const NUMBER_RE = /^\p{N}+$/u;
-/** Shorter mixes (`5pm`, `B12`) read as a time or a size more often than as an identifier. */
+/** Shorter mixes (`B12`) read as a size or a vitamin more often than as an identifier. */
 const MIN_CODE_LENGTH = 4;
-/** A bare number this long (`77314`) is a tracking or serial number; a year or a count is shorter. */
+/** One unbroken run of digits this long (`77314`) is a tracking or serial number; a year or a count is shorter. */
 const MIN_NUMBER_CODE_LENGTH = 5;
 
 /**
  * The tokens with a digit of every identifier in `text`: `2291` of `KX-2291`, `e4012` of `E4012`, `77314`. A year, a
- * count or a time is not one.
+ * date (`2026-11-27`), a decimal, a count, an ordinal, a unit or a time is not one.
  */
 const codeTokensOf = (text: string): Set<string> => {
     const codes = new Set<string>();
 
     for (const [chunk] of normalize(text).matchAll(CHUNK_RE)) {
-        const bare = chunk.replaceAll(/[-_./#]/gu, "");
-        const mixed = bare.length >= MIN_CODE_LENGTH && LETTER_RE.test(bare) && DIGIT_RE.test(bare);
+        const mixed = chunk.replaceAll(SEPARATOR_RE, "").length >= MIN_CODE_LENGTH && LETTERS_THEN_DIGITS_RE.test(chunk);
 
-        if (mixed || (bare.length >= MIN_NUMBER_CODE_LENGTH && NUMBER_RE.test(bare))) {
+        if (mixed || (chunk.length >= MIN_NUMBER_CODE_LENGTH && NUMBER_RE.test(chunk))) {
             for (const token of searchTokensOf(chunk)) {
                 if (DIGIT_RE.test(token)) {
                     codes.add(token);
