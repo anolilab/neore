@@ -36,6 +36,8 @@ const meta = {
     args: { levels: [], overlay: SettingsModal, url: "/chat" },
     component: StoryPage,
     parameters: {
+        // Axe checks the settings dialog; the page behind it shows through a dimmed backdrop, which skews its contrast, and has stories of its own.
+        a11y: { context: { include: ['[role="dialog"]'] } },
         layout: "fullscreen",
         msw: {
             handlers: {

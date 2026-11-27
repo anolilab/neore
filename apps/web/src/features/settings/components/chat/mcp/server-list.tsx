@@ -67,14 +67,14 @@ export const MCPServerList: FC<MCPServerListProps> = ({
                 return (
                     <div
                         className={cn(
-                            "border-border/50 py-3 transition-colors not-first:border-t",
+                            "@container/settings-row border-border/50 py-3 transition-colors not-first:border-t",
                             editingIndex === index && "bg-muted/40 -mx-3 rounded-lg px-3",
                         )}
                         key={key}
                     >
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-3 @lg/settings-row:grid @lg/settings-row:grid-cols-[minmax(0,1fr)_auto] @lg/settings-row:items-center @lg/settings-row:gap-8">
                             <button
-                                className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 bg-transparent text-left"
+                                className="flex min-w-0 cursor-pointer items-center gap-3 bg-transparent text-left"
                                 onClick={() => onEdit(index)}
                                 type="button"
                             >
@@ -83,8 +83,8 @@ export const MCPServerList: FC<MCPServerListProps> = ({
                                     <AvatarFallback>{getServerInitials(server.name)}</AvatarFallback>
                                 </Avatar>
                                 <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="truncate text-sm font-medium">{server.name}</span>
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                        <span className="min-w-0 text-sm font-medium break-words">{server.name}</span>
                                         <Badge className="px-1.5 py-0 text-[10px]" variant="outline">
                                             {server.protocol.toUpperCase()}
                                         </Badge>
@@ -100,7 +100,9 @@ export const MCPServerList: FC<MCPServerListProps> = ({
                                             </Badge>
                                         )}
                                     </div>
-                                    <p className="text-muted-foreground truncate text-xs">{server.url}</p>
+                                    <p className="text-muted-foreground truncate text-xs" title={server.url}>
+                                        {server.url}
+                                    </p>
                                     {server.headers && server.headers.length > 0 && (
                                         <p className="text-muted-foreground text-xs">
                                             {t`${server.headers.length} custom headers`}
@@ -111,7 +113,7 @@ export const MCPServerList: FC<MCPServerListProps> = ({
                                     )}
                                 </div>
                             </button>
-                            <div className="flex items-center gap-1">
+                            <div className="flex flex-wrap items-center gap-1">
                                 {offerSignIn && (
                                     <Button
                                         aria-busy={signingIn === server.name}

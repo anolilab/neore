@@ -421,12 +421,10 @@ const SubAgentRolesSettings: FC = () => {
 
     return (
         <div className="space-y-8">
-            <Alert>
-                <Info aria-hidden="true" className="h-4 w-4" />
-                <AlertDescription>
-                    {t`"Always" is guidance to the assistant, not a hard rule. Ask it to do something itself and it will. Chats keep the model you picked for them; only sub-agents use these models.`}
-                </AlertDescription>
-            </Alert>
+            <p className="text-muted-foreground flex items-start gap-1.5 px-1 text-xs leading-normal">
+                <Info aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
+                <span>{t`"Always" is guidance to the assistant, not a hard rule. Ask it to do something itself and it will. Chats keep the model you picked for them; only sub-agents use these models.`}</span>
+            </p>
 
             <SettingsCard
                 description={t`Choose a model for each kind of work the assistant hands to a sub-agent. A role with a model is offered to the assistant; one without stays off.`}

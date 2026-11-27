@@ -3,8 +3,9 @@
 import { useLingui } from "@lingui/react/macro";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@neore/ui/components/collapsible";
 import { formatDate, formatTime } from "@neore/ui/utils/locale-format";
-import { CheckCircle2, Copy, KeyRound, Loader2, MessageSquare, Pause, Play, Trash2 } from "lucide-react";
+import { CheckCircle2, ChevronDown, Copy, KeyRound, Loader2, MessageSquare, Pause, Play, Trash2 } from "lucide-react";
 import type { FC } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -56,6 +57,8 @@ const MessengerPlatformCard: FC<MessengerPlatformCardProps> = ({ beta, connectio
     // The code is shown once — only its hash is stored — so it lives in state
     // until the card unmounts or a new one replaces it.
     const [pairing, setPairing] = useState<{ code: string; expiresAt: number } | null>(null);
+    // Closed by default; a new pairing code opens it, since the code is shown once.
+    const [detailsOpen, setDetailsOpen] = useState(false);
 
     const isConnected = connection?.status === "active";
     const isPaused = connection?.status === "paused";
@@ -70,6 +73,7 @@ const MessengerPlatformCard: FC<MessengerPlatformCardProps> = ({ beta, connectio
 
             if (created.pairingCode && created.pairingCodeExpiresAt) {
                 setPairing({ code: created.pairingCode, expiresAt: created.pairingCodeExpiresAt });
+                setDetailsOpen(true);
             }
 
             toast.success(t`${name} connection activated`);
@@ -117,6 +121,7 @@ const MessengerPlatformCard: FC<MessengerPlatformCardProps> = ({ beta, connectio
             const result = await regeneratePairingCode.mutateAsync({ connectionId: connection._id as never });
 
             setPairing({ code: result.pairingCode, expiresAt: result.pairingCodeExpiresAt });
+            setDetailsOpen(true);
         } catch (error: any) {
             toast.error(error.message || t`Failed to create a pairing code`);
         }
@@ -170,9 +175,13 @@ const MessengerPlatformCard: FC<MessengerPlatformCardProps> = ({ beta, connectio
                         </Button>
                     )
                 }
-                description={description}
+                description={
+                    <span className="line-clamp-2" title={description}>
+                        {description}
+                    </span>
+                }
                 title={
-                    <span className="flex items-center gap-2.5">
+                    <span className="flex flex-wrap items-center gap-2.5">
                         <span className={`flex size-7 shrink-0 items-center justify-center rounded-md ${iconColor}`}>
                             <Icon aria-hidden="true" className="size-4 text-white" />
                         </span>
@@ -192,50 +201,66 @@ const MessengerPlatformCard: FC<MessengerPlatformCardProps> = ({ beta, connectio
                 }
             >
                 {hasConnection && (
-                    <div className="space-y-3">
-                        <div className="text-muted-foreground space-y-1 text-xs">
-                            {platformUsername && <p>{t`Username: @${platformUsername}`}</p>}
-                            {lastMessageAt && <p suppressHydrationWarning>{t`Last message: ${lastMessageAt}`}</p>}
-                        </div>
+                    <Collapsible onOpenChange={setDetailsOpen} open={detailsOpen}>
+                        <CollapsibleTrigger className="text-muted-foreground hover:text-foreground group inline-flex items-center gap-1 text-xs font-medium">
+                            {t`Details`}
+                            <ChevronDown aria-hidden className="size-3 transition-transform group-data-[panel-open]:rotate-180" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                            <div className="space-y-3 pt-3">
+                                <div className="text-muted-foreground space-y-1 text-xs">
+                                    {platformUsername && <p>{t`Username: @${platformUsername}`}</p>}
+                                    {lastMessageAt && <p suppressHydrationWarning>{t`Last message: ${lastMessageAt}`}</p>}
+                                </div>
 
-                        {/* Pairing: the bot answers only the contact who sent the one-time code */}
-                        <div aria-labelledby={`pairing-${platform}`} className="space-y-1" role="group">
-                            <p className="text-muted-foreground text-xs font-medium" id={`pairing-${platform}`}>
-                                {isPaired ? t`Paired` : t`Not paired — the bot answers nobody yet`}
-                            </p>
-                            {pairing && (
-                                <p aria-live="polite" className="text-xs" role="status">
-                                    {t`Send this to the bot from your account:`}{" "}
-                                    <code className="bg-muted rounded px-1.5 py-0.5 font-mono">/pair {pairing.code}</code>{" "}
-                                    <span className="text-muted-foreground" suppressHydrationWarning>
-                                        {t`(valid until ${pairingValidUntil})`}
-                                    </span>
-                                </p>
-                            )}
-                            <Button className="h-7 px-2 text-xs" disabled={isAnyPending} onClick={handleRegenerateCode} size="sm" variant="outline">
-                                <KeyRound aria-hidden="true" className="mr-1 size-3.5" />
-                                {isPaired ? t`Re-pair with a new code` : t`New pairing code`}
-                            </Button>
-                        </div>
-
-                        {/* Tools for replies: opt-in per connection */}
-                        {connection.replyTools && (
-                            <MessengerReplyTools connectionId={connection._id} disabled={isAnyPending} replyTools={connection.replyTools} />
-                        )}
-
-                        {webhookUrl && (
-                            <div className="space-y-1">
-                                <p className="text-muted-foreground text-xs font-medium">{t`Webhook URL`}</p>
-                                <div className="flex items-center gap-1">
-                                    <code className="bg-muted flex-1 truncate rounded px-2 py-1 font-mono text-xs">{webhookUrl}</code>
-                                    <Button aria-label={t`Copy webhook URL`} className="shrink-0" onClick={handleCopyWebhookUrl} size="icon" variant="ghost">
-                                        <Copy aria-hidden="true" className="size-3.5" />
+                                {/* Pairing: the bot answers only the contact who sent the one-time code */}
+                                <div aria-labelledby={`pairing-${platform}`} className="space-y-1" role="group">
+                                    <p className="text-muted-foreground text-xs font-medium" id={`pairing-${platform}`}>
+                                        {isPaired ? t`Paired` : t`Not paired — the bot answers nobody yet`}
+                                    </p>
+                                    {pairing && (
+                                        <p aria-live="polite" className="text-xs" role="status">
+                                            {t`Send this to the bot from your account:`}{" "}
+                                            <code className="bg-muted rounded px-1.5 py-0.5 font-mono">/pair {pairing.code}</code>{" "}
+                                            <span className="text-muted-foreground" suppressHydrationWarning>
+                                                {t`(valid until ${pairingValidUntil})`}
+                                            </span>
+                                        </p>
+                                    )}
+                                    <Button className="h-7 px-2 text-xs" disabled={isAnyPending} onClick={handleRegenerateCode} size="sm" variant="outline">
+                                        <KeyRound aria-hidden="true" className="mr-1 size-3.5" />
+                                        {isPaired ? t`Re-pair with a new code` : t`New pairing code`}
                                     </Button>
                                 </div>
-                                <p className="text-muted-foreground text-xs">{i18n._(webhookHint(platform))}</p>
+
+                                {/* Tools for replies: opt-in per connection */}
+                                {connection.replyTools && (
+                                    <MessengerReplyTools connectionId={connection._id} disabled={isAnyPending} replyTools={connection.replyTools} />
+                                )}
+
+                                {webhookUrl && (
+                                    <div className="space-y-1">
+                                        <p className="text-muted-foreground text-xs font-medium">{t`Webhook URL`}</p>
+                                        <div className="flex items-center gap-1">
+                                            <code className="bg-muted min-w-0 flex-1 truncate rounded px-2 py-1 font-mono text-xs" title={webhookUrl}>
+                                                {webhookUrl}
+                                            </code>
+                                            <Button
+                                                aria-label={t`Copy webhook URL`}
+                                                className="shrink-0"
+                                                onClick={handleCopyWebhookUrl}
+                                                size="icon"
+                                                variant="ghost"
+                                            >
+                                                <Copy aria-hidden="true" className="size-3.5" />
+                                            </Button>
+                                        </div>
+                                        <p className="text-muted-foreground text-xs">{i18n._(webhookHint(platform))}</p>
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
+                        </CollapsibleContent>
+                    </Collapsible>
                 )}
             </SettingsRow>
 

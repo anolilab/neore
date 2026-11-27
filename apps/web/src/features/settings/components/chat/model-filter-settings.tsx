@@ -126,12 +126,18 @@ const ModelFilterSettings: FC = () => {
 
     return (
         <div className="space-y-6">
-            <SettingsCard
-                action={hasAnyRules ? resetAll : undefined}
-                actionLabel={hasAnyRules ? t`Clear All` : undefined}
-                description={t`Control which AI models and providers can be used based on geographic region, compliance requirements, and privacy preferences.`}
-                title={t`Model Restrictions`}
-            />
+            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                <SettingsCard
+                    className="min-w-0 flex-1 basis-64"
+                    description={t`Control which AI models and providers can be used based on geographic region, compliance requirements, and privacy preferences.`}
+                    title={t`Model Restrictions`}
+                />
+                {hasAnyRules && (
+                    <Button onClick={resetAll} size="sm" variant="outline">
+                        {t`Clear All`}
+                    </Button>
+                )}
+            </div>
 
             {/* Region Filtering */}
             <SettingsCard

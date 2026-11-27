@@ -1,11 +1,14 @@
 "use client";
 
 import { useLingui } from "@lingui/react/macro";
+import { Button } from "@neore/ui/components/button";
+import cn from "@neore/ui/utils/cn";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import type { SettingsCardClassNames } from "@/components/settings/settings-card";
 import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import { useListAccounts } from "@/features/auth/hooks/account-management";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -44,24 +47,34 @@ const DeleteAccountCardView = ({ className, classNames, isPending }: Omit<Delete
 
     return (
         <div>
-            <SettingsCard
-                action={() => {
-                    setShowDialog(true);
-                }}
-                actionLabel={t`Delete Account`}
-                className={className}
-                classNames={classNames}
-                description={
-                    isDeletionInProgress
-                        ? t`Your account and all associated data are being deleted. This cannot be cancelled.`
-                        : t`Permanently delete your account and all associated data`
-                }
-                disabled={isDeletionInProgress}
-                instructions={deletionStatus === "failed" ? t`The last deletion request failed. You can request it again.` : undefined}
-                isPending={isPending}
-                title={t`Delete Account`}
-                variant="destructive"
-            />
+            <SettingsCard className={className} classNames={classNames} isPending={isPending} variant="destructive">
+                <SettingsRow
+                    control={
+                        <Button
+                            className={cn(classNames?.button, classNames?.destructiveButton)}
+                            disabled={isDeletionInProgress}
+                            onClick={() => {
+                                setShowDialog(true);
+                            }}
+                            size="sm"
+                            variant="destructive"
+                        >
+                            {t`Delete Account`}
+                        </Button>
+                    }
+                    description={
+                        <>
+                            {isDeletionInProgress
+                                ? t`Your account and all associated data are being deleted. This cannot be cancelled.`
+                                : t`Permanently delete your account and all associated data`}
+                            {deletionStatus === "failed" && (
+                                <span className="mt-1 block">{t`The last deletion request failed. You can request it again.`}</span>
+                            )}
+                        </>
+                    }
+                    title={t`Delete Account`}
+                />
+            </SettingsCard>
 
             <DeleteAccountDialog classNames={classNames} onOpenChange={setShowDialog} open={showDialog} />
         </div>

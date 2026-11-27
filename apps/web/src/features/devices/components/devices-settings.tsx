@@ -329,72 +329,75 @@ export const DeviceRow: FC<{
     };
 
     return (
-        <li className="border-border/50 flex flex-wrap items-center gap-3 py-3 not-first:border-t">
-            <div className="min-w-0 flex-1 space-y-1">
-                <Label className="sr-only" htmlFor={nameId}>{t`Device name`}</Label>
-                <Input
-                    className="max-w-xs"
-                    id={nameId}
-                    maxLength={80}
-                    onBlur={() => {
-                        const next = name.trim();
+        <li className="border-border/50 @container/device-row flex flex-col gap-3 py-3 not-first:border-t">
+            {/* The row decides from its own width: the actions drop under the name and the tool list until there is room beside them. */}
+            <div className="flex flex-col gap-3 @3xl/device-row:grid @3xl/device-row:grid-cols-[minmax(0,1fr)_auto] @3xl/device-row:items-center @3xl/device-row:gap-8">
+                <div className="min-w-0 space-y-1">
+                    <Label className="sr-only" htmlFor={nameId}>{t`Device name`}</Label>
+                    <Input
+                        className="max-w-xs"
+                        id={nameId}
+                        maxLength={80}
+                        onBlur={() => {
+                            const next = name.trim();
 
-                        if (next && next !== device.name) {
-                            rename.mutate(
-                                { deviceId: device._id as Id<"devices">, name: next },
-                                { onError: () => toast.error(t`Could not rename the device.`) },
-                            );
-                        }
-                    }}
-                    onChange={(event) => setName(event.target.value)}
-                    value={name}
-                />
-                <p className="text-muted-foreground text-xs">
-                    {device.toolNames.length > 0 ? t`${device.toolNames.length} tools: ${device.toolNames.join(", ")}` : t`No tools shared yet`}
-                </p>
-                {/* A server over SSH runs the host software, not the desktop app, so it has no app version to report. */}
-                {device.transport !== "ssh" && (
-                    <p className="text-muted-foreground text-xs text-pretty tabular-nums">
-                        {device.appVersion === undefined ? t`Neore version not reported` : t`Neore ${device.appVersion}`}
+                            if (next && next !== device.name) {
+                                rename.mutate(
+                                    { deviceId: device._id as Id<"devices">, name: next },
+                                    { onError: () => toast.error(t`Could not rename the device.`) },
+                                );
+                            }
+                        }}
+                        onChange={(event) => setName(event.target.value)}
+                        value={name}
+                    />
+                    <p className="text-muted-foreground text-xs break-words">
+                        {device.toolNames.length > 0 ? t`${device.toolNames.length} tools: ${device.toolNames.join(", ")}` : t`No tools shared yet`}
                     </p>
-                )}
-                {/* Always in the accessibility tree, so the first failure is announced too. `ph-no-capture`: ssh text can carry anything. */}
-                <p className="ph-no-capture text-destructive text-xs" id={errorId} role="status">
-                    {failure === undefined ? null : failureText(failure)}
-                </p>
-                {device.updateRequired === true && (
-                    <p className="text-destructive text-xs" id={updateNoticeId(device._id)} role="status">
-                        {t`Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on.`}
+                    {/* A server over SSH runs the host software, not the desktop app, so it has no app version to report. */}
+                    {device.transport !== "ssh" && (
+                        <p className="text-muted-foreground text-xs text-pretty tabular-nums">
+                            {device.appVersion === undefined ? t`Neore version not reported` : t`Neore ${device.appVersion}`}
+                        </p>
+                    )}
+                    {/* Always in the accessibility tree, so the first failure is announced too. `ph-no-capture`: ssh text can carry anything. */}
+                    <p className="ph-no-capture text-destructive text-xs" id={errorId} role="status">
+                        {failure === undefined ? null : failureText(failure)}
                     </p>
-                )}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-                {isThisComputer && <Badge variant="outline">{t`This computer`}</Badge>}
-                {device.transport === "ssh" && <Badge variant="outline">{t`Server over SSH`}</Badge>}
-                <Badge variant={online ? "default" : "secondary"}>{online ? t`Online` : t`Offline`}</Badge>
-                {reconnect?.phase === "gaveUp" && <Badge variant="destructive">{t`Connection lost`}</Badge>}
-                {(reconnect?.phase === "waiting" || reconnect?.phase === "connecting") && <Badge variant="secondary">{t`Reconnecting`}</Badge>}
-                {connected !== undefined && (
-                    <Button
-                        aria-describedby={failure === undefined ? undefined : errorId}
-                        onClick={() => connection(() => (stoppable ? disconnectNativeHost(device._id) : connectNativeHost(device._id)))}
-                        size="sm"
-                        variant="outline"
-                    >
-                        {buttonLabel}
+                    {device.updateRequired === true && (
+                        <p className="text-destructive text-xs" id={updateNoticeId(device._id)} role="status">
+                            {t`Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on.`}
+                        </p>
+                    )}
+                </div>
+                <div className="flex min-w-0 flex-wrap items-center gap-2 @3xl/device-row:justify-end">
+                    {isThisComputer && <Badge variant="outline">{t`This computer`}</Badge>}
+                    {device.transport === "ssh" && <Badge variant="outline">{t`Server over SSH`}</Badge>}
+                    <Badge variant={online ? "default" : "secondary"}>{online ? t`Online` : t`Offline`}</Badge>
+                    {reconnect?.phase === "gaveUp" && <Badge variant="destructive">{t`Connection lost`}</Badge>}
+                    {(reconnect?.phase === "waiting" || reconnect?.phase === "connecting") && <Badge variant="secondary">{t`Reconnecting`}</Badge>}
+                    {connected !== undefined && (
+                        <Button
+                            aria-describedby={failure === undefined ? undefined : errorId}
+                            onClick={() => connection(() => (stoppable ? disconnectNativeHost(device._id) : connectNativeHost(device._id)))}
+                            size="sm"
+                            variant="outline"
+                        >
+                            {buttonLabel}
+                        </Button>
+                    )}
+                    {reconnect?.phase === "gaveUp" && (
+                        <Button onClick={() => connection(() => disconnectNativeHost(device._id))} size="sm" variant="outline">
+                            {t`Dismiss`}
+                        </Button>
+                    )}
+                    <Button aria-label={t`Copy diagnostics for ${device.name}`} onClick={copyDiagnostics} size="sm" variant="outline">
+                        {t`Copy diagnostics`}
                     </Button>
-                )}
-                {reconnect?.phase === "gaveUp" && (
-                    <Button onClick={() => connection(() => disconnectNativeHost(device._id))} size="sm" variant="outline">
-                        {t`Dismiss`}
+                    <Button onClick={() => setConfirming(true)} size="sm" variant="outline">
+                        {t`Remove`}
                     </Button>
-                )}
-                <Button aria-label={t`Copy diagnostics for ${device.name}`} onClick={copyDiagnostics} size="sm" variant="outline">
-                    {t`Copy diagnostics`}
-                </Button>
-                <Button onClick={() => setConfirming(true)} size="sm" variant="outline">
-                    {t`Remove`}
-                </Button>
+                </div>
             </div>
             <StartAgents device={device} online={online} />
             <DeviceScope deviceId={device._id} projectIds={device.projectIds} />

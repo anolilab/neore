@@ -13,15 +13,15 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
-import { Alert, AlertDescription } from "@neore/ui/components/alert";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@neore/ui/components/collapsible";
 import { Heading, HeadingSection } from "@neore/ui/components/heading";
 import { Label } from "@neore/ui/components/label";
 import { Switch } from "@neore/ui/components/switch";
 import { ToggleGroup, ToggleGroupItem } from "@neore/ui/components/toggle-group";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Info } from "lucide-react";
+import { ChevronRight, Info } from "lucide-react";
 import type { FC } from "react";
 import { useEffect, useId, useState } from "react";
 
@@ -237,20 +237,29 @@ const QuickCheckSetting: FC<QuickCheckProps> = ({ checked, isSaving, onChange })
     return (
         <SettingsCard
             description={
-                <span id={detailsId}>
-                    {t`Before a connected tool set to Ask pauses the chat, a short model check reads the call. It only looks at tools from MCP servers and connectors you have marked as trusted, and only those whose name starts with a read verb such as get, list, search or fetch, and never after the chat has read your knowledge base, memories, project context, a tool result, an attached file, document or web page, or while any skill is enabled. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Everything else still asks you. Off by default.`}
-                </span>
+                <span
+                    id={detailsId}
+                >{t`Before a connected tool set to Ask pauses the chat, a short model check reads the call. Everything it does not clear still asks you. Off by default.`}</span>
             }
             title={<Label className="text-[15px] font-semibold" htmlFor={switchId}>{t`Let a quick check approve low-risk calls`}</Label>}
         >
             <div className="flex items-start justify-between gap-4 py-3">
-                <ul className="text-muted-foreground list-disc space-y-1 pl-5 text-xs">
-                    <li>{t`Covers only tools from MCP servers and connectors you trust for auto-approval (a switch on each server in your MCP settings and on each connector), left at their default Ask, in chats only you can write to. A trusted server's tool descriptions reach the model and can influence what is approved, so trust only servers you would let act for you. Changing a server's address ends its trust.`}</li>
-                    <li>{t`Never covers a tool you set to Ask yourself, built-in tools, device tools, questions to you, sub-agents or coding agents, or anything that sends, publishes, pays or deletes.`}</li>
-                    <li>{t`Never covers a call after the chat has read web pages, attached files, documents or pages, knowledge or other tool results: those can carry hidden instructions.`}</li>
-                    <li>{t`Never covers a call while any skill is enabled or invoked. Skills can come from the marketplace, an organization or an import, and there is no reliable way to tell yours apart, so switch your skills off to use the quick check.`}</li>
-                    <li>{t`Each check is one small model call on your account and is rate-limited. If it fails or runs out of time, you are asked as usual.`}</li>
-                </ul>
+                <Collapsible className="min-w-0 flex-1">
+                    <CollapsibleTrigger className="text-muted-foreground hover:text-foreground group flex items-center gap-1 text-xs transition-colors">
+                        <ChevronRight aria-hidden="true" className="size-3 transition-transform group-data-[panel-open]:rotate-90" />
+                        {t`Details`}
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-2 pt-2">
+                        <p className="text-muted-foreground text-xs leading-normal">{t`Before a connected tool set to Ask pauses the chat, a short model check reads the call. It only looks at tools from MCP servers and connectors you have marked as trusted, and only those whose name starts with a read verb such as get, list, search or fetch, and never after the chat has read your knowledge base, memories, project context, a tool result, an attached file, document or web page, or while any skill is enabled. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Everything else still asks you. Off by default.`}</p>
+                        <ul className="text-muted-foreground list-disc space-y-1 pl-5 text-xs">
+                            <li>{t`Covers only tools from MCP servers and connectors you trust for auto-approval (a switch on each server in your MCP settings and on each connector), left at their default Ask, in chats only you can write to. A trusted server's tool descriptions reach the model and can influence what is approved, so trust only servers you would let act for you. Changing a server's address ends its trust.`}</li>
+                            <li>{t`Never covers a tool you set to Ask yourself, built-in tools, device tools, questions to you, sub-agents or coding agents, or anything that sends, publishes, pays or deletes.`}</li>
+                            <li>{t`Never covers a call after the chat has read web pages, attached files, documents or pages, knowledge or other tool results: those can carry hidden instructions.`}</li>
+                            <li>{t`Never covers a call while any skill is enabled or invoked. Skills can come from the marketplace, an organization or an import, and there is no reliable way to tell yours apart, so switch your skills off to use the quick check.`}</li>
+                            <li>{t`Each check is one small model call on your account and is rate-limited. If it fails or runs out of time, you are asked as usual.`}</li>
+                        </ul>
+                    </CollapsibleContent>
+                </Collapsible>
                 <Switch aria-describedby={detailsId} checked={checked} disabled={isSaving} id={switchId} onCheckedChange={onChange} />
             </div>
         </SettingsCard>
@@ -345,12 +354,10 @@ const ToolPermissionsSettings: FC = () => {
 
     return (
         <div className="space-y-8">
-            <Alert>
-                <Info aria-hidden="true" className="h-4 w-4" />
-                <AlertDescription>
-                    {t`Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so "Ask" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only.`}
-                </AlertDescription>
-            </Alert>
+            <p className="text-muted-foreground flex items-start gap-1.5 px-1 text-xs leading-normal">
+                <Info aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
+                <span>{t`Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so "Ask" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only.`}</span>
+            </p>
 
             <NewChatPermissionModeSetting />
 

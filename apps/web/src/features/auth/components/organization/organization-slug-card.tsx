@@ -14,6 +14,7 @@ import { useActiveOrganization, useHasPermission, useListOrganizations } from "@
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 
 import { getLocalizedError } from "../../lib/utilities";
+import SettingsFieldRow, { hideCardHeader } from "../settings/settings-field-row";
 
 const ORGANIZATION_SLUG_RE = /^[a-z0-9-]+$/;
 
@@ -103,39 +104,43 @@ const OrganizationSlugForm = ({ className, classNames, ...properties }: Settings
                 <SettingsCard
                     actionLabel={t`Save`}
                     className={className}
-                    classNames={classNames}
-                    description={t`Change your organization's unique identifier`}
+                    classNames={hideCardHeader(classNames)}
                     disabled={!hasPermission?.success}
-                    instructions={t`This is your organization's URL namespace`}
                     isPending={isPending}
-                    title={t`Organization Slug`}
                     {...properties}
                 >
                     <CardContent className={classNames?.content}>
-                        {isPending ? (
-                            <Skeleton className={cn("h-9 w-full", classNames?.skeleton)} />
-                        ) : (
-                            <form.AppField name="slug">
-                                {(field) => (
-                                    <field.FormItem>
-                                        <field.FormControl>
-                                            <Input
-                                                className={classNames?.input}
-                                                disabled={isSubmitting || !hasPermission?.success}
-                                                onBlur={field.handleBlur}
-                                                onChange={(e) => {
-                                                    field.handleChange(e.target.value);
-                                                }}
-                                                placeholder={t`Enter organization slug`}
-                                                value={field.state.value}
-                                            />
-                                        </field.FormControl>
+                        <SettingsFieldRow
+                            description={t`Change your organization's unique identifier`}
+                            instructions={t`This is your organization's URL namespace`}
+                            title={t`Organization Slug`}
+                        >
+                            {isPending ? (
+                                <Skeleton className={cn("h-9 w-full", classNames?.skeleton)} />
+                            ) : (
+                                <form.AppField name="slug">
+                                    {(field) => (
+                                        <field.FormItem>
+                                            <field.FormControl>
+                                                <Input
+                                                    aria-label={t`Organization Slug`}
+                                                    className={classNames?.input}
+                                                    disabled={isSubmitting || !hasPermission?.success}
+                                                    onBlur={field.handleBlur}
+                                                    onChange={(e) => {
+                                                        field.handleChange(e.target.value);
+                                                    }}
+                                                    placeholder={t`Enter organization slug`}
+                                                    value={field.state.value}
+                                                />
+                                            </field.FormControl>
 
-                                        <field.FormMessage className={classNames?.error} />
-                                    </field.FormItem>
-                                )}
-                            </form.AppField>
-                        )}
+                                            <field.FormMessage className={classNames?.error} />
+                                        </field.FormItem>
+                                    )}
+                                </form.AppField>
+                            )}
+                        </SettingsFieldRow>
                     </CardContent>
                 </SettingsCard>
             </form>
@@ -151,18 +156,15 @@ const OrganizationSlugCard = ({ className, classNames, ...properties }: Settings
 
     if (!activeOrganization) {
         return (
-            <SettingsCard
-                actionLabel={t`Save`}
-                className={className}
-                classNames={classNames}
-                description={t`Change your organization's unique identifier`}
-                instructions={t`This is your organization's URL namespace`}
-                isPending
-                title={t`Organization Slug`}
-                {...properties}
-            >
+            <SettingsCard actionLabel={t`Save`} className={className} classNames={hideCardHeader(classNames)} isPending {...properties}>
                 <CardContent className={classNames?.content}>
-                    <Skeleton className={cn("h-9 w-full", classNames?.skeleton)} />
+                    <SettingsFieldRow
+                        description={t`Change your organization's unique identifier`}
+                        instructions={t`This is your organization's URL namespace`}
+                        title={t`Organization Slug`}
+                    >
+                        <Skeleton className={cn("h-9 w-full", classNames?.skeleton)} />
+                    </SettingsFieldRow>
                 </CardContent>
             </SettingsCard>
         );

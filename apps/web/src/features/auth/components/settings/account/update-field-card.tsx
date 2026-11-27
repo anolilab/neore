@@ -17,6 +17,7 @@ import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 
 import { getLocalizedError } from "../../../lib/utilities";
 import type { FieldType } from "../../../types/form-validation-types";
+import SettingsFieldRow, { hideCardHeader } from "../settings-field-row";
 
 export interface UpdateFieldCardProperties {
     className?: string;
@@ -155,11 +156,11 @@ const UpdateFieldCard = ({
                 <SettingsCard
                     actionLabel={t`Save`}
                     className={className}
-                    classNames={classNames}
-                    description={description}
-                    instructions={instructions}
+                    classNames={type === "boolean" ? classNames : hideCardHeader(classNames)}
+                    description={type === "boolean" ? description : undefined}
+                    instructions={type === "boolean" ? instructions : undefined}
                     isPending={isPending}
-                    title={label}
+                    title={type === "boolean" ? label : undefined}
                 >
                     <CardContent className={classNames?.content}>
                         {type === "boolean" && (
@@ -184,30 +185,36 @@ const UpdateFieldCard = ({
                                 )}
                             </form.AppField>
                         )}
-                        {type !== "boolean" && isPending && <Skeleton className={cn("h-9 w-full", classNames?.skeleton)} />}
-                        {type !== "boolean" && !isPending && (
-                            <form.AppField name={name}>
-                                {(field) => (
-                                    <field.FormItem>
-                                        <field.FormControl>
-                                            <Input
-                                                autoComplete={name === "name" || name === "username" ? name : "off"}
-                                                className={classNames?.input}
-                                                disabled={isSubmitting}
-                                                onBlur={field.handleBlur}
-                                                onChange={(e) => {
-                                                    field.handleChange(e.target.value);
-                                                }}
-                                                placeholder={placeholder}
-                                                type={type === "number" ? "number" : "text"}
-                                                value={field.state.value as string}
-                                            />
-                                        </field.FormControl>
+                        {type !== "boolean" && (
+                            <SettingsFieldRow description={description} instructions={instructions} title={label}>
+                                {isPending ? (
+                                    <Skeleton className={cn("h-9 w-full", classNames?.skeleton)} />
+                                ) : (
+                                    <form.AppField name={name}>
+                                        {(field) => (
+                                            <field.FormItem>
+                                                <field.FormControl>
+                                                    <Input
+                                                        aria-label={fieldLabel}
+                                                        autoComplete={name === "name" || name === "username" ? name : "off"}
+                                                        className={classNames?.input}
+                                                        disabled={isSubmitting}
+                                                        onBlur={field.handleBlur}
+                                                        onChange={(e) => {
+                                                            field.handleChange(e.target.value);
+                                                        }}
+                                                        placeholder={placeholder}
+                                                        type={type === "number" ? "number" : "text"}
+                                                        value={field.state.value as string}
+                                                    />
+                                                </field.FormControl>
 
-                                        <field.FormMessage className={classNames?.error} />
-                                    </field.FormItem>
+                                                <field.FormMessage className={classNames?.error} />
+                                            </field.FormItem>
+                                        )}
+                                    </form.AppField>
                                 )}
-                            </form.AppField>
+                            </SettingsFieldRow>
                         )}
                     </CardContent>
                 </SettingsCard>

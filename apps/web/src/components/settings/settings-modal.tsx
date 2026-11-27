@@ -252,6 +252,20 @@ export const SettingsModal: FC = () => {
     // Where the last pick led, for the live region: the field is empty after a pick, so nothing else tells a screen reader it worked.
     const [announcement, setAnnouncement] = useState("");
 
+    // The current tab stays in view in the list: a link can open one far down (Account, Privacy).
+    useEffect(() => {
+        if (!isOpen) {
+            return undefined;
+        }
+
+        // The dialog renders its list after this commit, so the scroll waits a frame for it.
+        const frame = requestAnimationFrame(() => {
+            navRef.current?.querySelector<HTMLElement>('[aria-current="true"]')?.scrollIntoView({ block: "nearest" });
+        });
+
+        return () => cancelAnimationFrame(frame);
+    }, [isOpen, currentTab]);
+
     // "/" jumps to the search, as the hint in the field says; typed into a field it is just a slash.
     useEffect(() => {
         if (!isOpen) {
@@ -624,7 +638,8 @@ export const SettingsModal: FC = () => {
                                             let stateClassName = "text-muted-foreground web:hover:bg-surface-row-hover hover:text-foreground";
 
                                             if (isActive) {
-                                                stateClassName = "bg-surface-row-active text-foreground";
+                                                // The light nav is white like the row-active fill, so light uses the pressed-in well instead.
+                                                stateClassName = "bg-surface-well dark:bg-surface-row-active text-foreground";
                                             } else if (isLocked) {
                                                 stateClassName = "text-muted-foreground/40 web:hover:bg-surface-row-hover hover:text-muted-foreground";
                                             }

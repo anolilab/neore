@@ -15,22 +15,29 @@ export interface SettingsCardHeaderProperties {
     title: ReactNode;
 }
 
-const SettingsCardHeader = ({ className, classNames, description, isPending, title }: SettingsCardHeaderProperties) => (
-    <CardHeader className={cn(classNames?.header, className)}>
-        {isPending ? (
-            <>
-                <Skeleton className={cn("my-0.5 h-5 w-1/3 md:h-5.5", classNames?.skeleton)} />
+const SettingsCardHeader = ({ className, classNames, description, isPending, title }: SettingsCardHeaderProperties) => {
+    // A section with neither (a single-field card whose row carries the title) draws no header, not an empty heading.
+    if (!isPending && !title && !description) {
+        return null;
+    }
 
-                {description && <Skeleton className={cn("mt-1.5 mb-0.5 h-3 w-2/3 md:h-3.5", classNames?.skeleton)} />}
-            </>
-        ) : (
-            <>
-                <CardTitle className={cn("text-[15px] font-semibold", classNames?.title)}>{title}</CardTitle>
+    return (
+        <CardHeader className={cn(classNames?.header, className)}>
+            {isPending ? (
+                <>
+                    <Skeleton className={cn("my-0.5 h-5 w-1/3 md:h-5.5", classNames?.skeleton)} />
 
-                {description && <CardDescription className={cn("text-sm", classNames?.description)}>{description}</CardDescription>}
-            </>
-        )}
-    </CardHeader>
-);
+                    {description && <Skeleton className={cn("mt-1.5 mb-0.5 h-3 w-2/3 md:h-3.5", classNames?.skeleton)} />}
+                </>
+            ) : (
+                <>
+                    <CardTitle className={cn("text-[15px] font-semibold", classNames?.title)}>{title}</CardTitle>
+
+                    {description && <CardDescription className={cn("text-sm", classNames?.description)}>{description}</CardDescription>}
+                </>
+            )}
+        </CardHeader>
+    );
+};
 
 export default SettingsCardHeader;

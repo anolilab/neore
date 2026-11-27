@@ -1,9 +1,10 @@
 import { useLingui } from "@lingui/react/macro";
+import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
-import { CardContent } from "@neore/ui/components/card";
 import { useQuery } from "@tanstack/react-query";
 
 import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import useBillingOptions from "../hooks/use-billing-options";
@@ -20,51 +21,54 @@ const PersonalPlanCard = () => {
 
     return (
         <SettingsCard description={t`Pro is your own plan: every model and 1,000 messages a day.`} isPending={isPending} title={t`Your plan`}>
-            <CardContent className="flex items-center justify-between gap-4">
-                <div className="text-muted-foreground text-sm">
-                    {t`Current plan:`} <strong>{isPro ? t`Pro` : t`Free`}</strong>
-                </div>
-                {plan?.creemCustomerId ? (
-                    <Button
-                        disabled={checkoutPending}
-                        onClick={() => {
-                            void openPortal("user");
-                        }}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                    >
-                        {t`Manage subscription`}
-                    </Button>
-                ) : null}
-                {isPro || isPending ? null : (
-                    <div className="flex items-center gap-2">
-                        {yearly.pro ? (
+            <SettingsRow
+                control={
+                    <>
+                        <Badge variant={isPro ? "default" : "secondary"}>{isPro ? t`Pro` : t`Free`}</Badge>
+                        {plan?.creemCustomerId ? (
                             <Button
                                 disabled={checkoutPending}
                                 onClick={() => {
-                                    void startCheckout("pro", "year");
+                                    void openPortal("user");
                                 }}
                                 size="sm"
                                 type="button"
                                 variant="outline"
                             >
-                                {t`Pay yearly`}
+                                {t`Manage subscription`}
                             </Button>
                         ) : null}
-                        <Button
-                            disabled={checkoutPending}
-                            onClick={() => {
-                                void startCheckout("pro");
-                            }}
-                            size="sm"
-                            type="button"
-                        >
-                            {yearly.pro ? t`Upgrade to Pro, monthly` : t`Upgrade to Pro`}
-                        </Button>
-                    </div>
-                )}
-            </CardContent>
+                        {isPro || isPending ? null : (
+                            <>
+                                {yearly.pro ? (
+                                    <Button
+                                        disabled={checkoutPending}
+                                        onClick={() => {
+                                            void startCheckout("pro", "year");
+                                        }}
+                                        size="sm"
+                                        type="button"
+                                        variant="outline"
+                                    >
+                                        {t`Pay yearly`}
+                                    </Button>
+                                ) : null}
+                                <Button
+                                    disabled={checkoutPending}
+                                    onClick={() => {
+                                        void startCheckout("pro");
+                                    }}
+                                    size="sm"
+                                    type="button"
+                                >
+                                    {yearly.pro ? t`Upgrade to Pro, monthly` : t`Upgrade to Pro`}
+                                </Button>
+                            </>
+                        )}
+                    </>
+                }
+                title={t`Current plan:`}
+            />
         </SettingsCard>
     );
 };

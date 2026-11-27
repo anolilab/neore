@@ -1,13 +1,14 @@
 "use client";
 
 import { useLingui } from "@lingui/react/macro";
+import { Card } from "@neore/ui/components/card";
 import { Input } from "@neore/ui/components/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@neore/ui/components/tabs";
 import { Search } from "lucide-react";
 import type { FC } from "react";
 import { useState } from "react";
 
-import SettingsCard from "@/components/settings/settings-card";
+import SettingsCardHeader from "@/components/settings/settings-card-header";
 
 import ConnectorCard from "./connector-card";
 import connectorCategoryLabel from "./connector-category";
@@ -31,12 +32,14 @@ const ConnectorsPage: FC = () => {
     const connectedCount = (catalog ?? []).filter((entry) => entry.connection?.status === "connected").length;
 
     return (
-        <SettingsCard description={t`Connect third-party services to extend AI capabilities with your data and tools.`} title={t`Connectors`}>
-            <div className="space-y-3 py-3">
-                <p className="text-muted-foreground text-xs">
-                    {t`Connectors talk to each provider's own MCP server over OAuth 2.0. Your tokens are stored encrypted, the AI asks before using a tool that can change data, and disconnecting revokes access.`}
-                </p>
+        <Card className="w-full text-start" variant="plain">
+            <SettingsCardHeader
+                className="px-1"
+                description={t`Connectors talk to each provider's own MCP server over OAuth 2.0. Your tokens are stored encrypted, the AI asks before using a tool that can change data, and disconnecting revokes access.`}
+                title={t`Connectors`}
+            />
 
+            <div className="space-y-3">
                 <p aria-live="polite" className="text-sm font-medium" role="status">
                     {!isLoading && connectedCount > 0 && t`${connectedCount} connected`}
                 </p>
@@ -55,41 +58,39 @@ const ConnectorsPage: FC = () => {
             </div>
 
             <Tabs onValueChange={setActiveTab} value={activeTab}>
-                <div className="pb-3">
-                    <TabsList className="w-full">
-                        <TabsTrigger className="flex-1" value="all">
-                            {t`All`}
+                <TabsList className="w-full">
+                    <TabsTrigger className="flex-1" value="all">
+                        {t`All`}
+                    </TabsTrigger>
+                    {categories.map((category) => (
+                        <TabsTrigger className="flex-1 capitalize" key={category} value={category}>
+                            {connectorCategoryLabel(category, i18n)}
                         </TabsTrigger>
-                        {categories.map((category) => (
-                            <TabsTrigger className="flex-1 capitalize" key={category} value={category}>
-                                {connectorCategoryLabel(category, i18n)}
-                            </TabsTrigger>
-                        ))}
-                    </TabsList>
-                </div>
+                    ))}
+                </TabsList>
                 <TabsContent value={activeTab}>
                     {isLoading && (
-                        <p className="text-muted-foreground border-border/50 border-t py-6 text-center text-sm" role="status">
+                        <p className="text-muted-foreground py-6 text-center text-sm" role="status">
                             {t`Loading connectors...`}
                         </p>
                     )}
                     {!isLoading && filtered.length > 0 && (
-                        <ul>
-                            {filtered.map((entry) => (
-                                <li key={entry.id}>
-                                    <ConnectorCard entry={entry} />
-                                </li>
-                            ))}
-                        </ul>
+                        <div className="surface-raised overflow-hidden rounded-xl" data-slot="settings-card-body">
+                            <div className="px-4 py-1">
+                                {filtered.map((entry) => (
+                                    <ConnectorCard entry={entry} key={entry.id} />
+                                ))}
+                            </div>
+                        </div>
                     )}
                     {!isLoading && filtered.length === 0 && (
-                        <p className="text-muted-foreground border-border/50 border-t py-6 text-center text-sm">
+                        <p className="text-muted-foreground py-6 text-center text-sm">
                             {searchTerm ? t`No connectors found for "${searchTerm}"` : t`No connectors available in this category`}
                         </p>
                     )}
                 </TabsContent>
             </Tabs>
-        </SettingsCard>
+        </Card>
     );
 };
 

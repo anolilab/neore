@@ -3,8 +3,9 @@
 import { useLingui } from "@lingui/react/macro";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@neore/ui/components/collapsible";
 import ConfirmDialog from "@neore/ui/components/confirm-dialog";
-import { BookOpen, CircleAlert, CircleCheck, Clock, ExternalLink, GitBranch, HardDrive, Loader2, Mail, MessageSquare, Plug } from "lucide-react";
+import { BookOpen, ChevronDown, CircleAlert, CircleCheck, Clock, ExternalLink, GitBranch, HardDrive, Loader2, Mail, MessageSquare, Plug } from "lucide-react";
 import type { FC } from "react";
 import { useId, useState } from "react";
 
@@ -144,7 +145,11 @@ const ConnectorCard: FC<{ entry: ConnectorCatalogEntry }> = ({ entry }) => {
                         )}
                     </>
                 }
-                description={entry.description}
+                description={
+                    <span className="line-clamp-2" title={entry.description}>
+                        {entry.description}
+                    </span>
+                }
                 title={
                     <span className="flex flex-wrap items-center gap-2">
                         <Icon aria-hidden className="text-primary-text size-4 shrink-0" />
@@ -166,53 +171,61 @@ const ConnectorCard: FC<{ entry: ConnectorCatalogEntry }> = ({ entry }) => {
                 }
             >
                 {hasDetails && (
-                    <div className="flex flex-col gap-3">
-                        {status === "connected" && connection?.accountLabel && (
-                            <p className="text-muted-foreground text-xs">{t`Connected to ${connection.accountLabel}`}</p>
-                        )}
+                    <Collapsible>
+                        <CollapsibleTrigger className="text-muted-foreground hover:text-foreground group inline-flex items-center gap-1 text-xs font-medium">
+                            {t`Details`}
+                            <ChevronDown aria-hidden className="size-3 transition-transform group-data-[panel-open]:rotate-180" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                            <div className="flex flex-col gap-3 pt-3">
+                                {status === "connected" && connection?.accountLabel && (
+                                    <p className="text-muted-foreground text-xs">{t`Connected to ${connection.accountLabel}`}</p>
+                                )}
 
-                        {(status === "expired" || status === "error") && (
-                            <p className="text-destructive text-xs">{connection?.lastError ?? t`This connection needs to be renewed.`}</p>
-                        )}
+                                {(status === "expired" || status === "error") && (
+                                    <p className="text-destructive text-xs">{connection?.lastError ?? t`This connection needs to be renewed.`}</p>
+                                )}
 
-                        {status === "not_configured" && (
-                            <p className="text-muted-foreground text-xs">{t`An administrator needs to register an OAuth app for this connector before it can be used.`}</p>
-                        )}
+                                {status === "not_configured" && (
+                                    <p className="text-muted-foreground text-xs">{t`An administrator needs to register an OAuth app for this connector before it can be used.`}</p>
+                                )}
 
-                        {entry.availabilityNote && <p className="text-muted-foreground text-xs">{entry.availabilityNote}</p>}
+                                {entry.availabilityNote && <p className="text-muted-foreground text-xs">{entry.availabilityNote}</p>}
 
-                        {scopes.length > 0 && (
-                            <div>
-                                <p className="text-muted-foreground text-xs font-medium" id={scopesId}>
-                                    {hasGrant ? t`Granted permissions` : t`Requested permissions`}
-                                </p>
-                                <ul aria-labelledby={scopesId} className="mt-1 flex flex-wrap gap-1">
-                                    {scopes.map((scope) => (
-                                        <li key={scope}>
-                                            <code className="bg-muted rounded px-1.5 py-0.5 text-[11px] break-all">
-                                                {scope.replace("https://www.googleapis.com/auth/", "")}
-                                            </code>
-                                        </li>
-                                    ))}
-                                </ul>
+                                {scopes.length > 0 && (
+                                    <div>
+                                        <p className="text-muted-foreground text-xs font-medium" id={scopesId}>
+                                            {hasGrant ? t`Granted permissions` : t`Requested permissions`}
+                                        </p>
+                                        <ul aria-labelledby={scopesId} className="mt-1 flex flex-wrap gap-1">
+                                            {scopes.map((scope) => (
+                                                <li key={scope}>
+                                                    <code className="bg-muted rounded px-1.5 py-0.5 text-[11px] break-all">
+                                                        {scope.replace("https://www.googleapis.com/auth/", "")}
+                                                    </code>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+
+                                {status === "connected" && <TrustServerSwitch server={{ kind: "connector", name: entry.name, slug: entry.slug }} />}
+
+                                {entry.docsUrl && (
+                                    <a
+                                        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
+                                        href={entry.docsUrl}
+                                        rel="noopener noreferrer"
+                                        target="_blank"
+                                    >
+                                        {t`About ${entry.name}`}
+                                        <ExternalLink aria-hidden className="size-3" />
+                                        <span className="sr-only">{t`(opens in a new tab)`}</span>
+                                    </a>
+                                )}
                             </div>
-                        )}
-
-                        {status === "connected" && <TrustServerSwitch server={{ kind: "connector", name: entry.name, slug: entry.slug }} />}
-
-                        {entry.docsUrl && (
-                            <a
-                                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
-                                href={entry.docsUrl}
-                                rel="noopener noreferrer"
-                                target="_blank"
-                            >
-                                {t`About ${entry.name}`}
-                                <ExternalLink aria-hidden className="size-3" />
-                                <span className="sr-only">{t`(opens in a new tab)`}</span>
-                            </a>
-                        )}
-                    </div>
+                        </CollapsibleContent>
+                    </Collapsible>
                 )}
             </SettingsRow>
 

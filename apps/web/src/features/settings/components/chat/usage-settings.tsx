@@ -16,7 +16,7 @@ import { formatDateTime, formatNumber } from "@neore/ui/utils/locale-format";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, AlertCircle, Bell, BellOff, ChevronDown, ChevronRight, DollarSign, Loader2, Trash2, TrendingUp, Zap } from "lucide-react";
 import type { FC } from "react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
@@ -143,6 +143,8 @@ const OverviewCard: FC<OverviewCardProps> = ({ icon, label, value }) => (
 const UsageSettings: FC = () => {
     const { i18n, t } = useLingui();
     const [days, setDays] = useState<7 | 30 | 90>(30);
+    const periodLabelId = useId();
+    const periodTriggerId = useId();
     const { backfilling } = useUsageBackfill();
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [formData, setFormData] = useState(EMPTY_FORM);
@@ -242,9 +244,21 @@ const UsageSettings: FC = () => {
                     <p className="text-muted-foreground text-sm">{t`Track your LLM token usage, cost, and set budget alerts`}</p>
                 </div>
 
+                <span className="sr-only" id={periodLabelId}>
+                    {t`Period`}
+                </span>
                 <Select onValueChange={(v) => v && setDays(Number(v) as 7 | 30 | 90)} value={String(days)}>
-                    <SelectTrigger className="w-[130px]">
-                        <SelectValue />
+                    {/* Named "Period" plus the shown value, so the name holds the visible text even before the value renders. */}
+                    <SelectTrigger aria-labelledby={`${periodLabelId} ${periodTriggerId}`} className="w-[150px]" id={periodTriggerId}>
+                        <SelectValue>
+                            {(value: string | null) => {
+                                if (value === "7") {
+                                    return t`Last 7 days`;
+                                }
+
+                                return value === "90" ? t`Last 90 days` : t`Last 30 days`;
+                            }}
+                        </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="7">{t`Last 7 days`}</SelectItem>

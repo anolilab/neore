@@ -142,6 +142,13 @@ const saveStatus = (state: { canSubmit: boolean; isSubmitting: boolean }): "inva
 
 const defaultShortcut = (key: keyof KeyboardShortcutForm): string => formatShortcutForDisplay(defaultKeyboardShortcuts[key] ?? "");
 
+/** The description without its "(Ctrl + Shift + A)": the row's field already shows the key combination. */
+const withoutDefaultShortcut = (description: string, key: keyof KeyboardShortcutForm): string => {
+    const combo = defaultShortcut(key);
+
+    return combo ? description.replace(` (${combo})`, "").replace(`(${combo})`, "").trim() : description;
+};
+
 const KeyboardShortcutsSettings: FC = () => {
     const { t } = useLingui();
 
@@ -377,7 +384,7 @@ const KeyboardShortcutsSettings: FC = () => {
                                 }
                                 description={
                                     <>
-                                        {shortcutDescriptions[key]}
+                                        {withoutDefaultShortcut(shortcutDescriptions[key], key)}
                                         <form.Subscribe selector={(state) => isDuplicate(state.fieldMeta[key]?.errors)}>
                                             {(duplicate) =>
                                                 duplicate && (

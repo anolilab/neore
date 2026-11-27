@@ -817,11 +817,11 @@ const TriggerSettings: FC = () => {
                             const lastRunAt = trigger.lastTriggeredAt ? formatDateTime(trigger.lastTriggeredAt, i18n.locale) : null;
 
                             return (
-                                <div className="border-border/50 py-3 not-first:border-t" key={trigger._id}>
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <CardHeading className="truncate font-medium">{trigger.name}</CardHeading>
+                                <div className="border-border/50 @container/settings-row py-3 not-first:border-t" key={trigger._id}>
+                                    <div className="flex flex-col gap-3 @lg/settings-row:grid @lg/settings-row:grid-cols-[minmax(0,1fr)_auto] @lg/settings-row:items-start @lg/settings-row:gap-8">
+                                        <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                                <CardHeading className="min-w-0 font-medium break-words">{trigger.name}</CardHeading>
                                                 <TriggerTypeBadge type={trigger.type} />
                                                 {trigger.enabled ? (
                                                     <Badge variant="default">{t`Active`}</Badge>
@@ -862,8 +862,11 @@ const TriggerSettings: FC = () => {
 
                                             {/* Webhook URL display */}
                                             {trigger.type === "webhook" && (
-                                                <div className="mt-2 flex items-center gap-1.5">
-                                                    <code className="bg-muted truncate rounded px-1.5 py-0.5 text-[11px]">
+                                                <div className="mt-2 flex min-w-0 items-center gap-1.5">
+                                                    <code
+                                                        className="bg-muted min-w-0 truncate rounded px-1.5 py-0.5 text-[11px]"
+                                                        title={`${env.VITE_LUNORA_URL}/triggers/webhook/${trigger._id}`}
+                                                    >
                                                         {env.VITE_LUNORA_URL}/triggers/webhook/{trigger._id}
                                                     </code>
                                                     <button
@@ -895,7 +898,7 @@ const TriggerSettings: FC = () => {
                                             )}
                                         </div>
 
-                                        <div className="flex shrink-0 items-center gap-1">
+                                        <div className="flex flex-wrap items-center gap-1">
                                             {/* Test run */}
                                             <Button
                                                 aria-label={t`Test run trigger`}

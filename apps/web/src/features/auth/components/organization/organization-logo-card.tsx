@@ -2,24 +2,22 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
-import { Card } from "@neore/ui/components/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
-import cn from "@neore/ui/utils/cn";
 import { Trash2Icon, UploadCloudIcon } from "lucide-react";
-import type { ComponentProps } from "react";
 import { useRef, useState } from "react";
 
-import type { SettingsCardClassNames } from "@/components/settings/settings-card";
-import SettingsCardFooter from "@/components/settings/settings-card-footer";
-import SettingsCardHeader from "@/components/settings/settings-card-header";
+import type { SettingsCardClassNames, SettingsCardProperties } from "@/components/settings/settings-card";
+import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import { useActiveOrganization, useHasPermission, useListOrganizations } from "@/features/auth/hooks/organization-management";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 
 import { fileToBase64, resizeAndCropImage } from "../../lib/image-utilities";
 import { getLocalizedError } from "../../lib/utilities";
+import { hideCardHeader } from "../settings/settings-field-row";
 import OrganizationLogo from "./organization-logo";
 
-export interface OrganizationLogoCardProperties extends ComponentProps<typeof Card> {
+export interface OrganizationLogoCardProperties extends SettingsCardProperties {
     className?: string;
     classNames?: SettingsCardClassNames;
 }
@@ -109,71 +107,66 @@ const OrganizationLogoForm = ({ className, classNames, ...properties }: Organiza
     };
 
     return (
-        <Card className={cn("w-full pb-0 text-start", className, classNames?.base)} {...properties}>
-            <input
-                accept="image/*"
-                disabled={loading || !hasPermission?.success}
-                hidden
-                onChange={(e) => {
-                    const file = e.target.files?.item(0);
+        <SettingsCard className={className} classNames={hideCardHeader(classNames)} isPending={isPending} {...properties}>
+            <SettingsRow
+                control={
+                    <>
+                        <input
+                            accept="image/*"
+                            disabled={loading || !hasPermission?.success}
+                            hidden
+                            onChange={(e) => {
+                                const file = e.target.files?.item(0);
 
-                    if (file) {
-                        handleLogoChange(file);
-                    }
+                                if (file) {
+                                    handleLogoChange(file);
+                                }
 
-                    e.target.value = "";
-                }}
-                ref={fileInputReference}
-                type="file"
+                                e.target.value = "";
+                            }}
+                            ref={fileInputReference}
+                            type="file"
+                        />
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger
+                                render={
+                                    <Button className="size-fit rounded-full" disabled={!hasPermission?.success} size="icon" type="button" variant="ghost">
+                                        <OrganizationLogo
+                                            className="size-20 text-2xl"
+                                            classNames={undefined}
+                                            isPending={isPending || loading}
+                                            key={activeOrganization?.logo}
+                                            organization={activeOrganization}
+                                        />
+                                    </Button>
+                                }
+                            />
+
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem disabled={loading || !hasPermission?.success} onClick={openFileDialog}>
+                                    <UploadCloudIcon />
+                                    {t`Upload Logo`}
+                                </DropdownMenuItem>
+                                {activeOrganization?.logo && (
+                                    <DropdownMenuItem disabled={loading || !hasPermission?.success} onClick={handleDeleteLogo} variant="destructive">
+                                        <Trash2Icon />
+                                        {t`Delete Logo`}
+                                    </DropdownMenuItem>
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </>
+                }
+                description={
+                    <>
+                        {t`Upload your organization's logo`}
+                        <span className="mt-1 block">{t`Click on the logo to upload a new image`}</span>
+                    </>
+                }
+                title={t`Logo`}
             />
-
-            <div className="flex justify-between">
-                <SettingsCardHeader
-                    className="grow self-start"
-                    classNames={classNames}
-                    description={t`Upload your organization's logo`}
-                    isPending={isPending}
-                    title={t`Logo`}
-                />
-
-                <DropdownMenu>
-                    <DropdownMenuTrigger
-                        render={
-                            <Button className="me-6 size-fit rounded-full" disabled={!hasPermission?.success} size="icon" type="button" variant="ghost">
-                                <OrganizationLogo
-                                    className="size-20 text-2xl"
-                                    classNames={undefined}
-                                    isPending={isPending || loading}
-                                    key={activeOrganization?.logo}
-                                    organization={activeOrganization}
-                                />
-                            </Button>
-                        }
-                    />
-
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuItem disabled={loading || !hasPermission?.success} onClick={openFileDialog}>
-                            <UploadCloudIcon />
-                            {t`Upload Logo`}
-                        </DropdownMenuItem>
-                        {activeOrganization?.logo && (
-                            <DropdownMenuItem disabled={loading || !hasPermission?.success} onClick={handleDeleteLogo} variant="destructive">
-                                <Trash2Icon />
-                                {t`Delete Logo`}
-                            </DropdownMenuItem>
-                        )}
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
-
-            <SettingsCardFooter
-                className="!py-5"
-                classNames={classNames}
-                instructions={t`Click on the logo to upload a new image`}
-                isPending={isPending}
-                isSubmitting={loading}
-            />
-        </Card>
+        </SettingsCard>
     );
 };
 
@@ -185,29 +178,17 @@ const OrganizationLogoCard = ({ className, classNames, ...properties }: Organiza
 
     if (!activeOrganization) {
         return (
-            <Card className={cn("w-full pb-0 text-start", className, classNames?.base)} {...properties}>
-                <div className="flex justify-between">
-                    <SettingsCardHeader
-                        className="grow self-start"
-                        classNames={classNames}
-                        description={t`Upload your organization's logo`}
-                        isPending
-                        title={t`Logo`}
-                    />
-
-                    <Button className="me-6 size-fit rounded-full" disabled size="icon" type="button" variant="ghost">
-                        <OrganizationLogo className="size-20 text-2xl" classNames={undefined} isPending />
-                    </Button>
-                </div>
-
-                <SettingsCardFooter
-                    className="!py-5"
-                    classNames={classNames}
-                    instructions={t`Click on the logo to upload a new image`}
-                    isPending
-                    isSubmitting={false}
+            <SettingsCard className={className} classNames={hideCardHeader(classNames)} isPending {...properties}>
+                <SettingsRow
+                    control={
+                        <Button className="size-fit rounded-full" disabled size="icon" type="button" variant="ghost">
+                            <OrganizationLogo className="size-20 text-2xl" classNames={undefined} isPending />
+                        </Button>
+                    }
+                    description={t`Upload your organization's logo`}
+                    title={t`Logo`}
                 />
-            </Card>
+            </SettingsCard>
         );
     }
 

@@ -409,11 +409,8 @@ const MCPSettings: FC = () => {
                 title={t`MCP Servers`}
             >
                 <div className="border-border/50 py-3 not-first:border-t">
-                    <p className="text-muted-foreground max-w-2xl text-xs leading-normal">
-                        {t`MCP servers provide additional tools that the AI can use during conversations. Tools from connected servers are automatically available when chatting.`}
-                    </p>
                     <a
-                        className="text-primary-text mt-1 inline-flex items-center gap-1 text-xs underline"
+                        className="text-primary-text inline-flex items-center gap-1 text-xs underline"
                         href="https://modelcontextprotocol.io/introduction"
                         rel="noopener noreferrer"
                         target="_blank"

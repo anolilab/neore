@@ -1,7 +1,6 @@
 "use client";
 
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Alert, AlertDescription } from "@neore/ui/components/alert";
 import { Button } from "@neore/ui/components/button";
 import { RadioGroup, RadioGroupItem } from "@neore/ui/components/radio-group";
 import { Switch } from "@neore/ui/components/switch";
@@ -104,15 +103,15 @@ const AgentSettings: FC = () => {
 
     return (
         <div className="space-y-8">
-            <Alert>
-                <Info aria-hidden="true" className="h-4 w-4" />
-                <AlertDescription>
+            <p className="text-muted-foreground flex items-start gap-1.5 px-1 text-xs leading-normal">
+                <Info aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
+                <span>
                     <Trans>
                         The agent loop is always enabled for systematic task execution. These settings control additional specialized modules that enhance the
                         AI&apos;s capabilities for specific task types.
                     </Trans>
-                </AlertDescription>
-            </Alert>
+                </span>
+            </p>
 
             <SettingsCard description={t`Enable specialized modules to enhance AI capabilities`} title={t`Agent Modules`}>
                 <SettingsRow
