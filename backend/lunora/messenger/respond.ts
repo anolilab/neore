@@ -27,7 +27,7 @@ import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 import { internalAction } from "../_generated/server";
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
-import { formatMemoryDigest, MEMORY_OFF_DIGEST } from "../memory/export-format";
+import { digestCandidates, formatMemoryDigest, MEMORY_DIGEST_SOURCE_CHECKS, MEMORY_OFF_DIGEST } from "../memory/export-format";
 import { readBotLabels, readExportMemories } from "../memory/markdown-export";
 import { memoryLogger } from "../lib/logger";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
@@ -406,10 +406,23 @@ export const memoryDigestText = async (ctx: Pick<ActionCtx, "runQuery">, userId:
         ctx.runQuery(internal.memory.functions.getUserTimeZone, { userId }),
     ]);
 
+    const now = Date.now();
     // The same bot labels as the download, from one call; past the read limit every bot reads "a bot".
     const { labels: bots } = await readBotLabels(ctx, userId, rows);
+    // Unlike the download (the signed-in owner, who sees the same rows in settings), a phone may be read by anyone holding
+    // it: memories whose source chat is locked, in the trash or gone are left out. One read for the candidates checked.
+    const sourceIds = [
+        ...new Set(
+            digestCandidates(rows, now, timeZone)
+                .slice(0, MEMORY_DIGEST_SOURCE_CHECKS)
+                .flatMap((row) => (row.sourceThreadId === undefined ? [] : [row.sourceThreadId])),
+        ),
+    ];
+    const hiddenSources = new Set(
+        sourceIds.length === 0 ? [] : await ctx.runQuery(internal.memory.markdown_export.readHiddenSourceThreads, { threadIds: sourceIds, userId }),
+    );
 
-    return formatMemoryDigest(rows, { bots, maxChars: DIGEST_MAX_CHARS[platform], now: Date.now(), timeZone, truncated });
+    return formatMemoryDigest(rows, { bots, hiddenSources, maxChars: DIGEST_MAX_CHARS[platform], now, timeZone, truncated });
 };
 
 interface MemoryDigestArgs extends Delivery {

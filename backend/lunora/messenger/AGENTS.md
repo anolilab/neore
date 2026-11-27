@@ -35,4 +35,5 @@
   the connection was paired in (`platformChatId`) and only when the adapter marks it one-to-one (`InboundMessage.direct`,
   absent = a group; a Discord gateway message is never one-to-one); anywhere else the owner gets a notice, never the
   digest. It shares the download's `memory/export` limit. The action re-reads the connection before it reads and again
-  before it sends, and answers nothing if the pairing changed since the command was queued.
+  before it sends, and answers nothing if the pairing changed since the command was queued. A memory whose source chat
+  is locked, in the trash or gone is left out of the digest (`readHiddenSourceThreads`), unlike the download.

@@ -39,7 +39,7 @@ import { checkRateLimit } from "../lib/rate-limiter";
 import { checkSenderPairing } from "./pairing";
 import {
     isMemoryCommand,
-    MEMORY_COMMAND_DISCORD_SLASH_NOTICE,
+    MEMORY_COMMAND_DISCORD_MESSAGE_NOTICE,
     MEMORY_COMMAND_OTHER_CHAT_NOTICE,
     MEMORY_COMMAND_RATE_LIMITED_NOTICE,
 } from "./lib/memory-command";
@@ -138,7 +138,7 @@ const answerMemoryCommand = async (
     };
 
     if (message.direct !== true || message.chatId !== connection.platformChatId) {
-        await sendNotice(message.directUnknown === true ? MEMORY_COMMAND_DISCORD_SLASH_NOTICE : MEMORY_COMMAND_OTHER_CHAT_NOTICE);
+        await sendNotice(message.directUnknown === true ? MEMORY_COMMAND_DISCORD_MESSAGE_NOTICE : MEMORY_COMMAND_OTHER_CHAT_NOTICE);
 
         return;
     }

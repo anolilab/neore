@@ -426,14 +426,14 @@ describe("Discord through acceptInbound", () => {
         }
 
         expect(scheduledPaths()).toStrictEqual(["messenger_respond:sendMemoryDigest", "messenger_respond:sendNotice", "messenger_respond:sendNotice"]);
-        // A group DM is told to use the direct chat; a gateway message, which names no channel type, to use the slash command.
+        // A group DM is told to use the direct chat; a gateway message, which names no channel type, where else to look.
         expect(
             scheduled()
                 .slice(1)
                 .map((entry) => entry.args.text),
         ).toStrictEqual([
             "Send /memory in your direct chat with this bot: what it remembers about you is not shown here.",
-            "Use the /memory slash command in your direct message with the bot.",
+            "On Discord, /memory isn't available in messages yet; download your memories from Memory settings.",
         ]);
     });
 

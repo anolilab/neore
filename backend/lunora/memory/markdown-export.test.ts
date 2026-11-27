@@ -8,7 +8,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import schema from "../schema";
 import type { BotLabel, ExportMemoryRow } from "./export-format";
 import { formatMemoryDigest, formatMemoryMarkdown, MEMORY_DIGEST_MAX_CHARS, MEMORY_EXPORT_MAX_ROWS, MEMORY_EXPORT_SCAN_ROWS } from "./export-format";
-import { MEMORY_EXPORT_PAGE_ROWS, readBotLabels, readExportMemories, readMemoryExportPage, resolveMemoryBotLabels } from "./markdown-export";
+import {
+    MEMORY_EXPORT_PAGE_ROWS,
+    readBotLabels,
+    readExportMemories,
+    readHiddenSourceThreads,
+    readMemoryExportPage,
+    resolveMemoryBotLabels,
+} from "./markdown-export";
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -198,6 +205,21 @@ describe("formatMemoryDigest", () => {
         expect(digest).not.toContain("y".repeat(100));
         expect(digest).toContain("• short one");
         expect(digest).toContain("• short two");
+    });
+
+    it("leaves out a memory whose source chat is hidden, and says so", () => {
+        const rows = [
+            row({ memory: "from a locked chat", sourceThreadId: "locked" }),
+            row({ memory: "from an open chat", sourceThreadId: "open" }),
+            row({ memory: "added by hand" }),
+        ];
+        const digest = formatMemoryDigest(rows, { bots: NO_BOTS, hiddenSources: new Set(["locked"]), now: NOW, timeZone: "UTC", truncated: false });
+
+        expect(digest).not.toContain("from a locked chat");
+        expect(digest).toContain("• from an open chat");
+        expect(digest).toContain("• added by hand");
+        expect(digest).toContain("Some memories from locked chats are hidden here.\nThe full list");
+        expect(formatMemoryDigest(rows, { bots: NO_BOTS, now: NOW, timeZone: "UTC", truncated: false })).not.toContain("hidden here");
     });
 
     it("never cuts through an emoji at the 200- or 40-character cap", () => {
@@ -435,5 +457,27 @@ describe("resolveMemoryBotLabels", () => {
             "a — last confirmed 2026-03-01 · learned in chat · a bot",
         );
         await expect(readBotLabels(failing("INTERNAL"), "user-1", rows)).rejects.toThrow("read failed");
+    });
+});
+
+describe("readHiddenSourceThreads", () => {
+    it("hides a locked, trashed, missing or other person's chat, and keeps the owner's open one", async () => {
+        const hidden = await harness.run(async (ctx: any) => {
+            const thread = async (fields: Record<string, unknown>) =>
+                (await ctx.db.insert("threads", { createdAt: 1, status: "active", title: "t", updatedAt: 1, userId: "user-1", ...fields })) as string;
+            const open = await thread({});
+            const locked = await thread({ lockedAt: 2 });
+            const trashed = await thread({ deleted: true });
+            const theirs = await thread({ userId: "user-2" });
+            const gone = await thread({});
+
+            await ctx.db.delete("threads", gone);
+
+            const result: string[] = await ctx.runQuery(readHiddenSourceThreads, { threadIds: [open, locked, trashed, theirs, gone], userId: "user-1" });
+
+            return { expected: [locked, trashed, theirs, gone], result };
+        });
+
+        expect(hidden.result).toStrictEqual(hidden.expected);
     });
 });

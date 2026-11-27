@@ -194,6 +194,9 @@ const ctx = () =>
                 case "memory_functions:isMemoryEnabled": {
                     return state.memoryEnabled;
                 }
+                case "memory_markdown_export:readHiddenSourceThreads": {
+                    return (args as { threadIds: string[] }).threadIds.filter((id) => id.startsWith("locked"));
+                }
                 case "memory_markdown_export:readMemoryExportPage": {
                     state.memoryReads.push((args as { userId: string }).userId);
 
@@ -461,6 +464,19 @@ describe("/memory digest", () => {
 
         expect(await memoryDigestText(ctx(), "owner", "telegram")).toBe(MEMORY_OFF_DIGEST);
         expect(state.memoryReads).toStrictEqual([]);
+    });
+
+    it("leaves out a memory from a locked chat and keeps one from an open chat", async () => {
+        state.memoryRows = [
+            { lastConfirmedAt: NOW, memory: "said in a locked chat", pinned: false, sourceThreadId: "locked-1", type: "context" },
+            { lastConfirmedAt: NOW, memory: "said in an open chat", pinned: false, sourceThreadId: "open-1", type: "context" },
+        ];
+
+        const digest = await memoryDigestText(ctx(), "owner", "telegram");
+
+        expect(digest).not.toContain("said in a locked chat");
+        expect(digest).toContain("• said in an open chat");
+        expect(digest).toContain("Some memories from locked chats are hidden here.");
     });
 
     it("fits WeChat's 600-character message, pointer kept", async () => {

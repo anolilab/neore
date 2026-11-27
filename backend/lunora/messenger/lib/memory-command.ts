@@ -13,8 +13,11 @@ export const isMemoryCommand = (text: string | undefined): boolean => text !== u
 
 export const MEMORY_COMMAND_OTHER_CHAT_NOTICE = "Send /memory in your direct chat with this bot: what it remembers about you is not shown here.";
 
-/** For a Discord message that names no channel type (`directUnknown`): only the slash command tells a DM from a group DM. */
-export const MEMORY_COMMAND_DISCORD_SLASH_NOTICE = "Use the /memory slash command in your direct message with the bot.";
+/**
+ * For a Discord message that names no channel type (`directUnknown`): it cannot be told from a group DM. No `memory`
+ * application command is registered by the app (Discord commands are set up by hand), so this points to the download.
+ */
+export const MEMORY_COMMAND_DISCORD_MESSAGE_NOTICE = "On Discord, /memory isn't available in messages yet; download your memories from Memory settings.";
 
 /** Sent when the digest could not be read; the cause is logged, never shown. */
 export const MEMORY_DIGEST_FAILED_NOTICE = "Couldn't read your memories right now. Please try again in a moment.";

@@ -22,6 +22,8 @@ export interface ExportMemoryRow {
     memory: string;
     pinned: boolean;
     source?: string;
+    /** The chat the memory was learned in (its evidence's, else its own `threadId`); never printed. */
+    sourceThreadId?: string;
     type: MemoryType;
     validUntil?: string;
 }
@@ -185,6 +187,10 @@ const DIGEST_LINE_MAX = 200;
 
 export const MEMORY_OFF_DIGEST = "Memory is off for your account, so nothing new is remembered. Turn it on in Settings → Personalization → Memory.";
 const DIGEST_POINTER = "The full list, with dates: Settings → Personalization → Memory → Download memories.";
+const DIGEST_HIDDEN_NOTE = "Some memories from locked chats are hidden here.";
+
+/** Candidates whose source chat `/memory` checks at most, best first: the ten it shows come from these. */
+export const MEMORY_DIGEST_SOURCE_CHECKS = 50;
 
 /** The importance a row with none is read as, as retrieval and reflection read it (`retrieve-ranking.ts`, `reflection.ts`). */
 const UNSCORED_IMPORTANCE = 50;
@@ -197,6 +203,13 @@ const byWeight = (a: ExportMemoryRow, b: ExportMemoryRow): number =>
     (b.importance ?? UNSCORED_IMPORTANCE) - (a.importance ?? UNSCORED_IMPORTANCE) ||
     b.lastConfirmedAt - a.lastConfirmedAt;
 
+/** The memories a digest may list, best first: pinned ones, and unpinned ones not past their end date. */
+export const digestCandidates = (rows: ReadonlyArray<ExportMemoryRow>, now: number, timeZone: string | null | undefined): ExportMemoryRow[] => {
+    const today = exportDayOf(now, timeZone);
+
+    return rows.filter((row) => row.pinned || !isExpired(row, today)).toSorted(byWeight);
+};
+
 /**
  * The `/memory` reply: counts by type, then up to ten memories (pinned first; an unpinned one past its end date is
  * left out), each with its source and scope as the file labels them, cut to `maxChars` (the platform's message limit, at most {@link MEMORY_DIGEST_MAX_CHARS}). The pointer to the
@@ -204,29 +217,49 @@ const byWeight = (a: ExportMemoryRow, b: ExportMemoryRow): number =>
  */
 export const formatMemoryDigest = (
     rows: ReadonlyArray<ExportMemoryRow>,
-    options: { bots: ReadonlyMap<string, BotLabel>; maxChars?: number; now: number; timeZone: string | null | undefined; truncated: boolean },
+    options: {
+        bots: ReadonlyMap<string, BotLabel>;
+        /** Source chats that are locked, in the trash or gone: their memories are left out, and the digest says so. */
+        hiddenSources?: ReadonlySet<string>;
+        maxChars?: number;
+        now: number;
+        timeZone: string | null | undefined;
+        truncated: boolean;
+    },
 ): string => {
     if (rows.length === 0) {
         return `Nothing is remembered yet.\n\n${DIGEST_POINTER}`;
     }
 
     const maxChars = Math.min(options.maxChars ?? MEMORY_DIGEST_MAX_CHARS, MEMORY_DIGEST_MAX_CHARS);
-    const today = exportDayOf(options.now, options.timeZone);
     const counts = MEMORY_TYPES.map((type) => [type, rows.filter((row) => row.type === type).length] as const)
         .filter(([, count]) => count > 0)
         .map(([type, count]) => `${TYPE_TITLES[type].toLowerCase()} ${String(count)}`);
     const total = `${options.truncated ? "More than " : ""}${String(rows.length)}`;
     const head = `${total} ${rows.length === 1 ? "memory" : "memories"} (${counts.join(", ")}).`;
-    const top = rows
-        .filter((row) => row.pinned || !isExpired(row, today))
-        .toSorted(byWeight)
-        .slice(0, MEMORY_DIGEST_TOP)
-        .map((row) => {
-            const text = oneLine(row.memory);
+    const hiddenSources = options.hiddenSources ?? new Set<string>();
+    const shown: ExportMemoryRow[] = [];
+    let hidden = false;
 
-            return `${row.pinned ? "📌" : "•"} ${cutTo(text, DIGEST_LINE_MAX)} — ${sourceOf(row)} · ${scopeOf(row, options.bots, DIGEST_BOT_NAME_MAX)}`;
-        });
-    const tail = `\n\n${DIGEST_POINTER}`;
+    // Only the candidates whose source chats were checked; one of those left out before the tenth shown is said.
+    for (const row of digestCandidates(rows, options.now, options.timeZone).slice(0, MEMORY_DIGEST_SOURCE_CHECKS)) {
+        if (shown.length === MEMORY_DIGEST_TOP) {
+            break;
+        }
+
+        if (row.sourceThreadId !== undefined && hiddenSources.has(row.sourceThreadId)) {
+            hidden = true;
+        } else {
+            shown.push(row);
+        }
+    }
+
+    const top = shown.map((row) => {
+        const text = oneLine(row.memory);
+
+        return `${row.pinned ? "📌" : "•"} ${cutTo(text, DIGEST_LINE_MAX)} — ${sourceOf(row)} · ${scopeOf(row, options.bots, DIGEST_BOT_NAME_MAX)}`;
+    });
+    const tail = `\n\n${hidden ? `${DIGEST_HIDDEN_NOTE}\n` : ""}${DIGEST_POINTER}`;
     let body = head;
     let listed = 0;
 
