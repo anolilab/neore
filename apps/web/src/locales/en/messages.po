@@ -2383,11 +2383,11 @@ msgstr "Accent color updated"
 
 #: src/features/auth/components/organization/accept-invitation-card.tsx:192
 #: src/features/auth/components/organization/user-invitations-card.tsx:116
-#: src/features/tasks/components/task-suggestions.tsx:245
+#: src/features/tasks/components/task-suggestions.tsx:248
 msgid "Accept"
 msgstr "Accept"
 
-#: src/features/tasks/components/task-suggestions.tsx:238
+#: src/features/tasks/components/task-suggestions.tsx:241
 msgid "Accept \"{title}\""
 msgstr "Accept \"{title}\""
 
@@ -11501,12 +11501,12 @@ msgstr "Discord Public Key"
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:389
-#: src/features/tasks/components/task-suggestions.tsx:234
+#: src/features/tasks/components/task-suggestions.tsx:237
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "Dismiss"
 
-#: src/features/tasks/components/task-suggestions.tsx:221
+#: src/features/tasks/components/task-suggestions.tsx:224
 msgid "Dismiss \"{title}\""
 msgstr "Dismiss \"{title}\""
 
@@ -14070,7 +14070,7 @@ msgstr "Failed to create preset"
 msgid "Failed to create tag"
 msgstr "Failed to create tag"
 
-#: src/features/tasks/components/task-suggestions.tsx:241
+#: src/features/tasks/components/task-suggestions.tsx:244
 msgid "Failed to create the task"
 msgstr "Failed to create the task"
 
@@ -14194,7 +14194,7 @@ msgstr "Failed to disconnect connector"
 msgid "Failed to dismiss the digest"
 msgstr "Failed to dismiss the digest"
 
-#: src/features/tasks/components/task-suggestions.tsx:228
+#: src/features/tasks/components/task-suggestions.tsx:231
 msgid "Failed to dismiss the suggestion"
 msgstr "Failed to dismiss the suggestion"
 
@@ -31681,7 +31681,7 @@ msgid "Show a message in the app when a chat waits for your answer or your appro
 msgstr "Show a message in the app when a chat waits for your answer or your approval."
 
 #: src/features/skills/components/bundle-import-dialog.tsx:99
-#: src/features/tasks/components/task-suggestions.tsx:213
+#: src/features/tasks/components/task-suggestions.tsx:216
 msgid "Show all"
 msgstr "Show all"
 
@@ -31689,7 +31689,7 @@ msgstr "Show all"
 msgid "Show all {lines} lines"
 msgstr "Show all {lines} lines"
 
-#: src/features/tasks/components/task-suggestions.tsx:203
+#: src/features/tasks/components/task-suggestions.tsx:206
 msgid "Show all instructions for \"{title}\""
 msgstr "Show all instructions for \"{title}\""
 
@@ -31736,11 +31736,11 @@ msgstr "Show Labels"
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 #: src/features/chat/pins/pin-item.tsx:214
 #: src/features/skills/components/bundle-import-dialog.tsx:99
-#: src/features/tasks/components/task-suggestions.tsx:213
+#: src/features/tasks/components/task-suggestions.tsx:216
 msgid "Show less"
 msgstr "Show less"
 
-#: src/features/tasks/components/task-suggestions.tsx:203
+#: src/features/tasks/components/task-suggestions.tsx:206
 msgid "Show less of the instructions for \"{title}\""
 msgstr "Show less of the instructions for \"{title}\""
 
@@ -33854,7 +33854,7 @@ msgstr "Suggested tasks"
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Suggestion available, press Right Arrow to accept"
 
-#: src/features/tasks/components/task-suggestions.tsx:227
+#: src/features/tasks/components/task-suggestions.tsx:230
 msgid "Suggestion dismissed: {title}"
 msgstr "Suggestion dismissed: {title}"
 
@@ -34269,7 +34269,7 @@ msgstr "Task"
 msgid "Task approved"
 msgstr "Task approved"
 
-#: src/features/tasks/components/task-suggestions.tsx:241
+#: src/features/tasks/components/task-suggestions.tsx:244
 msgid "Task created: {title}"
 msgstr "Task created: {title}"
 

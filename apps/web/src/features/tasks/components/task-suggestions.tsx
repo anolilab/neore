@@ -27,7 +27,7 @@ const attempt = async (run: () => Promise<unknown>): Promise<boolean> => {
     }
 };
 
-/** Instructions up to this long fit the two clamped lines even in the narrowest column, so they get no toggle. */
+/** Instructions longer than this are clamped to two lines and get a toggle; shorter ones are shown whole, wrapped. */
 const CLAMP_THRESHOLD = 70;
 
 /** Whether focus has fallen to the page itself, as it does when the focused element is removed. Anywhere else, the person put it there. */
@@ -167,6 +167,8 @@ const TaskSuggestions: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
                     {suggestions.map((suggestion) => {
                         const { _id: id, cronExpression, instructions, title } = suggestion;
                         const expanded = expandedIds.includes(id);
+                        // Only text with a toggle is clamped, so no clamped text is left without a way to read it all.
+                        const clampable = instructions.length > CLAMP_THRESHOLD;
                         const instructionsId = `${headingId}-instructions-${id}`;
 
                         return (
@@ -189,17 +191,18 @@ const TaskSuggestions: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
                                     </p>
                                     <p
                                         className={
-                                            expanded
-                                                ? "text-muted-foreground text-xs break-words whitespace-pre-wrap"
-                                                : "text-muted-foreground line-clamp-2 text-xs"
+                                            clampable && !expanded
+                                                ? "text-muted-foreground line-clamp-2 text-xs"
+                                                : "text-muted-foreground text-xs break-words whitespace-pre-wrap"
                                         }
                                         id={instructionsId}
                                     >
                                         {instructions}
                                     </p>
-                                    {instructions.length > CLAMP_THRESHOLD && (
+                                    {clampable && (
                                         <Button
                                             aria-controls={instructionsId}
+                                            aria-expanded={expanded}
                                             aria-label={expanded ? t`Show less of the instructions for "${title}"` : t`Show all instructions for "${title}"`}
                                             className="h-auto px-0 py-0.5"
                                             onClick={() => {

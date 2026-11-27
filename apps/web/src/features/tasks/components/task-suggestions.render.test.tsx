@@ -199,11 +199,15 @@ describe("TaskSuggestions", () => {
 
         const show = screen.getByRole("button", { name: 'Show all instructions for "Weekly notes"' });
 
-        // A short suggestion fits its two lines, so it gets no toggle.
+        // A short suggestion is shown whole, wrapped, so it gets no clamp and no toggle.
         expect(screen.queryByRole("button", { name: 'Show all instructions for "Morning plants"' })).toBeNull();
+        expect(screen.getByText("Do Morning plants every week").className).not.toContain("line-clamp");
         expect(show.getAttribute("aria-controls")).toBe(instructions.id);
+        expect(show.getAttribute("aria-expanded")).toBe("false");
 
         fireEvent.click(show);
+
+        expect(screen.getByRole("button", { name: 'Show less of the instructions for "Weekly notes"' }).getAttribute("aria-expanded")).toBe("true");
 
         expect(screen.getByText(long).className).not.toContain("line-clamp");
         expect(screen.getByText(long).className).toContain("whitespace-pre-wrap");

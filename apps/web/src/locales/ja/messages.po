@@ -2384,11 +2384,11 @@ msgstr "アクセントカラーを更新しました"
 
 #: src/features/auth/components/organization/accept-invitation-card.tsx:192
 #: src/features/auth/components/organization/user-invitations-card.tsx:116
-#: src/features/tasks/components/task-suggestions.tsx:245
+#: src/features/tasks/components/task-suggestions.tsx:248
 msgid "Accept"
 msgstr "承諾"
 
-#: src/features/tasks/components/task-suggestions.tsx:238
+#: src/features/tasks/components/task-suggestions.tsx:241
 msgid "Accept \"{title}\""
 msgstr "「{title}」を承諾"
 
@@ -11502,12 +11502,12 @@ msgstr "Discord 公開鍵"
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:389
-#: src/features/tasks/components/task-suggestions.tsx:234
+#: src/features/tasks/components/task-suggestions.tsx:237
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "閉じる"
 
-#: src/features/tasks/components/task-suggestions.tsx:221
+#: src/features/tasks/components/task-suggestions.tsx:224
 msgid "Dismiss \"{title}\""
 msgstr "「{title}」を閉じる"
 
@@ -14071,7 +14071,7 @@ msgstr "プリセットを作成できませんでした"
 msgid "Failed to create tag"
 msgstr "タグを作成できませんでした"
 
-#: src/features/tasks/components/task-suggestions.tsx:241
+#: src/features/tasks/components/task-suggestions.tsx:244
 msgid "Failed to create the task"
 msgstr "タスクを作成できませんでした"
 
@@ -14195,7 +14195,7 @@ msgstr "コネクタを切断できませんでした"
 msgid "Failed to dismiss the digest"
 msgstr "ダイジェストを閉じられませんでした"
 
-#: src/features/tasks/components/task-suggestions.tsx:228
+#: src/features/tasks/components/task-suggestions.tsx:231
 msgid "Failed to dismiss the suggestion"
 msgstr "提案を閉じられませんでした"
 
@@ -31682,7 +31682,7 @@ msgid "Show a message in the app when a chat waits for your answer or your appro
 msgstr "チャットがあなたの返答または承認を待っているときにアプリ内でメッセージを表示します。"
 
 #: src/features/skills/components/bundle-import-dialog.tsx:99
-#: src/features/tasks/components/task-suggestions.tsx:213
+#: src/features/tasks/components/task-suggestions.tsx:216
 msgid "Show all"
 msgstr "すべて表示"
 
@@ -31690,7 +31690,7 @@ msgstr "すべて表示"
 msgid "Show all {lines} lines"
 msgstr "{lines} 行すべてを表示"
 
-#: src/features/tasks/components/task-suggestions.tsx:203
+#: src/features/tasks/components/task-suggestions.tsx:206
 msgid "Show all instructions for \"{title}\""
 msgstr "「{title}」の指示をすべて表示"
 
@@ -31737,11 +31737,11 @@ msgstr "ラベルを表示"
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 #: src/features/chat/pins/pin-item.tsx:214
 #: src/features/skills/components/bundle-import-dialog.tsx:99
-#: src/features/tasks/components/task-suggestions.tsx:213
+#: src/features/tasks/components/task-suggestions.tsx:216
 msgid "Show less"
 msgstr "表示を減らす"
 
-#: src/features/tasks/components/task-suggestions.tsx:203
+#: src/features/tasks/components/task-suggestions.tsx:206
 msgid "Show less of the instructions for \"{title}\""
 msgstr "「{title}」の指示を折りたたむ"
 
@@ -33855,7 +33855,7 @@ msgstr "提案されたタスク"
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "候補があります。右矢印キーで確定します"
 
-#: src/features/tasks/components/task-suggestions.tsx:227
+#: src/features/tasks/components/task-suggestions.tsx:230
 msgid "Suggestion dismissed: {title}"
 msgstr "提案を閉じました：{title}"
 
@@ -34270,7 +34270,7 @@ msgstr "タスク"
 msgid "Task approved"
 msgstr "タスクを承認しました"
 
-#: src/features/tasks/components/task-suggestions.tsx:241
+#: src/features/tasks/components/task-suggestions.tsx:244
 msgid "Task created: {title}"
 msgstr "タスクを作成しました：{title}"
 

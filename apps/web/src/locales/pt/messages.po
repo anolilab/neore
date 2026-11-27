@@ -2384,11 +2384,11 @@ msgstr "Cor de destaque atualizada"
 
 #: src/features/auth/components/organization/accept-invitation-card.tsx:192
 #: src/features/auth/components/organization/user-invitations-card.tsx:116
-#: src/features/tasks/components/task-suggestions.tsx:245
+#: src/features/tasks/components/task-suggestions.tsx:248
 msgid "Accept"
 msgstr "Aceitar"
 
-#: src/features/tasks/components/task-suggestions.tsx:238
+#: src/features/tasks/components/task-suggestions.tsx:241
 msgid "Accept \"{title}\""
 msgstr "Aceitar «{title}»"
 
@@ -11502,12 +11502,12 @@ msgstr "Public Key do Discord"
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:389
-#: src/features/tasks/components/task-suggestions.tsx:234
+#: src/features/tasks/components/task-suggestions.tsx:237
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "Dispensar"
 
-#: src/features/tasks/components/task-suggestions.tsx:221
+#: src/features/tasks/components/task-suggestions.tsx:224
 msgid "Dismiss \"{title}\""
 msgstr "Dispensar «{title}»"
 
@@ -14071,7 +14071,7 @@ msgstr "Falha ao criar a predefinição"
 msgid "Failed to create tag"
 msgstr "Falha ao criar a tag"
 
-#: src/features/tasks/components/task-suggestions.tsx:241
+#: src/features/tasks/components/task-suggestions.tsx:244
 msgid "Failed to create the task"
 msgstr "Falha ao criar a tarefa"
 
@@ -14195,7 +14195,7 @@ msgstr "Falha ao desconectar o conector"
 msgid "Failed to dismiss the digest"
 msgstr "Falha ao dispensar o resumo"
 
-#: src/features/tasks/components/task-suggestions.tsx:228
+#: src/features/tasks/components/task-suggestions.tsx:231
 msgid "Failed to dismiss the suggestion"
 msgstr "Falha ao dispensar a sugestão"
 
@@ -31682,7 +31682,7 @@ msgid "Show a message in the app when a chat waits for your answer or your appro
 msgstr "Mostra uma mensagem no app quando um chat espera sua resposta ou aprovação."
 
 #: src/features/skills/components/bundle-import-dialog.tsx:99
-#: src/features/tasks/components/task-suggestions.tsx:213
+#: src/features/tasks/components/task-suggestions.tsx:216
 msgid "Show all"
 msgstr "Mostrar tudo"
 
@@ -31690,7 +31690,7 @@ msgstr "Mostrar tudo"
 msgid "Show all {lines} lines"
 msgstr "Mostrar todas as {lines} linhas"
 
-#: src/features/tasks/components/task-suggestions.tsx:203
+#: src/features/tasks/components/task-suggestions.tsx:206
 msgid "Show all instructions for \"{title}\""
 msgstr "Mostrar todas as instruções de “{title}”"
 
@@ -31737,11 +31737,11 @@ msgstr "Mostrar rótulos"
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 #: src/features/chat/pins/pin-item.tsx:214
 #: src/features/skills/components/bundle-import-dialog.tsx:99
-#: src/features/tasks/components/task-suggestions.tsx:213
+#: src/features/tasks/components/task-suggestions.tsx:216
 msgid "Show less"
 msgstr "Mostrar menos"
 
-#: src/features/tasks/components/task-suggestions.tsx:203
+#: src/features/tasks/components/task-suggestions.tsx:206
 msgid "Show less of the instructions for \"{title}\""
 msgstr "Mostrar menos das instruções de “{title}”"
 
@@ -33855,7 +33855,7 @@ msgstr "Tarefas sugeridas"
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Sugestão disponível, pressione Seta para a direita para aceitar"
 
-#: src/features/tasks/components/task-suggestions.tsx:227
+#: src/features/tasks/components/task-suggestions.tsx:230
 msgid "Suggestion dismissed: {title}"
 msgstr "Sugestão dispensada: {title}"
 
@@ -34270,7 +34270,7 @@ msgstr "Tarefa"
 msgid "Task approved"
 msgstr "Tarefa aprovada"
 
-#: src/features/tasks/components/task-suggestions.tsx:241
+#: src/features/tasks/components/task-suggestions.tsx:244
 msgid "Task created: {title}"
 msgstr "Tarefa criada: {title}"
 

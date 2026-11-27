@@ -2384,11 +2384,11 @@ msgstr "强调色已更新"
 
 #: src/features/auth/components/organization/accept-invitation-card.tsx:192
 #: src/features/auth/components/organization/user-invitations-card.tsx:116
-#: src/features/tasks/components/task-suggestions.tsx:245
+#: src/features/tasks/components/task-suggestions.tsx:248
 msgid "Accept"
 msgstr "接受"
 
-#: src/features/tasks/components/task-suggestions.tsx:238
+#: src/features/tasks/components/task-suggestions.tsx:241
 msgid "Accept \"{title}\""
 msgstr "接受“{title}”"
 
@@ -11502,12 +11502,12 @@ msgstr "Discord 公钥"
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:389
-#: src/features/tasks/components/task-suggestions.tsx:234
+#: src/features/tasks/components/task-suggestions.tsx:237
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "关闭"
 
-#: src/features/tasks/components/task-suggestions.tsx:221
+#: src/features/tasks/components/task-suggestions.tsx:224
 msgid "Dismiss \"{title}\""
 msgstr "关闭“{title}”"
 
@@ -14071,7 +14071,7 @@ msgstr "创建预设失败"
 msgid "Failed to create tag"
 msgstr "创建标签失败"
 
-#: src/features/tasks/components/task-suggestions.tsx:241
+#: src/features/tasks/components/task-suggestions.tsx:244
 msgid "Failed to create the task"
 msgstr "创建任务失败"
 
@@ -14195,7 +14195,7 @@ msgstr "断开连接器失败"
 msgid "Failed to dismiss the digest"
 msgstr "关闭摘要失败"
 
-#: src/features/tasks/components/task-suggestions.tsx:228
+#: src/features/tasks/components/task-suggestions.tsx:231
 msgid "Failed to dismiss the suggestion"
 msgstr "关闭建议失败"
 
@@ -31682,7 +31682,7 @@ msgid "Show a message in the app when a chat waits for your answer or your appro
 msgstr "聊天等待你的回复或批准时在应用内显示提醒。"
 
 #: src/features/skills/components/bundle-import-dialog.tsx:99
-#: src/features/tasks/components/task-suggestions.tsx:213
+#: src/features/tasks/components/task-suggestions.tsx:216
 msgid "Show all"
 msgstr "显示全部"
 
@@ -31690,7 +31690,7 @@ msgstr "显示全部"
 msgid "Show all {lines} lines"
 msgstr "显示全部 {lines} 行"
 
-#: src/features/tasks/components/task-suggestions.tsx:203
+#: src/features/tasks/components/task-suggestions.tsx:206
 msgid "Show all instructions for \"{title}\""
 msgstr "显示“{title}”的全部说明"
 
@@ -31737,11 +31737,11 @@ msgstr "显示标签"
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 #: src/features/chat/pins/pin-item.tsx:214
 #: src/features/skills/components/bundle-import-dialog.tsx:99
-#: src/features/tasks/components/task-suggestions.tsx:213
+#: src/features/tasks/components/task-suggestions.tsx:216
 msgid "Show less"
 msgstr "收起"
 
-#: src/features/tasks/components/task-suggestions.tsx:203
+#: src/features/tasks/components/task-suggestions.tsx:206
 msgid "Show less of the instructions for \"{title}\""
 msgstr "收起“{title}”的说明"
 
@@ -33855,7 +33855,7 @@ msgstr "建议的任务"
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "有可用建议，按右方向键接受"
 
-#: src/features/tasks/components/task-suggestions.tsx:227
+#: src/features/tasks/components/task-suggestions.tsx:230
 msgid "Suggestion dismissed: {title}"
 msgstr "建议已关闭：{title}"
 
@@ -34270,7 +34270,7 @@ msgstr "任务"
 msgid "Task approved"
 msgstr "任务已批准"
 
-#: src/features/tasks/components/task-suggestions.tsx:241
+#: src/features/tasks/components/task-suggestions.tsx:244
 msgid "Task created: {title}"
 msgstr "任务已创建：{title}"
 

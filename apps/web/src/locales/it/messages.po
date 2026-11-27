@@ -2384,11 +2384,11 @@ msgstr "Colore di accento aggiornato"
 
 #: src/features/auth/components/organization/accept-invitation-card.tsx:192
 #: src/features/auth/components/organization/user-invitations-card.tsx:116
-#: src/features/tasks/components/task-suggestions.tsx:245
+#: src/features/tasks/components/task-suggestions.tsx:248
 msgid "Accept"
 msgstr "Accetta"
 
-#: src/features/tasks/components/task-suggestions.tsx:238
+#: src/features/tasks/components/task-suggestions.tsx:241
 msgid "Accept \"{title}\""
 msgstr "Accetta «{title}»"
 
@@ -11502,12 +11502,12 @@ msgstr "Chiave pubblica Discord"
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:389
-#: src/features/tasks/components/task-suggestions.tsx:234
+#: src/features/tasks/components/task-suggestions.tsx:237
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "Ignora"
 
-#: src/features/tasks/components/task-suggestions.tsx:221
+#: src/features/tasks/components/task-suggestions.tsx:224
 msgid "Dismiss \"{title}\""
 msgstr "Ignora «{title}»"
 
@@ -14071,7 +14071,7 @@ msgstr "Impossibile creare il preset"
 msgid "Failed to create tag"
 msgstr "Impossibile creare il tag"
 
-#: src/features/tasks/components/task-suggestions.tsx:241
+#: src/features/tasks/components/task-suggestions.tsx:244
 msgid "Failed to create the task"
 msgstr "Impossibile creare l'attività"
 
@@ -14195,7 +14195,7 @@ msgstr "Impossibile disconnettere il connettore"
 msgid "Failed to dismiss the digest"
 msgstr "Impossibile ignorare il riepilogo"
 
-#: src/features/tasks/components/task-suggestions.tsx:228
+#: src/features/tasks/components/task-suggestions.tsx:231
 msgid "Failed to dismiss the suggestion"
 msgstr "Impossibile ignorare il suggerimento"
 
@@ -31682,7 +31682,7 @@ msgid "Show a message in the app when a chat waits for your answer or your appro
 msgstr "Mostra un messaggio nell'app quando una chat attende la tua risposta o approvazione."
 
 #: src/features/skills/components/bundle-import-dialog.tsx:99
-#: src/features/tasks/components/task-suggestions.tsx:213
+#: src/features/tasks/components/task-suggestions.tsx:216
 msgid "Show all"
 msgstr "Mostra tutto"
 
@@ -31690,7 +31690,7 @@ msgstr "Mostra tutto"
 msgid "Show all {lines} lines"
 msgstr "Mostra tutte le {lines} righe"
 
-#: src/features/tasks/components/task-suggestions.tsx:203
+#: src/features/tasks/components/task-suggestions.tsx:206
 msgid "Show all instructions for \"{title}\""
 msgstr "Mostra tutte le istruzioni di «{title}»"
 
@@ -31737,11 +31737,11 @@ msgstr "Mostra etichette"
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 #: src/features/chat/pins/pin-item.tsx:214
 #: src/features/skills/components/bundle-import-dialog.tsx:99
-#: src/features/tasks/components/task-suggestions.tsx:213
+#: src/features/tasks/components/task-suggestions.tsx:216
 msgid "Show less"
 msgstr "Mostra meno"
 
-#: src/features/tasks/components/task-suggestions.tsx:203
+#: src/features/tasks/components/task-suggestions.tsx:206
 msgid "Show less of the instructions for \"{title}\""
 msgstr "Mostra meno delle istruzioni di «{title}»"
 
@@ -33855,7 +33855,7 @@ msgstr "Attività suggerite"
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Suggerimento disponibile, premi Freccia destra per accettarlo"
 
-#: src/features/tasks/components/task-suggestions.tsx:227
+#: src/features/tasks/components/task-suggestions.tsx:230
 msgid "Suggestion dismissed: {title}"
 msgstr "Suggerimento ignorato: {title}"
 
@@ -34270,7 +34270,7 @@ msgstr "Attività"
 msgid "Task approved"
 msgstr "Attività approvata"
 
-#: src/features/tasks/components/task-suggestions.tsx:241
+#: src/features/tasks/components/task-suggestions.tsx:244
 msgid "Task created: {title}"
 msgstr "Attività creata: {title}"
 
