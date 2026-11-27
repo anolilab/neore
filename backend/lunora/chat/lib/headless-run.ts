@@ -119,14 +119,14 @@ export interface HeadlessRunOptions {
     goal?: { maxRounds?: number; text: string };
     /** Leave an existing thread's status as it is, instead of marking it active when the run ends. */
     keepThreadStatus?: boolean;
-    /** `false`: memories are still read into the prompt, but nothing is extracted afterwards. Default: extract when `memory` is on. */
+    /**
+     * `false`: memories are still read into the prompt, but nothing is extracted afterwards, for a run whose prompt is an
+     * outside payload (a headless prompt has no typed words of the user's to quote). Default: extract when `memory` is on.
+     */
     learn?: boolean;
     /** A step cap for a quick reply. Default: Deep Work's budget, with context compression between steps. */
     maxSteps?: number;
-    /**
-     * Retrieve memories before, and extract them after (unless `learn` is `false`). A headless prompt has no typed words of
-     * the user's to quote, so a run whose prompt is an outside payload must not learn from it.
-     */
+    /** Retrieve memories before, and extract them after (unless `learn` is `false`). */
     memory: boolean;
     model: string;
     /**

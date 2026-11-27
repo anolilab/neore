@@ -355,7 +355,7 @@ describe("belief revision", () => {
             memory: "The user works as a nurse in Hamburg",
         });
 
-        // The merge the dropped fact never reached is not left for the next call.
+        // The first call left its revision answer unused: it must not answer the next call's extraction.
         generateText.mockReset();
 
         // A different statement: the gate skips one already processed today.

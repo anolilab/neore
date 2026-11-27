@@ -344,7 +344,6 @@ export const extractMemories = internalAction
         const truncatedUserMessage = truncateUserMessage(args.userMessage, args.steeredFrom);
         const truncatedAssistantResponse = args.assistantResponse.slice(0, 4000);
 
-        // Tool results (a page, a search hit, an MCP answer) are other people's text: they never reach the extractor.
         let model: Awaited<ReturnType<typeof getUtilityModel>>;
         let rules: ModelFilterRules;
 
@@ -416,7 +415,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
         // Evidence gate. Where the prompt can be quoted, a fact is kept only when a verbatim excerpt of the user's own
         // typed words backs it (`factEvidence`). The model's say-so is not enough: an extractor reading a page, an
         // attachment or the assistant's answer can be talked into "facts" nobody wrote. A run with no quotable prompt
-        // (`quotablePrompt` unset) is not gated here; the trigger runs that used to be such runs extract nothing.
+        // (`quotablePrompt` unset) is not gated here.
         if (args.quotablePrompt !== undefined) {
             // `quoteRefused`: a quote that is not the user's typed words, or one `evidenceQuote` refuses (secret-like, a health condition, too short).
             const dropped = { noQuote: 0, quoteRefused: 0 };
