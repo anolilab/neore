@@ -725,10 +725,12 @@ const REVIEW_SEEN_MAX_PAGES = 5;
 const REVIEW_ALL_MAX_PAGES = 10;
 /**
  * Pages of the NEWEST reviews a full read goes back through on a PR past `REVIEW_ALL_MAX_PAGES` (1000 reviews). The host lists in
- * creation order, so a review newer than the seen one sits at the newest end: the read starts at the last page and goes back until a
- * page holds only reviews submitted at or before the seen review's time, or this many pages. The budget is a cost bound, not a
- * guarantee: a review created on a page that is not read and submitted late is not found, because the list is ordered by creation
- * and finding it would take reading every page.
+ * creation order, so a review newer than the seen one sits at the newest end, but one created earlier and submitted later sits on
+ * an earlier page: the read starts at the last page and walks back through this many pages on EVERY poll, with no early stop (a page
+ * with nothing submitted after the seen review does not prove the pages before it hold nothing). A pending review is not read at
+ * all (`listReviews` leaves it out), and one without a time never orders anything; once it is submitted it carries a time and is
+ * found by a later poll while it lies inside this budget. The budget is a cost bound, not a guarantee: a review created on a page
+ * past it and submitted late is not found, because the list is ordered by creation and finding it would take reading every page.
  */
 const REVIEW_TAIL_MAX_PAGES = 10;
 const REVIEW_BODY_MAX_CHARS = 20_000;
@@ -812,11 +814,6 @@ const listReviews = async (request: HostRequest, ref: PullRequestRef, options?: 
             if (page === last) {
                 lastLength = read.values.length;
             }
-
-            // Reviews run oldest first by creation: a page holding none submitted after the seen one has nothing newer before it.
-            if (read.values.every((value) => toMs(submittedReviewSchema.safeParse(value).data?.submitted_at) <= seenAt)) {
-                break;
-            }
         }
 
         return { earliest: earliestPage, lastLength, values: tailValues };
@@ -827,8 +824,8 @@ const listReviews = async (request: HostRequest, ref: PullRequestRef, options?: 
     let earliest = 1;
     let pagesRead = 1;
 
-    // Past the bound, with a seen review: the newest end of the list, back to where reviews are no later than the seen one. The seen
-    // review's own time costs one request; one that cannot be read leaves the plain fallback below.
+    // Past the bound, with a seen review: the newest pages of the list, a fixed number on every poll (`REVIEW_TAIL_MAX_PAGES`). The
+    // seen review's own time costs one request; one that cannot be read leaves the plain fallback below.
     const tail =
         options?.readAll === true && options.seenId !== undefined && first.last !== undefined && first.last > REVIEW_ALL_MAX_PAGES
             ? await readNewestEnd(first.last, options.seenId)

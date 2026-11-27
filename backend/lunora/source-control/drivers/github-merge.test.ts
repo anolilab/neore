@@ -709,7 +709,7 @@ describe("reading past the first page", () => {
 
         describe("on a PR past the page bound, with a seen review", () => {
             // Review n is on page ceil(n / 100) and was submitted at second n: creation and submission agree unless a test says otherwise.
-            const longList = (last: number, lastLength = 100) => {
+            const longList = (last: number, submittedAt = (id: number) => id, noTime = new Set<number>()) => {
                 const requests: string[] = [];
                 const request: HostRequest = async (path, options: HostRequestOptions = {}) => {
                     const lookup = REVIEW_BY_ID.exec(path)?.groups?.id;
@@ -717,33 +717,54 @@ describe("reading past the first page", () => {
                     if (lookup !== undefined) {
                         requests.push(`review ${lookup}`);
 
-                        return Response.json({ submitted_at: new Date(Date.UTC(2026, 0, 1, 0, 0, Number(lookup))).toISOString() });
+                        return Response.json({ submitted_at: new Date(Date.UTC(2026, 0, 1, 0, 0, submittedAt(Number(lookup)))).toISOString() });
                     }
 
                     const page = Number(options.query?.page ?? 1);
 
                     requests.push(`page ${String(page)}`);
 
-                    const count = page === last ? lastLength : 100;
+                    // A review in `noTime` has a verdict but no submission time.
+                    const body = pageOf((page - 1) * 100 + 1, 100, submittedAt).map((review) =>
+                        noTime.has(review.id) ? { ...review, submitted_at: null } : review,
+                    );
 
-                    return Response.json(pageOf((page - 1) * 100 + 1, count), { headers: page === 1 ? { link: linkTo(last) } : {} });
+                    return Response.json(body, { headers: page === 1 ? { link: linkTo(last) } : {} });
                 };
 
                 return { request, requests };
             };
 
-            it("reads the last page back until a page holds nothing submitted after the seen review: four requests for 10,000 reviews", async () => {
-                const { request, requests } = longList(100);
-                // Review 9950 is on the last page; page 99 (9801-9900) is all earlier than it.
-                const reviews = await githubDriver.listReviews(request, REF, { readAll: true, seenId: "9950" });
+            it("walks the full budget on every poll, so a review submitted late on an earlier page inside it is found", async () => {
+                // Review 9150 (page 92) was submitted after the seen review 9950 (page 100), whatever its position.
+                const seenAt = 9950;
+                const late = (id: number) => (id === 9150 ? 20_000 : id);
 
-                expect(requests).toEqual(["page 1", "review 9950", "page 100", "page 99"]);
-                expect(reviews.items[0]?.id).toBe("10000");
-                expect(reviews.items.some((item) => item.id === "9950")).toBe(true);
-                expect(reviews.total).toBe(10_000);
+                for (let poll = 0; poll < 2; poll += 1) {
+                    const { request, requests } = longList(100, late);
+                    const reviews = await githubDriver.listReviews(request, REF, { readAll: true, seenId: String(seenAt) });
+
+                    // The first page, the seen review's time, then ten pages from the last (100 down to 91), every time.
+                    expect(requests).toHaveLength(12);
+                    expect(requests.slice(2)).toEqual(Array.from({ length: 10 }, (_, index) => `page ${String(100 - index)}`));
+                    expect(reviews.items[0]?.id).toBe("9150");
+                }
             });
 
-            it("stops at its page budget when the seen review is far back, and still hands over the newest reviews", async () => {
+            it("does not end the walk at a page of reviews with no submission time, and a review with no time is not newer", async () => {
+                // Pages 100 and 99 hold only reviews with no time; a late-submitted review sits on page 95, inside the budget.
+                const noTime = new Set(Array.from({ length: 200 }, (_, index) => 9801 + index));
+                const { request, requests } = longList(100, (id) => (id === 9450 ? 20_000 : id), noTime);
+                const reviews = await githubDriver.listReviews(request, REF, { readAll: true, seenId: "9950" });
+
+                expect(requests).toHaveLength(12);
+                expect(reviews.items.some((item) => item.id === "9450")).toBe(true);
+                // The no-time reviews come back with no time (0): they sort last and never order as newer than the seen review.
+                expect(reviews.items.filter((item) => item.submittedAt === 0).length).toBeGreaterThan(0);
+                expect(reviews.items[0]?.id).toBe("9450");
+            });
+
+            it("never reads more than the budget when the seen review is far back, and still hands over the newest reviews", async () => {
                 const { request, requests } = longList(100);
                 const reviews = await githubDriver.listReviews(request, REF, { readAll: true, seenId: "10" });
 
