@@ -22,18 +22,20 @@ export interface SkillContent {
 }
 
 /** A skill's content, with only the fields the file defines. */
-export const skillContent = (source: SkillContent): SkillContent => ({
-    category: source.category,
-    config: source.config,
-    description: source.description,
-    icon: source.icon,
-    instructions: source.instructions,
-    name: source.name,
-    slug: source.slug,
-    tags: source.tags,
-    variables: source.variables,
-    version: source.version,
-});
+export const skillContent = (source: SkillContent): SkillContent => {
+    return {
+        category: source.category,
+        config: source.config,
+        description: source.description,
+        icon: source.icon,
+        instructions: source.instructions,
+        name: source.name,
+        slug: source.slug,
+        tags: source.tags,
+        variables: source.variables,
+        version: source.version,
+    };
+};
 
 /** The fields of a trigger that the file defines and its row stores as written. */
 export interface TriggerContent {
@@ -55,23 +57,25 @@ export interface TriggerContent {
 }
 
 /** A trigger's content, with only the fields the file defines. */
-export const triggerContent = (source: TriggerContent): TriggerContent => ({
-    botComputer: source.botComputer,
-    botId: source.botId,
-    cronExpression: source.cronExpression,
-    description: source.description,
-    eventSource: source.eventSource,
-    filters: source.filters,
-    inputTemplate: source.inputTemplate,
-    model: source.model,
-    name: source.name,
-    quietWhenEmpty: source.quietWhenEmpty,
-    searchMode: source.searchMode,
-    systemPrompt: source.systemPrompt,
-    timezone: source.timezone,
-    type: source.type,
-    webhookSignatureScheme: source.webhookSignatureScheme,
-});
+export const triggerContent = (source: TriggerContent): TriggerContent => {
+    return {
+        botComputer: source.botComputer,
+        botId: source.botId,
+        cronExpression: source.cronExpression,
+        description: source.description,
+        eventSource: source.eventSource,
+        filters: source.filters,
+        inputTemplate: source.inputTemplate,
+        model: source.model,
+        name: source.name,
+        quietWhenEmpty: source.quietWhenEmpty,
+        searchMode: source.searchMode,
+        systemPrompt: source.systemPrompt,
+        timezone: source.timezone,
+        type: source.type,
+        webhookSignatureScheme: source.webhookSignatureScheme,
+    };
+};
 
 /** A trigger's live hash, read back from its row. A row that stores a field differently from the file reads as edited, which is the safe side. */
 export const triggerRowHash = async (row: TriggerContent): Promise<string> => await contentHash(triggerContent(row));
@@ -118,14 +122,16 @@ export const groupContent = (source: {
     participantKeys: string[];
     synthesizerKey?: string;
     title: string;
-}): GroupContent => ({
-    debateRounds: source.debateRounds,
-    mode: source.mode,
-    model: source.model,
-    participantKeys: [...source.participantKeys],
-    synthesizerKey: source.synthesizerKey,
-    title: normalizeGroupTitle(source.title),
-});
+}): GroupContent => {
+    return {
+        debateRounds: source.debateRounds,
+        mode: source.mode,
+        model: source.model,
+        participantKeys: [...source.participantKeys],
+        synthesizerKey: source.synthesizerKey,
+        title: normalizeGroupTitle(source.title),
+    };
+};
 
 /**
  * A group's live hash, read back from its thread. Each stored participant is mapped to its plugin entry key. A participant that
@@ -136,7 +142,7 @@ export const groupRowHash = async (
         debateRounds?: number;
         mode: string;
         model: string;
-        participants: Array<{ skillId: string }>;
+        participants: { skillId: string }[];
         synthesizerSkillId?: string;
         title?: string;
     },

@@ -9,18 +9,20 @@ const OWNER = "owner-a";
 const INSTALL = "install-1";
 const GROUP_MARKER = `${INSTALL}:group:panel`;
 
-const skill = (slug: string) => ({
-    description: `The ${slug} persona`,
-    instructions: `Speak as ${slug}.`,
-    name: slug,
-    pluginInstallId: INSTALL,
-    pluginMarker: `${INSTALL}:skill:${slug}`,
-    isPremium: true,
-    plan: "premium",
-    slug,
-    source: { type: "plugin" as const, version: "1.0.0" },
-    userId: OWNER,
-});
+const skill = (slug: string) => {
+    return {
+        description: `The ${slug} persona`,
+        instructions: `Speak as ${slug}.`,
+        isPremium: true,
+        name: slug,
+        plan: "premium",
+        pluginInstallId: INSTALL,
+        pluginMarker: `${INSTALL}:skill:${slug}`,
+        slug,
+        source: { type: "plugin" as const, version: "1.0.0" },
+        userId: OWNER,
+    };
+};
 
 describe("plugin group chats", () => {
     let harness: ReturnType<typeof lunoraTest>;
@@ -37,16 +39,18 @@ describe("plugin group chats", () => {
         harness.close();
     });
 
-    const groupInput = (skillIds: string[]) => ({
-        mode: "round-robin" as const,
-        model: "claude-haiku-5-5",
-        pluginInstallId: INSTALL,
-        pluginMarker: GROUP_MARKER,
-        plan: "premium",
-        skillIds,
-        title: "Panel",
-        userId: OWNER,
-    });
+    const groupInput = (skillIds: string[]) => {
+        return {
+            mode: "round-robin" as const,
+            model: "claude-haiku-5-5",
+            plan: "premium",
+            pluginInstallId: INSTALL,
+            pluginMarker: GROUP_MARKER,
+            skillIds,
+            title: "Panel",
+            userId: OWNER,
+        };
+    };
 
     const groupsWithMarker = async () =>
         await harness.run(

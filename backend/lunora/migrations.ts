@@ -445,8 +445,10 @@ export const dropThreadIsGroupChat = defineMigration({
             return undefined;
         }
 
-        const { isGroupChat: _dropped, ...rest } = document;
+        const row: Record<string, unknown> = { ...document };
 
-        return rest;
+        delete row.isGroupChat;
+
+        return row as typeof document;
     },
 });

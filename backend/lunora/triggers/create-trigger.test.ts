@@ -13,9 +13,9 @@ const pluginInput = {
     cronExpression: "0 9 * * *",
     model: "claude-haiku-5-5",
     name: "Daily summary",
+    plan: "premium",
     pluginInstallId: INSTALL,
     pluginMarker: MARKER,
-    plan: "premium",
     type: "schedule" as const,
     userId: OWNER,
 };

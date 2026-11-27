@@ -115,8 +115,18 @@ describe("plugin update action", () => {
 
     const as = () => harness.withIdentity({ userId: OWNER } as never);
     const run = async <T>(function_: (context: any) => Promise<T>): Promise<T> => await harness.run(async (context: any) => await function_(context));
-    const skillsNamed = async () => await run(async (context) => (await context.db.skills.findMany({ where: { userId: OWNER } })).page);
-    const installRow = async () => await run(async (context) => (await context.db.pluginInstalls.findMany({ where: { userId: OWNER } })).page[0]);
+    const skillsNamed = async () =>
+        await run(async (context) => {
+            const { page } = await context.db.skills.findMany({ where: { userId: OWNER } });
+
+            return page;
+        });
+    const installRow = async () =>
+        await run(async (context) => {
+            const { page } = await context.db.pluginInstalls.findMany({ where: { userId: OWNER } });
+
+            return page[0];
+        });
     const updateTo = async (slugs: string[], version: string) => {
         const next = await fileOf(slugs, version);
 
@@ -140,15 +150,17 @@ describe("plugin update action", () => {
         expect(result).toMatchObject({ skipped: [], version: "1.1.0" });
         expect(result.applied).toContain("skill:reviewer");
 
-        const names = (await skillsNamed()).map((row: { name: string }) => row.name);
+        const rows = await skillsNamed();
+        const names = rows.map((row: { name: string }) => row.name);
 
         expect(names).toEqual(expect.arrayContaining(["analyst", "critic", "reviewer"]));
         expect(await installRow()).toMatchObject({ contentHash: next.contentHash, status: "installed", version: "1.1.0" });
     });
 
     it("removes the last skill when it is unedited, and leaves the rest alone", async () => {
+        const { markdown } = await fileOf(["analyst"], "1.1.0");
         const preview = (await as().action(procedureAt("plugins_update", "previewUpdate"), {
-            markdown: (await fileOf(["analyst"], "1.1.0")).markdown,
+            markdown,
         } as never)) as PreviewResult;
 
         expect(preview.plan).toContainEqual({ action: "delete", entryKey: "skill:critic" });
@@ -157,13 +169,18 @@ describe("plugin update action", () => {
 
         expect(result.applied).toContain("skill:critic");
 
-        const names = (await skillsNamed()).map((row: { name: string }) => row.name);
+        const rows = await skillsNamed();
+        const names = rows.map((row: { name: string }) => row.name);
 
         expect(names).toEqual(["analyst"]);
     });
 
     it("keeps the last skill when the person has edited it: detached, with its marker cleared, and reported", async () => {
-        const [critic] = await run(async (context) => (await context.db.skills.findMany({ where: { name: "critic" } })).page);
+        const [critic] = await run(async (context) => {
+            const { page } = await context.db.skills.findMany({ where: { name: "critic" } });
+
+            return page;
+        });
 
         await run(async (context) => await context.db.patch("skills", critic._id, { instructions: "Changed by the owner." }));
 
@@ -171,7 +188,8 @@ describe("plugin update action", () => {
 
         expect(result.applied).toContain("skill:critic");
 
-        const kept = (await skillsNamed()).find((row: { name: string }) => row.name === "critic");
+        const rows = await skillsNamed();
+        const kept = rows.find((row: { name: string }) => row.name === "critic");
 
         expect(kept).toMatchObject({ instructions: "Changed by the owner.", pluginInstallId: "", pluginMarker: "" });
     });
@@ -216,7 +234,9 @@ describe("plugin update action", () => {
 
         expect(result.skipped).toStrictEqual([]);
         expect(result.applied).toEqual(expect.arrayContaining(["skill:critic-two", "skill:critic"]));
-        expect((await skillsNamed()).map((row: { slug: string }) => row.slug).toSorted()).toStrictEqual(["analyst", "critic-2"]);
+        const rows = await skillsNamed();
+
+        expect(rows.map((row: { slug: string }) => row.slug).toSorted((a: string, b: string) => a.localeCompare(b))).toStrictEqual(["analyst", "critic-2"]);
     });
 
     it("a keyed skill whose slug changes takes the new slug on its row, so the next update does not read it as edited", async () => {
@@ -255,7 +275,11 @@ describe("plugin update action", () => {
     });
 
     it("reports a removal as skipped when a group chat still names the skill", async () => {
-        const [critic] = await run(async (context) => (await context.db.skills.findMany({ where: { name: "critic" } })).page);
+        const [critic] = await run(async (context) => {
+            const { page } = await context.db.skills.findMany({ where: { name: "critic" } });
+
+            return page;
+        });
 
         await run(async (context) => {
             await context.db.insert("threads", {
@@ -269,6 +293,8 @@ describe("plugin update action", () => {
         const result = await updateTo(["analyst"], "1.1.0");
 
         expect(result.skipped).toContainEqual({ action: "delete", entryKey: "skill:critic" });
-        expect((await skillsNamed()).map((row: { name: string }) => row.name).toSorted()).toStrictEqual(["analyst", "critic"]);
+        const rows = await skillsNamed();
+
+        expect(rows.map((row: { name: string }) => row.name).toSorted((a: string, b: string) => a.localeCompare(b))).toStrictEqual(["analyst", "critic"]);
     });
 });

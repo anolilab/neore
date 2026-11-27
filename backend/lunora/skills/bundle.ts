@@ -486,9 +486,9 @@ export const exportBundle = authAction
         // A selection that is exactly one installed plugin's unedited children is exported as that plugin's own file, with each
         // item under the key its install gave it. The lookup runs first, because a plugin file's body carries the keys.
         const plugin = await ctx.runQuery(internal.plugins.export.pluginForSelection, {
-            groupChatIds: groupChatIds,
-            skillIds: skillIds,
-            triggerIds: triggerIds,
+            groupChatIds,
+            skillIds,
+            triggerIds,
             userId,
         });
         const keyById = new Map((plugin?.keys ?? []).map((child) => [child.id, child.key] as const));

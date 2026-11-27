@@ -10,6 +10,7 @@ import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { patchRow } from "../lib/patch";
+import { requireOwnerShard } from "./owner-shard";
 import { LEASE_MS } from "./logic";
 import { vPluginItemKind } from "./validators";
 
@@ -35,6 +36,8 @@ export const createInstallRow = internalMutation
     })
     .output(v.object({ generation: v.number(), installId: v.string() }))
     .mutation(async ({ args, ctx }) => {
+        requireOwnerShard(args.userId, "install");
+
         const existing = await ctx.db.pluginInstalls.findFirst({ where: { pluginSlug: args.pluginSlug, userId: args.userId } });
 
         if (existing) {

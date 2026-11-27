@@ -8,7 +8,7 @@ import { planBundle } from "./bundle-plan";
 const HASH = "a".repeat(64);
 
 /** Turns a plain bundle into a plugin file: the same body, with the `bundle: 2` header. */
-const asPlugin = (body: string): string => body.replace("bundle: 1\n", `bundle: 2\nplugin: keys-plugin\npluginVersion: 1.0.0\ncontentHash: ${HASH}\n`);
+const asPlugin = (body: string): string => body.replace("bundle: 1\n", () => `bundle: 2\nplugin: keys-plugin\npluginVersion: 1.0.0\ncontentHash: ${HASH}\n`);
 
 const ANALYST = { description: "Analyst skill", instructions: "Be the analyst.", name: "Analyst", slug: "analyst" };
 const CRITIC = { description: "Critic skill", instructions: "Be the critic.", name: "Critic", slug: "critic" };

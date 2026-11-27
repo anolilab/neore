@@ -92,7 +92,11 @@ describe("applying an update", () => {
         );
 
         const skill = await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }));
-        const link = await run(async (context) => (await context.db.pluginItems.findMany({ where: { installId } })).page[0]);
+        const link = await run(async (context) => {
+            const { page } = await context.db.pluginItems.findMany({ where: { installId } });
+
+            return page[0];
+        });
         const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
 
         expect(skill).toMatchObject({ instructions: REVISED.instructions });
@@ -234,7 +238,11 @@ describe("applying an update", () => {
         );
 
         const skill = await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }));
-        const link = await run(async (context) => (await context.db.pluginItems.findMany({ where: { installId } })).page[0]);
+        const link = await run(async (context) => {
+            const { page } = await context.db.pluginItems.findMany({ where: { installId } });
+
+            return page[0];
+        });
 
         expect(skill?.tags).toBeUndefined();
         expect(await skillRowHash(skill)).toBe(link.contentHash);
@@ -259,7 +267,11 @@ describe("applying an update", () => {
         await run(async (context) => await context.runMutation(failUpdate, { contentHash: HASH, createKeys: [], generation, installId, keepForRepair: false }));
 
         const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
-        const links = await run(async (context) => (await context.db.pluginItems.findMany({ where: { installId } })).page);
+        const links = await run(async (context) => {
+            const { page } = await context.db.pluginItems.findMany({ where: { installId } });
+
+            return page;
+        });
 
         expect(install).toMatchObject({ status: "installed", version: "1.0.0" });
         expect(links.map((row: { entryKey: string }) => row.entryKey)).toStrictEqual(["skill:analyst"]);

@@ -1,6 +1,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { ROOT_SHARD_KEY, runInShard } from "../lib/shard-context";
 import schema from "../schema";
 import { createInstallRow, deleteInstall, finishInstall, markNeedsRepair, recordCreated, recordIntent } from "./install-steps";
 
@@ -24,12 +25,20 @@ describe("install steps", () => {
         harness.close();
     });
 
-    const run = async <T>(fn: (context: any) => Promise<T>): Promise<T> => await harness.run(async (context: any) => await fn(context));
+    const run = async <T>(function_: (context: any) => Promise<T>): Promise<T> => await harness.run(async (context: any) => await function_(context));
 
     it("refuses a second install of the same plugin for the same person", async () => {
         await run(async (context) => await context.runMutation(createInstallRow, start));
 
         await expect(run(async (context) => await context.runMutation(createInstallRow, start))).rejects.toThrow("already installed");
+    });
+
+    it("refuses to start an install on the root shard or another person's shard", async () => {
+        for (const shard of [ROOT_SHARD_KEY, "someone-else"]) {
+            await expect(runInShard(shard, async () => await run(async (context) => await context.runMutation(createInstallRow, start)))).rejects.toThrow(
+                "owner's shard",
+            );
+        }
     });
 
     it("links each child from intent to created, then finishes the install", async () => {
@@ -60,7 +69,11 @@ describe("install steps", () => {
             ),
         ).rejects.toThrow("STALE_LEASE");
 
-        const links = await run(async (context) => (await context.db.pluginItems.findMany({ where: { installId } })).page);
+        const links = await run(async (context) => {
+            const { page } = await context.db.pluginItems.findMany({ where: { installId } });
+
+            return page;
+        });
 
         expect(links).toHaveLength(0);
     });
@@ -85,7 +98,11 @@ describe("install steps", () => {
         await run(async (context) => await context.runMutation(deleteInstall, { generation, installId }));
 
         const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
-        const links = await run(async (context) => (await context.db.pluginItems.findMany({ where: { installId } })).page);
+        const links = await run(async (context) => {
+            const { page } = await context.db.pluginItems.findMany({ where: { installId } });
+
+            return page;
+        });
 
         expect(install).toBeNull();
         expect(links).toHaveLength(0);

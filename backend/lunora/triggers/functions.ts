@@ -441,7 +441,7 @@ export const triggerCreateFields = {
     webhookSignatureScheme: v.optional(vWebhookSignatureScheme),
 };
 
-const vTriggerCreateArgs = v.object({ ...triggerCreateFields });
+type TriggerCreateArgs = Infer<ReturnType<typeof v.object<typeof triggerCreateFields>>>;
 
 /** The owner a trigger row is created for. The caller stamps it from its own identity, never from request input. */
 export interface TriggerOwner {
@@ -460,7 +460,7 @@ export interface TriggerPluginLink {
 export const insertTrigger = async (
     context: MutationCtx,
     owner: TriggerOwner,
-    args: Infer<typeof vTriggerCreateArgs>,
+    args: TriggerCreateArgs,
     plugin?: TriggerPluginLink,
 ): Promise<{ triggerId: string; webhookSecret?: string }> => {
     const { userId } = owner;
@@ -520,6 +520,8 @@ export const insertTrigger = async (
         name: args.name,
         // Triggers created before this column was written have none and run in the personal space.
         organizationId: owner.organizationId,
+        pluginInstallId: plugin?.pluginInstallId,
+        pluginMarker: plugin?.pluginMarker,
         quietWhenEmpty: args.quietWhenEmpty === true ? true : undefined,
         searchMode: args.searchMode,
         systemPrompt: cleanPromptField(args.systemPrompt, "The system prompt"),
@@ -529,8 +531,6 @@ export const insertTrigger = async (
         updatedAt: now,
         userId,
         webhookSecret,
-        pluginInstallId: plugin?.pluginInstallId,
-        pluginMarker: plugin?.pluginMarker,
         webhookSignatureScheme,
     });
 

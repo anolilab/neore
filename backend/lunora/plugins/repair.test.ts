@@ -269,7 +269,11 @@ describe("repair", () => {
 
             await run(async (context) => await repairRows(context, OWNER, SLUG));
 
-            const rows = await run(async (context) => (await context.db.pluginItems.findMany({ where: { installId } })).page);
+            const rows = await run(async (context) => {
+                const { page } = await context.db.pluginItems.findMany({ where: { installId } });
+
+                return page;
+            });
 
             expect(rows.map((row: { entryKey: string }) => row.entryKey)).toEqual(["skill:analyst"]);
         });

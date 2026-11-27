@@ -175,9 +175,13 @@ describe("repair: taking over a stopped install", () => {
                 await context.db.patch("pluginInstalls", first.installId, { leaseUntil: Date.now() - 1000, status: "updating", targetVersion: "1.1.0" }),
         );
 
-        const begun = await run(async (context) => await beginRepairRows(context, OWNER, SLUG, "e".repeat(64)));
+        const entries = [{ contentHash: HASH, entryKey: "skill:extra", kind: "skill" as const }];
+        const begun = await run(async (context) => await beginRepairRows(context, OWNER, SLUG, "e".repeat(64), entries));
+        const { page } = await run(async (context) => await context.db.pluginItems.findMany({ where: { installId: first.installId } }));
 
         expect(begun.status).toBe("installed");
+        // The new file was not checked against the install, so its entries add no rows.
+        expect(page).toStrictEqual([]);
     });
 
     it("refuses another file for an install that is not updating", async () => {

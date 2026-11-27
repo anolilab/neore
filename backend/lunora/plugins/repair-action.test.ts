@@ -88,17 +88,29 @@ describe("repair through the action", () => {
     });
 
     const as = () => harness.withIdentity({ userId: OWNER } as never);
-    const run = async <T>(fn: (context: any) => Promise<T>): Promise<T> => await harness.run(async (context: any) => await fn(context));
+    const run = async <T>(function_: (context: any) => Promise<T>): Promise<T> => await harness.run(async (context: any) => await function_(context));
 
     it("creates back a child that was lost, and finishes the install", async () => {
         await as().action(procedureAt("plugins_install_action", "installPlugin"), { contentHash: hash, markdown: pluginFile(hash) } as never);
 
-        const install = await run(async (context) => (await context.db.pluginInstalls.findMany({ where: { userId: OWNER } })).page[0]);
-        const skill = await run(async (context) => (await context.db.skills.findMany({ where: { userId: OWNER } })).page[0]);
+        const install = await run(async (context) => {
+            const { page } = await context.db.pluginInstalls.findMany({ where: { userId: OWNER } });
+
+            return page[0];
+        });
+        const skill = await run(async (context) => {
+            const { page } = await context.db.skills.findMany({ where: { userId: OWNER } });
+
+            return page[0];
+        });
 
         // The crash: the skill row is lost, and the install is left for repair.
         await run(async (context) => await context.db.delete("skills", skill._id));
-        const link = await run(async (context) => (await context.db.pluginItems.findMany({ where: { installId: install._id } })).page[0]);
+        const link = await run(async (context) => {
+            const { page } = await context.db.pluginItems.findMany({ where: { installId: install._id } });
+
+            return page[0];
+        });
 
         await run(async (context) => await context.db.patch("pluginItems", link._id, { state: "intent" }));
         await run(async (context) => await context.db.patch("pluginInstalls", install._id, { status: "needs-repair" }));
@@ -111,7 +123,11 @@ describe("repair through the action", () => {
 
         expect(result).toMatchObject({ status: "installed" });
 
-        const restored = await run(async (context) => (await context.db.skills.findMany({ where: { userId: OWNER } })).page);
+        const restored = await run(async (context) => {
+            const { page } = await context.db.skills.findMany({ where: { userId: OWNER } });
+
+            return page;
+        });
         const after = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: install._id } }));
 
         expect(restored).toHaveLength(1);
@@ -149,7 +165,11 @@ describe("repair through the action", () => {
             } as never),
         ).rejects.toThrow("not the file");
 
-        const skills = await run(async (context) => (await context.db.skills.findMany({ where: { userId: OWNER } })).page);
+        const skills = await run(async (context) => {
+            const { page } = await context.db.skills.findMany({ where: { userId: OWNER } });
+
+            return page;
+        });
 
         expect(skills.map((skill: { instructions: string }) => skill.instructions)).toEqual([ANALYST.instructions]);
     });

@@ -89,7 +89,12 @@ describe("plugin skills", () => {
         harness.close();
     });
 
-    const rowsWithMarker = async () => await harness.run(async (context: any) => (await context.db.skills.findMany({ where: { pluginMarker: MARKER } })).page);
+    const rowsWithMarker = async () =>
+        await harness.run(async (context: any) => {
+            const { page } = await context.db.skills.findMany({ where: { pluginMarker: MARKER } });
+
+            return page;
+        });
 
     it("refuses a plugin source through the public create procedure, and stores nothing", async () => {
         await expect(
@@ -104,11 +109,9 @@ describe("plugin skills", () => {
     it("never stores a marker from the public create procedure, even when a caller sends one", async () => {
         const outcome = await harness
             .withIdentity({ userId: OWNER } as never)
-            .mutation(procedureAt("skills_functions", "createSkill"), { ...skillInput, source: { type: "editor" }, pluginMarker: MARKER } as never)
-            .then(
-                () => "stored without the marker",
-                () => "refused",
-            );
+            .mutation(procedureAt("skills_functions", "createSkill"), { ...skillInput, pluginMarker: MARKER, source: { type: "editor" } } as never)
+            .then(() => "stored without the marker")
+            .catch(() => "refused");
 
         expect(["stored without the marker", "refused"]).toContain(outcome);
         expect(await rowsWithMarker()).toHaveLength(0);

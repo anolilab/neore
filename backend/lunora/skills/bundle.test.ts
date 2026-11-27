@@ -78,12 +78,12 @@ vi.mock("../lib/shard-routes", async (importOriginal) => {
 });
 
 const MODULES = {
-    plugins_export: async () => await import("../plugins/export"),
     agent_threads: async () => await import("../agent/threads"),
     bots_functions: async () => await import("../bots/functions"),
     chat_custom_providers: async () => await import("../chat/custom-providers"),
     chat_group_functions: async () => await import("../chat/group/functions"),
     lib_claim_once: async () => await import("../lib/claim-once"),
+    plugins_export: async () => await import("../plugins/export"),
     skills_bundle: async () => await import("./bundle"),
     skills_functions: async () => await import("./functions"),
     triggers_functions: async () => await import("../triggers/functions"),

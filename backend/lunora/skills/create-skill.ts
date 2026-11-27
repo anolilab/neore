@@ -55,12 +55,10 @@ export const skillCreateFields = {
     visibility: v.optional(v.union(v.literal("private"), v.literal("organization"), v.literal("public"))),
 };
 
-const vSkillCreateArgs = v.object({ ...skillCreateFields });
-
 /** Every source a stored skill row can carry at create time: the public ones, and a plugin's. */
-const vSkillRowSource = v.union(vPublicSkillSource, vPluginSkillSource);
+type SkillRowSource = Infer<typeof vPublicSkillSource> | Infer<typeof vPluginSkillSource>;
 
-export type SkillRowArgs = Omit<Infer<typeof vSkillCreateArgs>, "source"> & { source: Infer<typeof vSkillRowSource> };
+export type SkillRowArgs = Omit<Infer<ReturnType<typeof v.object<typeof skillCreateFields>>>, "source"> & { source: SkillRowSource };
 
 /** Who the new row belongs to. The caller stamps it from its own identity, never from request input. */
 export interface SkillOwner {
@@ -172,16 +170,16 @@ export const insertSkill = async (ctx: MutationContext, owner: SkillOwner, args:
 export const createPluginSkill = internalMutation
     .input({
         ...skillCreateFields,
+        activeOrganizationId: v.optional(v.string().max(MAX_LENGTH.id)),
         isPremium: v.boolean(),
         plan: v.optional(v.string().max(MAX_LENGTH.short)),
         pluginInstallId: v.string().max(MAX_LENGTH.id),
         pluginMarker: v.string().max(MAX_LENGTH.short),
         source: vPluginSkillSource,
         userId: v.string().max(MAX_LENGTH.id),
-        activeOrganizationId: v.optional(v.string().max(MAX_LENGTH.id)),
     })
     .output(v.id("skills"))
-    .mutation(async ({ args: { activeOrganizationId, isPremium, pluginInstallId, pluginMarker, plan, source, userId, ...fields }, ctx }) => {
+    .mutation(async ({ args: { activeOrganizationId, isPremium, plan, pluginInstallId, pluginMarker, source, userId, ...fields }, ctx }) => {
         const existing = await ctx.db.skills.findFirst({ where: { pluginMarker } });
 
         if (existing) {

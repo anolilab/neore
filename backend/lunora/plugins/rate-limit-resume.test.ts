@@ -119,8 +119,15 @@ describe("a rate limit part-way through an install", () => {
 
     const as = () => harness.withIdentity({ userId: OWNER } as never);
     const run = async <T>(function_: (context: any) => Promise<T>): Promise<T> => await harness.run(async (context: any) => await function_(context));
-    const skillNames = async () =>
-        (await run(async (context) => (await context.db.skills.findMany({ where: { userId: OWNER } })).page)).map((skill: { name: string }) => skill.name);
+    const skillNames = async () => {
+        const skills = await run(async (context) => {
+            const { page } = await context.db.skills.findMany({ where: { userId: OWNER } });
+
+            return page;
+        });
+
+        return skills.map((skill: { name: string }) => skill.name);
+    };
 
     it("keeps the child made before the limit, leaves the install for repair, and repair creates the rest, including the entry never reached", async () => {
         await expect(
@@ -129,7 +136,11 @@ describe("a rate limit part-way through an install", () => {
 
         expect(await skillNames()).toEqual(["analyst"]);
 
-        const install = await run(async (context) => (await context.db.pluginInstalls.findMany({ where: { userId: OWNER } })).page[0]);
+        const install = await run(async (context) => {
+            const { page } = await context.db.pluginInstalls.findMany({ where: { userId: OWNER } });
+
+            return page[0];
+        });
 
         expect(install).toMatchObject({ status: "needs-repair" });
 
@@ -144,6 +155,8 @@ describe("a rate limit part-way through an install", () => {
         } as never);
 
         expect(result).toMatchObject({ status: "installed" });
-        expect((await skillNames()).toSorted()).toEqual(["analyst", "auditor", "reviewer"]);
+        const names = await skillNames();
+
+        expect(names.toSorted((a: string, b: string) => a.localeCompare(b))).toEqual(["analyst", "auditor", "reviewer"]);
     });
 });

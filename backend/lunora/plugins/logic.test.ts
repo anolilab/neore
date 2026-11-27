@@ -73,7 +73,7 @@ describe("contentHash", () => {
     const skill = { instructions: "Summarise the note.", name: "Summary", tags: ["notes"] };
 
     it("is the same for the same content, whatever the key order", async () => {
-        const reordered = { tags: ["notes"], name: "Summary", instructions: "Summarise the note." };
+        const reordered = { instructions: "Summarise the note.", name: "Summary", tags: ["notes"] };
 
         expect(await contentHash(skill)).toBe(await contentHash(reordered));
     });
@@ -94,19 +94,23 @@ describe("contentHash", () => {
 describe("diffUpdate", () => {
     type Kind = "group" | "skill" | "trigger";
 
-    const child = (entryKey: string, extra: { currentHash?: string; kind?: Kind; pendingHash?: string } = {}) => ({
-        contentHash: "h1",
-        currentHash: "h1",
-        entryKey,
-        kind: "skill" as Kind,
-        ...extra,
-    });
+    const child = (entryKey: string, extra: { currentHash?: string; kind?: Kind; pendingHash?: string } = {}) => {
+        return {
+            contentHash: "h1",
+            currentHash: "h1",
+            entryKey,
+            kind: "skill" as Kind,
+            ...extra,
+        };
+    };
 
-    const incoming = (entryKey: string, hash: string, kind: Kind = "skill") => ({
-        contentHash: hash,
-        entryKey,
-        kind,
-    });
+    const incoming = (entryKey: string, hash: string, kind: Kind = "skill") => {
+        return {
+            contentHash: hash,
+            entryKey,
+            kind,
+        };
+    };
 
     it("updates an unedited child in place when its content changed", () => {
         expect(diffUpdate([child("a")], [incoming("a", "h2")])).toEqual([{ action: "update", entryKey: "a" }]);
@@ -159,6 +163,7 @@ describe("version order and downgrades", () => {
         expect(isDowngrade("1.0.0", "1.0.1")).toBe(false);
     });
 
+    // eslint-disable-next-line sonarjs/no-hardcoded-ip -- "1.0.0.1" is a malformed version string here, not an IP address
     it.each(["v2.0.0", "1.0", "1.0.0.1", "2.0.0-rc.1", "1.x.0"])("refuses a malformed version %j rather than comparing it", (version) => {
         expect(() => compareVersions(version, "1.0.0")).toThrow("not a major.minor.patch version");
         expect(() => isDowngrade("2.0.0", version)).toThrow("not a major.minor.patch version");
@@ -166,7 +171,9 @@ describe("version order and downgrades", () => {
 });
 
 describe("isCompletePluginExport", () => {
-    const created = (id: string) => ({ contentHash: "h1", currentHash: "h1", id, state: "created" as const });
+    const created = (id: string) => {
+        return { contentHash: "h1", currentHash: "h1", id, state: "created" as const };
+    };
 
     const children = [created("s1"), created("t1")];
 
@@ -176,7 +183,7 @@ describe("isCompletePluginExport", () => {
 
     it("exports as a plain bundle for a partial or mixed selection", () => {
         expect(isCompletePluginExport({ status: "installed" }, children, new Set(["s1"]))).toBe(false);
-        expect(isCompletePluginExport({ status: "installed" }, children, new Set(["s1", "t1", "other"]))).toBe(false);
+        expect(isCompletePluginExport({ status: "installed" }, children, new Set(["other", "s1", "t1"]))).toBe(false);
     });
 
     it("refuses an install that is not installed", () => {

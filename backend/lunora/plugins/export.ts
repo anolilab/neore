@@ -15,6 +15,8 @@ import { isCompletePluginExport } from "./logic";
 /** An entry key whose part after the kind is a bare position: an install made before declared keys. */
 const POSITIONAL_KEY_RE = /^\d+$/u;
 
+const BUNDLE_HEADER_RE = /^bundle: 1\n/mu;
+
 export interface PluginHeader {
     contentHash: string;
     slug: string;
@@ -23,7 +25,7 @@ export interface PluginHeader {
 
 /** Rewrites a plain bundle's header into a plugin file's. The body is untouched, so its hash does not change. */
 export const withPluginHeader = (markdown: string, header: PluginHeader): string =>
-    markdown.replace(/^bundle: 1\n/mu, `bundle: 2\nplugin: ${header.slug}\npluginVersion: ${header.version}\ncontentHash: ${header.contentHash}\n`);
+    markdown.replace(BUNDLE_HEADER_RE, () => `bundle: 2\nplugin: ${header.slug}\npluginVersion: ${header.version}\ncontentHash: ${header.contentHash}\n`);
 
 /**
  * The installed plugin a selection is exactly, or null. The check reads the picked items: they must all belong to one
@@ -107,7 +109,7 @@ export const pluginForSelection = internalQuery
             return null;
         }
 
-        const keys: Array<{ id: string; key: string }> = [];
+        const keys: { id: string; key: string }[] = [];
 
         for (const link of links) {
             if (link.itemId === undefined || !pickedSet.has(link.itemId)) {

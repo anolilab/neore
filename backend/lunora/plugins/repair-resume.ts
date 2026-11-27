@@ -73,11 +73,16 @@ export const beginRepairRows = async (
     const installId = install._id as string;
 
     // An install stopped by a rate limit has rows only for the entries it reached; the rest get theirs now, so none is skipped.
-    if (repairableNow(install, ctx.now)) {
+    // Not for a stopped update: its file was not checked above, so it may not add children.
+    if (install.status !== "updating" && repairableNow(install, ctx.now)) {
         const { page: existingRows } = await ctx.db.pluginItems.findMany({ where: { installId } });
         const known = new Set(existingRows.map((row) => row.entryKey));
 
-        for (const entry of entries.filter((item) => !known.has(item.entryKey))) {
+        for (const entry of entries) {
+            if (known.has(entry.entryKey)) {
+                continue;
+            }
+
             await ctx.db.insert("pluginItems", {
                 contentHash: entry.contentHash,
                 createdAt: ctx.now,

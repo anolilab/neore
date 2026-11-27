@@ -685,15 +685,15 @@ export const parseBundleMarkdown = (markdown: string): ParseBundleResult => {
     const sections = readSections(text.slice(match[0].length).split("\n"), errors, isPlugin);
     const declared = new Set<string>();
 
-    for (const section of sections) {
-        if (section.declaredKey === undefined) {
+    for (const { declaredKey, kind } of sections) {
+        if (declaredKey === undefined) {
             continue;
         }
 
-        const id = `${section.kind}:${section.declaredKey}`;
+        const id = `${kind}:${declaredKey}`;
 
         if (declared.has(id)) {
-            errors.push(`Two ${section.kind} items share the key "${section.declaredKey}"`);
+            errors.push(`Two ${kind} items share the key "${declaredKey}"`);
         }
 
         declared.add(id);

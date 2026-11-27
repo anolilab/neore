@@ -103,10 +103,8 @@ describe("public create procedures take no plugin marker", () => {
                 pluginMarker: MARKER,
                 type: "schedule",
             } as never)
-            .then(
-                () => "stored without the marker",
-                () => "refused",
-            );
+            .then(() => "stored without the marker")
+            .catch(() => "refused");
 
         // Each case states the outcome it expects; the marker check must hold either way.
         expect(outcome).toBe("stored without the marker");
@@ -123,10 +121,8 @@ describe("public create procedures take no plugin marker", () => {
                 skillIds: [],
                 title: "Panel",
             } as never)
-            .then(
-                () => "stored without the marker",
-                () => "refused",
-            );
+            .then(() => "stored without the marker")
+            .catch(() => "refused");
 
         // Each case states the outcome it expects; the marker check must hold either way.
         expect(outcome).toBe("refused");

@@ -45,7 +45,7 @@ describe("updating a trigger in place", () => {
         harness.close();
     });
 
-    const run = async <T>(fn: (context: any) => Promise<T>): Promise<T> => await harness.run(async (context: any) => await fn(context));
+    const run = async <T>(function_: (context: any) => Promise<T>): Promise<T> => await harness.run(async (context: any) => await function_(context));
 
     /** An installed plugin with one schedule trigger, enabled by the person. */
     const installed = async () => {
@@ -120,6 +120,6 @@ describe("updating a trigger in place", () => {
 
         const trigger = await run(async (context) => await context.db.triggers.findFirst({ where: { _id: triggerId } }));
 
-        expect(trigger).toMatchObject({ cronExpression: "0 9 * * *", enabled: true, description: "Changed by the owner." });
+        expect(trigger).toMatchObject({ cronExpression: "0 9 * * *", description: "Changed by the owner.", enabled: true });
     });
 });

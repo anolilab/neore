@@ -2051,37 +2051,6 @@ export const schema = defineSchema({
         .index("slug", ["slug"])
         .triggers((t) => auditTriggersFor(t, "organization", AUDIT_TABLES["organization"]!)),
 
-    // A plugin install and the children it created. Global: install state must be readable without a user's shard.
-    pluginInstalls: defineTable({
-        contentHash: v.string(),
-        generation: v.number(),
-        installedAt: v.number(),
-        leaseUntil: v.optional(v.number()),
-        pluginSlug: v.string(),
-        status: vPluginInstallStatus,
-        targetVersion: v.optional(v.string()),
-        updatedAt: v.number(),
-        userId: v.string(),
-        version: v.string(),
-    })
-        .global()
-        .index("by_user_and_slug", ["userId", "pluginSlug"]),
-
-    pluginItems: defineTable({
-        contentHash: v.string(),
-        createdAt: v.number(),
-        entryKey: v.string(),
-        installId: v.string(),
-        itemId: v.optional(v.string()),
-        kind: vPluginItemKind,
-        pendingHash: v.optional(v.string()),
-        state: vPluginItemState,
-        userId: v.string(),
-    })
-        .global()
-        .index("by_install", ["installId"])
-        .index("by_user", ["userId"]),
-
     organizationPolicies: defineTable({
         // The policy as canonical JSON text, written only after `auth/lib/organization-policy.ts`
         // accepted it. Text, not a typed object, so the parser stays the one place that knows its shape.
@@ -2465,6 +2434,37 @@ export const schema = defineSchema({
     playgroundApiKeys: defineTable({
         name: v.optional(v.string()),
     }).index("name", ["name"]),
+
+    // A plugin install and the children it created. Global: install state must be readable without a user's shard.
+    pluginInstalls: defineTable({
+        contentHash: v.string(),
+        generation: v.number(),
+        installedAt: v.number(),
+        leaseUntil: v.optional(v.number()),
+        pluginSlug: v.string(),
+        status: vPluginInstallStatus,
+        targetVersion: v.optional(v.string()),
+        updatedAt: v.number(),
+        userId: v.string(),
+        version: v.string(),
+    })
+        .global()
+        .index("by_user_and_slug", ["userId", "pluginSlug"]),
+
+    pluginItems: defineTable({
+        contentHash: v.string(),
+        createdAt: v.number(),
+        entryKey: v.string(),
+        installId: v.string(),
+        itemId: v.optional(v.string()),
+        kind: vPluginItemKind,
+        pendingHash: v.optional(v.string()),
+        state: vPluginItemState,
+        userId: v.string(),
+    })
+        .global()
+        .index("by_install", ["installId"])
+        .index("by_user", ["userId"]),
 
     presentations: defineTable({
         createdAt: v.number(),
@@ -3926,9 +3926,6 @@ export const schema = defineSchema({
         }),
 
     threads: defineTable({
-        // A plugin install's child. Written only by internal wrappers.
-        pluginInstallId: v.optional(v.string()),
-        pluginMarker: v.optional(v.string()),
         // Cache of the agent the active path runs on, for the thread list and the composer's
         // first paint; the path's last `agentSwitch` row decides (`agent/agent-switch.ts`).
         // Unset = the thread was never switched, and every send keeps its own model.
@@ -4020,6 +4017,9 @@ export const schema = defineSchema({
         pinnedAt: v.optional(v.number()),
         // The goal every following message in this chat runs with, until it is cleared (`chat/goals/functions.ts`).
         pinnedGoal: v.optional(vPinnedGoal),
+        // A plugin install's child. Written only by internal wrappers.
+        pluginInstallId: v.optional(v.string()),
+        pluginMarker: v.optional(v.string()),
         projectId: v.optional(v.id("projects")),
         publicAccessToken: v.optional(v.string()),
         reasoningEffort: v.optional(v.number()),
@@ -4257,6 +4257,8 @@ export const schema = defineSchema({
         nextTriggerAt: v.optional(v.number()),
         organizationId: v.optional(v.string()),
         payloadTemplate: v.optional(v.string()),
+        pluginInstallId: v.optional(v.string()),
+        pluginMarker: v.optional(v.string()),
         // A bot routine that only posts when there is something to report (`triggers/quiet.ts`). Absent = off. Only with a botId.
         quietWhenEmpty: v.optional(v.boolean()),
         searchMode: v.optional(v.string()),
@@ -4270,8 +4272,6 @@ export const schema = defineSchema({
         webhookPreviousSecret: v.optional(v.string()),
         webhookPreviousSecretExpiresAt: v.optional(v.number()),
         webhookSecret: v.optional(v.string()),
-        pluginInstallId: v.optional(v.string()),
-        pluginMarker: v.optional(v.string()),
         // How a webhook delivery is signed; unset = "timestamped" (`triggers/http.ts`).
         // A trigger accepts only its own scheme's headers. Widening this union is additive.
         webhookSignatureScheme: v.optional(vWebhookSignatureScheme),

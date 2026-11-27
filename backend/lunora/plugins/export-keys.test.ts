@@ -41,11 +41,11 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
 
 const MODULES = {
     lib_claim_once: async () => await import("../lib/claim-once"),
-    skills_create_skill: async () => await import("../skills/create-skill"),
-    skills_bundle: async () => await import("../skills/bundle"),
+    plugins_export: async () => await import("./export"),
     plugins_install_action: async () => await import("./install-action"),
     plugins_install_steps: async () => await import("./install-steps"),
-    plugins_export: async () => await import("./export"),
+    skills_bundle: async () => await import("../skills/bundle"),
+    skills_create_skill: async () => await import("../skills/create-skill"),
 } as const;
 
 beforeAll(async () => {
@@ -71,13 +71,17 @@ const procedureAt = (module: keyof typeof MODULES, name: string): never => {
 const OWNER = "owner-a";
 const SLUG = "daily-brief";
 
-const skill = (slug: string) => ({ description: `${slug} skill`, instructions: `Be the ${slug}.`, name: slug, slug });
+const skill = (slug: string) => {
+    return { description: `${slug} skill`, instructions: `Be the ${slug}.`, name: slug, slug };
+};
 
 /** A plugin file with one skill per slug, each under its own key. */
 const fileOf = async (slugs: string[]) => {
     const body = buildBundleMarkdown({
         description: "",
-        items: slugs.map((slug) => ({ key: slug, kind: "skill" as const, skill: skill(slug) })),
+        items: slugs.map((slug) => {
+            return { key: slug, kind: "skill" as const, skill: skill(slug) };
+        }),
         name: "Daily brief",
     });
     const contentHash = await bodyHash(body);
@@ -104,9 +108,11 @@ describe("exporting an installed plugin", () => {
     });
 
     it("writes the installed skills under their declared keys, and the file reads back with the same keys", async () => {
-        const skillIds = await harness.run(async (context: any) =>
-            (await context.db.skills.findMany({ where: { userId: OWNER } })).page.map((row: { _id: string }) => row._id),
-        );
+        const skillIds = await harness.run(async (context: any) => {
+            const { page } = await context.db.skills.findMany({ where: { userId: OWNER } });
+
+            return page.map((row: { _id: string }) => row._id);
+        });
 
         const { markdown } = (await harness.withIdentity({ userId: OWNER } as never).action(procedureAt("skills_bundle", "exportBundle"), {
             groupChatIds: [],

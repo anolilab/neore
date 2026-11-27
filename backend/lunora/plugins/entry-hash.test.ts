@@ -46,12 +46,16 @@ describe("a group's live hash", () => {
     const groupEntry = (create: typeof GROUP): PlanEntry =>
         ({ key: "group:0", kind: "group", plan: { create, kind: "group" }, problems: [], requires: [], title: "Panel", warnings: [] }) as unknown as PlanEntry;
     const keyOf = (skillId: string) => ({ A: "skill:0", B: "skill:1" })[skillId];
-    const row = (participants: string[], title = "Panel") => ({
-        mode: "round-robin",
-        model: "claude-haiku-5-5",
-        participants: participants.map((skillId) => ({ skillId })),
-        title,
-    });
+    const row = (participants: string[], title = "Panel") => {
+        return {
+            mode: "round-robin",
+            model: "claude-haiku-5-5",
+            participants: participants.map((skillId) => {
+                return { skillId };
+            }),
+            title,
+        };
+    };
 
     it("matches the file's group when every participant is the plugin's own skill", async () => {
         expect(await groupRowHash(row(["A", "B"]), keyOf)).toBe(await entryHash(groupEntry(GROUP)));

@@ -5,7 +5,7 @@
 import type { Infer } from "lunorash/server";
 
 import { sha256Hex } from "../lib/crypto";
-import { vPluginInstallStatus, vPluginItemKind, vPluginItemState } from "./validators";
+import type { vPluginInstallStatus, vPluginItemKind, vPluginItemState } from "./validators";
 
 /** A holder keeps its lease this long; nothing runs past it. */
 export const LEASE_MS = 5 * 60 * 1000;
@@ -31,17 +31,20 @@ export const actionsFor = (status: InstallStatus, leaseExpired: boolean): Instal
         case "installed": {
             return ["update", "uninstall"];
         }
+        case "installing": {
+            return leaseExpired ? ["repair", "uninstall"] : [];
+        }
         case "needs-repair": {
             return ["repair", "uninstall"];
         }
-        case "installing": {
+        case "uninstalling": {
             return leaseExpired ? ["repair", "uninstall"] : [];
         }
         case "updating": {
             return leaseExpired ? ["repair"] : [];
         }
-        case "uninstalling": {
-            return leaseExpired ? ["repair", "uninstall"] : [];
+        default: {
+            return [];
         }
     }
 };
@@ -69,6 +72,14 @@ export const parseMarker = (marker: string): { entryKey: string; installId: stri
     return { entryKey: marker.slice(separator + 1), installId: marker.slice(0, separator) };
 };
 
+const compareKeys = (a: string, b: string): number => {
+    if (a < b) {
+        return -1;
+    }
+
+    return a > b ? 1 : 0;
+};
+
 /** JSON with object keys sorted at every depth, so the same content always serialises the same way. */
 export const canonicalJson = (value: unknown): string => {
     if (Array.isArray(value)) {
@@ -78,7 +89,7 @@ export const canonicalJson = (value: unknown): string => {
     if (value !== null && typeof value === "object") {
         const entries = Object.entries(value as Record<string, unknown>)
             .filter(([, item]) => item !== undefined)
-            .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+            .toSorted(([a], [b]) => compareKeys(a, b));
 
         return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(",")}}`;
     }
@@ -124,13 +135,10 @@ export type UpdateAction = "create" | "delete" | "detach" | "keep-edited" | "rep
  * group whose definition changed is reported, not changed. A child whose kind changed is replaced.
  * A child caught mid-update (its live hash is its pending hash) is not an edit: the update finishes it.
  */
-export const diffUpdate = (
-    installed: ReadonlyArray<InstalledChild>,
-    incoming: ReadonlyArray<IncomingEntry>,
-): Array<{ action: UpdateAction; entryKey: string }> => {
+export const diffUpdate = (installed: ReadonlyArray<InstalledChild>, incoming: ReadonlyArray<IncomingEntry>): { action: UpdateAction; entryKey: string }[] => {
     const byKey = new Map(installed.map((child) => [child.entryKey, child]));
     const incomingKeys = new Set(incoming.map((entry) => entry.entryKey));
-    const plan: Array<{ action: UpdateAction; entryKey: string }> = [];
+    const plan: { action: UpdateAction; entryKey: string }[] = [];
 
     for (const entry of incoming) {
         const child = byKey.get(entry.entryKey);
@@ -184,8 +192,8 @@ export const compareVersions = (a: string, b: string): number => {
         throw new Error(`not a major.minor.patch version: ${malformed}`);
     }
 
-    const left = a.split(".").map((part) => Number(part));
-    const right = b.split(".").map((part) => Number(part));
+    const left = a.split(".").map(Number);
+    const right = b.split(".").map(Number);
 
     for (let index = 0; index < 3; index += 1) {
         const difference = (left[index] ?? 0) - (right[index] ?? 0);

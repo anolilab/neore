@@ -88,20 +88,25 @@ describe("update: the installed children and their live hashes", () => {
 
         const installed = await run(async (context) => await context.runQuery(loadInstalledForUpdate, { pluginSlug: SLUG, userId: OWNER }));
 
-        expect(installed.children[0].currentHash).not.toBe(installed.children[0].contentHash);
+        const [child] = installed.children;
+
+        expect(child.currentHash).not.toBe(child.contentHash);
     });
 
     it("reports a child whose row is gone as missing", async () => {
         const { installId } = await installWithSkill();
 
-        await run(
-            async (context) =>
-                await context.db.delete("skills", (await context.db.skills.findFirst({ where: { pluginMarker: markerFor(installId, "skill:analyst") } }))._id),
-        );
+        await run(async (context) => {
+            const row = await context.db.skills.findFirst({ where: { pluginMarker: markerFor(installId, "skill:analyst") } });
+
+            await context.db.delete("skills", row._id);
+        });
 
         const installed = await run(async (context) => await context.runQuery(loadInstalledForUpdate, { pluginSlug: SLUG, userId: OWNER }));
 
-        expect(installed.children[0].currentHash).toBe("missing");
+        const [child] = installed.children;
+
+        expect(child.currentHash).toBe("missing");
     });
 
     it("returns null for a plugin the person does not have", async () => {

@@ -41,10 +41,10 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
 
 const MODULES = {
     lib_claim_once: async () => await import("../lib/claim-once"),
-    skills_create_skill: async () => await import("../skills/create-skill"),
     plugins_install_action: async () => await import("./install-action"),
     plugins_install_steps: async () => await import("./install-steps"),
     skills_bundle: async () => await import("../skills/bundle"),
+    skills_create_skill: async () => await import("../skills/create-skill"),
 } as const;
 
 beforeAll(async () => {
@@ -90,7 +90,12 @@ describe("plugin install action", () => {
     });
 
     const as = () => harness.withIdentity({ userId: OWNER } as never);
-    const installs = async () => await harness.run(async (context: any) => (await context.db.pluginInstalls.findMany({ where: { userId: OWNER } })).page);
+    const installs = async () =>
+        await harness.run(async (context: any) => {
+            const { page } = await context.db.pluginInstalls.findMany({ where: { userId: OWNER } });
+
+            return page;
+        });
 
     it("previews the file and returns the hash of its body", async () => {
         const preview = await as().action(procedureAt("plugins_install_action", "previewPlugin"), { markdown: pluginFile(hash) } as never);
@@ -117,7 +122,11 @@ describe("plugin install action", () => {
         expect(rows).toHaveLength(1);
         expect(rows[0]).toMatchObject({ pluginSlug: "daily-brief", status: "installed" });
 
-        const skills = await harness.run(async (context: any) => (await context.db.skills.findMany({ where: { userId: OWNER } })).page);
+        const skills = await harness.run(async (context: any) => {
+            const { page } = await context.db.skills.findMany({ where: { userId: OWNER } });
+
+            return page;
+        });
 
         expect(skills).toEqual([expect.objectContaining({ name: "analyst", pluginInstallId: rows[0]._id, source: { type: "plugin", version: "1.0.0" } })]);
 
