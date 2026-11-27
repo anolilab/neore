@@ -319,7 +319,8 @@ const neutralize = (root: Element): void => {
         }
 
         if (element.localName === "a" || element.localName === "area") {
-            element.setAttribute("target", "_blank");
+            // A link to a place in the chapter (a footnote, a note's way back) moves within the frame, which loads nothing; any other goes nowhere.
+            element.setAttribute("target", (element.getAttribute("href") ?? "").trimStart().startsWith("#") ? "_self" : "_blank");
             element.setAttribute("rel", "noopener noreferrer");
         }
 

@@ -343,6 +343,20 @@ describe("chapterDocument", () => {
         expect(frame.querySelector("a")?.getAttribute("href")).toBe("https://example.org");
     });
 
+    it("keeps a link to a place in the chapter (a footnote and its way back) inside the frame, whatever target it wrote", () => {
+        const frame = parse(
+            chapterDocument(
+                '<p>text<a href="#fn1" id="ref1" target="_top">1</a></p><p id="fn1">note <a href=" #ref1" target="named">back</a></p><a href="https://example.org#x">out</a>',
+                [],
+            ),
+        );
+        const [note, back, out] = [...frame.querySelectorAll("a")];
+
+        expect(note?.getAttribute("target")).toBe("_self");
+        expect(back?.getAttribute("target")).toBe("_self");
+        expect(out?.getAttribute("target")).toBe("_blank");
+    });
+
     it("drops a base a chapter brings, so its links keep the frame's own", () => {
         const frame = parse(chapterDocument('<base href="https://evil.example/"><p>x</p>', []));
 
