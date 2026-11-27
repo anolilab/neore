@@ -442,6 +442,7 @@ export interface InternalApiTypes {
         group: {
             functions: {
                 createImportedGroupChat: FunctionReference<"mutation", { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; model: string; organizationId?: string; skillIds: Array<string>; synthesizerSkillId?: string; title?: string; userId: string }, { threadId: string }>;
+                createPluginGroupChat: FunctionReference<"mutation", { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; model: string; organizationId?: string; plan?: string; pluginInstallId: string; pluginMarker: string; skillIds: Array<string>; synthesizerSkillId?: string; title?: string; userId: string }, { threadId: string }>;
                 getGroupHistory: FunctionReference<"query", { threadId: string; userId: string }, Array<{ agentName?: string; id: string; role: "user" | "assistant"; speakerSkillId?: string; text: string }>>;
                 getGroupRunConfig: FunctionReference<"query", { organizationId?: string; threadId: string; userId: string }, null | { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: Array<{ config?: { additionalTools?: Array<string>; disabledTools?: Array<string>; preferredModel?: string; reasoningEffort?: number; searchMode?: string; voice?: string }; description: string; instructions: string; name: string; skillId: string; slug: string }>; stopRequestedAt?: number; synthesizerSkillId?: string }>;
                 isGroupStopRequested: FunctionReference<"query", { since: number; threadId: string }, boolean>;
@@ -1034,6 +1035,38 @@ export interface InternalApiTypes {
             redeemPageInvite: FunctionReference<"mutation", { token: string; userId: string }, { pageId: Id<"pages"> }>;
         };
     };
+    plugins: {
+        export: {
+            pluginForSelection: FunctionReference<"query", { groupChatIds: Array<string>; skillIds: Array<string>; triggerIds: Array<string>; userId: string }, null | { keys: Array<{ id: string; key: string }>; slug: string; version: string }>;
+        };
+        install_steps: {
+            createInstallRow: FunctionReference<"mutation", { contentHash: string; pluginSlug: string; userId: string; version: string }, { generation: number; installId: string }>;
+            deleteInstall: FunctionReference<"mutation", { generation: number; installId: string }, null>;
+            finishInstall: FunctionReference<"mutation", { generation: number; installId: string }, null>;
+            markNeedsRepair: FunctionReference<"mutation", { generation: number; installId: string }, null>;
+            recordCreated: FunctionReference<"mutation", { generation: number; installId: string; intentId: string; itemId: string }, null>;
+            recordIntent: FunctionReference<"mutation", { contentHash: string; entryKey: string; generation: number; installId: string; kind: "skill" | "trigger" | "group"; userId: string }, string>;
+        };
+        repair_resume: {
+            beginRepair: FunctionReference<"mutation", { contentHash: string; pluginSlug: string; userId: string }, { generation: number; installId: string; linked: number; missing: Array<{ entryKey: string; intentId: string; kind: "skill" | "trigger" | "group" }>; status: "installed" | "needs-repair" }>;
+        };
+        uninstall_action: {
+            beginUninstall: FunctionReference<"mutation", { pluginSlug: string; userId: string }, { generation: number; groups: Array<string>; installId: string; kept: Array<string>; removed: number }>;
+            claimGroup: FunctionReference<"mutation", { generation: number; installId: string; threadId: string }, boolean>;
+            finishUninstall: FunctionReference<"mutation", { generation: number; installId: string }, null>;
+        };
+        update: {
+            loadInstalledForUpdate: FunctionReference<"query", { pluginSlug: string; userId: string }, null | { children: Array<{ contentHash: string; currentHash: string; entryKey: string; kind: "skill" | "trigger" | "group" }>; installId: string; ownSlugs: Array<{ entryKey: string; slug: string }>; status: string; version: string }>;
+        };
+        update_apply: {
+            beginUpdate: FunctionReference<"mutation", { installId: string; targetVersion: string; userId: string }, number>;
+            detachChild: FunctionReference<"mutation", { entryKey: string; generation: number; installId: string; userId: string }, null>;
+            finishUpdate: FunctionReference<"mutation", { contentHash: string; generation: number; installId: string; version: string }, null>;
+            removeChild: FunctionReference<"mutation", { entryKey: string; generation: number; installId: string; userId: string }, null>;
+            updateSkillChild: FunctionReference<"mutation", { category?: string; config?: unknown; contentHash: string; description: string; entryKey: string; generation: number; icon?: string; installId: string; instructions: string; name: string; slug: string; tags?: Array<string>; variables?: unknown; version?: string; userId: string }, null>;
+            updateTriggerChild: FunctionReference<"mutation", { contentHash: string; cronExpression?: string; description?: string; entryKey: string; generation: number; inputTemplate?: string; installId: string; model: string; name: string; searchMode?: string; systemPrompt?: string; timezone?: string; userId: string }, null>;
+        };
+    };
     projects: {
         functions: {
             getProjectContextForRun: FunctionReference<"query", { projectId: Id<"projects">; userId: string }, string | null>;
@@ -1260,6 +1293,7 @@ export interface InternalApiTypes {
         functions: {
             admitTriggerRun: FunctionReference<"mutation", { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; releaseUnlessRun?: boolean; requireEnabled?: boolean; triggerId: Id<"triggers"> }, null | string | { filtered: string } | { skipped: "disabled" | "duplicate" }>;
             createExecution: FunctionReference<"mutation", { firing?: number; payload?: string; triggerId: Id<"triggers"> }, Id<"triggerExecutions">>;
+            createPluginTrigger: FunctionReference<"mutation", { botComputer?: boolean; botId?: string; cronExpression?: string; description?: string; eventSource?: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string }; filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>; inputTemplate?: string; model: string; name: string; quietWhenEmpty?: boolean; searchMode?: string; systemPrompt?: string; timezone?: string; type: "event" | "schedule" | "webhook"; webhookPreset?: { event: "pull_request_opened" | "pull_request_merged" | "pull_request_review_requested" | "issue_assigned"; provider: "github" } | { event: "merge_request_opened" | "merge_request_merged"; provider: "gitlab" }; webhookSignatureScheme?: "timestamped" | "native" | "gitlab-token"; plan?: string; pluginInstallId: string; pluginMarker: string; userId: string }, { triggerId: string; webhookSecret?: string }>;
             getDueScheduleTriggers: FunctionReference<"query", { now: number }, import("./dataModel.js").Doc_triggers[]>;
             getTriggerInternal: FunctionReference<"query", { triggerId: Id<"triggers"> }, import("./dataModel.js").Doc_triggers | null>;
             pruneExpiredRunPrompts: FunctionReference<"mutation", {}, null>;
@@ -1765,6 +1799,7 @@ export const internal: InternalApiTypes = {
         group: {
             functions: {
                 createImportedGroupChat: { __lunoraRef: "chat_group_functions:createImportedGroupChat" },
+                createPluginGroupChat: { __lunoraRef: "chat_group_functions:createPluginGroupChat" },
                 getGroupHistory: { __lunoraRef: "chat_group_functions:getGroupHistory" },
                 getGroupRunConfig: { __lunoraRef: "chat_group_functions:getGroupRunConfig" },
                 isGroupStopRequested: { __lunoraRef: "chat_group_functions:isGroupStopRequested" },
@@ -2357,6 +2392,38 @@ export const internal: InternalApiTypes = {
             redeemPageInvite: { __lunoraRef: "pages_sharing:redeemPageInvite" },
         },
     },
+    plugins: {
+        export: {
+            pluginForSelection: { __lunoraRef: "plugins_export:pluginForSelection" },
+        },
+        install_steps: {
+            createInstallRow: { __lunoraRef: "plugins_install_steps:createInstallRow" },
+            deleteInstall: { __lunoraRef: "plugins_install_steps:deleteInstall" },
+            finishInstall: { __lunoraRef: "plugins_install_steps:finishInstall" },
+            markNeedsRepair: { __lunoraRef: "plugins_install_steps:markNeedsRepair" },
+            recordCreated: { __lunoraRef: "plugins_install_steps:recordCreated" },
+            recordIntent: { __lunoraRef: "plugins_install_steps:recordIntent" },
+        },
+        repair_resume: {
+            beginRepair: { __lunoraRef: "plugins_repair_resume:beginRepair" },
+        },
+        uninstall_action: {
+            beginUninstall: { __lunoraRef: "plugins_uninstall_action:beginUninstall" },
+            claimGroup: { __lunoraRef: "plugins_uninstall_action:claimGroup" },
+            finishUninstall: { __lunoraRef: "plugins_uninstall_action:finishUninstall" },
+        },
+        update: {
+            loadInstalledForUpdate: { __lunoraRef: "plugins_update:loadInstalledForUpdate" },
+        },
+        update_apply: {
+            beginUpdate: { __lunoraRef: "plugins_update_apply:beginUpdate" },
+            detachChild: { __lunoraRef: "plugins_update_apply:detachChild" },
+            finishUpdate: { __lunoraRef: "plugins_update_apply:finishUpdate" },
+            removeChild: { __lunoraRef: "plugins_update_apply:removeChild" },
+            updateSkillChild: { __lunoraRef: "plugins_update_apply:updateSkillChild" },
+            updateTriggerChild: { __lunoraRef: "plugins_update_apply:updateTriggerChild" },
+        },
+    },
     projects: {
         functions: {
             getProjectContextForRun: { __lunoraRef: "projects_functions:getProjectContextForRun" },
@@ -2583,6 +2650,7 @@ export const internal: InternalApiTypes = {
         functions: {
             admitTriggerRun: { __lunoraRef: "triggers_functions:admitTriggerRun" },
             createExecution: { __lunoraRef: "triggers_functions:createExecution" },
+            createPluginTrigger: { __lunoraRef: "triggers_functions:createPluginTrigger" },
             getDueScheduleTriggers: { __lunoraRef: "triggers_functions:getDueScheduleTriggers" },
             getTriggerInternal: { __lunoraRef: "triggers_functions:getTriggerInternal" },
             pruneExpiredRunPrompts: { __lunoraRef: "triggers_functions:pruneExpiredRunPrompts" },

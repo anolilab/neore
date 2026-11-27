@@ -44,8 +44,8 @@ import {
 } from "./evals/validators";
 import { AUDIT_TABLES, auditTriggersFor } from "./lib/audit-triggers";
 import { vCapabilityReport } from "./lib/capability-report";
-import { vPluginInstallStatus, vPluginItemKind, vPluginItemState } from "./plugins/validators";
 import { notificationInputFields } from "./notifications/validators";
+import { vPluginInstallStatus, vPluginItemKind, vPluginItemState } from "./plugins/validators";
 import {
     vCachedRequest,
     vDraftComment,
