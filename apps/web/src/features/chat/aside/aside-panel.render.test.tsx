@@ -920,6 +920,46 @@ describe("AsidePanel", () => {
         }
     });
 
+    it("does not scroll to another hit when a streamed answer adds a match before the selected one", async () => {
+        vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
+        const scroll = vi.fn();
+
+        useAsideStore.setState({ byThread: { "thread-1": [{ answer: "A cat. A cat.", id: "a", question: "Why?", status: "answered", token: "tok" }] } });
+        render(<AsidePanel threadId="thread-1" />);
+
+        // Each hit sits further down the panel than the last, so a hit that is not the selected one lies out of sight.
+        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
+        Object.defineProperty(Range.prototype, "getBoundingClientRect", {
+            configurable: true,
+            value: function rectByOffset(this: Range) {
+                // eslint-disable-next-line unicorn/no-this-outside-of-class -- the rect depends on which range is asked, which only the receiver says
+                return rectAt(20 + this.startOffset * 120);
+            },
+        });
+
+        try {
+            act(() => {
+                globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+            });
+            fireEvent.change(screen.getByRole("textbox", { name: "Find in side questions" }), { target: { value: "cat" } });
+            fireEvent.click(screen.getByRole("button", { name: "Next match" }));
+            await settleReveal();
+            expect(scroll).toHaveBeenCalled();
+            scroll.mockClear();
+
+            // The stream puts a match before the selected one, so the same occurrence number now names an earlier hit.
+            act(() => {
+                screen.getByText("A cat. A cat.").textContent = "Cat! A cat. A cat.";
+            });
+            await settleReveal();
+            expect(scroll).not.toHaveBeenCalled();
+        } finally {
+            Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+            Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
+            vi.useRealTimers();
+        }
+    });
+
     it("moves focus to the panel when Escape closes the bar after the control that opened it was dismissed", () => {
         useAsideStore.setState({
             byThread: { "thread-1": [{ answer: "A cat.", id: "a", question: "Why?", status: "answered", token: "tok" }] },

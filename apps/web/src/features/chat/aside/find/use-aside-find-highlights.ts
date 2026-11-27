@@ -201,7 +201,25 @@ const entryOf = (range: Range | undefined): string | undefined =>
 interface Anchor {
     entryId: string | undefined;
     occurrence: number;
+    /** Characters from the start of the entry's text to the hit: the hit keeps it while the text around it is rewritten. */
+    textOffset: number | undefined;
 }
+
+/** How far into its entry's text a hit starts, or undefined when it is not in an entry. */
+const textOffsetOf = (range: Range | undefined): number | undefined => {
+    const row = range?.startContainer.parentElement?.closest<HTMLElement>(`[${CSS.escape(ASIDE_ENTRY_ATTRIBUTE)}]`);
+
+    if (!range || !row) {
+        return undefined;
+    }
+
+    const lead = document.createRange();
+
+    lead.setStart(row, 0);
+    lead.setEnd(range.startContainer, range.startOffset);
+
+    return lead.toString().length;
+};
 
 /** The selected hit: its anchor, the flat position it last held, and the navigation that selected it. */
 interface Selection {
@@ -213,17 +231,28 @@ interface Selection {
 const anchorAt = (all: Range[], position: number): Anchor => {
     const entryId = entryOf(all[position]);
 
-    return { entryId, occurrence: all.slice(0, position).filter((range) => entryOf(range) === entryId).length };
+    return {
+        entryId,
+        occurrence: all.slice(0, position).filter((range) => entryOf(range) === entryId).length,
+        textOffset: textOffsetOf(all[position]),
+    };
 };
 
-/** Whether two selections name the same hit: the same entry, and the same place among its hits. */
-const isSameAnchor = (a: Anchor | undefined, b: Anchor | undefined): boolean => a?.entryId === b?.entryId && a?.occurrence === b?.occurrence;
+/** Whether two selections name the same hit: the same entry, and the same place in its text. */
+const isSameAnchor = (a: Anchor | undefined, b: Anchor | undefined): boolean => a?.entryId === b?.entryId && a?.textOffset === b?.textOffset;
 
 /** Where the anchored hit sits in the rescanned list, or undefined when its entry is gone. */
 const positionOf = (all: Range[], anchor: Anchor): number | undefined => {
     const positions = all.flatMap((range, position) => (entryOf(range) === anchor.entryId ? [position] : []));
 
-    return positions.length > 0 ? positions[Math.min(anchor.occurrence, positions.length - 1)] : undefined;
+    if (positions.length === 0) {
+        return undefined;
+    }
+
+    // The hit that still starts at the same place in its entry. When the text before it changed, the occurrence it was.
+    const exact = positions.find((position) => textOffsetOf(all[position]) === anchor.textOffset);
+
+    return exact ?? positions[Math.min(anchor.occurrence, positions.length - 1)];
 };
 
 /**
