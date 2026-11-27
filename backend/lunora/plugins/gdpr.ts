@@ -9,20 +9,23 @@ import { internalQuery, type MutationCtx } from "../_generated/server";
 import { type BatchResult, deleteOneByOne } from "../gdpr/batch";
 
 /**
- * Rows per table per call. Both tables are `.global()`, so every delete reads its row and then deletes it (two D1 statements) and
- * one invocation allows about 50: two page reads and up to 2 x 10 deletes at two each is 42.
+ * Rows per table per call. The tables are `.global()`, so every delete reads its row and then deletes it (two D1 statements) and
+ * one invocation allows about 50: three page reads and up to 3 x 7 deletes at two each is 45.
  */
-const PAGE = 10;
+const PAGE = 7;
 
-/** One batch of the person's links and installs. `hasMore` while either table may hold more; the workflow calls again. */
+/** One batch of the person's links, installs and install slots. `hasMore` while either table may hold more; the workflow calls again. */
 export const erasePluginsForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
     const { page: items } = await ctx.db.pluginItems.findMany({ consistency: "primary", limit: PAGE, where: { userId } });
     const { page: installs } = await ctx.db.pluginInstalls.findMany({ consistency: "primary", limit: PAGE, where: { userId } });
 
+    const { page: slots } = await ctx.db.pluginInstallSlots.findMany({ consistency: "primary", limit: PAGE, where: { userId } });
+
+    await deleteOneByOne(slots, async (row) => await ctx.db.delete("pluginInstallSlots", row._id));
     await deleteOneByOne(items, async (row) => await ctx.db.delete("pluginItems", row._id));
     await deleteOneByOne(installs, async (row) => await ctx.db.delete("pluginInstalls", row._id));
 
-    return { hasMore: items.length >= PAGE || installs.length >= PAGE };
+    return { hasMore: items.length >= PAGE || installs.length >= PAGE || slots.length >= PAGE };
 };
 
 /** Rows read per page for the export, installs and links alike. */

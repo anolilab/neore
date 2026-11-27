@@ -2550,8 +2550,20 @@ export const schema = defineSchema({
         version: v.string(),
     })
         .global()
-        // Unique: one install per person and plugin, held by the database. Named anew because an existing D1 table keeps an index
-        // of the same name and columns as it was created (the old non-unique `by_user_and_slug`).
+        .index("by_user_and_slug", ["userId", "pluginSlug"]),
+
+    // One row per person and plugin, held for as long as the install row exists: its unique index is what refuses a second install of
+    // a plugin. A table of its own because a unique index cannot be added to the existing `pluginInstalls` table (`lunora prepare`
+    // blocks it, and a migration never reaches a `.global()` table).
+    pluginInstallSlots: defineTable({
+        createdAt: v.number(),
+        // Set once the install row exists; a slot without one is a create that stopped between its two inserts.
+        installId: v.optional(v.string()),
+        pluginSlug: v.string(),
+        userId: v.string(),
+    })
+        .global()
+        .index("by_install", ["installId"])
         .index("by_user_and_plugin_slug", ["userId", "pluginSlug"], { unique: true }),
 
     pluginItems: defineTable({

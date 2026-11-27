@@ -92,9 +92,12 @@ describe("uninstall", () => {
         const { page: links } = await run(async (context) => await context.db.pluginItems.findMany({ where: { installId } }));
         const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
 
+        const { page: slots } = await run(async (context) => await context.db.pluginInstallSlots.findMany({}));
+
         expect(skill).toBeNull();
         expect(links).toHaveLength(0);
         expect(install).toBeNull();
+        expect(slots).toHaveLength(0);
     });
 
     it("keeps an edited skill, detached so that no later sweep finds it", async () => {

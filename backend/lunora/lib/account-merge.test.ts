@@ -1592,7 +1592,7 @@ describe("reassignGlobalRows", () => {
         }
     });
 
-    describe("plugin installs and the unique index", () => {
+    describe("plugin installs and their slots", () => {
         const base = { contentHash: "a".repeat(64), createdAt: 0, generation: 1, status: "installed" as const, updatedAt: 0, version: "1.0.0" };
         const open = () => lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
 
@@ -1601,9 +1601,13 @@ describe("reassignGlobalRows", () => {
 
             try {
                 const guestInstall = await harness.run(async (context: any) => {
-                    await context.db.insert("pluginInstalls", { ...base, pluginSlug: "shared", userId: "user" });
+                    const userId = await context.db.insert("pluginInstalls", { ...base, pluginSlug: "shared", userId: "user" });
+                    const id = await context.db.insert("pluginInstalls", { ...base, pluginSlug: "shared", userId: "guest" });
 
-                    return await context.db.insert("pluginInstalls", { ...base, pluginSlug: "shared", userId: "guest" });
+                    await context.db.insert("pluginInstallSlots", { createdAt: 0, installId: userId, pluginSlug: "shared", userId: "user" });
+                    await context.db.insert("pluginInstallSlots", { createdAt: 0, installId: id, pluginSlug: "shared", userId: "guest" });
+
+                    return id;
                 });
 
                 // The target read misses the new account's install, as a read that ran before its create would.
@@ -1635,6 +1639,30 @@ describe("reassignGlobalRows", () => {
 
                 expect(page.map((row: any) => [row.userId, row.pluginSlug])).toStrictEqual([["user", "shared"]]);
                 expect(page.some((row: any) => row._id === guestInstall)).toBe(false);
+
+                const { page: slots } = await harness.run(async (context: any) => await context.db.pluginInstallSlots.findMany({}));
+
+                expect(slots.map((row: any) => row.userId)).toStrictEqual(["user"]);
+            } finally {
+                harness.close();
+            }
+        });
+
+        it("moves the slot with the install", async () => {
+            const harness = open();
+
+            try {
+                await harness.run(async (context: any) => {
+                    const id = await context.db.insert("pluginInstalls", { ...base, pluginSlug: "only", userId: "guest" });
+
+                    await context.db.insert("pluginInstallSlots", { createdAt: 0, installId: id, pluginSlug: "only", userId: "guest" });
+                });
+
+                await harness.run(async (context: any) => await mergePluginInstallsPage(context, "guest", "user"));
+
+                const { page } = await harness.run(async (context: any) => await context.db.pluginInstallSlots.findMany({}));
+
+                expect(page.map((row: any) => row.userId)).toStrictEqual(["user"]);
             } finally {
                 harness.close();
             }

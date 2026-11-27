@@ -90,7 +90,7 @@ import { AUDIT_TABLES } from "./audit-triggers";
 import { hasClaimWithPrefix, prefixEnd, releaseClaimsWithPrefix } from "./claim-once";
 import { authLogger } from "./logger";
 import { callOnShard } from "./cross-shard";
-import { isUniqueViolation } from "./error-helpers";
+import { moveInstallSlot, releaseInstallSlot } from "../plugins/install-slots";
 import { enqueueJob } from "./job-queue";
 import { noteRetentionDueAt, noteShardActivity, noteShardDue } from "./shard-housekeeping";
 import { currentShard } from "./shard-context";
@@ -244,9 +244,10 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     passkey: ["userId"],
     // A route restore still owed to the guest's pins (`chat/pins/functions.ts`): both columns follow the merge, as `sharedPinRoutes` does.
     pendingPinRestores: ["ownerId", "userId"],
+    pluginInstalls: [],
     // A plugin install is moved by its own step (`mergePluginInstallsPage`) ahead of this loop: a person has one install per plugin, so
     // an install of a plugin the new account already has is dropped with its links, and its children detached, rather than moved.
-    pluginInstalls: [],
+    pluginInstallSlots: [],
     pluginItems: [],
     projectRepositories: ["userId"],
     projectRuleFiles: ["userId"],
@@ -2200,8 +2201,13 @@ export const mergePluginInstallsPage = async (ctx: MutationCtx, from: string, to
                 return { done: false, statements };
             }
 
-            // Only while the install is still the one read: an action that took it over since (a new generation) keeps it for a later page.
-            try {
+            // The slot moves first; a person who already holds one for the plugin gets this install dropped below, as a duplicate.
+            const slotMoved = await moveInstallSlot(ctx, installId, to);
+
+            statements += 3;
+
+            if (slotMoved) {
+                // Only while the install is still the one read: an action that took it over since (a new generation) keeps it for a later page.
                 const { applied } = await ctx.db.patchIf("pluginInstalls", install._id, { patch: { userId: to }, where: { generation: install.generation } });
 
                 statements += 2;
@@ -2211,21 +2217,14 @@ export const mergePluginInstallsPage = async (ctx: MutationCtx, from: string, to
 
                     continue;
                 }
-            } catch (error) {
-                if (!isUniqueViolation(error)) {
-                    throw error;
+
+                // An install with links is a call of its own, as a duplicate is.
+                if (links.page.length > 0) {
+                    return { done: false, statements };
                 }
 
-                // The new account gained an install of this plugin since the read (the unique index): the next call finds it and drops this one.
-                return { done: false, statements: statements + 2 };
+                continue;
             }
-
-            // An install with links is a call of its own, as a duplicate is.
-            if (links.page.length > 0) {
-                return { done: false, statements };
-            }
-
-            continue;
         }
 
         // A duplicate costs up to two dozen D1 statements (its skills and links are global rows), so it gets a call to itself.
@@ -2292,8 +2291,9 @@ export const mergePluginInstallsPage = async (ctx: MutationCtx, from: string, to
             return { done: false, statements };
         }
 
+        await releaseInstallSlot(ctx, installId);
         await ctx.db.delete("pluginInstalls", install._id);
-        statements += 2;
+        statements += 4;
 
         return { done: false, statements };
     }

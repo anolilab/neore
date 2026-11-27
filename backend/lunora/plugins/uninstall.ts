@@ -19,6 +19,7 @@ import type { MutationCtx } from "../_generated/server";
 import { DEFAULT_GROUP_TITLE } from "../chat/group/functions";
 import { indexedGroupUsers } from "../chat/group/skill-index";
 import { skillVisibility } from "../skills/access";
+import { releaseInstallSlot } from "./install-slots";
 import { requireOwnerShard } from "./owner-shard";
 import { skillRowHash, triggerRowHash } from "./entry-hash";
 import { patchInstallIf, STALE } from "./held-install";
@@ -427,6 +428,7 @@ export const finishUninstallRows = async (
         return { ...result, hasMore: true };
     }
 
+    await releaseInstallSlot(ctx, installId);
     await ctx.db.delete("pluginInstalls", install._id as Id<"pluginInstalls">);
 
     return { ...result, hasMore: false };

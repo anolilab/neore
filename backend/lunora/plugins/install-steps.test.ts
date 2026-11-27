@@ -9,6 +9,7 @@ import { createInstallRow, deleteInstall, finishInstall, markNeedsRepair, record
 const OWNER = "owner-a";
 const HASH = "b".repeat(64);
 
+const installRow = { contentHash: HASH, generation: 1, installedAt: 0, pluginSlug: "daily-brief", status: "installed", updatedAt: 0, version: "1.0.0" };
 const start = { contentHash: HASH, pluginSlug: "daily-brief", userId: OWNER, version: "1.0.0" };
 
 describe("install steps", () => {
@@ -34,13 +35,63 @@ describe("install steps", () => {
         await expect(run(async (context) => await context.runMutation(createInstallRow, start))).rejects.toThrow("already installed");
     });
 
-    it("holds one install per person and plugin in the database, not only in the read before the insert", async () => {
+    it("holds one install per person and plugin in a slot row the database keeps unique", async () => {
+        const { installId } = await run(async (context) => await context.runMutation(createInstallRow, start));
+
+        const slot = { createdAt: 0, installId: "x", pluginSlug: "daily-brief" };
+        const { page } = await run(async (context) => await context.db.pluginInstallSlots.findMany({}));
+
+        expect(page).toHaveLength(1);
+        expect(page[0]).toMatchObject({ installId, pluginSlug: "daily-brief", userId: OWNER });
+        await expect(run(async (context) => await context.db.insert("pluginInstallSlots", { ...slot, userId: OWNER }))).rejects.toMatchObject({
+            kind: "unique",
+        });
+        await run(async (context) => await context.db.insert("pluginInstallSlots", { ...slot, userId: "owner-b" }));
+    });
+
+    it("lets a reinstall through a slot that names an install that is gone", async () => {
+        await run(async (context) => await context.db.insert("pluginInstalls", { ...installRow, userId: OWNER }));
+        const installs = await run(async (context) => await context.db.pluginInstalls.findMany({}));
+
+        await run(
+            async (context) =>
+                await context.db.insert("pluginInstallSlots", { createdAt: 0, installId: installs.page[0]._id, pluginSlug: "daily-brief", userId: OWNER }),
+        );
+        await run(async (context) => await context.db.delete("pluginInstalls", installs.page[0]._id));
+        // The slot names an install that is gone: a leftover, so a reinstall goes through.
         await run(async (context) => await context.runMutation(createInstallRow, start));
 
-        const row = { contentHash: HASH, generation: 1, installedAt: 0, pluginSlug: "daily-brief", status: "installing", updatedAt: 0, version: "1.0.0" };
+        const { page } = await run(async (context) => await context.db.pluginInstallSlots.findMany({}));
 
-        await expect(run(async (context) => await context.db.insert("pluginInstalls", { ...row, userId: OWNER }))).rejects.toMatchObject({ kind: "unique" });
-        await run(async (context) => await context.db.insert("pluginInstalls", { ...row, userId: "owner-b" }));
+        expect(page).toHaveLength(1);
+    });
+
+    it("refuses while a slot of an unfinished create is younger than the lease, and takes it over once older", async () => {
+        await run(async (context) => await context.db.insert("pluginInstallSlots", { createdAt: Date.now(), pluginSlug: "daily-brief", userId: OWNER }));
+
+        await expect(run(async (context) => await context.runMutation(createInstallRow, start))).rejects.toThrow("already installed");
+
+        await run(async (context) => {
+            const { page } = await context.db.pluginInstallSlots.findMany({});
+
+            await context.db.patch("pluginInstallSlots", page[0]._id, { createdAt: 0 });
+        });
+
+        const created = await run(async (context) => await context.runMutation(createInstallRow, start));
+        const { page } = await run(async (context) => await context.db.pluginInstallSlots.findMany({}));
+
+        expect(page).toHaveLength(1);
+        expect(page[0].installId).toBe(created.installId);
+    });
+
+    it("deletes the slot with the install on a rollback", async () => {
+        const { generation, installId } = await run(async (context) => await context.runMutation(createInstallRow, start));
+
+        await run(async (context) => await context.runMutation(deleteInstall, { generation, installId }));
+
+        const { page } = await run(async (context) => await context.db.pluginInstallSlots.findMany({}));
+
+        expect(page).toHaveLength(0);
     });
 
     it("keeps a child when the rollback that deletes it no longer holds the install", async () => {

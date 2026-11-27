@@ -8,8 +8,8 @@ import { v, LunoraError } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { internalMutation } from "../_generated/server";
-import { isUniqueViolation } from "../lib/error-helpers";
 import { heldInstall, heldInstallForShardWrite, patchInstallIf } from "./held-install";
+import { claimInstallSlot, releaseInstallSlot, releaseSlotById } from "./install-slots";
 import { refuseWhileErasing, requireOwnerShard } from "./owner-shard";
 import { LEASE_MS } from "./logic";
 import { vPluginItemKind } from "./validators";
@@ -33,6 +33,9 @@ export const createInstallRow = internalMutation
         }
 
         const { now } = ctx;
+
+        // The slot first: its unique index refuses a second create that read before the first one wrote.
+        const slotId = await claimInstallSlot(ctx, args.userId, args.pluginSlug);
         let installId: string;
 
         try {
@@ -48,13 +51,12 @@ export const createInstallRow = internalMutation
                 version: args.version,
             });
         } catch (error) {
-            // A second create that read before the first one wrote: the unique index (`by_user_and_plugin_slug`) refuses it.
-            if (isUniqueViolation(error)) {
-                throw new LunoraError("CONFLICT", `The plugin "${args.pluginSlug}" is already installed. Uninstall it first.`);
-            }
+            await releaseSlotById(ctx, slotId);
 
             throw error;
         }
+
+        await ctx.db.patch("pluginInstallSlots", slotId, { installId });
 
         return { generation: 1, installId };
     });
@@ -161,6 +163,7 @@ export const deleteInstall = internalMutation
             return { hasMore: true };
         }
 
+        await releaseInstallSlot(ctx, args.installId);
         await ctx.db.delete("pluginInstalls", args.installId as Id<"pluginInstalls">);
 
         return { hasMore: false };

@@ -12,7 +12,8 @@ interface Row {
 }
 
 /** A fake of the two `.global()` readers. Only `findMany` exists, as on the D1 backend, and it honours `limit`. */
-const fakeCtx = (tables: { pluginInstalls: Row[]; pluginItems: Row[] }) => {
+const fakeCtx = (tables: { pluginInstalls: Row[]; pluginInstallSlots?: Row[]; pluginItems: Row[] }) => {
+    const all = { pluginInstalls: tables.pluginInstalls, pluginInstallSlots: tables.pluginInstallSlots ?? [], pluginItems: tables.pluginItems };
     const deleted: string[] = [];
     let statements = 0;
 
@@ -38,15 +39,16 @@ const fakeCtx = (tables: { pluginInstalls: Row[]; pluginItems: Row[] }) => {
             statements += 2;
             deleted.push(`${table}:${id}`);
 
-            const rows = table === "pluginItems" ? tables.pluginItems : tables.pluginInstalls;
+            const rows = all[table as keyof typeof all];
 
             rows.splice(
                 rows.findIndex((row) => row._id === id),
                 1,
             );
         },
-        pluginInstalls: reader(tables.pluginInstalls),
-        pluginItems: reader(tables.pluginItems),
+        pluginInstalls: reader(all.pluginInstalls),
+        pluginInstallSlots: reader(all.pluginInstallSlots),
+        pluginItems: reader(all.pluginItems),
     };
 
     return { ctx: { db } as never, deleted, statements: () => statements };
@@ -61,6 +63,7 @@ describe("erasePluginsForUser", () => {
     it("erases the person's links and installs, and no other person's rows", async () => {
         const { ctx, deleted } = fakeCtx({
             pluginInstalls: [...rows("install", USER, 2), ...rows("other-install", OTHER, 1)],
+            pluginInstallSlots: rows("slot", USER, 1),
             pluginItems: [...rows("item", USER, 3), ...rows("other-item", OTHER, 2)],
         });
 
@@ -68,6 +71,7 @@ describe("erasePluginsForUser", () => {
         expect(deleted.toSorted((a, b) => a.localeCompare(b))).toEqual([
             "pluginInstalls:install-0",
             "pluginInstalls:install-1",
+            "pluginInstallSlots:slot-0",
             "pluginItems:item-0",
             "pluginItems:item-1",
             "pluginItems:item-2",
@@ -77,6 +81,7 @@ describe("erasePluginsForUser", () => {
     it("takes several bounded calls for a large account, and leaves other people's rows alone", async () => {
         const { ctx, deleted, statements } = fakeCtx({
             pluginInstalls: [...rows("install", USER, 45), ...rows("other-install", OTHER, 1)],
+            pluginInstallSlots: [...rows("slot", USER, 45), ...rows("other-slot", OTHER, 1)],
             pluginItems: [...rows("item", USER, 130), ...rows("other-item", OTHER, 2)],
         });
         let calls = 0;
@@ -95,9 +100,10 @@ describe("erasePluginsForUser", () => {
         }
 
         expect(calls).toBeGreaterThan(1);
-        expect(mostStatements).toBeLessThanOrEqual(42);
+        expect(mostStatements).toBeLessThanOrEqual(45);
         expect(deleted.filter((entry) => entry.startsWith("pluginItems:"))).toHaveLength(130);
         expect(deleted.filter((entry) => entry.startsWith("pluginInstalls:"))).toHaveLength(45);
+        expect(deleted.filter((entry) => entry.startsWith("pluginInstallSlots:"))).toHaveLength(45);
         expect(deleted.some((entry) => entry.includes("other-"))).toBe(false);
     });
 });
@@ -107,6 +113,7 @@ describe("account merge lists the plugin tables", () => {
         // The installs move in the merge's own step (`mergePluginInstallsPage`), so a plugin both accounts have is not installed twice.
         expect(GLOBAL_USER_COLUMNS.pluginInstalls).toEqual([]);
         expect(GLOBAL_USER_COLUMNS.pluginItems).toEqual([]);
+        expect(GLOBAL_USER_COLUMNS.pluginInstallSlots).toEqual([]);
     });
 });
 
