@@ -29,6 +29,7 @@ import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
 import DiffCommentsDraft from "./diff-comments-draft";
 import { caretAfterRemoval } from "./host-caret";
+import HostFork from "./host-fork";
 import { exceedsRawInputLimit } from "./host-input";
 import HostOptions from "./host-options";
 import type { HostQueueEffect, HostQueueEvent, HostQueueState } from "./host-queue";
@@ -1134,6 +1135,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
                 state={session?.agentState}
                 threadId={threadId}
             />
+            <HostFork capabilities={session?.capabilities} disabled={starting} threadId={threadId} />
             <div className="flex items-end gap-2">
                 <div className="relative min-w-0 flex-1">
                     {menuOpen && (

@@ -7,11 +7,12 @@
  * names an option the agent itself offered, and both are checked again by Rust (`device-core/src/acp_call.rs`).
  */
 import type { Infer } from "lunorash/server";
+import { capabilityOf, isAvailable } from "@neore/ai/capabilities";
 import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { insertThread } from "../agent/table-writes";
+import { insertThread, insertThreadRelationship } from "../agent/table-writes";
 import { stopHostTurn } from "./lib/finish";
 import { claimFence, claimRow, recordClaimResult } from "../lib/claim-once";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
@@ -21,8 +22,10 @@ import { isDeviceInScope } from "../devices/lib/scope";
 import { ACP_CLAIM_WINDOW_MS } from "../devices/lib/constants";
 import { countOpenCalls, isDeviceOnline, isDeviceOutdated } from "../devices/lib/state";
 import { withdrawSend } from "./lib/withdraw";
+import { isThreadLocked } from "../lib/thread-lock";
 import { isHostRunThread } from "./lib/host-thread";
 import { hostOrganizationRefusal } from "./lib/organization-cap";
+import { nativeIdFits } from "./lib/reattach";
 import { sessionOfThread } from "./lib/sessions";
 import { projectRunnerOf, runnerStillOffered } from "./lib/project-runner";
 import { HOST_START_OUT_OF_SCOPE, offerOf, startFailureMessage, webSessionId } from "./lib/start";
@@ -106,6 +109,8 @@ export interface StartHostSessionInput {
     clientId: string;
     deviceId: Id<"devices">;
     folderId: string;
+    /** The agent's own session id to fork into the new thread's session (`forkHostThread`); no client names it. */
+    forkSessionId?: string;
     /** The caller's verified active organization (`ctx.user.activeOrganization`), unset in the personal space. */
     organizationId?: string;
     /** The project the thread is filed under; the start then remembers its runner there (`lib/project-runner.ts`). */
@@ -223,7 +228,11 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
         userId,
     });
 
-    const call = await openHostSession(ctx, { device, hostSessionId, offer, threadId, userId }, ctx.now);
+    const call = await openHostSession(
+        ctx,
+        { device, ...(args.forkSessionId !== undefined && { forkSessionId: args.forkSessionId }), hostSessionId, offer, threadId, userId },
+        ctx.now,
+    );
 
     if ("error" in call) {
         // Throwing rolls the thread and the session back with the claim.
@@ -253,6 +262,66 @@ export const startHostSession = authMutation
         const result = await startHostSessionFor(ctx, ctx.user.userId, { ...args, organizationId: ctx.user.activeOrganization?.id });
 
         ctx.log.event("acp.start_host_session", { started: result.started });
+
+        return result;
+    });
+
+/**
+ * Forks a coding agent's chat: a new chat on the same computer, folder and agent whose session continues the agent's own session of
+ * this one (`forkSessionId`, read here from the caller's own session row, never from the client). The source chat is left as it is
+ * and the two share the folder. Owner only, and only an agent that said it forks sessions: one that did not would open an empty
+ * session that only looks like a fork. A double tap forks once (`clientId`, as a start's).
+ */
+export const forkHostThread = authMutation
+    .use(rateLimit("hosts/start"))
+    .input({ clientId: v.string().max(MAX_LENGTH.id), threadId: v.id("threads") })
+    .output(v.object({ started: v.boolean(), threadId: v.optional(v.string()) }))
+    .mutation(async ({ args, ctx }) => {
+        const { userId } = ctx.user;
+        const thread = await ctx.db.threads.findFirst({ consistency: "primary", where: { _id: args.threadId, userId } });
+
+        // A chat that is not the caller's answers as one that does not exist.
+        if (!thread || thread.deleted === true || !isHostRunThread(thread)) {
+            throw new LunoraError("NOT_FOUND", "Chat not found");
+        }
+
+        if (isThreadLocked(thread)) {
+            throw new LunoraError("FORBIDDEN", "Unlock this chat to fork it.");
+        }
+
+        const session = await sessionOfThread(ctx, thread._id);
+        const nativeId = session?.nativeSessionId;
+
+        if (!session || session.userId !== userId || nativeId === undefined || !nativeIdFits(nativeId)) {
+            throw new LunoraError("BAD_REQUEST", "This chat has no saved agent session to fork yet. Send a message first.");
+        }
+
+        if (!isAvailable(capabilityOf(session.capabilities, "sessions.fork"))) {
+            throw new LunoraError("BAD_REQUEST", "This agent cannot fork a session.");
+        }
+
+        const result = await startHostSessionFor(ctx, userId, {
+            agentKey: session.agentKey,
+            clientId: args.clientId,
+            deviceId: session.deviceId,
+            folderId: session.folderId,
+            forkSessionId: nativeId,
+            organizationId: ctx.user.activeOrganization?.id,
+            ...(thread.projectId && { projectId: thread.projectId }),
+        });
+
+        // Once, by the start that made the thread: a retry of it finds the link already there.
+        if (result.started && result.threadId !== undefined) {
+            await insertThreadRelationship(ctx.db, {
+                branchType: "branch",
+                createdAt: ctx.now,
+                parentThreadId: thread._id,
+                threadId: result.threadId as Id<"threads">,
+                userId,
+            });
+        }
+
+        ctx.log.event("acp.fork_host_thread", { started: result.started });
 
         return result;
     });

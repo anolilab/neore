@@ -15773,6 +15773,14 @@ msgstr "Mot de passe oublié ?"
 msgid "Fork"
 msgstr "Dupliquer"
 
+#: src/features/chat/host/host-fork.tsx:63
+msgid "Fork here"
+msgstr "Dupliquer ici"
+
+#: src/features/chat/host/host-fork.tsx:72
+msgid "Fork this chat?"
+msgstr "Dupliquer ce chat ?"
+
 #. placeholder {0}: skill.name
 #: src/features/skills/components/skill-item.tsx:148
 msgid "Fork {0} to edit a copy"
@@ -34986,6 +34994,10 @@ msgstr "Cette suggestion ne peut plus être ajoutée."
 #: src/features/develop/components/guide-tab.tsx:133
 msgid "That suggestion is gone."
 msgstr "Cette suggestion n’existe plus."
+
+#: src/features/chat/host/host-fork.tsx:67
+msgid "The fork continues from this conversation in a new chat on the same computer and folder. Both chats work in that folder, so they can change the same files, and a git worktree there is shared too."
+msgstr "La copie poursuit cette conversation dans un nouveau chat sur le même ordinateur et dans le même dossier. Les deux chats travaillent dans ce dossier : ils peuvent modifier les mêmes fichiers, et un worktree git s’y trouvant est lui aussi partagé."
 
 #: src/features/develop/components/guide-tab.tsx:64
 msgid "The {requestNoun} changed while the guide was being written. Write it again."

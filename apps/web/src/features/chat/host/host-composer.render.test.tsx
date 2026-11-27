@@ -1017,6 +1017,21 @@ describe("the coding-agent composer", () => {
         });
     });
 
+    it("offers Fork here only when the agent said it forks sessions", async () => {
+        const forks = { groups: { sessions: { fork: { degradation: "none", supported: true } } }, reportedAt: 1, version: 1 };
+
+        mount(session({ capabilities: forks }));
+
+        expect(await screen.findByRole("button", { name: "Fork here" })).toBeTruthy();
+    });
+
+    it("offers no fork to an agent that did not say it forks sessions", async () => {
+        mount(session({ capabilities: { groups: {}, reportedAt: 0, version: 1 } }));
+
+        expect(await screen.findByLabelText("Message to the coding agent")).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Fork here" })).toBeNull();
+    });
+
     it("offers Continue after a restart or a timeout, and sends it as a message", async () => {
         mount(session({ lastEndReason: "interrupted" }));
 

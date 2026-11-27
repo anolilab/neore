@@ -372,6 +372,86 @@ describe("the offers in a manifest", () => {
     });
 });
 
+describe("forkHostThread", () => {
+    const report = (fork: Row) => {
+        return { groups: { sessions: { fork } }, reportedAt: 1, version: 1 };
+    };
+    const FORKABLE = report({ degradation: "none", supported: true });
+    // A started thread whose agent reported an id of its own and what it can do, as `session_open` leaves it.
+    const started = async (capabilities: Row | undefined = FORKABLE, nativeSessionId: string | null = "native-1") => {
+        const device = await pairedDevice(ownerId);
+        const first = (await as(ownerId).mutation(
+            remote.startHostSession as never,
+            { agentKey: "claude", clientId: "tap-src", deviceId: device.deviceId, folderId: "f1" } as never,
+        )) as {
+            threadId: string;
+        };
+        const [session] = await rows("acpSessions");
+
+        await run(async (ctx) => {
+            await ctx.db.patch("acpSessions", session!._id, { capabilities, ...(nativeSessionId !== null && { nativeSessionId }), status: "idle" });
+        });
+
+        return { device, threadId: first.threadId };
+    };
+    const fork = async (threadId: string, clientId = "fork-1", userId = ownerId) =>
+        await as(userId).mutation(remote.forkHostThread as never, { clientId, threadId } as never);
+
+    it("starts a new chat on the same computer, folder and agent, asking the computer to fork the agent's own session", async () => {
+        const { device, threadId } = await started();
+        const result = (await fork(threadId)) as { started: boolean; threadId: string };
+
+        expect(result.started).toBe(true);
+        expect(result.threadId).not.toBe(threadId);
+
+        const startCalls = await rows("deviceCalls", { toolName: "acp_start" });
+        const input = (JSON.parse(startCalls.at(-1)?.envelope as string) as Row).input as Row;
+
+        expect(startCalls).toHaveLength(2);
+        expect(input).toMatchObject({ agentKey: "claude", folderId: "f1", forkSessionId: "native-1", threadId: result.threadId });
+        expect(input).not.toHaveProperty("nativeSessionId");
+
+        const [forked] = await rows("acpSessions", { threadId: result.threadId });
+        const [source] = await rows("acpSessions", { threadId });
+
+        expect(forked).toMatchObject({ deviceId: device.deviceId, status: "starting" });
+        // The source is untouched, and the new chat is linked to it.
+        expect(source).toMatchObject({ nativeSessionId: "native-1", status: "idle" });
+        expect(await rows("threadRelationships", { threadId: result.threadId })).toMatchObject([{ branchType: "branch", parentThreadId: threadId }]);
+    });
+
+    it("forks once for a double tap", async () => {
+        const { threadId } = await started();
+        const first = (await fork(threadId)) as { threadId: string };
+        const second = (await fork(threadId)) as { started: boolean; threadId?: string };
+
+        expect(second).toEqual({ started: false, threadId: first.threadId });
+        expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(2);
+        expect(await rows("threadRelationships", { parentThreadId: threadId })).toHaveLength(1);
+    });
+
+    it("refuses an agent that did not say it forks sessions, before anything is written", async () => {
+        const { threadId } = await started(report({ reason: "not_offered", supported: false }));
+
+        await expect(fork(threadId)).rejects.toThrow("This agent cannot fork a session.");
+        expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(1);
+        expect(await rows("acpSessions")).toHaveLength(1);
+    });
+
+    it("refuses a chat whose session has no saved agent session id yet", async () => {
+        const { threadId } = await started(FORKABLE, null);
+
+        await expect(fork(threadId)).rejects.toThrow("no saved agent session");
+    });
+
+    it("answers a chat that is not the caller's as one that does not exist", async () => {
+        const { threadId } = await started();
+
+        await expect(fork(threadId, "fork-x", "someone-else")).rejects.toThrow("Chat not found");
+        expect(await rows("acpSessions")).toHaveLength(1);
+    });
+});
+
 describe("startHostSession", () => {
     const start = async (clientId = "tap-1", overrides: Record<string, unknown> = {}, deviceId = "") =>
         await as(ownerId).mutation(remote.startHostSession as never, { agentKey: "claude", clientId, deviceId, folderId: "f1", ...overrides } as never);

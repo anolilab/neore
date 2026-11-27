@@ -15773,6 +15773,14 @@ msgstr "忘记密码？"
 msgid "Fork"
 msgstr "复刻"
 
+#: src/features/chat/host/host-fork.tsx:63
+msgid "Fork here"
+msgstr "在此复刻"
+
+#: src/features/chat/host/host-fork.tsx:72
+msgid "Fork this chat?"
+msgstr "要复刻此聊天吗？"
+
 #. placeholder {0}: skill.name
 #: src/features/skills/components/skill-item.tsx:148
 msgid "Fork {0} to edit a copy"
@@ -34986,6 +34994,10 @@ msgstr "该建议已无法再添加。"
 #: src/features/develop/components/guide-tab.tsx:133
 msgid "That suggestion is gone."
 msgstr "该建议已不存在。"
+
+#: src/features/chat/host/host-fork.tsx:67
+msgid "The fork continues from this conversation in a new chat on the same computer and folder. Both chats work in that folder, so they can change the same files, and a git worktree there is shared too."
+msgstr "复刻会在同一台电脑的同一文件夹中，用新聊天继续此对话。两个聊天都在该文件夹中工作，因此可能修改相同的文件，其中的 git 工作树也会被共享。"
 
 #: src/features/develop/components/guide-tab.tsx:64
 msgid "The {requestNoun} changed while the guide was being written. Write it again."
