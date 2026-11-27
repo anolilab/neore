@@ -930,7 +930,7 @@ describe("a run the watchdog reads wrongly", () => {
 
         const [, args] = vi.mocked(afterRun).mock.calls[0]!;
 
-        expect(args.quotablePrompt).toBeUndefined();
+        expect(args.quotablePrompt).toBe("");
         expect(args.promptMessageId).toBeUndefined();
     });
 
@@ -944,7 +944,7 @@ describe("a run the watchdog reads wrongly", () => {
 
         const [, args] = vi.mocked(afterRun).mock.calls[0]!;
 
-        expect(args.quotablePrompt).toBeUndefined();
+        expect(args.quotablePrompt).toBe("");
         expect(args.promptMessageId).toBeUndefined();
     });
 

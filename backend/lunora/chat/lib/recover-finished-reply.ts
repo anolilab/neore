@@ -155,12 +155,14 @@ export const recoverFinishedReply = async (ctx: Pick<ActionCtx, "runMutation" | 
         prompt: userPrompt,
         // Relative dates read against the prompt's day, whoever wrote it.
         ...(prompt[0] && { promptAt: prompt[0]._creationTime }),
-        // Only the user's own words are quoted, as at a normal finish.
-        ...(origin !== "outside_agent" &&
-            (prompt[0]?.userId === undefined || prompt[0].userId === userId) && {
-                promptMessageId: messageId,
-                quotablePrompt: typedTextOf(prompt[0]?.message),
-            }),
+        // Only the user's own words are quoted, as at a normal finish: any other prompt carries an empty quotable text, so
+        // memory extraction (which keeps a fact only when it quotes the user) learns nothing from it.
+        ...(origin !== "outside_agent" && (prompt[0]?.userId === undefined || prompt[0].userId === userId)
+            ? {
+                  promptMessageId: messageId,
+                  quotablePrompt: typedTextOf(prompt[0]?.message),
+              }
+            : { quotablePrompt: "" }),
         recordUsage: false,
         savedMessages: rows,
         ...(skill && { skill }),

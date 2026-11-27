@@ -87,7 +87,7 @@
   message (the prompt's, or the steer's). **Evidence gate:** with `quotablePrompt` set, a fact with no verbatim typed quote is dropped before any
   save (`memory.evidence_gate`: counts, no text); the extractor reads no tool results; trigger runs pass `learn: false`. A quote is kept only through `evidenceQuote` over the TYPED text
   (`chat/lib/attached-text.ts`: no attachment, page capture or guest note; trigger, headless and outside-agent runs
-  pass none); it checks `containsSecret` and its own labels, and drops one naming a health condition. Merges take the
+  carry an empty one); it checks `containsSecret` and its own labels, and drops one naming a health condition. Merges take the
   newer quote, ranked by `evidence.at`: when the words were sent (`promptAt`, or the steer's own `sentAt`, stamped by
   `steerRun`), never when the job ran nor `updatedAt`; a belief-revision UPDATE (`reviseExtractedMemory`) takes its
   own quote; its `base` check leaves a row rewritten meanwhile alone. A reflection merge (`merge: true`) gives a

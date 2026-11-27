@@ -418,7 +418,8 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
         // attachment or the assistant's answer can be talked into "facts" nobody wrote. A run with no quotable prompt
         // (`quotablePrompt` unset) is not gated here; the trigger runs that used to be such runs extract nothing.
         if (args.quotablePrompt !== undefined) {
-            const dropped = { noQuote: 0, quoteNotTyped: 0 };
+            // `quoteRefused`: a quote that is not the user's typed words, or one `evidenceQuote` refuses (secret-like, a health condition, too short).
+            const dropped = { noQuote: 0, quoteRefused: 0 };
 
             extractedFacts = extractedFacts.filter((fact) => {
                 if (factEvidence(fact.quote, args.promptAt ?? Date.now(), args) !== undefined) {
@@ -428,13 +429,13 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                 if (fact.quote === undefined || fact.quote.trim() === "") {
                     dropped.noQuote += 1;
                 } else {
-                    dropped.quoteNotTyped += 1;
+                    dropped.quoteRefused += 1;
                 }
 
                 return false;
             });
 
-            if (dropped.noQuote + dropped.quoteNotTyped > 0) {
+            if (dropped.noQuote + dropped.quoteRefused > 0) {
                 ctx.log.event(EVIDENCE_GATE_EVENT, { ...dropped, kept: extractedFacts.length, threadId: args.threadId, userId: args.userId });
             }
         }
