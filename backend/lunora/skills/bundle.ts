@@ -662,7 +662,8 @@ export const planFor = async (
     markdown: string,
     selected: ReadonlySet<string> | undefined,
     // `ownSlugs`: the slug each of the plugin's installed skills holds, by entry key. An update may keep it under that key only.
-    options: { ownSlugs?: ReadonlyArray<{ entryKey: string; slug: string }> } = {},
+    // `freedSlugs`: slugs of skills an update removes before it creates, so a new skill may take them and they do not count against the limit.
+    options: { freedSlugs?: ReadonlyArray<string>; ownSlugs?: ReadonlyArray<{ entryKey: string; slug: string }> } = {},
 ): Promise<{ bundle: { description: string; name: string }; entries: PlanEntry[]; env: PlanEnv }> => {
     const parsed = parseBundleMarkdown(markdown);
 
@@ -672,9 +673,10 @@ export const planFor = async (
 
     const known = await ctx.runQuery(internal.skills.bundle.loadImportContext, { userId: ctx.user.userId });
     const knownTools = knownToolNames();
+    const freed = new Set(options.freedSlugs);
     const env: PlanEnv = {
-        existingSkillCount: known.skillCount,
-        existingSlugs: new Set(known.slugs),
+        existingSkillCount: Math.max(0, known.skillCount - freed.size),
+        existingSlugs: new Set(known.slugs.filter((slug) => !freed.has(slug))),
         isKnownTool: (name) => knownTools.has(name),
         isModelRunnable: isRunnableModel,
         now: Date.now(),

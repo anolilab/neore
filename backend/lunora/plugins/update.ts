@@ -20,6 +20,9 @@ import { planFor } from "../skills/bundle";
 import { assertNoToolConfig, checkPluginFile } from "./install-action";
 import { entryHash, skillContent, skillRowHash } from "./entry-hash";
 import { skillVisibility } from "../skills/access";
+import { indexedGroupNames } from "../chat/group/skill-index";
+import { fileEntryKeys, freedSkills } from "./early-removal";
+import type { SureSkill } from "./early-removal";
 import { liveHashOf } from "./live-hash";
 import type { SkillKeyCache } from "./live-hash";
 import { diffUpdate, isDowngrade, markerFor } from "./logic";
@@ -53,6 +56,8 @@ export const loadInstalledForUpdate = internalQuery
                 /** The skills that exist now, by entry key: a group chat's participants must be among them or among the new skills. */
                 skillIds: v.array(v.object({ entryKey: v.string(), skillId: v.string() })),
                 status: v.string(),
+                /** Skills that are sure to go if a file drops them: created, idle, unedited, private, and named by no group chat (index complete). */
+                sureToGo: v.array(v.object({ entryKey: v.string(), slug: v.string() })),
                 version: v.string(),
             }),
         ),
@@ -73,6 +78,7 @@ export const loadInstalledForUpdate = internalQuery
         const children: { contentHash: string; currentHash: string; entryKey: string; kind: "group" | "skill" | "trigger"; triggerType: string }[] = [];
         const ownSlugs: { entryKey: string; slug: string }[] = [];
         const skillIds: { entryKey: string; skillId: string }[] = [];
+        const sureToGo: SureSkill[] = [];
 
         const skillKeys: SkillKeyCache = new Map();
 
@@ -94,6 +100,16 @@ export const loadInstalledForUpdate = internalQuery
                     if (skillVisibility(skill) !== "private") {
                         currentHash = "shared";
                     }
+
+                    if (
+                        link.state === "created" &&
+                        !link.pendingHash &&
+                        skill.userId === args.userId &&
+                        currentHash === link.contentHash &&
+                        (await indexedGroupNames(ctx, args.userId, skill._id as string)) === false
+                    ) {
+                        sureToGo.push({ entryKey: link.entryKey, slug: skill.slug });
+                    }
                 }
             } else {
                 currentHash = await liveHashOf(ctx, installId, link, skillKeys);
@@ -113,7 +129,7 @@ export const loadInstalledForUpdate = internalQuery
             children.push({ contentHash: link.contentHash, currentHash, entryKey: link.entryKey, kind: link.kind, triggerType });
         }
 
-        return { children, generation: install.generation, installId, ownSlugs, skillIds, status: install.status, version: install.version };
+        return { children, generation: install.generation, installId, ownSlugs, skillIds, status: install.status, sureToGo, version: install.version };
     });
 
 export const previewUpdate = authAction
@@ -149,7 +165,8 @@ export const previewUpdate = authAction
             throw new LunoraError("CONFLICT", `The plugin "${header.slug}" is ${installed.status}, not installed. Repair it first.`);
         }
 
-        const { entries } = await planFor(ctx, args.markdown, undefined, { ownSlugs: installed.ownSlugs });
+        const freed = freedSkills(installed.sureToGo, fileEntryKeys(args.markdown));
+        const { entries } = await planFor(ctx, args.markdown, undefined, { freedSlugs: freed.map((row) => row.slug), ownSlugs: installed.ownSlugs });
 
         assertNoToolConfig(entries);
         const incoming = await Promise.all(
@@ -235,7 +252,8 @@ export const updatePlugin = authAction
             );
         }
 
-        const { entries } = await planFor(ctx, args.markdown, undefined, { ownSlugs: installed.ownSlugs });
+        const freed = freedSkills(installed.sureToGo, fileEntryKeys(args.markdown));
+        const { entries } = await planFor(ctx, args.markdown, undefined, { freedSlugs: freed.map((row) => row.slug), ownSlugs: installed.ownSlugs });
 
         assertNoToolConfig(entries);
         const incoming = await Promise.all(
@@ -308,6 +326,9 @@ export const updatePlugin = authAction
         const applied: string[] = [];
         const webhookSecrets: { entryKey: string; secret: string }[] = [];
         let importDone = false;
+        // Dropped skills removed before any create; the old version has lost them even if the update then fails.
+        const removedEarly = new Set<string>();
+        const freedKeys = new Set(freed.map((row) => row.entryKey));
         const skipped: { action: UpdateAction; entryKey: string }[] = [];
         const removals: { action: UpdateAction; entryKey: string }[] = [];
         const groupRewrites: { action: UpdateAction; entryKey: string }[] = [];
@@ -320,8 +341,27 @@ export const updatePlugin = authAction
         };
 
         try {
+            // Before the creates, so the dropped skill's slot and slug are free for the new one. A skill that was sure to go and is kept
+            // after all (a group chat took it since) stops the update here, with nothing created.
             for (const step of plan) {
-                if (step.action === "same") {
+                if (step.action !== "delete" || !freedKeys.has(step.entryKey)) {
+                    continue;
+                }
+
+                const ids = { entryKey: step.entryKey, generation, installId: installed.installId, userId };
+                const removed = await ctx.runMutation(internal.plugins.update_apply.removeChild, ids);
+
+                removedEarly.add(step.entryKey);
+
+                if (!removed) {
+                    throw new LunoraError("CONFLICT", `The skill for "${step.entryKey}" is in use now, so it was kept. Preview the update again.`);
+                }
+
+                applied.push(step.entryKey);
+            }
+
+            for (const step of plan) {
+                if (step.action === "same" || removedEarly.has(step.entryKey)) {
                     continue;
                 }
 
@@ -576,7 +616,7 @@ export const updatePlugin = authAction
                     generation,
                     installId: installed.installId,
                     keepForRepair,
-                    partial: applied.length > 0 || skipped.length > 0 || importDone,
+                    partial: applied.length > 0 || skipped.length > 0 || importDone || removedEarly.size > 0,
                 })
                 .catch(() => undefined);
 
