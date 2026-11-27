@@ -1293,8 +1293,6 @@ export const getActiveMemoriesForUser = internalQuery
             scopes.push(null);
         }
 
-        const usable = (m: Doc<"memories">): boolean => isUsableOn(m, today);
-
         // The active-row index, so superseded rows are never read. Paged until `limit` usable rows or the scope ends,
         // so expired rows cannot fill the window; at most `ACTIVE_READ_MAX_ROWS` rows (or one page), a bounded read.
         const perScope = await Promise.all(
@@ -1316,7 +1314,7 @@ export const getActiveMemoriesForUser = internalQuery
                         .order("desc")
                         .paginate({ cursor, numItems: limit });
 
-                    kept.push(...result.page.filter((m) => usable(m)));
+                    kept.push(...result.page.filter((m) => isUsableOn(m, today)));
 
                     if (result.isDone) {
                         break;
