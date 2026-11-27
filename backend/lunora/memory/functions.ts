@@ -27,7 +27,7 @@ import { botOwnerRows } from "./bot-owner";
 import { type MemoryEvidence, newestEvidence, vMemoryEvidence } from "./evidence";
 import { logRedaction, redactMemoryText } from "./redact";
 import { DROPPED_DIGEST_SUMMARY, localDayOf } from "./reflection-logic";
-import { byNewest, isUsableOn, KEYWORD_HITS_PER_TERM, mergeScopeWindows, scopesOf } from "./retrieve-ranking";
+import { byNewest, isUsableOn, KEYWORD_LOOKUP_LIMIT, keywordLookupOf, mergeScopeWindows, scopesOf } from "./retrieve-ranking";
 import { lastConfirmedOf, MEMORY_TYPES, type MemoryType, vMemoryType } from "./taxonomy";
 import { deleteVectorRow, patchMessage } from "../agent/table-writes";
 import { candidatesOnActivePath } from "../agent/branch-rows";
@@ -1904,13 +1904,16 @@ export const getMemoriesByEmbeddingIds = internalQuery
     });
 
 /**
- * The keyword leg of retrieval: one search-index lookup per term (at most `MAX_KEYWORD_TERMS`, each
- * `KEYWORD_HITS_PER_TERM` rows), over the user's own rows. As in `getMemoriesByEmbeddingIds`, a superseded row and an
- * unpinned fact past its end date are left out; the caller drops rows of a bot the chat does not read and scores the rest.
+ * The keyword leg of retrieval: one search-index lookup per term (at most `MAX_KEYWORD_TERMS`, each reading
+ * `KEYWORD_LOOKUP_LIMIT` rows) over the user's rows. Each keeps whole-token matches only and, as in
+ * `getMemoriesByEmbeddingIds`, leaves out a superseded row and an unpinned fact past its end date, and a row of a scope
+ * the chat does not read, before its cut (`keywordLookupOf`); it also says how many usable rows hold the term.
  */
 export const searchMemoriesByKeyword = internalQuery
     .input({
         activeOn: v.optional(v.number()),
+        botId: v.optional(v.string()),
+        includeUserWide: v.optional(v.boolean()),
         terms: v.array(v.string()),
         timeZone: v.optional(v.string()),
         userId: v.string(),
@@ -1923,14 +1926,10 @@ export const searchMemoriesByKeyword = internalQuery
                 const rows = await ctx.db
                     .query("memories")
                     .withSearchIndex("search_memory_text", (q) => q.search("memory", term).eq("userId", args.userId))
-                    .take(KEYWORD_HITS_PER_TERM);
+                    .take(KEYWORD_LOOKUP_LIMIT);
+                const lookup = keywordLookupOf(term, rows, { botId: args.botId, includeUserWide: args.includeUserWide }, today);
 
-                return {
-                    hits: rows
-                        .filter((m) => !m.supersededBy && (today === undefined || m.pinned === true || !isExpired(m, today)))
-                        .map((m) => retrievalRowOf(m)),
-                    term,
-                };
+                return { ...lookup, hits: lookup.hits.map((m) => retrievalRowOf(m)) };
             }),
         );
     });

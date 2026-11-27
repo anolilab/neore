@@ -4,8 +4,10 @@
  * runs in `retrieve.ts` and in the offline retrieval eval (`retrieval-eval.test.ts`).
  */
 
-import { bm25Idf, extractKeywordTerms, reciprocalRankFusion, scoreKeywordCandidates, tokenize } from "../knowledge/hybrid";
+import { bm25Idf, MAX_KEYWORD_TERMS, reciprocalRankFusion, scoreKeywordCandidates } from "../knowledge/hybrid";
 import { factDatesOf } from "./dates";
+import { salientTermsOf, searchTokensOf } from "./search-terms";
+import type { SalientTerm } from "./search-terms";
 
 /**
  * The signals' weights, which add up to 1. Relevance leads: among rows of one topic the cosines are close, so the
@@ -30,7 +32,7 @@ export const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
  * at 0.40, so 0.45 leaves a margin over the noise. The keyword floor (on the BM25 share, `keywordSignalsFor`) applies
  * to a memory with no vector, to one whose vector is new or the search did not fill its cut, to one holding the query's
  * rare term, and to every memory when no vector search ran. 0.15 is the highest that keeps every category of the eval
- * (multi Recall@8 0.867 at 0.2, 0.883 at 0.15); the keyword-only run reads Recall@8 0.550 and abstain rate 0.633 there.
+ * (multi Recall@8 0.867 at 0.2, 0.883 at 0.15); the keyword-only run reads Recall@8 0.603 and abstain rate 0.800 there.
  */
 export const INJECT_MIN_RELEVANCE = 0.45;
 export const INJECT_MIN_KEYWORD_RELEVANCE = 0.15;
@@ -171,34 +173,73 @@ export const topScopedHits = <T extends { botId?: string | null }>(hits: T[], sc
  */
 export const vectorCutIsFull = (scopedHits: ReadonlyArray<unknown>): boolean => scopedHits.length >= VECTOR_TOP_K;
 
-/** Rows one keyword lookup asks of the search index; a retrieval makes one per salient term, at most `MAX_KEYWORD_TERMS`. */
+/**
+ * Rows one keyword lookup reads of the search index. The index matches the term as a prefix and ranks by occurrences,
+ * so `time` also returns `timer`, `timeline`, …: it reads well past the rows it keeps, so those cannot crowd out a whole-
+ * token match. A retrieval makes one lookup per salient term, at most `MAX_KEYWORD_TERMS`.
+ */
+export const KEYWORD_LOOKUP_LIMIT = 50;
+
+/** Whole-token, usable, in-scope rows one lookup keeps. */
 export const KEYWORD_HITS_PER_TERM = 20;
 
 /** Keyword hits that count per search: the best by BM25, of the chat's own scopes. */
 export const KEYWORD_TOP_K = VECTOR_TOP_K;
 
+/** The terms a retrieval looks up: the first `MAX_KEYWORD_TERMS` salient terms of the whole search text. */
+export const keywordLookupTerms = (searchText: string): string[] =>
+    salientTermsOf(searchText)
+        .slice(0, MAX_KEYWORD_TERMS)
+        .map(({ term }) => term);
+
+/** One term's lookup: the rows it keeps, and how many usable rows of the user hold the term. */
+export interface KeywordLookup<T> {
+    /** The index had fewer rows than `KEYWORD_LOOKUP_LIMIT` for the term, so `corpusRows` is every usable row holding it. */
+    complete: boolean;
+    /** Usable rows of the user, of any scope, holding the term as a whole token. */
+    corpusRows: number;
+    hits: T[];
+    term: string;
+}
+
 /**
- * The best `limit` keyword hits of the chat's own scopes, best first by BM25 over what the lookups returned. A row of
- * another bot is dropped before scoring, as the vector hits are; the lookup already left out superseded and expired rows.
+ * What one lookup keeps of the rows the index returned for `term`, best first: whole-token matches only, not
+ * superseded, in effect on `today`, and of the chat's scopes, cut to `KEYWORD_HITS_PER_TERM` only after those checks.
  */
-export const topKeywordHits = <T extends { _id: string; botId?: string | null; memory: string }>(
-    termRows: { hits: T[]; term: string }[],
+export const keywordLookupOf = <
+    T extends { botId?: string | null; memory: string; pinned?: boolean | null; supersededBy?: string | null; validUntil?: string | null },
+>(
+    term: string,
+    fetched: T[],
     scope: MemoryScope,
+    today: string | undefined,
+): KeywordLookup<T> => {
+    const held = fetched.filter((row) => !row.supersededBy && isUsableOn(row, today) && searchTokensOf(row.memory).includes(term));
+
+    return {
+        complete: fetched.length < KEYWORD_LOOKUP_LIMIT,
+        corpusRows: held.length,
+        hits: held.filter((row) => inScope(row, scope)).slice(0, KEYWORD_HITS_PER_TERM),
+        term,
+    };
+};
+
+/** The best `limit` keyword hits, best first by BM25 over whole tokens of what the lookups kept. */
+export const topKeywordHits = <T extends { _id: string; memory: string }>(
+    lookups: { hits: T[]; term: string }[],
     corpusSize: number,
     limit: number = KEYWORD_TOP_K,
 ): T[] => {
-    const termHits = termRows.map(({ hits, term }) => {
+    const termHits = lookups.map(({ hits, term }) => {
         return {
-            hits: hits
-                .filter((row) => inScope(row, scope))
-                .map((row) => {
-                    return { content: row.memory, id: row._id, row };
-                }),
+            hits: hits.map((row) => {
+                return { content: row.memory, id: row._id, row };
+            }),
             term,
         };
     });
 
-    return scoreKeywordCandidates(termHits, Math.max(corpusSize, CANDIDATE_WINDOW_SIZE))
+    return scoreKeywordCandidates(termHits, Math.max(corpusSize, CANDIDATE_WINDOW_SIZE), { tokenize: searchTokensOf, wholeTokens: true })
         .slice(0, limit)
         .map(({ candidate }) => candidate.row);
 };
@@ -261,63 +302,101 @@ const computeScore = (memory: RankCandidate, semanticScore: number, now: number)
 };
 
 /**
- * A query term at most this many candidates hold is rare. A row holding the query's rarest term, when it is rare,
- * counts by its words even where the vector search says otherwise: embeddings miss exact tokens (a code, a name, a
- * rare word), which is what such a term usually is.
+ * A term at most this many usable rows of the user hold is rare (its lookup, which reads the whole user, says how
+ * many). A row holding the query's rare term counts by its words even where the vector search says otherwise:
+ * embeddings miss exact tokens (a code, a name, a rare word), which is what such a term usually is.
  */
 export const RARE_TERM_MAX_ROWS = 2;
 
+/**
+ * The query's rare term: its leading identifier, or else the rarest looked-up term (the earlier on a tie), when that
+ * term's lookup read every row holding it and at most `RARE_TERM_MAX_ROWS` usable rows of the user do.
+ */
+const rareTermOf = (terms: SalientTerm[], corpus: ReadonlyMap<string, { complete: boolean; corpusRows: number }>): string | undefined => {
+    const rareRows = (term: string): number | undefined => {
+        const lookup = corpus.get(term);
+
+        return lookup?.complete === true && lookup.corpusRows > 0 && lookup.corpusRows <= RARE_TERM_MAX_ROWS ? lookup.corpusRows : undefined;
+    };
+    const [leading] = terms;
+
+    if (leading?.code === true) {
+        return rareRows(leading.term) === undefined ? undefined : leading.term;
+    }
+
+    let rarest: { held: number; term: string } | undefined;
+
+    for (const { term } of terms) {
+        const held = rareRows(term);
+
+        if (held !== undefined && (rarest === undefined || held < rarest.held)) {
+            rarest = { held, term };
+        }
+    }
+
+    return rarest?.term;
+};
+
 /** What the keyword side knows of each candidate. */
 export interface KeywordSignals {
-    /** BM25 over the candidates, as a share of the most the query's terms could score (0-1). */
+    /** BM25 over the candidates, as a share of the most the query's terms found in the memory could score (0-1). */
     keywordScores: Map<string, number>;
-    /** The candidates holding the query's rarest term, when at most `RARE_TERM_MAX_ROWS` hold it. */
+    /** The candidates holding the query's leading term and its rare term. */
     rareTermMatches: Set<string>;
 }
 
 /**
- * The keyword signals of every candidate. The query's salient terms (`extractKeywordTerms`: no stopwords, codes
- * first) are matched as whole tokens, not by the index's prefix (`time` would read `timer`), and scored with BM25 over
- * the candidates, counted as at least a window of rows so a short list does not make every term look rare. The score is
- * divided by the sum of the terms' IDF, what a row holding each term once at average length scores, so it reads as the
- * IDF-weighted share of the query's terms a row holds. When no candidate holds the query's most distinctive term (a
- * code such as `QZ-5508`, else its longest word), the query names something the memory does not have: then no row is
- * a rare-term match, whatever common word it shares.
+ * The keyword signals of every candidate, over every salient term of the search (`salientTermsOf`; the lookups take
+ * only the first few) matched as whole tokens, as the index splits them.
+ *
+ * - The score is BM25 over the candidates, counted as at least a window of rows, divided by the sum of IDF over the
+ *   terms the memory holds at all (a candidate holds it, or its lookup found a row): the IDF-weighted share of those
+ *   terms a row holds. A word the memory never had does not dilute the one it does, such as an identifier.
+ * - When the query's leading term is an identifier no candidate holds (`QZ-5508`), the query asks for something the
+ *   memory does not have: no candidate has keyword relevance, whatever common word it shares.
+ * - The rare term is that identifier, or else the rarest looked-up term, when its lookup is complete and at most
+ *   `RARE_TERM_MAX_ROWS` rows of the user hold it; a word leading term must be in the memory at all. A rare-term match
+ *   holds the rare term and the leading term, so a row sharing only one ordinary word with the query is not one.
  */
-export const keywordSignalsFor = (candidates: RankCandidate[], searchText: string): KeywordSignals => {
+export const keywordSignalsFor = (
+    candidates: RankCandidate[],
+    searchText: string,
+    lookups: ReadonlyArray<{ complete: boolean; corpusRows: number; term: string }> = [],
+): KeywordSignals => {
     const keywordScores = new Map<string, number>();
     const rareTermMatches = new Set<string>();
-    const terms = extractKeywordTerms(searchText);
+    const terms = salientTermsOf(searchText);
+    const rows = candidates.map((m) => {
+        return { content: m.memory, id: m._id, tokens: searchTokensOf(m.memory) };
+    });
+    const termHits = terms.map(({ term }) => {
+        return { hits: rows.filter((row) => row.tokens.includes(term)), term };
+    });
+    const [leading] = terms;
+    const leadingHits = termHits[0]?.hits ?? [];
 
-    if (terms.length === 0) {
+    if (leading === undefined || (leading.code && leadingHits.length === 0)) {
         return { keywordScores, rareTermMatches };
     }
 
-    const rows = candidates.map((m) => {
-        return { content: m.memory, id: m._id, tokens: tokenize(m.memory) };
-    });
-    const termHits = terms.map((term) => {
-        return { hits: rows.filter((row) => row.tokens.includes(term)), term };
-    });
+    const corpus = new Map(lookups.map((lookup) => [lookup.term, lookup]));
+    const inMemory = (term: string, held: number): boolean => held > 0 || (corpus.get(term)?.corpusRows ?? 0) > 0;
     const corpusSize = Math.max(candidates.length, CANDIDATE_WINDOW_SIZE);
-    const most = termHits.reduce((sum, { hits }) => sum + bm25Idf(hits.length, corpusSize), 0);
+    const most = termHits.reduce((sum, { hits, term }) => sum + (inMemory(term, hits.length) ? bm25Idf(hits.length, corpusSize) : 0), 0);
 
-    for (const { candidate, score } of scoreKeywordCandidates(termHits, corpusSize)) {
+    const scored = scoreKeywordCandidates(termHits, corpusSize, { tokenize: searchTokensOf, wholeTokens: true });
+
+    for (const { candidate, score } of scored) {
         keywordScores.set(candidate.id, Math.min(score / most, 1));
     }
 
-    const matched = termHits.filter(({ hits }) => hits.length > 0);
-    const rarest = Math.min(...matched.map(({ hits }) => hits.length));
-    // `extractKeywordTerms` puts the most distinctive term first (a code, else the longest word).
-    const namesOther = termHits[0]?.hits.length === 0;
+    const rareTerm = leading.code || inMemory(leading.term, leadingHits.length) ? rareTermOf(terms, corpus) : undefined;
+    const leadingIds = new Set(leadingHits.map((hit) => hit.id));
+    const rareHits = termHits.find(({ term }) => term === rareTerm)?.hits ?? [];
 
-    if (!namesOther && rarest <= RARE_TERM_MAX_ROWS) {
-        for (const { hits } of matched) {
-            if (hits.length === rarest) {
-                for (const hit of hits) {
-                    rareTermMatches.add(hit.id);
-                }
-            }
+    for (const hit of rareHits) {
+        if (leadingIds.has(hit.id)) {
+            rareTermMatches.add(hit.id);
         }
     }
 

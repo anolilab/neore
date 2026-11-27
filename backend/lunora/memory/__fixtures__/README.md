@@ -57,9 +57,9 @@ without a vector hit falls back to the keyword score, except an embedded row old
 filled the cut (`vectorCutIsFull`): it was not among the nearest, so it has no relevance. The fixture ages are in days, so every row is older
 than the sync window. `now` and `today` come from `meta`, never the clock.
 
-The keyword search is simulated the same way: one lookup per salient term (`extractKeywordTerms`) over every row of the
-user, a token starting with the term, most occurrences first, then newest, cut to `KEYWORD_HITS_PER_TERM` (20); then the
-superseded and expired rows dropped and the best `KEYWORD_TOP_K` (30) of the chat's scopes kept by BM25
+The keyword search is simulated the same way: one lookup per salient term (`keywordLookupTerms`) over every row of the
+user, a token starting with the term, most occurrences first, then newest, cut to `KEYWORD_LOOKUP_LIMIT` (50); then the
+production filter (`keywordLookupOf`: whole tokens, usable, in scope, 20 kept) and the best `KEYWORD_TOP_K` (30) by BM25
 (`topKeywordHits`), fused with the vector hits by rank (`fuseSearchHits`).
 
 ## Metrics
@@ -89,26 +89,31 @@ current one, both over this fixture.
 
 | Slice    | Recall@8      | NDCG@8        | Expected in window | Off-topic rate | Abstain rate  | Abstain precision |
 | -------- | ------------- | ------------- | ------------------ | -------------- | ------------- | ----------------- |
-| overall  | 0.823 → 0.957 | 0.668 → 0.801 | 0.947 → 1.000      | 0.853 → 0.836  | 0.867 → 0.967 | 0.605 → 1.000     |
-| single   | 0.940 → 0.940 | 0.830 → 0.830 | 1.000 → 1.000      | 0.880 → 0.880  |               |                   |
+| overall  | 0.823 → 0.957 | 0.668 → 0.799 | 0.947 → 1.000      | 0.853 → 0.836  | 0.867 → 0.967 | 0.605 → 1.000     |
+| single   | 0.940 → 0.940 | 0.830 → 0.822 | 1.000 → 1.000      | 0.880 → 0.880  |               |                   |
 | multi    | 0.883 → 0.883 | 0.726 → 0.725 | 1.000 → 1.000      | 0.771 → 0.771  |               |                   |
 | temporal | 1.000 → 1.000 | 0.715 → 0.715 | 1.000 → 1.000      | 0.872 → 0.872  |               |                   |
 | update   | 1.000 → 1.000 | 0.776 → 0.776 | 1.000 → 1.000      | 0.873 → 0.873  |               |                   |
-| exact    | 0.000 → 1.000 | 0.000 → 1.000 | 0.600 → 1.000      | 1.000 → 0.091  |               |                   |
+| exact    | 0.000 → 1.000 | 0.000 → 1.000 | 0.600 → 1.000      | 1.000 → 0.048  |               |                   |
 | abstain  |               |               |                    | 1.000 → 1.000  | 0.867 → 0.967 | 1.000 → 1.000     |
 
-With no vector search the keyword-only run reads Recall@8 0.160 → 0.550 and abstain rate 0.433 → 0.633. On the
+With no vector search the keyword-only run reads Recall@8 0.160 → 0.603 and abstain rate 0.433 → 0.800. Single NDCG@8
+falls by 0.008 (two queries reorder) because a word the memory never had no longer dilutes the one it does: a row with
+no vector that shares one word of a question whose other words are in no memory scores in full. Its floor stays 0.830,
+within the 0.02 tolerance. On the
 150-query fixture before the `exact` rows, the earlier changes (newest-rows window, relevance gate, weights) took
 overall Recall@8 0.600 → 0.950 and NDCG@8 0.431 → 0.771.
 
 What moved them:
 
-- **Keywords find what vectors miss.** Each salient query term is one lookup of the `search_memory_text` FTS5 index, so a
-  row older than the window that holds the query's code or name becomes a candidate. Its relevance is the BM25 share of
-  the query's terms over the candidates (whole tokens: `time` is not `timer`, which cost two abstain queries with prefix
-  matching), and a row holding the query's rarest term (at most 2 candidates) counts by keyword even when a full
-  vector cut lacks it, unless no candidate holds the query's most distinctive term (`QZ-5508` when the user has
-  `KX-2291`). The keyword floor is 0.15: at 0.2, multi Recall@8 reads 0.867. NDCG@8 of multi moves by 0.001.
+- **Keywords find what vectors miss.** Each of the first six salient query terms is one lookup of the
+  `search_memory_text` FTS5 index (reading 50 rows, keeping 20 whole-token, usable, in-scope ones), so a row older than
+  the window that holds the query's code or name becomes a candidate. Relevance is the BM25 share of every salient term
+  the memory holds at all, over whole tokens (`time` is not `timer`, which cost two abstain queries with prefix
+  matching). A query whose leading identifier is in no memory (`QZ-5508` when the user has `KX-2291`) has no keyword
+  relevance at all. A row holding the leading term and the rare term (that identifier, or the rarest looked-up word,
+  held by at most 2 of the user's rows) counts by keyword even when a full vector cut lacks it. The keyword floor is
+  0.15: at 0.2, multi Recall@8 reads 0.867. NDCG@8 of multi moves by 0.001.
 
 - **The window is the newest rows.** It used to be the first 100 rows of the index (type descending, then newest), so an
   `activity` row sorted last and only one of the `temporal` rows reached scoring. Now it is the newest 100 of each scope

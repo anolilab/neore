@@ -67,11 +67,11 @@ const STOPWORDS = new Set<string>(
  * search is worst at, so they lead; then longer terms before shorter ones.
  * Single characters are dropped unless numeric.
  */
-export const extractKeywordTerms = (query: string, maxTerms: number = MAX_KEYWORD_TERMS): string[] => {
+export const extractKeywordTerms = (query: string, maxTerms: number = MAX_KEYWORD_TERMS, tokenizeWith: (text: string) => string[] = tokenize): string[] => {
     const seen = new Set<string>();
     const terms: { hasDigit: boolean; position: number; term: string }[] = [];
 
-    for (const [position, token] of tokenize(query).entries()) {
+    for (const [position, token] of tokenizeWith(query).entries()) {
         if (seen.has(token) || STOPWORDS.has(token)) {
             continue;
         }
@@ -92,12 +92,12 @@ export const extractKeywordTerms = (query: string, maxTerms: number = MAX_KEYWOR
         .map((t) => t.term);
 };
 
-/** Occurrences of `term` under the index's matching rule (exact or prefix), floored at 1. */
-const termFrequency = (tokens: string[], term: string): number => {
+/** Occurrences of `term` under the index's matching rule (exact or prefix), or as whole tokens only, floored at 1. */
+const termFrequency = (tokens: string[], term: string, wholeTokens: boolean): number => {
     let tf = 0;
 
     for (const token of tokens) {
-        if (token.startsWith(term)) {
+        if (wholeTokens ? token === term : token.startsWith(term)) {
             tf += 1;
         }
     }
@@ -130,8 +130,15 @@ export interface KeywordTermHits<T extends KeywordCandidate = KeywordCandidate> 
  *
  * Term frequency is floored at 1: the index returned the chunk for that term, so
  * it matches even where our tokenizer disagrees with the index (e.g. CJK bigrams).
+ * `tokenize` and `wholeTokens` let a caller with its own tokens count only whole
+ * matches; knowledge uses neither.
  */
-export const scoreKeywordCandidates = <T extends KeywordCandidate>(termHits: KeywordTermHits<T>[], corpusSize: number): { candidate: T; score: number }[] => {
+export const scoreKeywordCandidates = <T extends KeywordCandidate>(
+    termHits: KeywordTermHits<T>[],
+    corpusSize: number,
+    options: { tokenize?: (text: string) => string[]; wholeTokens?: boolean } = {},
+): { candidate: T; score: number }[] => {
+    const { tokenize: tokenizeWith = tokenize, wholeTokens = false } = options;
     const candidates = new Map<string, { candidate: T; matchedTerms: Set<string>; tokens: string[] }>();
 
     for (const { hits, term } of termHits) {
@@ -139,7 +146,7 @@ export const scoreKeywordCandidates = <T extends KeywordCandidate>(termHits: Key
             let entry = candidates.get(hit.id);
 
             if (!entry) {
-                entry = { candidate: hit, matchedTerms: new Set(), tokens: tokenize(hit.content) };
+                entry = { candidate: hit, matchedTerms: new Set(), tokens: tokenizeWith(hit.content) };
                 candidates.set(hit.id, entry);
             }
 
@@ -174,7 +181,7 @@ export const scoreKeywordCandidates = <T extends KeywordCandidate>(termHits: Key
         let score = 0;
 
         for (const term of entry.matchedTerms) {
-            const tf = termFrequency(entry.tokens, term);
+            const tf = termFrequency(entry.tokens, term, wholeTokens);
 
             score += (idf.get(term) ?? 0) * ((tf * (BM25_K1 + 1)) / (tf + BM25_K1 * (1 - BM25_B + (BM25_B * length) / avgLength)));
         }

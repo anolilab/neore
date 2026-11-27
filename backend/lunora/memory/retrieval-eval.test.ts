@@ -9,12 +9,13 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { extractKeywordTerms, tokenize } from "../knowledge/hybrid";
 import {
     CANDIDATE_WINDOW_SIZE,
     fuseSearchHits,
     isUsableOn,
-    KEYWORD_HITS_PER_TERM,
+    KEYWORD_LOOKUP_LIMIT,
+    keywordLookupOf,
+    keywordLookupTerms,
     keywordSignalsFor,
     rankMemories,
     selectCandidateWindow,
@@ -24,6 +25,7 @@ import {
     vectorCutIsFull,
     withSearchHits,
 } from "./retrieve-ranking";
+import { searchTokensOf } from "./search-terms";
 
 const DAY_MS = 86_400_000;
 
@@ -123,19 +125,19 @@ const run = (query: FixtureQuery, vectors = true): { ids: string[]; inWindow: Se
     const window = selectCandidateWindow(active, { ...scope, limit: CANDIDATE_WINDOW_SIZE, today });
 
     // The search index, as it answers each term's lookup: every row of the user (other bots', superseded and expired
-    // ones too) with a token starting with the term, most occurrences first, then newest, cut to the lookup's limit;
-    // the lookup then drops the superseded and expired rows, and production keeps the best in scope.
-    const termRows = extractKeywordTerms(query.text).map((term) => {
-        const found = rows
+    // ones too) with a token starting with the term, most occurrences first, then newest, cut to what a lookup reads;
+    // the lookup then keeps the whole-token, usable, in-scope rows (`keywordLookupOf`, as production).
+    const lookups = keywordLookupTerms(query.text).map((term) => {
+        const fetched = rows
             .map((m) => {
-                return { m, tf: tokenize(m.memory).filter((token) => token.startsWith(term)).length };
+                return { m, tf: searchTokensOf(m.memory).filter((token) => token.startsWith(term)).length };
             })
             .filter(({ tf }) => tf > 0)
             .toSorted((a, b) => b.tf - a.tf || b.m._creationTime - a.m._creationTime || (a.m._id < b.m._id ? -1 : 1))
-            .slice(0, KEYWORD_HITS_PER_TERM)
+            .slice(0, KEYWORD_LOOKUP_LIMIT)
             .map(({ m }) => m);
 
-        return { hits: found.filter((m) => !m.supersededBy && isUsableOn(m, today)), term };
+        return keywordLookupOf(term, fetched, scope, today);
     });
 
     // Production adds the hits the window lacks (vector hits read by embedding id, best first, fused with the keyword
@@ -144,14 +146,14 @@ const run = (query: FixtureQuery, vectors = true): { ids: string[]; inWindow: Se
         window,
         fuseSearchHits(
             scoped.map((h) => byId.get(h.id)!),
-            topKeywordHits(termRows, scope, window.length),
+            topKeywordHits(lookups, window.length),
         ),
         { ...scope, today },
     );
 
     const ranked = rankMemories({
         candidates,
-        ...keywordSignalsFor(candidates, query.text),
+        ...keywordSignalsFor(candidates, query.text, lookups),
         now,
         vectorScores,
         vectorSearched: vectorCutIsFull(scoped),
@@ -229,7 +231,7 @@ interface Floor {
 }
 const BASELINE: Record<"overall" | Category, Floor> & { overall: Required<Floor> & { abstainPrecision: number; abstainRate: number } } = {
     abstain: { offTopicRate: 1 },
-    exact: { inWindow: 1, ndcgAt8: 1, offTopicRate: 0.091, recallAt8: 1 },
+    exact: { inWindow: 1, ndcgAt8: 1, offTopicRate: 0.048, recallAt8: 1 },
     multi: { inWindow: 1, ndcgAt8: 0.726, offTopicRate: 0.771, recallAt8: 0.883 },
     overall: { abstainPrecision: 1, abstainRate: 0.967, inWindow: 1, ndcgAt8: 0.801, offTopicRate: 0.836, recallAt8: 0.957 },
     single: { inWindow: 1, ndcgAt8: 0.83, offTopicRate: 0.88, recallAt8: 0.94 },
@@ -355,7 +357,7 @@ describe("memory retrieval eval", () => {
         const { abstainRate, recallAt8 } = summary(totals);
 
         // The keyword search still runs. Before it, with word overlap over the window alone: Recall@8 0.160, abstain rate 0.433.
-        expect(recallAt8!).toBeGreaterThanOrEqual(0.55 - TOLERANCE);
-        expect(abstainRate!).toBeGreaterThanOrEqual(0.633 - TOLERANCE);
+        expect(recallAt8!).toBeGreaterThanOrEqual(0.603 - TOLERANCE);
+        expect(abstainRate!).toBeGreaterThanOrEqual(0.8 - TOLERANCE);
     });
 });

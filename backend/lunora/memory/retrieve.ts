@@ -16,13 +16,13 @@ import { internalAction } from "../_generated/server";
 import { searchVectors } from "../agent/vector/index";
 import { validateVectorDimension, type VectorDimension } from "../agent/vector/tables";
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
-import { extractKeywordTerms } from "../knowledge/hybrid";
 import { isSearchIndexBuilding } from "../lib/search-index";
 import { gatewayFetch } from "../lib/services";
 import { getMemoryEmbeddingModel, MEMORY_EMBEDDING_MODEL_NAME } from "./dedup";
 import {
     CANDIDATE_WINDOW_SIZE,
     fuseSearchHits,
+    keywordLookupTerms,
     keywordSignalsFor,
     rankMemories,
     SEARCH_MAX_RESULTS,
@@ -35,7 +35,7 @@ import {
     vectorCutIsFull,
     withSearchHits,
 } from "./retrieve-ranking";
-import type { RankedMemory } from "./retrieve-ranking";
+import type { KeywordLookup, RankedMemory } from "./retrieve-ranking";
 
 // ============================================================================
 // Retrieval Types
@@ -105,14 +105,13 @@ export const retrieveRelevantMemories = internalAction
         const now = Date.now();
         // The keyword leg runs beside the window read and the vector search, and fails alone: without it, the vector hits
         // and the window still count.
-        const searchText = args.searchText.slice(0, 2000);
-        const terms = extractKeywordTerms(searchText);
+        const terms = keywordLookupTerms(args.searchText);
         const keywordLookups =
             terms.length === 0
                 ? Promise.resolve([])
                 : (
-                      ctx.runQuery(internal.memory.functions.searchMemoriesByKeyword, { activeOn: now, terms, userId: args.userId }) as Promise<
-                          { hits: ActiveMemory[]; term: string }[]
+                      ctx.runQuery(internal.memory.functions.searchMemoriesByKeyword, { activeOn: now, ...scope, terms, userId: args.userId }) as Promise<
+                          KeywordLookup<ActiveMemory>[]
                       >
                   ).catch((error: unknown) => {
                       // After a deploy that adds `search_memory_text`, Lunora refuses the index until its backfill covers
@@ -155,7 +154,7 @@ export const retrieveRelevantMemories = internalAction
                     embeddingModel,
                     threadId: undefined,
                     userId: args.userId,
-                    values: [searchText],
+                    values: [args.searchText.slice(0, 2000)],
                 });
 
                 const queryVector = embeddings[0];
@@ -205,13 +204,15 @@ export const retrieveRelevantMemories = internalAction
 
         // 4. The window plus the hits it lacks, vector and keyword fused by rank, each only in scope (a hit on another
         // bot's row is never added). Both lookups already left out a fact past its end date, so no day is passed here.
-        const keywordHits = topKeywordHits(await keywordLookups, scope, windowMemories.length);
+        const lookups = await keywordLookups;
+        const keywordHits = topKeywordHits(lookups, windowMemories.length);
         const candidates = withSearchHits(windowMemories, fuseSearchHits(hitMemories, keywordHits), scope);
 
         // 5. Score each memory (vector hit, else keyword) and keep the ones to inject, or for a search the ones to return
         return rankMemories({
             candidates,
-            ...keywordSignalsFor(candidates, searchText),
+            // The whole search text: only the lookups and the embedding are bounded.
+            ...keywordSignalsFor(candidates, args.searchText, lookups),
             ...(args.search === true && {
                 limit: Math.min(Math.max(Math.trunc(args.limit ?? SEARCH_MAX_RESULTS), 1), SEARCH_MAX_RESULTS),
                 minKeywordRelevance: SEARCH_MIN_KEYWORD_RELEVANCE,

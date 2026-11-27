@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
     fuseSearchHits,
+    KEYWORD_LOOKUP_LIMIT,
+    keywordLookupOf,
+    keywordLookupTerms,
     keywordSignalsFor,
     rankMemories,
     SEARCH_MAX_RESULTS,
@@ -75,12 +78,39 @@ describe("rankMemories", () => {
         expect(idsOf(rank([fresh, pinned], at({ fresh: 0.5, pinned: 0.5 })))).toEqual(["fresh", "pinned"]);
     });
 
-    it("asks for a share of the search's words of a memory with no vector hit", () => {
-        const text = { lastConfirmedAt: NOW, memory: "likes hiking boots" };
+    it("counts the share of the search's words the memory holds, not the words it never had (Qodo 8)", () => {
+        const rows = [candidate("a", { memory: "likes hiking boots" }), candidate("b", { memory: "likes cooking" })];
+        const { keywordScores } = keywordSignalsFor(rows, "hiking cooking baking painting running swimming");
 
-        // 1 of 6 words (IDF-weighted, 0.14) is under the keyword floor of 0.15; 2 of 6 (0.28) is over it.
-        expect(rank([candidate("a", text)], [], "hiking cooking baking painting running swimming")).toEqual([]);
-        expect(rank([candidate("a", text)], [], "hiking boots baking painting running swimming").map((m) => m.memoryId)).toEqual(["a"]);
+        // `baking` … `swimming` are in no memory: `hiking` and `cooking` are the whole search, one each.
+        expect(keywordScores.get("a")).toBeCloseTo(0.5, 1);
+        expect(keywordScores.get("b")).toBeCloseTo(0.5, 1);
+        // One identifier among five words the memory never had still scores in full.
+        expect(
+            keywordSignalsFor([candidate("e", { memory: "Boiler shows E4012" })], "is E4012 anywhere regarding plumbing heating radiators").keywordScores.get(
+                "e",
+            ),
+        ).toBeCloseTo(1, 2);
+    });
+
+    it("scores every salient term of the search, past the lookups' six (Qodo 5)", () => {
+        const searchText = "remember everything regarding wonderful holidays somewhere tropical kettle";
+
+        expect(keywordLookupTerms(searchText)).not.toContain("kettle");
+        expect(rank([candidate("k", { memory: "descaled the kettle" })], [], searchText).map((m) => m.memoryId)).toEqual(["k"]);
+    });
+
+    it("matches whole tokens only: `time` is not `timer` (Qodo 10)", () => {
+        const rows = [
+            candidate("timer", { memory: "runs a timer" }),
+            candidate("both", { memory: "time and timer" }),
+            candidate("day", { memory: "time and day" }),
+        ];
+        const { keywordScores } = keywordSignalsFor(rows, "what time");
+
+        expect(keywordScores.has("timer")).toBe(false);
+        // `timer` adds nothing to the term frequency of `time`.
+        expect(keywordScores.get("both")).toBeCloseTo(keywordScores.get("day")!, 10);
     });
 
     it("leaves out an old embedded memory a decisive vector search missed, and finds every other one without a hit by its words", () => {
@@ -122,24 +152,73 @@ describe("rankMemories", () => {
         expect(rank(rows, [], "hiking boots")[0]!.score).toBeCloseTo(0.65 + 0.2, 10);
     });
 
-    it("finds a memory holding the query's rare term past a decisive vector search or a low cosine, and none when the query names another code", () => {
+    describe("the rare term, by the user's corpus", () => {
         const old = { embeddingId: "emb", lastConfirmedAt: NOW - 30 * DAY };
-        const rows = [
-            candidate("part", { ...old, memory: "Placed an order for part KX-2291" }),
-            ...["k1", "k2", "k3"].map((id) => candidate(id, { ...old, memory: "Placed an order for a kettle" })),
-        ];
-        const ids = (searchText: string, vectorScores: [string, number][] = []) =>
-            rankMemories({ candidates: rows, ...keywordSignalsFor(rows, searchText), now: NOW, vectorScores: new Map(vectorScores), vectorSearched: true }).map(
-                (m) => m.memoryId,
-            );
+        /** A lookup that read every row holding the term. */
+        const lookup = (term: string, corpusRows: number) => {
+            return { complete: true, corpusRows, term };
+        };
+        /** Ranked with a decisive vector search that lacks every row unless `vectorScores` says otherwise. */
+        const ids = (rows: RankCandidate[], searchText: string, lookups: ReturnType<typeof lookup>[], vectorScores: [string, number][] = []) =>
+            rankMemories({
+                candidates: rows,
+                ...keywordSignalsFor(rows, searchText, lookups),
+                now: NOW,
+                vectorScores: new Map(vectorScores),
+                vectorSearched: true,
+            }).map((m) => m.memoryId);
 
-        expect(keywordSignalsFor(rows, "did I order KX-2291").rareTermMatches).toEqual(new Set(["part"]));
-        // The kettles share `order`, a word three rows hold: the vector search decides them, and it lacks them.
-        expect(ids("did I order KX-2291")).toEqual(["part"]);
-        expect(ids("did I order KX-2291", [["part", 0.2]])).toEqual(["part"]);
-        // `5508` is the query's most distinctive term and no row holds it: the words it shares with the part decide nothing.
-        expect(keywordSignalsFor(rows, "did I order part QZ-5508").rareTermMatches).toEqual(new Set());
-        expect(ids("did I order part QZ-5508")).toEqual([]);
+        it("finds a memory holding the query's identifier past a decisive vector search or a low cosine", () => {
+            const rows = [
+                candidate("part", { ...old, memory: "Placed an order for part KX-2291" }),
+                ...["k1", "k2", "k3"].map((id) => candidate(id, { ...old, memory: "Placed an order for a kettle" })),
+            ];
+            const lookups = [lookup("2291", 1), lookup("order", 4), lookup("kx", 1)];
+
+            expect(keywordSignalsFor(rows, "did I order KX-2291", lookups).rareTermMatches).toEqual(new Set(["part"]));
+            // The kettles share `order`, a word four rows hold: the vector search decides them, and it lacks them.
+            expect(ids(rows, "did I order KX-2291", lookups)).toEqual(["part"]);
+            expect(ids(rows, "did I order KX-2291", lookups, [["part", 0.2]])).toEqual(["part"]);
+        });
+
+        it("gives no keyword relevance at all when the query names an identifier no memory holds (Qodo 2)", () => {
+            // A row with no vector is found by words, so only the absent code keeps it out.
+            const rows = [candidate("part", { memory: "Placed an order for part KX-2291" })];
+            const signals = keywordSignalsFor(rows, "did I order part QZ-5508", [lookup("5508", 0), lookup("order", 1), lookup("part", 1), lookup("qz", 0)]);
+
+            expect(signals.keywordScores.size).toBe(0);
+            expect(rank(rows, [], "did I order part QZ-5508")).toEqual([]);
+            // Relevance by vector still counts.
+            expect(rank(rows, [["part", 0.9]], "did I order part QZ-5508").map((m) => m.memoryId)).toEqual(["part"]);
+        });
+
+        it("reads a year as a word, not an identifier: it does not turn the rule off (Qodo 3)", () => {
+            const rows = [candidate("canon", { ...old, memory: "Canon camera serial KX-2291" }), candidate("other", { ...old, memory: "bought a new desk" })];
+            const searchText = "serial of the Canon camera I bought in 2019";
+            const lookups = [lookup("serial", 1), lookup("camera", 1), lookup("bought", 1), lookup("canon", 1), lookup("2019", 0)];
+
+            expect(ids(rows, searchText, lookups)).toEqual(["canon"]);
+        });
+
+        it("counts a word rare only by the user's own rows, and only with the query's leading term (Qodo 7)", () => {
+            // Several restaurant notes: `restaurant` is not rare however few of them are candidates.
+            const restaurants = [
+                candidate("r1", { ...old, memory: "likes the restaurant near the office" }),
+                candidate("r2", { ...old, memory: "favorite colour is green" }),
+            ];
+
+            expect(ids(restaurants, "favorite restaurant in Berlin", [lookup("restaurant", 6), lookup("favorite", 1), lookup("berlin", 0)])).toEqual([]);
+
+            // `E4012` is the rare term: the invoice-only row shares a word and is not a match.
+            const boiler = [
+                candidate("boiler", { ...old, memory: "Boiler error E4012 on the invoice" }),
+                candidate("invoice", { ...old, memory: "Paid the invoice for the plumber" }),
+            ];
+
+            expect(ids(boiler, "E4012 invoice", [lookup("e4012", 1), lookup("invoice", 2)])).toEqual(["boiler"]);
+            // Without corpus counts (the lookups failed), no term is known to be rare.
+            expect(ids(boiler, "E4012 invoice", [])).toEqual([]);
+        });
     });
 
     it("keeps the 8 best, best first, and keeps candidate order among equal scores", () => {
@@ -220,19 +299,45 @@ describe("selectCandidateWindow", () => {
 });
 
 describe("keyword hits", () => {
-    const row = (id: string, memory: string, botId: string | null = null) => {
+    const row = (
+        id: string,
+        memory: string,
+        botId: string | null = null,
+    ): { _id: string; botId: string | null; memory: string; supersededBy?: string; validUntil?: string } => {
         return { _id: id, botId, memory };
     };
 
-    it("drops another bot's rows before the cut, and keeps the best by BM25", () => {
-        const termRows = [
-            { hits: [row("other", "KX-2291 spare", "bot-b"), row("own", "ordered KX-2291 for the dishwasher"), row("plain", "KX notes")], term: "kx" },
-            { hits: [row("own", "ordered KX-2291 for the dishwasher"), row("other", "KX-2291 spare", "bot-b")], term: "2291" },
+    it("keeps whole-token, usable, in-scope rows before the cut, so prefix matches cannot crowd them out (Qodo 9)", () => {
+        const fetched = [
+            ...Array.from({ length: 30 }, (_, i) => row(`prefix-${String(i)}`, `set a timer ${String(i)}`)),
+            { ...row("superseded", "time for tea"), supersededBy: "newer" },
+            { ...row("expired", "time for tea"), validUntil: "2026-11-01" },
+            row("other", "time for tea", "bot-b"),
+            row("own", "time for tea"),
+        ];
+        const result = keywordLookupOf("time", fetched, {}, "2026-11-27");
+
+        expect(result.hits.map((h) => h._id)).toEqual(["own"]);
+        // Every usable row of the user holding the term, of any scope; fewer rows than a lookup reads, so it is all of them.
+        expect(result).toMatchObject({ complete: true, corpusRows: 2 });
+        expect(
+            keywordLookupOf(
+                "time",
+                Array.from({ length: KEYWORD_LOOKUP_LIMIT }, (_, i) => row(`t${String(i)}`, "time")),
+                {},
+                undefined,
+            ).complete,
+        ).toBe(false);
+    });
+
+    it("keeps the best hits by BM25", () => {
+        const lookups = [
+            { hits: [row("own", "ordered KX-2291 for the dishwasher"), row("plain", "KX notes")], term: "kx" },
+            { hits: [row("own", "ordered KX-2291 for the dishwasher")], term: "2291" },
         ];
 
-        expect(topKeywordHits(termRows, {}, 0).map((h) => h._id)).toEqual(["own", "plain"]);
-        expect(topKeywordHits(termRows, {}, 0, 1).map((h) => h._id)).toEqual(["own"]);
-        expect(topKeywordHits(termRows, { botId: "bot-b" }, 0).map((h) => h._id)).toEqual(["other"]);
+        expect(topKeywordHits(lookups, 0).map((h) => h._id)).toEqual(["own", "plain"]);
+        expect(topKeywordHits(lookups, 0, 1).map((h) => h._id)).toEqual(["own"]);
     });
 
     it("fuses the vector and keyword hits by rank: a row both found leads, each row once", () => {

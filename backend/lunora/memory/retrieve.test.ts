@@ -243,6 +243,13 @@ describe("candidates", () => {
         expect(warn).toHaveBeenCalledWith(expect.stringContaining("Vector search failed"), expect.anything());
     });
 
+    it("scores the words of a search past its first 2,000 characters (Qodo 6)", async () => {
+        await seed([{ memory: "descaled the kettle" }]);
+
+        // The embedding reads the first 2,000 characters; the keyword score reads all of it.
+        expect(await retrieve({ searchText: `${"the ".repeat(600)}kettle` })).toEqual(["descaled the kettle"]);
+    });
+
     it("never finds by keyword a superseded row, a fact past its end date, or another bot's row", async () => {
         await harness.run(async (ctx: any) => {
             const base = { lastConfirmedAt: 0, source: "auto", type: "preference", updatedAt: 0, userId: USER };
