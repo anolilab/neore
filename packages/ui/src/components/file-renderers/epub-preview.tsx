@@ -123,12 +123,15 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
     // origin, a loopback service or a scheme the app does not serve is refused without a request.
     const origins = useFetchableOrigins();
     const refused = !isFetchableUrl(url, origins);
-    // The result carries the URL it belongs to: a book from an earlier file is never shown for this one.
-    const [loaded, setLoaded] = useState<{ load: Load; url: string }>({ load: { status: "loading" }, url });
-    const [shown, setShown] = useState<{ doc: string; id: string; url: string } | undefined>();
-    const [position, setPosition] = useState({ index: 0, url });
-    const load: Load = loaded.url === url ? loaded.load : { status: "loading" };
-    const index = position.url === url ? position.index : 0;
+    // A result belongs to the file AND the cap it was read under: a book read for another file, or under another cap, is never shown for this
+    // one, and a book whose load was torn down (the effect's cleanup destroys it) is not one to show again if the same file comes back.
+    const key = `${url}\n${String(maxBytes)}`;
+    const [loaded, setLoaded] = useState<{ key: string; load: Load }>({ key, load: { status: "loading" } });
+    const [shown, setShown] = useState<{ doc: string; id: string; key: string } | undefined>();
+    const [position, setPosition] = useState({ index: 0, key });
+    const isLive = loaded.key === key && !(loaded.load.status === "ready" && loaded.load.book.destroyed);
+    const load: Load = isLive ? loaded.load : { status: "loading" };
+    const index = position.key === key ? position.index : 0;
 
     useEffect(() => {
         if (refused) {
@@ -138,12 +141,22 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
         const controller = new AbortController();
         let opened: OpenedEpub | undefined;
         let cancelled = false;
-        // A deadline as well as the unmount abort: a stalled URL must not hold the preview forever.
-        const deadline = setTimeout(() => controller.abort(), EPUB_FETCH_TIMEOUT_MS);
+        let deadline: ReturnType<typeof setTimeout> | undefined;
 
         const run = async (): Promise<void> => {
+            const loading = fetchBook(url, maxBytes, controller.signal);
+
             try {
-                opened = await fetchBook(url, maxBytes, controller.signal);
+                // A deadline for the whole load, parsing included: the abort stops the download, and the race settles a load that is stuck in
+                // the archive guard or the parser, which take no signal.
+                const timeout = new Promise<never>((_resolve, reject) => {
+                    deadline = setTimeout(() => {
+                        controller.abort();
+                        reject(new Error("load timed out"));
+                    }, EPUB_FETCH_TIMEOUT_MS);
+                });
+
+                opened = await Promise.race([loading, timeout]);
 
                 if (cancelled) {
                     opened.destroy();
@@ -154,15 +167,18 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
                 // A book with nothing to read is not kept: its parsed archive goes with it.
                 if (opened.chapters.length === 0) {
                     opened.destroy();
-                    setLoaded({ load: { status: "failed" }, url });
+                    setLoaded({ key, load: { status: "failed" } });
 
                     return;
                 }
 
-                setLoaded({ load: { book: opened, status: "ready" }, url });
+                setLoaded({ key, load: { book: opened, status: "ready" } });
             } catch (error) {
+                // A book that arrives after the deadline is released, not shown.
+                loading.then((late) => late.destroy()).catch(() => undefined);
+
                 if (!cancelled) {
-                    setLoaded({ load: error === TooLarge ? { status: "too-large" } : { status: "failed" }, url });
+                    setLoaded({ key, load: error === TooLarge ? { status: "too-large" } : { status: "failed" } });
                 }
             } finally {
                 clearTimeout(deadline);
@@ -177,7 +193,7 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
             controller.abort();
             opened?.destroy();
         };
-    }, [maxBytes, refused, url]);
+    }, [key, maxBytes, refused, url]);
 
     const chapter = load.status === "ready" ? load.book.chapters[index] : undefined;
     const chapterId = chapter?.id;
@@ -204,13 +220,13 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
                 const doc = await Promise.race([book.read(chapterId, controller.signal), timeout]);
 
                 if (!cancelled) {
-                    setShown({ doc, id: chapterId, url });
+                    setShown({ doc, id: chapterId, key });
                 }
             } catch {
                 if (!cancelled) {
                     // The book is no use now: its archive is released with the failure, not at an unmount that may be long off.
                     book.destroy();
-                    setLoaded({ load: { status: "failed" }, url });
+                    setLoaded({ key, load: { status: "failed" } });
                 }
             } finally {
                 clearTimeout(timer);
@@ -224,7 +240,7 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
             clearTimeout(timer);
             controller.abort();
         };
-    }, [book, chapterId, url]);
+    }, [book, chapterId, key]);
 
     const tooLarge = !refused && load.status === "too-large";
 
@@ -242,7 +258,7 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
 
     const total = load.status === "ready" ? load.book.chapters.length : 0;
     const label = t`Chapter ${index + 1} of ${total}`;
-    const go = (to: number) => setPosition({ index: to, url });
+    const go = (to: number) => setPosition({ index: to, key });
 
     return (
         <div className={cn("my-2 w-full max-w-2xl overflow-hidden rounded-lg border", className)}>
@@ -280,7 +296,7 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
                         className="bg-background h-[500px] w-full border-0"
                         referrerPolicy="no-referrer"
                         sandbox=""
-                        srcDoc={shown !== undefined && shown.id === chapterId && shown.url === url ? shown.doc : undefined}
+                        srcDoc={shown !== undefined && shown.id === chapterId && shown.key === key ? shown.doc : undefined}
                         title={chapter?.title ?? label}
                     />
                     <div className="bg-muted/50 flex items-center justify-between gap-2 border-t px-3 py-1.5">

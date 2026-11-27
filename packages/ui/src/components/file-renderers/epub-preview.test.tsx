@@ -17,6 +17,7 @@ const book = vi.hoisted(() => {
         guard: undefined as Error | undefined,
         guardArgs: [] as unknown[],
         opened: 0,
+        openGate: undefined as Promise<void> | undefined,
         reads: [] as string[],
         stall: false,
         throwOnOpen: false,
@@ -43,10 +44,24 @@ vi.mock("./epub-book", () => {
                 throw new Error("not a book");
             }
 
+            if (book.openGate !== undefined) {
+                await book.openGate;
+            }
+
+            let destroyed = false;
+
             return {
                 chapters: [{ id: "c1", title: "Beginning" }, { id: "c2" }, { id: "c3", title: "End" }].slice(0, book.chapters),
                 destroy: () => {
+                    if (destroyed) {
+                        return;
+                    }
+
+                    destroyed = true;
                     book.destroyed += 1;
+                },
+                get destroyed() {
+                    return destroyed;
                 },
                 read: async (id: string) => {
                     book.reads.push(id);
@@ -121,6 +136,7 @@ beforeEach(() => {
     book.destroyed = 0;
     book.guard = undefined;
     book.guardArgs = [];
+    book.openGate = undefined;
     book.opened = 0;
     book.reads = [];
     book.stall = false;
@@ -314,6 +330,104 @@ describe("EpubPreview failures", () => {
 
             expect(view.container.textContent).toContain("Could not preview");
             expect(book.destroyed).toBeGreaterThanOrEqual(1);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+});
+
+describe("EpubPreview load generations", () => {
+    const render = async (props: { maxBytes?: number; url: string }) => {
+        await act(async () => {
+            view.root.render(
+                <FetchableOriginsProvider origins={[ORIGIN]}>
+                    <EpubPreview filename="book.epub" {...props} />
+                </FetchableOriginsProvider>,
+            );
+        });
+        await act(async () => {
+            await Promise.resolve();
+        });
+    };
+    const gate = () => {
+        let release: () => void = () => undefined;
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the configured Node range (22.0) predates `Promise.withResolvers`
+        const promise = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+
+        return { promise, release };
+    };
+    const settle = async () => {
+        await act(async () => {
+            await Promise.resolve();
+        });
+        await act(async () => {
+            await Promise.resolve();
+        });
+    };
+
+    it("does not show a book again after its load was torn down: an A to B to A sequence waits for a fresh load", async () => {
+        answer(new Uint8Array([1]));
+        await render({ url: `${ORIGIN}/a.epub` });
+        expect(view.container.textContent).toContain("Chapter 1 of 3");
+
+        // To B, whose load never finishes while the person goes back to A.
+        const stalled = gate();
+
+        book.openGate = stalled.promise;
+        await render({ url: `${ORIGIN}/b.epub` });
+        expect(book.destroyed).toBe(1);
+        await render({ url: `${ORIGIN}/a.epub` });
+
+        // A's old book was destroyed by its effect's cleanup: its chapters and controls are not shown while the new load is on its way.
+        expect(view.container.querySelector("iframe")).toBeNull();
+        expect(view.container.textContent).not.toContain("Chapter 1 of 3");
+
+        stalled.release();
+        await settle();
+        expect(view.container.textContent).toContain("Chapter 1 of 3");
+        expect(view.container.querySelector("iframe")).not.toBeNull();
+    });
+
+    it("loads again, and shows nothing of the old book meanwhile, when the cap changes for the same file", async () => {
+        answer(new Uint8Array([1]));
+        await render({ maxBytes: 1000, url: `${ORIGIN}/a.epub` });
+        expect(view.container.querySelector("iframe")).not.toBeNull();
+
+        const stalled = gate();
+
+        book.openGate = stalled.promise;
+        await render({ maxBytes: 2000, url: `${ORIGIN}/a.epub` });
+        expect(book.destroyed).toBe(1);
+        expect(view.container.querySelector("iframe")).toBeNull();
+
+        stalled.release();
+        await settle();
+        expect(view.container.querySelector("iframe")).not.toBeNull();
+    });
+
+    it("ends a load stuck in parsing at the deadline, and releases a book that arrives after it", async () => {
+        vi.useFakeTimers();
+
+        try {
+            const stalled = gate();
+
+            book.openGate = stalled.promise;
+            answer(new Uint8Array([1]));
+            await mount();
+            expect(view.container.querySelector("iframe")).toBeNull();
+
+            await act(async () => {
+                vi.advanceTimersByTime(30_001);
+            });
+            await settle();
+            expect(view.container.textContent).toContain("Could not preview");
+
+            stalled.release();
+            await settle();
+            expect(book.destroyed).toBe(1);
+            expect(view.container.querySelector("iframe")).toBeNull();
         } finally {
             vi.useRealTimers();
         }
