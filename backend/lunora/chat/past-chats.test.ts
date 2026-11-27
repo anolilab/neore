@@ -63,12 +63,33 @@ const insertThread = (
     fields: { botId?: string; externalThreadId?: string; isPublic?: boolean; lockedAt?: number; tags?: string[]; title: string; userId?: string },
 ) => context.db.insert("threads", { model: "gpt-4o", status: "active", tags: ["chat"], userId: OWNER, ...fields });
 
-/** An untagged chat (as a branch, side chat or import is created), linked to `parentThreadId` when one is given. */
-const insertUntaggedThread = async (context: any, title: string, parentThreadId?: string) => {
-    const threadId = await context.db.insert("threads", { model: "gpt-4o", status: "active", title, userId: OWNER });
+/** An untagged chat (as a branch, side chat or import is created), with one link per entry of `links`, in order. */
+const insertUntaggedThread = async (
+    context: any,
+    title: string,
+    parentThreadId?: string,
+    options: { createdBy?: string; links?: ("branch" | "comparison" | "side" | undefined)[] } = {},
+) => {
+    const threadId = await context.db.insert("threads", {
+        model: "gpt-4o",
+        status: "active",
+        title,
+        userId: OWNER,
+        ...(options.createdBy !== undefined && { createdBy: options.createdBy }),
+    });
 
     if (parentThreadId !== undefined) {
-        await context.db.insert("threadRelationships", { branchType: "branch", createdAt: 0, parentThreadId, threadId, userId: OWNER });
+        const links = options.links ?? ["branch"];
+
+        for (const [index, branchType] of links.entries()) {
+            await context.db.insert("threadRelationships", {
+                ...(branchType !== undefined && { branchType }),
+                createdAt: index,
+                parentThreadId,
+                threadId,
+                userId: OWNER,
+            });
+        }
     }
 
     return threadId;
@@ -261,6 +282,46 @@ describe("searchPastChats", () => {
             });
 
             expect(await searchIn(harness, { query: "Lisbon", threadId: current })).toStrictEqual({ hits: [], unavailable: "not_private" });
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("trusts only the server's copy links: a link the owner can write and an import are no source, a branch behind another link is", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const current = await harness.run(async (context: any) => {
+                await withMemory(context);
+
+                const here = await insertThread(context, { title: "Today" });
+                const plain = await insertThread(context, { title: "Plain" });
+                const rows: [string, Parameters<typeof insertUntaggedThread>[3]][] = [
+                    // What the public relationship mutation can write.
+                    ["Comparison link", { links: ["comparison"] }],
+                    ["Untyped link", { links: [undefined] }],
+                    // An import linked to a chat, even through a branch link.
+                    ["Import", { createdBy: "import:chatgpt", links: ["comparison"] }],
+                    ["Import as branch", { createdBy: "import:chatgpt", links: ["branch"] }],
+                    // A real branch whose first link is not a copy link.
+                    ["Branch behind a comparison", { links: ["comparison", "branch"] }],
+                    ["Side chat", { links: ["side"] }],
+                ];
+
+                for (const [index, [title, options]] of rows.entries()) {
+                    await insertPrompt(context, {
+                        createdAt: SENT_AT + index,
+                        text: `Lisbon in ${title}`,
+                        threadId: await insertUntaggedThread(context, title, plain, options),
+                    });
+                }
+
+                return here;
+            });
+
+            const { hits } = await searchIn(harness, { query: "Lisbon", threadId: current });
+
+            expect(hits.map((hit) => hit.title).toSorted((a, b) => a.localeCompare(b))).toStrictEqual(["Branch behind a comparison", "Side chat"]);
         } finally {
             harness.close();
         }

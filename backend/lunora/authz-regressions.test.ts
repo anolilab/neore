@@ -188,6 +188,15 @@ describe("thread relationships", () => {
             as(STRANGER).mutation(procedureAt("chat_functions", "createThreadRelationshipPublic"), { parentThreadId: mine, threadId: victim } as never),
         ).rejects.toThrow();
 
+        // A branch or side chat link is the server's record of a copy, which the past-chat search trusts: no caller writes one.
+        await expect(
+            as(STRANGER).mutation(procedureAt("chat_functions", "createThreadRelationshipPublic"), {
+                branchType: "branch",
+                parentThreadId: mine,
+                threadId: mineToo,
+            } as never),
+        ).rejects.toThrow();
+
         await as(STRANGER).mutation(procedureAt("chat_functions", "createThreadRelationshipPublic"), { parentThreadId: mine, threadId: mineToo } as never);
 
         expect(await run(async (context) => await context.db.query("threadRelationships").collect())).toHaveLength(1);

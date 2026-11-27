@@ -39,8 +39,14 @@ const CHILD_RUN_TAGS: ReadonlySet<string> = new Set(["sub-agent", "worker"]);
  * apart, and a kind added later stays out until it is listed here.
  */
 const TYPED_CHAT_TAGS: ReadonlySet<string> = new Set(["chat", "host", "local"]);
-/** Links whose chat starts as a copy of its parent's rows: a branch (no type on older links), a side chat, a comparison. */
-const COPY_LINKS: ReadonlySet<string | undefined> = new Set(["branch", "comparison", "side", undefined]);
+/**
+ * Links only the server writes when it copies a chat's rows into a new one: a branch (`branchThread`) and a side chat
+ * (`side-chat.ts`). A link the owner can write (`createThreadRelationshipPublic`: a comparison) proves no copy, so it
+ * makes no chat a source; a comparison chat is tagged and needs no link.
+ */
+const COPY_LINKS: ReadonlySet<string | undefined> = new Set(["branch", "side"]);
+/** A chat's links read to find a copy link; a chat with more is judged on these. */
+const PAST_CHAT_LINKS_READ = 8;
 
 /** Whether a tagged chat is one a person types into ({@link TYPED_CHAT_TAGS}); a messenger chat never is. */
 const isTypedChatKind = (thread: ThreadDoc): boolean => {
@@ -152,6 +158,11 @@ export const searchPastChats = internalQuery
                 return isTypedChatKind(thread);
             }
 
+            // An imported conversation (`chat-import/`) holds words typed elsewhere, whatever it is linked to.
+            if (thread.createdBy?.startsWith("import:") === true) {
+                return false;
+            }
+
             const known = sources.get(thread._id);
 
             if (known !== undefined) {
@@ -163,13 +174,24 @@ export const searchPastChats = internalQuery
             if (depth < PAST_CHAT_LINEAGE_DEPTH && lineageReads < PAST_CHAT_LINEAGE_READS) {
                 lineageReads += 1;
 
-                const [link] = await context.db
+                const links = await context.db
                     .query("threadRelationships")
                     .withIndex("by_thread", (q) => q.eq("threadId", thread._id as Id<"threads">))
-                    .take(1);
-                const parent = link && COPY_LINKS.has(link.branchType) && (link.userId ?? userId) === userId ? await threadOf(link.parentThreadId) : null;
+                    .take(PAST_CHAT_LINKS_READ);
 
-                source = parent !== null && parent.userId === userId && (await isTypedSource(parent, depth + 1));
+                // Any copy link to a source makes the chat one: a comparison link beside a branch's does not hide it.
+                for (const link of links) {
+                    if (!COPY_LINKS.has(link.branchType) || (link.userId ?? userId) !== userId) {
+                        continue;
+                    }
+
+                    const parent = await threadOf(link.parentThreadId);
+
+                    if (parent !== null && parent.userId === userId && (await isTypedSource(parent, depth + 1))) {
+                        source = true;
+                        break;
+                    }
+                }
             }
 
             sources.set(thread._id, source);

@@ -2749,12 +2749,16 @@ export const createThreadRelationship = internalMutation
         });
     });
 
-/** Public auth mutation — called from the browser during comparison thread creation */
+/**
+ * Public auth mutation — called from the browser during comparison thread creation. It writes comparison links only: a
+ * branch or side chat link is the server's own record that it copied a chat's rows (`branchThread`, `side-chat.ts`), which
+ * the past-chat search trusts (`past-chats.ts#COPY_LINKS`). A link with no type is still accepted, and trusted by nothing.
+ */
 export const createThreadRelationshipPublic = authMutation
     .use(rateLimit("chat/create"))
     .input({
         branchPoint: v.optional(v.number()),
-        branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"))),
+        branchType: v.optional(v.literal("comparison")),
         parentThreadId: v.id("threads"),
         threadId: v.id("threads"),
     })
