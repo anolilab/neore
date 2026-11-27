@@ -572,7 +572,9 @@ describe("zone formatters", () => {
 
 describe(reflectionSourceIds, () => {
     it("lists only the day's memories the prompt shows, with every merge member and promotion source", () => {
-        const learned = Array.from({ length: REFLECTION_LIMITS.maxDigestItems + 3 }, (_, index) => ({ id: `learned-${String(index)}` }));
+        const learned = Array.from({ length: REFLECTION_LIMITS.maxDigestItems + 3 }, (_, index) => {
+            return { id: `learned-${String(index)}` };
+        });
         const ids = reflectionSourceIds(learned, {
             merges: [{ absorbedIds: ["absorbed"], survivorId: "survivor", texts: ["a", "b"], type: "preference" }],
             promotions: [{ sourceIds: ["source-a", "source-b"], texts: ["a", "b"] }],

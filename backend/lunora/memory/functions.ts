@@ -702,7 +702,7 @@ export const stepMemoryCleanup = internalMutation
         }
 
         if (row.kind === "digests") {
-            const next = await removeFromDigests(ctx, row.userId, new Set(row.ids ?? []), row.fromCreatedAt ?? 0);
+            const next = await removeFromDigests(ctx, row.userId, new Set(row.ids), row.fromCreatedAt ?? 0);
 
             if (next === null) {
                 await ctx.db.delete("memoryCleanups", row._id);
@@ -821,7 +821,11 @@ export const sweepMemoryCleanups = internalMutation
             .withIndex("by_dueAt", (q) => q.lt("dueAt", CLEANUP_NEVER))
             .take(1);
 
-        return { nextDueAt: next ? (rows.length === CLEANUP_SWEEP_BATCH ? ctx.now : next.dueAt) : null };
+        if (!next) {
+            return { nextDueAt: null };
+        }
+
+        return { nextDueAt: rows.length === CLEANUP_SWEEP_BATCH ? ctx.now : next.dueAt };
     });
 
 /**

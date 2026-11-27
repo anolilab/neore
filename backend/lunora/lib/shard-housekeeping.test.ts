@@ -53,7 +53,9 @@ beforeAll(async () => {
     const { resumeStalledGuestMergesOnTick } = await import("./account-merge");
 
     registry.set("lib_account_merge:resumeStalledGuestMergesOnTick", resumeStalledGuestMergesOnTick);
-    registry.set("memory_functions:sweepMemoryCleanups", (await import("../memory/functions")).sweepMemoryCleanups);
+    const { sweepMemoryCleanups } = await import("../memory/functions");
+
+    registry.set("memory_functions:sweepMemoryCleanups", sweepMemoryCleanups);
 });
 
 const NOW = 10_000_000_000;

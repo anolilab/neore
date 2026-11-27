@@ -360,7 +360,18 @@ const ageCleanups = async () =>
 /** The job's own run: an internal action is reached through `ctx.runAction`. */
 const runCleanup = async (args: unknown) => await harness.action(async (ctx: any) => await ctx.runAction(runMemoryCleanup, args));
 const cleanupJobs = () => harness.scheduler.list().filter((job) => job.functionPath?.includes("runMemoryCleanup") === true);
-const memoryCount = async () => (await run(async (ctx) => await ctx.db.query("memories").collect())).length;
+const memoryCount = async () => {
+    const rows = await run(async (ctx) => await ctx.db.query("memories").collect());
+
+    return rows.length;
+};
+const cleanupOf = async (id: Id<"memoryCleanups">) => await run(async (ctx) => await ctx.db.get("memoryCleanups", id));
+const frontierOf = async (id: Id<"memoryCleanups">) => {
+    const row = await cleanupOf(id);
+
+    return row?.frontier;
+};
+const GAVE_UP = /Gave up .*attempts/;
 
 /** A walk with `count` older versions behind a root that is already deleted, as a long delete leaves it. */
 const seedChain = async (count: number): Promise<{ cleanupId: Id<"memoryCleanups">; older: Id<"memories">[] }> =>
@@ -452,7 +463,9 @@ describe("a user with more digests than one write cleans", () => {
         // The first write took one page; the rest waits in a record, with a job armed for it.
         expect(await cleanups()).toMatchObject([{ kind: "digests", userId: OWNER }]);
         expect(cleanupJobs()).toHaveLength(1);
-        expect((await run(async (ctx) => await ctx.db.get("memoryDigests", late)))?.learned).toHaveLength(2);
+        const lateDigest = await run(async (ctx) => await ctx.db.get("memoryDigests", late));
+
+        expect(lateDigest?.learned).toHaveLength(2);
 
         await runCleanup(cleanupJobs()[0]?.args);
 
@@ -460,7 +473,7 @@ describe("a user with more digests than one write cleans", () => {
 
         expect(digests).toHaveLength(130);
         expect(digests.every((digest) => digest.summary === "")).toBe(true);
-        expect(digests.some((digest) => digest.learned.some((entry: { memoryId: string }) => entry.memoryId === gone.memoryId))).toBe(false);
+        expect(digests.some((digest) => (digest.learned as { memoryId: string }[]).some((entry) => entry.memoryId === gone.memoryId))).toBe(false);
         expect(await cleanups()).toHaveLength(0);
     });
 });
@@ -636,12 +649,12 @@ describe("a long chain whose follow-up is lost", () => {
 describe("a cleanup step that fails", () => {
     it("rolls back whole, so a retry still reaches every older version, and the failure moves the record back", async () => {
         const { cleanupId, older } = await seedChain(3);
-        const chainOf = (await run(async (ctx) => await ctx.db.get("memoryCleanups", cleanupId)))?.frontier;
+        const chainOf = await frontierOf(cleanupId);
 
         // A vector delete fails and the log call after it throws: a write that deleted a row has to fail as a whole.
         const withVector = await seed("older with a vector");
 
-        await run(async (ctx) => await ctx.db.patch("memories", withVector.memoryId, { supersededBy: chainOf?.[0] as Id<"memories"> }));
+        await run(async (ctx) => await ctx.db.patch("memories", withVector.memoryId, { supersededBy: (chainOf as Id<"memories">[])[0] }));
         vi.mocked(deleteVectorRow).mockRejectedValueOnce(new Error("vector index unavailable"));
         vi.mocked(memoryLogger.warn).mockImplementationOnce(() => {
             throw new Error("log sink down");
@@ -651,7 +664,7 @@ describe("a cleanup step that fails", () => {
 
         // Nothing the failed step did survived: every older row is there, the frontier is as it was.
         expect(await memoryCount()).toBe(older.length + 1);
-        expect((await run(async (ctx) => await ctx.db.get("memoryCleanups", cleanupId)))?.frontier).toEqual(chainOf);
+        expect(await frontierOf(cleanupId)).toEqual(chainOf);
         // The failure is counted and the record is not due for a while.
         const failed = await run(async (ctx) => await ctx.db.get("memoryCleanups", cleanupId));
 
@@ -681,7 +694,7 @@ describe("a cleanup step that fails", () => {
         expect(step.again).toBe(true);
         expect(await memoryCount()).toBe(260 - 100);
         // The other record was not touched by that write.
-        expect((await run(async (ctx) => await ctx.db.get("memoryCleanups", second.cleanupId)))?.frontier).toHaveLength(1);
+        expect(await frontierOf(second.cleanupId)).toHaveLength(1);
     });
 
     it("moves a failing record behind the others, and gives up on it after a fixed number of attempts, keeping the row", async () => {
@@ -713,7 +726,7 @@ describe("a cleanup step that fails", () => {
         expect(last.retryInMs).toBeNull();
         expect(given).not.toBeNull();
         expect(given?.dueAt).toBeGreaterThan(Date.now() * 1000);
-        expect(memoryLogger.error).toHaveBeenCalledWith(expect.stringMatching(/Gave up .*attempts/));
+        expect(memoryLogger.error).toHaveBeenCalledWith(expect.stringMatching(GAVE_UP));
         // Count-only: no row text in the log.
         expect(JSON.stringify(vi.mocked(memoryLogger.error).mock.calls)).not.toContain("older 0");
     });
@@ -730,7 +743,7 @@ describe("a cleanup step that fails", () => {
         expect(cleanupJobs()).toHaveLength(1);
         expect(cleanupJobs()[0]?.args).toMatchObject({ cleanupId: record?._id });
         // The shard is woken for it through the census as well, which reaches a shard past the housekeeping horizon.
-        const census = await run(async (ctx) => await ctx.db.shardActivity.findFirst({ where: { shardKey: OWNER } }));
+        const census = await run(async (ctx: any) => await ctx.db.shardActivity.findFirst({ where: { shardKey: OWNER } }));
 
         expect(census?.nextDueAt).toBe(record?.dueAt);
     });

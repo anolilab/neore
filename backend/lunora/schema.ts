@@ -1792,10 +1792,10 @@ export const schema = defineSchema({
         // When the record is next worked: after a grace period at first, after a backoff once a step failed.
         dueAt: v.number(),
         embeddingId: v.optional(v.string()),
-        frontier: v.optional(v.array(v.id("memories"))),
         // `digests`: the deleted memories' ids, and the `createdAt` the walk over the user's digests goes on from (a
         // position in the rows, not an opaque cursor: a guest merge moves the rows and the record).
         fromCreatedAt: v.optional(v.number()),
+        frontier: v.optional(v.array(v.id("memories"))),
         ids: v.optional(v.array(v.string())),
         kind: v.union(v.literal("vector"), v.literal("chain"), v.literal("digests")),
         memoryId: v.optional(v.string()),
