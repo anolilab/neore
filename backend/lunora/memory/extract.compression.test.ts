@@ -55,6 +55,7 @@ const extract = async () =>
         async (ctx: any) =>
             await ctx.runAction(extractMemories, {
                 assistantResponse: "Nice to meet you, Dana.",
+                quotablePrompt: MESSAGE,
                 threadId,
                 userId: USER,
                 userMessage: MESSAGE,
@@ -69,7 +70,11 @@ beforeAll(async () => {
 beforeEach(async () => {
     harness = lunoraTest(schema as never);
     embedMany.mockRejectedValue(new Error("no embeddings in this test"));
-    generateText.mockResolvedValue({ output: { facts: [{ confidence: 90, importance: 80, memory: "The user is a nurse in Hamburg", type: "identity" }] } });
+    generateText.mockResolvedValue({
+        output: {
+            facts: [{ confidence: 90, importance: 80, memory: "The user is a nurse in Hamburg", quote: "work as a nurse in Hamburg", type: "identity" }],
+        },
+    });
 
     threadId = await harness.run(async (ctx: any) => {
         await ctx.db.insert("userSettings", { memoryEnabled: true, timezone: "UTC", userId: USER });

@@ -756,7 +756,7 @@ export const takeControl = authAction
         await rateLimitGuard({
             ...ctx,
             rateLimitKey: leaseOnly === true ? "browser/control" : "browser/liveView",
-            user: { plan: ctx.user.plan, userId },
+            user: { isAdmin: ctx.user.isAdmin, plan: ctx.user.plan, userId },
         } as never);
 
         const claim = await ctx.runMutation(internal.browser.live_view.claimControl, {

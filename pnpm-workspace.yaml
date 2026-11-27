@@ -91,15 +91,15 @@ catalogs:
     "@rive-app/react-webgl2": 4.40.0
     motion: 14.14.0
   auth:
-    # `@lunora/auth` (alpha.258) depends on
-    # `@better-auth/{api-key,passkey,mcp,scim,oauth-provider}` at EXACTLY 1.7.16,
-    # whose peers pin better-call 1.4.5 / `@better-auth/utils` 0.5.1 /
+    # `@lunora/auth` (alpha.279) depends on
+    # `@better-auth/{api-key,passkey,mcp,scim,oauth-provider}` at EXACTLY 1.7.28,
+    # whose peers pin better-call 1.4.6 / `@better-auth/utils` 0.5.1 /
     # `@better-fetch/fetch` 1.3.3. Taking 1.7.6 here split api-key and passkey
     # into two copies each. Move the four entries (and the `@better-auth/core`
     # override) when `@lunora/auth` does.
-    "@better-auth/api-key": 1.7.16
-    "@better-auth/passkey": 1.7.16
-    better-auth: 1.7.16
+    "@better-auth/api-key": 1.7.28
+    "@better-auth/passkey": 1.7.28
+    better-auth: 1.7.28
     jose: 6.2.18
   build:
     # Moves WITH wrangler: each vite-plugin release peer-requires the wrangler
@@ -299,7 +299,7 @@ catalogs:
     tailwind-csstree: 0.4.2
     typescript-eslint: 8.73.0
   lunora:
-    "@lunora/auth": 1.0.0-alpha.277
+    "@lunora/auth": 1.0.0-alpha.279
     "@lunora/bindings": 1.0.0-alpha.154
     "@lunora/client": 1.0.0-alpha.304
     "@lunora/cli": 1.0.0-alpha.510
@@ -629,7 +629,7 @@ overrides:
   # crashes with "Cannot destructure property ... as it is null". The data grid
   # was the visible casualty. One copy only.
   "@babel/types": 8.0.6
-  "@better-auth/core": 1.7.16
+  "@better-auth/core": 1.7.28
   "@eslint/plugin-kit@<0.3.3": ">=0.5.0"
   "@grpc/grpc-js@<1.14.5": ">=1.14.5"
   "@hono/node-server@<1.19.10": ">=1.19.10"

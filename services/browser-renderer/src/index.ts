@@ -1165,8 +1165,12 @@ app.post("/login", async (c) => {
     let refused = sessionId ? await holds.take(sessionId) : null;
 
     // Another call holds the session: wait for it (a person's frame of the page, taken again at lower qualities on a
-    // large page, lets go within a few seconds), within the sign-in's budget, then refuse as before.
-    for (const until = Math.min(Date.now() + LOGIN_BUSY_WAIT_MS, deadline); refused === "busy" && sessionId && Date.now() + LOGIN_BUSY_STEP_MS < until;) {
+    // large page, lets go within a few seconds), then refuse as before. The wait never eats into the time a page load and
+    // the typing need, so a sign-in with the least budget is refused at once rather than timing out after the hold.
+    for (
+        const until = Math.min(Date.now() + LOGIN_BUSY_WAIT_MS, deadline - (MIN_LOGIN_BUDGET_MS - LOGIN_MARGIN_MS));
+        refused === "busy" && sessionId && Date.now() + LOGIN_BUSY_STEP_MS < until;
+    ) {
         await new Promise((resolve) => {
             setTimeout(resolve, LOGIN_BUSY_STEP_MS);
         });

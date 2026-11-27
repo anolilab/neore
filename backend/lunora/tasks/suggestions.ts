@@ -3,7 +3,7 @@
  *
  * The feature is OPT-IN (`userSettings.scheduleIdeasEnabled`, absent = off) and nothing here creates a task by
  * itself: accepting goes through `insertTask`, the path `createTask` uses, and only for a pending row the caller
- * owns while the switch is on. Turning the switch off erases the rows (`eraseUserTaskSuggestions`).
+ * owns while the switch is on. Turning the switch or memory off erases the rows (`eraseUserTaskSuggestions`).
  *
  * A row holds the proposed task in its own shape and the ids of the chats it came from — never message text.
  *
@@ -21,7 +21,8 @@ import { internalMutation } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { containsSecret } from "../lib/secret-redaction";
 import { runAfterOnShard } from "../lib/shard-scheduler";
-import { findNextCronTime, isValidCronExpression } from "../triggers/schedule";
+import { findNextCronTime, isHourlyOrSlowerCronExpression } from "../triggers/schedule";
+import { readMemoryEnabled } from "../memory/functions";
 import { insertTask, normalizeTaskText } from "./functions";
 import {
     MAX_DECIDED_SUGGESTIONS_PER_STATUS,
@@ -85,14 +86,14 @@ export const readScheduleIdeasEnabled = async (ctx: Pick<QueryCtx, "db">, userId
     return settings?.scheduleIdeasEnabled === true;
 };
 
-/** The caller's pending suggestions, newest first, at most {@link MAX_PENDING_SUGGESTIONS}. Empty while the switch is off. */
+/** The caller's pending suggestions, newest first, at most {@link MAX_PENDING_SUGGESTIONS}. Empty while the switch or memory is off. */
 export const listTaskSuggestions = authQuery
     .input({})
     .output(v.array(vSuggestionView))
     .query(async ({ ctx }) => {
         const { userId } = ctx.user;
 
-        if (!(await readScheduleIdeasEnabled(ctx, userId))) {
+        if (!(await readScheduleIdeasEnabled(ctx, userId)) || !(await readMemoryEnabled(ctx, userId))) {
             return [];
         }
 
@@ -116,7 +117,7 @@ export const listTaskSuggestions = authQuery
 
 /**
  * Turns a pending suggestion into a task. A row that is not the caller's answers NOT_FOUND (ids cannot be probed);
- * one already decided, or a switch that is off, is refused. The task and the status change are one transaction, so a
+ * one already decided, or a switch (or memory) that is off, is refused. The task and the status change are one transaction, so a
  * repeated or concurrent accept creates the task once.
  */
 export const acceptTaskSuggestion = authMutation
@@ -131,7 +132,7 @@ export const acceptTaskSuggestion = authMutation
             throw new LunoraError("NOT_FOUND", "Suggestion not found");
         }
 
-        if (!(await readScheduleIdeasEnabled(ctx, userId))) {
+        if (!(await readScheduleIdeasEnabled(ctx, userId)) || !(await readMemoryEnabled(ctx, userId))) {
             throw new LunoraError("FORBIDDEN", "Schedule ideas are turned off");
         }
 
@@ -179,8 +180,9 @@ export const dismissTaskSuggestion = authMutation
     });
 
 /**
- * Stores suggestions for one user. Server-only: the caller is the daily job. Writes nothing while the switch is off,
- * drops a proposal whose schedule is not a valid cron expression, is longer than a task's schedule may be, or matches
+ * Stores suggestions for one user. Server-only: the caller is the daily job. Writes nothing while the switch or memory is off,
+ * drops a proposal whose schedule is not a valid cron expression, fires more often than hourly (the minute field is not one
+ * fixed minute), is longer than a task's schedule may be, or matches
  * no date (`0 0 30 2 *`: a task would fall back to running hourly), or whose text is empty, and keeps the pending
  * list within {@link MAX_PENDING_SUGGESTIONS}.
  */
@@ -198,7 +200,8 @@ export const insertTaskSuggestions = internalMutation
     })
     .output(v.object({ inserted: v.number() }))
     .mutation(async ({ args: { suggestions, userId }, ctx }) => {
-        if (!(await readScheduleIdeasEnabled(ctx, userId))) {
+        // The job only runs with both switches on, and this is its last write: memory turned off while the model ran stores nothing.
+        if (!(await readScheduleIdeasEnabled(ctx, userId)) || !(await readMemoryEnabled(ctx, userId))) {
             return { inserted: 0 };
         }
 
@@ -229,9 +232,10 @@ export const insertTaskSuggestions = internalMutation
             const cronExpression = normalizeTaskText(suggestion.cronExpression);
 
             // Accepting runs the task rules: a schedule they refuse, or one that never fires, is dropped here, not left pending.
+            // A model's schedule fires at most once an hour (its prompt says so): one fixed minute, never `*`, a step or a list.
             if (
                 cronExpression.length > TASK_SCHEDULE_MAX ||
-                !isValidCronExpression(cronExpression) ||
+                !isHourlyOrSlowerCronExpression(cronExpression) ||
                 findNextCronTime(cronExpression, ctx.now) === undefined
             ) {
                 continue;

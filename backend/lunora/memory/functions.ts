@@ -5,6 +5,7 @@ import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
+import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { memoryLogger } from "../lib/logger";
 import { isThreadLocked } from "../lib/thread-lock";
@@ -14,6 +15,7 @@ import { dateColumns, factDatesOf, hasFactDates, isExpired, normalizeFactDates, 
 import {
     type ImportApp,
     importDedupKey,
+    IMPORT_ACCOUNT_DELETING_MESSAGE,
     IMPORT_MEMORY_OFF_MESSAGE,
     IMPORT_WIDE_WINDOW_ROWS,
     IMPORTED_CONFIDENCE,
@@ -24,7 +26,8 @@ import { botOwnerRows } from "./bot-owner";
 import { type MemoryEvidence, newestEvidence, vMemoryEvidence } from "./evidence";
 import { logRedaction, redactMemoryText } from "./redact";
 import { localDayOf } from "./reflection-logic";
-import { lastConfirmedOf, type MemoryType, vMemoryType } from "./taxonomy";
+import { byNewest, isUsableOn, mergeScopeWindows, scopesOf } from "./retrieve-ranking";
+import { lastConfirmedOf, MEMORY_TYPES, type MemoryType, vMemoryType } from "./taxonomy";
 import { deleteVectorRow, patchMessage } from "../agent/table-writes";
 import { candidatesOnActivePath } from "../agent/branch-rows";
 import { requireOwnedThread, resolveThreadReadAccess } from "../agent/thread-read-access";
@@ -845,6 +848,8 @@ export const saveImportedMemoryBatch = internalMutation
                 type: vMemoryType,
             }),
         ),
+        // The background file import sets it: a batch claimed before an account deletion must write nothing once it is under way.
+        refuseDuringDeletion: v.optional(v.boolean()),
         userId: v.string(),
     })
     .output(
@@ -869,6 +874,11 @@ export const saveImportedMemoryBatch = internalMutation
 
         if (!(await readMemoryEnabled(ctx, args.userId))) {
             throw new LunoraError("FORBIDDEN", IMPORT_MEMORY_OFF_MESSAGE);
+        }
+
+        // In the writing mutation, so a save and the deletion sweep never interleave: nothing is written once deletion is under way.
+        if (args.refuseDuringDeletion === true && (await isAccountDeletionUnderway(ctx, args.userId))) {
+            throw new LunoraError("FORBIDDEN", IMPORT_ACCOUNT_DELETING_MESSAGE);
         }
 
         const today = localDayOf(now, await userTimeZone(ctx, args.userId));
@@ -1251,7 +1261,7 @@ export const confirmMemories = internalMutation
     });
 
 /** Rows one scope's active read reads at most, unless `limit` (one page) is more. */
-const ACTIVE_READ_MAX_ROWS = 1500;
+export const ACTIVE_READ_MAX_ROWS = 1500;
 
 /**
  * Memories a run may read or dedupe against. Without `botId` only the user's own
@@ -1260,6 +1270,11 @@ const ACTIVE_READ_MAX_ROWS = 1500;
  * pass `botId` WITHOUT `includeUserWide`: a bot's extraction never matches or
  * edits a user memory. With `activeOn` (an instant), an unpinned fact whose end
  * date is before that day in the user's timezone is left out: retrieval never injects it.
+ *
+ * The window is the first `limit` rows of each scope in index order (type descending, then newest) by default.
+ * With `newestFirst` it is the newest `limit` rows whatever the type: retrieval scores only the window, so a
+ * window filled by type would hold `preference` and `identity` rows and never an `activity` one. That reads the
+ * newest rows of each type and merges them, within the same total read budget.
  */
 export const getActiveMemoriesForUser = internalQuery
     .input({
@@ -1267,6 +1282,7 @@ export const getActiveMemoriesForUser = internalQuery
         botId: v.optional(v.string()),
         includeUserWide: v.optional(v.boolean()),
         limit: v.optional(v.number()),
+        newestFirst: v.optional(v.boolean()),
         /** The day of `activeOn` is read in this timezone; without it, in the user's stored one. */
         timeZone: v.optional(v.string()),
         userId: v.string(),
@@ -1277,60 +1293,72 @@ export const getActiveMemoriesForUser = internalQuery
 
         // Each scope is read through its own index, so one scope's rows never use up
         // another's window. A null `botId` is the user's own memories.
-        const scopes: (string | null)[] = [args.botId ?? null];
+        const scopes = scopesOf(args);
 
-        if (args.botId !== undefined && args.includeUserWide === true) {
-            scopes.push(null);
-        }
+        // The active-row index, so superseded rows are never read. The index holds no end date, so an expired row is
+        // dropped after it is read: each range is paged until it has `limit` usable rows or ends. The ranges of a scope
+        // (one, or one per type) share ONE budget of `maxRows` rows (or one page), taken a page per open range per round,
+        // so a type buried in expired rows may use what the others did not need, and the read stays bounded.
+        const readScope = async (scope: string | null, types: ReadonlyArray<MemoryType | undefined>, maxRows: number): Promise<Doc<"memories">[]> => {
+            const ranges = types.map((type) => {
+                return { cursor: null as string | null, done: false, kept: [] as Doc<"memories">[], type };
+            });
+            let read = 0;
 
-        // A pinned fact stays past its end date: pinning is how the user keeps it.
-        const usable = (m: Doc<"memories">): boolean => today === undefined || m.pinned === true || !isExpired(m, today);
+            while (read < maxRows) {
+                const open = ranges.filter((range) => !range.done && range.kept.length < limit);
 
-        // The active-row index, so superseded rows are never read. Paged until `limit` usable rows or the scope ends,
-        // so expired rows cannot fill the window; at most `ACTIVE_READ_MAX_ROWS` rows (or one page), a bounded read.
-        const perScope = await Promise.all(
-            scopes.map(async (scope) => {
-                const kept: Doc<"memories">[] = [];
-                let cursor: string | null = null;
-
-                const maxRows = Math.max(limit, ACTIVE_READ_MAX_ROWS);
-
-                for (let read = 0; read < maxRows && kept.length < limit; read += limit) {
-                    const result = await ctx.db
-                        .query("memories")
-                        .withIndex("by_userId_botId_active", (q) =>
-                            q
-                                .eq("userId", args.userId)
-                                .eq("botId", scope as Id<"bots"> | null)
-                                .eq("supersededBy", null),
-                        )
-                        .order("desc")
-                        .paginate({ cursor, numItems: limit });
-
-                    kept.push(...result.page.filter((m) => usable(m)));
-
-                    if (result.isDone) {
-                        break;
-                    }
-
-                    cursor = result.continueCursor;
+                if (open.length === 0) {
+                    break;
                 }
 
-                return kept;
+                const round = open.slice(0, Math.max(1, Math.floor((maxRows - read) / limit)));
+                const pages = await Promise.all(
+                    round.map(
+                        async (range) =>
+                            await ctx.db
+                                .query("memories")
+                                .withIndex("by_userId_botId_active", (q) => {
+                                    const active = q
+                                        .eq("userId", args.userId)
+                                        .eq("botId", scope as Id<"bots"> | null)
+                                        .eq("supersededBy", null);
+
+                                    return range.type === undefined ? active : active.eq("type", range.type);
+                                })
+                                .order("desc")
+                                .paginate({ cursor: range.cursor, numItems: limit }),
+                    ),
+                );
+
+                for (const [index, page] of pages.entries()) {
+                    const range = round[index]!;
+
+                    // An empty page still counts, so the loop always ends.
+                    read += Math.max(page.page.length, 1);
+                    range.kept.push(...page.page.filter((m) => isUsableOn(m, today)));
+                    range.done = page.isDone;
+                    range.cursor = page.continueCursor;
+                }
+            }
+
+            return ranges.flatMap((range) => range.kept);
+        };
+
+        const perScope = await Promise.all(
+            scopes.map(async (scope) => {
+                if (args.newestFirst !== true) {
+                    return await readScope(scope, [undefined], Math.max(limit, ACTIVE_READ_MAX_ROWS));
+                }
+
+                // Within a type the index is newest first, so the newest `limit` of the scope are among each type's own.
+                const rows = await readScope(scope, MEMORY_TYPES, Math.max(limit, ACTIVE_READ_MAX_ROWS));
+
+                return rows.toSorted(byNewest).slice(0, limit);
             }),
         );
 
-        // Each scope keeps up to `limit` of its own, so a busy bot cannot push the user's memories out. Merged in
-        // the order each index yields: type descending, then newest first.
-        const memories = perScope
-            .flatMap((rows) => rows.slice(0, limit))
-            .toSorted((a, b) => {
-                if (a.type !== b.type) {
-                    return a.type < b.type ? 1 : -1;
-                }
-
-                return b._creationTime - a._creationTime;
-            });
+        const memories = mergeScopeWindows(perScope, limit, args.newestFirst === true ? byNewest : undefined);
 
         return memories.map((m) => {
             return {
@@ -1401,6 +1429,7 @@ export const getMemoriesByEmbeddingIds = internalQuery
                     confidence: memory.confidence,
                     embeddingId,
                     importance: memory.importance,
+                    lastConfirmedAt: lastConfirmedOf(memory),
                     memory: memory.memory,
                     pinned: memory.pinned === true,
                     type: memory.type,

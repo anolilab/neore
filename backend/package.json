@@ -46,6 +46,7 @@
         "./ask-user-limits": "./lunora/chat/tools/ask-user-constants.ts",
         "./request-secret-limits": "./lunora/chat/tools/request-secret-constants.ts",
         "./knowledge/citations": "./lunora/knowledge/citations.ts",
+        "./memory/import-file-limits": "./lunora/memory/import-file-limits.ts",
         "./messenger/reply-tools": "./lunora/messenger/lib/reply-tools.ts",
         "./package.json": "./package.json",
         "./public-api/mcp-client-config": "./lunora/public-api/mcp-client-config.ts",
