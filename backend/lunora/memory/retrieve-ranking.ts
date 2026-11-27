@@ -480,10 +480,12 @@ export const keywordSignalsFor = (
 
     const corpus = new Map(lookups.map((lookup) => [lookup.term, lookup]));
     const inMemory = (term: string, held: number): boolean => held > 0 || (corpus.get(term)?.corpusRows ?? 0) > 0;
-    const corpusSize = Math.max(candidates.length, CANDIDATE_WINDOW_SIZE);
+    // The same df and N as `topKeywordHits`: a term's lookup counts every in-scope row holding it, which the candidates
+    // (the window and the hits) only sample, so a word many memories hold is common here too.
+    const corpusSize = Math.max(candidates.length, CANDIDATE_WINDOW_SIZE, ...lookups.map(({ corpusRows }) => corpusRows));
     const idfs = termHits.map(({ hits, term }, index) => {
         if (inMemory(term, hits.length)) {
-            return bm25Idf(hits.length, corpusSize);
+            return bm25Idf(Math.max(hits.length, corpus.get(term)?.corpusRows ?? 0), corpusSize);
         }
 
         // An identifier nobody holds still weighs in, at the IDF of a term no row holds; an absent word does not.

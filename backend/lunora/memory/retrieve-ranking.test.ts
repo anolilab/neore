@@ -111,6 +111,24 @@ describe("rankMemories", () => {
         expect(keywordScores.get("zep")).toBeLessThanOrEqual(1 / 3);
     });
 
+    it("weighs a word by every in-scope memory holding it: a row sharing only a common word stays under the floor", () => {
+        const kettle = candidate("kettle", { memory: "descaled the kettle" });
+        const dishwasher = candidate("dishwasher", { memory: "emptied the dishwasher" });
+        const lookups = [
+            { complete: false, corpusRows: 60, term: "dishwasher" },
+            { complete: true, corpusRows: 1, term: "kettle" },
+        ];
+        const ids = rankMemories({
+            candidates: [kettle, dishwasher],
+            ...keywordSignalsFor([kettle, dishwasher], "kettle dishwasher", lookups),
+            now: NOW,
+            vectorScores: new Map(),
+        }).map((m) => m.memoryId);
+
+        // Sixty memories hold `dishwasher`: the two candidates alone would read it as rare as `kettle`.
+        expect(ids).toEqual(["kettle"]);
+    });
+
     it("scores every salient term of the search, past the lookups' six", () => {
         const searchText = "remember everything regarding wonderful holidays somewhere tropical kettle";
 
