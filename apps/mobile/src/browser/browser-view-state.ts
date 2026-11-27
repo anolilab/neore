@@ -148,6 +148,24 @@ export const otherLeaseEndOnDevice = (status: BrowserStatus | undefined, receive
     return receivedAt + (status.control.until - status.now);
 };
 
+/**
+ * Whether a new read key (an agent action, a page opened, a nudge) asks the running reader for a read: never the first
+ * key seen, which the reader's own first read covers, nor the same key again.
+ */
+export const isReadDue = (previousKey: string | undefined, nextKey: string): boolean => previousKey !== undefined && previousKey !== nextKey;
+
+/**
+ * A page held off by a grant's end reads its status again on the offline provider's tick (back online, or a retry
+ * due), but never on the tick it ran out at: the end's own read is timed. `expiredAt`: that tick, once known.
+ */
+export const expiredReread = (expiredAt: number | undefined, tick: number): { expiredAt: number; isDue: boolean } => {
+    if (expiredAt === undefined || expiredAt === tick) {
+        return { expiredAt: tick, isDue: false };
+    }
+
+    return { expiredAt, isDue: true };
+};
+
 /** A frame is read only for a screen that shows the page, in front, online. */
 export const shouldReadFrame = (view: ViewState, { isActive, isOffline }: { isActive: boolean; isOffline: boolean }): boolean =>
     view.kind === "ready" && isActive && !isOffline;

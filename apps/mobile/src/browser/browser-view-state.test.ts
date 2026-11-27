@@ -5,12 +5,14 @@ import {
     BROWSER_CLOSED,
     browserLinkUntil,
     CONTROLLED_BY_OTHER,
+    expiredReread,
     frameMessage,
     frameTrigger,
     GRANT_END_MARGIN_MS,
     grantEndOnDevice,
     isOlderStatus,
     isRateLimited,
+    isReadDue,
     NO_BROWSER,
     NOT_READABLE,
     otherLeaseEndOnDevice,
@@ -154,5 +156,25 @@ describe(browserLinkUntil, () => {
         expect(browserLinkUntil(running({ accessUntil: 160, now: 100 }), 5000)).toBe(5060 - GRANT_END_MARGIN_MS);
         expect(browserLinkUntil(running({ accessUntil: 100_000, now: 100 }), 5000)).toBe(5400);
         expect(browserLinkUntil({ kind: "none", now: 100 } as BrowserStatus, 5000)).toBeUndefined();
+    });
+});
+
+describe(isReadDue, () => {
+    it("asks for a read on a changed key only: not the first key after a mount, nor the same key again", () => {
+        expect(isReadDue(undefined, "b-1|500|https://example.com|0")).toBe(false);
+        expect(isReadDue("b-1|500|https://example.com|0", "b-1|500|https://example.com|0")).toBe(false);
+        expect(isReadDue("b-1|500|https://example.com|0", "b-1|600|https://example.com|0")).toBe(true);
+        expect(isReadDue("b-1|500|https://example.com|0", "b-1|500|https://example.com|1")).toBe(true);
+    });
+});
+
+describe(expiredReread, () => {
+    it("reads an expired grant again only on a tick after the one it ran out at", () => {
+        // The tick it ran out at is kept, and reads nothing: the end's own read is timed.
+        expect(expiredReread(undefined, 3)).toStrictEqual({ expiredAt: 3, isDue: false });
+        expect(expiredReread(3, 3)).toStrictEqual({ expiredAt: 3, isDue: false });
+        // Every later tick reads again, the expiry tick kept.
+        expect(expiredReread(3, 4)).toStrictEqual({ expiredAt: 3, isDue: true });
+        expect(expiredReread(3, 5)).toStrictEqual({ expiredAt: 3, isDue: true });
     });
 });

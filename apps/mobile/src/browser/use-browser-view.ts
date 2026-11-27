@@ -12,11 +12,13 @@ import type { BrowserFrame, BrowserStatus } from "./browser-api";
 import { handBackBrowser, keepBrowserControl, navigateBrowser, readBrowserStatus, readFrame, takeBrowserControl, watchBrowserStatus } from "./browser-api";
 import type { Seen, ViewState } from "./browser-view-state";
 import {
+    expiredReread,
     frameMessage,
     frameTrigger,
     GRANT_END_MARGIN_MS,
     grantEndOnDevice,
     isRateLimited,
+    isReadDue,
     otherLeaseEndOnDevice,
     shouldReadFrame,
     viewStateOf,
@@ -180,13 +182,11 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
             return undefined;
         }
 
-        if (expiredAtTick.current === undefined || expiredAtTick.current === refreshTick) {
-            expiredAtTick.current = refreshTick;
+        const next = expiredReread(expiredAtTick.current, refreshTick);
 
-            return undefined;
-        }
+        expiredAtTick.current = next.expiredAt;
 
-        return reread();
+        return next.isDue ? reread() : undefined;
     }, [isExpired, refreshTick, threadId]);
 
     const view = viewStateOf(status, error, status !== undefined && expiredAnswer === status, closedBrowserId);
@@ -244,7 +244,7 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
     const readKey = `${trigger ?? ""}|${nudge}`;
 
     useEffect(() => {
-        if (readFor.current !== undefined && readFor.current !== readKey) {
+        if (isReadDue(readFor.current, readKey)) {
             reader.current?.request();
         }
 
