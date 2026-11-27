@@ -26,6 +26,7 @@ import { botOwnerRows } from "./bot-owner";
 import { type MemoryEvidence, newestEvidence, vMemoryEvidence } from "./evidence";
 import { logRedaction, redactMemoryText } from "./redact";
 import { localDayOf } from "./reflection-logic";
+import { isUsableOn, mergeScopeWindows } from "./retrieve-ranking";
 import { lastConfirmedOf, type MemoryType, vMemoryType } from "./taxonomy";
 import { deleteVectorRow, patchMessage } from "../agent/table-writes";
 import { candidatesOnActivePath } from "../agent/branch-rows";
@@ -1292,8 +1293,7 @@ export const getActiveMemoriesForUser = internalQuery
             scopes.push(null);
         }
 
-        // A pinned fact stays past its end date: pinning is how the user keeps it.
-        const usable = (m: Doc<"memories">): boolean => today === undefined || m.pinned === true || !isExpired(m, today);
+        const usable = (m: Doc<"memories">): boolean => isUsableOn(m, today);
 
         // The active-row index, so superseded rows are never read. Paged until `limit` usable rows or the scope ends,
         // so expired rows cannot fill the window; at most `ACTIVE_READ_MAX_ROWS` rows (or one page), a bounded read.
@@ -1329,17 +1329,7 @@ export const getActiveMemoriesForUser = internalQuery
             }),
         );
 
-        // Each scope keeps up to `limit` of its own, so a busy bot cannot push the user's memories out. Merged in
-        // the order each index yields: type descending, then newest first.
-        const memories = perScope
-            .flatMap((rows) => rows.slice(0, limit))
-            .toSorted((a, b) => {
-                if (a.type !== b.type) {
-                    return a.type < b.type ? 1 : -1;
-                }
-
-                return b._creationTime - a._creationTime;
-            });
+        const memories = mergeScopeWindows(perScope, limit);
 
         return memories.map((m) => {
             return {
