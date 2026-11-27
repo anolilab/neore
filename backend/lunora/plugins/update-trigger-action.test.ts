@@ -432,7 +432,7 @@ describe("a webhook secret when a later step fails", () => {
 
     const as = () => harness.withIdentity({ userId: OWNER } as never);
 
-    it("rides on the error, since a retry plans the replaced webhook unchanged", async () => {
+    it("is not put on the error when a later step fails; the replaced webhook stays switched off", async () => {
         // The scheme change replaces the webhook (new secret); the last step, recording the new version, then fails.
         const next = await file("native", "1.1.0");
         const original = procedureAt("plugins_update_apply", "finishUpdate");
@@ -459,9 +459,11 @@ describe("a webhook secret when a later step fails", () => {
         registry.set("plugins_update_apply:finishUpdate", original);
 
         expect(failure).toBeInstanceOf(Error);
-        expect(failure.data?.webhookSecrets).toHaveLength(1);
-        expect(failure.data.webhookSecrets[0]).toMatchObject({ entryKey: "trigger:hook" });
-        expect(typeof failure.data.webhookSecrets[0].secret).toBe("string");
+        expect(JSON.stringify(failure.data ?? {})).not.toContain("webhookSecrets");
+
+        const triggers = await harness.run(async (context: any) => await context.db.query("triggers").collect());
+
+        expect(triggers.find((row: { name: string }) => row.name === "Hook")).toMatchObject({ enabled: false, type: "webhook" });
 
         const retry = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown: next.markdown } as never)) as PreviewResult;
 

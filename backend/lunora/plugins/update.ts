@@ -173,7 +173,7 @@ export const previewUpdate = authAction
  * Applies an update. Changed skills, triggers (schedule or webhook, a type change included) and group chats are rewritten in place, and
  * a skill records the new plugin version as its source; unchanged ones are left alone; an edited child is reported as skipped. A trigger
  * rewrite switches the trigger off; a webhook that a type change (or a signature scheme change) created returns its secret once in
- * `webhookSecrets`, and when a later step fails the error carries them in `data.webhookSecrets`. A group chat
+ * `webhookSecrets`; when a later step fails it is not returned, and the person rotates it (`triggers.rotateWebhookSecret`). A group chat
  * rewrite keeps its messages. New children are created (skills, triggers, then new group chats, which name the plugin's skills by
  * entry key), and removed ones deleted or detached: a dropped group chat with no messages or pins is deleted, one that has either is
  * kept and detached from the plugin (and reported as skipped), and a skill such a group still names is kept the way it is for any
@@ -553,19 +553,9 @@ export const updatePlugin = authAction
                 })
                 .catch(() => undefined);
 
-            const failure = importFailure(error);
-
-            if (webhookSecrets.length === 0) {
-                throw failure;
-            }
-
-            // A secret a finished step issued is shown once and a retry plans that trigger `same`, so it rides on the error. The existing
-            // `triggers.rotateWebhookSecret` makes a new one if the client still loses it.
-            const cause = failure instanceof LunoraError ? failure : undefined;
-
-            throw new LunoraError(cause?.code ?? "INTERNAL", cause?.message ?? (failure instanceof Error ? failure.message : "The update failed"), {
-                data: { ...(cause?.data as Record<string, unknown> | undefined), webhookSecrets },
-            });
+            // A secret issued before the failure is not sent on the error, which may be logged: the trigger it belongs to is switched
+            // off, and `triggers.rotateWebhookSecret` issues a new one.
+            throw importFailure(error);
         }
 
         return { applied, skipped, version: header.version, webhookSecrets };
