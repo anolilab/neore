@@ -5,6 +5,7 @@
 import type { Infer } from "lunorash/server";
 
 import { sha256Hex } from "../lib/crypto";
+import { FRONTMATTER_RE } from "../skills/markdown";
 import type { vPluginInstallStatus, vPluginItemKind, vPluginItemState } from "./validators";
 
 /** A holder keeps its lease this long; nothing runs past it. */
@@ -67,11 +68,9 @@ export const canonicalJson = (value: unknown): string => {
     return JSON.stringify(value);
 };
 
-/** The frontmatter block at the top of a bundle file: the header, which is not part of the hashed content. */
-const FRONTMATTER_RE = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/u;
-
 /**
- * The content hash of a plugin file: SHA-256 of its body, with the header removed and line endings normalised.
+ * The content hash of a plugin file: SHA-256 of its body, with the header removed and line endings normalised. The header is
+ * found with the bundle parser's own pattern, so every header the parser accepts is the one left out.
  * The header carries this hash, so the hash cannot cover the header. Any change to an item changes it.
  */
 export const bodyHash = async (markdown: string): Promise<string> => await sha256Hex(markdown.replaceAll(/\r\n?/gu, "\n").replace(FRONTMATTER_RE, ""));

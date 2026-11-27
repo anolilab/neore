@@ -128,6 +128,22 @@ describe("uninstall", () => {
         );
     });
 
+    it("reports a skill that something else detached after the begin step as kept", async () => {
+        const { skillId } = await installed();
+
+        const finished = await run(async (context) => {
+            const begun = await uninstallRows(context, OWNER, SLUG);
+
+            // A repair that ran meanwhile dropped it: marker and install id cleared, the skill kept.
+            await context.db.patch("skills", skillId, { pluginInstallId: "", pluginMarker: "" });
+
+            return await finishUninstallRows(context, begun.installId, begun.generation, { pendingSkills: begun.pendingSkills });
+        });
+
+        expect(finished.kept).toEqual(["Analyst"]);
+        expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).not.toBeNull();
+    });
+
     it("runs on the root shard where development collapses every user onto it", async () => {
         await installed();
         // The guard reads the Worker's own `env` (the test stub of `cloudflare:workers`), where development sets these.

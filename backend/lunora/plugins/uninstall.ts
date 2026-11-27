@@ -385,12 +385,10 @@ export const finishUninstallRows = async (
             continue;
         }
 
-        // Detached already, with the kept group that names it (`detachKeptGroup`): still reported as kept.
+        // Detached already, by the kept group that names it (`detachKeptGroup`) or by a repair that dropped it meanwhile: it stays,
+        // so it is reported as kept.
         if (skill.pluginInstallId !== installId) {
-            if (usedByKept.has(skillId)) {
-                result.kept.push(skill.name);
-            }
-
+            result.kept.push(skill.name);
             continue;
         }
 
