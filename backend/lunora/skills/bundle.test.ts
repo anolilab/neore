@@ -78,6 +78,7 @@ vi.mock("../lib/shard-routes", async (importOriginal) => {
 });
 
 const MODULES = {
+    plugins_export: async () => await import("../plugins/export"),
     agent_threads: async () => await import("../agent/threads"),
     bots_functions: async () => await import("../bots/functions"),
     chat_custom_providers: async () => await import("../chat/custom-providers"),
