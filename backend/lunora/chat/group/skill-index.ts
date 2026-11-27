@@ -12,8 +12,8 @@
  */
 import type { TriggerBuilder, TriggerCtx } from "lunorash/server";
 
-import type { Doc } from "../../_generated/dataModel";
-import type { QueryCtx } from "../../_generated/server";
+import type { Doc, Id } from "../../_generated/dataModel";
+import type { MutationCtx, QueryCtx } from "../../_generated/server";
 
 /** Most rows one thread's reconcile reads: far over a group's participant cap. */
 const ROWS_PER_THREAD = 500;
@@ -60,7 +60,7 @@ interface ThreadFields {
 const indexKey = (thread: ThreadFields | undefined): string =>
     thread?.userId === undefined ? "" : JSON.stringify([thread.userId, groupSkillIds(thread.groupChat).toSorted((a, b) => a.localeCompare(b))]);
 
-const hasIds = (thread: ThreadFields | undefined): boolean => indexKey(thread) !== "" && groupSkillIds(thread?.groupChat).length > 0;
+const hasIds = (thread: ThreadFields | undefined): boolean => thread?.userId !== undefined && groupSkillIds(thread.groupChat).length > 0;
 
 /**
  * Makes the thread's rows equal what it names now: rows for a skill it dropped (or another owner) go, a missing one is added.
@@ -135,7 +135,7 @@ export const groupSkillIndexTriggers = (t: TriggerBuilder) => {
 };
 
 /** A mutation's view of the rows, for the backfill. */
-export const mutationStore = (ctx: { db: any }): IndexStore => {
+export const mutationStore = (ctx: Pick<MutationCtx, "db">): IndexStore => {
     return {
         insert: async (row) => {
             await ctx.db.insert("groupChatSkills", row);
@@ -143,10 +143,10 @@ export const mutationStore = (ctx: { db: any }): IndexStore => {
         list: async (threadId) => {
             const { page } = await ctx.db.groupChatSkills.findMany({ limit: ROWS_PER_THREAD, where: { threadId } });
 
-            return page as StoredRow[];
+            return page as unknown as StoredRow[];
         },
         remove: async (id) => {
-            await ctx.db.delete("groupChatSkills", id);
+            await ctx.db.delete("groupChatSkills", id as Id<"groupChatSkills">);
         },
     };
 };
