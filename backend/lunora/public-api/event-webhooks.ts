@@ -180,7 +180,8 @@ export const unsubscribeOn = async (ctx: Pick<MutationCtx, "db">, userId: string
 
 /** Removes up to one batch of expired subscriptions. Each delete is its own call, in order. */
 export const reapExpiredOn = async (ctx: Pick<MutationCtx, "db">, now: number): Promise<{ hasMore: boolean; nextWakeAt?: number; removed: number }> => {
-    const { page } = await ctx.db.eventWebhookSubscriptions.findMany({ limit: REAP_BATCH, where: { expiresAt: { lt: now } } });
+    // From the primary: a replica that has not seen a refresh would show the row expired, and the reap would delete a live subscription.
+    const { page } = await ctx.db.eventWebhookSubscriptions.findMany({ consistency: "primary", limit: REAP_BATCH, where: { expiresAt: { lt: now } } });
 
     for (const row of page) {
         await ctx.db.delete("eventWebhookSubscriptions", row._id);
