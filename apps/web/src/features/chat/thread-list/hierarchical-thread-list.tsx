@@ -38,7 +38,7 @@ import useStableCallback from "./hooks/use-stable-callback";
 import useThreadGroups from "./hooks/use-thread-groups";
 import useThreadHandlers from "./hooks/use-thread-handlers";
 import useThreadListKeyboard from "./hooks/use-thread-list-keyboard";
-import { countSections, filterGroupsBySection, sameSectionCounts } from "./lib/section-filter";
+import { countSections, filterGroupsBySection, groupsToOpenOnPick, sameSectionCounts } from "./lib/section-filter";
 import { renameFocusTarget } from "./rename-focus-target";
 import RenameThreadDialog from "./rename-thread-dialog";
 import SnoozeUntilDialog from "./snooze-until-dialog";
@@ -472,6 +472,25 @@ const HierarchicalThreadList: FC<
     const isSearching = searchQuery.trim() !== "" || typedSearchQuery.trim() !== "";
     // Groups the filter shows pass through as the same objects, so the rows under them do not re-render. Drag-and-drop works on
     // `allThreadGroups`: an order built from the filtered groups would drop the hidden threads from it.
+    // Picking a section opens its group once if it was collapsed; after that its own chevron decides.
+    const previousSectionFilter = useRef(sectionFilter);
+
+    useEffect(() => {
+        const previous = previousSectionFilter.current;
+
+        previousSectionFilter.current = sectionFilter;
+
+        if (previous === sectionFilter) {
+            return;
+        }
+
+        for (const group of groupsToOpenOnPick(allThreadGroups, previous, sectionFilter)) {
+            if (group.groupType) {
+                toggleGroupCollapsed(group.groupType, group.projectId);
+            }
+        }
+    }, [allThreadGroups, sectionFilter, toggleGroupCollapsed]);
+
     const filteredGroups = useMemo(
         () => (isSearching ? allThreadGroups : filterGroupsBySection(allThreadGroups, sectionFilter, currentThreadId)),
         [allThreadGroups, currentThreadId, isSearching, sectionFilter],

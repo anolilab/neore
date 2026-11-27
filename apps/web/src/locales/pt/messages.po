@@ -2373,14 +2373,14 @@ msgstr "Sobre {0}"
 msgid "about {0} (opens in a new tab)"
 msgstr "sobre {0} (abre em uma nova aba)"
 
-#: src/features/settings/lib/settings-keywords.ts:92
+#: src/features/settings/lib/settings-keywords.ts:109
 msgid "about me"
 msgstr "sobre mim"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:224
-#: src/features/settings/lib/settings-keywords.ts:90
-#: src/features/settings/lib/settings-keywords.ts:91
-#: src/features/settings/lib/settings-keywords.ts:92
+#: src/features/settings/lib/settings-keywords.ts:107
+#: src/features/settings/lib/settings-keywords.ts:108
+#: src/features/settings/lib/settings-keywords.ts:109
 msgid "About You"
 msgstr "Sobre você"
 
@@ -2601,7 +2601,7 @@ msgstr "Adicionar um comentário"
 msgid "Add a member from your organization to <0>{0}</0>"
 msgstr "Adicione um membro da sua organização a <0>{0}</0>"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:250
+#: src/features/auth/components/organization/billing-settings-card.tsx:257
 #: src/features/auth/components/team/team-settings-dialog.tsx:191
 msgid "Add a model..."
 msgstr "Adicionar um modelo..."
@@ -2790,8 +2790,8 @@ msgid "Add picked frame as image node"
 msgstr "Adicionar o quadro escolhido como nó de imagem"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:147
-#: src/features/chat/thread-list/thread-list-dock.tsx:116
-#: src/features/chat/thread-list/thread-list-dock.tsx:126
+#: src/features/chat/thread-list/thread-list-dock.tsx:120
+#: src/features/chat/thread-list/thread-list-dock.tsx:130
 #: src/features/projects/components/add-project-dialog.tsx:691
 msgid "Add project"
 msgstr "Adicionar projeto"
@@ -3764,7 +3764,7 @@ msgstr "Permitir uma vez"
 msgid "Allow this site ({0})"
 msgstr "Permitir este site ({0})"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:221
+#: src/features/auth/components/organization/billing-settings-card.tsx:228
 #: src/features/auth/components/team/team-settings-dialog.tsx:170
 msgid "Allowed AI Models"
 msgstr "Modelos de IA permitidos"
@@ -3774,10 +3774,12 @@ msgid "Allowed for a limited time"
 msgstr "Permitido por tempo limitado"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:206
+#: src/features/settings/lib/settings-keywords.ts:98
 msgid "Allowed Providers"
 msgstr "Provedores permitidos"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:175
+#: src/features/settings/lib/settings-keywords.ts:95
 msgid "Allowed Regions"
 msgstr "Regiões permitidas"
 
@@ -3957,7 +3959,7 @@ msgstr "analítico"
 msgid "Analytical (deep structure)"
 msgstr "Analítico (estrutura profunda)"
 
-#: src/features/settings/lib/settings-keywords.ts:116
+#: src/features/settings/lib/settings-keywords.ts:137
 msgid "analytics"
 msgstr "análises"
 
@@ -4284,8 +4286,8 @@ msgstr "Aplicar estilo"
 msgid "Applying..."
 msgstr "Aplicando..."
 
-#: src/features/settings/lib/settings-keywords.ts:105
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:122
+#: src/features/settings/lib/settings-keywords.ts:123
 msgid "approval"
 msgstr "aprovação"
 
@@ -4605,7 +4607,7 @@ msgstr "Artistas que querem a qualidade estética do Krea em um modelo acessíve
 msgid "Asc"
 msgstr "Cresc."
 
-#: src/features/settings/lib/settings-keywords.ts:105
+#: src/features/settings/lib/settings-keywords.ts:122
 msgid "ask"
 msgstr "perguntar"
 
@@ -4847,7 +4849,7 @@ msgstr "Autenticação"
 msgid "Authentication Required"
 msgstr "Autenticação necessária"
 
-#: src/features/settings/lib/settings-keywords.ts:105
+#: src/features/settings/lib/settings-keywords.ts:122
 msgid "auto"
 msgstr "automático"
 
@@ -5113,7 +5115,7 @@ msgstr "Voltar às seções de configurações"
 msgid "Back to workflows"
 msgstr "Voltar aos fluxos de trabalho"
 
-#: src/features/settings/lib/settings-keywords.ts:92
+#: src/features/settings/lib/settings-keywords.ts:109
 msgid "background"
 msgstr "segundo plano"
 
@@ -5125,7 +5127,7 @@ msgstr "Cor de fundo (opcional)"
 msgid "Background Removal"
 msgstr "Remoção de fundo"
 
-#: src/features/settings/lib/settings-keywords.ts:113
+#: src/features/settings/lib/settings-keywords.ts:134
 msgid "backup"
 msgstr "backup"
 
@@ -5456,19 +5458,18 @@ msgstr "Cobrado na sua própria chave de API, não nos seus créditos."
 msgid "Billing"
 msgstr "Cobrança"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:317
+#: src/features/auth/components/organization/billing-settings-card.tsx:324
 msgid "Billing details for this organization"
 msgstr "Detalhes de cobrança desta organização"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:195
-#: src/features/auth/components/organization/billing-settings-card.tsx:201
+#: src/features/auth/components/organization/billing-settings-card.tsx:220
 msgid "Billing Email"
 msgstr "E-mail de cobrança"
 
 #: src/features/auth/components/organization/billing-settings-card.tsx:137
-#: src/features/auth/components/organization/billing-settings-card.tsx:278
-#: src/features/auth/components/organization/billing-settings-card.tsx:318
-#: src/features/auth/components/organization/billing-settings-card.tsx:341
+#: src/features/auth/components/organization/billing-settings-card.tsx:285
+#: src/features/auth/components/organization/billing-settings-card.tsx:325
+#: src/features/auth/components/organization/billing-settings-card.tsx:348
 msgid "Billing Settings"
 msgstr "Configurações de cobrança"
 
@@ -5480,7 +5481,7 @@ msgstr "Configurações de cobrança atualizadas com sucesso"
 msgid "Binary"
 msgstr "Binário"
 
-#: src/features/settings/lib/settings-keywords.ts:92
+#: src/features/settings/lib/settings-keywords.ts:109
 msgid "bio"
 msgstr "bio"
 
@@ -5511,14 +5512,17 @@ msgid "Blocked"
 msgstr "Bloqueado"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:282
+#: src/features/settings/lib/settings-keywords.ts:100
 msgid "Blocked Models"
 msgstr "Modelos bloqueados"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:226
+#: src/features/settings/lib/settings-keywords.ts:99
 msgid "Blocked Providers"
 msgstr "Provedores bloqueados"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:200
+#: src/features/settings/lib/settings-keywords.ts:96
 msgid "Blocked Regions"
 msgstr "Regiões bloqueadas"
 
@@ -5741,7 +5745,7 @@ msgstr "Traga suas próprias chaves (BYOK)"
 msgid "Broad style range from photorealism to illustration"
 msgstr "Ampla variedade de estilos, do fotorrealismo à ilustração"
 
-#: src/features/settings/lib/settings-keywords.ts:86
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "browse"
 msgstr "navegar"
 
@@ -5833,6 +5837,7 @@ msgid "Budget alert deleted"
 msgstr "Alerta de orçamento excluído"
 
 #: src/features/settings/components/chat/usage-settings.tsx:410
+#: src/features/settings/lib/settings-keywords.ts:129
 msgid "Budget Alerts"
 msgstr "Alertas de orçamento"
 
@@ -5882,7 +5887,7 @@ msgstr "Raciocínio integrado antes de gerar"
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:369
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:370
-#: src/features/settings/lib/settings-keywords.ts:105
+#: src/features/settings/lib/settings-keywords.ts:122
 msgid "Built-in tools"
 msgstr "Ferramentas integradas"
 
@@ -6055,7 +6060,7 @@ msgstr "Taxa de acerto do cache"
 msgid "Cached input"
 msgstr "Entrada em cache"
 
-#: src/features/settings/lib/settings-keywords.ts:90
+#: src/features/settings/lib/settings-keywords.ts:107
 msgid "call me"
 msgstr "me chame de"
 
@@ -6376,7 +6381,7 @@ msgstr "Catalão"
 msgid "Catalan (Spain)"
 msgstr "Catalão (Espanha)"
 
-#: src/features/settings/lib/settings-keywords.ts:86
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "catalog"
 msgstr "catálogo"
 
@@ -6647,7 +6652,7 @@ msgstr "Tamanho do texto do chat"
 msgid "Chat text size updated"
 msgstr "Tamanho do texto do chat atualizado"
 
-#: src/features/settings/lib/settings-keywords.ts:98
+#: src/features/settings/lib/settings-keywords.ts:115
 msgid "chat titles"
 msgstr "títulos dos chats"
 
@@ -6663,7 +6668,7 @@ msgstr "Converse com a IA por um bot de app personalizado do Feishu ou Lark, em 
 msgid "Chat, create, <0>and build.</0>"
 msgstr "Converse, crie <0>e construa.</0>"
 
-#: src/features/settings/lib/settings-keywords.ts:114
+#: src/features/settings/lib/settings-keywords.ts:135
 msgid "chatgpt"
 msgstr "chatgpt"
 
@@ -7044,7 +7049,7 @@ msgstr "Oferta circulante"
 msgid "city"
 msgstr "cidade"
 
-#: src/features/settings/lib/settings-keywords.ts:114
+#: src/features/settings/lib/settings-keywords.ts:135
 msgid "claude"
 msgstr "claude"
 
@@ -7420,7 +7425,7 @@ msgstr "Navegação de código"
 msgid "Code output"
 msgstr "Saída do código"
 
-#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:119
 msgid "code review"
 msgstr "revisão de código"
 
@@ -8074,7 +8079,7 @@ msgid "Configure team settings"
 msgstr "Configurar a equipe"
 
 #: src/features/auth/components/organization/billing-settings-card.tsx:136
-#: src/features/auth/components/organization/billing-settings-card.tsx:276
+#: src/features/auth/components/organization/billing-settings-card.tsx:283
 msgid "Configure the billing contact and available AI models"
 msgstr "Configure o contato de cobrança e os modelos de IA disponíveis"
 
@@ -8415,7 +8420,7 @@ msgstr "Conector desconectado. Revogue o acesso nas configurações do provedor 
 msgid "Connector: {0}"
 msgstr "Conector: {0}"
 
-#: src/features/settings/lib/settings-keywords.ts:86
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "connectors"
 msgstr "conectores"
 
@@ -8431,7 +8436,7 @@ msgid "Connectors talk to each provider's own MCP server over OAuth 2.0. Your to
 msgstr "Os conectores se comunicam com o próprio servidor MCP de cada provedor via OAuth 2.0. Seus tokens são armazenados criptografados, a IA pergunta antes de usar uma ferramenta que pode alterar dados, e desconectar revoga o acesso."
 
 #: src/features/settings/components/privacy/consent-preferences.tsx:17
-#: src/features/settings/lib/settings-keywords.ts:116
+#: src/features/settings/lib/settings-keywords.ts:137
 msgid "Consent Preferences"
 msgstr "Preferências de consentimento"
 
@@ -8758,7 +8763,7 @@ msgstr "Converter para TypeScript"
 msgid "Converting..."
 msgstr "Convertendo..."
 
-#: src/features/settings/lib/settings-keywords.ts:116
+#: src/features/settings/lib/settings-keywords.ts:137
 msgid "cookies"
 msgstr "cookies"
 
@@ -8963,6 +8968,7 @@ msgid "Cost {display}"
 msgstr "Custo {display}"
 
 #: src/features/settings/components/chat/usage-settings.tsx:308
+#: src/features/settings/lib/settings-keywords.ts:127
 msgid "Cost by Model"
 msgstr "Custo por modelo"
 
@@ -9298,7 +9304,7 @@ msgstr "Não foi possível carregar a origem desta memória."
 msgid "Could not load your activity."
 msgstr "Não foi possível carregar sua atividade."
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:323
+#: src/features/auth/components/organization/billing-settings-card.tsx:330
 msgid "Could not load your organization's billing details. Try again later."
 msgstr "Não foi possível carregar os detalhes de cobrança da sua organização. Tente novamente mais tarde."
 
@@ -9977,7 +9983,7 @@ msgid "Credits"
 msgstr "Créditos"
 
 #: src/features/auth/components/organization/billing-settings-card.tsx:190
-#: src/features/auth/components/organization/billing-settings-card.tsx:346
+#: src/features/auth/components/organization/billing-settings-card.tsx:353
 msgid "Credits per user:"
 msgstr "Créditos por usuário:"
 
@@ -10076,7 +10082,7 @@ msgid "Current Prompt Variables"
 msgstr "Variáveis do prompt atual"
 
 #: src/features/auth/components/organization/billing-settings-card.tsx:187
-#: src/features/auth/components/organization/billing-settings-card.tsx:345
+#: src/features/auth/components/organization/billing-settings-card.tsx:352
 msgid "Current tier:"
 msgstr "Plano atual:"
 
@@ -10119,7 +10125,7 @@ msgstr "Endpoints personalizados"
 msgid "Custom Endpoints"
 msgstr "Endpoints personalizados"
 
-#: src/features/settings/lib/settings-keywords.ts:94
+#: src/features/settings/lib/settings-keywords.ts:111
 msgid "custom instructions"
 msgstr "instruções personalizadas"
 
@@ -10129,7 +10135,7 @@ msgstr "Instruções personalizadas"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:317
 #: src/features/settings/components/personalization/personalization-settings.tsx:331
-#: src/features/settings/lib/settings-keywords.ts:96
+#: src/features/settings/lib/settings-keywords.ts:113
 msgid "Custom Instructions"
 msgstr "Instruções personalizadas"
 
@@ -10262,6 +10268,7 @@ msgid "Daily cost (microdollars)"
 msgstr "Custo diário (microdólares)"
 
 #: src/features/settings/components/chat/usage-settings.tsx:352
+#: src/features/settings/lib/settings-keywords.ts:128
 msgid "Daily Cost Trend"
 msgstr "Tendência de custo diário"
 
@@ -10315,12 +10322,12 @@ msgid "Data & Analysis"
 msgstr "Dados e análise"
 
 #: src/features/settings/components/privacy/data-access.tsx:21
-#: src/features/settings/lib/settings-keywords.ts:115
+#: src/features/settings/lib/settings-keywords.ts:136
 msgid "Data Access Summary"
 msgstr "Resumo de acesso aos dados"
 
 #: src/features/settings/components/privacy/data-export.tsx:99
-#: src/features/settings/lib/settings-keywords.ts:113
+#: src/features/settings/lib/settings-keywords.ts:134
 msgid "Data Export"
 msgstr "Exportação de dados"
 
@@ -10655,7 +10662,7 @@ msgstr "Graus"
 msgid "Delayed"
 msgstr "Atrasado"
 
-#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:119
 msgid "delegate"
 msgstr "delegar"
 
@@ -10748,8 +10755,8 @@ msgstr "Excluir {name}"
 msgid "Delete {title}"
 msgstr "Excluir {title}"
 
-#: src/features/auth/components/settings/account/delete-account-card.tsx:62
-#: src/features/auth/components/settings/account/delete-account-card.tsx:75
+#: src/features/auth/components/settings/account/delete-account-card.tsx:63
+#: src/features/auth/components/settings/account/delete-account-card.tsx:76
 #: src/features/auth/components/settings/account/delete-account-dialog.tsx:98
 #: src/features/auth/components/settings/account/delete-account-dialog.tsx:153
 msgid "Delete Account"
@@ -10861,7 +10868,7 @@ msgstr "Excluir predefinição"
 msgid "Delete preset?"
 msgstr "Excluir predefinição?"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1194
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1213
 msgid "Delete Project"
 msgstr "Excluir projeto"
 
@@ -11083,6 +11090,7 @@ msgstr "Negar {tool}"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:356
 #: src/features/settings/components/chat/model-filter-settings.tsx:368
+#: src/features/settings/lib/settings-keywords.ts:103
 msgid "Deny Data Collection"
 msgstr "Negar coleta de dados"
 
@@ -11357,6 +11365,7 @@ msgid "Development"
 msgstr "Desenvolvimento"
 
 #: src/features/devices/components/devices-settings.tsx:712
+#: src/features/settings/lib/settings-keywords.ts:89
 msgid "Device activity"
 msgstr "Atividade dos dispositivos"
 
@@ -11725,7 +11734,7 @@ msgstr "Clique duas vezes para renomear"
 msgid "down"
 msgstr "para baixo"
 
-#: src/features/settings/lib/settings-keywords.ts:113
+#: src/features/settings/lib/settings-keywords.ts:134
 msgid "download"
 msgstr "baixar"
 
@@ -12941,7 +12950,7 @@ msgstr "Informe uma região da AWS válida, ex.: us-east-1"
 msgid "Enter an API version such as v1 or 2024-10-21"
 msgstr "Informe uma versão de API como v1 ou 2024-10-21"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:206
+#: src/features/auth/components/organization/billing-settings-card.tsx:209
 msgid "Enter billing email"
 msgstr "Digite o e-mail de cobrança"
 
@@ -14122,7 +14131,7 @@ msgstr "Falha ao excluir a chave de acesso"
 msgid "Failed to delete preset"
 msgstr "Falha ao excluir a predefinição"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:553
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:572
 msgid "Failed to delete project"
 msgstr "Falha ao excluir o projeto"
 
@@ -14320,7 +14329,7 @@ msgstr "Falha ao tornar a conversa permanente"
 msgid "Failed to move file"
 msgstr "Falha ao mover o arquivo"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:838
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:857
 #: src/features/projects/components/move-to-project-dialog.tsx:38
 msgid "Failed to move thread"
 msgstr "Falha ao mover a conversa"
@@ -15070,7 +15079,7 @@ msgid "Favicon"
 msgstr "Favicon"
 
 #: src/features/settings/components/chat/favorite-models-settings.tsx:121
-#: src/features/settings/lib/settings-keywords.ts:88
+#: src/features/settings/lib/settings-keywords.ts:105
 msgid "Favorite models"
 msgstr "Modelos favoritos"
 
@@ -15700,7 +15709,7 @@ msgstr "Para este modelo"
 msgid "Forest"
 msgstr "Floresta"
 
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:116
 msgid "forget"
 msgstr "esquecer"
 
@@ -16143,8 +16152,8 @@ msgstr "Seções do gateway"
 msgid "Gaussian Blur"
 msgstr "Desfoque gaussiano"
 
-#: src/features/settings/lib/settings-keywords.ts:113
-#: src/features/settings/lib/settings-keywords.ts:115
+#: src/features/settings/lib/settings-keywords.ts:134
+#: src/features/settings/lib/settings-keywords.ts:136
 msgid "gdpr"
 msgstr "gdpr"
 
@@ -16152,7 +16161,7 @@ msgstr "gdpr"
 msgid "GDPR Requests:"
 msgstr "Solicitações do RGPD:"
 
-#: src/features/settings/lib/settings-keywords.ts:114
+#: src/features/settings/lib/settings-keywords.ts:135
 msgid "gemini"
 msgstr "gemini"
 
@@ -17238,6 +17247,7 @@ msgid "Hidden characters were removed from your message."
 msgstr "Caracteres ocultos foram removidos da sua mensagem."
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:251
+#: src/features/settings/lib/settings-keywords.ts:101
 msgid "Hidden in Model Picker"
 msgstr "Oculto no seletor de modelos"
 
@@ -17611,7 +17621,7 @@ msgid "How often the agent retries with the verifier's feedback before asking yo
 msgstr "Quantas vezes o agente tenta novamente com o feedback do verificador antes de pedir sua revisão."
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:352
-#: src/features/settings/lib/settings-keywords.ts:98
+#: src/features/settings/lib/settings-keywords.ts:115
 msgid "How should titles be written?"
 msgstr "Como os títulos devem ser escritos?"
 
@@ -17624,11 +17634,12 @@ msgid "How to merge"
 msgstr "Como mesclar"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:1050
+#: src/features/settings/lib/settings-keywords.ts:125
 msgid "How Triggers Work"
 msgstr "Como os gatilhos funcionam"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:327
-#: src/features/settings/lib/settings-keywords.ts:95
+#: src/features/settings/lib/settings-keywords.ts:112
 msgid "How would you like the AI to respond?"
 msgstr "Como você quer que a IA responda?"
 
@@ -18057,7 +18068,7 @@ msgid "Import complete!"
 msgstr "Importação concluída!"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:333
-#: src/features/settings/lib/settings-keywords.ts:114
+#: src/features/settings/lib/settings-keywords.ts:135
 msgid "Import Conversations"
 msgstr "Importar conversas"
 
@@ -18523,7 +18534,7 @@ msgstr "Post do Instagram"
 msgid "Instagram Story"
 msgstr "Story do Instagram"
 
-#: src/features/settings/lib/settings-keywords.ts:86
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "install"
 msgstr "instalar"
 
@@ -18562,7 +18573,7 @@ msgstr "instruct"
 msgid "Instruction files"
 msgstr "Arquivos de instruções"
 
-#: src/features/settings/lib/settings-keywords.ts:103
+#: src/features/settings/lib/settings-keywords.ts:120
 msgid "instructions"
 msgstr "instruções"
 
@@ -18600,7 +18611,7 @@ msgstr "Instruções para a IA..."
 msgid "Instructions must be {INSTRUCTIONS_MAX} characters or less"
 msgstr "As instruções devem ter no máximo {INSTRUCTIONS_MAX} caracteres"
 
-#: src/features/settings/lib/settings-keywords.ts:86
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "integrations"
 msgstr "integrações"
 
@@ -18655,7 +18666,7 @@ msgstr "As respostas interrompidas vão parar"
 msgid "Intimate, street photography"
 msgstr "Intimista, fotografia de rua"
 
-#: src/features/settings/lib/settings-keywords.ts:100
+#: src/features/settings/lib/settings-keywords.ts:117
 msgid "intro"
 msgstr "introdução"
 
@@ -18973,7 +18984,7 @@ msgstr "Javanês"
 msgid "Javanese (Indonesia)"
 msgstr "Javanês (Indonésia)"
 
-#: src/features/settings/lib/settings-keywords.ts:91
+#: src/features/settings/lib/settings-keywords.ts:108
 msgid "job"
 msgstr "tarefa"
 
@@ -19745,7 +19756,7 @@ msgstr "Da esquerda para a direita (LTR)"
 msgid "Left: this version. Right: the page now."
 msgstr "Esquerda: esta versão. Direita: a página atual."
 
-#: src/features/settings/lib/settings-keywords.ts:117
+#: src/features/settings/lib/settings-keywords.ts:138
 msgid "legal"
 msgstr "jurídico"
 
@@ -20349,7 +20360,7 @@ msgstr "Carregando esta verificação…"
 msgid "Loading threads"
 msgstr "Carregando conversas"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:944
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:963
 msgid "Loading threads..."
 msgstr "Carregando conversas..."
 
@@ -21117,7 +21128,7 @@ msgid "MCP"
 msgstr "MCP"
 
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:160
-#: src/features/settings/lib/settings-keywords.ts:86
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "MCP Registry"
 msgstr "MCP Registry"
 
@@ -21164,7 +21175,7 @@ msgstr "Servidores MCP"
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:386
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:387
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:123
 msgid "MCP tools"
 msgstr "Ferramentas MCP"
 
@@ -21288,7 +21299,7 @@ msgstr "Membros de {organizationName} podem anexar esta coleção e a IA pode ci
 msgid "Members of your active organization can use it."
 msgstr "Os membros da sua organização ativa podem usá-la."
 
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:116
 msgid "memories"
 msgstr "memórias"
 
@@ -21312,7 +21323,7 @@ msgstr "Memórias usadas nesta resposta ({0})"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
 #: src/features/settings/components/personalization/memory-settings.tsx:165
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:116
 msgid "Memory"
 msgstr "Memória"
 
@@ -21544,6 +21555,7 @@ msgid "Messenger Bots"
 msgstr "Bots de mensageiros"
 
 #: src/features/settings/connectors/messenger/messenger-page.tsx:99
+#: src/features/settings/lib/settings-keywords.ts:132
 msgid "Messenger Integration"
 msgstr "Integração com mensageiros"
 
@@ -21599,7 +21611,7 @@ msgstr "Acesso ao microfone negado. Permita o acesso ao microfone nas configura�
 msgid "Microsoft App ID of your Azure Bot"
 msgstr "Microsoft App ID do seu Azure Bot"
 
-#: src/features/settings/lib/settings-keywords.ts:114
+#: src/features/settings/lib/settings-keywords.ts:135
 msgid "migrate"
 msgstr "migrar"
 
@@ -21877,7 +21889,7 @@ msgstr "Filtro de modelo"
 msgid "Model info"
 msgstr "Informações do modelo"
 
-#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:119
 msgid "Model per kind of work"
 msgstr "Modelo por tipo de trabalho"
 
@@ -22073,7 +22085,7 @@ msgstr "Mais"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:299
 #: src/features/settings/components/personalization/personalization-settings.tsx:303
-#: src/features/settings/lib/settings-keywords.ts:92
+#: src/features/settings/lib/settings-keywords.ts:109
 msgid "More About You"
 msgstr "Mais sobre você"
 
@@ -22381,7 +22393,7 @@ msgstr "Silenciar"
 msgid "Mute thread"
 msgstr "Silenciar conversa"
 
-#: src/features/settings/lib/settings-keywords.ts:113
+#: src/features/settings/lib/settings-keywords.ts:134
 msgid "my data"
 msgstr "meus dados"
 
@@ -22420,7 +22432,7 @@ msgid "n/a"
 msgstr "n/d"
 
 #: src/features/settings/lib/settings-keywords.ts:26
-#: src/features/settings/lib/settings-keywords.ts:90
+#: src/features/settings/lib/settings-keywords.ts:107
 msgid "name"
 msgstr "nome"
 
@@ -22488,7 +22500,7 @@ msgstr "Nome da tag {0}"
 msgid "Name:"
 msgstr "Nome:"
 
-#: src/features/settings/lib/settings-keywords.ts:98
+#: src/features/settings/lib/settings-keywords.ts:115
 msgid "naming"
 msgstr "nomeação"
 
@@ -22823,6 +22835,7 @@ msgid "New Azure Bots are single-tenant: set the Teams Tenant ID key, or replies
 msgstr "Novos Azure Bots são single-tenant: defina a chave Tenant ID do Teams, senão as respostas não conseguem se autenticar."
 
 #: src/features/settings/components/chat/bots-settings.tsx:376
+#: src/features/settings/lib/settings-keywords.ts:84
 msgid "New bot"
 msgstr "Novo bot"
 
@@ -22995,8 +23008,8 @@ msgid "New thread"
 msgstr "Nova conversa"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:150
-#: src/features/chat/thread-list/thread-list-dock.tsx:132
-#: src/features/chat/thread-list/thread-list-dock.tsx:142
+#: src/features/chat/thread-list/thread-list-dock.tsx:136
+#: src/features/chat/thread-list/thread-list-dock.tsx:146
 msgid "New Thread"
 msgstr "Nova conversa"
 
@@ -23143,7 +23156,7 @@ msgstr "Nicarágua"
 
 #: src/features/settings/components/chat/favorite-models-settings.tsx:56
 #: src/features/settings/components/personalization/personalization-settings.tsx:272
-#: src/features/settings/lib/settings-keywords.ts:90
+#: src/features/settings/lib/settings-keywords.ts:107
 msgid "Nickname"
 msgstr "Apelido"
 
@@ -23480,7 +23493,7 @@ msgstr "Nenhuma memória ainda. A IA vai começar a aprender com suas conversas 
 msgid "No message of yours is loaded in this conversation"
 msgstr "Nenhuma mensagem sua está carregada nesta conversa"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:992
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1011
 msgid "No messages found for"
 msgstr "Nenhuma mensagem encontrada para"
 
@@ -23790,7 +23803,7 @@ msgstr "Nenhum texto para mostrar."
 msgid "No thread has worked on this {requestNoun} yet."
 msgstr "Nenhuma conversa trabalhou neste {requestNoun} ainda."
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:992
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1011
 msgid "No threads found for"
 msgstr "Nenhuma conversa encontrada para"
 
@@ -23798,16 +23811,16 @@ msgstr "Nenhuma conversa encontrada para"
 msgid "No threads in this group"
 msgstr "Nenhuma conversa neste grupo"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:958
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:977
 msgid "No threads in this section"
 msgstr "Nenhuma conversa nesta seção"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:607
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:626
 msgid "No threads were active in that date range."
 msgstr "Nenhuma conversa esteve ativa nesse intervalo de datas."
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:263
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:969
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:988
 msgid "No threads yet"
 msgstr "Nenhuma conversa ainda"
 
@@ -24221,11 +24234,11 @@ msgstr "Editor de objetos"
 msgid "Object Prompt"
 msgstr "Prompt do objeto"
 
-#: src/features/settings/lib/settings-keywords.ts:91
+#: src/features/settings/lib/settings-keywords.ts:108
 msgid "occupation"
 msgstr "ocupação"
 
-#: src/features/settings/lib/settings-keywords.ts:105
+#: src/features/settings/lib/settings-keywords.ts:122
 msgid "off"
 msgstr "desativado"
 
@@ -24379,7 +24392,7 @@ msgid "On-premise option"
 msgstr "Opção on-premise"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:389
-#: src/features/settings/lib/settings-keywords.ts:100
+#: src/features/settings/lib/settings-keywords.ts:117
 msgid "Onboarding"
 msgstr "Introdução"
 
@@ -24538,7 +24551,7 @@ msgstr "Só em uma execução"
 msgid "Only listed tools"
 msgstr "Apenas as ferramentas listadas"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:340
+#: src/features/auth/components/organization/billing-settings-card.tsx:347
 msgid "Only organization owners can manage billing settings"
 msgstr "Somente proprietários da organização podem gerenciar as configurações de cobrança"
 
@@ -26217,7 +26230,7 @@ msgstr "Access token permanente (System User) para a WhatsApp Cloud API"
 msgid "Permanently delete this organization and all its data"
 msgstr "Excluir permanentemente esta organização e todos os dados dela"
 
-#: src/features/auth/components/settings/account/delete-account-card.tsx:69
+#: src/features/auth/components/settings/account/delete-account-card.tsx:70
 msgid "Permanently delete your account and all associated data"
 msgstr "Excluir permanentemente sua conta e todos os dados associados"
 
@@ -26245,8 +26258,8 @@ msgstr "Modo de permissão: {0}"
 msgid "Permission requests from the agent"
 msgstr "Solicitações de permissão do agente"
 
-#: src/features/settings/lib/settings-keywords.ts:105
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:122
+#: src/features/settings/lib/settings-keywords.ts:123
 msgid "permissions"
 msgstr "permissões"
 
@@ -26262,7 +26275,7 @@ msgstr "Persa"
 msgid "Persian (Iran)"
 msgstr "Persa (Irã)"
 
-#: src/features/settings/lib/settings-keywords.ts:103
+#: src/features/settings/lib/settings-keywords.ts:120
 msgid "persona"
 msgstr "persona"
 
@@ -26379,7 +26392,7 @@ msgstr "Escolhido em (s)"
 msgid "Picked frame wire (remove it)"
 msgstr "Conexão do quadro escolhido (remover)"
 
-#: src/features/settings/lib/settings-keywords.ts:88
+#: src/features/settings/lib/settings-keywords.ts:105
 msgid "picker"
 msgstr "seletor"
 
@@ -26453,7 +26466,7 @@ msgstr "Fixar à direita"
 msgid "Pink"
 msgstr "Rosa"
 
-#: src/features/settings/lib/settings-keywords.ts:88
+#: src/features/settings/lib/settings-keywords.ts:105
 msgid "pinned"
 msgstr "fixado"
 
@@ -26907,9 +26920,9 @@ msgstr "Predefinição atualizada"
 msgid "Presets"
 msgstr "Predefinições"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:971
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:984
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1010
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:990
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1003
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1029
 msgid "Press ? for keyboard shortcuts"
 msgstr "Pressione ? para ver os atalhos de teclado"
 
@@ -27137,6 +27150,8 @@ msgstr "privacidade"
 #: src/features/settings/components/account/account-settings.tsx:165
 #: src/features/settings/components/chat/model-filter-settings.tsx:334
 #: src/features/settings/lib/settings-keywords.ts:26
+#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:103
 #: src/features/settings/lib/settings-navigation.ts:146
 msgid "Privacy"
 msgstr "Privacidade"
@@ -27147,7 +27162,7 @@ msgid "Privacy & Data"
 msgstr "Privacidade e dados"
 
 #: src/features/settings/components/privacy/privacy-policy.tsx:16
-#: src/features/settings/lib/settings-keywords.ts:117
+#: src/features/settings/lib/settings-keywords.ts:138
 msgid "Privacy Policy"
 msgstr "Política de privacidade"
 
@@ -27269,7 +27284,7 @@ msgid "Productivity"
 msgstr "Produtividade"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:294
-#: src/features/settings/lib/settings-keywords.ts:91
+#: src/features/settings/lib/settings-keywords.ts:108
 msgid "Profession"
 msgstr "Profissão"
 
@@ -27346,7 +27361,7 @@ msgstr "Precisão de edição de nível profissional"
 msgid "Professionals who need versatile, high-quality image creation from descriptive text prompts"
 msgstr "Profissionais que precisam de criação de imagens versátil e de alta qualidade a partir de prompts descritivos"
 
-#: src/features/settings/lib/settings-keywords.ts:115
+#: src/features/settings/lib/settings-keywords.ts:136
 msgid "profile"
 msgstr "perfil"
 
@@ -27430,7 +27445,7 @@ msgstr "Projetos em que este dispositivo é oferecido"
 msgid "Promote to Admin"
 msgstr "Promover a admin"
 
-#: src/features/settings/lib/settings-keywords.ts:103
+#: src/features/settings/lib/settings-keywords.ts:120
 msgid "prompt"
 msgstr "prompt"
 
@@ -27628,6 +27643,9 @@ msgid "Provider removed"
 msgstr "Provedor removido"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:205
+#: src/features/settings/lib/settings-keywords.ts:97
+#: src/features/settings/lib/settings-keywords.ts:98
+#: src/features/settings/lib/settings-keywords.ts:99
 msgid "Provider Restrictions"
 msgstr "Restrições de provedores"
 
@@ -28598,6 +28616,9 @@ msgid "region"
 msgstr "região"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:150
+#: src/features/settings/lib/settings-keywords.ts:94
+#: src/features/settings/lib/settings-keywords.ts:95
+#: src/features/settings/lib/settings-keywords.ts:96
 msgid "Region Restrictions"
 msgstr "Restrições de região"
 
@@ -28746,7 +28767,7 @@ msgstr "Recarregar pré-visualização"
 msgid "Reload their version"
 msgstr "Recarregar a versão da outra pessoa"
 
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:116
 msgid "remember"
 msgstr "lembrar"
 
@@ -28809,7 +28830,7 @@ msgstr "Remover {fileName}"
 msgid "Remove {label}"
 msgstr "Remover {label}"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:229
+#: src/features/auth/components/organization/billing-settings-card.tsx:236
 #: src/features/auth/components/team/team-settings-dialog.tsx:177
 msgid "Remove {model}"
 msgstr "Remover {model}"
@@ -29786,7 +29807,7 @@ msgstr "Função atualizada"
 msgid "Role Updates"
 msgstr "Atualizações de função"
 
-#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:119
 msgid "roles"
 msgstr "funções"
 
@@ -30165,7 +30186,7 @@ msgstr "Arábia Saudita"
 #: ../../packages/ui/src/components/inline-edit.tsx:119
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:118
 #: src/features/auth/components/organization/billing-settings-card.tsx:133
-#: src/features/auth/components/organization/billing-settings-card.tsx:273
+#: src/features/auth/components/organization/billing-settings-card.tsx:280
 #: src/features/auth/components/organization/organization-name-card.tsx:100
 #: src/features/auth/components/organization/organization-name-card.tsx:155
 #: src/features/auth/components/organization/organization-slug-card.tsx:105
@@ -30491,7 +30512,7 @@ msgstr "pesquisar"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:241
 #: src/features/chat/signed-out/signed-out-chat.tsx:141
-#: src/features/chat/thread-list/thread-list-dock.tsx:91
+#: src/features/chat/thread-list/thread-list-dock.tsx:95
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:93
 msgid "Search"
 msgstr "Pesquisar"
@@ -30539,7 +30560,7 @@ msgstr "Pesquisar dados..."
 msgid "Search depth: {0}"
 msgstr "Profundidade da pesquisa: {0}"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:983
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1002
 msgid "Search failed for \"{searchQuery}\". Try again."
 msgstr "A pesquisa por \"{searchQuery}\" falhou. Tentar novamente."
 
@@ -30784,7 +30805,7 @@ msgstr "Pesquisou apenas as mensagens mais recentes"
 msgid "Searching"
 msgstr "Pesquisando"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1000
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1019
 msgid "Searching..."
 msgstr "Pesquisando..."
 
@@ -31071,7 +31092,7 @@ msgstr "Selecionar até a última coluna"
 msgid "Select to top of table"
 msgstr "Selecionar até o topo da tabela"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:220
+#: src/features/auth/components/organization/billing-settings-card.tsx:227
 msgid "Select which AI models organization members can use. Leave empty for enterprise to allow all models."
 msgstr "Selecione quais modelos de IA os membros da organização podem usar. Deixe em branco no plano Enterprise para permitir todos os modelos."
 
@@ -31397,11 +31418,12 @@ msgstr "Server-Sent Events (SSE)"
 msgid "Serverless Postgres database with branching"
 msgstr "Banco de dados Postgres serverless com branching"
 
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:123
 msgid "servers"
 msgstr "servidores"
 
 #: src/features/devices/components/devices-settings.tsx:705
+#: src/features/settings/lib/settings-keywords.ts:88
 msgid "Servers over SSH"
 msgstr "Servidores via SSH"
 
@@ -32918,7 +32940,7 @@ msgstr "Estrela"
 msgid "Star a model in the model picker and it shows up here."
 msgstr "Favorite um modelo no seletor de modelos e ele aparece aqui."
 
-#: src/features/settings/lib/settings-keywords.ts:88
+#: src/features/settings/lib/settings-keywords.ts:105
 msgid "starred"
 msgstr "favoritos"
 
@@ -32979,7 +33001,7 @@ msgstr "Inicie um novo chat para começar"
 msgid "Start a new context: earlier messages are no longer sent to the model"
 msgstr "Iniciar um novo contexto: as mensagens anteriores deixam de ser enviadas ao modelo"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:970
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:989
 msgid "Start a new conversation to create your first thread"
 msgstr "Envie uma mensagem para criar sua primeira conversa"
 
@@ -33691,7 +33713,7 @@ msgstr "Forte raciocínio e compreensão visual"
 msgid "Strongest reasoning in the GLM family"
 msgstr "O raciocínio mais forte da família GLM"
 
-#: src/features/settings/lib/settings-keywords.ts:94
+#: src/features/settings/lib/settings-keywords.ts:111
 #: src/features/workflow/templates/index.ts:217
 msgid "style"
 msgstr "estilo"
@@ -33752,7 +33774,7 @@ msgstr "Resultado estilizado"
 msgid "stylized animation"
 msgstr "animação estilizada"
 
-#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:119
 msgid "sub-agent"
 msgstr "subagente"
 
@@ -34101,7 +34123,7 @@ msgstr "Padrão do sistema"
 msgid "System message:"
 msgstr "Mensagem do sistema:"
 
-#: src/features/settings/lib/settings-keywords.ts:94
+#: src/features/settings/lib/settings-keywords.ts:111
 msgid "system prompt"
 msgstr "prompt do sistema"
 
@@ -34121,7 +34143,7 @@ msgid "System prompt applied"
 msgstr "Prompt de sistema aplicado"
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:275
-#: src/features/settings/lib/settings-keywords.ts:103
+#: src/features/settings/lib/settings-keywords.ts:120
 msgid "System Prompt Presets"
 msgstr "Predefinições de prompt de sistema"
 
@@ -34540,7 +34562,7 @@ msgstr "Modo temporário ativado"
 msgid "Temporary mode enabled ({0})"
 msgstr "Modo temporário ativado ({0})"
 
-#: src/features/settings/lib/settings-keywords.ts:117
+#: src/features/settings/lib/settings-keywords.ts:138
 msgid "terms"
 msgstr "termos"
 
@@ -35478,7 +35500,7 @@ msgstr "O prompt melhorado vai aparecer aqui..."
 msgid "The keys you have set now."
 msgstr "As teclas que você definiu agora."
 
-#: src/features/auth/components/settings/account/delete-account-card.tsx:71
+#: src/features/auth/components/settings/account/delete-account-card.tsx:72
 msgid "The last deletion request failed. You can request it again."
 msgstr "A última solicitação de exclusão falhou. Você pode solicitar novamente."
 
@@ -36801,7 +36823,7 @@ msgstr "Isso vai excluir permanentemente {0} contas de usuários anônimos e tod
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "Isso vai excluir permanentemente todas as {0} memórias e os resumos diários delas. A IA vai recomeçar a aprender a partir da sua próxima conversa."
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1184
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1203
 msgid "This will permanently delete the project and all associated threads. This action cannot be undone."
 msgstr "Isso vai excluir permanentemente o projeto e todas as conversas associadas. Essa ação não pode ser desfeita."
 
@@ -36927,12 +36949,12 @@ msgstr "Estatísticas da conversa"
 msgid "Thread summary"
 msgstr "Resumo da conversa"
 
-#: src/features/settings/lib/settings-keywords.ts:98
+#: src/features/settings/lib/settings-keywords.ts:115
 msgid "thread titles"
 msgstr "títulos das conversas"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:347
-#: src/features/settings/lib/settings-keywords.ts:98
+#: src/features/settings/lib/settings-keywords.ts:115
 msgid "Thread Titles"
 msgstr "Títulos das conversas"
 
@@ -37201,7 +37223,7 @@ msgstr "Os tokens usados no seu próprio endpoint não são cobrados em crédito
 msgid "Tokyo"
 msgstr "Tóquio"
 
-#: src/features/settings/lib/settings-keywords.ts:94
+#: src/features/settings/lib/settings-keywords.ts:111
 msgid "tone"
 msgstr "tom"
 
@@ -37421,7 +37443,7 @@ msgstr "Acompanhe cada token e cada dólar."
 msgid "Track your LLM token usage, cost, and set budget alerts"
 msgstr "Acompanhe o uso de tokens de LLM e o custo, e configure alertas de orçamento"
 
-#: src/features/settings/lib/settings-keywords.ts:116
+#: src/features/settings/lib/settings-keywords.ts:137
 msgid "tracking"
 msgstr "rastreamento"
 
@@ -37711,11 +37733,11 @@ msgstr "Experimente o Neore"
 msgid "Try searching for a different term."
 msgstr "Tente pesquisar outro termo."
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1006
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1025
 msgid "Try searching in message content"
 msgstr "Tente pesquisar no conteúdo das mensagens"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1006
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1025
 msgid "Try searching in thread titles or summaries"
 msgstr "Tente pesquisar nos títulos ou resumos das conversas"
 
@@ -37775,7 +37797,7 @@ msgstr "Ative a memória para importar um arquivo."
 msgid "Turns these tools off:"
 msgstr "Desativa estas ferramentas:"
 
-#: src/features/settings/lib/settings-keywords.ts:100
+#: src/features/settings/lib/settings-keywords.ts:117
 msgid "tutorial"
 msgstr "tutorial"
 
@@ -38454,7 +38476,7 @@ msgstr "Fazer upgrade para o Pro"
 msgid "Upgrade to Pro, monthly"
 msgstr "Atualizar para Pro, mensal"
 
-#: src/features/settings/lib/settings-keywords.ts:114
+#: src/features/settings/lib/settings-keywords.ts:135
 msgid "upload"
 msgstr "enviar arquivo"
 
@@ -39953,7 +39975,7 @@ msgstr "Que bom ver você de novo"
 msgid "Welcome to Neore"
 msgstr "Boas-vindas ao Neore"
 
-#: src/features/settings/lib/settings-keywords.ts:100
+#: src/features/settings/lib/settings-keywords.ts:117
 msgid "welcome tour"
 msgstr "tour de boas-vindas"
 
@@ -40096,7 +40118,7 @@ msgstr "O que monitorar"
 msgid "What users sent from the app, newest first"
 msgstr "O que os usuários enviaram pelo app, os mais recentes primeiro"
 
-#: src/features/settings/lib/settings-keywords.ts:115
+#: src/features/settings/lib/settings-keywords.ts:136
 msgid "what we store"
 msgstr "o que armazenamos"
 
@@ -40322,7 +40344,7 @@ msgstr "Sem uma, seu agente SSH e suas chaves padrão são usados. Senhas ainda 
 msgid "Wix developer docs, Velo code assistance, and site management"
 msgstr "Documentação para desenvolvedores Wix, assistência com código Velo e gerenciamento de sites"
 
-#: src/features/settings/lib/settings-keywords.ts:91
+#: src/features/settings/lib/settings-keywords.ts:108
 msgid "work"
 msgstr "trabalho"
 
@@ -40893,7 +40915,7 @@ msgstr "Seu acesso a este chat terminou."
 msgid "Your account already has the maximum number of API keys, so the command line was not signed in. Revoke one in Settings, then run `neore login --device` again."
 msgstr "Sua conta já tem o número máximo de chaves de API, então a linha de comando não foi conectada. Revogue uma nas Configurações e execute `neore login --device` novamente."
 
-#: src/features/auth/components/settings/account/delete-account-card.tsx:68
+#: src/features/auth/components/settings/account/delete-account-card.tsx:69
 msgid "Your account and all associated data are being deleted. This cannot be cancelled."
 msgstr "Sua conta e todos os dados associados estão sendo excluídos. Isso não pode ser cancelado."
 
@@ -40936,6 +40958,7 @@ msgid "Your backup models were changed in another tab. The saved list is shown a
 msgstr "Seus modelos de reserva foram alterados em outra aba. A lista salva é exibida novamente."
 
 #: src/features/settings/components/chat/bots-settings.tsx:461
+#: src/features/settings/lib/settings-keywords.ts:85
 msgid "Your bots"
 msgstr "Seus bots"
 
@@ -41346,6 +41369,7 @@ msgstr "O modelo carro-chefe da Z.AI com visão aprimorada"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:339
 #: src/features/settings/components/chat/model-filter-settings.tsx:351
+#: src/features/settings/lib/settings-keywords.ts:102
 msgid "Zero Data Retention (ZDR)"
 msgstr "Retenção zero de dados (ZDR)"
 

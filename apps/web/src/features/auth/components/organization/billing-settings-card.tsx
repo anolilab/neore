@@ -13,13 +13,12 @@ import { Skeleton } from "@neore/ui/components/skeleton";
 import cn from "@neore/ui/utils/cn";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useId, useState } from "react";
 import * as z from "zod";
 
 import type { SettingsCardProperties } from "@/components/settings/settings-card";
 import SettingsCard from "@/components/settings/settings-card";
 import SettingsRow from "@/components/settings/settings-row";
-import SettingsFieldRow from "@/features/auth/components/settings/settings-field-row";
 import { useActiveOrganization } from "@/features/auth/hooks/organization-management";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import useBillingOptions from "@/features/billing/hooks/use-billing-options";
@@ -51,6 +50,7 @@ interface BillingSettingsEditorProperties extends SettingsCardProperties {
 const BillingSettingsEditor = ({ billingInfo, className, classNames, ...properties }: BillingSettingsEditorProperties) => {
     const { toast } = useAuth();
     const { t } = useLingui();
+    const billingEmailId = useId();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
 
@@ -192,26 +192,33 @@ const BillingSettingsEditor = ({ billingInfo, className, classNames, ...properti
                     {/* Billing Email */}
                     <form.AppField name="billingEmail">
                         {(field) => (
-                            <SettingsFieldRow title={t`Billing Email`}>
-                                <field.FormItem>
-                                    {/* `render` puts the id on the input itself; the default wrapper <div> would leave the label pointing at a non-control. */}
-                                    <field.FormControl
-                                        render={
-                                            <Input
-                                                aria-label={t`Billing Email`}
-                                                className={classNames?.input}
-                                                disabled={isSubmitting}
-                                                onBlur={field.handleBlur}
-                                                onChange={(e) => field.handleChange(e.target.value)}
-                                                placeholder={t`Enter billing email`}
-                                                type="email"
-                                                value={field.state.value}
+                            // A titled row under the card's own heading; its title labels the input, so the settings search can focus it.
+                            <SettingsRow
+                                control={
+                                    <div className="w-full @lg/settings-row:w-72">
+                                        <field.FormItem>
+                                            {/* `render` puts the id on the input itself; the default wrapper <div> would leave the label pointing at a non-control. */}
+                                            <field.FormControl
+                                                id={billingEmailId}
+                                                render={
+                                                    <Input
+                                                        className={classNames?.input}
+                                                        disabled={isSubmitting}
+                                                        onBlur={field.handleBlur}
+                                                        onChange={(e) => field.handleChange(e.target.value)}
+                                                        placeholder={t`Enter billing email`}
+                                                        type="email"
+                                                        value={field.state.value}
+                                                    />
+                                                }
                                             />
-                                        }
-                                    />
-                                    <field.FormMessage className={classNames?.error} />
-                                </field.FormItem>
-                            </SettingsFieldRow>
+                                            <field.FormMessage className={classNames?.error} />
+                                        </field.FormItem>
+                                    </div>
+                                }
+                                htmlFor={billingEmailId}
+                                title={t`Billing Email`}
+                            />
                         )}
                     </form.AppField>
 

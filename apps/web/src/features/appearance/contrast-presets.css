@@ -37,7 +37,7 @@
     --surface-well-shadow: inset 0 0 0 1px #595959;
     --surface-edge: #595959;
     --surface-edge-top: transparent;
-    --surface-drop: none;
+    --surface-drop: 0 0 #0000; /* no drop, but still a shadow, so the edge list that ends in it stays valid */
     --surface-glow: none;
     --attention: #6b3d00;
     --sidebar: #ffffff;
@@ -76,7 +76,7 @@
     --surface-well-shadow: inset 0 0 0 1px #a6a6a6;
     --surface-edge: #a6a6a6;
     --surface-edge-top: transparent;
-    --surface-drop: none;
+    --surface-drop: 0 0 #0000; /* no drop, but still a shadow, so the edge list that ends in it stays valid */
     --surface-glow: none;
     --attention: #ffc766;
     --sidebar: #000000;

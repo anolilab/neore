@@ -37,7 +37,7 @@ import type { NavItem } from "@/features/layout/components/nav-items";
 import NavItems from "@/features/layout/components/nav-items";
 import SiteHeader from "@/features/layout/components/site-header";
 import { breadcrumbLabel, DASHBOARD_PAGE_NAMES } from "@/features/layout/lib/dashboard-page-names";
-import { settingsLocation, settingsTabForPath } from "@/features/settings/lib/settings-link";
+import { adminPathFor, settingsLocation, settingsTabForPath } from "@/features/settings/lib/settings-link";
 import { requireSession } from "@/lib/auth/route-guard";
 
 /** The page names, as descriptors: this runs outside a component, so the caller translates them (`i18n._`). */
@@ -261,7 +261,17 @@ export const Route = createFileRoute("/dashboard")({
         const settingsTab = settingsTabForPath(location.pathname);
 
         if (settingsTab) {
-            throw redirect(settingsLocation(settingsTab, location.hash || undefined));
+            // The router's hash may carry its "#"; the modal looks the anchor up as an element id.
+            const anchor = location.hash.startsWith("#") ? location.hash.slice(1) : location.hash;
+
+            throw redirect(settingsLocation(settingsTab, anchor || undefined));
+        }
+
+        // Admin moved to its own pages.
+        const adminPath = adminPathFor(location.pathname);
+
+        if (adminPath) {
+            throw redirect({ href: adminPath });
         }
     },
     component: RouteComponent,

@@ -24,6 +24,11 @@ const TAB_BY_SETTINGS_PATH: Readonly<Record<string, SettingsTab>> = {
     "chat/models": "chat-models",
     "chat/triggers": "chat-triggers",
     "chat/usage": "chat-usage",
+    // Paths the LLM gateway's error actions link to.
+    "api-keys": "chat-api-keys",
+    "billing/limits": "auth-billing",
+    "chat/model": "chat-models",
+    "compliance/model-filters": "chat-model-filters",
     connectors: "connectors",
     "connectors/messenger": "connectors-messenger",
     privacy: "privacy",
@@ -33,6 +38,19 @@ const TAB_BY_SETTINGS_PATH: Readonly<Record<string, SettingsTab>> = {
 const PAGE_PATHS = ["connectors/callback", "admin"];
 
 const DEFAULT_TAB: SettingsTab = "app-customization";
+
+/** The /admin page an old admin settings path stands for (`/dashboard/settings/admin/users` → `/admin/users`), or `undefined`. */
+export const adminPathFor = (pathname: string): string | undefined => {
+    const prefix = `${SETTINGS_PATH_PREFIX}/admin`;
+
+    if (pathname !== prefix && !pathname.startsWith(`${prefix}/`)) {
+        return undefined;
+    }
+
+    const rest = pathname.slice(prefix.length);
+
+    return rest === "" || rest === "/" ? "/admin" : `/admin${rest}`;
+};
 
 /**
  * The modal tab an old settings path stands for, or `undefined` for a path that is not a settings page. An unknown
@@ -69,7 +87,12 @@ export interface SettingsSearch {
 export const settingsLinkSearch =
     (tab: SettingsTab, anchor?: string) =>
     (previous: Record<string, unknown>): Record<string, unknown> & SettingsSearch => {
-        return { ...previous, settings: true, settingsTab: tab, ...(anchor && { settingsAnchor: anchor }) };
+        // An anchor from an earlier settings link must not carry over to this one.
+        const next: Record<string, unknown> = { ...previous, settings: true, settingsTab: tab };
+
+        delete next.settingsAnchor;
+
+        return { ...next, ...(anchor && { settingsAnchor: anchor }) } as Record<string, unknown> & SettingsSearch;
     };
 
 /**

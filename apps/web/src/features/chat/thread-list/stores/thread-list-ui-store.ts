@@ -133,6 +133,9 @@ const resolveSetStateAction = <T>(action: SetStateAction<T>, currentValue: T): T
     typeof action === "function" ? (action as (previous: T) => T)(currentValue) : action;
 
 /** The saved section filter lives in this browser; a browser that refuses storage just starts from the default each time. */
+/** Set once the saved section choice has been read back (`onRehydrateStorage`). */
+const sectionFilterHydration = { done: false };
+
 const sectionFilterStorage = {
     getItem: (name: string): string | null => {
         try {
@@ -149,6 +152,12 @@ const sectionFilterStorage = {
         }
     },
     setItem: (name: string, value: string): void => {
+        // Every set() writes, and the list publishes its counts before the section bar has read the saved choice back: a write
+        // before that would replace the saved choice with the default.
+        if (!sectionFilterHydration.done) {
+            return;
+        }
+
         try {
             localStorage.setItem(name, value);
         } catch {
@@ -202,7 +211,8 @@ const initialiseState: StateCreator<ThreadListUIStore> = (set) => {
         setSearchQuery: (query) => set({ searchQuery: query }),
         setSearchType: (type) => set({ searchType: type }),
         setSectionCounts: (counts) => set({ sectionCounts: counts }),
-        setSectionFilter: (filter) => set({ sectionFilter: sanitizeSectionFilter(filter) }),
+        // A selection made in one section would otherwise stay selected, unseen, in the next one, and bulk delete acts on all of it.
+        setSectionFilter: (filter) => set({ sectionFilter: sanitizeSectionFilter(filter), selectedThreadIds: new Set() }),
 
         setSelectedCategory: (category) => set({ selectedCategory: category }),
         setSelectedTagIds: (tagIds) => set({ selectedTagIds: tagIds }),
@@ -247,6 +257,9 @@ const persistedState = persist(subscribeWithSelector(initialiseState), {
         return { ...current, sectionFilter: sanitizeSectionFilter((persisted as { sectionFilter?: unknown } | undefined)?.sectionFilter) };
     },
     name: "thread-list-sections",
+    onRehydrateStorage: () => () => {
+        sectionFilterHydration.done = true;
+    },
     partialize: (state) => {
         return { sectionFilter: state.sectionFilter };
     },

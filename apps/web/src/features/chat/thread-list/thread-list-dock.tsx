@@ -69,7 +69,11 @@ const ThreadListDock: FC<ThreadListDockProperties> = memo(({ isSearchLoading = f
                     {showSearch ? (
                         <SearchBar
                             isSearchLoading={isSearchLoading}
-                            onClose={toggleShowSearch}
+                            onClose={() => {
+                                // A closed search filters nothing: the query goes too, or the section bar stays hidden behind it.
+                                setSearchQuery("");
+                                toggleShowSearch();
+                            }}
                             onSearchQueryChange={setSearchQuery}
                             searchQuery={searchQuery}
                             searchType={searchType}
