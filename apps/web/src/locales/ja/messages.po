@@ -693,7 +693,7 @@ msgid "{0} lines"
 msgstr "{0} 行"
 
 #. placeholder {0}: stats.total
-#: src/features/settings/components/personalization/memory-settings.tsx:186
+#: src/features/settings/components/personalization/memory-settings.tsx:189
 msgid "{0} memories"
 msgstr "{0} 件のメモリ"
 
@@ -783,7 +783,7 @@ msgid "{0} on {1}, in {2}"
 msgstr "{2} の {1} 上の {0}"
 
 #. placeholder {0}: stats.pinned
-#: src/features/settings/components/personalization/memory-settings.tsx:187
+#: src/features/settings/components/personalization/memory-settings.tsx:190
 msgid "{0} pinned"
 msgstr "ピン留め {0} 件"
 
@@ -1023,6 +1023,10 @@ msgstr "{days} 日"
 #: src/features/settings/components/chat/api-keys-settings.tsx:290
 msgid "{days}d ago"
 msgstr "{days} 日前"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:360
+msgid "{done} of {total} entries processed"
+msgstr "{total} 件中 {done} 件を処理しました"
 
 #: src/features/chat/thread/host-activity.tsx:70
 msgid "{done} of {total} task done"
@@ -3511,7 +3515,7 @@ msgid "All"
 msgstr "すべて"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:208
+#: src/features/settings/components/personalization/memory-settings.tsx:211
 msgid "All ({0})"
 msgstr "すべて（{0}）"
 
@@ -6163,7 +6167,7 @@ msgstr "カナダ"
 #: src/features/settings/components/chat/usage-settings.tsx:581
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:416
 #: src/features/settings/components/personalization/memory-item.tsx:351
-#: src/features/settings/components/personalization/memory-settings.tsx:257
+#: src/features/settings/components/personalization/memory-settings.tsx:260
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
@@ -6190,6 +6194,10 @@ msgstr "ディープワークをキャンセル"
 #: src/features/settings/components/privacy/data-export.tsx:112
 msgid "Cancel Export"
 msgstr "エクスポートをキャンセル"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:434
+msgid "Cancel import"
+msgstr "インポートをキャンセル"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:409
 msgid "Cancel Import"
@@ -6807,6 +6815,14 @@ msgstr "中国語（繁体字）"
 msgid "Choose .md or .zip"
 msgstr ".md または .zip を選択"
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:378
+msgid "Choose a .txt file with one memory per line, or a .json file with a list of memories. The file can be up to {maxSize}."
+msgstr "1 行に 1 件のメモリを書いた .txt ファイル、またはメモリの一覧を入れた .json ファイルを選んでください。ファイルは {maxSize} まで使えます。"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:273
+msgid "Choose a .txt or .json file."
+msgstr ".txt または .json ファイルを選んでください。"
+
 #: src/features/settings/components/chat/default-models-settings.tsx:465
 msgid "Choose a model"
 msgstr "モデルを選択"
@@ -7064,11 +7080,11 @@ msgstr "すべてクリア"
 msgid "Clear All"
 msgstr "すべてクリア"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:247
+#: src/features/settings/components/personalization/memory-settings.tsx:250
 msgid "Clear All Memories"
 msgstr "すべてのメモリを消去"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:251
+#: src/features/settings/components/personalization/memory-settings.tsx:254
 msgid "Clear all memories?"
 msgstr "すべてのメモリを消去しますか？"
 
@@ -7119,7 +7135,7 @@ msgstr "タグフィルターをクリア"
 msgid "Clear the queue"
 msgstr "キューをクリア"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:137
+#: src/features/settings/components/personalization/memory-settings.tsx:138
 msgid "Cleared {count} memories"
 msgstr "{count} 件のメモリを消去しました"
 
@@ -8998,6 +9014,10 @@ msgstr "チャットを添付できませんでした"
 msgid "could not be saved"
 msgstr "保存できませんでした"
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:351
+msgid "Could not cancel the import."
+msgstr "インポートをキャンセルできませんでした。"
+
 #: src/features/chat/thread/composer-prompt-queue.tsx:469
 msgid "Could not cancel the message. It is still queued."
 msgstr "メッセージをキャンセルできませんでした。まだキューに入っています。"
@@ -9147,6 +9167,10 @@ msgstr "ワークフローをエクスポートできませんでした"
 #: src/features/skills/components/skill-generate-panel.tsx:62
 msgid "Could not generate a draft. Try again."
 msgstr "下書きを生成できませんでした。もう一度お試しください。"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:318
+msgid "Could not import the file."
+msgstr "ファイルをインポートできませんでした。"
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:82
 msgid "Could not import the workflow"
@@ -9309,6 +9333,14 @@ msgstr "そのチャットを読み込めませんでした"
 #: src/features/chat/thread/composer-input.tsx:1974
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "そのチャットを読み込めませんでした。ロックされている場合は、先にロックを解除してください。"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:306
+msgid "Could not read the file."
+msgstr "ファイルを読み込めませんでした。"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:369
+msgid "Could not read the import's progress."
+msgstr "インポートの進行状況を読み込めませんでした。"
 
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:101
 msgid "Could not read the pasted list"
@@ -10693,7 +10725,7 @@ msgstr "アカウントを削除"
 msgid "Delete alert \"{ruleName}\""
 msgstr "アラート「{ruleName}」を削除"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:258
+#: src/features/settings/components/personalization/memory-settings.tsx:261
 msgid "Delete All"
 msgstr "すべて削除"
 
@@ -12648,7 +12680,7 @@ msgstr "フォローアップの提案を有効化"
 msgid "Enable for Next Chat"
 msgstr "次のチャットで有効化"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:171
+#: src/features/settings/components/personalization/memory-settings.tsx:172
 msgid "Enable memory"
 msgstr "メモリを有効化"
 
@@ -13946,7 +13978,7 @@ msgstr "タグの色を変更できませんでした"
 msgid "Failed to clear filter rules"
 msgstr "フィルタールールをクリアできませんでした"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:133
+#: src/features/settings/components/personalization/memory-settings.tsx:134
 msgid "Failed to clear memories"
 msgstr "メモリを消去できませんでした"
 
@@ -14039,7 +14071,7 @@ msgstr "ファイルを削除できませんでした。もう一度お試しく
 msgid "Failed to delete files"
 msgstr "ファイルを削除できませんでした"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:105
+#: src/features/settings/components/personalization/memory-settings.tsx:106
 msgid "Failed to delete memory"
 msgstr "メモリを削除できませんでした"
 
@@ -14560,8 +14592,8 @@ msgstr "キーボードショートカットを更新できませんでした"
 msgid "Failed to update MCP server"
 msgstr "MCP サーバーを更新できませんでした"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:116
-#: src/features/settings/components/personalization/memory-settings.tsx:124
+#: src/features/settings/components/personalization/memory-settings.tsx:117
+#: src/features/settings/components/personalization/memory-settings.tsx:125
 msgid "Failed to update memory"
 msgstr "メモリを更新できませんでした"
 
@@ -14589,7 +14621,7 @@ msgstr "プルリクエストの設定を更新できませんでした"
 msgid "Failed to update reply tools"
 msgstr "返信ツールを更新できませんでした"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:148
+#: src/features/settings/components/personalization/memory-settings.tsx:149
 msgid "Failed to update setting"
 msgstr "設定を更新できませんでした"
 
@@ -15139,6 +15171,10 @@ msgstr "ファイルサイズが {maxSize} を超えています"
 msgid "File size too large. Maximum 5MB allowed."
 msgstr "ファイルサイズが大きすぎます。最大 5MB までです。"
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:382
+msgid "File to import"
+msgstr "インポートするファイル"
+
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:859
 msgid "File Too Large to Preview"
 msgstr "ファイルが大きすぎてプレビューできません"
@@ -15283,7 +15319,7 @@ msgstr "種類で絞り込み"
 msgid "Filter condition"
 msgstr "フィルター条件"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:194
+#: src/features/settings/components/personalization/memory-settings.tsx:197
 msgid "Filter memories by type"
 msgstr "種類でメモリを絞り込み"
 
@@ -17995,9 +18031,17 @@ msgstr "ChatGPT、Google Gemini、Claude、Neore のデータエクスポート�
 msgid "Import failed"
 msgstr "インポートに失敗しました"
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:395
+msgid "Import file"
+msgstr "ファイルをインポート"
+
 #: src/features/projects/components/project-rule-files.tsx:968
 msgid "Import files"
 msgstr "ファイルをインポート"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:420
+msgid "Import finished."
+msgstr "インポートが完了しました。"
 
 #: src/features/projects/components/repo-rule-file-import.tsx:216
 #: src/features/projects/components/repo-rule-file-import.tsx:378
@@ -18008,6 +18052,10 @@ msgstr "リポジトリからインポート"
 #: src/features/projects/components/computer-rule-file-import.tsx:643
 msgid "Import from this computer"
 msgstr "このコンピューターからインポート"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:375
+msgid "Import memories from a file"
+msgstr "ファイルからメモリをインポート"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:423
 msgid "Import More"
@@ -18020,6 +18068,14 @@ msgstr "Notion のエクスポートをインポート（.zip）"
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:222
 msgid "Import one kind of export at a time."
 msgstr "一度にインポートできるのは 1 種類のエクスポートだけです。"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:426
+msgid "Import progress"
+msgstr "インポートの進行状況"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:412
+msgid "Import result"
+msgstr "インポート結果"
 
 #: src/features/projects/components/project-rule-files.tsx:978
 msgid "Import rule folder"
@@ -18067,6 +18123,10 @@ msgstr "Notion のページを {added} 件インポートしました。添付�
 msgid "Imported {added} Notion page(s)."
 msgstr "Notion のページを {added} 件インポートしました。"
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:367
+msgid "Imported {imported} · Updated {updated} · Duplicates {duplicates} · Too long {tooLong} · Invalid {invalid}"
+msgstr "インポート済み {imported} · 更新 {updated} · 重複 {duplicates} · 長すぎる {tooLong} · 無効 {invalid}"
+
 #. placeholder {0}: skill.slug
 #: src/features/skills/components/bundle-import-dialog.tsx:129
 msgid "Imported as /{0}."
@@ -18085,6 +18145,10 @@ msgstr "スキル「{0}」をインポートしました"
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:396
 msgid "Importing from {0}..."
 msgstr "{0} からインポートしています..."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:419
+msgid "Importing memories…"
+msgstr "メモリをインポートしています…"
 
 #: src/features/marketing/components/gateway-footer.tsx:20
 #: src/features/marketing/components/gateway-footer.tsx:148
@@ -21191,7 +21255,7 @@ msgid "memories"
 msgstr "メモリ"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/settings/components/personalization/memory-settings.tsx:220
+#: src/features/settings/components/personalization/memory-settings.tsx:223
 msgid "Memories"
 msgstr "メモリ"
 
@@ -21209,7 +21273,7 @@ msgid "Memories used for this reply ({0})"
 msgstr "この返信で使用したメモリ（{0}）"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
-#: src/features/settings/components/personalization/memory-settings.tsx:164
+#: src/features/settings/components/personalization/memory-settings.tsx:165
 #: src/features/settings/lib/settings-keywords.ts:96
 msgid "Memory"
 msgstr "メモリ"
@@ -21218,17 +21282,25 @@ msgstr "メモリ"
 msgid "Memory — what the agent keeps across chats"
 msgstr "メモリ — エージェントがチャットをまたいで保持する内容"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:109
+#: src/features/settings/components/personalization/memory-settings.tsx:110
 msgid "Memory deleted"
 msgstr "メモリを削除しました"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:146
+#: src/features/settings/components/personalization/memory-settings.tsx:147
 msgid "Memory disabled"
 msgstr "メモリを無効にしました"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:146
+#: src/features/settings/components/personalization/memory-settings.tsx:147
 msgid "Memory enabled"
 msgstr "メモリを有効にしました"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:234
+msgid "Memory import finished"
+msgstr "メモリのインポートが完了しました"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:234
+msgid "Memory import stopped"
+msgstr "メモリのインポートが停止しました"
 
 #: src/features/marketing/use-cases/use-case-data.ts:115
 msgid "Memory in Neore: the agent keeps useful facts about you across chats, you can review and edit them in settings, and it is off until you turn it on."
@@ -23354,11 +23426,11 @@ msgstr "MCP サーバーが設定されていません。サーバーを追加�
 msgid "No members in this team yet"
 msgstr "このチームにはまだメンバーがいません"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:236
+#: src/features/settings/components/personalization/memory-settings.tsx:239
 msgid "No memories of this type."
 msgstr "この種類のメモリはありません。"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:237
+#: src/features/settings/components/personalization/memory-settings.tsx:240
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "メモリはまだありません。AI は会話から自動的に学習を始めます。"
 
@@ -30513,6 +30585,7 @@ msgstr "公開スキルを検索…"
 msgid "Search Reddit posts"
 msgstr "Reddit の投稿を検索"
 
+#: src/components/settings/settings-search.tsx:158
 #: src/features/pages/components/pages-sidebar.tsx:169
 msgid "Search results"
 msgstr "検索結果"
@@ -34867,7 +34940,7 @@ msgstr "エージェントのプラン"
 msgid "The agent's tool calls"
 msgstr "エージェントのツール呼び出し"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:163
+#: src/features/settings/components/personalization/memory-settings.tsx:164
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 msgstr "AI は会話から学習して応答をパーソナライズし、毎晩学んだことを振り返ります。記憶している内容はすべてここに表示され、編集、種類の変更、ピン留め、削除ができます。"
 
@@ -35136,6 +35209,10 @@ msgstr "拡張機能は {0} としてチャットを読み取り・送信でき�
 msgid "The file is larger than {0} KB, which is more than a bundle can be."
 msgstr "ファイルが {0} KB を超えており、バンドルの上限を超えています。"
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:266
+msgid "The file is larger than {maxSize}. Choose a smaller file."
+msgstr "ファイルが {maxSize} を超えています。より小さいファイルを選んでください。"
+
 #: src/features/skills/components/skill-import-dialog.tsx:91
 msgid "The file is larger than {megabytes} MB."
 msgstr "ファイルが {megabytes} MB を超えています。"
@@ -35292,6 +35369,10 @@ msgstr "ホストのソフトウェアが古くなっています"
 #: ../../packages/ui/src/components/icon-picker.tsx:452
 msgid "The icons could not be loaded."
 msgstr "アイコンを読み込めませんでした。"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:368
+msgid "The import stopped before it finished."
+msgstr "インポートは完了する前に停止しました。"
 
 #: src/features/canvas/canvas-panel.tsx:648
 msgid "The imported file appears to be empty."
@@ -36624,7 +36705,7 @@ msgid "This will permanently delete {0} anonymous user accounts and all their da
 msgstr "{0} 件の匿名ユーザーアカウントとそのすべてのデータが完全に削除されます。この操作は元に戻せません。"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:253
+#: src/features/settings/components/personalization/memory-settings.tsx:256
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "{0} 件のメモリとその日次ダイジェストがすべて完全に削除されます。AI は次の会話から改めて学習を始めます。"
 
@@ -37486,6 +37567,7 @@ msgstr "検索キーワードを変えてみてください。"
 #: src/features/projects/components/project-repositories.tsx:297
 #: src/features/projects/components/repo-rule-file-import.tsx:183
 #: src/features/settings/components/chat/default-models-settings.tsx:455
+#: src/features/settings/components/personalization/memory-file-import.tsx:445
 #: src/features/tasks/components/task-form-dialog.tsx:459
 #: src/features/vault/components/site-logins.tsx:480
 #: src/features/vault/components/site-logins.tsx:612
@@ -37584,6 +37666,10 @@ msgstr "自動マージをオフにしますか？"
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:195
 msgid "Turn on memory"
 msgstr "メモリをオンにする"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:400
+msgid "Turn on memory to import a file."
+msgstr "ファイルをインポートするには、メモリをオンにしてください。"
 
 #: src/features/skills/components/bundle-import-dialog.tsx:122
 msgid "Turns these tools off:"

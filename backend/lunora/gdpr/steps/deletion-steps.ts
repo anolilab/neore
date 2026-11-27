@@ -13,7 +13,13 @@ import {
     eraseThreadPasscodesForUser,
     eraseThreadSuggestionsAndInvites,
 } from "../../agent/gdpr";
-import { eraseSharedPinRoutesBatch, eraseThreadPinsAndTagsBatch, erasePersistentStreamsForUser, erasePresentationsForUser } from "../../chat/gdpr";
+import {
+    eraseSharedPinRoutesBatch,
+    eraseThreadPinsAndTagsBatch,
+    erasePersistentStreamsForUser,
+    erasePresentationsForUser,
+    materializePendingPinRoutesBatch,
+} from "../../chat/gdpr";
 import { deleteFollowRowsOfUserBatch } from "../../chat/follows/functions";
 import { eraseVaultForUser } from "../../vault/gdpr";
 import { erasePromptsForUser } from "../../prompts/gdpr";
@@ -84,6 +90,12 @@ export const deleteUserSharedPinRoutes = internalMutation
     .input({ userId: v.string() })
     .output(vBatchResult)
     .mutation(async ({ args: { userId }, ctx: context }) => await eraseSharedPinRoutesBatch(context, userId));
+
+/** One batch of the owed route restores that name the user, made into routes before the second owner-shard sweep (`chat/gdpr.ts`). */
+export const materializePendingPinRoutes = internalMutation
+    .input({ userId: v.string() })
+    .output(vBatchResult)
+    .mutation(async ({ args: { userId }, ctx: context }) => await materializePendingPinRoutesBatch(context, userId));
 
 /** One batch of the user's follow rows on any thread (`chat/follows/functions.ts`); drained by the workflow. */
 export const deleteUserFollowRows = internalMutation

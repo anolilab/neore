@@ -24,6 +24,7 @@ import { gdprLogger } from "../../lib/logger";
 import { ROOT_SHARD_KEY } from "../../lib/shard-context";
 import { onUserShard } from "../../lib/workflow-shard";
 import { stepDedupId } from "./dedup-id";
+import { SWEEP_ROUTES_PER_STEP, SWEEP_STEP_MS, type SweepResume } from "../owner-sweep";
 import { DELETION_CONFIRMATION_CLAIM_TTL_MS, DELETION_CONFIRMATION_EMAIL_SCOPE, POSTHOG_FAILED_MESSAGE } from "../constants";
 
 export interface DeletionParams {
@@ -220,30 +221,56 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             await context.step.sleep(`pin-writes-wait-${String(round)}`, "1 minute");
         }
 
-        // One pass over every page of owner shards: a step per page, so no step result carries every owner. Returns the owners of all pages.
+        // One pass over every page of owner shards. Each durable step covers up to `SWEEP_ROUTES_PER_STEP` routes, swept by repeated
+        // budgeted actions (`erasePinsOnOwnerShards`, one page each), so the step count stays under the workflow's cap and no step result
+        // carries more owners than one group holds. Returns the owners of all groups.
         const sweepOwnerShards = async (label: string): Promise<string[]> => {
             const owners: string[] = [];
             let cursor: string | null = null;
+            let resume: SweepResume | null = null;
+            let hasMore = true;
+            let group = 0;
 
-            for (let round = 0; ; round += 1) {
-                const page = (await context.step.do(
-                    `${label}-${String(round)}`,
-                    async () =>
-                        await context.run(
+            while (hasMore) {
+                const groupLabel = `${label}-${String(group)}`;
+                const result = (await context.step.do(groupLabel, async () => {
+                    const groupOwners: string[] = [];
+                    const startedAt = Date.now();
+                    let groupCursor: string | null = cursor;
+                    let groupResume: SweepResume | null = resume;
+                    let groupHasMore = true;
+                    let routes = 0;
+                    let round = 0;
+
+                    // A group ends when it has covered its routes, or its time, whichever comes first: it then returns the cursor and resume
+                    // point it stopped at, and the next group carries on from there.
+                    while (groupHasMore && routes < SWEEP_ROUTES_PER_STEP && Date.now() - startedAt < SWEEP_STEP_MS) {
+                        const page = (await context.run(
                             internal.gdpr.steps.erasePinsOnOwnerShards,
-                            { cursor, userId: args.userId },
-                            { dedupId: stepDedupId(scope, label, round) },
-                        ),
-                )) as { cursor: string | null; hasMore: boolean; owners: string[] };
+                            { cursor: groupCursor, resume: groupResume, userId: args.userId },
+                            { dedupId: stepDedupId(scope, groupLabel, round) },
+                        )) as { cursor: string | null; hasMore: boolean; owners: string[]; resume: SweepResume | null; routes: number };
 
-                owners.push(...page.owners);
+                        groupOwners.push(...page.owners);
+                        routes += page.routes;
+                        groupCursor = page.cursor;
+                        groupResume = page.resume ?? null;
+                        groupHasMore = page.hasMore;
+                        round += 1;
+                    }
 
-                if (!page.hasMore) {
-                    return owners;
-                }
+                    return { cursor: groupCursor, hasMore: groupHasMore, owners: [...new Set(groupOwners)], resume: groupResume };
+                })) as Partial<{ cursor: string | null; hasMore: boolean; owners: string[]; resume: SweepResume | null }> | null | undefined;
 
-                cursor = page.cursor;
+                // A group a previous build cached has no `resume`: it is read as none, so the next action is passed `null`, never `undefined`.
+                owners.push(...(result?.owners ?? []));
+                cursor = result?.cursor ?? null;
+                resume = result?.resume ?? null;
+                hasMore = result?.hasMore === true;
+                group += 1;
             }
+
+            return owners;
         };
 
         // The pins this user made on other owners' threads are removed from those owners' shards first: their routes are the only way to find them.
@@ -255,6 +282,18 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         // assumption (not a guarantee).
         await context.step.sleep("erase-pins-grace", "2 minutes");
 
+        // The owed restores of refused writes become routes before the second sweep: the cron pass may not have run them yet, and a pin their
+        // route leads to must be found here. Each is written before the sweep fences its owner shard, so the sweep reads it.
+        await drain(
+            "materialize-pending-pin-routes",
+            async (round) =>
+                await context.run(
+                    internal.gdpr.steps.deletion_steps.materializePendingPinRoutes,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "materialize-pending-pin-routes", round) },
+                ),
+        );
+
         const secondOwners = await sweepOwnerShards("erase-pins-on-owner-shards-again");
 
         // The owner shards are lifted now, from every owner both passes fenced, and before the routes go: the owners live only in those
@@ -262,7 +301,8 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         // refused, because the erasing marker stays live until the erasure ends and every write checks it before its insert
         // (`lib/account-moves.ts`). Batches keep each call's input small.
         const owners = [...new Set([...firstOwners, ...secondOwners])];
-        const releaseBatch = 200;
+        // Each owner is one shard call, so a batch stays within the action's call budget (`SWEEP_CALL_BUDGET`).
+        const releaseBatch = 30;
 
         for (let batch = 0; batch * releaseBatch < owners.length; batch += 1) {
             await context.step.do(
@@ -922,6 +962,18 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     internal.lib.account_moves.endAccountMoveFor,
                     { kind: "erasing", userId: args.userId },
                     { dedupId: stepDedupId(scope, "end-account-erasure") },
+                ),
+        );
+
+        // The lease rows of the account go in batches, until none is left: admissions reclaim only a few per call, and a row that stays
+        // names the account after the erasure completes.
+        await drain(
+            "reclaim-pin-write-leases",
+            async (round) =>
+                await context.run(
+                    internal.lib.account_moves.reclaimPinWriteLeasesFor,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "reclaim-pin-write-leases", round) },
                 ),
         );
 

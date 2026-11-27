@@ -692,7 +692,7 @@ msgid "{0} lines"
 msgstr "{0} lines"
 
 #. placeholder {0}: stats.total
-#: src/features/settings/components/personalization/memory-settings.tsx:186
+#: src/features/settings/components/personalization/memory-settings.tsx:189
 msgid "{0} memories"
 msgstr "{0} memories"
 
@@ -782,7 +782,7 @@ msgid "{0} on {1}, in {2}"
 msgstr "{0} on {1}, in {2}"
 
 #. placeholder {0}: stats.pinned
-#: src/features/settings/components/personalization/memory-settings.tsx:187
+#: src/features/settings/components/personalization/memory-settings.tsx:190
 msgid "{0} pinned"
 msgstr "{0} pinned"
 
@@ -1022,6 +1022,10 @@ msgstr "{days} days"
 #: src/features/settings/components/chat/api-keys-settings.tsx:290
 msgid "{days}d ago"
 msgstr "{days}d ago"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:360
+msgid "{done} of {total} entries processed"
+msgstr "{done} of {total} entries processed"
 
 #: src/features/chat/thread/host-activity.tsx:70
 msgid "{done} of {total} task done"
@@ -3510,7 +3514,7 @@ msgid "All"
 msgstr "All"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:208
+#: src/features/settings/components/personalization/memory-settings.tsx:211
 msgid "All ({0})"
 msgstr "All ({0})"
 
@@ -6162,7 +6166,7 @@ msgstr "Canada"
 #: src/features/settings/components/chat/usage-settings.tsx:581
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:416
 #: src/features/settings/components/personalization/memory-item.tsx:351
-#: src/features/settings/components/personalization/memory-settings.tsx:257
+#: src/features/settings/components/personalization/memory-settings.tsx:260
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
@@ -6189,6 +6193,10 @@ msgstr "Cancel deep work"
 #: src/features/settings/components/privacy/data-export.tsx:112
 msgid "Cancel Export"
 msgstr "Cancel Export"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:434
+msgid "Cancel import"
+msgstr "Cancel import"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:409
 msgid "Cancel Import"
@@ -6806,6 +6814,14 @@ msgstr "Chinese (Traditional)"
 msgid "Choose .md or .zip"
 msgstr "Choose .md or .zip"
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:378
+msgid "Choose a .txt file with one memory per line, or a .json file with a list of memories. The file can be up to {maxSize}."
+msgstr "Choose a .txt file with one memory per line, or a .json file with a list of memories. The file can be up to {maxSize}."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:273
+msgid "Choose a .txt or .json file."
+msgstr "Choose a .txt or .json file."
+
 #: src/features/settings/components/chat/default-models-settings.tsx:465
 msgid "Choose a model"
 msgstr "Choose a model"
@@ -7063,11 +7079,11 @@ msgstr "Clear all"
 msgid "Clear All"
 msgstr "Clear All"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:247
+#: src/features/settings/components/personalization/memory-settings.tsx:250
 msgid "Clear All Memories"
 msgstr "Clear All Memories"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:251
+#: src/features/settings/components/personalization/memory-settings.tsx:254
 msgid "Clear all memories?"
 msgstr "Clear all memories?"
 
@@ -7118,7 +7134,7 @@ msgstr "Clear tag filter"
 msgid "Clear the queue"
 msgstr "Clear the queue"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:137
+#: src/features/settings/components/personalization/memory-settings.tsx:138
 msgid "Cleared {count} memories"
 msgstr "Cleared {count} memories"
 
@@ -8997,6 +9013,10 @@ msgstr "Could not attach the chat"
 msgid "could not be saved"
 msgstr "could not be saved"
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:351
+msgid "Could not cancel the import."
+msgstr "Could not cancel the import."
+
 #: src/features/chat/thread/composer-prompt-queue.tsx:469
 msgid "Could not cancel the message. It is still queued."
 msgstr "Could not cancel the message. It is still queued."
@@ -9146,6 +9166,10 @@ msgstr "Could not export the workflow"
 #: src/features/skills/components/skill-generate-panel.tsx:62
 msgid "Could not generate a draft. Try again."
 msgstr "Could not generate a draft. Try again."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:318
+msgid "Could not import the file."
+msgstr "Could not import the file."
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:82
 msgid "Could not import the workflow"
@@ -9308,6 +9332,14 @@ msgstr "Could not read that chat"
 #: src/features/chat/thread/composer-input.tsx:1974
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Could not read that chat. If it is locked, unlock it first."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:306
+msgid "Could not read the file."
+msgstr "Could not read the file."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:369
+msgid "Could not read the import's progress."
+msgstr "Could not read the import's progress."
 
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:101
 msgid "Could not read the pasted list"
@@ -10692,7 +10724,7 @@ msgstr "Delete Account"
 msgid "Delete alert \"{ruleName}\""
 msgstr "Delete alert \"{ruleName}\""
 
-#: src/features/settings/components/personalization/memory-settings.tsx:258
+#: src/features/settings/components/personalization/memory-settings.tsx:261
 msgid "Delete All"
 msgstr "Delete All"
 
@@ -12647,7 +12679,7 @@ msgstr "Enable Follow-up Suggestions"
 msgid "Enable for Next Chat"
 msgstr "Enable for Next Chat"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:171
+#: src/features/settings/components/personalization/memory-settings.tsx:172
 msgid "Enable memory"
 msgstr "Enable memory"
 
@@ -13945,7 +13977,7 @@ msgstr "Failed to change tag color"
 msgid "Failed to clear filter rules"
 msgstr "Failed to clear filter rules"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:133
+#: src/features/settings/components/personalization/memory-settings.tsx:134
 msgid "Failed to clear memories"
 msgstr "Failed to clear memories"
 
@@ -14038,7 +14070,7 @@ msgstr "Failed to delete file. Please try again."
 msgid "Failed to delete files"
 msgstr "Failed to delete files"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:105
+#: src/features/settings/components/personalization/memory-settings.tsx:106
 msgid "Failed to delete memory"
 msgstr "Failed to delete memory"
 
@@ -14559,8 +14591,8 @@ msgstr "Failed to update keyboard shortcuts"
 msgid "Failed to update MCP server"
 msgstr "Failed to update MCP server"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:116
-#: src/features/settings/components/personalization/memory-settings.tsx:124
+#: src/features/settings/components/personalization/memory-settings.tsx:117
+#: src/features/settings/components/personalization/memory-settings.tsx:125
 msgid "Failed to update memory"
 msgstr "Failed to update memory"
 
@@ -14588,7 +14620,7 @@ msgstr "Failed to update pull request settings"
 msgid "Failed to update reply tools"
 msgstr "Failed to update reply tools"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:148
+#: src/features/settings/components/personalization/memory-settings.tsx:149
 msgid "Failed to update setting"
 msgstr "Failed to update setting"
 
@@ -15138,6 +15170,10 @@ msgstr "File size exceeds {maxSize}"
 msgid "File size too large. Maximum 5MB allowed."
 msgstr "File size too large. Maximum 5MB allowed."
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:382
+msgid "File to import"
+msgstr "File to import"
+
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:859
 msgid "File Too Large to Preview"
 msgstr "File Too Large to Preview"
@@ -15282,7 +15318,7 @@ msgstr "Filter by type"
 msgid "Filter condition"
 msgstr "Filter condition"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:194
+#: src/features/settings/components/personalization/memory-settings.tsx:197
 msgid "Filter memories by type"
 msgstr "Filter memories by type"
 
@@ -17994,9 +18030,17 @@ msgstr "Import conversations from ChatGPT, Google Gemini, Claude, a Neore data e
 msgid "Import failed"
 msgstr "Import failed"
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:395
+msgid "Import file"
+msgstr "Import file"
+
 #: src/features/projects/components/project-rule-files.tsx:968
 msgid "Import files"
 msgstr "Import files"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:420
+msgid "Import finished."
+msgstr "Import finished."
 
 #: src/features/projects/components/repo-rule-file-import.tsx:216
 #: src/features/projects/components/repo-rule-file-import.tsx:378
@@ -18007,6 +18051,10 @@ msgstr "Import from repository"
 #: src/features/projects/components/computer-rule-file-import.tsx:643
 msgid "Import from this computer"
 msgstr "Import from this computer"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:375
+msgid "Import memories from a file"
+msgstr "Import memories from a file"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:423
 msgid "Import More"
@@ -18019,6 +18067,14 @@ msgstr "Import Notion export (.zip)"
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:222
 msgid "Import one kind of export at a time."
 msgstr "Import one kind of export at a time."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:426
+msgid "Import progress"
+msgstr "Import progress"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:412
+msgid "Import result"
+msgstr "Import result"
 
 #: src/features/projects/components/project-rule-files.tsx:978
 msgid "Import rule folder"
@@ -18066,6 +18122,10 @@ msgstr "Imported {added} Notion page(s); skipped {skipped} attachment(s)."
 msgid "Imported {added} Notion page(s)."
 msgstr "Imported {added} Notion page(s)."
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:367
+msgid "Imported {imported} · Updated {updated} · Duplicates {duplicates} · Too long {tooLong} · Invalid {invalid}"
+msgstr "Imported {imported} · Updated {updated} · Duplicates {duplicates} · Too long {tooLong} · Invalid {invalid}"
+
 #. placeholder {0}: skill.slug
 #: src/features/skills/components/bundle-import-dialog.tsx:129
 msgid "Imported as /{0}."
@@ -18084,6 +18144,10 @@ msgstr "Imported skill \"{0}\""
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:396
 msgid "Importing from {0}..."
 msgstr "Importing from {0}..."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:419
+msgid "Importing memories…"
+msgstr "Importing memories…"
 
 #: src/features/marketing/components/gateway-footer.tsx:20
 #: src/features/marketing/components/gateway-footer.tsx:148
@@ -21190,7 +21254,7 @@ msgid "memories"
 msgstr "memories"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/settings/components/personalization/memory-settings.tsx:220
+#: src/features/settings/components/personalization/memory-settings.tsx:223
 msgid "Memories"
 msgstr "Memories"
 
@@ -21208,7 +21272,7 @@ msgid "Memories used for this reply ({0})"
 msgstr "Memories used for this reply ({0})"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
-#: src/features/settings/components/personalization/memory-settings.tsx:164
+#: src/features/settings/components/personalization/memory-settings.tsx:165
 #: src/features/settings/lib/settings-keywords.ts:96
 msgid "Memory"
 msgstr "Memory"
@@ -21217,17 +21281,25 @@ msgstr "Memory"
 msgid "Memory — what the agent keeps across chats"
 msgstr "Memory — what the agent keeps across chats"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:109
+#: src/features/settings/components/personalization/memory-settings.tsx:110
 msgid "Memory deleted"
 msgstr "Memory deleted"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:146
+#: src/features/settings/components/personalization/memory-settings.tsx:147
 msgid "Memory disabled"
 msgstr "Memory disabled"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:146
+#: src/features/settings/components/personalization/memory-settings.tsx:147
 msgid "Memory enabled"
 msgstr "Memory enabled"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:234
+msgid "Memory import finished"
+msgstr "Memory import finished"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:234
+msgid "Memory import stopped"
+msgstr "Memory import stopped"
 
 #: src/features/marketing/use-cases/use-case-data.ts:115
 msgid "Memory in Neore: the agent keeps useful facts about you across chats, you can review and edit them in settings, and it is off until you turn it on."
@@ -23353,11 +23425,11 @@ msgstr "No MCP servers configured. Add a server to extend AI capabilities."
 msgid "No members in this team yet"
 msgstr "No members in this team yet"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:236
+#: src/features/settings/components/personalization/memory-settings.tsx:239
 msgid "No memories of this type."
 msgstr "No memories of this type."
 
-#: src/features/settings/components/personalization/memory-settings.tsx:237
+#: src/features/settings/components/personalization/memory-settings.tsx:240
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "No memories yet. The AI will start learning from your conversations automatically."
 
@@ -30512,6 +30584,7 @@ msgstr "Search public skills…"
 msgid "Search Reddit posts"
 msgstr "Search Reddit posts"
 
+#: src/components/settings/settings-search.tsx:158
 #: src/features/pages/components/pages-sidebar.tsx:169
 msgid "Search results"
 msgstr "Search results"
@@ -34866,7 +34939,7 @@ msgstr "The agent's plan"
 msgid "The agent's tool calls"
 msgstr "The agent's tool calls"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:163
+#: src/features/settings/components/personalization/memory-settings.tsx:164
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 msgstr "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 
@@ -35135,6 +35208,10 @@ msgstr "The extension will be able to read and send chats as {0}. You can discon
 msgid "The file is larger than {0} KB, which is more than a bundle can be."
 msgstr "The file is larger than {0} KB, which is more than a bundle can be."
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:266
+msgid "The file is larger than {maxSize}. Choose a smaller file."
+msgstr "The file is larger than {maxSize}. Choose a smaller file."
+
 #: src/features/skills/components/skill-import-dialog.tsx:91
 msgid "The file is larger than {megabytes} MB."
 msgstr "The file is larger than {megabytes} MB."
@@ -35291,6 +35368,10 @@ msgstr "the host software is out of date"
 #: ../../packages/ui/src/components/icon-picker.tsx:452
 msgid "The icons could not be loaded."
 msgstr "The icons could not be loaded."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:368
+msgid "The import stopped before it finished."
+msgstr "The import stopped before it finished."
 
 #: src/features/canvas/canvas-panel.tsx:648
 msgid "The imported file appears to be empty."
@@ -36623,7 +36704,7 @@ msgid "This will permanently delete {0} anonymous user accounts and all their da
 msgstr "This will permanently delete {0} anonymous user accounts and all their data. This action cannot be undone."
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:253
+#: src/features/settings/components/personalization/memory-settings.tsx:256
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 
@@ -37485,6 +37566,7 @@ msgstr "Try adjusting your search terms."
 #: src/features/projects/components/project-repositories.tsx:297
 #: src/features/projects/components/repo-rule-file-import.tsx:183
 #: src/features/settings/components/chat/default-models-settings.tsx:455
+#: src/features/settings/components/personalization/memory-file-import.tsx:445
 #: src/features/tasks/components/task-form-dialog.tsx:459
 #: src/features/vault/components/site-logins.tsx:480
 #: src/features/vault/components/site-logins.tsx:612
@@ -37583,6 +37665,10 @@ msgstr "Turn off auto-merge?"
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:195
 msgid "Turn on memory"
 msgstr "Turn on memory"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:400
+msgid "Turn on memory to import a file."
+msgstr "Turn on memory to import a file."
 
 #: src/features/skills/components/bundle-import-dialog.tsx:122
 msgid "Turns these tools off:"

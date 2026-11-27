@@ -14807,6 +14807,84 @@
       "shardMode": "root",
       "refinementsRecorded": true
     },
+    "pendingPinRestores": {
+      "commitOrdered": false,
+      "fields": {
+        "dispatchedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "ownerId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "routeCreatedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "threadId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "threads"
+        },
+        "until": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_dispatched": {
+          "fields": [
+            "dispatchedAt"
+          ],
+          "unique": false
+        },
+        "by_owner": {
+          "fields": [
+            "ownerId"
+          ],
+          "unique": false
+        },
+        "by_thread": {
+          "fields": [
+            "threadId"
+          ],
+          "unique": false
+        },
+        "by_user": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        },
+        "by_user_and_thread": {
+          "fields": [
+            "userId",
+            "threadId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
+    },
     "persistentChunks": {
       "commitOrdered": false,
       "fields": {
@@ -22633,6 +22711,12 @@
           "kind": "string",
           "nullable": false,
           "optional": false,
+          "unique": false
+        },
+        "writerId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
           "unique": false
         }
       },
