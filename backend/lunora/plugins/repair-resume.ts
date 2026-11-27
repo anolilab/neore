@@ -20,6 +20,7 @@ import { planFor } from "../skills/bundle";
 import { assertNoToolConfig, checkPluginFile } from "./install-action";
 import { childOps, importFailure } from "./install-ops";
 import { entryHash } from "./entry-hash";
+import { refuseUnderKillSwitch } from "./gate";
 import { heldInstall, patchInstallIf, STALE } from "./held-install";
 import { LEASE_MS, markerFor } from "./logic";
 import { refuseWhileErasing, requireOwnerShard } from "./owner-shard";
@@ -287,6 +288,8 @@ export const repairPlugin = authAction
         if (ctx.user.activeOrganization) {
             throw new LunoraError("UNPROCESSABLE", "Organization plugin installs are not available yet");
         }
+
+        refuseUnderKillSwitch();
 
         const { hash, header } = await checkPluginFile(args.markdown);
 

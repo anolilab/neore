@@ -40,6 +40,13 @@ export const pluginFeatureOn = (userId: string, feature: PluginFeature): boolean
     return userId !== "" && list.split(",").some((entry) => entry.trim() === userId);
 };
 
+/** Refuses a step that creates plugin children while the kill switch is on. Repair is not behind an allowlist, but it is behind this. */
+export const refuseUnderKillSwitch = (): void => {
+    if (pluginKillSwitch()) {
+        throw new LunoraError("FORBIDDEN", "Plugins are switched off for now. Uninstalling a plugin still works.");
+    }
+};
+
 /** Refuses the call unless the account is on the feature's allowlist. */
 export const requirePluginFeature = (userId: string, feature: PluginFeature): void => {
     if (!pluginFeatureOn(userId, feature)) {

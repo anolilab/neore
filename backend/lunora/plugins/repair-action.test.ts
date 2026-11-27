@@ -5,6 +5,8 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { env as workerEnv } from "cloudflare:workers";
+
 import { registeredApi } from "../../test/registered-api";
 import { schemaWithShardedTables } from "../lib/test-schema";
 import { buildBundleMarkdown } from "../skills/bundle-format";
@@ -133,6 +135,26 @@ describe("repair through the action", () => {
         expect(restored).toHaveLength(1);
         expect(restored[0]).toMatchObject({ name: "analyst", pluginInstallId: install._id });
         expect(after).toMatchObject({ status: "installed" });
+    });
+
+    it("refuses a repair while the plugin kill switch is on", async () => {
+        await as().action(procedureAt("plugins_install_action", "installPlugin"), { contentHash: hash, markdown: pluginFile(hash) } as never);
+
+        const variables = workerEnv as Record<string, string | undefined>;
+
+        variables.PLUGINS_KILL_SWITCH = "on";
+
+        try {
+            await expect(
+                as().action(procedureAt("plugins_repair_resume", "repairPlugin"), {
+                    contentHash: hash,
+                    markdown: pluginFile(hash),
+                    pluginSlug: "daily-brief",
+                } as never),
+            ).rejects.toThrow("switched off");
+        } finally {
+            delete variables.PLUGINS_KILL_SWITCH;
+        }
     });
 
     it("refuses a repair with a file that is not the one the install came from", async () => {
