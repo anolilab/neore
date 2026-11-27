@@ -253,12 +253,16 @@ describe("a seen review beyond a truncated read", () => {
         expect(decision).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "107" } });
     });
 
-    it("does not wake for a review submitted before, or at the same time as, the seen one", () => {
-        for (const submittedAt of [4000, 5000]) {
-            const decision = decideWatch(marked, { ...quiet, reviews: [{ authorLogin: "bob", id: "1", submittedAt }], ...present }, NOW);
+    it("does not wake for a review submitted before the seen one", () => {
+        const decision = decideWatch(marked, { ...quiet, reviews: [{ authorLogin: "bob", id: "1", submittedAt: 4000 }], ...present }, NOW);
 
-            expect(decision).toMatchObject({ action: "none", state: { reviewId: "50" } });
-        }
+        expect(decision).toMatchObject({ action: "none", state: { reviewId: "50" } });
+    });
+
+    it("wakes, and moves the marker, for a review submitted in the same second as the seen one (a spurious wake over a missed review)", () => {
+        const decision = decideWatch(marked, { ...quiet, reviews: [{ authorLogin: "bob", id: "1", submittedAt: 5000 }], ...present }, NOW);
+
+        expect(decision).toMatchObject({ action: "wake", reasons: ["review"], state: { reviewId: "1" } });
     });
 
     it("does not take a review with no submission time for newer", () => {

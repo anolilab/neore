@@ -254,6 +254,20 @@ describe("deliverSteers and withdrawSteer", () => {
         ]);
     });
 
+    it("flags each delivered part: only the steer the owner did not type", async () => {
+        await steer("use the other file");
+        await as(OWNER).mutation(steerRun as never, { draftFrom: "promptLink", streamId, text: "and pay the bill", threadId } as never);
+        await steer("keep it short");
+
+        const delivered = (await deliver()) as { parts: { notTyped?: boolean; text: string }[] } | null;
+
+        expect(delivered?.parts).toStrictEqual([
+            { sentAt: expect.any(Number), text: "use the other file" },
+            { notTyped: true, sentAt: expect.any(Number), text: "and pay the bill" },
+            { sentAt: expect.any(Number), text: "keep it short" },
+        ]);
+    });
+
     it.each(NOT_TYPED_DRAFTS)("delivers marked a steer from a %s draft", async (draftFrom) => {
         await as(OWNER).mutation(steerRun as never, { draftFrom, streamId, text: "and pay the bill", threadId } as never);
 

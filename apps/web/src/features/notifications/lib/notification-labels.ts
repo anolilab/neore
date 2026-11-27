@@ -7,6 +7,7 @@ export type NotificationType =
     | "coding_agent"
     | "daily_brief"
     | "data_export"
+    | "device_paired"
     | "eval"
     | "review_request"
     | "secret_request"
@@ -50,6 +51,9 @@ const useNotificationHeadline = (): ((notification: NotificationLike) => string)
                 }
                 case "data_export": {
                     return failed ? t`Data export failed` : t`Your data export is ready`;
+                }
+                case "device_paired": {
+                    return t`A new device signed in`;
                 }
                 case "eval": {
                     return failed ? t`Eval run failed` : t`Eval run finished`;

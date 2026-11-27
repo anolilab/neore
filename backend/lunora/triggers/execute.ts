@@ -358,6 +358,9 @@ export const executeTrigger = internalAction
             const { text: responseText, threadId } = await runHeadlessAgent(ctx, {
                 botId: bot ? trigger.botId : undefined,
                 chainSource: chainSourceKey("trigger", triggerId),
+                // Memories are read into the run, never written from it. A webhook or event run's prompt is an outside payload,
+                // and a schedule run's is a saved instruction (or a manual test input), none of it the owner's words in a chat.
+                learn: false,
                 memory: true,
                 model,
                 onGenerationStart: () => {

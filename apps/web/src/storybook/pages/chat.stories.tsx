@@ -99,6 +99,7 @@ export const RoutePromptWrittenAgain: Story = {
     ],
     play: async ({ canvas }) => {
         await waitFor(() => expect(canvas.getByRole("textbox", { name: "Message" })).toHaveTextContent(ROUTE_PROMPT), PAGE_WAIT);
+        await settle(canvas);
     },
 };
 

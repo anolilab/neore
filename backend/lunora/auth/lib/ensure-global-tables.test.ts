@@ -20,16 +20,32 @@ const { ensureGlobalTables, globalSchemaFingerprint, resetEnsureGlobalTablesForT
 
 const INSERT_MARKER = /^INSERT OR IGNORE INTO "globalSchemaMarker"/u;
 const SELECT_MARKER = /^SELECT 1 FROM "globalSchemaMarker"/u;
+const PRAGMA_TABLE = /^PRAGMA table_info\("([^"]+)"\)$/u;
+const ALTER_ADD_COLUMN = /^ALTER TABLE "([^"]+)" ADD COLUMN "([^"]+)"/u;
 
-/** A D1 stand-in that knows only the marker table. */
-const fakeDatabase = () => {
+/**
+ * A D1 stand-in that knows the marker table and the given tables' columns. `racingColumn` makes an `ALTER ... ADD COLUMN` fail as if another
+ * isolate had just added the column, after this isolate's `PRAGMA` read it as missing.
+ */
+const fakeDatabase = (options: { columns?: Record<string, string[]>; racingColumn?: boolean } = {}) => {
     let markerTable: Set<string> | undefined;
+    const tables = new Map(
+        Object.entries(options.columns ?? { pinWriteLeases: ["expiresAt", "userId", "writerId"] }).map(([name, columns]) => [name, new Set(columns)]),
+    );
     const statements: string[] = [];
 
     return {
         exec: {
             all: async (sql: string, parameters: ReadonlyArray<unknown>) => {
                 statements.push(sql);
+
+                const pragma = PRAGMA_TABLE.exec(sql);
+
+                if (pragma) {
+                    return [...(tables.get(pragma[1]!) ?? [])].map((name) => {
+                        return { name };
+                    });
+                }
 
                 if (!markerTable) {
                     throw new Error("D1_ERROR: no such table: globalSchemaMarker");
@@ -40,6 +56,21 @@ const fakeDatabase = () => {
             run: async (sql: string, parameters: ReadonlyArray<unknown>) => {
                 statements.push(sql);
 
+                const alter = ALTER_ADD_COLUMN.exec(sql);
+
+                if (alter) {
+                    const columns = tables.get(alter[1]!) ?? new Set<string>();
+
+                    if (options.racingColumn === true || columns.has(alter[2]!)) {
+                        throw new Error(`D1_ERROR: duplicate column name: ${alter[2]}`);
+                    }
+
+                    columns.add(alter[2]!);
+                    tables.set(alter[1]!, columns);
+
+                    return;
+                }
+
                 if (sql.startsWith("CREATE TABLE IF NOT EXISTS")) {
                     markerTable ??= new Set();
                 } else if (sql.startsWith("INSERT OR IGNORE")) {
@@ -48,6 +79,7 @@ const fakeDatabase = () => {
             },
         },
         statements,
+        tables,
     };
 };
 
@@ -127,5 +159,38 @@ describe(globalSchemaFingerprint, () => {
         await expect(globalSchemaFingerprint({ tables: { a: table("global", "x"), b: table("shardBy", "x") } })).resolves.toBe(
             await globalSchemaFingerprint({ tables: { a: table("global", "x"), b: table("shardBy", "y") } }),
         );
+    });
+});
+
+describe("the writerId column on pinWriteLeases", () => {
+    beforeEach(() => {
+        migrate.mockReset();
+        migrate.mockImplementation(async () => {});
+        resetEnsureGlobalTablesForTests();
+    });
+
+    it("is added to a table an earlier build created, once, before the fingerprint is recorded", async () => {
+        const database = fakeDatabase({ columns: { pinWriteLeases: ["expiresAt", "userId"] } });
+
+        await ensureGlobalTables(database.exec);
+
+        expect(database.tables.get("pinWriteLeases")?.has("writerId")).toBe(true);
+        expect(database.statements.filter((sql) => sql.startsWith("ALTER TABLE"))).toHaveLength(1);
+        expect(database.statements.at(-1)).toMatch(INSERT_MARKER);
+    });
+
+    it("is left alone on a table that already has it", async () => {
+        const database = fakeDatabase();
+
+        await ensureGlobalTables(database.exec);
+
+        expect(database.statements.some((sql) => sql.startsWith("ALTER TABLE"))).toBe(false);
+    });
+
+    it("is not an error when another isolate adds it between this isolate's read and its write", async () => {
+        const database = fakeDatabase({ columns: { pinWriteLeases: ["expiresAt", "userId"] }, racingColumn: true });
+
+        await expect(ensureGlobalTables(database.exec)).resolves.toBeUndefined();
+        expect(database.statements.at(-1)).toMatch(INSERT_MARKER);
     });
 });

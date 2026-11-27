@@ -1021,6 +1021,7 @@ const runChatStartOnShard = async (
     // Read while the attachments load; answered after them, as before. A regenerate reads it too, but
     // only for the worker check below: its lock and owner checks stay with its own gate.
     const isRegenerate = Boolean(body.regenerate && body.parentId);
+
     const accessPromise = validThreadId
         ? context.runQuery(internal.chat.functions.gateThreadAction, {
               level: "write",
@@ -1092,6 +1093,17 @@ const runChatStartOnShard = async (
 
     if (access?.isWorker) {
         return workerThreadResponse();
+    }
+
+    // A pull request watch is waking this chat (`source-control/pr-watch-wake-lease.ts`): the reply waits, refused before anything is written,
+    // so no half of a reply is saved. Asked only of a caller the access gate let in (a stranger gets the answer any inaccessible thread gets,
+    // and learns nothing of a wake), and with the same held-lease check the lock and the delete use.
+    if (
+        validThreadId &&
+        access?.outcome === "ok" &&
+        (await context.runQuery(internal.source_control.pr_watch_wake_lease.wakeLeaseHeldFor, { threadId: validThreadId as Id<"threads"> })) === true
+    ) {
+        return Response.json({ code: "PR_WATCH_WAKING", error: "A pull request watch is replying to this chat. Try again in a moment." }, { status: 409 });
     }
 
     // A goal spends the owner's budget over several rounds, so an impersonating admin cannot start one: refused here, before
@@ -1996,6 +2008,12 @@ const editMessageAttached = async (
         }
 
         // The chat's claim is taken with its access check, so the chat's lock waits for the edit's save (`beginThreadAttach`).
+        // An edit starts a new reply, so it waits like a send while a pull request watch is waking this chat: refused before anything is
+        // written (`source-control/pr-watch-wake-lease.ts`), the same thread-keyed check.
+        if ((await context.runQuery(internal.source_control.pr_watch_wake_lease.wakeLeaseHeldFor, { threadId: threadId as Id<"threads"> })) === true) {
+            return Response.json({ code: "PR_WATCH_WAKING", error: "A pull request watch is replying to this chat. Try again in a moment." }, { status: 409 });
+        }
+
         const threadAttach = await beginThreadAttach(context, { fileIds, regenerate: false, threadId, unlockProof, userId });
 
         holder.threadAttach = threadAttach;

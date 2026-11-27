@@ -63,7 +63,10 @@ export interface PullRequestAgentDependencies {
     /** The thread's links, as far as the read goes: `complete` is `false` past its bound. */
     linked: () => Promise<{ complete: boolean; links: LinkedPullRequest[] }>;
     /** Starts or stops the watch that wakes this thread for the pull request (`pr-watch.ts`). Writes nothing on the host. */
-    setWatch: (ref: PullRequestRef, watching: boolean) => Promise<{ status: "already" | "capped" | "not_linked" | "ok" | "too_many" }>;
+    setWatch: (
+        ref: PullRequestRef,
+        watching: boolean,
+    ) => Promise<{ status: "already" | "capped" | "not_allowed" | "not_linked" | "ok" | "thread_locked" | "thread_unavailable" | "too_many" }>;
     token: () => Promise<GithubTokenOutcome>;
 }
 

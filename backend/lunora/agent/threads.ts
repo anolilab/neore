@@ -40,6 +40,7 @@ import { clearAwaitingInput, patchThread } from "./table-writes";
 import { deleteMcpEventsOfThread, hasMcpEventsOfThread } from "../public-api/events-log";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { deletePullRequestLinksOfThread, setLinksThreadDeleted } from "../source-control/pr-thread-links";
+import { refuseWhileWaking, wakeLeaseHeld } from "../source-control/pr-watch-wake-lease";
 import { deleteThreadSummaries } from "./thread-summaries";
 import { SEARCH_INTERNAL_FIELDS } from "./thread-search-plan";
 
@@ -541,6 +542,11 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
 
         const host = await context.db.get("threads", args.threadId);
 
+        // A pull request watch is waking this chat: the delete waits, as it does for a suggestion (`source-control/pr-watch-wake-lease.ts`).
+        if (host?.userId !== undefined && (await wakeLeaseHeld(context, host.userId, args.threadId, context.now))) {
+            throw new LunoraError("CONFLICT", "A pull request watch is waking this chat. Try again in a moment.");
+        }
+
         if (host) {
             // The thread is going from here on, whatever page the delete is on: no sub-agent's result posts into it.
             await context.db.patch("threads", args.threadId, { deletingAt: context.now });
@@ -792,6 +798,11 @@ export const updateThreadVisibility = internalMutation
             throw new LunoraError("BAD_REQUEST", "A locked chat cannot be shared. Unlock it first.");
         }
 
+        // A pull request watch is writing to this chat: it is not made public until it is done (`source-control/pr-watch-wake-lease.ts`).
+        if ((args.isPublic === true || args.publicAccessToken !== undefined) && thread.userId !== undefined) {
+            await refuseWhileWaking(ctx, thread.userId, args.threadId);
+        }
+
         // An absent token REMOVES the stored one — making a thread private must
         // revoke its old link, not leave it valid.
         await patchRow(ctx.db, "threads", thread, {
@@ -836,6 +847,12 @@ export const softDeleteThread = internalMutation
         const oldThread = await ctx.db.get("threads", args.threadId);
 
         assert(oldThread, `Thread ${args.threadId} not found`);
+
+        // A pull request watch is waking this chat: the trash waits, as it does for a suggestion (`source-control/pr-watch-wake-lease.ts`).
+        if (oldThread.userId !== undefined && (await wakeLeaseHeld(ctx, oldThread.userId, args.threadId, ctx.now))) {
+            throw new LunoraError("CONFLICT", "A pull request watch is waking this chat. Try again in a moment.");
+        }
+
         await ctx.db.patch("threads", args.threadId, {
             deleted: true,
             deletedAt: ctx.now,

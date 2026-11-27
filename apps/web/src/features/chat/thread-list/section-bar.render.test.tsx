@@ -92,6 +92,20 @@ describe("SectionBar", () => {
         expect(screen.getByRole("button", { name: "Snoozed, 0" })).toBeTruthy();
     });
 
+    it("drops the selection and its shift-click anchor on a section switch, so a range cannot start from the old section's rows", () => {
+        act(() => {
+            useThreadListUIStore.setState({ lastSelectedIndex: 4, selectedThreadIds: new Set(["t1"]) });
+        });
+        render(<SectionBar />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Working, 1" }));
+
+        const { lastSelectedIndex, selectedThreadIds } = useThreadListUIStore.getState();
+
+        expect(lastSelectedIndex).toBe(-1);
+        expect(selectedThreadIds.size).toBe(0);
+    });
+
     it("is hidden while a search is typed", () => {
         render(<SectionBar />);
 

@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { useThreadListUIStore } from "@/features/chat/thread-list/stores/thread-list-ui-store";
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 
+import { ASIDE_FIND_EVENT, hasAsideFindTarget } from "../lib/aside-find-target";
 import { FIND_IN_THREAD_EVENT, hasFindInThreadTarget } from "../lib/find-in-thread-target";
 import { focusThreadSearch } from "../lib/thread-search-target";
 
@@ -77,7 +78,10 @@ const useKeyboardShortcutHandler = (): ((action: keyof KeyboardShortcuts, event:
                     break;
                 }
                 case "findInThread": {
-                    if (hasFindInThreadTarget()) {
+                    if (hasAsideFindTarget()) {
+                        // Focus is in the side-question panel: its find bar owns that search (`aside/find/aside-find-bar.tsx`).
+                        globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+                    } else if (hasFindInThreadTarget()) {
                         // The open thread's find bar owns the query and the highlights (`thread-find-bar.tsx`).
                         globalThis.dispatchEvent(new CustomEvent(FIND_IN_THREAD_EVENT));
                     } else {
