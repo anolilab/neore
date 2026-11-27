@@ -3,9 +3,8 @@
  * refused when any answer is not a public address. The public-address rule is #815's (`isPublicAddress`, `lib/egress.ts`), so
  * the two features refuse the same ranges: loopback, private, CGNAT, link-local and reserved, IPv4 and IPv6.
  *
- * This is a check, not a pin. The Worker's `fetch` connects to whatever address its own resolver returns, so the answer checked
- * here may not be the one a later request uses. The window is recorded in `events-webhook.ts`. Part 2b runs this check again
- * before each delivery.
+ * This is an early refusal, not a pin. A delivery (part 2b, #917) checks the address again at connect time and connects to the
+ * address it checked (`lib/egress.ts`), so a delivery never relies on this answer. The window is recorded in `events-webhook.ts`.
  *
  * A lookup that fails, times out or answers with no address is `unresolved`, which the caller reports as a connection failure.
  */

@@ -8,10 +8,10 @@
  * Not here yet, part 2b: the endpoint verification handshake, signed deliveries, `gap` and `terminated` envelopes, retries,
  * and `deliveryStatus`. Until 2b, no request leaves the Worker for a callback URL: a subscription is stored and waits.
  *
- * Residual DNS-rebinding window (also in the PR body): the callback host is resolved at subscribe time
- * (`events-webhook-address.ts`). A Worker's `fetch` does not say which address it connected to, so the delivery-time check of
- * part 2b narrows the window but cannot close it. `postCheckedHttps` (`lib/egress.ts`) connects to the checked address, but
- * it reads no response body, so it cannot carry the verification's echoed challenge.
+ * Residual DNS-rebinding window (also in the PR body): the callback host is resolved at subscribe time (`events-webhook-address.ts`),
+ * which is an early refusal only. A delivery (part 2b, #917) connects to the address it checks at connect time (`lib/egress.ts`),
+ * so no delivery connects to the subscribe-time answer. `postCheckedHttps` reads no reply, so the verification's echoed challenge
+ * needs the reply read, which part 2b's request function does.
  */
 import { base64ToBytes, bytesToBase64, sha256Hex } from "../lib/crypto";
 import { type EventArguments, findEvent, parseEventArguments } from "./events-catalog";
