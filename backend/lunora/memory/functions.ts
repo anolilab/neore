@@ -1914,7 +1914,8 @@ export const searchMemoriesByKeyword = internalQuery
         activeOn: v.optional(v.number()),
         botId: v.optional(v.string()),
         includeUserWide: v.optional(v.boolean()),
-        terms: v.array(v.string()),
+        /** `keywordLookupTerms`: the index is asked for every token of a term, so an identifier is looked up whole. */
+        terms: v.array(v.object({ term: v.string(), tokens: v.array(v.string()) })),
         timeZone: v.optional(v.string()),
         userId: v.string(),
     })
@@ -1950,9 +1951,11 @@ export const searchMemoriesByKeyword = internalQuery
 
         return await Promise.all(
             args.terms.slice(0, MAX_KEYWORD_TERMS).map(async (term) => {
+                // The index ANDs the tokens (a prefix match on the last); `keywordLookupOf` then wants them adjacent.
+                const search = term.tokens.join(" ");
                 const rows = await ctx.db
                     .query("memories")
-                    .withSearchIndex("search_memory_text", (q) => q.search("memory", term).eq("userId", args.userId))
+                    .withSearchIndex("search_memory_text", (q) => q.search("memory", search).eq("userId", args.userId))
                     .take(KEYWORD_LOOKUP_LIMIT);
                 const lookup = keywordLookupOf(term, rows, { botId: args.botId, includeUserWide: args.includeUserWide }, today);
 

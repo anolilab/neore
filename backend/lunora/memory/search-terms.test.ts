@@ -17,21 +17,23 @@ describe(searchTokensOf, () => {
 describe(salientTermsOf, () => {
     it("leads with an identifier, then the longest word, and puts a year or a count last", () => {
         expect(salientTermsOf("did I order part QZ-5508 in 2019")).toEqual([
-            { code: true, term: "5508" },
-            { code: false, term: "order" },
-            { code: false, term: "part" },
-            { code: false, term: "qz" },
-            { code: false, term: "2019" },
+            { code: true, term: "5508", tokens: ["qz", "5508"] },
+            { code: false, term: "order", tokens: ["order"] },
+            { code: false, term: "part", tokens: ["part"] },
+            { code: false, term: "qz", tokens: ["qz"] },
+            { code: false, term: "2019", tokens: ["2019"] },
         ]);
         // A number alone, however long, is an ordinary term.
-        expect(salientTermsOf("which parcel ends in 77314")[0]).toEqual({ code: false, term: "parcel" });
-        expect(salientTermsOf("meet at 5pm")[0]).toEqual({ code: false, term: "meet" });
+        expect(salientTermsOf("which parcel ends in 77314")[0]).toMatchObject({ code: false, term: "parcel" });
+        expect(salientTermsOf("meet at 5pm")[0]).toMatchObject({ code: false, term: "meet" });
     });
 
     it.each([
         "in 2019",
         "3 times",
         "parcel 77314",
+        "budget is 15000",
+        "since 2026-11",
         "meeting on 2026-11-27",
         "due 27.11.2026",
         "since 11/27/2026",
@@ -49,7 +51,8 @@ describe(salientTermsOf, () => {
         ["ECON-204 notes", "204"],
         ["boiler E4012", "e4012"],
         ["release v2.3", "v2"],
+        ["ticket 12-345", "345"],
     ])("reads %s as an identifier", (searchText, term) => {
-        expect(salientTermsOf(searchText)[0]).toEqual({ code: true, term });
+        expect(salientTermsOf(searchText)[0]).toMatchObject({ code: true, term });
     });
 });

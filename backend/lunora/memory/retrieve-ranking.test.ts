@@ -204,6 +204,25 @@ describe("rankMemories", () => {
             expect(rank(rows, [["part", 0.9]], "did I order part QZ-5508").map((m) => m.memoryId)).toEqual(["part"]);
         });
 
+        it("matches an identifier whole: `AB-5508` is not returned for `QZ-5508` when the vectors miss it", () => {
+            const ab = candidate("ab", { ...old, memory: "Ordered part AB-5508" });
+            const qz = candidate("qz", { ...old, memory: "Ordered part QZ-5508" });
+            const searchText = "did I order QZ-5508";
+
+            expect(ids([ab], searchText, [lookup("5508", 0)])).toEqual([]);
+            expect(keywordSignalsFor([ab], searchText, [lookup("5508", 0)]).keywordScores.size).toBe(0);
+            expect(ids([ab, qz], searchText, [lookup("5508", 1)])).toEqual(["qz"]);
+        });
+
+        it("reads a plain number as an ordinary term: it never turns keyword relevance off", () => {
+            const hotel = candidate("hotel", { lastConfirmedAt: NOW - 30 * DAY, memory: "Liked the hotel by the old harbour" });
+            const searchText = "my budget is 15000, which hotel did I like?";
+
+            expect(keywordSignalsFor([hotel], searchText).keywordScores.get("hotel")).toBeGreaterThan(0);
+            // No vector hit for it, and no decisive search: it is found by its words.
+            expect(rank([hotel], [], searchText).map((m) => m.memoryId)).toEqual(["hotel"]);
+        });
+
         it("reads a year as a word, not an identifier: it does not turn the rule off", () => {
             const rows = [candidate("canon", { ...old, memory: "Canon camera serial KX-2291" }), candidate("other", { ...old, memory: "bought a new desk" })];
             const searchText = "serial of the Canon camera I bought in 2019";
@@ -327,19 +346,28 @@ describe("keyword hits", () => {
             row("other", "time for tea", "bot-b"),
             row("own", "time for tea"),
         ];
-        const result = keywordLookupOf("time", fetched, {}, "2026-11-27");
+        const time = { term: "time", tokens: ["time"] };
+        const result = keywordLookupOf(time, fetched, {}, "2026-11-27");
 
         expect(result.hits.map((h) => h._id)).toEqual(["own"]);
         // Every usable row of the user holding the term, of any scope; fewer rows than a lookup reads, so it is all of them.
         expect(result).toMatchObject({ complete: true, corpusRows: 2 });
         expect(
             keywordLookupOf(
-                "time",
+                time,
                 Array.from({ length: KEYWORD_LOOKUP_LIMIT }, (_, i) => row(`t${String(i)}`, "time")),
                 {},
                 undefined,
             ).complete,
         ).toBe(false);
+    });
+
+    it("keeps a row only when it holds the whole identifier: `AB-5508` is no hit for `QZ-5508`", () => {
+        const [code] = keywordLookupTerms("did I order QZ-5508");
+        const fetched = [row("ab", "Ordered part AB-5508"), row("apart", "QZ order and 5508 later"), row("qz", "Ordered part QZ-5508")];
+
+        expect(code).toEqual({ term: "5508", tokens: ["qz", "5508"] });
+        expect(keywordLookupOf(code!, fetched, {}, undefined)).toMatchObject({ corpusRows: 1, hits: [{ _id: "qz" }] });
     });
 
     it("keeps the best hits by BM25", () => {

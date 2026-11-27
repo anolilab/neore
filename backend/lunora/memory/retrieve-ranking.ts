@@ -6,7 +6,7 @@
 
 import { bm25Idf, MAX_KEYWORD_TERMS, reciprocalRankFusion, scoreKeywordCandidates } from "../knowledge/hybrid";
 import { factDatesOf } from "./dates";
-import { salientTermsOf, searchTokensOf } from "./search-terms";
+import { holdsSequence, salientTermsOf, searchTokensOf } from "./search-terms";
 import type { SalientTerm } from "./search-terms";
 
 /**
@@ -187,10 +187,18 @@ export const KEYWORD_HITS_PER_TERM = 20;
 export const KEYWORD_TOP_K = VECTOR_TOP_K;
 
 /** The terms a retrieval looks up: the first `MAX_KEYWORD_TERMS` salient terms of the whole search text. */
-export const keywordLookupTerms = (searchText: string): string[] =>
+export const keywordLookupTerms = (searchText: string): LookupTerm[] =>
     salientTermsOf(searchText)
         .slice(0, MAX_KEYWORD_TERMS)
-        .map(({ term }) => term);
+        .map(({ term, tokens }) => {
+            return { term, tokens };
+        });
+
+/** A term to look up: the index is asked for all of `tokens`, and a row is kept only when it holds them in order. */
+export interface LookupTerm {
+    term: string;
+    tokens: string[];
+}
 
 /** One term's lookup: the rows it keeps, and how many usable rows of the user hold the term. */
 export interface KeywordLookup<T> {
@@ -209,12 +217,12 @@ export interface KeywordLookup<T> {
 export const keywordLookupOf = <
     T extends { botId?: string | null; memory: string; pinned?: boolean | null; supersededBy?: string | null; validUntil?: string | null },
 >(
-    term: string,
+    { term, tokens }: LookupTerm,
     fetched: T[],
     scope: MemoryScope,
     today: string | undefined,
 ): KeywordLookup<T> => {
-    const held = fetched.filter((row) => !row.supersededBy && isUsableOn(row, today) && searchTokensOf(row.memory).includes(term));
+    const held = fetched.filter((row) => !row.supersededBy && isUsableOn(row, today) && holdsSequence(searchTokensOf(row.memory), tokens));
 
     return {
         complete: fetched.length < KEYWORD_LOOKUP_LIMIT,
@@ -369,8 +377,8 @@ export const keywordSignalsFor = (
     const rows = candidates.map((m) => {
         return { content: m.memory, id: m._id, tokens: searchTokensOf(m.memory) };
     });
-    const termHits = terms.map(({ term }) => {
-        return { hits: rows.filter((row) => row.tokens.includes(term)), term };
+    const termHits = terms.map(({ term, tokens }) => {
+        return { hits: rows.filter((row) => holdsSequence(row.tokens, tokens)), term };
     });
     const [leading] = terms;
     const leadingHits = termHits[0]?.hits ?? [];

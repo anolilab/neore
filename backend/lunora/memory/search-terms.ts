@@ -62,47 +62,87 @@ const LETTERS_THEN_DIGITS_RE = /^\p{L}+[-_./#]?\p{N}/u;
 const DIGIT_RE = /\p{N}/u;
 /** `v2.3` and `B12` are identifiers; `v2` is too short to tell from a word. */
 const MIN_CODE_LENGTH = 3;
+/** Digit groups joined by `-`, `_`, `/` or `#` (`12-345`); a `.` joins a decimal or a date instead. */
+const DIGIT_GROUPS_RE = /^\p{N}+(?:[-_/#]\p{N}+)+$/u;
+const GROUP_SEPARATOR_RE = /[-_/#]/u;
+
+/** `2026-11-27`, `11/27/2026`, `2026-11`: a year beside groups of at most two digits. */
+const isDateShaped = (groups: string[]): boolean =>
+    groups.some((group) => group.length === 4) && groups.every((group) => group.length === 4 || group.length <= 2);
+
+const isIdentifier = (chunk: string): boolean => {
+    if (chunk.replaceAll(SEPARATOR_RE, "").length >= MIN_CODE_LENGTH && LETTERS_THEN_DIGITS_RE.test(chunk)) {
+        return true;
+    }
+
+    if (!DIGIT_GROUPS_RE.test(chunk)) {
+        return false;
+    }
+
+    const groups = chunk.split(GROUP_SEPARATOR_RE);
+
+    return !isDateShaped(groups) && groups.some((group) => group.length >= 3);
+};
 
 /**
- * The tokens with a digit of every identifier in `text`: letters, then digits, at least 3 of them (`2291` of
- * `KX-2291`, `e4012` of `E4012`, `v2` of `v2.3`). A number alone never is one: a year, a count, a date
- * (`2026-11-27`), a decimal or a price; nor a mix that starts with digits, a time, an ordinal or a unit (`5pm`, `21st`,
- * `100km`).
+ * The identifiers of `text`, by each of their tokens with a digit: `5508` → `qz 5508` of `QZ-5508`, `e4012` of `E4012`,
+ * `v2` → `v2 3` of `v2.3`, `345` → `12 345` of `12-345`. An identifier is letters then digits, at least 3 of them, or
+ * digit groups joined by a separator. A number alone never is one: a year, a count, a price, a decimal or a date
+ * (`2026-11-27`); nor a mix that starts with digits, a time, an ordinal or a unit (`5pm`, `21st`, `100km`).
  */
-const codeTokensOf = (text: string): Set<string> => {
-    const codes = new Set<string>();
+const identifiersOf = (text: string): Map<string, string[]> => {
+    const identifiers = new Map<string, string[]>();
 
     for (const [chunk] of normalize(text).matchAll(CHUNK_RE)) {
-        const mixed = chunk.replaceAll(SEPARATOR_RE, "").length >= MIN_CODE_LENGTH && LETTERS_THEN_DIGITS_RE.test(chunk);
+        if (!isIdentifier(chunk)) {
+            continue;
+        }
 
-        if (mixed) {
-            for (const token of searchTokensOf(chunk)) {
-                // A single digit (the `3` of `v2.3`) is too common a token to stand for the identifier.
-                if (token.length > 1 && DIGIT_RE.test(token)) {
-                    codes.add(token);
-                }
+        const tokens = searchTokensOf(chunk);
+
+        for (const token of tokens) {
+            // A single digit (the `3` of `v2.3`) is too common a token to stand for the identifier.
+            if (token.length > 1 && DIGIT_RE.test(token) && !identifiers.has(token)) {
+                identifiers.set(token, tokens);
             }
         }
     }
 
-    return codes;
+    return identifiers;
 };
 
-/** A salient query term, and whether it is (part of) an identifier. */
+/** A salient query term: the token it is known by, and the tokens a row must hold, in order and adjacent. */
 export interface SalientTerm {
+    /** Part of an identifier: `tokens` is the whole identifier, so `AB-5508` does not hold `5508` of `QZ-5508`. */
     code: boolean;
     term: string;
+    tokens: string[];
 }
+
+/** Whether `tokens` hold `sequence` in order and adjacent. */
+export const holdsSequence = (tokens: ReadonlyArray<string>, sequence: ReadonlyArray<string>): boolean => {
+    if (sequence.length === 1) {
+        return tokens.includes(sequence[0]!);
+    }
+
+    for (let start = 0; start + sequence.length <= tokens.length; start += 1) {
+        if (sequence.every((token, offset) => tokens[start + offset] === token)) {
+            return true;
+        }
+    }
+
+    return false;
+};
 
 /**
  * Every salient term of a query (no stopwords, no single letters), the most distinctive first: identifiers, then words
- * longest first, then numbers and times (`2019`, `5pm`). The first is the query's leading term; the lookups take only the first
- * `MAX_KEYWORD_TERMS`, scoring takes them all.
+ * longest first, then numbers and times (`2019`, `5pm`). The first is the query's leading term; the lookups take only the
+ * first `MAX_KEYWORD_TERMS`, scoring takes them all.
  */
 export const salientTermsOf = (searchText: string): SalientTerm[] => {
-    const codes = codeTokensOf(searchText);
+    const identifiers = identifiersOf(searchText);
     const rank = (term: string): number => {
-        if (codes.has(term)) {
+        if (identifiers.has(term)) {
             return 0;
         }
 
@@ -112,6 +152,8 @@ export const salientTermsOf = (searchText: string): SalientTerm[] => {
     return extractKeywordTerms(searchText, Infinity, searchTokensOf)
         .toSorted((a, b) => rank(a) - rank(b))
         .map((term) => {
-            return { code: codes.has(term), term };
+            const tokens = identifiers.get(term);
+
+            return { code: tokens !== undefined, term, tokens: tokens ?? [term] };
         });
 };

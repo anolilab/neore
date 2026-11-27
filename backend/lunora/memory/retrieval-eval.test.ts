@@ -125,12 +125,17 @@ const run = (query: FixtureQuery, vectors = true): { ids: string[]; inWindow: Se
     const window = selectCandidateWindow(active, { ...scope, limit: CANDIDATE_WINDOW_SIZE, today });
 
     // The search index, as it answers each term's lookup: every row of the user (other bots', superseded and expired
-    // ones too) with a token starting with the term, most occurrences first, then newest, cut to what a lookup reads;
-    // the lookup then keeps the whole-token, usable, in-scope rows (`keywordLookupOf`, as production).
+    // ones too) holding all of the term's tokens (the last as a prefix), most occurrences first, then newest, cut to what
+    // a lookup reads; the lookup then keeps the whole-token, usable, in-scope rows (`keywordLookupOf`, as production).
     const lookups = keywordLookupTerms(query.text).map((term) => {
         const fetched = rows
             .map((m) => {
-                return { m, tf: searchTokensOf(m.memory).filter((token) => token.startsWith(term)).length };
+                const tokens = searchTokensOf(m.memory);
+                const counts = term.tokens.map(
+                    (wanted, index) => tokens.filter((token) => (index === term.tokens.length - 1 ? token.startsWith(wanted) : token === wanted)).length,
+                );
+
+                return { m, tf: counts.every((count) => count > 0) ? counts.reduce((sum, count) => sum + count, 0) : 0 };
             })
             .filter(({ tf }) => tf > 0)
             .toSorted((a, b) => b.tf - a.tf || b.m._creationTime - a.m._creationTime || (a.m._id < b.m._id ? -1 : 1))
