@@ -335,6 +335,72 @@ describe("TaskSuggestions", () => {
         expect(hasFocus(elsewhere)).toBe(true);
     });
 
+    describe("when the live list drops a row this view did not decide", () => {
+        /** The live list answers without the row, as it does after a decision in another tab. */
+        const dropRow = async (client: ReturnType<typeof mountList>["client"], id: string) => {
+            state.rows = state.rows.filter((entry) => entry._id !== id);
+            await client.invalidateQueries({ queryKey: ["listTaskSuggestions"] });
+        };
+
+        it("moves focus to the next row when the row that held it is dropped", async () => {
+            state.rows = [row("s1", "Weekly notes"), row("s2", "Morning plants"), row("s3", "Odd one")];
+            const { client } = mountList();
+
+            const held = await screen.findByRole("button", { name: 'Accept "Morning plants"' });
+
+            held.focus();
+            await dropRow(client, "s2");
+
+            await waitFor(() => expect(screen.queryByRole("button", { name: 'Accept "Morning plants"' })).toBeNull());
+            await waitFor(() => expect(screen.getAllByRole("listitem").map((item) => hasFocus(item))).toEqual([false, true]));
+            expect(screen.getAllByRole("listitem")[1]?.textContent).toContain("Odd one");
+        });
+
+        it("moves focus to the previous row when the last row that held it is dropped, then to the heading when none is left", async () => {
+            state.rows = [row("s1", "Weekly notes"), row("s2", "Morning plants")];
+            const { client } = mountList();
+
+            const held = await screen.findByRole("button", { name: 'Dismiss "Morning plants"' });
+
+            held.focus();
+            await dropRow(client, "s2");
+
+            await waitFor(() => expect(hasFocus(screen.getByRole("listitem"))).toBe(true));
+            expect(screen.getByRole("listitem").textContent).toContain("Weekly notes");
+
+            screen.getByRole("button", { name: 'Dismiss "Weekly notes"' }).focus();
+            await dropRow(client, "s1");
+
+            await waitFor(() => expect(hasFocus(screen.getByRole("heading", { name: "Tasks" }))).toBe(true));
+        });
+
+        it("leaves focus alone when it was outside the list", async () => {
+            state.rows = [row("s1", "Weekly notes"), row("s2", "Morning plants")];
+            const { client } = mountList();
+
+            await screen.findByRole("button", { name: 'Accept "Weekly notes"' });
+            screen.getByRole("button", { name: "New task" }).focus();
+            await dropRow(client, "s1");
+
+            await waitFor(() => expect(screen.queryByRole("button", { name: 'Accept "Weekly notes"' })).toBeNull());
+            expect(hasFocus(screen.getByRole("button", { name: "New task" }))).toBe(true);
+        });
+
+        it("leaves focus alone when the person moved on from the row before it was dropped", async () => {
+            state.rows = [row("s1", "Weekly notes"), row("s2", "Morning plants")];
+            const { client } = mountList();
+
+            const held = await screen.findByRole("button", { name: 'Accept "Weekly notes"' });
+
+            held.focus();
+            screen.getByRole("button", { name: "New task" }).focus();
+            await dropRow(client, "s1");
+
+            await waitFor(() => expect(screen.queryByRole("button", { name: 'Accept "Weekly notes"' })).toBeNull());
+            expect(hasFocus(screen.getByRole("button", { name: "New task" }))).toBe(true);
+        });
+    });
+
     it("shows nothing of the last account's decisions after an account switch", async () => {
         state.rows = [row("s1", "Weekly notes")];
         const { rerenderPage } = mountList();

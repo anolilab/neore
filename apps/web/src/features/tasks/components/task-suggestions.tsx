@@ -35,6 +35,26 @@ const CLAMP_THRESHOLD = 70;
 const focusIsLost = (): boolean => document.activeElement === null || document.activeElement === document.body;
 
 /**
+ * The row to hand focus to when `held` (the row that last held focus) is gone from `ids`: the next row of the list as it
+ * was, else the previous one, as a removal made here does. Nothing when that row is still listed or none held focus.
+ */
+const neighbourOfRemoved = (
+    held: string | null,
+    before: ReadonlyArray<string>,
+    ids: ReadonlyArray<string>,
+): { decided: string; next: string | null } | null => {
+    if (held === null || ids.includes(held)) {
+        return null;
+    }
+
+    const index = before.indexOf(held);
+    const after = index === -1 ? [] : before.slice(index + 1);
+    const earlier = index === -1 ? [] : before.slice(0, index).toReversed();
+
+    return { decided: held, next: [...after, ...earlier].find((id) => ids.includes(id)) ?? null };
+};
+
+/**
  * The tasks the daily job suggests from the person's own messages: each can be accepted (which creates the task, and the
  * board shows it) or dismissed. Nothing is shown while there are none, which is also the case while the feature is off.
  * A decided row leaves the list at once, without waiting for the live list to say so. Its status region stays mounted
@@ -49,6 +69,10 @@ const TaskSuggestionsList: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
     const items = useRef(new Map<string, HTMLLIElement>());
     // Where focus goes once the decided row has left the list: the neighbouring row (focusable, so it is read out), or the fallback.
     const focusAfter = useRef<{ decided: string; next: string | null } | null>(null);
+    // The row that holds focus, and the rows as the last render listed them: a row the live list drops while it holds focus
+    // takes the focus with it (the browser sends no event for that), so its neighbour has to be found from the old order.
+    const heldRow = useRef<string | null>(null);
+    const knownIds = useRef<ReadonlyArray<string>>([]);
     const [busyId, setBusyId] = useState<string | null>(null);
     // Rows decided in this view: hidden at once, and kept hidden if the live list answers once more from before the decision.
     const [decidedIds, setDecidedIds] = useState<ReadonlyArray<string>>([]);
@@ -80,13 +104,21 @@ const TaskSuggestionsList: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
     const dismiss = useMutation(crpc.tasks.suggestions.dismissTaskSuggestion.mutationOptions(refresh));
 
     useEffect(() => {
-        const pending = focusAfter.current;
+        const ids: ReadonlyArray<string> = suggestions.map((suggestion) => suggestion._id);
+        const before = knownIds.current;
 
-        if (!pending || suggestions.some((suggestion) => suggestion._id === pending.decided)) {
+        knownIds.current = ids;
+
+        // A row leaves for one of two reasons: this view decided it (`focusAfter`), or the live list dropped it, for example
+        // after a decision in another tab. In the second case only a row that held focus has anything to hand over.
+        const pending = focusAfter.current ?? neighbourOfRemoved(heldRow.current, before, ids);
+
+        if (!pending || ids.includes(pending.decided)) {
             return;
         }
 
         focusAfter.current = null;
+        heldRow.current = null;
 
         // Focus moves only when the removed row still held it. A person who went on to another control meanwhile keeps theirs.
         if (!focusIsLost()) {
@@ -176,6 +208,22 @@ const TaskSuggestionsList: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
                             <li
                                 className="bg-card flex flex-wrap items-start justify-between gap-3 rounded-lg border p-3 outline-offset-2"
                                 key={id}
+                                onBlur={(event) => {
+                                    // Focus left this row when it went to another element, or to the page by a click. A row that was removed
+                                    // while holding it, or a window that lost focus, still counts as holding it.
+                                    const target = event.relatedTarget;
+                                    const left =
+                                        target instanceof Node
+                                            ? !event.currentTarget.contains(target)
+                                            : event.currentTarget.isConnected && !event.currentTarget.contains(document.activeElement);
+
+                                    if (left && heldRow.current === id) {
+                                        heldRow.current = null;
+                                    }
+                                }}
+                                onFocus={() => {
+                                    heldRow.current = id;
+                                }}
                                 ref={(element) => {
                                     if (element) {
                                         items.current.set(id, element);
