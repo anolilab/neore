@@ -1,3 +1,4 @@
+// @ts-nocheck: a build script for a data file, run by hand with node.
 // Builds retrieval-eval.json. Run: node backend/lunora/memory/__fixtures__/build-retrieval-eval.mjs
 // The phrase bank below is written by hand and everything is synthetic; the script only combines it, with a seeded
 // random generator, into personas, memories and labelled queries. The JSON it writes is the committed fixture.

@@ -4,6 +4,8 @@
  * below are the baseline; a change to retrieval that lowers one of them has to say why in its own pull request.
  */
 import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
@@ -49,7 +51,7 @@ interface Fixture {
 type Category = "abstain" | "multi" | "single" | "temporal" | "update";
 const CATEGORIES: Category[] = ["single", "multi", "temporal", "update", "abstain"];
 
-const fixture = JSON.parse(readFileSync(new URL("__fixtures__/retrieval-eval.json", import.meta.url), "utf8")) as Fixture;
+const fixture = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "__fixtures__/retrieval-eval.json"), "utf8")) as Fixture;
 const { now, today, vectorTopK, windowSize } = fixture.meta;
 
 const unitVector = (tags: Tags): number[] => {
