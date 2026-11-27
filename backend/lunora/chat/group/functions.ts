@@ -395,7 +395,8 @@ export const createPluginGroupChat = internalMutation
                 const gone: string[] = [];
 
                 for (const participant of stored.participants) {
-                    if (!(await ctx.db.skills.findFirst({ where: { _id: participant.skillId as Id<"skills"> } }))) {
+                    // From the primary: a replica that lags would call a live skill gone, and the one-to-one match below would fail.
+                    if (!(await ctx.db.skills.findFirst({ consistency: "primary", where: { _id: participant.skillId as Id<"skills"> } }))) {
                         gone.push(participant.skillId);
                     }
                 }
