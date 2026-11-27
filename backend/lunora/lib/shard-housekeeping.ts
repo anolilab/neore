@@ -635,6 +635,13 @@ export const runShardTick = internalMutation
             memoryCleanupAt = nextDueAt ?? undefined;
         });
 
+        // Expired Events webhook subscriptions (`public-api/event-webhooks.ts`): housekeeping no longer visits a dormant shard, so the
+        // tick reaps them here. A page that did not finish, or a failed reap, is armed for now.
+        let subscriptionsMore = false;
+        const subscriptionsChecked = await bestEffort("reapExpiredEventSubscriptionsOnTick", async () => {
+            ({ hasMore: subscriptionsMore } = await ctx.runMutation(internal.public_api.event_webhooks.reapExpiredEventSubscriptions, {}));
+        });
+
         const { now } = ctx;
         // The earliest export run due here. A read that fails must not stop the re-arming below: the shard is then armed for now, as
         // a reap that failed is.
@@ -690,7 +697,17 @@ export const runShardTick = internalMutation
 
         // The dispatch cleared this shard's due time; a reap, a merge check, a retention prune or an export-run read that failed recorded
         // no next time, so try again. So does an Events backlog the rounds above did not finish.
-        if (!reaped || !mergesChecked || !cleanupsChecked || !pruned || !triggersChecked || exportRunRead === undefined || eventsLeft) {
+        if (
+            !reaped ||
+            !mergesChecked ||
+            !cleanupsChecked ||
+            !subscriptionsChecked ||
+            subscriptionsMore ||
+            !pruned ||
+            !triggersChecked ||
+            exportRunRead === undefined ||
+            eventsLeft
+        ) {
             candidates.push(now);
         }
 

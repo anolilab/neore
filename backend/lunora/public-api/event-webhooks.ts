@@ -11,6 +11,7 @@ import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { isHostApproved } from "../auth/event-webhook-hosts";
 import { isErasing } from "../lib/account-moves";
+import { noteShardDue } from "../lib/shard-housekeeping";
 import { MAX_SUBSCRIPTIONS } from "./events-webhook";
 
 /** Expired rows reclaimed per sweep call. The sweep runs again on the next tick while it reports more. */
@@ -86,6 +87,8 @@ export const subscribeOn = async (ctx: Pick<MutationCtx, "db">, input: Subscribe
 
     if (existing && existing.expiresAt > now) {
         await ctx.db.patch("eventWebhookSubscriptions", existing._id, { expiresAt, secretCiphertext: input.secretCiphertext, updatedAt: now });
+        // A dormant shard is reaped only when the tick reaches it: wake it at this expiry (`lib/shard-housekeeping.ts`).
+        await noteShardDue(ctx, expiresAt + 1, input.userId);
 
         return { cursorSeq: existing.scanSeq, expiresAt, kind: "granted", truncated: false };
     }
@@ -144,6 +147,9 @@ export const subscribeOn = async (ctx: Pick<MutationCtx, "db">, input: Subscribe
     } else {
         await ctx.db.insert("eventWebhookSubscriptions", { ...fields, createdAt: now, userId: input.userId });
     }
+
+    // A dormant shard is reaped only when the tick reaches it: wake it at this expiry (`lib/shard-housekeeping.ts`).
+    await noteShardDue(ctx, expiresAt + 1, input.userId);
 
     return { cursorSeq: scanSeq, expiresAt, kind: "granted", truncated };
 };

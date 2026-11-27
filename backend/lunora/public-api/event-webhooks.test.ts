@@ -89,6 +89,16 @@ describe("events/subscribe store", () => {
         expect(await rows()).toHaveLength(0);
     });
 
+    it("wakes the owner's shard at the subscription's expiry, so a dormant shard's expired rows are reaped", async () => {
+        await approve();
+
+        expect(await subscribe(writeOf())).toMatchObject({ kind: "granted" });
+
+        const census = await harness.run(async (ctx: any) => await ctx.db.shardActivity.findFirst({ where: { shardKey: OWNER } }));
+
+        expect(census?.nextDueAt).toBe(NOW + TTL + 1);
+    });
+
     it("reaps the account's expired subscriptions at the cap, so they hold no slot", async () => {
         await approve();
         await harness.run(async (ctx: any) => {
