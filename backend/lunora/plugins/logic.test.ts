@@ -214,7 +214,7 @@ describe("bodyHash", () => {
     it("leaves out every header form the bundle parser accepts", async () => {
         const plain = await bodyHash(file("contentHash: aaa", "item"));
 
-        expect(await bodyHash(`\uFEFF\n---\ncontentHash: bbb\n---\nitem`)).toBe(plain);
+        expect(await bodyHash(`\u{FEFF}\n---\ncontentHash: bbb\n---\nitem`)).toBe(plain);
         expect(await bodyHash(`---  \ncontentHash: bbb\n---\t\nitem`)).toBe(plain);
         expect(await bodyHash(`---\ncontentHash: bbb\n...\nitem`)).toBe(plain);
     });

@@ -450,6 +450,7 @@ describe("a webhook secret when a later step fails", () => {
                 },
             }),
         );
+
         try {
             const preview = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown: next.markdown } as never)) as PreviewResult;
 
