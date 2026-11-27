@@ -555,7 +555,7 @@ msgid "{0} ({1}) asks you to sign in at {trustHosts}, which is a different site.
 msgstr "{0} ({1}) vous demande de vous connecter sur {trustHosts}, qui est un autre site. L’accès que vous y accordez sera envoyé à {2}. Ne continuez que si vous faites confiance à ce serveur pour ce compte."
 
 #. placeholder {0}: collection.name
-#: src/features/knowledge/components/collection-picker.tsx:67
+#: src/features/knowledge/components/collection-picker.tsx:69
 msgid "{0} (shared)"
 msgstr "{0} (partagée)"
 
@@ -2601,7 +2601,7 @@ msgstr "Ajouter un commentaire"
 msgid "Add a member from your organization to <0>{0}</0>"
 msgstr "Ajouter un membre de votre organisation à <0>{0}</0>"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:253
+#: src/features/auth/components/organization/billing-settings-card.tsx:250
 #: src/features/auth/components/team/team-settings-dialog.tsx:191
 msgid "Add a model..."
 msgstr "Ajouter un modèle..."
@@ -2707,6 +2707,10 @@ msgstr "Ajouter des commentaires"
 #: src/features/develop/components/review-panel.tsx:202
 msgid "Add comments on a line of the diff, then submit."
 msgstr "Ajoutez des commentaires sur une ligne du diff, puis envoyez."
+
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:299
+msgid "Add documents"
+msgstr "Ajouter des documents"
 
 #: src/features/settings/components/chat/custom-providers-settings.tsx:322
 #: src/features/settings/components/chat/custom-providers-settings.tsx:431
@@ -2930,7 +2934,7 @@ msgid "Added"
 msgstr "Ajouté"
 
 #. placeholder {0}: result.value
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:166
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:167
 msgid "Added \"{0}\" to knowledge base"
 msgstr "« {0} » ajouté à la base de connaissances"
 
@@ -3526,9 +3530,9 @@ msgstr "Aligner verticalement (V)"
 #: src/components/model-picker/model-picker.tsx:1317
 #: src/features/chat/thread-list/thread-list-filter-menu.tsx:120
 #: src/features/marketing/components/tutorials-page.tsx:130
-#: src/features/settings/components/chat/models-settings.tsx:414
-#: src/features/settings/components/chat/models-settings.tsx:435
-#: src/features/settings/components/chat/models-settings.tsx:456
+#: src/features/settings/components/chat/models-settings.tsx:419
+#: src/features/settings/components/chat/models-settings.tsx:440
+#: src/features/settings/components/chat/models-settings.tsx:461
 #: src/features/settings/connectors/connectors-page.tsx:63
 #: src/routes/(chat)/workflow/gallery.tsx:20
 msgid "All"
@@ -3539,7 +3543,7 @@ msgstr "Tous"
 msgid "All ({0})"
 msgstr "Tous ({0})"
 
-#: src/features/settings/components/chat/models-settings.tsx:353
+#: src/features/settings/components/chat/models-settings.tsx:354
 msgid "All {provider} models enabled"
 msgstr "Tous les modèles {provider} activés"
 
@@ -3586,11 +3590,11 @@ msgid "All Directions"
 msgstr "Toutes les directions"
 
 #. placeholder {0}: counts?.length ?? 0
-#: src/features/knowledge/components/collection-picker.tsx:63
+#: src/features/knowledge/components/collection-picker.tsx:65
 msgid "All files ({0})"
 msgstr "Tous les fichiers ({0})"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:210
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:211
 msgid "All files removed from knowledge base"
 msgstr "Tous les fichiers ont été retirés de la base de connaissances"
 
@@ -3628,11 +3632,11 @@ msgstr "Tous les modèles et outils"
 msgid "All models allowed (Enterprise)"
 msgstr "Tous les modèles autorisés (Enterprise)"
 
-#: src/features/settings/components/chat/models-settings.tsx:312
+#: src/features/settings/components/chat/models-settings.tsx:313
 msgid "All models disabled"
 msgstr "Tous les modèles sont désactivés"
 
-#: src/features/settings/components/chat/models-settings.tsx:291
+#: src/features/settings/components/chat/models-settings.tsx:292
 msgid "All models enabled"
 msgstr "Tous les modèles activés"
 
@@ -3760,7 +3764,7 @@ msgstr "Autoriser une fois"
 msgid "Allow this site ({0})"
 msgstr "Autoriser ce site ({0})"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:224
+#: src/features/auth/components/organization/billing-settings-card.tsx:221
 #: src/features/auth/components/team/team-settings-dialog.tsx:170
 msgid "Allowed AI Models"
 msgstr "Modèles d’IA autorisés"
@@ -5452,23 +5456,23 @@ msgstr "Facturé sur votre propre clé API, pas sur vos crédits."
 msgid "Billing"
 msgstr "Facturation"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:321
+#: src/features/auth/components/organization/billing-settings-card.tsx:317
 msgid "Billing details for this organization"
 msgstr "Détails de facturation de cette organisation"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:202
-#: src/features/auth/components/organization/billing-settings-card.tsx:216
+#: src/features/auth/components/organization/billing-settings-card.tsx:195
+#: src/features/auth/components/organization/billing-settings-card.tsx:201
 msgid "Billing Email"
 msgstr "E-mail de facturation"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:136
-#: src/features/auth/components/organization/billing-settings-card.tsx:282
-#: src/features/auth/components/organization/billing-settings-card.tsx:322
-#: src/features/auth/components/organization/billing-settings-card.tsx:345
+#: src/features/auth/components/organization/billing-settings-card.tsx:137
+#: src/features/auth/components/organization/billing-settings-card.tsx:278
+#: src/features/auth/components/organization/billing-settings-card.tsx:318
+#: src/features/auth/components/organization/billing-settings-card.tsx:341
 msgid "Billing Settings"
 msgstr "Paramètres de facturation"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:83
+#: src/features/auth/components/organization/billing-settings-card.tsx:84
 msgid "Billing settings updated successfully"
 msgstr "Paramètres de facturation mis à jour avec succès"
 
@@ -6165,7 +6169,7 @@ msgstr "Canada"
 #: src/features/evals/components/save-eval-case-action.tsx:137
 #: src/features/feedback/components/send-feedback-dialog.tsx:385
 #: src/features/knowledge/components/collection-dialog.tsx:97
-#: src/features/knowledge/components/collection-picker.tsx:112
+#: src/features/knowledge/components/collection-picker.tsx:113
 #: src/features/local-models/components/ollama-model-manager.tsx:300
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
@@ -6304,7 +6308,7 @@ msgstr "Éditeur de canevas"
 msgid "Canvas opens a side-by-side editor next to your chat. Write long-form documents, edit code, and refine content with AI assistance. Changes are versioned so you can always go back."
 msgstr "Le canevas ouvre un éditeur à côté de votre chat. Rédigez des documents longs, modifiez du code et peaufinez vos contenus avec l’aide de l’IA. Les modifications sont versionnées : vous pouvez toujours revenir en arrière."
 
-#: src/features/settings/components/chat/models-settings.tsx:477
+#: src/features/settings/components/chat/models-settings.tsx:482
 msgid "Capabilities"
 msgstr "Capacités"
 
@@ -6930,6 +6934,10 @@ msgstr "Choisissez le système de caméra pour votre plan"
 msgid "Choose the project's folder, or type a path."
 msgstr "Choisissez le dossier du projet, ou saisissez un chemin."
 
+#: src/features/knowledge/components/collection-picker.tsx:123
+msgid "Choose which files to show and add to. New uploads go into the collection you pick."
+msgstr "Choisissez les fichiers à afficher et où ajouter. Les nouveaux envois vont dans la collection choisie."
+
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:357
 #~ msgid "Choose which tools the assistant may use on its own, which need your approval, and which are off."
 #~ msgstr "Choisissez les outils que l’assistant peut utiliser seul, ceux qui nécessitent votre approbation et ceux qui sont désactivés."
@@ -7088,7 +7096,7 @@ msgstr "Échec du nettoyage"
 #: src/features/chat/thread/media-gallery-view.tsx:382
 #: src/features/prompts/components/prompt-list.tsx:614
 #: src/features/settings/components/chat/api-keys-settings.tsx:382
-#: src/features/settings/components/chat/models-settings.tsx:469
+#: src/features/settings/components/chat/models-settings.tsx:474
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:370
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:379
 msgid "Clear"
@@ -7572,15 +7580,15 @@ msgstr "Réduire le groupe pour masquer ses éléments"
 msgid "Collapse textarea"
 msgstr "Réduire la zone de texte"
 
-#: src/features/knowledge/components/collection-picker.tsx:76
+#: src/features/knowledge/components/collection-picker.tsx:124
 msgid "Collection"
 msgstr "Collection"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:240
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:241
 msgid "Collection and its files deleted"
 msgstr "Collection et ses fichiers supprimés"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:240
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:241
 msgid "Collection deleted; its files are now uncategorised"
 msgstr "Collection supprimée ; ses fichiers sont désormais non classés"
 
@@ -8065,8 +8073,8 @@ msgstr "Configurer les paramètres de l’équipe « {teamName} »"
 msgid "Configure team settings"
 msgstr "Configurer les paramètres de l’équipe"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:135
-#: src/features/auth/components/organization/billing-settings-card.tsx:280
+#: src/features/auth/components/organization/billing-settings-card.tsx:136
+#: src/features/auth/components/organization/billing-settings-card.tsx:276
 msgid "Configure the billing contact and available AI models"
 msgstr "Configurez le contact de facturation et les modèles d’IA disponibles"
 
@@ -9290,7 +9298,7 @@ msgstr "Impossible de charger l’origine de ce souvenir."
 msgid "Could not load your activity."
 msgstr "Impossible de charger votre activité."
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:327
+#: src/features/auth/components/organization/billing-settings-card.tsx:323
 msgid "Could not load your organization's billing details. Try again later."
 msgstr "Impossible de charger les détails de facturation de votre organisation. Réessayez plus tard."
 
@@ -9969,7 +9977,7 @@ msgid "Credits"
 msgstr "Crédits"
 
 #: src/features/auth/components/organization/billing-settings-card.tsx:190
-#: src/features/auth/components/organization/billing-settings-card.tsx:350
+#: src/features/auth/components/organization/billing-settings-card.tsx:346
 msgid "Credits per user:"
 msgstr "Crédits par utilisateur :"
 
@@ -10068,7 +10076,7 @@ msgid "Current Prompt Variables"
 msgstr "Variables du prompt actuel"
 
 #: src/features/auth/components/organization/billing-settings-card.tsx:187
-#: src/features/auth/components/organization/billing-settings-card.tsx:349
+#: src/features/auth/components/organization/billing-settings-card.tsx:345
 msgid "Current tier:"
 msgstr "Niveau actuel :"
 
@@ -10692,7 +10700,7 @@ msgstr "Supprimer"
 #. placeholder {0}: deletingSkill.name
 #. placeholder {0}: deletingTrigger.name
 #. placeholder {0}: selected.name
-#: src/features/knowledge/components/collection-picker.tsx:106
+#: src/features/knowledge/components/collection-picker.tsx:107
 #: src/features/settings/components/chat/trigger-settings.tsx:1094
 #: src/features/skills/components/skill-list.tsx:317
 msgid "Delete \"{0}\"?"
@@ -10769,7 +10777,7 @@ msgstr "Supprimer l’avatar"
 msgid "Delete case {0}"
 msgstr "Supprimer le cas {0}"
 
-#: src/features/knowledge/components/collection-picker.tsx:101
+#: src/features/knowledge/components/collection-picker.tsx:102
 msgid "Delete collection"
 msgstr "Supprimer la collection"
 
@@ -10972,7 +10980,7 @@ msgstr "Supprimer le déclencheur"
 msgid "Delete trigger?"
 msgstr "Supprimer le déclencheur ?"
 
-#: src/features/knowledge/components/collection-picker.tsx:113
+#: src/features/knowledge/components/collection-picker.tsx:114
 msgid "Delete with files"
 msgstr "Supprimer avec les fichiers"
 
@@ -11422,7 +11430,7 @@ msgstr "Directory (tenant) ID — obligatoire pour les bots à locataire unique,
 msgid "Disable 2FA"
 msgstr "Désactiver la 2FA"
 
-#: src/features/settings/components/chat/models-settings.tsx:376
+#: src/features/settings/components/chat/models-settings.tsx:380
 msgid "Disable All"
 msgstr "Tout désactiver"
 
@@ -11892,7 +11900,7 @@ msgstr "Rédigez, modifiez et peaufinez des contenus longs dans un canevas côte
 msgid "Drafts"
 msgstr "Brouillons"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:313
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:317
 msgid "Drag & drop files here, or click to browse"
 msgstr "Glissez-déposez des fichiers ici, ou cliquez pour parcourir"
 
@@ -11934,7 +11942,7 @@ msgstr "Déposez un fichier ou cliquez pour l’importer"
 msgid "Drop files here"
 msgstr "Déposez les fichiers ici"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:313
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:317
 msgid "Drop files here..."
 msgstr "Déposez les fichiers ici..."
 
@@ -12244,7 +12252,7 @@ msgid "Edit case {0}"
 msgstr "Modifier le cas {0}"
 
 #: src/features/knowledge/components/collection-dialog.tsx:52
-#: src/features/knowledge/components/collection-picker.tsx:97
+#: src/features/knowledge/components/collection-picker.tsx:98
 msgid "Edit collection"
 msgstr "Modifier la collection"
 
@@ -12673,8 +12681,8 @@ msgstr "Activer la 2FA"
 msgid "Enable a skill first — only enabled skills can be evaluated."
 msgstr "Activez d’abord une compétence — seules les compétences activées peuvent être évaluées."
 
-#: src/features/settings/components/chat/models-settings.tsx:373
-#: src/features/settings/components/chat/models-settings.tsx:511
+#: src/features/settings/components/chat/models-settings.tsx:377
+#: src/features/settings/components/chat/models-settings.tsx:518
 msgid "Enable All"
 msgstr "Tout activer"
 
@@ -12715,7 +12723,7 @@ msgstr "Activer pour la prochaine conversation"
 msgid "Enable memory"
 msgstr "Activer la mémoire"
 
-#: src/features/settings/components/chat/models-settings.tsx:366
+#: src/features/settings/components/chat/models-settings.tsx:370
 msgid "Enable or disable models to control which ones appear in the model selector."
 msgstr "Activez ou désactivez des modèles pour choisir ceux qui apparaissent dans le sélecteur de modèles."
 
@@ -12933,7 +12941,7 @@ msgstr "Saisissez une région AWS valide, par ex. us-east-1"
 msgid "Enter an API version such as v1 or 2024-10-21"
 msgstr "Saisissez une version d'API comme v1 ou 2024-10-21"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:207
+#: src/features/auth/components/organization/billing-settings-card.tsx:206
 msgid "Enter billing email"
 msgstr "Saisissez l’e-mail de facturation"
 
@@ -13364,7 +13372,7 @@ msgstr "Tous les modèles"
 msgid "Every model and tool, 1,000 messages a day."
 msgstr "Tous les modèles et outils, 1 000 messages par jour."
 
-#: src/features/settings/components/chat/models-settings.tsx:576
+#: src/features/settings/components/chat/models-settings.tsx:587
 msgid "Every model returns to its default on or off setting."
 msgstr "Chaque modèle retrouve son réglage par défaut (activé ou désactivé)."
 
@@ -14090,7 +14098,7 @@ msgstr "Impossible de supprimer {fileName}"
 msgid "Failed to delete budget alert"
 msgstr "Impossible de supprimer l’alerte de budget"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:242
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:243
 msgid "Failed to delete collection"
 msgstr "Impossible de supprimer la collection"
 
@@ -14174,7 +14182,7 @@ msgstr "Impossible de retirer la collection"
 msgid "Failed to detach file"
 msgstr "Impossible de détacher le fichier"
 
-#: src/features/settings/components/chat/models-settings.tsx:314
+#: src/features/settings/components/chat/models-settings.tsx:315
 msgid "Failed to disable all models"
 msgstr "Impossible de désactiver tous les modèles"
 
@@ -14198,11 +14206,11 @@ msgstr "Impossible de télécharger l’export"
 msgid "Failed to download file. Please try again."
 msgstr "Impossible de télécharger le fichier. Veuillez réessayer."
 
-#: src/features/settings/components/chat/models-settings.tsx:293
+#: src/features/settings/components/chat/models-settings.tsx:294
 msgid "Failed to enable all models"
 msgstr "Impossible d’activer tous les modèles"
 
-#: src/features/settings/components/chat/models-settings.tsx:355
+#: src/features/settings/components/chat/models-settings.tsx:356
 msgid "Failed to enable models by provider"
 msgstr "Impossible d’activer les modèles du fournisseur"
 
@@ -14308,7 +14316,7 @@ msgstr "Impossible de charger le flux vidéo."
 msgid "Failed to make thread permanent"
 msgstr "Impossible de rendre la conversation permanente"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:224
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:225
 msgid "Failed to move file"
 msgstr "Impossible de déplacer le fichier"
 
@@ -14339,7 +14347,7 @@ msgstr "Impossible de coller. Veuillez réessayer."
 msgid "Failed to pin thread"
 msgstr "Impossible d’épingler la conversation"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:208
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:209
 msgid "Failed to remove {failed} file(s)"
 msgstr "Impossible de retirer {failed} fichier(s)"
 
@@ -14355,7 +14363,7 @@ msgstr "Impossible de supprimer la clé API {toolId}"
 msgid "Failed to remove endpoint"
 msgstr "Impossible de supprimer le point de terminaison"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:92
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:93
 msgid "Failed to remove file"
 msgstr "Impossible de retirer le fichier"
 
@@ -14391,7 +14399,7 @@ msgstr "Impossible de réorganiser les tags"
 msgid "Failed to request export"
 msgstr "Impossible de demander l’export"
 
-#: src/features/settings/components/chat/models-settings.tsx:327
+#: src/features/settings/components/chat/models-settings.tsx:328
 msgid "Failed to reset to defaults"
 msgstr "Impossible de rétablir les valeurs par défaut"
 
@@ -14628,7 +14636,7 @@ msgstr "Impossible de mettre à jour le serveur MCP"
 msgid "Failed to update memory"
 msgstr "Impossible de mettre à jour le souvenir"
 
-#: src/features/settings/components/chat/models-settings.tsx:270
+#: src/features/settings/components/chat/models-settings.tsx:271
 msgid "Failed to update model"
 msgstr "Impossible de mettre à jour le modèle"
 
@@ -14697,7 +14705,7 @@ msgstr "Impossible de mettre à jour le rôle de l’utilisateur"
 msgid "Failed to upload avatar"
 msgstr "Impossible d’importer l’avatar"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:148
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:149
 msgid "Failed to upload file. Please try again."
 msgstr "Impossible d’importer le fichier. Veuillez réessayer."
 
@@ -14796,7 +14804,7 @@ msgstr "rapide"
 #: ../../packages/chat-ui/src/model-picker/utils.ts:153
 #: src/components/model-picker/model-picker.tsx:80
 #: src/features/marketing/components/model-detail-page.tsx:33
-#: src/features/settings/components/chat/models-settings.tsx:30
+#: src/features/settings/components/chat/models-settings.tsx:31
 msgid "Fast"
 msgstr "Rapide"
 
@@ -15189,7 +15197,7 @@ msgstr "Entrée de fichier"
 msgid "File patterns, one per line"
 msgstr "Motifs de fichier, un par ligne"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:96
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:97
 msgid "File removed from knowledge base"
 msgstr "Fichier retiré de la base de connaissances"
 
@@ -15197,7 +15205,7 @@ msgstr "Fichier retiré de la base de connaissances"
 msgid "File size exceeds {maxSize}"
 msgstr "La taille du fichier dépasse {maxSize}"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:260
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:261
 #: src/features/vault/components/upload-zone.tsx:92
 msgid "File size too large. Maximum 5MB allowed."
 msgstr "Fichier trop volumineux. 5 Mo maximum."
@@ -15218,7 +15226,7 @@ msgstr "Type de fichier non accepté"
 msgid "File type not supported."
 msgstr "Type de fichier non pris en charge."
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:262
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:263
 msgid "File type not supported. Supported: PDF, DOCX, TXT, MD, CSV, JSON, XLS, XLSX."
 msgstr "Type de fichier non pris en charge. Formats pris en charge : PDF, DOCX, TXT, MD, CSV, JSON, XLS, XLSX."
 
@@ -15226,7 +15234,7 @@ msgstr "Type de fichier non pris en charge. Formats pris en charge : PDF, DOCX, 
 msgid "File upload"
 msgstr "Importation de fichier"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:264
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:265
 #: src/features/vault/components/upload-zone.tsx:96
 msgid "File upload rejected."
 msgstr "Importation du fichier refusée."
@@ -15390,7 +15398,7 @@ msgid "Filtering"
 msgstr "Filtrage"
 
 #: src/features/canvas/canvas-panel.tsx:126
-#: src/features/settings/components/chat/models-settings.tsx:399
+#: src/features/settings/components/chat/models-settings.tsx:404
 msgid "Filters"
 msgstr "Filtres"
 
@@ -15795,8 +15803,8 @@ msgstr "France"
 #: src/features/billing/components/personal-plan-card.tsx:27
 #: src/features/marketing/components/gateway-landing-page.tsx:113
 #: src/features/marketing/components/landing-page.tsx:327
-#: src/features/settings/components/chat/models-settings.tsx:40
-#: src/features/settings/components/chat/models-settings.tsx:555
+#: src/features/settings/components/chat/models-settings.tsx:41
+#: src/features/settings/components/chat/models-settings.tsx:564
 msgid "Free"
 msgstr "Gratuit"
 
@@ -17780,7 +17788,7 @@ msgstr "illustration"
 #: src/features/chat/thread/composer.tsx:131
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:605
-#: src/features/settings/components/chat/models-settings.tsx:41
+#: src/features/settings/components/chat/models-settings.tsx:42
 #: src/features/settings/lib/settings-keywords.ts:74
 #: src/features/settings/lib/settings-keywords.ts:75
 #: src/features/settings/lib/settings-keywords.ts:76
@@ -17838,7 +17846,7 @@ msgid "image editing"
 msgstr "retouche d’image"
 
 #: src/components/model-picker/model-picker.tsx:81
-#: src/features/settings/components/chat/models-settings.tsx:34
+#: src/features/settings/components/chat/models-settings.tsx:35
 msgid "Image Gen"
 msgstr "Génération d’images"
 
@@ -19075,7 +19083,7 @@ msgstr "Conserver les lignes actuelles"
 msgid "Keep editing"
 msgstr "Continuer la modification"
 
-#: src/features/knowledge/components/collection-picker.tsx:114
+#: src/features/knowledge/components/collection-picker.tsx:115
 msgid "Keep files"
 msgstr "Conserver les fichiers"
 
@@ -19095,7 +19103,7 @@ msgstr "Conservez une partie de la vidéo. La partie conservée est réencodée 
 msgid "Keep Permanently"
 msgstr "Conserver définitivement"
 
-#: src/features/knowledge/components/collection-picker.tsx:108
+#: src/features/knowledge/components/collection-picker.tsx:109
 msgid "Keep the files as uncategorised, or delete them together with the collection. Chats and projects that use the collection stop searching it."
 msgstr "Conservez les fichiers comme non classés ou supprimez-les avec la collection. Les conversations et projets qui utilisent la collection cessent d’y chercher."
 
@@ -19176,7 +19184,7 @@ msgstr "Base de connaissances"
 
 #: src/features/chat/header/kb-attachment-button.tsx:186
 #: src/features/layout/lib/dashboard-page-names.ts:26
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:278
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:279
 #: src/features/settings/lib/settings-navigation.ts:107
 msgid "Knowledge Base"
 msgstr "Base de connaissances"
@@ -21801,7 +21809,7 @@ msgstr "Mode"
 msgid "Mode {0}, on {1}. Nothing starts when it is created."
 msgstr "Mode {0}, sur {1}. Rien ne démarre à sa création."
 
-#: src/features/settings/components/chat/models-settings.tsx:427
+#: src/features/settings/components/chat/models-settings.tsx:432
 msgid "Mode:"
 msgstr "Mode :"
 
@@ -21853,11 +21861,11 @@ msgstr "Comparaison de modèles"
 msgid "Model context usage"
 msgstr "Utilisation du contexte du modèle"
 
-#: src/features/settings/components/chat/models-settings.tsx:268
+#: src/features/settings/components/chat/models-settings.tsx:269
 msgid "Model disabled"
 msgstr "Modèle désactivé"
 
-#: src/features/settings/components/chat/models-settings.tsx:268
+#: src/features/settings/components/chat/models-settings.tsx:269
 msgid "Model enabled"
 msgstr "Modèle activé"
 
@@ -21918,7 +21926,7 @@ msgstr "Modèle : OpenAI Whisper"
 #: src/features/marketing/components/navbar-menu.tsx:58
 #: src/features/marketing/components/navbar-menu.tsx:159
 #: src/features/settings/components/chat/custom-providers-settings.tsx:556
-#: src/features/settings/components/chat/models-settings.tsx:369
+#: src/features/settings/components/chat/models-settings.tsx:373
 #: src/features/settings/components/chat/native-providers-settings.tsx:633
 #: src/features/settings/lib/settings-navigation.ts:109
 msgid "Models"
@@ -22167,7 +22175,7 @@ msgstr "Mouvement : {motionPercent} %"
 msgid "Mountain Time (US & Canada)"
 msgstr "Heure des Rocheuses (États-Unis et Canada)"
 
-#: src/features/knowledge/components/collection-picker.tsx:157
+#: src/features/knowledge/components/collection-picker.tsx:163
 msgid "Move \"{fileName}\" to a collection"
 msgstr "Déplacer « {fileName} » vers une collection"
 
@@ -22361,7 +22369,7 @@ msgstr "plusieurs images"
 msgid "Mumbai, Kolkata"
 msgstr "Mumbai, Calcutta"
 
-#: src/features/settings/components/chat/models-settings.tsx:42
+#: src/features/settings/components/chat/models-settings.tsx:43
 msgid "Music"
 msgstr "Musique"
 
@@ -22805,8 +22813,8 @@ msgstr "Jamais utilisée"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:194
 #: src/components/model-picker/model-picker.tsx:375
-#: src/features/settings/components/chat/models-settings.tsx:43
-#: src/features/settings/components/chat/models-settings.tsx:552
+#: src/features/settings/components/chat/models-settings.tsx:44
+#: src/features/settings/components/chat/models-settings.tsx:561
 msgid "New"
 msgstr "Nouveau"
 
@@ -22868,7 +22876,7 @@ msgid "New chats with this bot start in the chosen mode"
 msgstr "Les nouvelles discussions avec ce bot démarrent dans le mode choisi"
 
 #: src/features/knowledge/components/collection-dialog.tsx:52
-#: src/features/knowledge/components/collection-picker.tsx:93
+#: src/features/knowledge/components/collection-picker.tsx:94
 msgid "New collection"
 msgstr "Nouvelle collection"
 
@@ -23490,7 +23498,7 @@ msgstr "Aucun micro trouvé."
 msgid "No models available"
 msgstr "Aucun modèle disponible"
 
-#: src/features/settings/components/chat/models-settings.tsx:502
+#: src/features/settings/components/chat/models-settings.tsx:509
 msgid "No models found matching your filters."
 msgstr "Aucun modèle ne correspond à vos filtres."
 
@@ -24530,7 +24538,7 @@ msgstr "Dans une seule exécution"
 msgid "Only listed tools"
 msgstr "Uniquement les outils listés"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:344
+#: src/features/auth/components/organization/billing-settings-card.tsx:340
 msgid "Only organization owners can manage billing settings"
 msgstr "Seuls les propriétaires de l’organisation peuvent gérer les paramètres de facturation"
 
@@ -25540,7 +25548,7 @@ msgstr "Prompt système d’origine"
 #: src/features/admin/components/feedback-admin-page.tsx:24
 #: src/features/admin/components/feedback-admin-page.tsx:171
 #: src/features/feedback/components/send-feedback-dialog.tsx:30
-#: src/features/settings/components/chat/models-settings.tsx:508
+#: src/features/settings/components/chat/models-settings.tsx:515
 msgid "Other"
 msgstr "Autre"
 
@@ -25668,15 +25676,15 @@ msgstr "Axé sur le format de sortie"
 msgid "Output:"
 msgstr "Sortie :"
 
-#: src/features/settings/components/chat/models-settings.tsx:562
+#: src/features/settings/components/chat/models-settings.tsx:571
 msgid "Overridden"
 msgstr "Remplacé"
 
-#: src/features/settings/components/chat/models-settings.tsx:560
+#: src/features/settings/components/chat/models-settings.tsx:569
 msgid "Overridden: Disabled"
 msgstr "Remplacé : désactivé"
 
-#: src/features/settings/components/chat/models-settings.tsx:560
+#: src/features/settings/components/chat/models-settings.tsx:569
 msgid "Overridden: Enabled"
 msgstr "Remplacé : activé"
 
@@ -26120,7 +26128,7 @@ msgstr "Paiements, abonnements et données financières"
 
 #: src/components/model-picker/model-picker.tsx:82
 #: src/features/canvas/pdf-preview-panel.tsx:80
-#: src/features/settings/components/chat/models-settings.tsx:35
+#: src/features/settings/components/chat/models-settings.tsx:36
 msgid "PDF"
 msgstr "PDF"
 
@@ -26132,7 +26140,7 @@ msgstr "Document PDF"
 msgid "PDF preview"
 msgstr "Aperçu du PDF"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:314
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:298
 msgid "PDF, DOCX, TXT, MD, CSV, JSON, XLS, XLSX — max 5MB"
 msgstr "PDF, DOCX, TXT, MD, CSV, JSON, XLS, XLSX — 5 Mo max."
 
@@ -26787,7 +26795,7 @@ msgstr "Préfère le modèle {0}."
 msgid "premium"
 msgstr "premium"
 
-#: src/features/settings/components/chat/models-settings.tsx:44
+#: src/features/settings/components/chat/models-settings.tsx:45
 #: src/features/settings/connectors/connector-card.tsx:167
 msgid "Premium"
 msgstr "Premium"
@@ -27165,7 +27173,7 @@ msgstr "Privé par défaut"
 #: src/features/billing/components/personal-plan-card.tsx:27
 #: src/features/marketing/components/gateway-landing-page.tsx:131
 #: src/features/marketing/components/landing-page.tsx:345
-#: src/features/settings/components/chat/models-settings.tsx:549
+#: src/features/settings/components/chat/models-settings.tsx:558
 #: src/features/workflow/components/nodes/pro-badge.tsx:6
 msgid "Pro"
 msgstr "Pro"
@@ -27627,7 +27635,7 @@ msgstr "Restrictions de fournisseurs"
 msgid "Provider updated"
 msgstr "Fournisseur mis à jour"
 
-#: src/features/settings/components/chat/models-settings.tsx:406
+#: src/features/settings/components/chat/models-settings.tsx:411
 msgid "Provider:"
 msgstr "Fournisseur :"
 
@@ -28244,7 +28252,7 @@ msgstr "raisonnement"
 #: ../../packages/chat-ui/src/model-picker/utils.ts:161
 #: ../../packages/ui/src/components/ai-elements/context.tsx:316
 #: src/features/chat/thread/message-cost-badge.tsx:64
-#: src/features/settings/components/chat/models-settings.tsx:32
+#: src/features/settings/components/chat/models-settings.tsx:33
 msgid "Reasoning"
 msgstr "Raisonnement"
 
@@ -28801,7 +28809,7 @@ msgstr "Supprimer {fileName}"
 msgid "Remove {label}"
 msgstr "Supprimer {label}"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:232
+#: src/features/auth/components/organization/billing-settings-card.tsx:229
 #: src/features/auth/components/team/team-settings-dialog.tsx:177
 msgid "Remove {model}"
 msgstr "Retirer {model}"
@@ -29299,7 +29307,7 @@ msgstr "Renvoyer l’e-mail de vérification"
 #: ../../packages/ui/src/components/image-editor.tsx:311
 #: src/features/canvas/canvas-panel.tsx:240
 #: src/features/chat/components/cinema-studio/cinema-panel.tsx:88
-#: src/features/settings/components/chat/models-settings.tsx:575
+#: src/features/settings/components/chat/models-settings.tsx:586
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:351
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:100
 msgid "Reset"
@@ -29319,7 +29327,7 @@ msgstr "Réinitialiser {roleLabel} à votre valeur par défaut"
 msgid "Reset execution state"
 msgstr "Réinitialiser l’état d’exécution"
 
-#: src/features/settings/components/chat/models-settings.tsx:583
+#: src/features/settings/components/chat/models-settings.tsx:594
 msgid "Reset models to defaults?"
 msgstr "Rétablir les modèles par défaut ?"
 
@@ -29336,11 +29344,11 @@ msgstr "Réinitialiser le mot de passe"
 msgid "Reset sorting"
 msgstr "Réinitialiser le tri"
 
-#: src/features/settings/components/chat/models-settings.tsx:325
+#: src/features/settings/components/chat/models-settings.tsx:326
 msgid "Reset to defaults"
 msgstr "Rétablir les valeurs par défaut"
 
-#: src/features/settings/components/chat/models-settings.tsx:380
+#: src/features/settings/components/chat/models-settings.tsx:384
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:409
 msgid "Reset to Defaults"
 msgstr "Rétablir les valeurs par défaut"
@@ -30156,8 +30164,8 @@ msgstr "Arabie saoudite"
 
 #: ../../packages/ui/src/components/inline-edit.tsx:119
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:118
-#: src/features/auth/components/organization/billing-settings-card.tsx:132
-#: src/features/auth/components/organization/billing-settings-card.tsx:277
+#: src/features/auth/components/organization/billing-settings-card.tsx:133
+#: src/features/auth/components/organization/billing-settings-card.tsx:273
 #: src/features/auth/components/organization/organization-name-card.tsx:100
 #: src/features/auth/components/organization/organization-name-card.tsx:155
 #: src/features/auth/components/organization/organization-slug-card.tsx:105
@@ -30609,7 +30617,7 @@ msgstr "Mode de recherche : {0}"
 msgid "Search mode: {0}."
 msgstr "Mode de recherche : {0}."
 
-#: src/features/settings/components/chat/models-settings.tsx:391
+#: src/features/settings/components/chat/models-settings.tsx:396
 msgid "Search models by name, ID, or provider..."
 msgstr "Rechercher des modèles par nom, identifiant ou fournisseur..."
 
@@ -31063,7 +31071,7 @@ msgstr "Sélectionner jusqu’à la dernière colonne"
 msgid "Select to top of table"
 msgstr "Sélectionner jusqu’en haut du tableau"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:223
+#: src/features/auth/components/organization/billing-settings-card.tsx:220
 msgid "Select which AI models organization members can use. Leave empty for enterprise to allow all models."
 msgstr "Sélectionnez les modèles d’IA que les membres de l’organisation peuvent utiliser. Laissez vide en Enterprise pour autoriser tous les modèles."
 
@@ -31596,7 +31604,7 @@ msgstr "Conversations partagées"
 msgid "Shared with me"
 msgstr "Partagées avec moi"
 
-#: src/features/knowledge/components/collection-picker.tsx:90
+#: src/features/knowledge/components/collection-picker.tsx:91
 msgid "Shared with your organization"
 msgstr "Partagée avec votre organisation"
 
@@ -33169,7 +33177,7 @@ msgstr "La qualité de pointe d’OpenAI"
 msgid "State-of-the-art performance across all benchmarks"
 msgstr "Des performances à la pointe sur tous les benchmarks"
 
-#: src/features/settings/components/chat/models-settings.tsx:448
+#: src/features/settings/components/chat/models-settings.tsx:453
 msgid "State:"
 msgstr "État :"
 
@@ -34592,7 +34600,7 @@ msgstr "texte"
 #: src/features/chat/thread/composer.tsx:130
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:567
-#: src/features/settings/components/chat/models-settings.tsx:45
+#: src/features/settings/components/chat/models-settings.tsx:46
 #: src/features/settings/lib/settings-keywords.ts:70
 #: src/features/settings/lib/settings-keywords.ts:71
 #: src/features/settings/lib/settings-keywords.ts:72
@@ -36228,7 +36236,7 @@ msgstr "Ce code n’est pas valide ou a déjà été utilisé. Relancez `neore l
 msgid "This code was opened with a different account. Sign in with that account, or run `neore login --device` or `neore-host pair` again."
 msgstr "Ce code a été ouvert avec un autre compte. Connectez-vous avec ce compte, ou relancez `neore login --device` ou `neore-host pair`."
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:294
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:293
 msgid "This collection is shared with you by a member of your organization. You can attach it to chats and projects; only its owner can change its files."
 msgstr "Cette collection vous est partagée par un membre de votre organisation. Vous pouvez la joindre à des conversations et des projets ; seul son propriétaire peut modifier ses fichiers."
 
@@ -37269,7 +37277,7 @@ msgstr "appel d’outils"
 #: ../../packages/chat-ui/src/model-picker/utils.ts:169
 #: ../../packages/chat-ui/src/model-picker/utils.ts:173
 #: src/components/model-picker/model-picker.tsx:84
-#: src/features/settings/components/chat/models-settings.tsx:33
+#: src/features/settings/components/chat/models-settings.tsx:34
 msgid "Tool Calling"
 msgstr "Appel d’outils"
 
@@ -37991,12 +37999,12 @@ msgstr "Débannir l’utilisateur"
 msgid "Unbans"
 msgstr "Débannissements"
 
-#: src/features/knowledge/components/collection-picker.tsx:140
+#: src/features/knowledge/components/collection-picker.tsx:146
 msgid "Uncategorised"
 msgstr "Non classés"
 
 #. placeholder {0}: countBy.get("none") ?? 0
-#: src/features/knowledge/components/collection-picker.tsx:64
+#: src/features/knowledge/components/collection-picker.tsx:66
 msgid "Uncategorised ({0})"
 msgstr "Non classés ({0})"
 
@@ -38494,7 +38502,7 @@ msgstr "Importer un avatar"
 msgid "Upload CSVs, run Python analysis, and export charts — no Jupyter setup required."
 msgstr "Importez des CSV, lancez des analyses Python et exportez des graphiques — sans installer Jupyter."
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:277
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:278
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "Importez des documents dans votre base de connaissances et regroupez-les en collections. L’IA y recherche le contexte pertinent et cite les passages utilisés."
 
@@ -38565,7 +38573,7 @@ msgid "Uploading data for import from {0}..."
 msgstr "Envoi des données à importer depuis {0}..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:73
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:308
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:312
 #: src/features/workflow/components/nodes/file-node.tsx:184
 msgid "Uploading..."
 msgstr "Envoi..."
@@ -39225,7 +39233,7 @@ msgstr "vidéo"
 #: src/features/chat/thread/composer.tsx:132
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:642
-#: src/features/settings/components/chat/models-settings.tsx:46
+#: src/features/settings/components/chat/models-settings.tsx:47
 #: src/features/settings/lib/settings-keywords.ts:77
 #: src/features/settings/lib/settings-keywords.ts:78
 #: src/features/settings/lib/settings-keywords.ts:79
@@ -39525,7 +39533,7 @@ msgstr "vision"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:157
 #: src/components/model-picker/model-picker.tsx:85
-#: src/features/settings/components/chat/models-settings.tsx:31
+#: src/features/settings/components/chat/models-settings.tsx:32
 msgid "Vision"
 msgstr "Vision"
 
@@ -40610,7 +40618,7 @@ msgid "You are about to impersonate {userName}. You will see the application as 
 msgstr "Vous êtes sur le point d’usurper l’identité de {userName}. Vous verrez l’application comme cet utilisateur et pourrez effectuer des actions en son nom."
 
 #: src/features/knowledge/hooks/use-knowledge-import.ts:284
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:147
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:148
 msgid "You are adding documents too quickly. Wait a moment and try again."
 msgstr "Vous ajoutez des documents trop rapidement. Patientez un instant et réessayez."
 
@@ -41068,7 +41076,7 @@ msgid "Your knowledge base is full. {failed} document(s) were not added."
 msgstr "Votre base de connaissances est pleine. {failed} document(s) n’ont pas été ajoutés."
 
 #: src/features/knowledge/hooks/use-knowledge-import.ts:283
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:143
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:144
 msgid "Your knowledge base is full. Remove files to add more."
 msgstr "Votre base de connaissances est pleine. Supprimez des fichiers pour en ajouter d’autres."
 

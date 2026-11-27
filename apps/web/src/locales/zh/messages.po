@@ -555,7 +555,7 @@ msgid "{0} ({1}) asks you to sign in at {trustHosts}, which is a different site.
 msgstr "{0}（{1}）要求你在 {trustHosts} 登录，这是另一个网站。你在那里授予的访问权限将发送给 {2}。仅在你信任该服务器使用此账号时才继续。"
 
 #. placeholder {0}: collection.name
-#: src/features/knowledge/components/collection-picker.tsx:67
+#: src/features/knowledge/components/collection-picker.tsx:69
 msgid "{0} (shared)"
 msgstr "{0}（共享）"
 
@@ -2601,7 +2601,7 @@ msgstr "添加评论"
 msgid "Add a member from your organization to <0>{0}</0>"
 msgstr "从你的组织中添加成员到 <0>{0}</0>"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:253
+#: src/features/auth/components/organization/billing-settings-card.tsx:250
 #: src/features/auth/components/team/team-settings-dialog.tsx:191
 msgid "Add a model..."
 msgstr "添加模型..."
@@ -2707,6 +2707,10 @@ msgstr "添加注释"
 #: src/features/develop/components/review-panel.tsx:202
 msgid "Add comments on a line of the diff, then submit."
 msgstr "在差异的某一行添加评论，然后提交。"
+
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:299
+msgid "Add documents"
+msgstr "添加文档"
 
 #: src/features/settings/components/chat/custom-providers-settings.tsx:322
 #: src/features/settings/components/chat/custom-providers-settings.tsx:431
@@ -2930,7 +2934,7 @@ msgid "Added"
 msgstr "已添加"
 
 #. placeholder {0}: result.value
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:166
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:167
 msgid "Added \"{0}\" to knowledge base"
 msgstr "已将“{0}”添加到知识库"
 
@@ -3526,9 +3530,9 @@ msgstr "垂直对齐（V）"
 #: src/components/model-picker/model-picker.tsx:1317
 #: src/features/chat/thread-list/thread-list-filter-menu.tsx:120
 #: src/features/marketing/components/tutorials-page.tsx:130
-#: src/features/settings/components/chat/models-settings.tsx:414
-#: src/features/settings/components/chat/models-settings.tsx:435
-#: src/features/settings/components/chat/models-settings.tsx:456
+#: src/features/settings/components/chat/models-settings.tsx:419
+#: src/features/settings/components/chat/models-settings.tsx:440
+#: src/features/settings/components/chat/models-settings.tsx:461
 #: src/features/settings/connectors/connectors-page.tsx:63
 #: src/routes/(chat)/workflow/gallery.tsx:20
 msgid "All"
@@ -3539,7 +3543,7 @@ msgstr "全部"
 msgid "All ({0})"
 msgstr "全部（{0}）"
 
-#: src/features/settings/components/chat/models-settings.tsx:353
+#: src/features/settings/components/chat/models-settings.tsx:354
 msgid "All {provider} models enabled"
 msgstr "已启用全部 {provider} 模型"
 
@@ -3586,11 +3590,11 @@ msgid "All Directions"
 msgstr "所有方向"
 
 #. placeholder {0}: counts?.length ?? 0
-#: src/features/knowledge/components/collection-picker.tsx:63
+#: src/features/knowledge/components/collection-picker.tsx:65
 msgid "All files ({0})"
 msgstr "所有文件（{0}）"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:210
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:211
 msgid "All files removed from knowledge base"
 msgstr "已从知识库中移除所有文件"
 
@@ -3628,11 +3632,11 @@ msgstr "全部模型和工具"
 msgid "All models allowed (Enterprise)"
 msgstr "允许所有模型（企业版）"
 
-#: src/features/settings/components/chat/models-settings.tsx:312
+#: src/features/settings/components/chat/models-settings.tsx:313
 msgid "All models disabled"
 msgstr "所有模型已禁用"
 
-#: src/features/settings/components/chat/models-settings.tsx:291
+#: src/features/settings/components/chat/models-settings.tsx:292
 msgid "All models enabled"
 msgstr "已启用所有模型"
 
@@ -3760,7 +3764,7 @@ msgstr "允许一次"
 msgid "Allow this site ({0})"
 msgstr "允许此网站（{0}）"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:224
+#: src/features/auth/components/organization/billing-settings-card.tsx:221
 #: src/features/auth/components/team/team-settings-dialog.tsx:170
 msgid "Allowed AI Models"
 msgstr "允许的 AI 模型"
@@ -5452,23 +5456,23 @@ msgstr "费用计入你自己的 API 密钥，而非你的积分。"
 msgid "Billing"
 msgstr "账单"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:321
+#: src/features/auth/components/organization/billing-settings-card.tsx:317
 msgid "Billing details for this organization"
 msgstr "此组织的账单详情"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:202
-#: src/features/auth/components/organization/billing-settings-card.tsx:216
+#: src/features/auth/components/organization/billing-settings-card.tsx:195
+#: src/features/auth/components/organization/billing-settings-card.tsx:201
 msgid "Billing Email"
 msgstr "账单邮箱"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:136
-#: src/features/auth/components/organization/billing-settings-card.tsx:282
-#: src/features/auth/components/organization/billing-settings-card.tsx:322
-#: src/features/auth/components/organization/billing-settings-card.tsx:345
+#: src/features/auth/components/organization/billing-settings-card.tsx:137
+#: src/features/auth/components/organization/billing-settings-card.tsx:278
+#: src/features/auth/components/organization/billing-settings-card.tsx:318
+#: src/features/auth/components/organization/billing-settings-card.tsx:341
 msgid "Billing Settings"
 msgstr "账单设置"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:83
+#: src/features/auth/components/organization/billing-settings-card.tsx:84
 msgid "Billing settings updated successfully"
 msgstr "账单设置已更新"
 
@@ -6165,7 +6169,7 @@ msgstr "加拿大"
 #: src/features/evals/components/save-eval-case-action.tsx:137
 #: src/features/feedback/components/send-feedback-dialog.tsx:385
 #: src/features/knowledge/components/collection-dialog.tsx:97
-#: src/features/knowledge/components/collection-picker.tsx:112
+#: src/features/knowledge/components/collection-picker.tsx:113
 #: src/features/local-models/components/ollama-model-manager.tsx:300
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
@@ -6304,7 +6308,7 @@ msgstr "画布编辑器"
 msgid "Canvas opens a side-by-side editor next to your chat. Write long-form documents, edit code, and refine content with AI assistance. Changes are versioned so you can always go back."
 msgstr "画布会在聊天旁打开并排编辑器。撰写长篇文档、编辑代码，并借助 AI 完善内容。所有更改都有版本记录，随时可以回退。"
 
-#: src/features/settings/components/chat/models-settings.tsx:477
+#: src/features/settings/components/chat/models-settings.tsx:482
 msgid "Capabilities"
 msgstr "能力"
 
@@ -6930,6 +6934,10 @@ msgstr "为你的镜头选择相机系统"
 msgid "Choose the project's folder, or type a path."
 msgstr "选择项目文件夹，或输入路径。"
 
+#: src/features/knowledge/components/collection-picker.tsx:123
+msgid "Choose which files to show and add to. New uploads go into the collection you pick."
+msgstr "选择要显示的文件以及添加到哪里。新上传的文件会放进你选择的集合。"
+
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:357
 #~ msgid "Choose which tools the assistant may use on its own, which need your approval, and which are off."
 #~ msgstr "选择哪些工具助手可以自行使用、哪些需要你批准、哪些关闭。"
@@ -7088,7 +7096,7 @@ msgstr "清理失败"
 #: src/features/chat/thread/media-gallery-view.tsx:382
 #: src/features/prompts/components/prompt-list.tsx:614
 #: src/features/settings/components/chat/api-keys-settings.tsx:382
-#: src/features/settings/components/chat/models-settings.tsx:469
+#: src/features/settings/components/chat/models-settings.tsx:474
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:370
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:379
 msgid "Clear"
@@ -7572,15 +7580,15 @@ msgstr "收起分组以隐藏子节点"
 msgid "Collapse textarea"
 msgstr "收起文本框"
 
-#: src/features/knowledge/components/collection-picker.tsx:76
+#: src/features/knowledge/components/collection-picker.tsx:124
 msgid "Collection"
 msgstr "集合"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:240
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:241
 msgid "Collection and its files deleted"
 msgstr "已删除集合及其文件"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:240
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:241
 msgid "Collection deleted; its files are now uncategorised"
 msgstr "已删除集合；其文件现为未分类"
 
@@ -8065,8 +8073,8 @@ msgstr "配置团队“{teamName}”的设置"
 msgid "Configure team settings"
 msgstr "配置团队设置"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:135
-#: src/features/auth/components/organization/billing-settings-card.tsx:280
+#: src/features/auth/components/organization/billing-settings-card.tsx:136
+#: src/features/auth/components/organization/billing-settings-card.tsx:276
 msgid "Configure the billing contact and available AI models"
 msgstr "配置账单联系人和可用的 AI 模型"
 
@@ -9290,7 +9298,7 @@ msgstr "无法加载此记忆的来源。"
 msgid "Could not load your activity."
 msgstr "无法加载你的活动。"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:327
+#: src/features/auth/components/organization/billing-settings-card.tsx:323
 msgid "Could not load your organization's billing details. Try again later."
 msgstr "无法加载你所在组织的账单详情。请稍后重试。"
 
@@ -9969,7 +9977,7 @@ msgid "Credits"
 msgstr "积分"
 
 #: src/features/auth/components/organization/billing-settings-card.tsx:190
-#: src/features/auth/components/organization/billing-settings-card.tsx:350
+#: src/features/auth/components/organization/billing-settings-card.tsx:346
 msgid "Credits per user:"
 msgstr "每位用户的积分："
 
@@ -10068,7 +10076,7 @@ msgid "Current Prompt Variables"
 msgstr "当前提示词变量"
 
 #: src/features/auth/components/organization/billing-settings-card.tsx:187
-#: src/features/auth/components/organization/billing-settings-card.tsx:349
+#: src/features/auth/components/organization/billing-settings-card.tsx:345
 msgid "Current tier:"
 msgstr "当前等级："
 
@@ -10692,7 +10700,7 @@ msgstr "删除"
 #. placeholder {0}: deletingSkill.name
 #. placeholder {0}: deletingTrigger.name
 #. placeholder {0}: selected.name
-#: src/features/knowledge/components/collection-picker.tsx:106
+#: src/features/knowledge/components/collection-picker.tsx:107
 #: src/features/settings/components/chat/trigger-settings.tsx:1094
 #: src/features/skills/components/skill-list.tsx:317
 msgid "Delete \"{0}\"?"
@@ -10769,7 +10777,7 @@ msgstr "删除头像"
 msgid "Delete case {0}"
 msgstr "删除用例 {0}"
 
-#: src/features/knowledge/components/collection-picker.tsx:101
+#: src/features/knowledge/components/collection-picker.tsx:102
 msgid "Delete collection"
 msgstr "删除集合"
 
@@ -10972,7 +10980,7 @@ msgstr "删除触发器"
 msgid "Delete trigger?"
 msgstr "删除触发器？"
 
-#: src/features/knowledge/components/collection-picker.tsx:113
+#: src/features/knowledge/components/collection-picker.tsx:114
 msgid "Delete with files"
 msgstr "连同文件一起删除"
 
@@ -11422,7 +11430,7 @@ msgstr "目录（租户）ID——单租户机器人必填，多租户请留空"
 msgid "Disable 2FA"
 msgstr "停用双重验证"
 
-#: src/features/settings/components/chat/models-settings.tsx:376
+#: src/features/settings/components/chat/models-settings.tsx:380
 msgid "Disable All"
 msgstr "全部停用"
 
@@ -11892,7 +11900,7 @@ msgstr "在并排画布中起草、编辑和润色长篇内容。AI 负责初稿
 msgid "Drafts"
 msgstr "草稿"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:313
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:317
 msgid "Drag & drop files here, or click to browse"
 msgstr "将文件拖放到此处，或点击浏览"
 
@@ -11934,7 +11942,7 @@ msgstr "拖放文件或点击上传"
 msgid "Drop files here"
 msgstr "将文件拖放到此处"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:313
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:317
 msgid "Drop files here..."
 msgstr "将文件拖放到此处..."
 
@@ -12244,7 +12252,7 @@ msgid "Edit case {0}"
 msgstr "编辑用例 {0}"
 
 #: src/features/knowledge/components/collection-dialog.tsx:52
-#: src/features/knowledge/components/collection-picker.tsx:97
+#: src/features/knowledge/components/collection-picker.tsx:98
 msgid "Edit collection"
 msgstr "编辑集合"
 
@@ -12673,8 +12681,8 @@ msgstr "启用双重验证"
 msgid "Enable a skill first — only enabled skills can be evaluated."
 msgstr "请先启用一个技能——只有已启用的技能才能被评测。"
 
-#: src/features/settings/components/chat/models-settings.tsx:373
-#: src/features/settings/components/chat/models-settings.tsx:511
+#: src/features/settings/components/chat/models-settings.tsx:377
+#: src/features/settings/components/chat/models-settings.tsx:518
 msgid "Enable All"
 msgstr "全部启用"
 
@@ -12715,7 +12723,7 @@ msgstr "为下一个聊天启用"
 msgid "Enable memory"
 msgstr "启用记忆"
 
-#: src/features/settings/components/chat/models-settings.tsx:366
+#: src/features/settings/components/chat/models-settings.tsx:370
 msgid "Enable or disable models to control which ones appear in the model selector."
 msgstr "启用或停用模型，以控制哪些模型出现在模型选择器中。"
 
@@ -12933,7 +12941,7 @@ msgstr "请输入有效的 AWS 区域，例如 us-east-1"
 msgid "Enter an API version such as v1 or 2024-10-21"
 msgstr "请输入 API 版本，例如 v1 或 2024-10-21"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:207
+#: src/features/auth/components/organization/billing-settings-card.tsx:206
 msgid "Enter billing email"
 msgstr "输入账单邮箱"
 
@@ -13364,7 +13372,7 @@ msgstr "所有模型"
 msgid "Every model and tool, 1,000 messages a day."
 msgstr "所有模型和工具，每天 1,000 条消息。"
 
-#: src/features/settings/components/chat/models-settings.tsx:576
+#: src/features/settings/components/chat/models-settings.tsx:587
 msgid "Every model returns to its default on or off setting."
 msgstr "每个模型都会恢复为其默认的开启或关闭设置。"
 
@@ -14090,7 +14098,7 @@ msgstr "删除 {fileName} 失败"
 msgid "Failed to delete budget alert"
 msgstr "删除预算提醒失败"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:242
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:243
 msgid "Failed to delete collection"
 msgstr "删除集合失败"
 
@@ -14174,7 +14182,7 @@ msgstr "移除集合失败"
 msgid "Failed to detach file"
 msgstr "移除文件失败"
 
-#: src/features/settings/components/chat/models-settings.tsx:314
+#: src/features/settings/components/chat/models-settings.tsx:315
 msgid "Failed to disable all models"
 msgstr "禁用所有模型失败"
 
@@ -14198,11 +14206,11 @@ msgstr "下载导出失败"
 msgid "Failed to download file. Please try again."
 msgstr "下载文件失败，请重试。"
 
-#: src/features/settings/components/chat/models-settings.tsx:293
+#: src/features/settings/components/chat/models-settings.tsx:294
 msgid "Failed to enable all models"
 msgstr "启用所有模型失败"
 
-#: src/features/settings/components/chat/models-settings.tsx:355
+#: src/features/settings/components/chat/models-settings.tsx:356
 msgid "Failed to enable models by provider"
 msgstr "按提供商启用模型失败"
 
@@ -14308,7 +14316,7 @@ msgstr "加载视频流失败。"
 msgid "Failed to make thread permanent"
 msgstr "将对话设为永久失败"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:224
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:225
 msgid "Failed to move file"
 msgstr "移动文件失败"
 
@@ -14339,7 +14347,7 @@ msgstr "粘贴失败，请重试。"
 msgid "Failed to pin thread"
 msgstr "置顶对话失败"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:208
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:209
 msgid "Failed to remove {failed} file(s)"
 msgstr "{failed} 个文件移除失败"
 
@@ -14355,7 +14363,7 @@ msgstr "移除 {toolId} API 密钥失败"
 msgid "Failed to remove endpoint"
 msgstr "移除端点失败"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:92
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:93
 msgid "Failed to remove file"
 msgstr "移除文件失败"
 
@@ -14391,7 +14399,7 @@ msgstr "重新排序标签失败"
 msgid "Failed to request export"
 msgstr "请求导出失败"
 
-#: src/features/settings/components/chat/models-settings.tsx:327
+#: src/features/settings/components/chat/models-settings.tsx:328
 msgid "Failed to reset to defaults"
 msgstr "恢复默认设置失败"
 
@@ -14628,7 +14636,7 @@ msgstr "更新 MCP 服务器失败"
 msgid "Failed to update memory"
 msgstr "更新记忆失败"
 
-#: src/features/settings/components/chat/models-settings.tsx:270
+#: src/features/settings/components/chat/models-settings.tsx:271
 msgid "Failed to update model"
 msgstr "更新模型失败"
 
@@ -14697,7 +14705,7 @@ msgstr "更新用户角色失败"
 msgid "Failed to upload avatar"
 msgstr "上传头像失败"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:148
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:149
 msgid "Failed to upload file. Please try again."
 msgstr "上传文件失败，请重试。"
 
@@ -14796,7 +14804,7 @@ msgstr "快速"
 #: ../../packages/chat-ui/src/model-picker/utils.ts:153
 #: src/components/model-picker/model-picker.tsx:80
 #: src/features/marketing/components/model-detail-page.tsx:33
-#: src/features/settings/components/chat/models-settings.tsx:30
+#: src/features/settings/components/chat/models-settings.tsx:31
 msgid "Fast"
 msgstr "快速"
 
@@ -15189,7 +15197,7 @@ msgstr "文件输入"
 msgid "File patterns, one per line"
 msgstr "文件模式（每行一个）"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:96
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:97
 msgid "File removed from knowledge base"
 msgstr "已从知识库中移除文件"
 
@@ -15197,7 +15205,7 @@ msgstr "已从知识库中移除文件"
 msgid "File size exceeds {maxSize}"
 msgstr "文件大小超过 {maxSize}"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:260
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:261
 #: src/features/vault/components/upload-zone.tsx:92
 msgid "File size too large. Maximum 5MB allowed."
 msgstr "文件过大，最大允许 5MB。"
@@ -15218,7 +15226,7 @@ msgstr "不接受此文件类型"
 msgid "File type not supported."
 msgstr "不支持此文件类型。"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:262
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:263
 msgid "File type not supported. Supported: PDF, DOCX, TXT, MD, CSV, JSON, XLS, XLSX."
 msgstr "不支持的文件类型。支持：PDF、DOCX、TXT、MD、CSV、JSON、XLS、XLSX。"
 
@@ -15226,7 +15234,7 @@ msgstr "不支持的文件类型。支持：PDF、DOCX、TXT、MD、CSV、JSON�
 msgid "File upload"
 msgstr "文件上传"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:264
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:265
 #: src/features/vault/components/upload-zone.tsx:96
 msgid "File upload rejected."
 msgstr "文件上传被拒绝。"
@@ -15390,7 +15398,7 @@ msgid "Filtering"
 msgstr "筛选"
 
 #: src/features/canvas/canvas-panel.tsx:126
-#: src/features/settings/components/chat/models-settings.tsx:399
+#: src/features/settings/components/chat/models-settings.tsx:404
 msgid "Filters"
 msgstr "滤镜"
 
@@ -15795,8 +15803,8 @@ msgstr "法国"
 #: src/features/billing/components/personal-plan-card.tsx:27
 #: src/features/marketing/components/gateway-landing-page.tsx:113
 #: src/features/marketing/components/landing-page.tsx:327
-#: src/features/settings/components/chat/models-settings.tsx:40
-#: src/features/settings/components/chat/models-settings.tsx:555
+#: src/features/settings/components/chat/models-settings.tsx:41
+#: src/features/settings/components/chat/models-settings.tsx:564
 msgid "Free"
 msgstr "免费"
 
@@ -17780,7 +17788,7 @@ msgstr "插画"
 #: src/features/chat/thread/composer.tsx:131
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:605
-#: src/features/settings/components/chat/models-settings.tsx:41
+#: src/features/settings/components/chat/models-settings.tsx:42
 #: src/features/settings/lib/settings-keywords.ts:74
 #: src/features/settings/lib/settings-keywords.ts:75
 #: src/features/settings/lib/settings-keywords.ts:76
@@ -17838,7 +17846,7 @@ msgid "image editing"
 msgstr "图像编辑"
 
 #: src/components/model-picker/model-picker.tsx:81
-#: src/features/settings/components/chat/models-settings.tsx:34
+#: src/features/settings/components/chat/models-settings.tsx:35
 msgid "Image Gen"
 msgstr "图像生成"
 
@@ -19075,7 +19083,7 @@ msgstr "保留当前行"
 msgid "Keep editing"
 msgstr "继续编辑"
 
-#: src/features/knowledge/components/collection-picker.tsx:114
+#: src/features/knowledge/components/collection-picker.tsx:115
 msgid "Keep files"
 msgstr "保留文件"
 
@@ -19095,7 +19103,7 @@ msgstr "保留视频的一部分。保留的部分会在此浏览器中重新编
 msgid "Keep Permanently"
 msgstr "永久保留"
 
-#: src/features/knowledge/components/collection-picker.tsx:108
+#: src/features/knowledge/components/collection-picker.tsx:109
 msgid "Keep the files as uncategorised, or delete them together with the collection. Chats and projects that use the collection stop searching it."
 msgstr "将文件保留为未分类，或与集合一起删除。使用该集合的聊天和项目将不再搜索它。"
 
@@ -19176,7 +19184,7 @@ msgstr "知识库"
 
 #: src/features/chat/header/kb-attachment-button.tsx:186
 #: src/features/layout/lib/dashboard-page-names.ts:26
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:278
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:279
 #: src/features/settings/lib/settings-navigation.ts:107
 msgid "Knowledge Base"
 msgstr "知识库"
@@ -21801,7 +21809,7 @@ msgstr "模式"
 msgid "Mode {0}, on {1}. Nothing starts when it is created."
 msgstr "模式 {0}，使用 {1}。创建时不会启动任何内容。"
 
-#: src/features/settings/components/chat/models-settings.tsx:427
+#: src/features/settings/components/chat/models-settings.tsx:432
 msgid "Mode:"
 msgstr "模式："
 
@@ -21853,11 +21861,11 @@ msgstr "模型对比"
 msgid "Model context usage"
 msgstr "模型上下文用量"
 
-#: src/features/settings/components/chat/models-settings.tsx:268
+#: src/features/settings/components/chat/models-settings.tsx:269
 msgid "Model disabled"
 msgstr "模型已停用"
 
-#: src/features/settings/components/chat/models-settings.tsx:268
+#: src/features/settings/components/chat/models-settings.tsx:269
 msgid "Model enabled"
 msgstr "模型已启用"
 
@@ -21918,7 +21926,7 @@ msgstr "模型：OpenAI Whisper"
 #: src/features/marketing/components/navbar-menu.tsx:58
 #: src/features/marketing/components/navbar-menu.tsx:159
 #: src/features/settings/components/chat/custom-providers-settings.tsx:556
-#: src/features/settings/components/chat/models-settings.tsx:369
+#: src/features/settings/components/chat/models-settings.tsx:373
 #: src/features/settings/components/chat/native-providers-settings.tsx:633
 #: src/features/settings/lib/settings-navigation.ts:109
 msgid "Models"
@@ -22167,7 +22175,7 @@ msgstr "运动：{motionPercent}%"
 msgid "Mountain Time (US & Canada)"
 msgstr "山地时间（美国和加拿大）"
 
-#: src/features/knowledge/components/collection-picker.tsx:157
+#: src/features/knowledge/components/collection-picker.tsx:163
 msgid "Move \"{fileName}\" to a collection"
 msgstr "将“{fileName}”移到集合"
 
@@ -22361,7 +22369,7 @@ msgstr "多张图片"
 msgid "Mumbai, Kolkata"
 msgstr "孟买、加尔各答"
 
-#: src/features/settings/components/chat/models-settings.tsx:42
+#: src/features/settings/components/chat/models-settings.tsx:43
 msgid "Music"
 msgstr "音乐"
 
@@ -22805,8 +22813,8 @@ msgstr "从未使用"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:194
 #: src/components/model-picker/model-picker.tsx:375
-#: src/features/settings/components/chat/models-settings.tsx:43
-#: src/features/settings/components/chat/models-settings.tsx:552
+#: src/features/settings/components/chat/models-settings.tsx:44
+#: src/features/settings/components/chat/models-settings.tsx:561
 msgid "New"
 msgstr "新"
 
@@ -22868,7 +22876,7 @@ msgid "New chats with this bot start in the chosen mode"
 msgstr "与此机器人的新聊天将以所选模式开始"
 
 #: src/features/knowledge/components/collection-dialog.tsx:52
-#: src/features/knowledge/components/collection-picker.tsx:93
+#: src/features/knowledge/components/collection-picker.tsx:94
 msgid "New collection"
 msgstr "新建集合"
 
@@ -23490,7 +23498,7 @@ msgstr "未找到麦克风。"
 msgid "No models available"
 msgstr "没有可用的模型"
 
-#: src/features/settings/components/chat/models-settings.tsx:502
+#: src/features/settings/components/chat/models-settings.tsx:509
 msgid "No models found matching your filters."
 msgstr "未找到符合筛选条件的模型。"
 
@@ -24530,7 +24538,7 @@ msgstr "仅在一次运行中"
 msgid "Only listed tools"
 msgstr "仅列出的工具"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:344
+#: src/features/auth/components/organization/billing-settings-card.tsx:340
 msgid "Only organization owners can manage billing settings"
 msgstr "只有组织所有者才能管理账单设置"
 
@@ -25540,7 +25548,7 @@ msgstr "原始系统提示词"
 #: src/features/admin/components/feedback-admin-page.tsx:24
 #: src/features/admin/components/feedback-admin-page.tsx:171
 #: src/features/feedback/components/send-feedback-dialog.tsx:30
-#: src/features/settings/components/chat/models-settings.tsx:508
+#: src/features/settings/components/chat/models-settings.tsx:515
 msgid "Other"
 msgstr "其他"
 
@@ -25668,15 +25676,15 @@ msgstr "侧重输出格式"
 msgid "Output:"
 msgstr "输出："
 
-#: src/features/settings/components/chat/models-settings.tsx:562
+#: src/features/settings/components/chat/models-settings.tsx:571
 msgid "Overridden"
 msgstr "已覆盖"
 
-#: src/features/settings/components/chat/models-settings.tsx:560
+#: src/features/settings/components/chat/models-settings.tsx:569
 msgid "Overridden: Disabled"
 msgstr "已覆盖：停用"
 
-#: src/features/settings/components/chat/models-settings.tsx:560
+#: src/features/settings/components/chat/models-settings.tsx:569
 msgid "Overridden: Enabled"
 msgstr "已覆盖：启用"
 
@@ -26120,7 +26128,7 @@ msgstr "付款、订阅和财务数据"
 
 #: src/components/model-picker/model-picker.tsx:82
 #: src/features/canvas/pdf-preview-panel.tsx:80
-#: src/features/settings/components/chat/models-settings.tsx:35
+#: src/features/settings/components/chat/models-settings.tsx:36
 msgid "PDF"
 msgstr "PDF"
 
@@ -26132,7 +26140,7 @@ msgstr "PDF 文档"
 msgid "PDF preview"
 msgstr "PDF 预览"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:314
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:298
 msgid "PDF, DOCX, TXT, MD, CSV, JSON, XLS, XLSX — max 5MB"
 msgstr "PDF、DOCX、TXT、MD、CSV、JSON、XLS、XLSX——最大 5MB"
 
@@ -26787,7 +26795,7 @@ msgstr "偏好模型 {0}。"
 msgid "premium"
 msgstr "高端"
 
-#: src/features/settings/components/chat/models-settings.tsx:44
+#: src/features/settings/components/chat/models-settings.tsx:45
 #: src/features/settings/connectors/connector-card.tsx:167
 msgid "Premium"
 msgstr "高级版"
@@ -27165,7 +27173,7 @@ msgstr "默认私密"
 #: src/features/billing/components/personal-plan-card.tsx:27
 #: src/features/marketing/components/gateway-landing-page.tsx:131
 #: src/features/marketing/components/landing-page.tsx:345
-#: src/features/settings/components/chat/models-settings.tsx:549
+#: src/features/settings/components/chat/models-settings.tsx:558
 #: src/features/workflow/components/nodes/pro-badge.tsx:6
 msgid "Pro"
 msgstr "Pro"
@@ -27627,7 +27635,7 @@ msgstr "提供商限制"
 msgid "Provider updated"
 msgstr "已更新提供商"
 
-#: src/features/settings/components/chat/models-settings.tsx:406
+#: src/features/settings/components/chat/models-settings.tsx:411
 msgid "Provider:"
 msgstr "提供商："
 
@@ -28244,7 +28252,7 @@ msgstr "推理"
 #: ../../packages/chat-ui/src/model-picker/utils.ts:161
 #: ../../packages/ui/src/components/ai-elements/context.tsx:316
 #: src/features/chat/thread/message-cost-badge.tsx:64
-#: src/features/settings/components/chat/models-settings.tsx:32
+#: src/features/settings/components/chat/models-settings.tsx:33
 msgid "Reasoning"
 msgstr "推理"
 
@@ -28801,7 +28809,7 @@ msgstr "移除 {fileName}"
 msgid "Remove {label}"
 msgstr "移除 {label}"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:232
+#: src/features/auth/components/organization/billing-settings-card.tsx:229
 #: src/features/auth/components/team/team-settings-dialog.tsx:177
 msgid "Remove {model}"
 msgstr "移除 {model}"
@@ -29299,7 +29307,7 @@ msgstr "重新发送验证邮件"
 #: ../../packages/ui/src/components/image-editor.tsx:311
 #: src/features/canvas/canvas-panel.tsx:240
 #: src/features/chat/components/cinema-studio/cinema-panel.tsx:88
-#: src/features/settings/components/chat/models-settings.tsx:575
+#: src/features/settings/components/chat/models-settings.tsx:586
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:351
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:100
 msgid "Reset"
@@ -29319,7 +29327,7 @@ msgstr "将 {roleLabel} 重置为你的默认设置"
 msgid "Reset execution state"
 msgstr "重置执行状态"
 
-#: src/features/settings/components/chat/models-settings.tsx:583
+#: src/features/settings/components/chat/models-settings.tsx:594
 msgid "Reset models to defaults?"
 msgstr "将模型重置为默认设置？"
 
@@ -29336,11 +29344,11 @@ msgstr "重置密码"
 msgid "Reset sorting"
 msgstr "重置排序"
 
-#: src/features/settings/components/chat/models-settings.tsx:325
+#: src/features/settings/components/chat/models-settings.tsx:326
 msgid "Reset to defaults"
 msgstr "恢复默认"
 
-#: src/features/settings/components/chat/models-settings.tsx:380
+#: src/features/settings/components/chat/models-settings.tsx:384
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:409
 msgid "Reset to Defaults"
 msgstr "恢复默认"
@@ -30156,8 +30164,8 @@ msgstr "沙特阿拉伯"
 
 #: ../../packages/ui/src/components/inline-edit.tsx:119
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:118
-#: src/features/auth/components/organization/billing-settings-card.tsx:132
-#: src/features/auth/components/organization/billing-settings-card.tsx:277
+#: src/features/auth/components/organization/billing-settings-card.tsx:133
+#: src/features/auth/components/organization/billing-settings-card.tsx:273
 #: src/features/auth/components/organization/organization-name-card.tsx:100
 #: src/features/auth/components/organization/organization-name-card.tsx:155
 #: src/features/auth/components/organization/organization-slug-card.tsx:105
@@ -30609,7 +30617,7 @@ msgstr "搜索模式：{0}"
 msgid "Search mode: {0}."
 msgstr "搜索模式：{0}。"
 
-#: src/features/settings/components/chat/models-settings.tsx:391
+#: src/features/settings/components/chat/models-settings.tsx:396
 msgid "Search models by name, ID, or provider..."
 msgstr "按名称、ID 或提供商搜索模型..."
 
@@ -31063,7 +31071,7 @@ msgstr "选择到最后一列"
 msgid "Select to top of table"
 msgstr "选择到表格顶部"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:223
+#: src/features/auth/components/organization/billing-settings-card.tsx:220
 msgid "Select which AI models organization members can use. Leave empty for enterprise to allow all models."
 msgstr "选择组织成员可以使用的 AI 模型。企业版留空则允许所有模型。"
 
@@ -31596,7 +31604,7 @@ msgstr "共享对话"
 msgid "Shared with me"
 msgstr "与我共享"
 
-#: src/features/knowledge/components/collection-picker.tsx:90
+#: src/features/knowledge/components/collection-picker.tsx:91
 msgid "Shared with your organization"
 msgstr "已与你的组织共享"
 
@@ -33169,7 +33177,7 @@ msgstr "顶尖的 OpenAI 品质"
 msgid "State-of-the-art performance across all benchmarks"
 msgstr "在所有基准测试中表现顶尖"
 
-#: src/features/settings/components/chat/models-settings.tsx:448
+#: src/features/settings/components/chat/models-settings.tsx:453
 msgid "State:"
 msgstr "状态："
 
@@ -34592,7 +34600,7 @@ msgstr "文本"
 #: src/features/chat/thread/composer.tsx:130
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:567
-#: src/features/settings/components/chat/models-settings.tsx:45
+#: src/features/settings/components/chat/models-settings.tsx:46
 #: src/features/settings/lib/settings-keywords.ts:70
 #: src/features/settings/lib/settings-keywords.ts:71
 #: src/features/settings/lib/settings-keywords.ts:72
@@ -36228,7 +36236,7 @@ msgstr "此验证码无效或已被使用。请重新运行 `neore login --devic
 msgid "This code was opened with a different account. Sign in with that account, or run `neore login --device` or `neore-host pair` again."
 msgstr "此验证码是用其他账户打开的。请使用该账户登录，或重新运行 `neore login --device` 或 `neore-host pair`。"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:294
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:293
 msgid "This collection is shared with you by a member of your organization. You can attach it to chats and projects; only its owner can change its files."
 msgstr "此集合由你组织中的成员共享给你。你可以将其附加到聊天和项目；只有其所有者可以更改其中的文件。"
 
@@ -37269,7 +37277,7 @@ msgstr "工具调用"
 #: ../../packages/chat-ui/src/model-picker/utils.ts:169
 #: ../../packages/chat-ui/src/model-picker/utils.ts:173
 #: src/components/model-picker/model-picker.tsx:84
-#: src/features/settings/components/chat/models-settings.tsx:33
+#: src/features/settings/components/chat/models-settings.tsx:34
 msgid "Tool Calling"
 msgstr "工具调用"
 
@@ -37991,12 +37999,12 @@ msgstr "解封用户"
 msgid "Unbans"
 msgstr "解封"
 
-#: src/features/knowledge/components/collection-picker.tsx:140
+#: src/features/knowledge/components/collection-picker.tsx:146
 msgid "Uncategorised"
 msgstr "未分类"
 
 #. placeholder {0}: countBy.get("none") ?? 0
-#: src/features/knowledge/components/collection-picker.tsx:64
+#: src/features/knowledge/components/collection-picker.tsx:66
 msgid "Uncategorised ({0})"
 msgstr "未分类（{0}）"
 
@@ -38494,7 +38502,7 @@ msgstr "上传头像"
 msgid "Upload CSVs, run Python analysis, and export charts — no Jupyter setup required."
 msgstr "上传 CSV、运行 Python 分析并导出图表——无需配置 Jupyter。"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:277
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:278
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "将文档上传到知识库并分组为集合。AI 会从中搜索相关上下文，并引用所用的段落。"
 
@@ -38565,7 +38573,7 @@ msgid "Uploading data for import from {0}..."
 msgstr "正在上传来自 {0} 的数据以便导入..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:73
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:308
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:312
 #: src/features/workflow/components/nodes/file-node.tsx:184
 msgid "Uploading..."
 msgstr "正在上传..."
@@ -39225,7 +39233,7 @@ msgstr "视频"
 #: src/features/chat/thread/composer.tsx:132
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:642
-#: src/features/settings/components/chat/models-settings.tsx:46
+#: src/features/settings/components/chat/models-settings.tsx:47
 #: src/features/settings/lib/settings-keywords.ts:77
 #: src/features/settings/lib/settings-keywords.ts:78
 #: src/features/settings/lib/settings-keywords.ts:79
@@ -39525,7 +39533,7 @@ msgstr "视觉"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:157
 #: src/components/model-picker/model-picker.tsx:85
-#: src/features/settings/components/chat/models-settings.tsx:31
+#: src/features/settings/components/chat/models-settings.tsx:32
 msgid "Vision"
 msgstr "视觉"
 
@@ -40610,7 +40618,7 @@ msgid "You are about to impersonate {userName}. You will see the application as 
 msgstr "你即将模拟登录 {userName}。你将看到对方看到的应用界面，并可以代表对方执行操作。"
 
 #: src/features/knowledge/hooks/use-knowledge-import.ts:284
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:147
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:148
 msgid "You are adding documents too quickly. Wait a moment and try again."
 msgstr "你添加文档的速度过快。请稍候再试。"
 
@@ -41068,7 +41076,7 @@ msgid "Your knowledge base is full. {failed} document(s) were not added."
 msgstr "你的知识库已满。有 {failed} 个文档未添加。"
 
 #: src/features/knowledge/hooks/use-knowledge-import.ts:283
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:143
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:144
 msgid "Your knowledge base is full. Remove files to add more."
 msgstr "你的知识库已满。请删除一些文件后再添加。"
 

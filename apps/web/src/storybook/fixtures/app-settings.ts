@@ -210,6 +210,8 @@ export const appSettingsFixtures = (options: { memories?: typeof MEMORIES } = {}
             stats: { contradictionsResolved: 0, decayed: 1, merged: 2, newMemories: 3, promoted: 1, retired: 0 },
             summary: "You asked for shorter answers twice, so that preference is now pinned in your notes.",
         }),
+        // No memory import has run.
+        lunora(api.memory.import_job.getMemoryImportProgress, null),
         ...pushFixtures(),
     ];
 };

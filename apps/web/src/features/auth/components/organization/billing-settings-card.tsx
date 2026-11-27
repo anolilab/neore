@@ -19,6 +19,7 @@ import * as z from "zod";
 import type { SettingsCardProperties } from "@/components/settings/settings-card";
 import SettingsCard from "@/components/settings/settings-card";
 import SettingsRow from "@/components/settings/settings-row";
+import SettingsFieldRow from "@/features/auth/components/settings/settings-field-row";
 import { useActiveOrganization } from "@/features/auth/hooks/organization-management";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import useBillingOptions from "@/features/billing/hooks/use-billing-options";
@@ -136,133 +137,128 @@ const BillingSettingsEditor = ({ billingInfo, className, classNames, ...properti
                     title={t`Billing Settings`}
                     {...properties}
                 >
-                    <CardContent className={classNames?.content}>
-                        {/* Tier and credits: read-only, managed by the platform's billing system */}
-                        <SettingsRow
-                            control={
-                                <>
-                                    <strong className="text-sm">{billingInfo.baseTier}</strong>
-                                    {billingInfo.creemSubscriptionId ? (
+                    {/* Tier and credits: read-only, managed by the platform's billing system */}
+                    <SettingsRow
+                        control={
+                            <>
+                                <strong className="text-sm">{billingInfo.baseTier}</strong>
+                                {billingInfo.creemSubscriptionId ? (
+                                    <Button
+                                        disabled={checkoutPending}
+                                        onClick={() => {
+                                            void openPortal("organization");
+                                        }}
+                                        size="sm"
+                                        type="button"
+                                        variant="outline"
+                                    >
+                                        {t`Manage Team subscription`}
+                                    </Button>
+                                ) : (
+                                    <>
                                         <Button
                                             disabled={checkoutPending}
                                             onClick={() => {
-                                                void openPortal("organization");
+                                                void startCheckout("team");
                                             }}
                                             size="sm"
                                             type="button"
-                                            variant="outline"
                                         >
-                                            {t`Manage Team subscription`}
+                                            {yearly.team ? t`Upgrade organization to Team, monthly` : t`Upgrade organization to Team`}
                                         </Button>
-                                    ) : (
-                                        <>
+                                        {yearly.team ? (
                                             <Button
                                                 disabled={checkoutPending}
                                                 onClick={() => {
-                                                    void startCheckout("team");
+                                                    void startCheckout("team", "year");
                                                 }}
                                                 size="sm"
                                                 type="button"
+                                                variant="outline"
                                             >
-                                                {yearly.team ? t`Upgrade organization to Team, monthly` : t`Upgrade organization to Team`}
+                                                {t`Pay yearly`}
                                             </Button>
-                                            {yearly.team ? (
-                                                <Button
-                                                    disabled={checkoutPending}
-                                                    onClick={() => {
-                                                        void startCheckout("team", "year");
-                                                    }}
-                                                    size="sm"
-                                                    type="button"
-                                                    variant="outline"
-                                                >
-                                                    {t`Pay yearly`}
-                                                </Button>
-                                            ) : null}
-                                        </>
-                                    )}
-                                </>
-                            }
-                            description={t`Your plan and credit allowance follow your subscription.`}
-                            title={t`Current tier:`}
-                        />
+                                        ) : null}
+                                    </>
+                                )}
+                            </>
+                        }
+                        description={t`Your plan and credit allowance follow your subscription.`}
+                        title={t`Current tier:`}
+                    />
 
-                        <SettingsRow control={<strong className="text-sm">{billingInfo.creditsPerUser}</strong>} title={t`Credits per user:`} />
+                    <SettingsRow control={<strong className="text-sm">{billingInfo.creditsPerUser}</strong>} title={t`Credits per user:`} />
 
-                        {/* Billing Email */}
-                        <form.AppField name="billingEmail">
-                            {(field) => (
-                                <SettingsRow
-                                    control={
-                                        <field.FormItem className="w-full @lg/settings-row:w-72">
-                                            {/* `render` puts the id on the input itself; the default wrapper <div> would leave the label pointing at a non-control. */}
-                                            <field.FormControl
-                                                render={
-                                                    <Input
-                                                        aria-label={t`Billing Email`}
-                                                        className={classNames?.input}
-                                                        disabled={isSubmitting}
-                                                        onBlur={field.handleBlur}
-                                                        onChange={(e) => field.handleChange(e.target.value)}
-                                                        placeholder={t`Enter billing email`}
-                                                        type="email"
-                                                        value={field.state.value}
-                                                    />
-                                                }
-                                            />
-                                            <field.FormMessage className={classNames?.error} />
-                                        </field.FormItem>
-                                    }
-                                    title={t`Billing Email`}
-                                />
-                            )}
-                        </form.AppField>
-
-                        {/* Allowed Models */}
-                        <SettingsRow
-                            description={t`Select which AI models organization members can use. Leave empty for enterprise to allow all models.`}
-                            title={t`Allowed AI Models`}
-                        >
-                            <div className="space-y-2">
-                                <div className="flex flex-wrap gap-2">
-                                    {selectedModels.map((model) => (
-                                        <Badge className="gap-1" key={model} variant="secondary">
-                                            {model}
-                                            <button
-                                                aria-label={t`Remove ${model}`}
-                                                className="hover:bg-muted ml-1 rounded-full p-0.5"
+                    {/* Billing Email */}
+                    <form.AppField name="billingEmail">
+                        {(field) => (
+                            <SettingsFieldRow title={t`Billing Email`}>
+                                <field.FormItem>
+                                    {/* `render` puts the id on the input itself; the default wrapper <div> would leave the label pointing at a non-control. */}
+                                    <field.FormControl
+                                        render={
+                                            <Input
+                                                aria-label={t`Billing Email`}
+                                                className={classNames?.input}
                                                 disabled={isSubmitting}
-                                                onClick={() => handleRemoveModel(model)}
-                                                type="button"
-                                            >
-                                                <X aria-hidden="true" className="h-3 w-3" />
-                                            </button>
-                                        </Badge>
-                                    ))}
-                                </div>
-                                <Select
-                                    disabled={isSubmitting}
-                                    onValueChange={(value) => {
-                                        if (value) {
-                                            handleAddModel(value);
+                                                onBlur={field.handleBlur}
+                                                onChange={(e) => field.handleChange(e.target.value)}
+                                                placeholder={t`Enter billing email`}
+                                                type="email"
+                                                value={field.state.value}
+                                            />
                                         }
-                                    }}
-                                    value=""
-                                >
-                                    <SelectTrigger className={classNames?.input}>
-                                        <SelectValue placeholder={t`Add a model...`} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {AVAILABLE_MODELS.filter((m) => !selectedModelSet.has(m)).map((model) => (
-                                            <SelectItem key={model} value={model}>
-                                                {model}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                    />
+                                    <field.FormMessage className={classNames?.error} />
+                                </field.FormItem>
+                            </SettingsFieldRow>
+                        )}
+                    </form.AppField>
+
+                    {/* Allowed Models */}
+                    <SettingsRow
+                        description={t`Select which AI models organization members can use. Leave empty for enterprise to allow all models.`}
+                        title={t`Allowed AI Models`}
+                    >
+                        <div className="space-y-2">
+                            <div className="flex flex-wrap gap-2">
+                                {selectedModels.map((model) => (
+                                    <Badge className="gap-1" key={model} variant="secondary">
+                                        {model}
+                                        <button
+                                            aria-label={t`Remove ${model}`}
+                                            className="hover:bg-muted ml-1 rounded-full p-0.5"
+                                            disabled={isSubmitting}
+                                            onClick={() => handleRemoveModel(model)}
+                                            type="button"
+                                        >
+                                            <X aria-hidden="true" className="h-3 w-3" />
+                                        </button>
+                                    </Badge>
+                                ))}
                             </div>
-                        </SettingsRow>
-                    </CardContent>
+                            <Select
+                                disabled={isSubmitting}
+                                onValueChange={(value) => {
+                                    if (value) {
+                                        handleAddModel(value);
+                                    }
+                                }}
+                                value=""
+                            >
+                                <SelectTrigger className={classNames?.input}>
+                                    <SelectValue placeholder={t`Add a model...`} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {AVAILABLE_MODELS.filter((m) => !selectedModelSet.has(m)).map((model) => (
+                                        <SelectItem key={model} value={model}>
+                                            {model}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </SettingsRow>
                 </SettingsCard>
             </form>
         </form.AppForm>

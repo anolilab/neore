@@ -7,6 +7,7 @@ import type { GatewayModel, ModelFilterCapability } from "@neore/ai/models";
 import { ProviderIcon } from "@neore/ui/components/ai-elements/provider-icon";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
+import { Card } from "@neore/ui/components/card";
 import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { Heading } from "@neore/ui/components/heading";
 import { Input } from "@neore/ui/components/input";
@@ -19,7 +20,7 @@ import type { FC } from "react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import SettingsCard from "@/components/settings/settings-card";
+import SettingsCardHeader from "@/components/settings/settings-card-header";
 import SettingsRow from "@/components/settings/settings-row";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -360,29 +361,33 @@ const ModelsSettings: FC = () => {
     return (
         <div className="space-y-6">
             <FavoriteModelsSettings />
-            <SettingsCard
-                description={
-                    <>
-                        {t`Enable or disable models to control which ones appear in the model selector.`} {enabledCount} / {models.length}
-                    </>
-                }
-                title={t`Models`}
-            >
-                <div className="flex flex-wrap gap-2 py-3">
-                    <Button onClick={enableAll} size="sm" variant="outline">
-                        {t`Enable All`}
-                    </Button>
-                    <Button onClick={disableAll} size="sm" variant="outline">
-                        {t`Disable All`}
-                    </Button>
-                    <Button onClick={() => setConfirmResetOpen(true)} size="sm" variant="outline">
-                        <RotateCcw aria-hidden="true" className="mr-2 size-4" />
-                        {t`Reset to Defaults`}
-                    </Button>
+            <Card className="w-full text-start" variant="plain">
+                <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                    <SettingsCardHeader
+                        className="min-w-0 flex-1 basis-64 px-1"
+                        description={
+                            <>
+                                {t`Enable or disable models to control which ones appear in the model selector.`} {enabledCount} / {models.length}
+                            </>
+                        }
+                        title={t`Models`}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                        <Button onClick={enableAll} size="sm" variant="outline">
+                            {t`Enable All`}
+                        </Button>
+                        <Button onClick={disableAll} size="sm" variant="outline">
+                            {t`Disable All`}
+                        </Button>
+                        <Button onClick={() => setConfirmResetOpen(true)} size="sm" variant="outline">
+                            <RotateCcw aria-hidden="true" className="mr-2 size-4" />
+                            {t`Reset to Defaults`}
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Search and Filters */}
-                <div className="border-border/50 space-y-3 border-t py-3">
+                <div className="space-y-3">
                     <div className="relative">
                         <Search aria-hidden="true" className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
                         <Input
@@ -401,12 +406,12 @@ const ModelsSettings: FC = () => {
                         </Button>
 
                         {providers.length > 0 && (
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1.5">
                                 <Label className="text-muted-foreground text-xs" htmlFor="models-provider-filter">
                                     {t`Provider:`}
                                 </Label>
                                 <select
-                                    className="border-input bg-background h-8 rounded-md border px-2 text-xs"
+                                    className="border-input bg-background h-8 max-w-40 rounded-md border px-2 text-xs"
                                     id="models-provider-filter"
                                     onChange={(e) => setSelectedProvider(e.target.value || null)}
                                     value={selectedProvider || ""}
@@ -422,12 +427,12 @@ const ModelsSettings: FC = () => {
                         )}
 
                         {modes.length > 0 && (
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1.5">
                                 <Label className="text-muted-foreground text-xs" htmlFor="models-mode-filter">
                                     {t`Mode:`}
                                 </Label>
                                 <select
-                                    className="border-input bg-background h-8 rounded-md border px-2 text-xs"
+                                    className="border-input bg-background h-8 max-w-40 rounded-md border px-2 text-xs"
                                     id="models-mode-filter"
                                     onChange={(e) => setSelectedMode(e.target.value || null)}
                                     value={selectedMode || ""}
@@ -443,12 +448,12 @@ const ModelsSettings: FC = () => {
                         )}
 
                         {states.length > 0 && (
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1.5">
                                 <Label className="text-muted-foreground text-xs" htmlFor="models-state-filter">
                                     {t`State:`}
                                 </Label>
                                 <select
-                                    className="border-input bg-background h-8 rounded-md border px-2 text-xs"
+                                    className="border-input bg-background h-8 max-w-40 rounded-md border px-2 text-xs"
                                     id="models-state-filter"
                                     onChange={(e) => setSelectedState(e.target.value || null)}
                                     value={selectedState || ""}
@@ -497,80 +502,86 @@ const ModelsSettings: FC = () => {
                     )}
                 </div>
 
-                {/* Models List */}
-                {filteredModels.length === 0 ? (
-                    <div className="text-muted-foreground border-border/50 border-t py-6 text-center text-sm">{t`No models found matching your filters.`}</div>
-                ) : (
-                    Array.from(groupedModels.entries(), ([provider, providerModels]) => (
-                        <div className="border-border/50 border-t" key={provider}>
-                            <div className="flex items-center justify-between pt-3">
-                                <Heading className="text-sm font-semibold" fallbackLevel={3}>
-                                    {provider === OTHER_PROVIDER ? t`Other` : provider}
-                                </Heading>
-                                <Button className="h-7 text-xs" onClick={() => enableByProvider(provider)} size="sm" variant="ghost">
-                                    {t`Enable All`}
-                                </Button>
-                            </div>
-                            {providerModels.map((model) => {
-                                const isEnabled = currentEnabledState[model.id] ?? false;
-                                const isOverridden = modelOverrides[model.id] !== undefined;
-                                const switchId = `models-enabled-${model.id}`;
+                <div className="surface-raised overflow-hidden rounded-xl" data-slot="settings-card-body">
+                    <div className="px-4 py-1">
+                        {/* Models List */}
+                        {filteredModels.length === 0 ? (
+                            <div className="text-muted-foreground py-6 text-center text-sm">{t`No models found matching your filters.`}</div>
+                        ) : (
+                            Array.from(groupedModels.entries(), ([provider, providerModels]) => (
+                                <div className="border-border/50 not-first:border-t" key={provider}>
+                                    <div className="flex items-center justify-between pt-3">
+                                        <Heading className="text-sm font-semibold" fallbackLevel={3}>
+                                            {provider === OTHER_PROVIDER ? t`Other` : provider}
+                                        </Heading>
+                                        <Button className="h-7 text-xs" onClick={() => enableByProvider(provider)} size="sm" variant="ghost">
+                                            {t`Enable All`}
+                                        </Button>
+                                    </div>
+                                    {providerModels.map((model) => {
+                                        const isEnabled = currentEnabledState[model.id] ?? false;
+                                        const isOverridden = modelOverrides[model.id] !== undefined;
+                                        const switchId = `models-enabled-${model.id}`;
 
-                                return (
-                                    <SettingsRow
-                                        control={<Switch checked={isEnabled} id={switchId} onCheckedChange={(checked) => toggleModel(model.id, checked)} />}
-                                        description={
-                                            <>
-                                                {model.name && model.name !== model.id && <span className="block truncate font-mono">{model.id}</span>}
-                                                {model.filterCapabilities && model.filterCapabilities.length > 0 && (
-                                                    <span className="mt-1 flex flex-wrap gap-1">
-                                                        {model.filterCapabilities.map((cap) => (
-                                                            <Badge className="px-1 py-0 text-[10px]" key={cap} variant="outline">
-                                                                {capabilityLabel(cap)}
+                                        return (
+                                            <SettingsRow
+                                                control={
+                                                    <Switch checked={isEnabled} id={switchId} onCheckedChange={(checked) => toggleModel(model.id, checked)} />
+                                                }
+                                                description={
+                                                    <>
+                                                        {model.name && model.name !== model.id && <span className="block truncate font-mono">{model.id}</span>}
+                                                        {model.filterCapabilities && model.filterCapabilities.length > 0 && (
+                                                            <span className="mt-1 flex flex-wrap gap-1">
+                                                                {model.filterCapabilities.map((cap) => (
+                                                                    <Badge className="px-1 py-0 text-[10px]" key={cap} variant="outline">
+                                                                        {capabilityLabel(cap)}
+                                                                    </Badge>
+                                                                ))}
+                                                            </span>
+                                                        )}
+                                                    </>
+                                                }
+                                                htmlFor={switchId}
+                                                key={model.id}
+                                                title={
+                                                    <span className="inline-flex flex-wrap items-center gap-2">
+                                                        {model.displayProvider && (
+                                                            <ProviderIcon
+                                                                className="size-3"
+                                                                provider={model.provider || model.displayProvider}
+                                                                providerIcon={model.displayProvider}
+                                                            />
+                                                        )}
+                                                        <span>{model.name ?? model.id}</span>
+                                                        {model.isPremium && (
+                                                            <Badge className="bg-purple-500/10 px-1.5 py-0.5 text-[10px] text-purple-600 dark:text-purple-400">{t`Pro`}</Badge>
+                                                        )}
+                                                        {model.isNew && (
+                                                            <Badge className="bg-green-500/10 px-1.5 py-0.5 text-[10px] text-green-600 dark:text-green-400">{t`New`}</Badge>
+                                                        )}
+                                                        {!model.isPremium && (
+                                                            <Badge className="bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-600 dark:text-blue-400">{t`Free`}</Badge>
+                                                        )}
+                                                        {isOverridden && (
+                                                            <Badge
+                                                                className="bg-orange-500/10 px-1.5 py-0.5 text-[10px] text-orange-600 dark:text-orange-400"
+                                                                title={isEnabled ? t`Overridden: Enabled` : t`Overridden: Disabled`}
+                                                            >
+                                                                {t`Overridden`}
                                                             </Badge>
-                                                        ))}
+                                                        )}
                                                     </span>
-                                                )}
-                                            </>
-                                        }
-                                        htmlFor={switchId}
-                                        key={model.id}
-                                        title={
-                                            <span className="inline-flex flex-wrap items-center gap-2">
-                                                {model.displayProvider && (
-                                                    <ProviderIcon
-                                                        className="size-3"
-                                                        provider={model.provider || model.displayProvider}
-                                                        providerIcon={model.displayProvider}
-                                                    />
-                                                )}
-                                                <span>{model.name ?? model.id}</span>
-                                                {model.isPremium && (
-                                                    <Badge className="bg-purple-500/10 px-1.5 py-0.5 text-[10px] text-purple-600 dark:text-purple-400">{t`Pro`}</Badge>
-                                                )}
-                                                {model.isNew && (
-                                                    <Badge className="bg-green-500/10 px-1.5 py-0.5 text-[10px] text-green-600 dark:text-green-400">{t`New`}</Badge>
-                                                )}
-                                                {!model.isPremium && (
-                                                    <Badge className="bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-600 dark:text-blue-400">{t`Free`}</Badge>
-                                                )}
-                                                {isOverridden && (
-                                                    <Badge
-                                                        className="bg-orange-500/10 px-1.5 py-0.5 text-[10px] text-orange-600 dark:text-orange-400"
-                                                        title={isEnabled ? t`Overridden: Enabled` : t`Overridden: Disabled`}
-                                                    >
-                                                        {t`Overridden`}
-                                                    </Badge>
-                                                )}
-                                            </span>
-                                        }
-                                    />
-                                );
-                            })}
-                        </div>
-                    ))
-                )}
-            </SettingsCard>
+                                                }
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            </Card>
             <ConfirmDialog
                 confirmLabel={t`Reset`}
                 description={t`Every model returns to its default on or off setting.`}

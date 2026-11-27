@@ -25,6 +25,7 @@ import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import { useAuthActiveOrganization } from "@/features/auth/hooks/use-auth-session";
 import type { CollectionScope, CollectionView } from "@/features/knowledge/components/collection-picker";
 import { CollectionPicker, MoveToCollection } from "@/features/knowledge/components/collection-picker";
@@ -277,49 +278,48 @@ const KnowledgeBaseSettings: FC = () => {
             description={t`Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used.`}
             title={t`Knowledge Base`}
         >
-            <div className="py-3">
-                <CollectionPicker
-                    collections={collections}
-                    counts={files}
-                    onCreate={() => setDialog("create")}
-                    onDelete={handleDeleteCollection}
-                    onEdit={() => setDialog("edit")}
-                    onScopeChange={setScope}
-                    scope={scope}
-                />
-            </div>
+            <CollectionPicker
+                collections={collections}
+                counts={files}
+                onCreate={() => setDialog("create")}
+                onDelete={handleDeleteCollection}
+                onEdit={() => setDialog("edit")}
+                onScopeChange={setScope}
+                scope={scope}
+            />
 
-            <div className="border-border/50 space-y-3 border-t py-3">
-                {readOnly ? (
-                    <p className="text-muted-foreground bg-muted/50 rounded-md p-3 text-xs">{t`This collection is shared with you by a member of your organization. You can attach it to chats and projects; only its owner can change its files.`}</p>
-                ) : (
-                    <>
-                        {/* Upload zone */}
-                        <div
-                            {...getRootProps()}
-                            className={`cursor-pointer rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
-                                isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-muted-foreground/50"
-                            } ${isUploading ? "pointer-events-none opacity-50" : ""}`}
-                        >
-                            <input {...getInputProps()} />
-                            {isUploading ? (
-                                <div className="flex flex-col items-center gap-2">
-                                    <Loader2Icon aria-hidden="true" className="text-muted-foreground h-8 w-8 animate-spin" />
-                                    <p className="text-muted-foreground text-sm">{t`Uploading...`}</p>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-center gap-2">
-                                    <UploadIcon aria-hidden="true" className="text-muted-foreground h-8 w-8" />
-                                    <p className="text-sm">{isDragActive ? t`Drop files here...` : t`Drag & drop files here, or click to browse`}</p>
-                                    <p className="text-muted-foreground text-xs">{t`PDF, DOCX, TXT, MD, CSV, JSON, XLS, XLSX — max 5MB`}</p>
-                                </div>
-                            )}
-                        </div>
-
-                        <KnowledgeImportActions collectionId={ownSelected} onChange={refreshAll} />
-                    </>
-                )}
-            </div>
+            {readOnly ? (
+                <div className="border-border/50 border-t py-3">
+                    <p className="text-muted-foreground text-xs">{t`This collection is shared with you by a member of your organization. You can attach it to chats and projects; only its owner can change its files.`}</p>
+                </div>
+            ) : (
+                <SettingsRow
+                    control={<KnowledgeImportActions collectionId={ownSelected} onChange={refreshAll} />}
+                    description={t`PDF, DOCX, TXT, MD, CSV, JSON, XLS, XLSX — max 5MB`}
+                    title={t`Add documents`}
+                >
+                    {/* Upload zone */}
+                    <div
+                        {...getRootProps()}
+                        className={`cursor-pointer rounded-lg border border-dashed px-4 py-5 text-center transition-colors ${
+                            isDragActive ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/50"
+                        } ${isUploading ? "pointer-events-none opacity-50" : ""}`}
+                    >
+                        <input {...getInputProps()} />
+                        {isUploading ? (
+                            <p className="text-muted-foreground flex items-center justify-center gap-2 text-sm">
+                                <Loader2Icon aria-hidden="true" className="size-4 animate-spin" />
+                                {t`Uploading...`}
+                            </p>
+                        ) : (
+                            <p className="text-muted-foreground flex items-center justify-center gap-2 text-sm">
+                                <UploadIcon aria-hidden="true" className="size-4 shrink-0" />
+                                {isDragActive ? t`Drop files here...` : t`Drag & drop files here, or click to browse`}
+                            </p>
+                        )}
+                    </div>
+                </SettingsRow>
+            )}
 
             <div className="border-border/50 border-t py-3">
                 {/* Stats */}

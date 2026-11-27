@@ -555,7 +555,7 @@ msgid "{0} ({1}) asks you to sign in at {trustHosts}, which is a different site.
 msgstr "{0}（{1}）は別のサイトである {trustHosts} でのサインインを求めています。そこで許可したアクセス権は {2} に送信されます。このアカウントでこのサーバーを信頼できる場合のみ続行してください。"
 
 #. placeholder {0}: collection.name
-#: src/features/knowledge/components/collection-picker.tsx:67
+#: src/features/knowledge/components/collection-picker.tsx:69
 msgid "{0} (shared)"
 msgstr "{0}（共有）"
 
@@ -2601,7 +2601,7 @@ msgstr "コメントを追加"
 msgid "Add a member from your organization to <0>{0}</0>"
 msgstr "組織のメンバーを <0>{0}</0> に追加"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:253
+#: src/features/auth/components/organization/billing-settings-card.tsx:250
 #: src/features/auth/components/team/team-settings-dialog.tsx:191
 msgid "Add a model..."
 msgstr "モデルを追加..."
@@ -2707,6 +2707,10 @@ msgstr "コメントを追加"
 #: src/features/develop/components/review-panel.tsx:202
 msgid "Add comments on a line of the diff, then submit."
 msgstr "差分の行にコメントを追加してから、送信してください。"
+
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:299
+msgid "Add documents"
+msgstr "ドキュメントを追加"
 
 #: src/features/settings/components/chat/custom-providers-settings.tsx:322
 #: src/features/settings/components/chat/custom-providers-settings.tsx:431
@@ -2930,7 +2934,7 @@ msgid "Added"
 msgstr "追加済み"
 
 #. placeholder {0}: result.value
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:166
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:167
 msgid "Added \"{0}\" to knowledge base"
 msgstr "「{0}」をナレッジベースに追加しました"
 
@@ -3526,9 +3530,9 @@ msgstr "垂直方向に整列（V）"
 #: src/components/model-picker/model-picker.tsx:1317
 #: src/features/chat/thread-list/thread-list-filter-menu.tsx:120
 #: src/features/marketing/components/tutorials-page.tsx:130
-#: src/features/settings/components/chat/models-settings.tsx:414
-#: src/features/settings/components/chat/models-settings.tsx:435
-#: src/features/settings/components/chat/models-settings.tsx:456
+#: src/features/settings/components/chat/models-settings.tsx:419
+#: src/features/settings/components/chat/models-settings.tsx:440
+#: src/features/settings/components/chat/models-settings.tsx:461
 #: src/features/settings/connectors/connectors-page.tsx:63
 #: src/routes/(chat)/workflow/gallery.tsx:20
 msgid "All"
@@ -3539,7 +3543,7 @@ msgstr "すべて"
 msgid "All ({0})"
 msgstr "すべて（{0}）"
 
-#: src/features/settings/components/chat/models-settings.tsx:353
+#: src/features/settings/components/chat/models-settings.tsx:354
 msgid "All {provider} models enabled"
 msgstr "{provider} のすべてのモデルを有効にしました"
 
@@ -3586,11 +3590,11 @@ msgid "All Directions"
 msgstr "全方向"
 
 #. placeholder {0}: counts?.length ?? 0
-#: src/features/knowledge/components/collection-picker.tsx:63
+#: src/features/knowledge/components/collection-picker.tsx:65
 msgid "All files ({0})"
 msgstr "すべてのファイル（{0}）"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:210
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:211
 msgid "All files removed from knowledge base"
 msgstr "ナレッジベースからすべてのファイルを削除しました"
 
@@ -3628,11 +3632,11 @@ msgstr "すべてのモデルとツール"
 msgid "All models allowed (Enterprise)"
 msgstr "すべてのモデルを許可（Enterprise）"
 
-#: src/features/settings/components/chat/models-settings.tsx:312
+#: src/features/settings/components/chat/models-settings.tsx:313
 msgid "All models disabled"
 msgstr "すべてのモデルが無効です"
 
-#: src/features/settings/components/chat/models-settings.tsx:291
+#: src/features/settings/components/chat/models-settings.tsx:292
 msgid "All models enabled"
 msgstr "すべてのモデルを有効にしました"
 
@@ -3760,7 +3764,7 @@ msgstr "一度だけ許可"
 msgid "Allow this site ({0})"
 msgstr "このサイトを許可（{0}）"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:224
+#: src/features/auth/components/organization/billing-settings-card.tsx:221
 #: src/features/auth/components/team/team-settings-dialog.tsx:170
 msgid "Allowed AI Models"
 msgstr "許可された AI モデル"
@@ -5452,23 +5456,23 @@ msgstr "クレジットではなく、ご自身の API キーに課金されま�
 msgid "Billing"
 msgstr "請求"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:321
+#: src/features/auth/components/organization/billing-settings-card.tsx:317
 msgid "Billing details for this organization"
 msgstr "この組織の請求の詳細"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:202
-#: src/features/auth/components/organization/billing-settings-card.tsx:216
+#: src/features/auth/components/organization/billing-settings-card.tsx:195
+#: src/features/auth/components/organization/billing-settings-card.tsx:201
 msgid "Billing Email"
 msgstr "請求先メールアドレス"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:136
-#: src/features/auth/components/organization/billing-settings-card.tsx:282
-#: src/features/auth/components/organization/billing-settings-card.tsx:322
-#: src/features/auth/components/organization/billing-settings-card.tsx:345
+#: src/features/auth/components/organization/billing-settings-card.tsx:137
+#: src/features/auth/components/organization/billing-settings-card.tsx:278
+#: src/features/auth/components/organization/billing-settings-card.tsx:318
+#: src/features/auth/components/organization/billing-settings-card.tsx:341
 msgid "Billing Settings"
 msgstr "請求設定"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:83
+#: src/features/auth/components/organization/billing-settings-card.tsx:84
 msgid "Billing settings updated successfully"
 msgstr "請求設定を更新しました"
 
@@ -6165,7 +6169,7 @@ msgstr "カナダ"
 #: src/features/evals/components/save-eval-case-action.tsx:137
 #: src/features/feedback/components/send-feedback-dialog.tsx:385
 #: src/features/knowledge/components/collection-dialog.tsx:97
-#: src/features/knowledge/components/collection-picker.tsx:112
+#: src/features/knowledge/components/collection-picker.tsx:113
 #: src/features/local-models/components/ollama-model-manager.tsx:300
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
@@ -6304,7 +6308,7 @@ msgstr "キャンバスエディター"
 msgid "Canvas opens a side-by-side editor next to your chat. Write long-form documents, edit code, and refine content with AI assistance. Changes are versioned so you can always go back."
 msgstr "キャンバスは、チャットの横にエディターを並べて開きます。長文のドキュメントを書き、コードを編集し、AI の支援でコンテンツを磨き上げましょう。変更はバージョン管理されるので、いつでも元に戻せます。"
 
-#: src/features/settings/components/chat/models-settings.tsx:477
+#: src/features/settings/components/chat/models-settings.tsx:482
 msgid "Capabilities"
 msgstr "機能"
 
@@ -6930,6 +6934,10 @@ msgstr "撮影に使うカメラシステムを選択します"
 msgid "Choose the project's folder, or type a path."
 msgstr "プロジェクトのフォルダーを選択するか、パスを入力してください。"
 
+#: src/features/knowledge/components/collection-picker.tsx:123
+msgid "Choose which files to show and add to. New uploads go into the collection you pick."
+msgstr "表示するファイルと追加先を選びます。新しくアップロードしたファイルは選んだコレクションに入ります。"
+
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:357
 #~ msgid "Choose which tools the assistant may use on its own, which need your approval, and which are off."
 #~ msgstr "アシスタントが自動で使えるツール、承認が必要なツール、無効にするツールを選択します。"
@@ -7088,7 +7096,7 @@ msgstr "クリーンアップに失敗しました"
 #: src/features/chat/thread/media-gallery-view.tsx:382
 #: src/features/prompts/components/prompt-list.tsx:614
 #: src/features/settings/components/chat/api-keys-settings.tsx:382
-#: src/features/settings/components/chat/models-settings.tsx:469
+#: src/features/settings/components/chat/models-settings.tsx:474
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:370
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:379
 msgid "Clear"
@@ -7572,15 +7580,15 @@ msgstr "グループを折りたたんで子要素を非表示にする"
 msgid "Collapse textarea"
 msgstr "テキストエリアを折りたたむ"
 
-#: src/features/knowledge/components/collection-picker.tsx:76
+#: src/features/knowledge/components/collection-picker.tsx:124
 msgid "Collection"
 msgstr "コレクション"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:240
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:241
 msgid "Collection and its files deleted"
 msgstr "コレクションとそのファイルを削除しました"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:240
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:241
 msgid "Collection deleted; its files are now uncategorised"
 msgstr "コレクションを削除しました。ファイルは未分類になりました"
 
@@ -8065,8 +8073,8 @@ msgstr "チーム「{teamName}」の設定を構成"
 msgid "Configure team settings"
 msgstr "チーム設定を構成"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:135
-#: src/features/auth/components/organization/billing-settings-card.tsx:280
+#: src/features/auth/components/organization/billing-settings-card.tsx:136
+#: src/features/auth/components/organization/billing-settings-card.tsx:276
 msgid "Configure the billing contact and available AI models"
 msgstr "請求先の連絡先と利用可能な AI モデルを設定します"
 
@@ -9290,7 +9298,7 @@ msgstr "このメモリの取得元を読み込めませんでした。"
 msgid "Could not load your activity."
 msgstr "アクティビティを読み込めませんでした。"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:327
+#: src/features/auth/components/organization/billing-settings-card.tsx:323
 msgid "Could not load your organization's billing details. Try again later."
 msgstr "組織の請求の詳細を読み込めませんでした。後でもう一度お試しください。"
 
@@ -9969,7 +9977,7 @@ msgid "Credits"
 msgstr "クレジット"
 
 #: src/features/auth/components/organization/billing-settings-card.tsx:190
-#: src/features/auth/components/organization/billing-settings-card.tsx:350
+#: src/features/auth/components/organization/billing-settings-card.tsx:346
 msgid "Credits per user:"
 msgstr "ユーザーあたりのクレジット："
 
@@ -10068,7 +10076,7 @@ msgid "Current Prompt Variables"
 msgstr "現在のプロンプト変数"
 
 #: src/features/auth/components/organization/billing-settings-card.tsx:187
-#: src/features/auth/components/organization/billing-settings-card.tsx:349
+#: src/features/auth/components/organization/billing-settings-card.tsx:345
 msgid "Current tier:"
 msgstr "現在のプラン："
 
@@ -10692,7 +10700,7 @@ msgstr "削除"
 #. placeholder {0}: deletingSkill.name
 #. placeholder {0}: deletingTrigger.name
 #. placeholder {0}: selected.name
-#: src/features/knowledge/components/collection-picker.tsx:106
+#: src/features/knowledge/components/collection-picker.tsx:107
 #: src/features/settings/components/chat/trigger-settings.tsx:1094
 #: src/features/skills/components/skill-list.tsx:317
 msgid "Delete \"{0}\"?"
@@ -10769,7 +10777,7 @@ msgstr "アバターを削除"
 msgid "Delete case {0}"
 msgstr "ケース {0} を削除"
 
-#: src/features/knowledge/components/collection-picker.tsx:101
+#: src/features/knowledge/components/collection-picker.tsx:102
 msgid "Delete collection"
 msgstr "コレクションを削除"
 
@@ -10972,7 +10980,7 @@ msgstr "トリガーを削除"
 msgid "Delete trigger?"
 msgstr "トリガーを削除しますか？"
 
-#: src/features/knowledge/components/collection-picker.tsx:113
+#: src/features/knowledge/components/collection-picker.tsx:114
 msgid "Delete with files"
 msgstr "ファイルごと削除"
 
@@ -11422,7 +11430,7 @@ msgstr "ディレクトリ（テナント）ID — シングルテナントの�
 msgid "Disable 2FA"
 msgstr "2FA を無効化"
 
-#: src/features/settings/components/chat/models-settings.tsx:376
+#: src/features/settings/components/chat/models-settings.tsx:380
 msgid "Disable All"
 msgstr "すべて無効化"
 
@@ -11892,7 +11900,7 @@ msgstr "横並びのキャンバスで長文コンテンツの下書き、編集
 msgid "Drafts"
 msgstr "下書き"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:313
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:317
 msgid "Drag & drop files here, or click to browse"
 msgstr "ここにファイルをドラッグ＆ドロップするか、クリックして選択"
 
@@ -11934,7 +11942,7 @@ msgstr "ファイルをドロップするか、クリックしてアップロー
 msgid "Drop files here"
 msgstr "ここにファイルをドロップ"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:313
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:317
 msgid "Drop files here..."
 msgstr "ここにファイルをドロップ..."
 
@@ -12244,7 +12252,7 @@ msgid "Edit case {0}"
 msgstr "ケース {0} を編集"
 
 #: src/features/knowledge/components/collection-dialog.tsx:52
-#: src/features/knowledge/components/collection-picker.tsx:97
+#: src/features/knowledge/components/collection-picker.tsx:98
 msgid "Edit collection"
 msgstr "コレクションを編集"
 
@@ -12673,8 +12681,8 @@ msgstr "2FA を有効化"
 msgid "Enable a skill first — only enabled skills can be evaluated."
 msgstr "まずスキルを有効にしてください。評価できるのは有効なスキルのみです。"
 
-#: src/features/settings/components/chat/models-settings.tsx:373
-#: src/features/settings/components/chat/models-settings.tsx:511
+#: src/features/settings/components/chat/models-settings.tsx:377
+#: src/features/settings/components/chat/models-settings.tsx:518
 msgid "Enable All"
 msgstr "すべて有効化"
 
@@ -12715,7 +12723,7 @@ msgstr "次のチャットで有効化"
 msgid "Enable memory"
 msgstr "メモリを有効化"
 
-#: src/features/settings/components/chat/models-settings.tsx:366
+#: src/features/settings/components/chat/models-settings.tsx:370
 msgid "Enable or disable models to control which ones appear in the model selector."
 msgstr "モデルを有効または無効にして、モデル選択に表示するモデルを管理します。"
 
@@ -12933,7 +12941,7 @@ msgstr "有効な AWS リージョンを入力してください（例: us-east-
 msgid "Enter an API version such as v1 or 2024-10-21"
 msgstr "v1 や 2024-10-21 のような API バージョンを入力してください"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:207
+#: src/features/auth/components/organization/billing-settings-card.tsx:206
 msgid "Enter billing email"
 msgstr "請求先メールアドレスを入力"
 
@@ -13364,7 +13372,7 @@ msgstr "すべてのモデル"
 msgid "Every model and tool, 1,000 messages a day."
 msgstr "すべてのモデルとツール、1日1,000メッセージ。"
 
-#: src/features/settings/components/chat/models-settings.tsx:576
+#: src/features/settings/components/chat/models-settings.tsx:587
 msgid "Every model returns to its default on or off setting."
 msgstr "すべてのモデルが、オン／オフのデフォルト設定に戻ります。"
 
@@ -14090,7 +14098,7 @@ msgstr "{fileName} を削除できませんでした"
 msgid "Failed to delete budget alert"
 msgstr "予算アラートを削除できませんでした"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:242
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:243
 msgid "Failed to delete collection"
 msgstr "コレクションを削除できませんでした"
 
@@ -14174,7 +14182,7 @@ msgstr "コレクションを外せませんでした"
 msgid "Failed to detach file"
 msgstr "ファイルを外せませんでした"
 
-#: src/features/settings/components/chat/models-settings.tsx:314
+#: src/features/settings/components/chat/models-settings.tsx:315
 msgid "Failed to disable all models"
 msgstr "すべてのモデルを無効にできませんでした"
 
@@ -14198,11 +14206,11 @@ msgstr "エクスポートをダウンロードできませんでした"
 msgid "Failed to download file. Please try again."
 msgstr "ファイルをダウンロードできませんでした。もう一度お試しください。"
 
-#: src/features/settings/components/chat/models-settings.tsx:293
+#: src/features/settings/components/chat/models-settings.tsx:294
 msgid "Failed to enable all models"
 msgstr "すべてのモデルを有効にできませんでした"
 
-#: src/features/settings/components/chat/models-settings.tsx:355
+#: src/features/settings/components/chat/models-settings.tsx:356
 msgid "Failed to enable models by provider"
 msgstr "プロバイダー単位でモデルを有効にできませんでした"
 
@@ -14308,7 +14316,7 @@ msgstr "動画ストリームを読み込めませんでした。"
 msgid "Failed to make thread permanent"
 msgstr "スレッドを永続化できませんでした"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:224
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:225
 msgid "Failed to move file"
 msgstr "ファイルを移動できませんでした"
 
@@ -14339,7 +14347,7 @@ msgstr "貼り付けできませんでした。もう一度お試しください
 msgid "Failed to pin thread"
 msgstr "スレッドをピン留めできませんでした"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:208
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:209
 msgid "Failed to remove {failed} file(s)"
 msgstr "{failed} 個のファイルを削除できませんでした"
 
@@ -14355,7 +14363,7 @@ msgstr "{toolId} の API キーを削除できませんでした"
 msgid "Failed to remove endpoint"
 msgstr "エンドポイントを削除できませんでした"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:92
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:93
 msgid "Failed to remove file"
 msgstr "ファイルを削除できませんでした"
 
@@ -14391,7 +14399,7 @@ msgstr "タグを並べ替えられませんでした"
 msgid "Failed to request export"
 msgstr "エクスポートをリクエストできませんでした"
 
-#: src/features/settings/components/chat/models-settings.tsx:327
+#: src/features/settings/components/chat/models-settings.tsx:328
 msgid "Failed to reset to defaults"
 msgstr "既定にリセットできませんでした"
 
@@ -14628,7 +14636,7 @@ msgstr "MCP サーバーを更新できませんでした"
 msgid "Failed to update memory"
 msgstr "メモリを更新できませんでした"
 
-#: src/features/settings/components/chat/models-settings.tsx:270
+#: src/features/settings/components/chat/models-settings.tsx:271
 msgid "Failed to update model"
 msgstr "モデルを更新できませんでした"
 
@@ -14697,7 +14705,7 @@ msgstr "ユーザーのロールを更新できませんでした"
 msgid "Failed to upload avatar"
 msgstr "アバターをアップロードできませんでした"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:148
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:149
 msgid "Failed to upload file. Please try again."
 msgstr "ファイルをアップロードできませんでした。もう一度お試しください。"
 
@@ -14796,7 +14804,7 @@ msgstr "高速"
 #: ../../packages/chat-ui/src/model-picker/utils.ts:153
 #: src/components/model-picker/model-picker.tsx:80
 #: src/features/marketing/components/model-detail-page.tsx:33
-#: src/features/settings/components/chat/models-settings.tsx:30
+#: src/features/settings/components/chat/models-settings.tsx:31
 msgid "Fast"
 msgstr "高速"
 
@@ -15189,7 +15197,7 @@ msgstr "ファイル入力"
 msgid "File patterns, one per line"
 msgstr "ファイルパターン（1 行に 1 つ）"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:96
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:97
 msgid "File removed from knowledge base"
 msgstr "ナレッジベースからファイルを削除しました"
 
@@ -15197,7 +15205,7 @@ msgstr "ナレッジベースからファイルを削除しました"
 msgid "File size exceeds {maxSize}"
 msgstr "ファイルサイズが {maxSize} を超えています"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:260
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:261
 #: src/features/vault/components/upload-zone.tsx:92
 msgid "File size too large. Maximum 5MB allowed."
 msgstr "ファイルサイズが大きすぎます。最大 5MB までです。"
@@ -15218,7 +15226,7 @@ msgstr "このファイル形式は受け付けられません"
 msgid "File type not supported."
 msgstr "このファイル形式はサポートされていません。"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:262
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:263
 msgid "File type not supported. Supported: PDF, DOCX, TXT, MD, CSV, JSON, XLS, XLSX."
 msgstr "このファイル形式には対応していません。対応形式：PDF、DOCX、TXT、MD、CSV、JSON、XLS、XLSX。"
 
@@ -15226,7 +15234,7 @@ msgstr "このファイル形式には対応していません。対応形式：
 msgid "File upload"
 msgstr "ファイルのアップロード"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:264
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:265
 #: src/features/vault/components/upload-zone.tsx:96
 msgid "File upload rejected."
 msgstr "ファイルのアップロードが拒否されました。"
@@ -15390,7 +15398,7 @@ msgid "Filtering"
 msgstr "絞り込み"
 
 #: src/features/canvas/canvas-panel.tsx:126
-#: src/features/settings/components/chat/models-settings.tsx:399
+#: src/features/settings/components/chat/models-settings.tsx:404
 msgid "Filters"
 msgstr "フィルター"
 
@@ -15795,8 +15803,8 @@ msgstr "フランス"
 #: src/features/billing/components/personal-plan-card.tsx:27
 #: src/features/marketing/components/gateway-landing-page.tsx:113
 #: src/features/marketing/components/landing-page.tsx:327
-#: src/features/settings/components/chat/models-settings.tsx:40
-#: src/features/settings/components/chat/models-settings.tsx:555
+#: src/features/settings/components/chat/models-settings.tsx:41
+#: src/features/settings/components/chat/models-settings.tsx:564
 msgid "Free"
 msgstr "無料"
 
@@ -17780,7 +17788,7 @@ msgstr "イラスト"
 #: src/features/chat/thread/composer.tsx:131
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:605
-#: src/features/settings/components/chat/models-settings.tsx:41
+#: src/features/settings/components/chat/models-settings.tsx:42
 #: src/features/settings/lib/settings-keywords.ts:74
 #: src/features/settings/lib/settings-keywords.ts:75
 #: src/features/settings/lib/settings-keywords.ts:76
@@ -17838,7 +17846,7 @@ msgid "image editing"
 msgstr "画像編集"
 
 #: src/components/model-picker/model-picker.tsx:81
-#: src/features/settings/components/chat/models-settings.tsx:34
+#: src/features/settings/components/chat/models-settings.tsx:35
 msgid "Image Gen"
 msgstr "画像生成"
 
@@ -19075,7 +19083,7 @@ msgstr "現在の行を保持"
 msgid "Keep editing"
 msgstr "編集を続ける"
 
-#: src/features/knowledge/components/collection-picker.tsx:114
+#: src/features/knowledge/components/collection-picker.tsx:115
 msgid "Keep files"
 msgstr "ファイルを残す"
 
@@ -19095,7 +19103,7 @@ msgstr "動画の一部を残します。残した部分はこのブラウザー
 msgid "Keep Permanently"
 msgstr "永続的に保持"
 
-#: src/features/knowledge/components/collection-picker.tsx:108
+#: src/features/knowledge/components/collection-picker.tsx:109
 msgid "Keep the files as uncategorised, or delete them together with the collection. Chats and projects that use the collection stop searching it."
 msgstr "ファイルを未分類として残すか、コレクションと一緒に削除します。このコレクションを使っているチャットやプロジェクトは検索しなくなります。"
 
@@ -19176,7 +19184,7 @@ msgstr "ナレッジベース"
 
 #: src/features/chat/header/kb-attachment-button.tsx:186
 #: src/features/layout/lib/dashboard-page-names.ts:26
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:278
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:279
 #: src/features/settings/lib/settings-navigation.ts:107
 msgid "Knowledge Base"
 msgstr "ナレッジベース"
@@ -21801,7 +21809,7 @@ msgstr "モード"
 msgid "Mode {0}, on {1}. Nothing starts when it is created."
 msgstr "モード {0}、{1} 上。作成しても何も開始されません。"
 
-#: src/features/settings/components/chat/models-settings.tsx:427
+#: src/features/settings/components/chat/models-settings.tsx:432
 msgid "Mode:"
 msgstr "モード:"
 
@@ -21853,11 +21861,11 @@ msgstr "モデル比較"
 msgid "Model context usage"
 msgstr "モデルのコンテキスト使用量"
 
-#: src/features/settings/components/chat/models-settings.tsx:268
+#: src/features/settings/components/chat/models-settings.tsx:269
 msgid "Model disabled"
 msgstr "モデルを無効にしました"
 
-#: src/features/settings/components/chat/models-settings.tsx:268
+#: src/features/settings/components/chat/models-settings.tsx:269
 msgid "Model enabled"
 msgstr "モデルを有効にしました"
 
@@ -21918,7 +21926,7 @@ msgstr "モデル: OpenAI Whisper"
 #: src/features/marketing/components/navbar-menu.tsx:58
 #: src/features/marketing/components/navbar-menu.tsx:159
 #: src/features/settings/components/chat/custom-providers-settings.tsx:556
-#: src/features/settings/components/chat/models-settings.tsx:369
+#: src/features/settings/components/chat/models-settings.tsx:373
 #: src/features/settings/components/chat/native-providers-settings.tsx:633
 #: src/features/settings/lib/settings-navigation.ts:109
 msgid "Models"
@@ -22167,7 +22175,7 @@ msgstr "モーション: {motionPercent}%"
 msgid "Mountain Time (US & Canada)"
 msgstr "山岳部標準時（米国およびカナダ）"
 
-#: src/features/knowledge/components/collection-picker.tsx:157
+#: src/features/knowledge/components/collection-picker.tsx:163
 msgid "Move \"{fileName}\" to a collection"
 msgstr "「{fileName}」をコレクションに移動"
 
@@ -22361,7 +22369,7 @@ msgstr "複数の画像"
 msgid "Mumbai, Kolkata"
 msgstr "ムンバイ、コルカタ"
 
-#: src/features/settings/components/chat/models-settings.tsx:42
+#: src/features/settings/components/chat/models-settings.tsx:43
 msgid "Music"
 msgstr "音楽"
 
@@ -22805,8 +22813,8 @@ msgstr "未使用"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:194
 #: src/components/model-picker/model-picker.tsx:375
-#: src/features/settings/components/chat/models-settings.tsx:43
-#: src/features/settings/components/chat/models-settings.tsx:552
+#: src/features/settings/components/chat/models-settings.tsx:44
+#: src/features/settings/components/chat/models-settings.tsx:561
 msgid "New"
 msgstr "新規"
 
@@ -22868,7 +22876,7 @@ msgid "New chats with this bot start in the chosen mode"
 msgstr "このボットとの新しいチャットは選択したモードで始まります"
 
 #: src/features/knowledge/components/collection-dialog.tsx:52
-#: src/features/knowledge/components/collection-picker.tsx:93
+#: src/features/knowledge/components/collection-picker.tsx:94
 msgid "New collection"
 msgstr "新しいコレクション"
 
@@ -23490,7 +23498,7 @@ msgstr "マイクが見つかりません。"
 msgid "No models available"
 msgstr "利用可能なモデルがありません"
 
-#: src/features/settings/components/chat/models-settings.tsx:502
+#: src/features/settings/components/chat/models-settings.tsx:509
 msgid "No models found matching your filters."
 msgstr "フィルターに一致するモデルが見つかりません。"
 
@@ -24530,7 +24538,7 @@ msgstr "一方の実行のみ"
 msgid "Only listed tools"
 msgstr "一覧のツールのみ"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:344
+#: src/features/auth/components/organization/billing-settings-card.tsx:340
 msgid "Only organization owners can manage billing settings"
 msgstr "請求設定を管理できるのは組織のオーナーのみです"
 
@@ -25540,7 +25548,7 @@ msgstr "元のシステムプロンプト"
 #: src/features/admin/components/feedback-admin-page.tsx:24
 #: src/features/admin/components/feedback-admin-page.tsx:171
 #: src/features/feedback/components/send-feedback-dialog.tsx:30
-#: src/features/settings/components/chat/models-settings.tsx:508
+#: src/features/settings/components/chat/models-settings.tsx:515
 msgid "Other"
 msgstr "その他"
 
@@ -25668,15 +25676,15 @@ msgstr "出力形式重視"
 msgid "Output:"
 msgstr "出力:"
 
-#: src/features/settings/components/chat/models-settings.tsx:562
+#: src/features/settings/components/chat/models-settings.tsx:571
 msgid "Overridden"
 msgstr "上書き済み"
 
-#: src/features/settings/components/chat/models-settings.tsx:560
+#: src/features/settings/components/chat/models-settings.tsx:569
 msgid "Overridden: Disabled"
 msgstr "上書き済み: 無効"
 
-#: src/features/settings/components/chat/models-settings.tsx:560
+#: src/features/settings/components/chat/models-settings.tsx:569
 msgid "Overridden: Enabled"
 msgstr "上書き済み: 有効"
 
@@ -26120,7 +26128,7 @@ msgstr "支払い、サブスクリプション、財務データ"
 
 #: src/components/model-picker/model-picker.tsx:82
 #: src/features/canvas/pdf-preview-panel.tsx:80
-#: src/features/settings/components/chat/models-settings.tsx:35
+#: src/features/settings/components/chat/models-settings.tsx:36
 msgid "PDF"
 msgstr "PDF"
 
@@ -26132,7 +26140,7 @@ msgstr "PDF ドキュメント"
 msgid "PDF preview"
 msgstr "PDF プレビュー"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:314
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:298
 msgid "PDF, DOCX, TXT, MD, CSV, JSON, XLS, XLSX — max 5MB"
 msgstr "PDF、DOCX、TXT、MD、CSV、JSON、XLS、XLSX — 最大 5MB"
 
@@ -26787,7 +26795,7 @@ msgstr "モデル {0} を優先します。"
 msgid "premium"
 msgstr "プレミアム"
 
-#: src/features/settings/components/chat/models-settings.tsx:44
+#: src/features/settings/components/chat/models-settings.tsx:45
 #: src/features/settings/connectors/connector-card.tsx:167
 msgid "Premium"
 msgstr "プレミアム"
@@ -27165,7 +27173,7 @@ msgstr "デフォルトでプライベート"
 #: src/features/billing/components/personal-plan-card.tsx:27
 #: src/features/marketing/components/gateway-landing-page.tsx:131
 #: src/features/marketing/components/landing-page.tsx:345
-#: src/features/settings/components/chat/models-settings.tsx:549
+#: src/features/settings/components/chat/models-settings.tsx:558
 #: src/features/workflow/components/nodes/pro-badge.tsx:6
 msgid "Pro"
 msgstr "Pro"
@@ -27627,7 +27635,7 @@ msgstr "プロバイダーの制限"
 msgid "Provider updated"
 msgstr "プロバイダーを更新しました"
 
-#: src/features/settings/components/chat/models-settings.tsx:406
+#: src/features/settings/components/chat/models-settings.tsx:411
 msgid "Provider:"
 msgstr "プロバイダー:"
 
@@ -28244,7 +28252,7 @@ msgstr "推論"
 #: ../../packages/chat-ui/src/model-picker/utils.ts:161
 #: ../../packages/ui/src/components/ai-elements/context.tsx:316
 #: src/features/chat/thread/message-cost-badge.tsx:64
-#: src/features/settings/components/chat/models-settings.tsx:32
+#: src/features/settings/components/chat/models-settings.tsx:33
 msgid "Reasoning"
 msgstr "推論"
 
@@ -28801,7 +28809,7 @@ msgstr "{fileName} を削除"
 msgid "Remove {label}"
 msgstr "{label} を削除"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:232
+#: src/features/auth/components/organization/billing-settings-card.tsx:229
 #: src/features/auth/components/team/team-settings-dialog.tsx:177
 msgid "Remove {model}"
 msgstr "{model} を削除"
@@ -29299,7 +29307,7 @@ msgstr "確認メールを再送信"
 #: ../../packages/ui/src/components/image-editor.tsx:311
 #: src/features/canvas/canvas-panel.tsx:240
 #: src/features/chat/components/cinema-studio/cinema-panel.tsx:88
-#: src/features/settings/components/chat/models-settings.tsx:575
+#: src/features/settings/components/chat/models-settings.tsx:586
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:351
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:100
 msgid "Reset"
@@ -29319,7 +29327,7 @@ msgstr "{roleLabel} を既定に戻す"
 msgid "Reset execution state"
 msgstr "実行状態をリセット"
 
-#: src/features/settings/components/chat/models-settings.tsx:583
+#: src/features/settings/components/chat/models-settings.tsx:594
 msgid "Reset models to defaults?"
 msgstr "モデルをデフォルトにリセットしますか？"
 
@@ -29336,11 +29344,11 @@ msgstr "パスワードをリセット"
 msgid "Reset sorting"
 msgstr "並べ替えをリセット"
 
-#: src/features/settings/components/chat/models-settings.tsx:325
+#: src/features/settings/components/chat/models-settings.tsx:326
 msgid "Reset to defaults"
 msgstr "デフォルトに戻す"
 
-#: src/features/settings/components/chat/models-settings.tsx:380
+#: src/features/settings/components/chat/models-settings.tsx:384
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:409
 msgid "Reset to Defaults"
 msgstr "既定に戻す"
@@ -30156,8 +30164,8 @@ msgstr "サウジアラビア"
 
 #: ../../packages/ui/src/components/inline-edit.tsx:119
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:118
-#: src/features/auth/components/organization/billing-settings-card.tsx:132
-#: src/features/auth/components/organization/billing-settings-card.tsx:277
+#: src/features/auth/components/organization/billing-settings-card.tsx:133
+#: src/features/auth/components/organization/billing-settings-card.tsx:273
 #: src/features/auth/components/organization/organization-name-card.tsx:100
 #: src/features/auth/components/organization/organization-name-card.tsx:155
 #: src/features/auth/components/organization/organization-slug-card.tsx:105
@@ -30609,7 +30617,7 @@ msgstr "検索モード：{0}"
 msgid "Search mode: {0}."
 msgstr "検索モード: {0}。"
 
-#: src/features/settings/components/chat/models-settings.tsx:391
+#: src/features/settings/components/chat/models-settings.tsx:396
 msgid "Search models by name, ID, or provider..."
 msgstr "名前、ID、プロバイダーでモデルを検索..."
 
@@ -31063,7 +31071,7 @@ msgstr "最後の列まで選択"
 msgid "Select to top of table"
 msgstr "表の最上部まで選択"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:223
+#: src/features/auth/components/organization/billing-settings-card.tsx:220
 msgid "Select which AI models organization members can use. Leave empty for enterprise to allow all models."
 msgstr "組織のメンバーが使える AI モデルを選択します。Enterprise ですべてのモデルを許可する場合は空欄のままにしてください。"
 
@@ -31596,7 +31604,7 @@ msgstr "共有スレッド"
 msgid "Shared with me"
 msgstr "共有アイテム"
 
-#: src/features/knowledge/components/collection-picker.tsx:90
+#: src/features/knowledge/components/collection-picker.tsx:91
 msgid "Shared with your organization"
 msgstr "組織と共有済み"
 
@@ -33169,7 +33177,7 @@ msgstr "最先端の OpenAI 品質"
 msgid "State-of-the-art performance across all benchmarks"
 msgstr "あらゆるベンチマークで最先端の性能"
 
-#: src/features/settings/components/chat/models-settings.tsx:448
+#: src/features/settings/components/chat/models-settings.tsx:453
 msgid "State:"
 msgstr "状態:"
 
@@ -34592,7 +34600,7 @@ msgstr "テキスト"
 #: src/features/chat/thread/composer.tsx:130
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:567
-#: src/features/settings/components/chat/models-settings.tsx:45
+#: src/features/settings/components/chat/models-settings.tsx:46
 #: src/features/settings/lib/settings-keywords.ts:70
 #: src/features/settings/lib/settings-keywords.ts:71
 #: src/features/settings/lib/settings-keywords.ts:72
@@ -36228,7 +36236,7 @@ msgstr "このコードは無効か、すでに使用されています。`neore
 msgid "This code was opened with a different account. Sign in with that account, or run `neore login --device` or `neore-host pair` again."
 msgstr "このコードは別のアカウントで開かれました。そのアカウントでサインインするか、`neore login --device` または `neore-host pair` をもう一度実行してください。"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:294
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:293
 msgid "This collection is shared with you by a member of your organization. You can attach it to chats and projects; only its owner can change its files."
 msgstr "このコレクションは組織のメンバーから共有されています。チャットやプロジェクトに添付できますが、ファイルを変更できるのは所有者のみです。"
 
@@ -37269,7 +37277,7 @@ msgstr "ツール呼び出し"
 #: ../../packages/chat-ui/src/model-picker/utils.ts:169
 #: ../../packages/chat-ui/src/model-picker/utils.ts:173
 #: src/components/model-picker/model-picker.tsx:84
-#: src/features/settings/components/chat/models-settings.tsx:33
+#: src/features/settings/components/chat/models-settings.tsx:34
 msgid "Tool Calling"
 msgstr "ツール呼び出し"
 
@@ -37991,12 +37999,12 @@ msgstr "利用停止を解除"
 msgid "Unbans"
 msgstr "利用停止の解除"
 
-#: src/features/knowledge/components/collection-picker.tsx:140
+#: src/features/knowledge/components/collection-picker.tsx:146
 msgid "Uncategorised"
 msgstr "未分類"
 
 #. placeholder {0}: countBy.get("none") ?? 0
-#: src/features/knowledge/components/collection-picker.tsx:64
+#: src/features/knowledge/components/collection-picker.tsx:66
 msgid "Uncategorised ({0})"
 msgstr "未分類（{0}）"
 
@@ -38494,7 +38502,7 @@ msgstr "アバターをアップロード"
 msgid "Upload CSVs, run Python analysis, and export charts — no Jupyter setup required."
 msgstr "CSV をアップロードし、Python で分析してグラフをエクスポート — Jupyter のセットアップは不要です。"
 
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:277
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:278
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "ドキュメントをナレッジベースにアップロードし、コレクションにまとめます。AI は関連するコンテキストを検索し、使用したパッセージを引用します。"
 
@@ -38565,7 +38573,7 @@ msgid "Uploading data for import from {0}..."
 msgstr "{0} からのインポート用データをアップロードしています..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:73
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:308
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:312
 #: src/features/workflow/components/nodes/file-node.tsx:184
 msgid "Uploading..."
 msgstr "アップロードしています..."
@@ -39225,7 +39233,7 @@ msgstr "動画"
 #: src/features/chat/thread/composer.tsx:132
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:642
-#: src/features/settings/components/chat/models-settings.tsx:46
+#: src/features/settings/components/chat/models-settings.tsx:47
 #: src/features/settings/lib/settings-keywords.ts:77
 #: src/features/settings/lib/settings-keywords.ts:78
 #: src/features/settings/lib/settings-keywords.ts:79
@@ -39525,7 +39533,7 @@ msgstr "ビジョン"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:157
 #: src/components/model-picker/model-picker.tsx:85
-#: src/features/settings/components/chat/models-settings.tsx:31
+#: src/features/settings/components/chat/models-settings.tsx:32
 msgid "Vision"
 msgstr "ビジョン"
 
@@ -40610,7 +40618,7 @@ msgid "You are about to impersonate {userName}. You will see the application as 
 msgstr "{userName} になりすまそうとしています。そのユーザーと同じようにアプリケーションが表示され、代わりに操作を実行できます。"
 
 #: src/features/knowledge/hooks/use-knowledge-import.ts:284
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:147
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:148
 msgid "You are adding documents too quickly. Wait a moment and try again."
 msgstr "ドキュメントの追加が速すぎます。しばらく待ってからもう一度お試しください。"
 
@@ -41068,7 +41076,7 @@ msgid "Your knowledge base is full. {failed} document(s) were not added."
 msgstr "ナレッジベースが上限に達しました。{failed} 件のドキュメントは追加されませんでした。"
 
 #: src/features/knowledge/hooks/use-knowledge-import.ts:283
-#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:143
+#: src/features/settings/components/knowledge/knowledge-base-settings.tsx:144
 msgid "Your knowledge base is full. Remove files to add more."
 msgstr "ナレッジベースが上限に達しました。追加するにはファイルを削除してください。"
 

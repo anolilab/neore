@@ -19,6 +19,8 @@ import { FolderInputIcon, PencilIcon, PlusIcon, Trash2Icon, UsersIcon } from "lu
 import type { FC } from "react";
 import { useId, useMemo } from "react";
 
+import SettingsRow from "@/components/settings/settings-row";
+
 /** A row of `knowledge_collections.listCollections`. */
 export interface CollectionView {
     _id: Id<"knowledgeCollections">;
@@ -71,53 +73,57 @@ export const CollectionPicker: FC<CollectionPickerProps> = ({ collections, count
     ];
 
     return (
-        <div aria-labelledby={labelId} className="flex flex-wrap items-center gap-2" role="group">
-            <span className="text-muted-foreground text-xs font-medium" id={labelId}>
-                {t`Collection`}
-            </span>
-            <Select items={items} onValueChange={(value) => value && onScopeChange(value as CollectionScope)} value={scope as string}>
-                <SelectTrigger aria-labelledby={labelId} className="h-8 min-w-44 flex-1 text-sm sm:flex-none">
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    {items.map((item) => (
-                        <SelectItem key={item.value} value={item.value}>
-                            {item.label}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-            {selected?.shared && <UsersIcon aria-label={t`Shared with your organization`} className="text-muted-foreground h-4 w-4" role="img" />}
-            <Button onClick={onCreate} size="sm" variant="outline">
-                <PlusIcon aria-hidden="true" className="mr-1 h-3.5 w-3.5" />
-                {t`New collection`}
-            </Button>
-            {selected?.isOwner && (
+        <SettingsRow
+            control={
                 <>
-                    <Button aria-label={t`Edit collection`} onClick={onEdit} size="icon" variant="ghost">
-                        <PencilIcon aria-hidden="true" className="h-3.5 w-3.5" />
+                    <Select items={items} onValueChange={(value) => value && onScopeChange(value as CollectionScope)} value={scope as string}>
+                        <SelectTrigger aria-labelledby={labelId} className="h-8 min-w-44 flex-1 text-sm sm:flex-none">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {items.map((item) => (
+                                <SelectItem key={item.value} value={item.value}>
+                                    {item.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    {selected?.shared && <UsersIcon aria-label={t`Shared with your organization`} className="text-muted-foreground h-4 w-4" role="img" />}
+                    <Button onClick={onCreate} size="sm" variant="outline">
+                        <PlusIcon aria-hidden="true" className="mr-1 h-3.5 w-3.5" />
+                        {t`New collection`}
                     </Button>
-                    <AlertDialog>
-                        <AlertDialogTrigger render={<Button aria-label={t`Delete collection`} size="icon" variant="ghost" />}>
-                            <Trash2Icon aria-hidden="true" className="h-3.5 w-3.5" />
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>{t`Delete "${selected.name}"?`}</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    {t`Keep the files as uncategorised, or delete them together with the collection. Chats and projects that use the collection stop searching it.`}
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>{t`Cancel`}</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => onDelete(true)} variant="destructive">{t`Delete with files`}</AlertDialogAction>
-                                <AlertDialogAction onClick={() => onDelete(false)}>{t`Keep files`}</AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
+                    {selected?.isOwner && (
+                        <>
+                            <Button aria-label={t`Edit collection`} onClick={onEdit} size="icon" variant="ghost">
+                                <PencilIcon aria-hidden="true" className="h-3.5 w-3.5" />
+                            </Button>
+                            <AlertDialog>
+                                <AlertDialogTrigger render={<Button aria-label={t`Delete collection`} size="icon" variant="ghost" />}>
+                                    <Trash2Icon aria-hidden="true" className="h-3.5 w-3.5" />
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>{t`Delete "${selected.name}"?`}</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            {t`Keep the files as uncategorised, or delete them together with the collection. Chats and projects that use the collection stop searching it.`}
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>{t`Cancel`}</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => onDelete(true)} variant="destructive">{t`Delete with files`}</AlertDialogAction>
+                                        <AlertDialogAction onClick={() => onDelete(false)}>{t`Keep files`}</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </>
+                    )}
                 </>
-            )}
-        </div>
+            }
+            description={t`Choose which files to show and add to. New uploads go into the collection you pick.`}
+            title={t`Collection`}
+            titleId={labelId}
+        />
     );
 };
 

@@ -193,6 +193,23 @@ export const Billing: Story = {
     },
 };
 
+/** The organization's billing editor, shown to an owner: contact e-mail, allowed models and Save. */
+export const BillingOwner: Story = {
+    parameters: {
+        persona: "org-member",
+        msw: {
+            handlers: {
+                organization: organizationHandlers(),
+                lunora: lunoraHandlers(...userFixtures(), ...shellFixtures(), ...chatFixtures(), ...organizationFixtures({ billingOwner: true })),
+            },
+        },
+    },
+    args: openAt("auth-billing"),
+    play: async () => {
+        await settingsDialog();
+    },
+};
+
 /** The consent preferences button opens the consent dialog, which the app root mounts under its provider; the story supplies one. */
 export const Privacy: Story = {
     decorators: [

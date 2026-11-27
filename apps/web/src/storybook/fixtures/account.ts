@@ -286,8 +286,8 @@ export const privacyFixtures = (): LunoraFixture[] => [
 /** Billing tab: a Pro personal plan. */
 export const billingFixtures = (): LunoraFixture[] => [lunora(api.billing.checkout.getMyPlan, { baseTier: "pro", creemCustomerId: "cust_storybook" } as never)];
 
-/** Organizations, members, invitations and teams for the `org-member` persona. */
-export const organizationFixtures = (): LunoraFixture[] => [
+/** Organizations, members, invitations and teams for the `org-member` persona; `billingOwner` lets that persona edit the billing settings. */
+export const organizationFixtures = ({ billingOwner = false }: { billingOwner?: boolean } = {}): LunoraFixture[] => [
     lunora(api.auth.organization.listUserInvitations, [
         {
             expiresAt: ago(-5 * DAY),
@@ -309,7 +309,7 @@ export const organizationFixtures = (): LunoraFixture[] => [
         creditsPerUser: 500,
         creemCustomerId: null,
         creemSubscriptionId: null,
-        isOwner: false,
+        isOwner: billingOwner,
     } as never),
 ];
 
