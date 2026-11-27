@@ -267,7 +267,9 @@ describe("a chapter's style sheets", () => {
             folder.path,
         );
 
-        expect(sheetsOf(parse(await opened.read("c1")))).toEqual(["p{color:red}", "p{margin:0}", "p{padding:0}"]);
+        const document = await opened.read("c1");
+
+        expect(sheetsOf(parse(document))).toEqual(["p{color:red}", "p{margin:0}", "p{padding:0}"]);
         opened.destroy();
     });
 
@@ -275,11 +277,10 @@ describe("a chapter's style sheets", () => {
         const files = Object.fromEntries(
             Array.from({ length: MAX_ASSETS_PER_CHAPTER + 5 }, (_item, index) => [`s${String(index)}.css`, `p{order:${String(index)}}`] as const),
         );
-        const opened = await openEpub(
-            await book({ chapters: [{ body: `${links(Object.keys(files))}<p>x</p>`, file: "one.xhtml", id: "c1" }], files }),
-            folder.path,
-        );
-        const sheets = sheetsOf(parse(await opened.read("c1")));
+        const chapters = [{ body: `${links(Object.keys(files))}<p>x</p>`, file: "one.xhtml", id: "c1" }];
+        const opened = await openEpub(await book({ chapters, files }), folder.path);
+        const document = await opened.read("c1");
+        const sheets = sheetsOf(parse(document));
 
         expect(sheets).toHaveLength(MAX_ASSETS_PER_CHAPTER);
         expect(sheets[0]).toBe("p{order:0}");
