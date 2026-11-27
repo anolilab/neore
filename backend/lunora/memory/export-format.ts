@@ -97,7 +97,7 @@ const sourceOf = (row: ExportMemoryRow): string => {
             return "combined from earlier memories overnight";
         }
         default: {
-            // `auto`, or a row from before the column.
+            // `auto`, `requested` (saved when the user asked in chat, as the settings list labels it), or a row from before the column.
             return "learned in chat";
         }
     }
