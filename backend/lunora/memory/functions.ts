@@ -25,7 +25,7 @@ import {
     vImportApp,
 } from "./import-logic";
 import { botOwnerRows } from "./bot-owner";
-import { type MemoryEvidence, newestEvidence, vMemoryEvidence } from "./evidence";
+import { type MemoryEvidence, mentionsHealth, newestEvidence, vMemoryEvidence } from "./evidence";
 import { logRedaction, redactMemoryText } from "./redact";
 import { DROPPED_DIGEST_SUMMARY, localDayOf } from "./reflection-logic";
 import { byNewest, isUsableOn, KEYWORD_LOOKUP_LIMIT, keywordLookupOf, lookupSearchesOf, mergeScopeWindows, scopesOf } from "./retrieve-ranking";
@@ -1407,7 +1407,16 @@ export const saveMemoryBatch = internalMutation
                   )
                 : mem.evidence;
 
-            memoryIds.push(await insertMemory(ctx, { ...mem, evidence, supersedes }, now));
+            const inserted = await insertMemory(ctx, { ...mem, evidence, supersedes }, now);
+
+            memoryIds.push(inserted);
+
+            // A later fact of the same request with this text and dates is this row (`known` above), not a twin of it.
+            const insertedRow = activeRows !== undefined && inserted !== null ? await ctx.db.get("memories", inserted) : null;
+
+            if (insertedRow) {
+                activeRows?.push(insertedRow);
+            }
         }
 
         // The originals are retired by the same write. Each points at itself: `supersededBy` is its own id when compression retired it.
@@ -1765,11 +1774,11 @@ export const reviseExtractedMemory = internalMutation
             return false;
         }
 
-        // The backstop, as in `insertMemory`: a revision that is nothing but a secret does not apply, so the caller saves
-        // the fact as new, as for any revision that cannot apply.
+        // The backstops, as in `insertMemory` and the extraction gate: a revision that is nothing but a secret, or whose merged
+        // wording names a health condition, does not apply, so the caller saves the fact as new, as for any that cannot apply.
         const memory = redactMemoryText(args.memory);
 
-        if (row.memory !== args.base || memory === null) {
+        if (row.memory !== args.base || memory === null || mentionsHealth(memory)) {
             return false;
         }
 

@@ -10,7 +10,7 @@ import schema from "../schema";
 import { documentTextPart } from "../chat/lib/attached-text";
 import { addMessagesHandler } from "../agent/messages";
 import { extractMemories } from "./extract";
-import { saveMemoryBatch } from "./functions";
+import { reviseExtractedMemory, saveMemoryBatch } from "./functions";
 import { rememberFactFor, rememberResultOf } from "./remember";
 
 const { generateText, registry } = vi.hoisted(() => {
@@ -455,6 +455,46 @@ describe(rememberFactFor, () => {
             expect(rows.find((row) => row._id === old)?.supersededBy).toBe(known);
             expect(rows).toHaveLength(2);
         });
+
+        it("is the first of two facts of one request that differ only in spacing and case: one row is saved", async () => {
+            const ids = await setUp();
+            const saved = await harness.action(
+                async (ctx: any) =>
+                    await ctx.runMutation(saveMemoryBatch, {
+                        memories: ["User flies to Paris", "user  flies to PARIS"].map((memory) => {
+                            return { confidence: 90, importance: 70, memory, source: "requested", threadId: ids.threadId, type: "activity", userId: USER };
+                        }),
+                        requested: { promptMessageId: ids.promptMessageId, replyKey: REPLY, threadId: ids.threadId, userId: USER },
+                    }),
+            );
+            const [first] = saved;
+
+            expect(typeof first).toBe("string");
+            expect(saved).toStrictEqual([first, { known: first, text: "User flies to Paris" }]);
+            expect(await memories()).toHaveLength(1);
+        });
+    });
+
+    it("refuses a revision whose merged wording names a health condition, leaving the row as it was", async () => {
+        const row = await harness.run(
+            async (ctx: any) => await ctx.db.insert("memories", { memory: "User likes tea", source: "auto", type: "preference", updatedAt: 1, userId: USER }),
+        );
+        const applied = await harness.action(
+            async (ctx: any) =>
+                await ctx.runMutation(reviseExtractedMemory, {
+                    base: "User likes tea",
+                    confidence: 90,
+                    lastConfirmedAt: 2,
+                    memory: "User likes tea and has diabetes",
+                    memoryId: row,
+                    userId: USER,
+                }),
+        );
+
+        const [stored] = await memories();
+
+        expect(applied).toBe(false);
+        expect(stored?.memory).toBe("User likes tea");
     });
 });
 
