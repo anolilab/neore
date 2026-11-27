@@ -67,6 +67,10 @@ for (let p = 0; p < PERSONAS; p++) {
     };
     const add = (row) => {
         const [cl, ch, il, ih] = RANGES[row.type] ?? RANGES.context;
+
+        // A row is created before it is last confirmed, and neither is after the fixture's day (ages count back from `NOW`).
+        if (!(row.ageDays >= 0 && row.createdDays >= row.ageDays)) throw new Error(`impossible timestamps on ${row.id}`);
+
         const lowSignal = row.low === true;
 
         delete row.low;
@@ -81,10 +85,10 @@ for (let p = 0; p < PERSONAS; p++) {
     for (const t of have) {
         for (let a = 0; a < 6; a++) {
             const pinned = a === 0 && (t + p) % 4 === 0;
-            const age = ageOf();
+            const age = pinned ? round(200 + r() * 300, 1) : ageOf();
 
             add({
-                ageDays: pinned ? round(200 + r() * 300, 1) : age,
+                ageDays: age,
                 createdDays: round(age + 1 + r() * 20, 1),
                 id: `${pid}-${TOPICS[t][0]}-a${a}`,
                 noVector: r() < 0.07 || undefined,
@@ -141,25 +145,29 @@ for (let p = 0; p < PERSONAS; p++) {
     for (const t of have) {
         const a = (t + p) % 6;
 
-        if (r() < 0.8)
+        if (r() < 0.8) {
+            const age = ageOf();
+
             add({
-                ageDays: ageOf() + 60,
-                createdDays: ageOf() + 90,
+                ageDays: age + 60,
+                createdDays: age + 90,
                 id: `${pid}-${TOPICS[t][0]}-exp${a}`,
                 tags: tags(t, a),
                 text: TOPICS[t][2][a].replace("{d}", detail(t, 3)),
                 type: TYPES[a],
                 validUntil: dayString(NOW - (10 + Math.floor(r() * 200)) * 86400000),
             });
+        }
     }
 
     // Facts with an end date still ahead (the last one ends today): in effect, so they are candidates.
     have.slice(-4).forEach((t, k) => {
         const a = (t + p) % 6;
+        const age = ageOf();
 
         add({
-            ageDays: ageOf(),
-            createdDays: ageOf() + 5,
+            ageDays: age,
+            createdDays: age + 5,
             id: `${pid}-${TOPICS[t][0]}-cur${a}`,
             tags: tags(t, a),
             text: TOPICS[t][2][a].replace("{d}", detail(t, 3)),
@@ -177,10 +185,12 @@ for (let p = 0; p < PERSONAS; p++) {
             const t = have[k % have.length];
             const a = (k + p) % 6;
 
+            const age = ageOf();
+
             add({
-                ageDays: ageOf(),
+                ageDays: age,
                 botId: bot,
-                createdDays: ageOf() + 20,
+                createdDays: age + 20,
                 id: `${pid}-${bot}-${TOPICS[t][0]}-${k}`,
                 tags: tags(t, a),
                 text: TOPICS[t][2][a].replace("{d}", detail(t, shift)),
@@ -193,9 +203,11 @@ for (let p = 0; p < PERSONAS; p++) {
     for (let k = 0; k < 40 + p * 12; k++) {
         const t = have[(k * 3 + p) % have.length];
 
+        const age = ageOf();
+
         add({
-            ageDays: ageOf(),
-            createdDays: ageOf() + 3,
+            ageDays: age,
+            createdDays: age + 3,
             id: `${pid}-fill-${TOPICS[t][0]}-${k}`,
             low: true,
             noVector: r() < 0.1 || undefined,
@@ -236,15 +248,26 @@ for (let p = 0; p < PERSONAS; p++) {
         );
     }
 
-    events.slice(0, 6).forEach((t, k) => {
-        const row = memories.find((m) => m.id === `${pid}-ev-${TOPICS[t][0]}`);
-        const month =
-            Object.keys(row.tags)
-                .map(Number)
-                .find((d) => d >= MONTH0 && d < NOISE0) - MONTH0;
+    // Past-tense questions ("what did I do ...") ask only about events on or before the fixture's day; later events stay
+    // in the data as rows that must not be answers to them.
+    events
+        .filter((t) => memories.find((m) => m.id === `${pid}-ev-${TOPICS[t][0]}`).eventStart <= dayString(NOW))
+        .slice(0, 6)
+        .forEach((t, k) => {
+            const row = memories.find((m) => m.id === `${pid}-ev-${TOPICS[t][0]}`);
+            const month =
+                Object.keys(row.tags)
+                    .map(Number)
+                    .find((d) => d >= MONTH0 && d < NOISE0) - MONTH0;
 
-        q("temporal", `what did I do about ${TOPICS[t][0]} in ${MONTHS[month]}`, { [t]: 1, [ASPECT0 + 3]: 0.6, [MONTH0 + month]: 0.6 }, [row.id], bot(k + 2));
-    });
+            q(
+                "temporal",
+                `what did I do about ${TOPICS[t][0]} in ${MONTHS[month]}`,
+                { [t]: 1, [ASPECT0 + 3]: 0.6, [MONTH0 + month]: 0.6 },
+                [row.id],
+                bot(k + 2),
+            );
+        });
 
     [0, 1, 2, 5]
         .map((i) => chained[i])
@@ -270,8 +293,6 @@ const fixture = {
         dimensions: 64,
         now: NOW,
         today: dayString(NOW),
-        vectorTopK: 30,
-        windowSize: 100,
     },
     personas,
     queries,

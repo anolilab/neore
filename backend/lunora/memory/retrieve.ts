@@ -17,7 +17,7 @@ import { validateVectorDimension, type VectorDimension } from "../agent/vector/t
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
 import { getMemoryEmbeddingModel, MEMORY_EMBEDDING_MODEL_NAME } from "./dedup";
-import { CANDIDATE_WINDOW_SIZE, keywordScoresFor, rankMemories } from "./retrieve-ranking";
+import { CANDIDATE_WINDOW_SIZE, keywordScoresFor, rankMemories, VECTOR_TOP_K } from "./retrieve-ranking";
 import type { RankedMemory } from "./retrieve-ranking";
 
 // ============================================================================
@@ -113,7 +113,7 @@ export const retrieveRelevantMemories = internalAction
 
                     const vectorResults = await searchVectors(ctx, queryVector, {
                         dimension: dimension as VectorDimension,
-                        limit: 30,
+                        limit: VECTOR_TOP_K,
                         model: MEMORY_EMBEDDING_MODEL_NAME,
                         searchAllMessagesForUserId: args.userId,
                         table: "memories",

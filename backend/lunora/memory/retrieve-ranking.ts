@@ -23,6 +23,9 @@ export const MAX_AUTO_INJECT = 8;
 /** Rows each scope contributes to the candidate window. */
 export const CANDIDATE_WINDOW_SIZE = 100;
 
+/** Vector hits read per search (before superseded rows are dropped). */
+export const VECTOR_TOP_K = 30;
+
 /** What scoring reads of a memory. */
 export interface RankCandidate {
     _id: string;
