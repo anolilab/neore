@@ -2771,6 +2771,9 @@ export const schema = defineSchema({
                 claim: v.number(),
                 done: v.boolean(),
                 markers: v.object({ checks: v.optional(v.string()), conflict: v.optional(v.string()), review: v.optional(v.string()) }),
+                // Set when the charge is kept, right before the model is asked, and kept through any settlement: the model may have generated
+                // for this occurrence, so no new paid turn is admitted for the same markers.
+                modelReached: v.optional(v.boolean()),
                 reasons: v.array(v.union(v.literal("checks"), v.literal("conflict"), v.literal("review"))),
                 run: v.optional(v.string()),
                 startedAt: v.number(),

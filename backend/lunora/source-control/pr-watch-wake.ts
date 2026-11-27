@@ -292,6 +292,20 @@ export const claimWatchWake = internalMutation
             return null;
         }
 
+        // An earlier turn for these very occurrences may already have generated (its settlement failed after the model ran): no second paid
+        // turn for the same markers, however long ago. A newer marker, or a kind it did not carry, is a new occurrence and stays eligible; a
+        // round refunded before the model was reached never set the flag and stays retryable.
+        const last = link.watchWakeCompleted;
+
+        if (
+            last?.modelReached === true &&
+            last.startedAt === link.watch.startedAt &&
+            last.run === link.watchRun &&
+            reasons.every((reason) => last.reasons.includes(reason) && last.markers[reason] === currentMarker(link.watch ?? {}, reason))
+        ) {
+            return null;
+        }
+
         if (link.watch.lastWakeAt !== undefined && ctx.now - link.watch.lastWakeAt < PR_WATCH_WAKE_COOLDOWN_MS) {
             return null;
         }
@@ -533,9 +547,13 @@ export const keepWatchWakeCharge = internalMutation
             return "refused" as const;
         }
 
-        if (link.watchWakeRefund !== undefined && link.watchWakeRefund.claim === args.claim && !link.watchWakeRefund.applied) {
-            await ctx.db.patch("pullRequestThreads", link._id, { watchWakeRefund: { ...link.watchWakeRefund, applied: true } });
-        }
+        // The model is about to be asked: the occurrence is marked as one that may have generated, and the refund owed for it is closed.
+        await ctx.db.patch("pullRequestThreads", link._id, {
+            ...(record !== undefined && { watchWakeCompleted: { ...record, modelReached: true } }),
+            ...(link.watchWakeRefund !== undefined &&
+                link.watchWakeRefund.claim === args.claim &&
+                !link.watchWakeRefund.applied && { watchWakeRefund: { ...link.watchWakeRefund, applied: true } }),
+        });
 
         return "kept" as const;
     });

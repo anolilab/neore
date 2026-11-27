@@ -25048,6 +25048,12 @@
                 }
               }
             },
+            "modelReached": {
+              "kind": "boolean",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
             "reasons": {
               "kind": "array",
               "nullable": false,

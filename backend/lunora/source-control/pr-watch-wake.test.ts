@@ -452,9 +452,10 @@ describe("the job", () => {
 describe("a failing wake turn", () => {
     const failOnce = async (linkId: string): Promise<void> => {
         await start(linkId);
-        probe.fail = true;
+        // Failed before the model was reached (refunded): such a turn is retryable, so a streak of them can build.
+        probe.failBeforeModel = true;
         await runJob(enqueued.at(-1)!);
-        probe.fail = false;
+        probe.failBeforeModel = false;
     };
 
     it("records the failure, keeps the reasons and waits the retry time before another delivery", async () => {
@@ -1307,6 +1308,126 @@ describe("the model of the turn", () => {
     });
 });
 
+describe("an occurrence that may already have generated", () => {
+    const pastRetry = async (linkId: string) => {
+        const row = await rowOf(linkId);
+
+        return row.watchWakeFailure.retryAt + 1000;
+    };
+
+    it("is not paid for again after the retry time when the model ran and the turn then failed", async () => {
+        const { linkId } = await seed();
+
+        await start(linkId);
+        probe.fail = true;
+        await runJob(enqueued[0]!);
+        probe.fail = false;
+
+        const failed = await rowOf(linkId);
+
+        expect(runs).toHaveLength(1);
+        expect(probe.charges).toBe(1);
+        expect(failed.watchWakeCompleted).toMatchObject({ done: true, modelReached: true });
+
+        vi.useFakeTimers({ now: await pastRetry(linkId), toFake: ["Date"] });
+
+        try {
+            expect(await start(linkId)).toBe(false);
+        } finally {
+            vi.useRealTimers();
+        }
+
+        expect(enqueued).toHaveLength(1);
+        expect(probe.charges).toBe(1);
+        expect(runs).toHaveLength(1);
+    });
+
+    it("is not paid for again after the retry time when the completion write failed after the model ran", async () => {
+        const { linkId } = await seed();
+
+        await start(linkId);
+        await harness
+            .action(async (ctx: any) => {
+                const real = ctx.runMutation.bind(ctx);
+
+                ctx.runMutation = async (reference: unknown, args: unknown) => {
+                    if (reference === completeWatchWake || reference === finishWatchWake) {
+                        throw new Error("write failed");
+                    }
+
+                    return await real(reference, args);
+                };
+
+                await ctx.runAction(runWatchWake, { ...enqueued[0]!.args, jobId: enqueued[0]!.options.once.jobId });
+            })
+            .catch(() => undefined);
+
+        // The lease lapses; the next claim settles the started occurrence as a failed attempt, which keeps the model-reached mark.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("pullRequestThreads", linkId, { watchWakeLeaseUntil: Date.now() - 1000 });
+        });
+        expect(await start(linkId)).toBe(false);
+        const settled = await rowOf(linkId);
+
+        expect(settled.watchWakeCompleted).toMatchObject({ done: true, modelReached: true });
+
+        vi.useFakeTimers({ now: await pastRetry(linkId), toFake: ["Date"] });
+
+        try {
+            expect(await start(linkId)).toBe(false);
+        } finally {
+            vi.useRealTimers();
+        }
+
+        expect(probe.charges).toBe(1);
+        expect(runs).toHaveLength(1);
+    });
+
+    it("stays eligible for a newer marker, and a round refunded before the model stays retryable", async () => {
+        const { linkId } = await seed();
+
+        await start(linkId);
+        probe.fail = true;
+        await runJob(enqueued[0]!);
+        probe.fail = false;
+
+        // A newer failing head is a new occurrence.
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.get("pullRequestThreads", linkId);
+
+            await ctx.db.patch("pullRequestThreads", linkId, { watch: { ...row.watch, checksHeadSha: "sha-9", headSha: "sha-9" } });
+        });
+
+        vi.useFakeTimers({ now: await pastRetry(linkId), toFake: ["Date"] });
+
+        try {
+            expect(await start(linkId)).toBe(true);
+        } finally {
+            vi.useRealTimers();
+        }
+
+        // A turn that failed before the model was refunded and never marked the occurrence: a retry is allowed.
+        const other = await seed();
+
+        await start(other.linkId);
+        probe.failBeforeModel = true;
+        await runJob(enqueued.at(-1)!);
+        probe.failBeforeModel = false;
+
+        const early = await rowOf(other.linkId);
+
+        expect(early.watchWakeCompleted.modelReached).toBeUndefined();
+
+        vi.useFakeTimers({ now: early.watchWakeFailure.retryAt + 1000, toFake: ["Date"] });
+
+        try {
+            expect(await start(other.linkId)).toBe(true);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+});
+
 describe("a watch stopped or restarted during its turn", () => {
     it("counts the delivered turn once against the run it started under when the watch is stopped meanwhile", async () => {
         const { linkId, threadId } = await seed();
@@ -1421,11 +1542,11 @@ describe("a restarted watch", () => {
                 });
             });
             await harness.action(async (ctx: any) => await ctx.runAction(startWatchWake, { linkId, run: row.watchRun, startedAt: row.watch.startedAt }));
-            probe.fail = true;
+            probe.failBeforeModel = true;
             await harness.action(
                 async (ctx: any) => await ctx.runAction(runWatchWake, { ...enqueued.at(-1)!.args, jobId: enqueued.at(-1)!.options.once.jobId }),
             );
-            probe.fail = false;
+            probe.failBeforeModel = false;
         };
 
         for (let index = 0; index < PR_WATCH_MAX_WAKE_FAILURES; index += 1) {
