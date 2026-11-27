@@ -9,6 +9,7 @@ import { SessionLock } from "./session-lock";
 interface FakeBinding {
     connectSession: (sessionId: string) => Promise<unknown>;
     launch: (options: unknown) => Promise<unknown>;
+    sessions?: () => Promise<{ sessionId: string }[]>;
 }
 
 // eslint-disable-next-line no-restricted-syntax -- @cloudflare/playwright imports `cloudflare:workers`, which Node cannot load; the Worker takes the launcher from it, not from Env
@@ -16,6 +17,11 @@ vi.mock("@cloudflare/playwright", () => {
     return {
         connect: vi.fn(async (endpoint: FakeBinding, sessionId: string) => await endpoint.connectSession(sessionId)),
         launch: vi.fn(async (endpoint: FakeBinding, options: unknown) => await endpoint.launch(options)),
+        sessions: vi.fn(async (endpoint: FakeBinding) => {
+            const listed = await endpoint.sessions?.();
+
+            return listed ?? [];
+        }),
     };
 });
 
@@ -127,8 +133,11 @@ const stallingBrowser = (close: () => Promise<void>, sessionId: string) => {
 interface Body {
     action?: string;
     budgetMs?: number;
+    fullPage?: boolean;
+    maxBytes?: number;
     origin?: string;
     password?: string;
+    reconnectOnly?: boolean;
     sessionId?: string;
     url?: string;
     username?: string;
@@ -552,9 +561,37 @@ describe("the session hold every isolate shares", () => {
         post(env, "/action", { action: "extract", sessionId: "busy" }, other).catch(() => undefined);
         await vi.advanceTimersByTimeAsync(0);
 
-        const login = await post(env, "/login", { ...LOGIN, sessionId: "busy" });
+        let isAnswered = false;
+        const answer = post(env, "/login", { ...LOGIN, sessionId: "busy" }).finally(() => {
+            isAnswered = true;
+        });
+
+        // It waits a moment for the other call (a person's frame lets go within a second or two), then refuses.
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(isAnswered).toBe(false);
+        await vi.advanceTimersByTimeAsync(10_000);
+
+        const login = await answer;
 
         expect(login.status).toBe(409);
+        expect(started).toStrictEqual(["connect"]);
+    });
+
+    it("refuses at once, without waiting for the other call, a sign-in whose budget leaves no time to wait", async () => {
+        const { env, started } = binding();
+        const other = await otherIsolate();
+
+        post(env, "/action", { action: "extract", sessionId: "busy" }, other).catch(() => undefined);
+        await vi.advanceTimersByTimeAsync(0);
+
+        let isAnswered = false;
+        const answer = post(env, "/login", { ...LOGIN, budgetMs: 20_000, sessionId: "busy" }).finally(() => {
+            isAnswered = true;
+        });
+
+        await vi.advanceTimersByTimeAsync(0);
+        expect(isAnswered).toBe(true);
+        await expect(answer).resolves.toHaveProperty("status", 409);
         expect(started).toStrictEqual(["connect"]);
     });
 
@@ -623,6 +660,181 @@ describe("the session hold every isolate shares", () => {
 
         expect(response.status).toBe(503);
         await expect(response.json()).resolves.toStrictEqual({ error: expect.stringContaining("result is withheld"), success: false });
+    });
+
+    it("answers 404 SESSION_GONE for a reconnect-only action whose session is gone, and launches nothing", async () => {
+        const launchBrowser = vi.fn();
+        const env = {
+            BROWSER: {
+                connectSession: async () => {
+                    throw new Error("no such session");
+                },
+                launch: launchBrowser,
+            },
+            NODE_ENV: "test",
+            SESSION_LOCK: lockNamespace().namespace,
+        };
+        const response = await post(env as never, "/action", { action: "screenshot", reconnectOnly: true, sessionId: "reaped" });
+
+        expect(response.status).toBe(404);
+        expect(response.headers.get("x-browser-action")).toBe("not-run");
+        await expect(response.json()).resolves.toMatchObject({ code: "SESSION_GONE", success: false });
+        expect(launchBrowser).not.toHaveBeenCalled();
+    });
+
+    it("gives a reconnected session's screenshot the page's own viewport, after a scroll too", async () => {
+        const { env, pending } = binding();
+        const page = {
+            context: () => {
+                return { route: async () => undefined };
+            },
+            evaluate: async () => {
+                return { height: 844, width: 390 };
+            },
+            screenshot: vi.fn(async () => new Uint8Array([1, 2, 3])),
+            setDefaultTimeout: () => undefined,
+            title: async () => "A page",
+            url: () => "https://example.com/scrolled#below",
+            // A reconnected session: Playwright knows no viewport size of its own.
+            viewportSize: () => null,
+        };
+        const answer = post(env, "/action", { action: "screenshot", fullPage: false, reconnectOnly: true, sessionId: "kept" });
+
+        await vi.advanceTimersByTimeAsync(0);
+        pending[0]?.({ close: async () => undefined, contexts: () => [{ pages: () => [page] }], sessionId: () => "kept" });
+
+        const response = await answer;
+
+        await expect(response.json()).resolves.toMatchObject({
+            screenshot: "AQID",
+            sessionId: "kept",
+            success: true,
+            url: "https://example.com/scrolled#below",
+            viewport: { height: 844, width: 390 },
+        });
+        expect(page.screenshot).toHaveBeenCalledWith(expect.objectContaining({ fullPage: false }));
+    });
+
+    it("answers a failure, not a gone session, when a reconnect-only connect fails on a session the provider still lists", async () => {
+        const env = {
+            BROWSER: {
+                connectSession: async () => {
+                    throw new Error("connect timed out");
+                },
+                launch: vi.fn(),
+                sessions: async () => [{ sessionId: "alive" }],
+            },
+            NODE_ENV: "test",
+            SESSION_LOCK: lockNamespace().namespace,
+        };
+        const response = await post(env as never, "/action", { action: "screenshot", reconnectOnly: true, sessionId: "alive" });
+
+        expect(response.status).toBe(500);
+        expect(env.BROWSER.launch).not.toHaveBeenCalled();
+    });
+
+    it("takes a screenshot over the caller's byte cap again at a lower quality", async () => {
+        const { env, pending } = binding();
+        const page = {
+            context: () => {
+                return { route: async () => undefined };
+            },
+            evaluate: async () => {
+                return { height: 844, width: 390 };
+            },
+            screenshot: vi.fn(async ({ quality }: { quality: number }) => new Uint8Array(quality === 40 ? 10 : 100)),
+            setDefaultTimeout: () => undefined,
+            title: async () => "A page",
+            url: () => "https://example.com/",
+            viewportSize: () => null,
+        };
+        const answer = post(env, "/action", { action: "screenshot", maxBytes: 50, reconnectOnly: true, sessionId: "kept" });
+
+        await vi.advanceTimersByTimeAsync(0);
+        pending[0]?.({ close: async () => undefined, contexts: () => [{ pages: () => [page] }], sessionId: () => "kept" });
+
+        const response = await answer;
+
+        await expect(response.json()).resolves.toMatchObject({ screenshot: Buffer.alloc(10).toString("base64"), success: true });
+        expect(page.screenshot).toHaveBeenLastCalledWith(expect.objectContaining({ quality: 40 }));
+    });
+
+    it("refuses a screenshot that does not fit the caller's cap even at the lowest quality, and sends no image", async () => {
+        const { env, pending } = binding();
+        const page = {
+            context: () => {
+                return { route: async () => undefined };
+            },
+            evaluate: async () => {
+                return { height: 844, width: 390 };
+            },
+            screenshot: vi.fn(async () => new Uint8Array(100)),
+            setDefaultTimeout: () => undefined,
+            title: async () => "A page",
+            url: () => "https://example.com/",
+            viewportSize: () => null,
+        };
+        const answer = post(env, "/action", { action: "screenshot", maxBytes: 50, reconnectOnly: true, sessionId: "kept" });
+
+        await vi.advanceTimersByTimeAsync(0);
+        pending[0]?.({ close: async () => undefined, contexts: () => [{ pages: () => [page] }], sessionId: () => "kept" });
+
+        const response = await answer;
+        const body = await response.json();
+
+        expect(body).toMatchObject({ success: false });
+        expect(body).not.toHaveProperty("screenshot");
+        expect(page.screenshot).toHaveBeenLastCalledWith(expect.objectContaining({ quality: 20 }));
+    });
+
+    it("opens no page for a reconnect-only action on a browser that has none, and runs nothing", async () => {
+        const { env, pending } = binding();
+        const newPage = vi.fn();
+        const answer = post(env, "/action", { action: "screenshot", reconnectOnly: true, sessionId: "empty" });
+
+        await vi.advanceTimersByTimeAsync(0);
+        pending[0]?.({ close: async () => undefined, contexts: () => [{ pages: () => [] }], newPage, sessionId: () => "empty" });
+
+        const response = await answer;
+
+        expect(response.status).toBe(422);
+        expect(response.headers.get("x-browser-action")).toBe("not-run");
+        expect(newPage).not.toHaveBeenCalled();
+    });
+
+    it("drops a viewport a page script overwrote with something other than a number", async () => {
+        const { env, pending } = binding();
+        const page = {
+            context: () => {
+                return { route: async () => undefined };
+            },
+            evaluate: async () => {
+                return { height: 844, width: "x" };
+            },
+            screenshot: vi.fn(async () => new Uint8Array([1, 2, 3])),
+            setDefaultTimeout: () => undefined,
+            title: async () => "A page",
+            url: () => "https://example.com/",
+            viewportSize: () => null,
+        };
+        const answer = post(env, "/action", { action: "screenshot", reconnectOnly: true, sessionId: "kept" });
+
+        await vi.advanceTimersByTimeAsync(0);
+        pending[0]?.({ close: async () => undefined, contexts: () => [{ pages: () => [page] }], sessionId: () => "kept" });
+
+        const response = await answer;
+        const body = await response.json();
+
+        expect(body).toMatchObject({ success: true });
+        expect(body).not.toHaveProperty("viewport");
+    });
+
+    it("refuses a reconnect-only action that names no session, before any browser opens", async () => {
+        const { env, started } = binding();
+        const response = await post(env, "/action", { action: "screenshot", reconnectOnly: true });
+
+        expect(response.status).toBe(400);
+        expect(started).toStrictEqual([]);
     });
 
     it("answers 410 with SESSION_RETIRED, not a busy 409, for a session retired for good", async () => {

@@ -57,6 +57,7 @@ import {
     retrieveTool,
     saveSecretAsProviderKeyTool,
     searchMemoryTool,
+    searchPastChatsTool,
     setMcpServerSecretTool,
     signInWithSavedLoginTool,
     shellExecutionTool,
@@ -134,7 +135,7 @@ export const SEARCH_MODES: SearchModeInfo[] = [
 // Document tools are available in all search modes
 const DOCUMENT_TOOLS = [ToolName.CreateDocument, ToolName.UpdateDocument, ToolName.RenderUI];
 // Memory search is available in all modes for progressive disclosure
-const MEMORY_TOOLS = [ToolName.SearchMemory];
+const MEMORY_TOOLS = [ToolName.SearchMemory, ToolName.SearchPastChats];
 // Knowledge base search is available in all modes
 const KNOWLEDGE_TOOLS = [ToolName.KnowledgeSearch];
 
@@ -426,6 +427,7 @@ const ALL_TOOLS: Record<ToolName, unknown> = {
 
     // Memory Tools
     [ToolName.SearchMemory]: searchMemoryTool,
+    [ToolName.SearchPastChats]: searchPastChatsTool,
     [ToolName.SetMcpServerSecret]: setMcpServerSecretTool,
     // Sandbox Tools
     [ToolName.ShellExecution]: shellExecutionTool,
@@ -505,7 +507,7 @@ const TOOLS_BY_CATEGORY = {
     interaction: [ToolName.AskUser, ToolName.RequestSecret, ToolName.SaveSecretAsProviderKey, ToolName.SetMcpServerSecret],
     knowledge: [ToolName.KnowledgeSearch],
     location: [ToolName.FindPlace, ToolName.NearbyPlacesSearch, ToolName.Weather],
-    memory: [ToolName.SearchMemory],
+    memory: [ToolName.SearchMemory, ToolName.SearchPastChats],
     pullRequest: [
         ToolName.ReadPullRequest,
         ToolName.ReadFailingChecks,

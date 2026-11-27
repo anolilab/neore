@@ -52,7 +52,7 @@ msgid "\"{0}\" has variables that need values."
 msgstr "\"{0}\" tiene variables que necesitan valores."
 
 #. placeholder {0}: task.title
-#: src/features/tasks/components/tasks-page.tsx:122
+#: src/features/tasks/components/tasks-page.tsx:124
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "\"{0}\" empezará cuando terminen sus dependencias"
 
@@ -76,10 +76,6 @@ msgstr "No se pudo subir \"{fileName}\", así que el mensaje no se envió."
 #: src/features/chat/thread/composer-input.tsx:716
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "No se pudo subir «{fileName}». Comprueba tu conexión e inténtalo de nuevo."
-
-#: src/features/chat/thread/composer-input.tsx:1146
-#~ msgid "\"{fileName}\" could not be uploaded. Remove it to send."
-#~ msgstr "No se pudo subir \"{fileName}\". Quítalo para enviar."
 
 #: src/features/chat/thread/composer-input.tsx:719
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
@@ -130,7 +126,7 @@ msgstr "(solo adjuntos)"
 msgid "(broken link: what it links to could not be found)"
 msgstr "(enlace roto: no se encontró su destino)"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:116
+#: src/features/settings/components/chat/default-models-settings.tsx:127
 msgid "(default)"
 msgstr "(predeterminado)"
 
@@ -139,7 +135,7 @@ msgstr "(predeterminado)"
 msgid "(deleted case)"
 msgstr "(caso eliminado)"
 
-#: src/features/tasks/components/tasks-page.tsx:172
+#: src/features/tasks/components/tasks-page.tsx:174
 msgid "(deleted task)"
 msgstr "(tarea eliminada)"
 
@@ -245,7 +241,7 @@ msgstr "(compartida)"
 msgid "(too large)"
 msgstr "(demasiado grande)"
 
-#: src/features/tasks/components/tasks-page.tsx:182
+#: src/features/tasks/components/tasks-page.tsx:184
 msgid "(unavailable skill)"
 msgstr "(habilidad no disponible)"
 
@@ -697,7 +693,7 @@ msgid "{0} lines"
 msgstr "{0} líneas"
 
 #. placeholder {0}: stats.total
-#: src/features/settings/components/personalization/memory-settings.tsx:186
+#: src/features/settings/components/personalization/memory-settings.tsx:192
 msgid "{0} memories"
 msgstr "{0} recuerdos"
 
@@ -787,7 +783,7 @@ msgid "{0} on {1}, in {2}"
 msgstr "{0} en {1}, en {2}"
 
 #. placeholder {0}: stats.pinned
-#: src/features/settings/components/personalization/memory-settings.tsx:187
+#: src/features/settings/components/personalization/memory-settings.tsx:193
 msgid "{0} pinned"
 msgstr "{0} fijados"
 
@@ -1027,6 +1023,10 @@ msgstr "{days} días"
 #: src/features/settings/components/chat/api-keys-settings.tsx:290
 msgid "{days}d ago"
 msgstr "hace {days} d"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:388
+msgid "{done} of {total} entries processed"
+msgstr "{done} de {total} entradas procesadas"
 
 #: src/features/chat/thread/host-activity.tsx:70
 msgid "{done} of {total} task done"
@@ -1526,7 +1526,7 @@ msgstr "{resultCount, plural, one {# resultado} other {# resultados}}"
 msgid "{resultCount} results"
 msgstr "{resultCount} resultados"
 
-#: src/features/tasks/components/tasks-page.tsx:218
+#: src/features/tasks/components/tasks-page.tsx:222
 msgid "{reviewCount} tasks need your review"
 msgstr "{reviewCount} tareas necesitan tu revisión"
 
@@ -2384,8 +2384,13 @@ msgstr "Color de acento actualizado"
 
 #: src/features/auth/components/organization/accept-invitation-card.tsx:192
 #: src/features/auth/components/organization/user-invitations-card.tsx:116
+#: src/features/tasks/components/task-suggestions.tsx:248
 msgid "Accept"
 msgstr "Aceptar"
+
+#: src/features/tasks/components/task-suggestions.tsx:241
+msgid "Accept \"{title}\""
+msgstr "Aceptar «{title}»"
 
 #: src/features/auth/components/organization/accept-invitation-card.tsx:157
 msgid "Accept Invitation"
@@ -2569,6 +2574,10 @@ msgstr "Añadir {0}"
 msgid "Add {shapeLabel}"
 msgstr "Añadir {shapeLabel}"
 
+#: src/features/settings/components/chat/default-models-settings.tsx:467
+msgid "Add a backup model"
+msgstr "Añadir un modelo de respaldo"
+
 #: src/features/pages/components/page-comments-panel.tsx:146
 msgid "Add a comment"
 msgstr "Añade un comentario"
@@ -2627,6 +2636,10 @@ msgstr "Añade una capa extra de seguridad a tu cuenta activando la autenticaci�
 #: src/features/onboarding/components/setup-checklist.tsx:132
 msgid "Add an SSH server"
 msgstr "Añadir un servidor SSH"
+
+#: src/features/settings/components/chat/default-models-settings.tsx:467
+msgid "Add another backup model"
+msgstr "Añadir otro modelo de respaldo"
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:261
 msgid "Add at least one deployment name"
@@ -3277,7 +3290,7 @@ msgstr "Flujos de trabajo de programación agéntica que requieren el modelo de 
 msgid "agents"
 msgstr "agentes"
 
-#: src/features/tasks/components/tasks-page.tsx:195
+#: src/features/tasks/components/tasks-page.tsx:197
 msgid "Agents work your tasks on their own. A verifier checks each result against its success criteria, and anything it will not pass comes back to you."
 msgstr "Los agentes trabajan tus tareas por su cuenta. Un verificador comprueba cada resultado según sus criterios de éxito, y lo que no apruebe vuelve a ti."
 
@@ -3507,7 +3520,7 @@ msgid "All"
 msgstr "Todos"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:208
+#: src/features/settings/components/personalization/memory-settings.tsx:214
 msgid "All ({0})"
 msgstr "Todos ({0})"
 
@@ -3675,7 +3688,7 @@ msgstr "Todos los servidores"
 msgid "All shards measured."
 msgstr "Se han medido todos los shards."
 
-#: src/features/tasks/components/tasks-page.tsx:251
+#: src/features/tasks/components/tasks-page.tsx:255
 msgid "All tasks"
 msgstr "Todas las tareas"
 
@@ -5115,10 +5128,13 @@ msgstr "El código de respaldo es obligatorio"
 msgid "Backup Codes"
 msgstr "Códigos de respaldo"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:167
 #: src/features/settings/lib/settings-keywords.ts:73
 msgid "Backup model"
 msgstr "Modelo de respaldo"
+
+#: src/features/settings/components/chat/default-models-settings.tsx:348
+msgid "Backup models"
+msgstr "Modelos de respaldo"
 
 #: src/features/marketing/data/models-data.ts:83
 #: src/features/marketing/data/models-data.ts:225
@@ -5507,7 +5523,7 @@ msgstr "Azul"
 msgid "Blue Channel"
 msgstr "Canal azul"
 
-#: src/features/tasks/components/tasks-page.tsx:258
+#: src/features/tasks/components/tasks-page.tsx:262
 msgid "Board"
 msgstr "Tablero"
 
@@ -6156,7 +6172,7 @@ msgstr "Canadá"
 #: src/features/settings/components/chat/usage-settings.tsx:581
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:416
 #: src/features/settings/components/personalization/memory-item.tsx:351
-#: src/features/settings/components/personalization/memory-settings.tsx:257
+#: src/features/settings/components/personalization/memory-settings.tsx:263
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
@@ -6183,6 +6199,10 @@ msgstr "Cancelar trabajo profundo"
 #: src/features/settings/components/privacy/data-export.tsx:112
 msgid "Cancel Export"
 msgstr "Cancelar exportación"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:462
+msgid "Cancel import"
+msgstr "Cancelar importación"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:409
 msgid "Cancel Import"
@@ -6800,6 +6820,18 @@ msgstr "Chino (tradicional)"
 msgid "Choose .md or .zip"
 msgstr "Elegir .md o .zip"
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:406
+msgid "Choose a .txt file with one memory per line, or a .json file with a list of memories. The file can be up to {maxSize}."
+msgstr "Elige un archivo .txt con un recuerdo por línea, o un archivo .json con una lista de recuerdos. El archivo puede pesar hasta {maxSize}."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:301
+msgid "Choose a .txt or .json file."
+msgstr "Elige un archivo .txt o .json."
+
+#: src/features/settings/components/chat/default-models-settings.tsx:465
+msgid "Choose a model"
+msgstr "Elige un modelo"
+
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:430
 msgid "Choose a model for each kind of work the assistant hands to a sub-agent. A role with a model is offered to the assistant; one without stays off."
 msgstr "Elige un modelo para cada tipo de trabajo que el asistente pasa a un subagente. Un rol con modelo se ofrece al asistente; uno sin modelo queda desactivado."
@@ -6832,15 +6864,15 @@ msgstr "Elige al menos un permiso"
 msgid "Choose bundle file"
 msgstr "Elegir archivo de paquete"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:283
+#: src/features/settings/components/chat/default-models-settings.tsx:601
 msgid "Choose default image models"
 msgstr "Elegir modelos de imagen predeterminados"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:239
+#: src/features/settings/components/chat/default-models-settings.tsx:557
 msgid "Choose default text models"
 msgstr "Elegir modelos de texto predeterminados"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:325
+#: src/features/settings/components/chat/default-models-settings.tsx:643
 msgid "Choose default video models"
 msgstr "Elegir modelos de video predeterminados"
 
@@ -7053,11 +7085,11 @@ msgstr "Borrar todo"
 msgid "Clear All"
 msgstr "Borrar todo"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:247
+#: src/features/settings/components/personalization/memory-settings.tsx:253
 msgid "Clear All Memories"
 msgstr "Borrar todos los recuerdos"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:251
+#: src/features/settings/components/personalization/memory-settings.tsx:257
 msgid "Clear all memories?"
 msgstr "¿Borrar todos los recuerdos?"
 
@@ -7108,7 +7140,7 @@ msgstr "Quitar filtro de etiquetas"
 msgid "Clear the queue"
 msgstr "Vaciar la cola"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:137
+#: src/features/settings/components/personalization/memory-settings.tsx:139
 msgid "Cleared {count} memories"
 msgstr "{count} recuerdos borrados"
 
@@ -8987,6 +9019,10 @@ msgstr "No se pudo adjuntar el chat"
 msgid "could not be saved"
 msgstr "no se pudo guardar"
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:379
+msgid "Could not cancel the import."
+msgstr "No se pudo cancelar la importación."
+
 #: src/features/chat/thread/composer-prompt-queue.tsx:469
 msgid "Could not cancel the message. It is still queued."
 msgstr "No se pudo cancelar el mensaje. Sigue en la cola."
@@ -9136,6 +9172,10 @@ msgstr "No se pudo exportar el flujo de trabajo"
 #: src/features/skills/components/skill-generate-panel.tsx:62
 msgid "Could not generate a draft. Try again."
 msgstr "No se pudo generar un borrador. Inténtalo de nuevo."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:346
+msgid "Could not import the file."
+msgstr "No se pudo importar el archivo."
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:82
 msgid "Could not import the workflow"
@@ -9298,6 +9338,14 @@ msgstr "No se pudo leer ese chat"
 #: src/features/chat/thread/composer-input.tsx:1974
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "No se pudo leer ese chat. Si está bloqueado, desbloquéalo primero."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:334
+msgid "Could not read the file."
+msgstr "No se pudo leer el archivo."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:397
+msgid "Could not read the import's progress."
+msgstr "No se pudo leer el progreso de la importación."
 
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:101
 msgid "Could not read the pasted list"
@@ -9508,6 +9556,14 @@ msgstr "No se pudieron actualizar los participantes"
 msgid "Couldn't load follow state"
 msgstr "No se pudo cargar el estado de seguimiento"
 
+#: src/features/settings/components/chat/default-models-settings.tsx:435
+msgid "Couldn't load the model list."
+msgstr "No se pudo cargar la lista de modelos."
+
+#: src/features/settings/components/chat/default-models-settings.tsx:435
+msgid "Couldn't load the models you can add."
+msgstr "No se pudieron cargar los modelos que puedes añadir."
+
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:167
 msgid "Counted in whole weeks (Monday to Sunday, UTC) once each week has ended, so this week's usage shows next week."
 msgstr "Se cuenta por semanas completas (de lunes a domingo, UTC) una vez que cada semana ha terminado, así que el uso de esta semana aparece la semana que viene."
@@ -9611,7 +9667,7 @@ msgstr "Crea una app de Slack en api.slack.com/apps con la Events API activada."
 msgid "Create a tag…"
 msgstr "Crea una etiqueta…"
 
-#: src/features/tasks/components/tasks-page.tsx:243
+#: src/features/tasks/components/tasks-page.tsx:247
 msgid "Create a task, give it success criteria, and run it. You can chain tasks with dependencies and repeat them on a schedule."
 msgstr "Crea una tarea, dale criterios de éxito y ejecútala. Puedes encadenar tareas con dependencias y repetirlas según una programación."
 
@@ -10294,6 +10350,14 @@ msgstr "Fecha y hora"
 msgid "Day"
 msgstr "Día"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:64
+msgid "Day {monthDay} of every month at {time} UTC"
+msgstr "El día {monthDay} de cada mes a las {time} UTC"
+
+#: src/features/tasks/hooks/use-schedule-label.ts:61
+msgid "Day {monthDay} of the months that have one, at {time} UTC"
+msgstr "El día {monthDay} de los meses que lo tienen, a las {time} UTC"
+
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:131
 msgid "days"
 msgstr "días"
@@ -10486,51 +10550,51 @@ msgstr "modelo predeterminado"
 msgid "Default Model"
 msgstr "Modelo predeterminado"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:340
+#: src/features/settings/components/chat/default-models-settings.tsx:658
 msgid "Default model for animating a single image"
 msgstr "Modelo predeterminado para animar una sola imagen"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:243
+#: src/features/settings/components/chat/default-models-settings.tsx:561
 msgid "Default model for chat and text generation"
 msgstr "Modelo predeterminado para el chat y la generación de texto"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:309
+#: src/features/settings/components/chat/default-models-settings.tsx:627
 msgid "Default model for combining multiple reference images"
 msgstr "Modelo predeterminado para combinar varias imágenes de referencia"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:362
+#: src/features/settings/components/chat/default-models-settings.tsx:680
 msgid "Default model for editing or transforming existing video"
 msgstr "Modelo predeterminado para editar o transformar videos existentes"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:287
+#: src/features/settings/components/chat/default-models-settings.tsx:605
 msgid "Default model for generating images from text prompts"
 msgstr "Modelo predeterminado para generar imágenes a partir de prompts de texto"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:351
+#: src/features/settings/components/chat/default-models-settings.tsx:669
 msgid "Default model for generating video from multiple images"
 msgstr "Modelo predeterminado para generar video a partir de varias imágenes"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:329
+#: src/features/settings/components/chat/default-models-settings.tsx:647
 msgid "Default model for generating video from text prompts"
 msgstr "Modelo predeterminado para generar video a partir de prompts de texto"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:254
+#: src/features/settings/components/chat/default-models-settings.tsx:572
 msgid "Default model for image understanding and analysis"
 msgstr "Modelo predeterminado para comprender y analizar imágenes"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:298
+#: src/features/settings/components/chat/default-models-settings.tsx:616
 msgid "Default model for transforming existing images"
 msgstr "Modelo predeterminado para transformar imágenes existentes"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:373
+#: src/features/settings/components/chat/default-models-settings.tsx:691
 msgid "Default model for video generation from mixed inputs"
 msgstr "Modelo predeterminado para generar video a partir de entradas mixtas"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:265
+#: src/features/settings/components/chat/default-models-settings.tsx:583
 msgid "Default model for video understanding and transcription"
 msgstr "Modelo predeterminado para comprender y transcribir videos"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:225
+#: src/features/settings/components/chat/default-models-settings.tsx:543
 msgid "Default model updated"
 msgstr "Modelo predeterminado actualizado"
 
@@ -10607,7 +10671,7 @@ msgstr "El trabajo de {0} delegado se ejecuta en este modelo."
 #: src/features/skills/components/skill-list.tsx:311
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
-#: src/features/tasks/components/tasks-page.tsx:330
+#: src/features/tasks/components/tasks-page.tsx:334
 #: src/features/vault/components/site-logins.tsx:655
 msgid "Delete"
 msgstr "Eliminar"
@@ -10674,7 +10738,7 @@ msgstr "Eliminar cuenta"
 msgid "Delete alert \"{ruleName}\""
 msgstr "Eliminar la alerta \"{ruleName}\""
 
-#: src/features/settings/components/personalization/memory-settings.tsx:258
+#: src/features/settings/components/personalization/memory-settings.tsx:264
 msgid "Delete All"
 msgstr "Eliminar todo"
 
@@ -10713,7 +10777,7 @@ msgstr "¿Eliminar el conjunto de datos \"{0}\"?"
 msgid "Delete File"
 msgstr "Eliminar archivo"
 
-#: src/features/tasks/components/tasks-page.tsx:340
+#: src/features/tasks/components/tasks-page.tsx:344
 msgid "Delete goal \"{deleteTitle}\"?"
 msgstr "¿Eliminar el objetivo \"{deleteTitle}\"?"
 
@@ -10842,7 +10906,7 @@ msgstr "Eliminar etiqueta"
 msgid "Delete tag {0}"
 msgstr "Eliminar etiqueta {0}"
 
-#: src/features/tasks/components/tasks-page.tsx:340
+#: src/features/tasks/components/tasks-page.tsx:344
 msgid "Delete task \"{deleteTitle}\"?"
 msgstr "¿Eliminar la tarea \"{deleteTitle}\"?"
 
@@ -11438,9 +11502,14 @@ msgstr "Clave pública de Discord"
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:389
+#: src/features/tasks/components/task-suggestions.tsx:237
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "Descartar"
+
+#: src/features/tasks/components/task-suggestions.tsx:224
+msgid "Dismiss \"{title}\""
+msgstr "Descartar «{title}»"
 
 #: src/features/settings/components/personalization/memory-digest-card.tsx:54
 msgid "Dismiss digest"
@@ -12629,7 +12698,7 @@ msgstr "Activar sugerencias de seguimiento"
 msgid "Enable for Next Chat"
 msgstr "Activar para el próximo chat"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:171
+#: src/features/settings/components/personalization/memory-settings.tsx:173
 msgid "Enable memory"
 msgstr "Activar memoria"
 
@@ -13246,6 +13315,10 @@ msgstr "Evento"
 msgid "Event ends on"
 msgstr "El evento termina el"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:70
+msgid "Every {weekday} at {time} UTC"
+msgstr "Cada {weekday} a las {time} UTC"
+
 #: src/features/settings/components/chat/trigger-settings.tsx:174
 msgid "Every 6 hours"
 msgstr "Cada 6 horas"
@@ -13258,11 +13331,12 @@ msgstr "Cada chat y ejecución programada de este bot recibe solo estas herramie
 msgid "Every chat, unless its project sets the role."
 msgstr "Todos los chats, salvo que su proyecto defina el rol."
 
-#: src/features/settings/components/chat/agent-settings.tsx:70
-#~ msgid "Every click is checked, then made for real. A page can change a button between the check and the press, so a purchase click may not be checked."
-#~ msgstr "Cada clic se comprueba y luego se realiza de verdad. Una página puede cambiar un botón entre la comprobación y la pulsación, así que un clic de compra podría no comprobarse."
+#: src/features/tasks/hooks/use-schedule-label.ts:49
+msgid "Every day at {time} UTC"
+msgstr "Cada día a las {time} UTC"
 
 #: src/features/tasks/components/task-form-dialog.tsx:126
+#: src/features/tasks/hooks/use-schedule-label.ts:19
 msgid "Every day at 09:00 UTC"
 msgstr "Cada día a las 09:00 UTC"
 
@@ -13271,8 +13345,13 @@ msgid "Every day at 8 AM"
 msgstr "Todos los días a las 8 AM"
 
 #: src/features/tasks/components/task-form-dialog.tsx:127
+#: src/features/tasks/hooks/use-schedule-label.ts:23
 msgid "Every hour"
 msgstr "Cada hora"
+
+#: src/features/tasks/hooks/use-schedule-label.ts:43
+msgid "Every hour at minute {minute}"
+msgstr "Cada hora, en el minuto {minute}"
 
 #: src/features/marketing/components/landing-page.tsx:206
 msgid "Every leading AI model. One conversation."
@@ -13919,7 +13998,7 @@ msgstr "No se pudo bloquear al usuario"
 msgid "Failed to cancel export"
 msgstr "No se pudo cancelar la exportación"
 
-#: src/features/tasks/components/tasks-page.tsx:128
+#: src/features/tasks/components/tasks-page.tsx:130
 msgid "Failed to cancel the task"
 msgstr "No se pudo cancelar la tarea"
 
@@ -13931,7 +14010,7 @@ msgstr "No se pudo cambiar el color de la etiqueta"
 msgid "Failed to clear filter rules"
 msgstr "No se pudieron borrar las reglas de filtro"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:133
+#: src/features/settings/components/personalization/memory-settings.tsx:135
 msgid "Failed to clear memories"
 msgstr "No se pudieron borrar los recuerdos"
 
@@ -13992,6 +14071,10 @@ msgstr "No se pudo crear el preajuste"
 msgid "Failed to create tag"
 msgstr "No se pudo crear la etiqueta"
 
+#: src/features/tasks/components/task-suggestions.tsx:244
+msgid "Failed to create the task"
+msgstr "No se pudo crear la tarea"
+
 #: src/features/settings/components/chat/trigger-settings.tsx:539
 msgid "Failed to create trigger"
 msgstr "No se pudo crear el disparador"
@@ -14000,7 +14083,7 @@ msgstr "No se pudo crear el disparador"
 msgid "Failed to cut to clipboard"
 msgstr "No se pudo cortar al portapapeles"
 
-#: src/features/tasks/components/tasks-page.tsx:152
+#: src/features/tasks/components/tasks-page.tsx:154
 msgid "Failed to delete"
 msgstr "No se pudo eliminar"
 
@@ -14024,7 +14107,7 @@ msgstr "No se pudo eliminar el archivo. Inténtalo de nuevo."
 msgid "Failed to delete files"
 msgstr "No se pudieron eliminar los archivos"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:105
+#: src/features/settings/components/personalization/memory-settings.tsx:107
 msgid "Failed to delete memory"
 msgstr "No se pudo eliminar el recuerdo"
 
@@ -14111,6 +14194,10 @@ msgstr "No se pudo desconectar el conector"
 #: src/features/settings/components/personalization/memory-digest-card.tsx:32
 msgid "Failed to dismiss the digest"
 msgstr "No se pudo descartar el resumen"
+
+#: src/features/tasks/components/task-suggestions.tsx:231
+msgid "Failed to dismiss the suggestion"
+msgstr "No se pudo descartar la sugerencia"
 
 #: src/features/settings/components/privacy/data-export.tsx:69
 msgid "Failed to download export"
@@ -14216,6 +14303,10 @@ msgstr "No se pudieron cargar las habilidades"
 #: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:482
 msgid "Failed to load spreadsheet"
 msgstr "No se pudo cargar la hoja de cálculo"
+
+#: src/features/tasks/components/task-suggestions.tsx:153
+msgid "Failed to load the suggested tasks"
+msgstr "No se pudieron cargar las tareas sugeridas"
 
 #: src/features/settings/components/chat/usage-settings.tsx:265
 msgid "Failed to load usage data. Ensure the LLM Gateway is running and reachable."
@@ -14459,7 +14550,7 @@ msgstr "No se pudo iniciar la conexión"
 msgid "Failed to start the run"
 msgstr "No se pudo iniciar la ejecución"
 
-#: src/features/tasks/components/tasks-page.tsx:125
+#: src/features/tasks/components/tasks-page.tsx:127
 msgid "Failed to start the task"
 msgstr "No se pudo iniciar la tarea"
 
@@ -14492,9 +14583,10 @@ msgstr "No se pudo desfijar la conversación"
 msgid "Failed to update agent settings"
 msgstr "No se pudo actualizar la configuración del agente"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:158
-msgid "Failed to update backup model"
-msgstr "No se pudo actualizar el modelo de respaldo"
+#: src/features/settings/components/chat/default-models-settings.tsx:288
+#: src/features/settings/components/chat/default-models-settings.tsx:428
+msgid "Failed to update backup models"
+msgstr "No se pudieron actualizar los modelos de respaldo"
 
 #: src/features/settings/components/chat/agent-settings.tsx:80
 msgid "Failed to update browser click settings"
@@ -14508,7 +14600,7 @@ msgstr "No se pudo actualizar la configuración"
 msgid "Failed to update connection"
 msgstr "No se pudo actualizar la conexión"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:219
+#: src/features/settings/components/chat/default-models-settings.tsx:537
 msgid "Failed to update default model"
 msgstr "No se pudo actualizar el modelo predeterminado"
 
@@ -14544,8 +14636,8 @@ msgstr "No se pudieron actualizar los atajos de teclado"
 msgid "Failed to update MCP server"
 msgstr "No se pudo actualizar el servidor MCP"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:116
-#: src/features/settings/components/personalization/memory-settings.tsx:124
+#: src/features/settings/components/personalization/memory-settings.tsx:118
+#: src/features/settings/components/personalization/memory-settings.tsx:126
 msgid "Failed to update memory"
 msgstr "No se pudo actualizar el recuerdo"
 
@@ -14573,7 +14665,8 @@ msgstr "No se pudieron actualizar los ajustes de pull requests"
 msgid "Failed to update reply tools"
 msgstr "No se pudieron actualizar las herramientas de respuesta"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:148
+#: src/features/settings/components/personalization/memory-settings.tsx:150
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:41
 msgid "Failed to update setting"
 msgstr "No se pudo actualizar el ajuste"
 
@@ -15123,6 +15216,10 @@ msgstr "El tamaño del archivo supera {maxSize}"
 msgid "File size too large. Maximum 5MB allowed."
 msgstr "El archivo es demasiado grande. Se permite un máximo de 5 MB."
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:410
+msgid "File to import"
+msgstr "Archivo para importar"
+
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:859
 msgid "File Too Large to Preview"
 msgstr "Archivo demasiado grande para la vista previa"
@@ -15267,7 +15364,7 @@ msgstr "Filtrar por tipo"
 msgid "Filter condition"
 msgstr "Condición del filtro"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:194
+#: src/features/settings/components/personalization/memory-settings.tsx:200
 msgid "Filter memories by type"
 msgstr "Filtrar recuerdos por tipo"
 
@@ -16574,7 +16671,7 @@ msgstr "Objetivo: {goalTitle}"
 msgid "Goal: run until done"
 msgstr "Objetivo: ejecutar hasta terminar"
 
-#: src/features/tasks/components/tasks-page.tsx:224
+#: src/features/tasks/components/tasks-page.tsx:228
 msgid "Goals"
 msgstr "Objetivos"
 
@@ -17643,6 +17740,10 @@ msgstr "Ideal para clasificación y extracción sencillas"
 msgid "Ideas"
 msgstr "Ideas"
 
+#: src/features/tasks/components/task-suggestions.tsx:139
+msgid "Ideas from your own recent messages. Nothing is created until you accept one."
+msgstr "Ideas basadas en tus propios mensajes recientes. No se crea nada hasta que aceptes una."
+
 #: src/features/settings/components/personalization/memory-types.ts:28
 msgid "Identity"
 msgstr "Identidad"
@@ -17671,9 +17772,9 @@ msgstr "Si el problema persiste, contacta con soporte."
 msgid "If you turn it on, the next run is {0}."
 msgstr "Si lo activas, la próxima ejecución será {0}."
 
-#: src/features/settings/components/chat/default-models-settings.tsx:163
-msgid "If your chosen model is unavailable, the reply is retried once on this model"
-msgstr "Si el modelo que elegiste no está disponible, la respuesta se reintenta una vez con este modelo"
+#: src/features/settings/components/chat/default-models-settings.tsx:350
+msgid "If your chosen model is unavailable, the reply is retried on these models in order"
+msgstr "Si el modelo que elegiste no está disponible, la respuesta se reintenta con estos modelos en orden"
 
 #: src/features/skills/components/bundle-import-dialog.tsx:123
 msgid "Ignored, not available here:"
@@ -17696,7 +17797,7 @@ msgstr "ilustración"
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:131
 #: src/features/marketing/components/landing-footer.tsx:165
-#: src/features/settings/components/chat/default-models-settings.tsx:282
+#: src/features/settings/components/chat/default-models-settings.tsx:600
 #: src/features/settings/components/chat/models-settings.tsx:41
 #: src/features/settings/lib/settings-keywords.ts:74
 #: src/features/settings/lib/settings-keywords.ts:75
@@ -17790,17 +17891,17 @@ msgstr "Imagen fijada"
 msgid "Image to apply the style to (or use input from previous node)"
 msgstr "Imagen a la que aplicar el estilo (o usa la entrada del nodo anterior)"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:301
+#: src/features/settings/components/chat/default-models-settings.tsx:619
 #: src/features/settings/lib/settings-keywords.ts:75
 msgid "Image to image"
 msgstr "Imagen a imagen"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:257
+#: src/features/settings/components/chat/default-models-settings.tsx:575
 #: src/features/settings/lib/settings-keywords.ts:71
 msgid "Image to text"
 msgstr "Imagen a texto"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:343
+#: src/features/settings/components/chat/default-models-settings.tsx:661
 #: src/features/settings/lib/settings-keywords.ts:78
 msgid "Image to video"
 msgstr "Imagen a video"
@@ -17875,12 +17976,12 @@ msgstr "Imágenes en este chat ({0})"
 msgid "Images that require current knowledge, web search context, or complex reasoning about the subject matter"
 msgstr "Imágenes que requieren conocimientos actuales, contexto de búsqueda web o un razonamiento complejo sobre el tema"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:312
+#: src/features/settings/components/chat/default-models-settings.tsx:630
 #: src/features/settings/lib/settings-keywords.ts:76
 msgid "Images to image"
 msgstr "Imágenes a imagen"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:354
+#: src/features/settings/components/chat/default-models-settings.tsx:672
 #: src/features/settings/lib/settings-keywords.ts:79
 msgid "Images to video"
 msgstr "Imágenes a video"
@@ -17979,9 +18080,17 @@ msgstr "Importa conversaciones de ChatGPT, Google Gemini, Claude, una exportaci�
 msgid "Import failed"
 msgstr "La importación falló"
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:423
+msgid "Import file"
+msgstr "Importar archivo"
+
 #: src/features/projects/components/project-rule-files.tsx:968
 msgid "Import files"
 msgstr "Importar archivos"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:448
+msgid "Import finished."
+msgstr "Importación terminada."
 
 #: src/features/projects/components/repo-rule-file-import.tsx:216
 #: src/features/projects/components/repo-rule-file-import.tsx:378
@@ -17992,6 +18101,10 @@ msgstr "Importar desde el repositorio"
 #: src/features/projects/components/computer-rule-file-import.tsx:643
 msgid "Import from this computer"
 msgstr "Importar desde este ordenador"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:403
+msgid "Import memories from a file"
+msgstr "Importar recuerdos desde un archivo"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:423
 msgid "Import More"
@@ -18004,6 +18117,14 @@ msgstr "Importar exportación de Notion (.zip)"
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:222
 msgid "Import one kind of export at a time."
 msgstr "Importa un tipo de exportación a la vez."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:454
+msgid "Import progress"
+msgstr "Progreso de la importación"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:440
+msgid "Import result"
+msgstr "Resultado de la importación"
 
 #: src/features/projects/components/project-rule-files.tsx:978
 msgid "Import rule folder"
@@ -18051,6 +18172,10 @@ msgstr "Se importaron {added} página(s) de Notion; se omitieron {skipped} adjun
 msgid "Imported {added} Notion page(s)."
 msgstr "Se importaron {added} página(s) de Notion."
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:395
+msgid "Imported {imported} · Updated {updated} · Duplicates {duplicates} · Too long {tooLong} · Invalid {invalid}"
+msgstr "Importados {imported} · Actualizados {updated} · Duplicados {duplicates} · Demasiado largos {tooLong} · No válidos {invalid}"
+
 #. placeholder {0}: skill.slug
 #: src/features/skills/components/bundle-import-dialog.tsx:129
 msgid "Imported as /{0}."
@@ -18069,6 +18194,10 @@ msgstr "Habilidad «{0}» importada"
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:396
 msgid "Importing from {0}..."
 msgstr "Importando desde {0}..."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:447
+msgid "Importing memories…"
+msgstr "Importando recuerdos…"
 
 #: src/features/marketing/components/gateway-footer.tsx:20
 #: src/features/marketing/components/gateway-footer.tsx:148
@@ -19863,7 +19992,7 @@ msgstr "Vinculando…"
 msgid "Linux"
 msgstr "Linux"
 
-#: src/features/tasks/components/tasks-page.tsx:262
+#: src/features/tasks/components/tasks-page.tsx:266
 msgid "List"
 msgstr "Lista"
 
@@ -20101,6 +20230,10 @@ msgstr "Cargando imágenes"
 msgid "Loading messenger connections..."
 msgstr "Cargando conexiones de mensajería..."
 
+#: src/features/settings/components/chat/default-models-settings.tsx:92
+msgid "Loading models…"
+msgstr "Cargando modelos…"
+
 #: src/features/projects/components/project-repo-picker.tsx:175
 #: src/features/tasks/components/task-form-dialog.tsx:452
 msgid "Loading more projects…"
@@ -20198,7 +20331,7 @@ msgstr "Cargando hoja de cálculo…"
 msgid "Loading statistics…"
 msgstr "Cargando estadísticas…"
 
-#: src/features/tasks/components/tasks-page.tsx:212
+#: src/features/tasks/components/tasks-page.tsx:216
 msgid "Loading tasks…"
 msgstr "Cargando tareas…"
 
@@ -20213,10 +20346,6 @@ msgstr "Cargando la guía"
 #: src/features/develop/components/thread-pull-requests.tsx:318
 msgid "Loading the linked pull requests…"
 msgstr "Cargando las pull requests vinculadas…"
-
-#: src/features/devices/components/devices-settings.tsx:110
-#~ msgid "Loading the projects this computer may be used in…"
-#~ msgstr "Cargando los proyectos en los que se puede usar este ordenador…"
 
 #: src/features/sub-agents/components/sub-agent-approvals.tsx:48
 msgid "Loading the sub-agent's requests…"
@@ -20282,7 +20411,7 @@ msgstr "Cargando tus servidores, conectores y ordenadores…"
 #: src/features/settings/components/chat/agent-settings.tsx:90
 #: src/features/settings/components/chat/api-keys-settings.tsx:462
 #: src/features/settings/components/chat/custom-providers-settings.tsx:343
-#: src/features/settings/components/chat/default-models-settings.tsx:185
+#: src/features/settings/components/chat/default-models-settings.tsx:503
 #: src/features/settings/components/chat/native-providers-settings.tsx:396
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:291
 #: src/features/settings/components/chat/trigger-settings.tsx:974
@@ -21175,7 +21304,7 @@ msgid "memories"
 msgstr "recuerdos"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/settings/components/personalization/memory-settings.tsx:220
+#: src/features/settings/components/personalization/memory-settings.tsx:226
 msgid "Memories"
 msgstr "Recuerdos"
 
@@ -21193,7 +21322,7 @@ msgid "Memories used for this reply ({0})"
 msgstr "Recuerdos usados en esta respuesta ({0})"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
-#: src/features/settings/components/personalization/memory-settings.tsx:164
+#: src/features/settings/components/personalization/memory-settings.tsx:166
 #: src/features/settings/lib/settings-keywords.ts:96
 msgid "Memory"
 msgstr "Memoria"
@@ -21202,17 +21331,25 @@ msgstr "Memoria"
 msgid "Memory — what the agent keeps across chats"
 msgstr "Memoria: lo que el agente guarda entre chats"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:109
+#: src/features/settings/components/personalization/memory-settings.tsx:111
 msgid "Memory deleted"
 msgstr "Recuerdo eliminado"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:146
+#: src/features/settings/components/personalization/memory-settings.tsx:148
 msgid "Memory disabled"
 msgstr "Memoria desactivada"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:146
+#: src/features/settings/components/personalization/memory-settings.tsx:148
 msgid "Memory enabled"
 msgstr "Memoria activada"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:257
+msgid "Memory import finished"
+msgstr "Importación de recuerdos finalizada"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:257
+msgid "Memory import stopped"
+msgstr "Importación de recuerdos detenida"
 
 #: src/features/marketing/use-cases/use-case-data.ts:115
 msgid "Memory in Neore: the agent keeps useful facts about you across chats, you can review and edit them in settings, and it is off until you turn it on."
@@ -21652,7 +21789,7 @@ msgstr "El modelo multimodal más pequeño de Mistral, con 3B"
 msgid "mix"
 msgstr "mezclar"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:376
+#: src/features/settings/components/chat/default-models-settings.tsx:694
 #: src/features/settings/lib/settings-keywords.ts:81
 msgid "Mixed to video"
 msgstr "Mixto a vídeo"
@@ -21879,6 +22016,7 @@ msgid "Mon"
 msgstr "lun"
 
 #: src/features/tasks/components/task-form-dialog.tsx:130
+#: src/features/tasks/hooks/use-schedule-label.ts:31
 msgid "Mondays at 09:00 UTC"
 msgstr "Los lunes a las 09:00 UTC"
 
@@ -22071,10 +22209,12 @@ msgid "Move {label} up in starred"
 msgstr "Subir {label} en destacados"
 
 #: src/features/projects/components/project-rule-files.tsx:280
+#: src/features/settings/components/chat/default-models-settings.tsx:386
 msgid "Move {name} down"
 msgstr "Bajar {name}"
 
 #: src/features/projects/components/project-rule-files.tsx:277
+#: src/features/settings/components/chat/default-models-settings.tsx:373
 msgid "Move {name} up"
 msgstr "Subir {name}"
 
@@ -22768,7 +22908,7 @@ msgid "New first"
 msgstr "Nuevos primero"
 
 #: src/features/tasks/components/goal-form-dialog.tsx:73
-#: src/features/tasks/components/tasks-page.tsx:201
+#: src/features/tasks/components/tasks-page.tsx:203
 msgid "New goal"
 msgstr "Nuevo objetivo"
 
@@ -22834,7 +22974,7 @@ msgid "New tag"
 msgstr "Nueva etiqueta"
 
 #: src/features/tasks/components/task-form-dialog.tsx:206
-#: src/features/tasks/components/tasks-page.tsx:205
+#: src/features/tasks/components/tasks-page.tsx:207
 msgid "New task"
 msgstr "Nueva tarea"
 
@@ -23275,6 +23415,10 @@ msgstr "Aún no hay historial"
 msgid "No icon found"
 msgstr "No se encontró ningún icono"
 
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:56
+msgid "No ideas are made while memory is off."
+msgstr "No se generan ideas mientras la memoria esté desactivada."
+
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:171
 #: src/features/chat/thread/media-gallery-view.tsx:353
 msgid "No images yet"
@@ -23336,11 +23480,11 @@ msgstr "No hay servidores MCP configurados. Añade un servidor para ampliar las 
 msgid "No members in this team yet"
 msgstr "Aún no hay miembros en este equipo"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:236
+#: src/features/settings/components/personalization/memory-settings.tsx:242
 msgid "No memories of this type."
 msgstr "No hay recuerdos de este tipo."
 
-#: src/features/settings/components/personalization/memory-settings.tsx:237
+#: src/features/settings/components/personalization/memory-settings.tsx:243
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "Aún no hay recuerdos. La IA empezará a aprender de tus conversaciones automáticamente."
 
@@ -23362,7 +23506,7 @@ msgstr "Sin micrófono"
 msgid "No microphone found."
 msgstr "No se encontró ningún micrófono."
 
-#: src/features/settings/components/chat/default-models-settings.tsx:93
+#: src/features/settings/components/chat/default-models-settings.tsx:92
 msgid "No models available"
 msgstr "No hay modelos disponibles"
 
@@ -23630,7 +23774,7 @@ msgstr "No hay ningún resumen disponible. Haz clic en \"Generar\" para crear un
 msgid "No tags yet"
 msgstr "Aún no hay etiquetas"
 
-#: src/features/tasks/components/tasks-page.tsx:242
+#: src/features/tasks/components/tasks-page.tsx:246
 msgid "No tasks yet"
 msgstr "Aún no hay tareas"
 
@@ -23784,7 +23928,6 @@ msgstr "ninguno"
 
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:19
 #: src/features/chat/thread/ask-user-questions.tsx:87
-#: src/features/settings/components/chat/default-models-settings.tsx:165
 #: src/features/skills/components/skill-form-dialog.tsx:320
 #: src/features/skills/components/skill-form-dialog.tsx:334
 msgid "None"
@@ -24268,6 +24411,10 @@ msgstr "La introducción se reiniciará en tu próxima visita al chat."
 msgid "Onboarding wizard"
 msgstr "Asistente de introducción"
 
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:55
+msgid "Once a day, suggest recurring tasks based only on your own recent messages. Nothing is created until you accept a suggestion. Turning this off deletes the suggestions waiting for you."
+msgstr "Una vez al día, sugiere tareas recurrentes basadas únicamente en tus propios mensajes recientes. No se crea nada hasta que aceptes una sugerencia. Al desactivarlo se eliminan las sugerencias pendientes."
+
 #: src/features/marketing/use-cases/use-case-data.ts:123
 msgid "Once a night, for users active that day, a reflection pass merges duplicates and promotes repeated facts."
 msgstr "Una vez por la noche, para los usuarios activos ese día, una pasada de reflexión fusiona duplicados y promueve los datos repetidos."
@@ -24434,11 +24581,6 @@ msgstr "Solo se pueden comparar modelos del mismo tipo. Borra la selección para
 #: src/features/chat/browser-live-view/browser-human-check.tsx:437
 msgid "Only someone who can write in this chat can take control of the browser."
 msgstr "Solo quien puede escribir en este chat puede tomar el control del navegador."
-
-#. placeholder {0}: allThreadsData.lunora.length
-#: src/components/command-palette.tsx:631
-#~ msgid "Only the {0} threads loaded here are filtered by state; older ones are not included."
-#~ msgstr "Solo se filtran por estado las {0} conversaciones cargadas aquí; las más antiguas no se incluyen."
 
 #. placeholder {0}: allThreadsData.lunora.length
 #: src/components/command-palette.tsx:973
@@ -25314,14 +25456,6 @@ msgstr "Ordena los modelos que marcaste como destacados en el selector de modelo
 #: src/features/settings/components/chat/agent-settings.tsx:65
 msgid "Ordinary buttons and links are checked, then clicked for real, so popups and real-click checks work. A page can change one in the moment between that check and the press, and that press is not checked again, so an ordinary button can become a purchase unseen. Purchases you approve are still checked in the page."
 msgstr "Los botones y enlaces normales se comprueban y luego se pulsan de verdad, para que funcionen las ventanas emergentes y las comprobaciones con clic real. Una página puede cambiar uno en el momento entre esa comprobación y la pulsación, y esa pulsación no se vuelve a comprobar, así que un botón normal puede convertirse en una compra sin que se note. Las compras que apruebas se siguen comprobando en la página."
-
-#: src/features/settings/components/chat/agent-settings.tsx:65
-#~ msgid "Ordinary buttons and links are checked, then clicked for real, so popups and real-click checks work. A page can still change one in the moment between that check and the press. Purchases and approved clicks stay checked in the page."
-#~ msgstr "Los botones y enlaces ordinarios se comprueban y luego se pulsan de verdad, así que las ventanas emergentes y las comprobaciones de clic real funcionan. Una página todavía puede cambiar uno en el momento entre la comprobación y la pulsación. Las compras y los clics aprobados siguen comprobándose en la página."
-
-#: src/features/settings/components/chat/agent-settings.tsx:65
-#~ msgid "Ordinary buttons and links get real clicks, so popups and real-click checks work. Purchases and approved clicks stay checked in the page."
-#~ msgstr "Los botones y enlaces ordinarios reciben clics reales, así que las ventanas emergentes y las comprobaciones de clic real funcionan. Las compras y los clics aprobados siguen comprobándose en la página."
 
 #: src/features/settings/components/chat/agent-settings.tsx:70
 msgid "Ordinary clicks are checked, then made for real. A page can change an ordinary button between the check and the press, so it can become a purchase unseen. Purchases you approve are still checked in the page."
@@ -28688,6 +28822,7 @@ msgstr "Quitar {modelId} de la lista de bloqueados"
 
 #: src/features/pages/components/page-share-dialog.tsx:185
 #: src/features/projects/components/project-repositories.tsx:359
+#: src/features/settings/components/chat/default-models-settings.tsx:402
 msgid "Remove {name}"
 msgstr "Quitar a {name}"
 
@@ -28953,6 +29088,10 @@ msgstr "Repetir"
 #: src/features/tasks/components/task-card.tsx:79
 msgid "Repeats ({0} UTC)"
 msgstr "Se repite ({0} UTC)"
+
+#: src/features/tasks/hooks/use-schedule-label.ts:37
+msgid "Repeats ({cronExpression} UTC)"
+msgstr "Se repite ({cronExpression} UTC)"
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:397
 msgid "Replace"
@@ -29410,6 +29549,7 @@ msgstr "reintentar"
 #: src/features/settings/components/chat/bot-tool-selection.tsx:495
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:493
 #: src/features/tasks/components/task-detail-dialog.tsx:108
+#: src/features/tasks/components/task-suggestions.tsx:161
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
 #: src/lib/toast.ts:171
@@ -30270,6 +30410,14 @@ msgstr "Programación"
 msgid "Schedule {0}"
 msgstr "Programación {0}"
 
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:36
+msgid "Schedule ideas disabled"
+msgstr "Ideas de tareas programadas desactivadas"
+
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:36
+msgid "Schedule ideas enabled"
+msgstr "Ideas de tareas programadas activadas"
+
 #: src/features/skills/components/bundle-import-dialog.tsx:55
 msgid "Schedule or webhook"
 msgstr "Programación o webhook"
@@ -30508,6 +30656,7 @@ msgstr "Buscar habilidades públicas…"
 msgid "Search Reddit posts"
 msgstr "Busca publicaciones de Reddit"
 
+#: src/components/settings/settings-search.tsx:158
 #: src/features/pages/components/pages-sidebar.tsx:169
 msgid "Search results"
 msgstr "Resultados de búsqueda"
@@ -31533,12 +31682,17 @@ msgid "Show a message in the app when a chat waits for your answer or your appro
 msgstr "Muestra un mensaje en la app cuando un chat espera tu respuesta o tu aprobación."
 
 #: src/features/skills/components/bundle-import-dialog.tsx:99
+#: src/features/tasks/components/task-suggestions.tsx:216
 msgid "Show all"
 msgstr "Mostrar todo"
 
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 msgid "Show all {lines} lines"
 msgstr "Mostrar las {lines} líneas"
+
+#: src/features/tasks/components/task-suggestions.tsx:206
+msgid "Show all instructions for \"{title}\""
+msgstr "Mostrar todas las instrucciones de «{title}»"
 
 #: src/features/tasks/components/goal-list.tsx:73
 msgid "Show all tasks"
@@ -31583,8 +31737,13 @@ msgstr "Mostrar etiquetas"
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 #: src/features/chat/pins/pin-item.tsx:214
 #: src/features/skills/components/bundle-import-dialog.tsx:99
+#: src/features/tasks/components/task-suggestions.tsx:216
 msgid "Show less"
 msgstr "Mostrar menos"
+
+#: src/features/tasks/components/task-suggestions.tsx:206
+msgid "Show less of the instructions for \"{title}\""
+msgstr "Mostrar menos de las instrucciones de «{title}»"
 
 #: src/features/chat/pins/pin-item.tsx:214
 msgid "Show more"
@@ -33667,6 +33826,10 @@ msgstr "Se importaron correctamente {imported} conversaciones desde {0}"
 msgid "Suggest innovative solutions to reduce plastic waste"
 msgstr "Propón soluciones innovadoras para reducir los residuos plásticos"
 
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:50
+msgid "Suggest scheduled tasks"
+msgstr "Sugerir tareas programadas"
+
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:108
 msgid "Suggest video ideas for a tech YouTube channel"
 msgstr "Sugiere ideas de videos para un canal de tecnología en YouTube"
@@ -33684,9 +33847,21 @@ msgstr "Respuestas sugeridas"
 msgid "Suggested next prompt: {nextPromptSuggestion}. Press Tab to insert."
 msgstr "Siguiente mensaje sugerido: {nextPromptSuggestion}. Pulsa Tab para insertarlo."
 
+#: src/features/tasks/components/task-suggestions.tsx:137
+msgid "Suggested tasks"
+msgstr "Tareas sugeridas"
+
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:689
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Sugerencia disponible, pulsa Flecha derecha para aceptarla"
+
+#: src/features/tasks/components/task-suggestions.tsx:230
+msgid "Suggestion dismissed: {title}"
+msgstr "Sugerencia descartada: {title}"
+
+#: src/features/tasks/components/task-suggestions.tsx:143
+msgid "Suggestion updates"
+msgstr "Novedades de las sugerencias"
 
 #: src/features/settings/lib/settings-keywords.ts:33
 msgid "suggestions"
@@ -33930,8 +34105,8 @@ msgstr "Sistema"
 msgid "System (default)"
 msgstr "Sistema (predeterminado)"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:81
-#: src/features/settings/components/chat/default-models-settings.tsx:119
+#: src/features/settings/components/chat/default-models-settings.tsx:89
+#: src/features/settings/components/chat/default-models-settings.tsx:130
 msgid "System default"
 msgstr "Predeterminado del sistema"
 
@@ -34095,6 +34270,10 @@ msgstr "Tarea"
 msgid "Task approved"
 msgstr "Tarea aprobada"
 
+#: src/features/tasks/components/task-suggestions.tsx:244
+msgid "Task created: {title}"
+msgstr "Tarea creada: {title}"
+
 #: src/features/tasks/components/task-detail-dialog.tsx:211
 msgid "Task details, your review and the run history."
 msgstr "Detalles de la tarea, tu revisión y el historial de ejecuciones."
@@ -34145,18 +34324,18 @@ msgstr "Tarea en cola para otra ejecución"
 msgid "Task rejected"
 msgstr "Tarea rechazada"
 
-#: src/features/tasks/components/tasks-page.tsx:255
+#: src/features/tasks/components/tasks-page.tsx:259
 msgid "Task views"
 msgstr "Vistas de tareas"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:34
 #: src/features/layout/components/sidebar-shortcut.tsx:101
-#: src/features/tasks/components/tasks-page.tsx:192
+#: src/features/tasks/components/tasks-page.tsx:194
 msgid "Tasks"
 msgstr "Tareas"
 
 #. placeholder {0}: goalTitleById.get(selectedGoalId) ?? ""
-#: src/features/tasks/components/tasks-page.tsx:251
+#: src/features/tasks/components/tasks-page.tsx:255
 msgid "Tasks for {0}"
 msgstr "Tareas de {0}"
 
@@ -34429,7 +34608,7 @@ msgstr "texto"
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:130
 #: src/features/marketing/components/landing-footer.tsx:164
-#: src/features/settings/components/chat/default-models-settings.tsx:238
+#: src/features/settings/components/chat/default-models-settings.tsx:556
 #: src/features/settings/components/chat/models-settings.tsx:45
 #: src/features/settings/lib/settings-keywords.ts:70
 #: src/features/settings/lib/settings-keywords.ts:71
@@ -34525,7 +34704,7 @@ msgstr "Texto que la respuesta debe contener (sin distinguir mayúsculas)"
 msgid "Text the answer must not contain"
 msgstr "Texto que la respuesta no debe contener"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:290
+#: src/features/settings/components/chat/default-models-settings.tsx:608
 #: src/features/settings/lib/settings-keywords.ts:74
 msgid "Text to image"
 msgstr "Texto a imagen"
@@ -34542,12 +34721,12 @@ msgstr "Texto para leer en voz alta"
 msgid "Text to Speech"
 msgstr "Texto a voz"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:246
+#: src/features/settings/components/chat/default-models-settings.tsx:564
 #: src/features/settings/lib/settings-keywords.ts:70
 msgid "Text to text"
 msgstr "Texto a texto"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:332
+#: src/features/settings/components/chat/default-models-settings.tsx:650
 #: src/features/settings/lib/settings-keywords.ts:77
 msgid "Text to video"
 msgstr "Texto a vídeo"
@@ -34862,7 +35041,7 @@ msgstr "El plan del agente"
 msgid "The agent's tool calls"
 msgstr "Las llamadas a herramientas del agente"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:163
+#: src/features/settings/components/personalization/memory-settings.tsx:165
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 msgstr "La IA aprende de tus conversaciones para personalizar sus respuestas y reflexiona cada noche sobre lo aprendido. Todo lo que recuerda aparece aquí: edita, cambia el tipo, fija o elimina cualquier recuerdo."
 
@@ -35131,6 +35310,10 @@ msgstr "La extensión podrá leer y enviar chats como {0}. Puedes desconectarla 
 msgid "The file is larger than {0} KB, which is more than a bundle can be."
 msgstr "El archivo supera los {0} KB, que es más de lo que puede ser un paquete."
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:294
+msgid "The file is larger than {maxSize}. Choose a smaller file."
+msgstr "El archivo supera {maxSize}. Elige un archivo más pequeño."
+
 #: src/features/skills/components/skill-import-dialog.tsx:91
 msgid "The file is larger than {megabytes} MB."
 msgstr "El archivo supera los {megabytes} MB."
@@ -35183,7 +35366,7 @@ msgstr "El plan gratuito incluye 20 mensajes de texto al día con una selección
 msgid "The full system prompt to send to the model..."
 msgstr "El prompt de sistema completo que se enviará al modelo..."
 
-#: src/features/tasks/components/tasks-page.tsx:333
+#: src/features/tasks/components/tasks-page.tsx:337
 msgid "The goal is removed; its tasks stay, without a goal."
 msgstr "Se elimina el objetivo; sus tareas se conservan, sin objetivo."
 
@@ -35287,6 +35470,10 @@ msgstr "el software del host está desactualizado"
 #: ../../packages/ui/src/components/icon-picker.tsx:452
 msgid "The icons could not be loaded."
 msgstr "No se pudieron cargar los iconos."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:396
+msgid "The import stopped before it finished."
+msgstr "La importación se detuvo antes de terminar."
 
 #: src/features/canvas/canvas-panel.tsx:648
 msgid "The imported file appears to be empty."
@@ -35682,7 +35869,7 @@ msgstr "El subagente no pudo iniciarse."
 msgid "The tag \"{pendingDeleteName}\" will be removed from every chat that has it. The chats themselves are not deleted."
 msgstr "La etiqueta \"{pendingDeleteName}\" se quitará de todos los chats que la tengan. Los chats en sí no se eliminan."
 
-#: src/features/tasks/components/tasks-page.tsx:334
+#: src/features/tasks/components/tasks-page.tsx:338
 msgid "The task and its run history are removed. Tasks that depend on it stop waiting for it."
 msgstr "Se eliminan la tarea y su historial de ejecuciones. Las tareas que dependen de ella dejan de esperarla."
 
@@ -36317,10 +36504,6 @@ msgstr "Este enlace no acepta mensajes en este momento. Inténtalo más tarde."
 msgid "This list is full: remove a tool before adding another."
 msgstr "Esta lista está llena: quita una herramienta antes de añadir otra."
 
-#: src/features/vault/components/site-logins.tsx:307
-#~ msgid "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
-#~ msgstr "Este inicio de sesión se cambió en otro lugar y se ha recargado. Se conservan tus cambios en el usuario y la etiqueta; revisa sus bots, vuelve a escribir la contraseña si la estabas cambiando y guarda de nuevo."
-
 #: src/features/vault/components/site-logins.tsx:362
 msgid "This login was changed elsewhere and has been reloaded. Your username, label and sign-in page edits are kept; check its bots, type the password again if you were changing it, and save again."
 msgstr "Este inicio de sesión se cambió en otro lugar y se ha recargado. Se conservan tus cambios en el usuario, la etiqueta y la página de inicio de sesión; revisa sus bots, vuelve a escribir la contraseña si la estabas cambiando y guarda de nuevo."
@@ -36623,7 +36806,7 @@ msgid "This will permanently delete {0} anonymous user accounts and all their da
 msgstr "Se eliminarán de forma permanente {0} cuentas de usuario anónimas y todos sus datos. Esta acción no se puede deshacer."
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:253
+#: src/features/settings/components/personalization/memory-settings.tsx:259
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "Se eliminarán de forma permanente los {0} recuerdos y sus resúmenes diarios. La IA empezará a aprender de cero a partir de tu próxima conversación."
 
@@ -37484,6 +37667,8 @@ msgstr "Prueba a ajustar los términos de búsqueda."
 #: src/features/projects/components/project-repo-picker.tsx:198
 #: src/features/projects/components/project-repositories.tsx:297
 #: src/features/projects/components/repo-rule-file-import.tsx:183
+#: src/features/settings/components/chat/default-models-settings.tsx:455
+#: src/features/settings/components/personalization/memory-file-import.tsx:473
 #: src/features/tasks/components/task-form-dialog.tsx:459
 #: src/features/vault/components/site-logins.tsx:480
 #: src/features/vault/components/site-logins.tsx:612
@@ -37582,6 +37767,10 @@ msgstr "¿Desactivar la fusión automática?"
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:195
 msgid "Turn on memory"
 msgstr "Activar la memoria"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:428
+msgid "Turn on memory to import a file."
+msgstr "Activa la memoria para importar un archivo."
 
 #: src/features/skills/components/bundle-import-dialog.tsx:122
 msgid "Turns these tools off:"
@@ -37796,6 +37985,10 @@ msgstr "desarchivar"
 #: src/features/chat/thread-list/thread-node.tsx:128
 msgid "Unarchive thread"
 msgstr "Desarchivar conversación"
+
+#: src/features/settings/components/chat/default-models-settings.tsx:370
+msgid "Unavailable"
+msgstr "No disponible"
 
 #: src/features/admin/components/ban-user-dialog.tsx:89
 #: src/features/admin/components/ban-user-dialog.tsx:99
@@ -38091,6 +38284,10 @@ msgstr "Flujo de trabajo sin título"
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:18
 msgid "up"
 msgstr "arriba"
+
+#: src/features/settings/components/chat/default-models-settings.tsx:462
+msgid "Up to {limit}, tried in the order listed"
+msgstr "Hasta {limit}, probados en el orden de la lista"
 
 #: src/features/workflow/components/version-history.tsx:150
 msgid "Up to {MAX_HISTORY_ENTRIES} versions saved"
@@ -39035,7 +39232,7 @@ msgstr "vídeo"
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:132
 #: src/features/marketing/components/landing-footer.tsx:166
-#: src/features/settings/components/chat/default-models-settings.tsx:324
+#: src/features/settings/components/chat/default-models-settings.tsx:642
 #: src/features/settings/components/chat/models-settings.tsx:46
 #: src/features/settings/lib/settings-keywords.ts:77
 #: src/features/settings/lib/settings-keywords.ts:78
@@ -39114,12 +39311,12 @@ msgstr "Resultado de vídeo"
 msgid "Video thumbnail"
 msgstr "Miniatura de vídeo"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:268
+#: src/features/settings/components/chat/default-models-settings.tsx:586
 #: src/features/settings/lib/settings-keywords.ts:72
 msgid "Video to text"
 msgstr "Vídeo a texto"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:365
+#: src/features/settings/components/chat/default-models-settings.tsx:683
 #: src/features/settings/lib/settings-keywords.ts:80
 msgid "Video to video"
 msgstr "Vídeo a vídeo"
@@ -39731,7 +39928,12 @@ msgstr "Token de WeChat"
 msgid "Wed"
 msgstr "mié"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:53
+msgid "Weekdays at {time} UTC"
+msgstr "Días laborables a las {time} UTC"
+
 #: src/features/tasks/components/task-form-dialog.tsx:129
+#: src/features/tasks/hooks/use-schedule-label.ts:27
 msgid "Weekdays at 09:00 UTC"
 msgstr "Días laborables a las 09:00 UTC"
 
@@ -40732,6 +40934,11 @@ msgstr "Tu recurso de Azure OpenAI: punto de conexión, versión de la API y nom
 #: src/features/settings/components/personalization/personalization-settings.tsx:292
 msgid "Your background, preferences, or location to help the AI understand you better"
 msgstr "Tu formación, preferencias o ubicación, para que la IA te entienda mejor"
+
+#: src/features/settings/components/chat/default-models-settings.tsx:288
+#: src/features/settings/components/chat/default-models-settings.tsx:427
+msgid "Your backup models were changed in another tab. The saved list is shown again."
+msgstr "Tus modelos de respaldo se cambiaron en otra pestaña. Se vuelve a mostrar la lista guardada."
 
 #: src/features/settings/components/chat/bots-settings.tsx:456
 msgid "Your bots"

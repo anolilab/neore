@@ -56,6 +56,7 @@ vi.mock("../tools", () => {
         "retrieve",
         "saveSecretAsProviderKey",
         "searchMemory",
+        "searchPastChats",
         "setMcpServerSecret",
         "signInWithSavedLogin",
         "shellExecution",

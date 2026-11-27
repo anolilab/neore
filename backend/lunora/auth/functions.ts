@@ -300,11 +300,20 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
             toStore.searchDomainBlocklist = domains;
         }
 
+        const backupModelsBase = toStore.backupModelsBase as string[] | undefined;
+
+        delete toStore.backupModelsBase;
+
         // The backup list and the single value saved before it are kept in step: a write of either sets both, so a reader
         // of either sees the same first backup. An older client writes `backupModel` alone, and that edits only the first
         // entry: a model replaces it (and leaves its later place), "" removes it, and the rest of the list stays.
         if (Array.isArray(toStore.backupModels) || typeof toStore.backupModel === "string") {
             const saved = storedBackupModels(settings as Doc<"userSettings"> | null);
+
+            if (backupModelsBase !== undefined && (backupModelsBase.length !== saved.length || backupModelsBase.some((id, index) => id !== saved[index]))) {
+                throw new LunoraError("CONFLICT", "Your backup models were changed elsewhere. Reload them and try again.");
+            }
+
             const single = toStore.backupModel as string;
             const backupModels = Array.isArray(toStore.backupModels)
                 ? (toStore.backupModels as string[])
@@ -357,6 +366,15 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
     // on the user's own shard, where they live.
     if (tableName === "userSettings" && toStore.threadSummariesEnabled !== undefined && toStore.threadSummariesEnabled !== true) {
         await runAfterOnShard(context.scheduler, 0, internal.agent.thread_summaries.eraseUserThreadSummaries, { before: now, userId }, userId);
+    }
+
+    // Schedule ideas are opt-in too: switching them off, or memory off (the ideas need it), erases the suggestions waiting to be
+    // accepted (`tasks/suggestions.ts`), in the same save.
+    const ideasTurnedOff = toStore.scheduleIdeasEnabled !== undefined && toStore.scheduleIdeasEnabled !== true;
+    const memoryTurnedOff = toStore.memoryEnabled !== undefined && toStore.memoryEnabled !== true;
+
+    if (tableName === "userSettings" && (ideasTurnedOff || memoryTurnedOff)) {
+        await runAfterOnShard(context.scheduler, 0, internal.tasks.suggestions.eraseUserTaskSuggestions, { before: now, userId }, userId);
     }
 };
 

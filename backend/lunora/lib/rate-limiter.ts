@@ -122,6 +122,10 @@ export const RATE_LIMIT_CONFIGS = {
     // Keeping and steering the browser a person took control of (`browser/live-view.ts`).
     "browser/control:free": Ratelimit.fixedWindow(240, HOUR),
     "browser/control:premium": Ratelimit.fixedWindow(600, HOUR),
+    // A still frame of the thread's browser for a phone that watches it (`browser/frame.ts`): one every 10 s while
+    // the screen is open, and one after each agent action. A token bucket, so a few may come at once, never the hour's.
+    "browser/frame:free": Ratelimit.tokenBucket(12, MINUTE, 6),
+    "browser/frame:premium": Ratelimit.tokenBucket(24, MINUTE, 12),
     // Each call mints a live view URL at the provider (`browser/live-view.ts`).
     "browser/liveView:free": Ratelimit.fixedWindow(30, HOUR),
     "browser/liveView:premium": Ratelimit.fixedWindow(120, HOUR),

@@ -175,14 +175,14 @@ export const deliverSteers = internalMutation
         threadId: v.id("threads"),
         userId: v.string().max(MAX_LENGTH.id),
     })
-    // `parts`: each steer taken, with when it was sent (now, for one queued before that was kept).
+    // `parts`: each steer taken, with when it was sent (now, for one queued before that was kept) and whether the owner did not type it.
     .output(
         v.union(
             v.null(),
             v.object({
                 messageId: v.string(),
                 notTyped: v.optional(vNotTypedMarks),
-                parts: v.array(v.object({ sentAt: v.number(), text: v.string() })),
+                parts: v.array(v.object({ notTyped: v.optional(v.boolean()), sentAt: v.number(), text: v.string() })),
                 text: v.string(),
             }),
         ),
@@ -209,6 +209,7 @@ export const deliverSteers = internalMutation
         }
 
         // One marked steer marks the one row they are all delivered as.
+        const notTypedIds = new Set((stream.notTypedSteers ?? []).filter((entry) => hasNotTypedMarks(entry.notTyped)).map((entry) => entry.id));
         const notTyped = mergeNotTypedMarks(...(stream.notTypedSteers ?? []).filter((entry) => taken.ids.includes(entry.id)).map((entry) => entry.notTyped));
         const row = await insertSteerRow(ctx, { notTyped, pendingMessageId, text: taken.text, threadId, userId });
 
@@ -221,8 +222,9 @@ export const deliverSteers = internalMutation
         return {
             messageId: row.messageId,
             ...(hasNotTypedMarks(notTyped) && { notTyped }),
-            parts: taken.parts.map((part) => {
-                return { sentAt: part.sentAt ?? ctx.now, text: part.text };
+            // Flagged one by one: the row above is marked whole, but memory must still quote a typed steer delivered beside a marked one.
+            parts: taken.parts.map((part, index) => {
+                return { ...(notTypedIds.has(taken.ids[index] ?? "") && { notTyped: true }), sentAt: part.sentAt ?? ctx.now, text: part.text };
             }),
             text: taken.text,
         };

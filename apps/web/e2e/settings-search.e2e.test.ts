@@ -50,7 +50,8 @@ test.describe("Settings search", () => {
 
         const dialog = page.getByRole("dialog", { name: "Settings" });
         const field = dialog.getByRole("combobox", { name: SEARCH_FIELD });
-        const status = dialog.getByRole("status");
+        // Named: other tabs' components in the dialog have a live region of their own.
+        const status = dialog.getByRole("status", { exact: true, name: "Search results" });
 
         for (const { focusName, row, tab } of SETTINGS) {
             await field.focus();

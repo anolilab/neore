@@ -20,6 +20,14 @@
  * failed so the UI stops
  * spinning and the user can retry. The job is deliberately NOT re-run: a dead
  * delivery may already have paid for its generation.
+ *
+ * ## A skipped job gives its claim back
+ *
+ * A target that did nothing, and spent nothing, because the work is switched
+ * off right now (a person's opt-out) answers `{ skipped: true }`. The claim is
+ * then RELEASED instead of completed, so the same `jobId` can be sent again
+ * once the work is allowed. Only a target that never made a paid call or a write
+ * may answer so; any other outcome, a throw included, completes the claim.
  */
 import type { FunctionReference } from "lunorash/client";
 import { v } from "lunorash/server";
@@ -32,7 +40,8 @@ import { JOB_DISPATCH_TIMEOUT_MS } from "./job-queue-config";
 /** Longer than any single delivery may run, so a live delivery is never reaped. */
 export const JOB_LEASE_MS = JOB_DISPATCH_TIMEOUT_MS + 60 * 1000;
 
-const JOB_SCOPE = "job";
+/** The scope of a job's claim; a caller that must know whether a job is still held (`tasks/schedule-ideas.ts`) reads it. */
+export const JOB_SCOPE = "job";
 
 /** Claim `jobId`, run the `target` action with `args`, then complete the claim. A refused claim runs nothing. */
 export const runJobOnce = internalAction
@@ -60,13 +69,19 @@ export const runJobOnce = internalAction
             return null;
         }
 
+        let skipped = false;
+
         try {
             const reference = { __lunoraRef: target } as unknown as FunctionReference<"action", Record<string, unknown>, unknown>;
 
             // The claim key goes along as `jobId`, so the target can tag what it creates with it.
-            await ctx.runAction(reference, { ...(args as Record<string, unknown> | undefined), jobId });
+            const result = await ctx.runAction(reference, { ...(args as Record<string, unknown> | undefined), jobId });
+
+            skipped = typeof result === "object" && result !== null && (result as { skipped?: unknown }).skipped === true;
         } finally {
-            await ctx.runMutation(internal.lib.claim_once.completeKey, { key: jobId, scope: JOB_SCOPE });
+            await (skipped
+                ? ctx.runMutation(internal.lib.claim_once.releaseKey, { key: jobId, scope: JOB_SCOPE })
+                : ctx.runMutation(internal.lib.claim_once.completeKey, { key: jobId, scope: JOB_SCOPE }));
         }
 
         return null;

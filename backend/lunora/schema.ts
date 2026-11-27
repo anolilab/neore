@@ -77,6 +77,7 @@ import {
     vTaskRunOrigin,
     vTaskRunStatus,
     vTaskSkipReason,
+    vTaskSuggestionStatus,
     vTaskStatus,
     vVerdict,
 } from "./tasks/validators";
@@ -538,6 +539,17 @@ export const schema = defineSchema({
                 until: v.number(),
             }),
         ),
+        /**
+         * How many fresh control leases were taken on this row, by anyone (`browser/live-view.ts#claimControl`): a frame
+         * read that sees it change knows a person took control while its shot ran, even once the lease ended and was cleared.
+         */
+        controlClaims: v.optional(v.number()),
+        /**
+         * The client's own name for the view that holds the current lease (the phone's screen), written by every claim (a
+         * claim naming none clears it), so a take whose answer was lost is not refused as another view's when that view asks
+         * again. Not a credential: it only lifts `exclusive` (`browser/live-view.ts#claimControl`).
+         */
+        controlView: v.optional(v.string()),
         currentUrl: v.optional(v.string()),
         /** When the action that wrote `currentUrl` started, so an older action finishing later does not overwrite it. */
         currentUrlStartedAt: v.optional(v.number()),
@@ -1779,6 +1791,36 @@ export const schema = defineSchema({
         // The same scope, active rows only: superseded history never enters a read. `supersededBy` is null for an active row.
         .index("by_userId_botId_active", ["userId", "botId", "supersededBy", "type"]),
 
+    // Cleanup a memory write could not finish, written in the same commit as the work that left it so the reference
+    // survives a retry that cannot be scheduled or runs out (`memory/functions.ts`, `runMemoryCleanup`).
+    // `vector`: the embedding of a retired or deleted memory whose delete failed. `chain`: the ids still to walk of a
+    // delete's older versions, after the first write used its budget. `digests`: the deleted ids still to take out of the
+    // rest of the user's reflection digests (`ids`, from `cursor` on). A scheduler job on the owner's shard works each
+    // record at its `dueAt`; the housekeeping sweep arms any record that is due and has no live job.
+    memoryCleanups: defineTable({
+        // Steps that failed. At the cap the record keeps its row and its `dueAt` moves out of reach.
+        attempts: v.optional(v.number()),
+        // `digests`: where the walk over the user's digests goes on, the pagination cursor of the last page read. It names
+        // positions by value (`createdAt`, then the row's own id), so rows that share a `createdAt` are not read twice or skipped.
+        cursor: v.optional(v.string()),
+        // When the record is next worked: after a grace period at first, after a backoff once a step failed.
+        dueAt: v.number(),
+        embeddingId: v.optional(v.string()),
+        frontier: v.optional(v.array(v.id("memories"))),
+        // `digests`: the deleted memories' ids.
+        ids: v.optional(v.array(v.string())),
+        kind: v.union(v.literal("vector"), v.literal("chain"), v.literal("digests")),
+        memoryId: v.optional(v.string()),
+        // `chain` and `digests`: when the delete began, kept through every continuation. The walks over the user's digests read
+        // only digests written by then; a later one went through `saveMemoryDigest`'s own checks.
+        startedAt: v.optional(v.number()),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_dueAt", ["dueAt"])
+        .index("by_embeddingId", ["embeddingId"])
+        .index("by_userId", ["userId"]),
+
     // One nightly-reflection digest ("what I learned today") per run. See `memory/reflection.ts`.
     memoryDigests: defineTable({
         createdAt: v.number(),
@@ -1796,6 +1838,47 @@ export const schema = defineSchema({
             retired: v.number(),
         }),
         summary: v.string(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId_createdAt", ["userId", "createdAt"]),
+
+    // The parsed, redacted entries of one job's batch. Never the raw file; deleted when the job ends.
+    memoryImportBatches: defineTable({
+        entries: v.array(
+            v.object({
+                memory: v.string(),
+                type: v.union(v.literal("identity"), v.literal("preference"), v.literal("context"), v.literal("activity"), v.literal("experience")),
+            }),
+        ),
+        index: v.number(),
+        jobId: v.id("memoryImportJobs"),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_jobId_index", ["jobId", "index"])
+        .index("by_userId", ["userId"]),
+
+    // One background import of a large memory file. The job reads its parsed entries from `memoryImportBatches`, one
+    // batch per queue message, and drops them when it ends. See `memory/import-job.ts`.
+    memoryImportJobs: defineTable({
+        batchCount: v.number(),
+        // The batch a delivery claimed, so a redelivery of the same batch finds the claim taken.
+        claimedBatch: v.optional(v.number()),
+        createdAt: v.number(),
+        done: v.number(),
+        duplicates: v.number(),
+        error: v.optional(v.string()),
+        imported: v.number(),
+        invalid: v.number(),
+        // The batch that runs next; only that batch may be claimed.
+        nextBatch: v.number(),
+        status: v.union(v.literal("preparing"), v.literal("queued"), v.literal("running"), v.literal("done"), v.literal("failed")),
+        tooLong: v.number(),
+        // Entries read from the file: kept, duplicate, too long and invalid.
+        total: v.number(),
+        updated: v.number(),
+        updatedAt: v.number(),
         userId: v.string(),
     })
         .shardBy("userId")
@@ -2191,6 +2274,33 @@ export const schema = defineSchema({
         .index("credentialID", ["credentialID"])
         .triggers((t) => auditTriggersFor(t, "passkey", AUDIT_TABLES["passkey"]!)),
 
+    /**
+     * A route restore a refused pin write still owes (`chat/pins/functions.ts#restoreRoutes`). It is written before the write's route cleanup
+     * returns. A refused write's rollback does not undo a global row, so the row survives the refusal. The restore settles it at its terminal
+     * outcome. The cron (`restorePendingPinRoutes`) dispatches it when the queue send does not run the restore, and the erasure turns it into
+     * a route before its second sweep (`chat/gdpr.ts#materializePendingPinRoutesBatch`). `ownerId` names the owner when it was written, and a
+     * guest merge re-points it like `sharedPinRoutes`.
+     *
+     * Not in the account export, by decision: a transient recovery record, settled within minutes, that holds route ids and timestamps and
+     * no content. The pin it protects is exported through its route (`gdpr/steps.ts#collectSharedPins`).
+     */
+    pendingPinRestores: defineTable({
+        // When the cron pass last dispatched this row (its write time until then). The pass takes the least recently dispatched rows, so a
+        // row that cannot settle yet does not hold back the others.
+        dispatchedAt: v.number(),
+        ownerId: v.string(),
+        routeCreatedAt: v.number(),
+        threadId: v.id("threads"),
+        until: v.number(),
+        userId: v.string(),
+    })
+        .global()
+        .index("by_owner", ["ownerId"])
+        .index("by_thread", ["threadId"])
+        .index("by_user", ["userId"])
+        .index("by_user_and_thread", ["userId", "threadId"])
+        .index("by_dispatched", ["dispatchedAt"]),
+
     persistentChunks: defineTable({
         // A host stream's event that carries no text (a tool call, a permission request, the end of the
         // turn). It still takes its `seq`, so the host's `(turnId, seq)` claim covers every event.
@@ -2379,11 +2489,15 @@ export const schema = defineSchema({
             };
         }),
 
-    // One row per account that writes pins: the latest time a pin write of the account may still be in flight. A move waits for it
-    // to pass before it sweeps the account's pins (`lib/account-moves.ts`).
+    // One row per admitted pin write: the time that write may still be in flight. A move waits for the latest of them to pass before it
+    // sweeps the account's pins, and a refused write's route cleanup waits for the others (`lib/account-moves.ts`).
+    // Upgrade: none by hand. The global-table provisioner adds `writerId` to a store's existing table after its sweep (`COLUMNS_ADDED_SINCE`
+    // in `auth/lib/ensure-global-tables.ts`), so a store from an earlier build needs nothing and is never reset for it.
     pinWriteLeases: defineTable({
         expiresAt: v.number(),
         userId: v.string(),
+        // Absent on rows an earlier build wrote; such a row counts as another writer's.
+        writerId: v.optional(v.string()),
     })
         .global()
         .index("by_user", ["userId"]),
@@ -3484,6 +3598,31 @@ export const schema = defineSchema({
         .index("by_recurring_and_nextRunAt", ["recurring", "nextRunAt"])
         .index("by_status_and_updatedAt", ["status", "updatedAt"])
         .index("by_status_and_stuckCheckAt", ["status", "stuckCheckAt"]),
+
+    /**
+     * A scheduled task proposed from the user's own messages (`tasks/suggestions.ts`), waiting for an accept or a
+     * dismiss. Nothing here runs: accepting creates a task through the normal path and records its id. The row keeps
+     * the proposal in the task's own shape and only the ids of the chats it came from, never message text.
+     */
+    taskSuggestions: defineTable({
+        createdAt: v.number(),
+        // The proposed schedule, in the task's format (5-field UTC cron).
+        cronExpression: v.string(),
+        // Set with `status` when the person accepts or dismisses.
+        decidedAt: v.optional(v.number()),
+        instructions: v.string(),
+        // Where it came from: the chats (at most `MAX_SUGGESTION_SOURCES`) whose messages the idea was drawn from.
+        sourceThreadIds: v.array(v.string()),
+        status: vTaskSuggestionStatus,
+        // The task an accept created.
+        taskId: v.optional(v.id("tasks")),
+        title: v.string(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_user_and_status_and_createdAt", ["userId", "status", "createdAt"])
+        // The trim of decided rows keeps the most recently decided (`trimDecidedSuggestions`).
+        .index("by_user_and_status_and_decidedAt", ["userId", "status", "decidedAt"]),
 
     team: defineTable({
         createdAt: v.number(),
@@ -4586,6 +4725,8 @@ export const schema = defineSchema({
         resumeInterruptedRuns: v.optional(v.boolean()),
         // Opt-in: opening /chat lands on the most recent thread. Absent = off.
         resumeLastChat: v.optional(v.boolean()),
+        // Opt-in: suggest scheduled tasks drawn from the user's own messages (`tasks/suggestions.ts`). Absent = off.
+        scheduleIdeasEnabled: v.optional(v.boolean()),
         // Hostnames the web search tool never returns (`chat/tools/search-domains.ts`). Absent = none.
         searchDomainBlocklist: v.optional(v.array(v.string())),
         sendBehavior: v.optional(v.string()),

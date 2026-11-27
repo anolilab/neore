@@ -22,7 +22,7 @@ afterEach(() => {
     harness.close();
 });
 
-const insertMemory = async (memory: string, botId?: string): Promise<void> => {
+const insertMemory = async (memory: string, botId?: string, type = "identity"): Promise<void> => {
     await harness.run(
         async (ctx: any) =>
             await ctx.db.insert("memories", {
@@ -30,7 +30,7 @@ const insertMemory = async (memory: string, botId?: string): Promise<void> => {
                 lastConfirmedAt: Date.now(),
                 memory,
                 source: "auto",
-                type: "identity",
+                type,
                 updatedAt: Date.now(),
                 userId: "user-1",
             }),
@@ -108,6 +108,36 @@ describe("scope reads are not crowded out", () => {
         }
 
         expect(await readTexts({})).toContain("prefers short answers");
+    });
+
+    it("reads the newest rows whatever the type when asked newest first, and each scope its own", async () => {
+        // A pause between rows, so no two share a creation time.
+        const insertTyped = async (memory: string, type: string, botId?: string) => {
+            await new Promise((resolve) => {
+                setTimeout(resolve, 3);
+            });
+            await insertMemory(memory, botId, type);
+        };
+
+        // Oldest to newest: an identity row, two preference rows, then an activity row; a bot row after all of them.
+        await insertTyped("identity", "identity");
+        await insertTyped("preference 1", "preference");
+        await insertTyped("preference 2", "preference");
+        await insertTyped("activity", "activity");
+        await insertTyped("bot activity", "activity", "bot-a");
+
+        const read = async (args: Record<string, unknown>) => {
+            const rows = await harness.run(async (ctx: any) => await ctx.runQuery(getActiveMemoriesForUser, { limit: 3, userId: "user-1", ...args }));
+
+            return rows.map((row: { memory: string }) => row.memory);
+        };
+
+        // By type, `preference` rows fill the window first and the newest row is cut.
+        expect(await read({})).toEqual(["preference 2", "preference 1", "identity"]);
+        // Newest first: the activity row is in, the oldest row is out.
+        expect(await read({ newestFirst: true })).toEqual(["activity", "preference 2", "preference 1"]);
+        // Each scope keeps its own newest rows (2 here): the bot's row does not use up the user's window.
+        expect(await read({ botId: "bot-a", includeUserWide: true, limit: 2, newestFirst: true })).toEqual(["bot activity", "activity", "preference 2"]);
     });
 
     it("still returns the user's memory when a bot holds more rows than the old window", async () => {

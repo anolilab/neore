@@ -47,6 +47,13 @@ export const userSettingsFieldsWithoutUserId = {
             message: `At most ${MAX_BACKUP_MODELS} backup models`,
         }),
     ),
+    // The list a `backupModels` write was built on. The write is refused (CONFLICT) when the stored list is no longer this
+    // one, so an edit made on a stale copy (another tab) never overwrites a newer list. Never stored.
+    backupModelsBase: v.optional(
+        v.array(v.string().max(MAX_LENGTH.short)).check((value) => value.length <= MAX_BACKUP_MODELS, {
+            message: `At most ${MAX_BACKUP_MODELS} backup models`,
+        }),
+    ),
     // Appearance: cap long chat code blocks at 24 lines with an expand toggle. Absent means ON.
     capLongCodeBlocks: v.optional(v.boolean()),
     // In-app toasts for chat events (`features/notifications/lib/chat-toasts.ts`). Absent means ON.
@@ -143,6 +150,7 @@ export const userSettingsFieldsWithoutUserId = {
     resumeAfterUsageLimit: v.optional(v.boolean()), // A reply paused by a provider's usage limit resumes when the limit resets. Absent means on (`chat/lib/usage-limit-settings.ts`).
     resumeInterruptedRuns: v.optional(v.boolean()), // A run whose worker died resumes from its last saved row (max 3 times). Absent means on.
     resumeLastChat: v.optional(v.boolean()), // Open /chat on the most recent thread instead of a blank one. OPT-IN: absent means off.
+    scheduleIdeasEnabled: v.optional(v.boolean()), // Suggest scheduled tasks drawn from the user's own messages, to accept or dismiss. OPT-IN: absent means off.
     searchDomainBlocklist: v.optional(
         v.array(v.string().max(MAX_LENGTH.short)).check((value) => value.length <= MAX_SEARCH_DOMAIN_BLOCKLIST, {
             message: "Too many blocked domains",
