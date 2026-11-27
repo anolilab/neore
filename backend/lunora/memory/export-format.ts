@@ -40,9 +40,9 @@ export const MEMORY_EXPORT_MAX_ROWS = 2000;
 /** Active rows one export reads at most: the account export's own memory cap. */
 export const MEMORY_EXPORT_SCAN_ROWS = 5000;
 
-/** The local day an export is dated (its header and its file name), in the user's timezone or UTC. */
 const SCAN_LABEL = `${MEMORY_EXPORT_SCAN_ROWS.toLocaleString("en-US")} memories`;
 
+/** The local day an export is dated (its header and its file name), in the user's timezone or UTC. */
 export const exportDayOf = (now: number, timeZone: string | null | undefined): string => localDayOf(now, resolveTimeZone(timeZone));
 
 const IMPORT_APPS: Record<ImportApp, string> = { chatgpt: "ChatGPT", claude: "Claude", gemini: "Gemini", other: "another assistant" };

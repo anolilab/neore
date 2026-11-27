@@ -22,6 +22,15 @@ vi.mock("@lingui/react/macro", () => {
     };
 });
 
+// The session as the render sees it and as the store answers when the answer arrives: both are `userId`.
+vi.mock("@/features/auth/hooks/use-auth-session", () => {
+    return {
+        useAuthSession: () => {
+            return { data: harness.userId === undefined ? null : { user: { id: harness.userId } } };
+        },
+    };
+});
+
 // The session store, read when the answer arrives: `userId` is whoever is signed in at that moment.
 vi.mock("@/features/auth/lib/auth-ui-provider", () => {
     return {
@@ -210,5 +219,33 @@ describe("MemoryExportButton", () => {
 
         expect(clicks()).toHaveLength(0);
         expect(blobs).toHaveLength(0);
+    });
+
+    it("waits for the session before a click can start a download", async () => {
+        harness.userId = undefined;
+        harness.exportMemories.mockResolvedValue(ANSWER);
+
+        const client = queryClient();
+        const { rerender } = renderButton(client);
+        const waiting = screen.getByRole("button", { name: "Download memories (Markdown)" });
+
+        expect(waiting.getAttribute("aria-disabled")).toBe("true");
+        expect(waiting.getAttribute("aria-busy")).toBe("false");
+
+        fireEvent.click(waiting);
+
+        expect(harness.exportMemories).not.toHaveBeenCalled();
+
+        harness.userId = "user-1";
+        rerender(
+            <QueryClientProvider client={client}>
+                <MemoryExportButton />
+            </QueryClientProvider>,
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Download memories (Markdown)" }));
+
+        await waitFor(() => {
+            expect(clicks()).toHaveLength(1);
+        });
     });
 });

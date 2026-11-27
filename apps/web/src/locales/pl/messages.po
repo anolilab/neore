@@ -33,7 +33,7 @@ msgstr "-- WSTAWIANIE --"
 msgid "-- NORMAL --"
 msgstr "-- NORMALNY --"
 
-#: src/features/notifications/components/notification-list.tsx:115
+#: src/features/notifications/components/notification-list.tsx:117
 msgid ", unread"
 msgstr ", nieprzeczytane"
 
@@ -2153,6 +2153,10 @@ msgstr "Nadchodzi moment"
 msgid "A new chat opens with the selected messages quoted. Review it, then send."
 msgstr "Otworzy się nowy czat z cytatem wybranych wiadomości. Sprawdź go, a potem wyślij."
 
+#: src/features/notifications/lib/notification-labels.ts:56
+msgid "A new device signed in"
+msgstr "Zalogowano się na nowym urządzeniu"
+
 #: src/features/coding-agents/components/setup-fix-dialog.tsx:92
 msgid "A new run on the same repository and branch will fix the cause in the repository and run the step again. Read and edit its task before you start it."
 msgstr "Nowe uruchomienie w tym samym repozytorium i gałęzi naprawi przyczynę w repozytorium i ponownie wykona ten krok. Przeczytaj i edytuj jego zadanie, zanim je uruchomisz."
@@ -2201,11 +2205,7 @@ msgstr "Projekt może mieć najwyżej {limit} plików reguł. Najpierw usuń jed
 msgid "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
 msgstr "Publiczny adres http lub https. Pierwsze sprawdzenie tylko zapisuje wygląd strony. Odczytywany jest tylko pierwszy 1 MiB strony."
 
-#: src/features/notifications/lib/notification-labels.ts:56
-msgid "A new device signed in"
-msgstr "Zalogowano się na nowym urządzeniu"
-
-#: src/features/notifications/lib/notification-labels.ts:40
+#: src/features/notifications/lib/notification-labels.ts:41
 msgid "A question is waiting for you"
 msgstr "Czeka na Ciebie pytanie"
 
@@ -2279,7 +2279,7 @@ msgstr "Tylko sugestia. Jeśli się zgadzasz, dodaj etykietę w {hostLabel} samo
 msgid "A tag, #id, .class, tag.class or tag#id. Leave it empty to watch the whole page."
 msgstr "Tag, #id, .class, tag.class lub tag#id. Zostaw puste, aby obserwować całą stronę."
 
-#: src/features/notifications/lib/notification-labels.ts:70
+#: src/features/notifications/lib/notification-labels.ts:74
 msgid "A task is stuck"
 msgstr "Zadanie utknęło"
 
@@ -2295,7 +2295,7 @@ msgstr "Wątek otrzymuje odpowiedź"
 msgid "a tool"
 msgstr "narzędzie"
 
-#: src/features/notifications/lib/notification-labels.ts:73
+#: src/features/notifications/lib/notification-labels.ts:77
 msgid "A tool call needs your approval"
 msgstr "Wywołanie narzędzia wymaga Twojej zgody"
 
@@ -2316,7 +2316,7 @@ msgstr "Wpisane narzędzie nie zostało dodane. Najpierw je dodaj lub wyczyść 
 msgid "A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services (Zapier, n8n, your own code, etc.)."
 msgstr "Unikalny adres URL webhooka i sekret zostaną wygenerowane po utworzeniu tego wyzwalacza. Użyj tego adresu URL jako celu dla usług zewnętrznych (Zapier, n8n, własny kod itp.)."
 
-#: src/features/notifications/lib/notification-labels.ts:79
+#: src/features/notifications/lib/notification-labels.ts:83
 msgid "A usage alert was triggered"
 msgstr "Wyzwolono alert użycia"
 
@@ -2608,7 +2608,7 @@ msgstr "Dodaj notatkę..."
 msgid "Add a note…"
 msgstr "Dodaj notatkę…"
 
-#: src/features/devices/components/devices-settings.tsx:532
+#: src/features/devices/components/devices-settings.tsx:535
 msgid "Add a server over SSH"
 msgstr "Dodaj serwer przez SSH"
 
@@ -2777,12 +2777,12 @@ msgstr "Dodaj wybraną klatkę jako węzeł obrazu"
 
 #: src/features/chat/thread-list/thread-list-header.tsx:126
 #: src/features/chat/thread-list/thread-list-header.tsx:136
-#: src/features/projects/components/add-project-dialog.tsx:691
+#: src/features/projects/components/add-project-dialog.tsx:695
 msgid "Add project"
 msgstr "Dodaj projekt"
 
 #. placeholder {0}: rowName(machine)
-#: src/features/projects/components/add-project-dialog.tsx:514
+#: src/features/projects/components/add-project-dialog.tsx:518
 msgid "Add project on {0}"
 msgstr "Dodaj projekt na: {0}"
 
@@ -2971,11 +2971,11 @@ msgstr "Dodano:"
 msgid "Adding documents… {0} of {1}"
 msgstr "Dodawanie dokumentów… {0} z {1}"
 
-#: src/features/projects/components/add-project-dialog.tsx:525
+#: src/features/projects/components/add-project-dialog.tsx:529
 msgid "Adding the project…"
 msgstr "Dodawanie projektu…"
 
-#: src/features/devices/components/devices-settings.tsx:514
+#: src/features/devices/components/devices-settings.tsx:515
 msgid "Adding the server was cancelled on this computer."
 msgstr "Dodawanie serwera zostało anulowane na tym komputerze."
 
@@ -2984,11 +2984,11 @@ msgid "Adding your earlier replies…"
 msgstr "Dodawanie Twoich wcześniejszych odpowiedzi…"
 
 #: src/features/chat/aside/aside-panel.tsx:168
-#: src/features/projects/components/add-project-dialog.tsx:691
+#: src/features/projects/components/add-project-dialog.tsx:695
 msgid "Adding…"
 msgstr "Dodawanie…"
 
-#: src/features/devices/components/devices-settings.tsx:545
+#: src/features/devices/components/devices-settings.tsx:548
 msgid "Address"
 msgstr "Adres"
 
@@ -5074,7 +5074,7 @@ msgstr "Portal Azure → Twój zasób OpenAI → Klucze i punkt końcowy. Przech
 #: src/features/code/components/code-shell.tsx:162
 #: src/features/onboarding/components/onboarding-dialog.tsx:394
 #: src/features/pages/components/page-version-panel.tsx:89
-#: src/features/projects/components/add-project-dialog.tsx:688
+#: src/features/projects/components/add-project-dialog.tsx:692
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:309
 msgid "Back"
 msgstr "Wstecz"
@@ -6156,7 +6156,7 @@ msgstr "Kanada"
 #: src/features/local-models/components/ollama-model-manager.tsx:300
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
-#: src/features/projects/components/add-project-dialog.tsx:682
+#: src/features/projects/components/add-project-dialog.tsx:686
 #: src/features/projects/components/computer-rule-file-import.tsx:613
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:474
@@ -6239,7 +6239,7 @@ msgstr "Anuluj zaznaczenie"
 msgid "Cancelled"
 msgstr "Anulowano"
 
-#: src/features/projects/components/add-project-dialog.tsx:148
+#: src/features/projects/components/add-project-dialog.tsx:149
 msgid "Cancelled on this computer."
 msgstr "Anulowano na tym komputerze."
 
@@ -6584,11 +6584,11 @@ msgstr "Czat zakończony"
 msgid "Chat Import"
 msgstr "Import czatów"
 
-#: src/features/notifications/lib/notification-labels.ts:43
+#: src/features/notifications/lib/notification-labels.ts:44
 msgid "Chat import failed"
 msgstr "Import czatów nie powiódł się"
 
-#: src/features/notifications/lib/notification-labels.ts:43
+#: src/features/notifications/lib/notification-labels.ts:44
 msgid "Chat import finished"
 msgstr "Import czatów zakończony"
 
@@ -6912,7 +6912,7 @@ msgstr "Wybierz tryb wyszukiwania"
 msgid "Choose the camera system for your shot"
 msgstr "Wybierz system kamery do swojego ujęcia"
 
-#: src/features/projects/components/add-project-dialog.tsx:517
+#: src/features/projects/components/add-project-dialog.tsx:521
 msgid "Choose the project's folder, or type a path."
 msgstr "Wybierz folder projektu lub wpisz ścieżkę."
 
@@ -7230,7 +7230,7 @@ msgstr "schowek"
 msgid "clock"
 msgstr "zegar"
 
-#: src/features/projects/components/add-project-dialog.tsx:679
+#: src/features/projects/components/add-project-dialog.tsx:683
 msgid "Clone or create new…"
 msgstr "Sklonuj lub utwórz nowy…"
 
@@ -7452,11 +7452,11 @@ msgstr "Dziennik agenta kodującego"
 msgid "Coding Agent Pull Requests"
 msgstr "Pull requesty agentów programistycznych"
 
-#: src/features/notifications/lib/notification-labels.ts:46
+#: src/features/notifications/lib/notification-labels.ts:47
 msgid "Coding agent run failed"
 msgstr "Przebieg agenta kodującego nie powiódł się"
 
-#: src/features/notifications/lib/notification-labels.ts:46
+#: src/features/notifications/lib/notification-labels.ts:47
 msgid "Coding agent run finished"
 msgstr "Przebieg agenta kodującego zakończony"
 
@@ -8175,7 +8175,7 @@ msgstr "Podłącz węzeł audio/pliku jako wejście"
 msgid "Connect an image node as input"
 msgstr "Podłącz węzeł obrazu jako wejście"
 
-#: src/features/devices/components/devices-settings.tsx:563
+#: src/features/devices/components/devices-settings.tsx:566
 msgid "Connect and add"
 msgstr "Połącz i dodaj"
 
@@ -8248,7 +8248,7 @@ msgstr "Połącz hosta, aby to było aktualne."
 msgid "Connect third-party services to extend AI capabilities with your data and tools."
 msgstr "Połącz usługi zewnętrzne, aby rozszerzyć możliwości AI o twoje dane i narzędzia."
 
-#: src/features/projects/components/add-project-dialog.tsx:164
+#: src/features/projects/components/add-project-dialog.tsx:165
 msgid "Connect this server first."
 msgstr "Najpierw połącz ten serwer."
 
@@ -8284,7 +8284,7 @@ msgstr "Połącz swoje komunikatory, aby rozmawiać z AI bezpośrednio z Telegra
 msgid "Connect your own Telegram, WhatsApp, Slack or Discord bot to Neore and message your agent from the app you already use."
 msgstr "Połącz własnego bota Telegram, WhatsApp, Slack lub Discord z Neore i pisz do agenta w aplikacji, której już używasz."
 
-#: src/features/projects/components/add-project-dialog.tsx:181
+#: src/features/projects/components/add-project-dialog.tsx:182
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:24
 #: src/features/settings/connectors/connector-card.tsx:74
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:172
@@ -8323,7 +8323,7 @@ msgstr "Połączono z {0}"
 msgid "Connected. You can close this window."
 msgstr "Połączono. Możesz zamknąć to okno."
 
-#: src/features/projects/components/add-project-dialog.tsx:522
+#: src/features/projects/components/add-project-dialog.tsx:526
 msgid "Connecting {pairingHost}…"
 msgstr "Łączenie z {pairingHost}…"
 
@@ -8985,7 +8985,7 @@ msgstr "Aplikacje wrażliwe na koszty, które potrzebują niezawodnej AI od Goog
 msgid "Costa Rica"
 msgstr "Kostaryka"
 
-#: src/features/devices/components/devices-settings.tsx:524
+#: src/features/devices/components/devices-settings.tsx:527
 msgid "Could not add the server."
 msgstr "Nie udało się dodać serwera."
 
@@ -9304,7 +9304,7 @@ msgstr "Nie udało się otworzyć jako strony"
 msgid "Could not open the pull request."
 msgstr "Nie udało się otworzyć pull requesta."
 
-#: src/features/devices/components/devices-settings.tsx:628
+#: src/features/devices/components/devices-settings.tsx:634
 msgid "Could not pair this computer. Try again."
 msgstr "Nie udało się sparować tego komputera. Spróbuj ponownie."
 
@@ -9850,7 +9850,7 @@ msgid "Created"
 msgstr "Utworzono"
 
 #. placeholder {0}: created.value.path
-#: src/features/projects/components/add-project-dialog.tsx:246
+#: src/features/projects/components/add-project-dialog.tsx:247
 msgid "Created {0}"
 msgstr "Utworzono {0}"
 
@@ -10299,7 +10299,7 @@ msgstr "Podsumowanie dostępu do danych"
 msgid "Data Export"
 msgstr "Eksport danych"
 
-#: src/features/notifications/lib/notification-labels.ts:52
+#: src/features/notifications/lib/notification-labels.ts:53
 msgid "Data export failed"
 msgstr "Eksport danych nie powiódł się"
 
@@ -11336,7 +11336,7 @@ msgstr "Dla deweloperów, którzy potrzebują mocnych możliwości programistycz
 msgid "Development"
 msgstr "Programowanie"
 
-#: src/features/devices/components/devices-settings.tsx:707
+#: src/features/devices/components/devices-settings.tsx:713
 msgid "Device activity"
 msgstr "Aktywność urządzeń"
 
@@ -11348,7 +11348,7 @@ msgstr "Nazwa urządzenia"
 msgid "Device removed"
 msgstr "Usunięto urządzenie"
 
-#: src/features/devices/components/devices-settings.tsx:640
+#: src/features/devices/components/devices-settings.tsx:646
 #: src/features/layout/lib/dashboard-page-names.ts:23
 msgid "Devices"
 msgstr "Urządzenia"
@@ -11813,7 +11813,7 @@ msgstr "Pobierz JSON"
 msgid "Download Markdown"
 msgstr "Pobierz Markdown"
 
-#: src/features/settings/components/personalization/memory-export-button.tsx:89
+#: src/features/settings/components/personalization/memory-export-button.tsx:93
 msgid "Download memories (Markdown)"
 msgstr "Pobierz wspomnienia (Markdown)"
 
@@ -13292,11 +13292,11 @@ msgstr "Estoński (Estonia)"
 msgid "European Union"
 msgstr "Unia Europejska"
 
-#: src/features/notifications/lib/notification-labels.ts:55
+#: src/features/notifications/lib/notification-labels.ts:59
 msgid "Eval run failed"
 msgstr "Uruchomienie ewaluacji nie powiodło się"
 
-#: src/features/notifications/lib/notification-labels.ts:55
+#: src/features/notifications/lib/notification-labels.ts:59
 msgid "Eval run finished"
 msgstr "Uruchomienie ewaluacji zakończone"
 
@@ -15609,11 +15609,11 @@ msgstr "Przejdź do czatu: {title}"
 msgid "Focus Search"
 msgstr "Przejdź do wyszukiwania"
 
-#: src/features/projects/components/add-project-dialog.tsx:604
+#: src/features/projects/components/add-project-dialog.tsx:608
 msgid "Folder path"
 msgstr "Ścieżka folderu"
 
-#: src/features/projects/components/add-project-dialog.tsx:623
+#: src/features/projects/components/add-project-dialog.tsx:627
 msgid "Folders"
 msgstr "Foldery"
 
@@ -16647,7 +16647,7 @@ msgstr "Przejdź do sejfu"
 msgid "Go to your pages"
 msgstr "Przejdź do swoich stron"
 
-#: src/features/projects/components/add-project-dialog.tsx:627
+#: src/features/projects/components/add-project-dialog.tsx:631
 msgid "Go up to {parent}"
 msgstr "Przejdź wyżej do: {parent}"
 
@@ -19137,7 +19137,7 @@ msgstr "Kenia"
 msgid "Kept as yours"
 msgstr "Zachowano jako twoje"
 
-#: src/features/devices/components/devices-settings.tsx:557
+#: src/features/devices/components/devices-settings.tsx:560
 msgid "Key file (optional, absolute path)"
 msgstr "Plik klucza (opcjonalnie, ścieżka bezwzględna)"
 
@@ -19788,11 +19788,11 @@ msgstr "Pozwól szybkiej kontroli zatwierdzać wywołania niskiego ryzyka"
 msgid "Let replies use tools"
 msgstr "Pozwól odpowiedziom używać narzędzi"
 
-#: src/features/devices/components/devices-settings.tsx:638
+#: src/features/devices/components/devices-settings.tsx:644
 msgid "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 msgstr "Pozwól agentowi korzystać z plików, terminala i lokalnych serwerów MCP na Twoim komputerze przez aplikację desktopową Neore. Każda akcja najpierw pyta Cię o zgodę na tym komputerze, a nic nie uruchamia się z udostępnionych czatów ani zadań w tle."
 
-#: src/features/devices/components/devices-settings.tsx:698
+#: src/features/devices/components/devices-settings.tsx:704
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr "Pozwól agentowi pracować na serwerze, z którym łączysz się przez SSH, za pomocą własnego klienta SSH i kluczy. Neore prosi o zaufanie kluczowi serwera przy pierwszym połączeniu, a każda akcja wymaga Twojej zgody na tym komputerze, zanim zostanie wysłana. Serwer nie przechowuje żadnego Twojego sekretu."
 
@@ -20218,7 +20218,7 @@ msgstr "Wczytywanie plików"
 msgid "Loading files…"
 msgstr "Wczytywanie plików…"
 
-#: src/features/projects/components/add-project-dialog.tsx:523
+#: src/features/projects/components/add-project-dialog.tsx:527
 msgid "Loading folders…"
 msgstr "Wczytywanie folderów…"
 
@@ -20667,7 +20667,7 @@ msgstr "Przejrzyj recenzje, które prosiły o zmiany w pull requeście {address}
 msgid "Looking for instruction files..."
 msgstr "Szukanie plików z instrukcjami..."
 
-#: src/features/projects/components/add-project-dialog.tsx:538
+#: src/features/projects/components/add-project-dialog.tsx:542
 msgid "Looking for machines…"
 msgstr "Szukanie maszyn…"
 
@@ -20775,7 +20775,7 @@ msgstr "Plik binarny Mach-O"
 msgid "Machine"
 msgstr "Maszyna"
 
-#: src/features/projects/components/add-project-dialog.tsx:542
+#: src/features/projects/components/add-project-dialog.tsx:546
 msgid "Machines"
 msgstr "Maszyny"
 
@@ -22404,11 +22404,11 @@ msgstr "Wycisz wątek"
 msgid "my data"
 msgstr "moje dane"
 
-#: src/features/devices/components/devices-settings.tsx:602
+#: src/features/devices/components/devices-settings.tsx:606
 msgid "My Linux computer"
 msgstr "Mój komputer z Linuksem"
 
-#: src/features/devices/components/devices-settings.tsx:602
+#: src/features/devices/components/devices-settings.tsx:606
 msgid "My Mac"
 msgstr "Mój Mac"
 
@@ -22420,7 +22420,7 @@ msgstr "Mój serwer MCP"
 msgid "My skills"
 msgstr "Moje umiejętności"
 
-#: src/features/devices/components/devices-settings.tsx:602
+#: src/features/devices/components/devices-settings.tsx:606
 msgid "My Windows PC"
 msgstr "Mój komputer z Windows"
 
@@ -22446,7 +22446,7 @@ msgstr "nazwa"
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:478
 #: src/features/auth/components/settings/account/update-name-card.tsx:23
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:117
-#: src/features/devices/components/devices-settings.tsx:541
+#: src/features/devices/components/devices-settings.tsx:544
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
 #: src/features/projects/components/project-rule-files.tsx:262
@@ -23335,7 +23335,7 @@ msgstr "Brak opisu"
 msgid "No description provided."
 msgstr "Nie podano opisu."
 
-#: src/features/devices/components/devices-settings.tsx:692
+#: src/features/devices/components/devices-settings.tsx:698
 msgid "No devices paired."
 msgstr "Brak sparowanych urządzeń."
 
@@ -23397,7 +23397,7 @@ msgstr "W bazie wiedzy nie ma jeszcze plików. Prześlij dokumenty powyżej, aby
 msgid "No focal length selected"
 msgstr "Nie wybrano ogniskowej"
 
-#: src/features/projects/components/add-project-dialog.tsx:659
+#: src/features/projects/components/add-project-dialog.tsx:663
 msgid "No folders in here."
 msgstr "Brak folderów."
 
@@ -24135,7 +24135,7 @@ msgstr "Nic na ciebie nie czeka."
 msgid "Nothing to stop: that run had already ended."
 msgstr "Nie ma czego zatrzymywać: to uruchomienie już się zakończyło."
 
-#: src/features/notifications/lib/notification-labels.ts:82
+#: src/features/notifications/lib/notification-labels.ts:86
 msgid "Notification"
 msgstr "Powiadomienie"
 
@@ -24832,7 +24832,7 @@ msgstr "Otwórz selektor modeli"
 msgid "Open Model Picker"
 msgstr "Otwórz selektor modeli"
 
-#: src/features/devices/components/devices-settings.tsx:644
+#: src/features/devices/components/devices-settings.tsx:650
 msgid "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 msgstr "Otwórz Neore w aplikacji desktopowej, aby sparować ten komputer. Wcześniej sparowane urządzenia są wymienione poniżej."
 
@@ -25810,7 +25810,7 @@ msgstr "Sparuj komputer w Ustawieniach"
 msgid "Pair the desktop app in Settings → Devices to import from a computer."
 msgstr "Sparuj aplikację desktopową w Ustawienia → Urządzenia, aby importować z komputera."
 
-#: src/features/projects/components/add-project-dialog.tsx:208
+#: src/features/projects/components/add-project-dialog.tsx:209
 msgid "Pair this computer with your account first (Settings → Devices)."
 msgstr "Najpierw sparuj ten komputer ze swoim kontem (Ustawienia → Urządzenia)."
 
@@ -25822,7 +25822,7 @@ msgstr "Sparować tę maszynę?"
 msgid "Paired"
 msgstr "Sparowano"
 
-#: src/features/devices/components/devices-settings.tsx:677
+#: src/features/devices/components/devices-settings.tsx:683
 msgid "Paired devices"
 msgstr "Sparowane urządzenia"
 
@@ -25830,7 +25830,7 @@ msgstr "Sparowane urządzenia"
 msgid "Pairing request"
 msgstr "Żądanie parowania"
 
-#: src/features/devices/components/devices-settings.tsx:618
+#: src/features/devices/components/devices-settings.tsx:622
 msgid "Pairing was cancelled on this computer."
 msgstr "Parowanie zostało anulowane na tym komputerze."
 
@@ -26372,7 +26372,7 @@ msgstr "Wybierz jeden ze skrzynki odbiorczej, aby go przeczytać."
 msgid "Pick skills, schedules, webhooks and group chats to share as one Markdown file. API keys, webhook secrets, connector tokens and other credentials are never included, and neither are your account or organization ids."
 msgstr "Wybierz umiejętności, harmonogramy, webhooki i czaty grupowe do udostępnienia jako jeden plik Markdown. Klucze API, sekrety webhooków, tokeny konektorów i inne poświadczenia nigdy nie są dołączane, podobnie jak identyfikatory Twojego konta czy organizacji."
 
-#: src/features/projects/components/add-project-dialog.tsx:517
+#: src/features/projects/components/add-project-dialog.tsx:521
 msgid "Pick the computer or server the project's folder is on."
 msgstr "Wybierz komputer lub serwer, na którym znajduje się folder projektu."
 
@@ -26653,7 +26653,7 @@ msgstr "Dopracowany hollywoodzki wygląd"
 msgid "Popular"
 msgstr "Popularne"
 
-#: src/features/devices/components/devices-settings.tsx:553
+#: src/features/devices/components/devices-settings.tsx:556
 msgid "Port"
 msgstr "Port"
 
@@ -26865,8 +26865,8 @@ msgstr "Przygotowywanie prośby…"
 msgid "Preparing the import…"
 msgstr "Przygotowywanie importu…"
 
-#: src/features/settings/components/personalization/memory-export-button.tsx:89
-#: src/features/settings/components/personalization/memory-export-button.tsx:92
+#: src/features/settings/components/personalization/memory-export-button.tsx:93
+#: src/features/settings/components/personalization/memory-export-button.tsx:96
 msgid "Preparing your memories…"
 msgstr "Przygotowywanie wspomnień…"
 
@@ -26943,7 +26943,7 @@ msgstr "Naciśnij enter lub spację, aby zaznaczyć węzeł. Następnie możesz 
 msgid "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
 msgstr "Naciśnij enter lub spację, aby zaznaczyć krawędź. Następnie możesz nacisnąć delete, aby ją usunąć, lub escape, aby anulować."
 
-#: src/features/projects/components/add-project-dialog.tsx:620
+#: src/features/projects/components/add-project-dialog.tsx:624
 msgid "Press Enter to open the folder. A folder that does not exist is created."
 msgstr "Naciśnij Enter, aby otworzyć folder. Folder, który nie istnieje, zostanie utworzony."
 
@@ -31360,7 +31360,7 @@ msgstr "Szeryfowa"
 msgid "Served from cache"
 msgstr "Z pamięci podręcznej"
 
-#: src/features/devices/components/devices-settings.tsx:521
+#: src/features/devices/components/devices-settings.tsx:524
 msgid "Server added. Choose which of its folders to share in the desktop app."
 msgstr "Dodano serwer. Wybierz, które jego foldery udostępnić, w aplikacji desktopowej."
 
@@ -31404,7 +31404,7 @@ msgstr "Bezserwerowa baza danych Postgres z rozgałęzianiem"
 msgid "servers"
 msgstr "serwery"
 
-#: src/features/devices/components/devices-settings.tsx:700
+#: src/features/devices/components/devices-settings.tsx:706
 msgid "Servers over SSH"
 msgstr "Serwery przez SSH"
 
@@ -31583,7 +31583,7 @@ msgstr "udostępniona"
 msgid "Shared conversation"
 msgstr "Udostępniona rozmowa"
 
-#: src/features/devices/components/devices-settings.tsx:672
+#: src/features/devices/components/devices-settings.tsx:678
 msgid "Shared folders and local servers…"
 msgstr "Udostępnione foldery i lokalne serwery…"
 
@@ -31762,7 +31762,7 @@ msgstr "Pokaż mniej instrukcji zadania „{title}”"
 msgid "Show more"
 msgstr "Pokaż więcej"
 
-#: src/features/projects/components/add-project-dialog.tsx:669
+#: src/features/projects/components/add-project-dialog.tsx:673
 msgid "Show more folders"
 msgstr "Pokaż więcej folderów"
 
@@ -32841,16 +32841,16 @@ msgid "Sri Lanka"
 msgstr "Sri Lanka"
 
 #. placeholder {0}: row.name
-#: src/features/projects/components/add-project-dialog.tsx:185
+#: src/features/projects/components/add-project-dialog.tsx:186
 msgid "SSH · {0}"
 msgstr "SSH · {0}"
 
 #. placeholder {0}: row.name
-#: src/features/projects/components/add-project-dialog.tsx:188
+#: src/features/projects/components/add-project-dialog.tsx:189
 msgid "SSH · {0} · not connected yet"
 msgstr "SSH · {0} · jeszcze nie połączono"
 
-#: src/features/projects/components/add-project-dialog.tsx:581
+#: src/features/projects/components/add-project-dialog.tsx:585
 msgid "SSH hosts come from ~/.ssh/config. Picking one connects it."
 msgstr "Hosty SSH pochodzą z ~/.ssh/config. Wybranie jednego łączy go."
 
@@ -33770,11 +33770,11 @@ msgstr "podagent"
 msgid "Sub-agent"
 msgstr "Podagent"
 
-#: src/features/notifications/lib/notification-labels.ts:64
+#: src/features/notifications/lib/notification-labels.ts:68
 msgid "Sub-agent failed"
 msgstr "Podagent zakończył się błędem"
 
-#: src/features/notifications/lib/notification-labels.ts:64
+#: src/features/notifications/lib/notification-labels.ts:68
 msgid "Sub-agent finished"
 msgstr "Podagent zakończył pracę"
 
@@ -34303,11 +34303,11 @@ msgstr "E-maile o zadaniach wyłączone"
 msgid "Task emails turned on"
 msgstr "E-maile o zadaniach włączone"
 
-#: src/features/notifications/lib/notification-labels.ts:67
+#: src/features/notifications/lib/notification-labels.ts:71
 msgid "Task failed"
 msgstr "Zadanie nie powiodło się"
 
-#: src/features/notifications/lib/notification-labels.ts:67
+#: src/features/notifications/lib/notification-labels.ts:71
 msgid "Task finished"
 msgstr "Zadanie zakończone"
 
@@ -34819,7 +34819,7 @@ msgstr "Nie udało się. Spróbuj ponownie."
 msgid "That did not work. Try again."
 msgstr "To się nie udało. Spróbuj ponownie."
 
-#: src/features/projects/components/add-project-dialog.tsx:152
+#: src/features/projects/components/add-project-dialog.tsx:153
 msgid "That folder is already shared with this server."
 msgstr "Ten folder jest już udostępniony temu serwerowi."
 
@@ -34827,11 +34827,11 @@ msgstr "Ten folder jest już udostępniony temu serwerowi."
 msgid "That folder is not offered for this repository on that computer."
 msgstr "Ten folder nie jest oferowany dla tego repozytorium na tym komputerze."
 
-#: src/features/projects/components/add-project-dialog.tsx:156
+#: src/features/projects/components/add-project-dialog.tsx:157
 msgid "That folder is the server's home folder or a folder above it. Choose a folder inside it."
 msgstr "Ten folder to katalog domowy serwera lub folder nadrzędny. Wybierz folder znajdujący się wewnątrz niego."
 
-#: src/features/projects/components/add-project-dialog.tsx:136
+#: src/features/projects/components/add-project-dialog.tsx:137
 msgid "That folder was not found."
 msgstr "Nie znaleziono tego folderu."
 
@@ -34888,7 +34888,7 @@ msgstr "Nie udało się otworzyć tej strony."
 msgid "That passcode is not right."
 msgstr "Ten kod dostępu jest nieprawidłowy."
 
-#: src/features/projects/components/add-project-dialog.tsx:140
+#: src/features/projects/components/add-project-dialog.tsx:141
 msgid "That path is a file."
 msgstr "Ta ścieżka jest plikiem."
 
@@ -35083,7 +35083,7 @@ msgstr "Asystent ma kilka pytań"
 msgid "The assistant has a question"
 msgstr "Asystent ma pytanie"
 
-#: src/features/notifications/lib/notification-labels.ts:61
+#: src/features/notifications/lib/notification-labels.ts:65
 msgid "The assistant is asking for a secret"
 msgstr "Asystent prosi o sekret"
 
@@ -35264,7 +35264,7 @@ msgstr "Opis pliku \"{name}\" może mieć najwyżej {limit} znaków w jednym wie
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "Aplikacja desktopowa działa na macOS, Windows i Linux. Instalatory są dołączone do wydania desktopowego na GitHubie i pojawią się tam po jego opublikowaniu."
 
-#: src/features/projects/components/add-project-dialog.tsx:167
+#: src/features/projects/components/add-project-dialog.tsx:168
 msgid "The desktop could not complete that. Try again."
 msgstr "Aplikacja desktopowa nie mogła tego ukończyć. Spróbuj ponownie."
 
@@ -35284,7 +35284,7 @@ msgstr "Diff jest zbyt duży, aby go zachować. Pokazano pliki i liczby ich wier
 msgid "The documents the answer should be retrieved from. Used for hit rate, MRR, precision and recall."
 msgstr "Dokumenty, z których powinna zostać pobrana odpowiedź. Używane do obliczania współczynnika trafień, MRR, precyzji i pokrycia."
 
-#: src/features/settings/components/personalization/memory-export-button.tsx:96
+#: src/features/settings/components/personalization/memory-export-button.tsx:100
 msgid "The download could not be prepared. Please try again in a moment."
 msgstr "Nie udało się przygotować pobierania. Spróbuj ponownie za chwilę."
 
@@ -36279,8 +36279,8 @@ msgid "this computer"
 msgstr "ten komputer"
 
 #: src/features/devices/components/devices-settings.tsx:372
-#: src/features/projects/components/add-project-dialog.tsx:173
-#: src/features/projects/components/add-project-dialog.tsx:177
+#: src/features/projects/components/add-project-dialog.tsx:174
+#: src/features/projects/components/add-project-dialog.tsx:178
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "Ten komputer"
@@ -36297,20 +36297,20 @@ msgstr "Ten komputer nie jest już sparowany."
 msgid "This computer is no longer paired. Pair it again in Settings → Devices."
 msgstr "Ten komputer nie jest już sparowany. Sparuj go ponownie w Ustawienia → Urządzenia."
 
-#: src/features/devices/components/devices-settings.tsx:649
+#: src/features/devices/components/devices-settings.tsx:655
 msgid "This computer is not paired yet."
 msgstr "Ten komputer nie jest jeszcze sparowany."
 
 #. placeholder {0}: pairedHere.name
-#: src/features/devices/components/devices-settings.tsx:665
+#: src/features/devices/components/devices-settings.tsx:671
 msgid "This computer is paired as “{0}”."
 msgstr "Ten komputer jest sparowany jako „{0}”."
 
-#: src/features/devices/components/devices-settings.tsx:649
+#: src/features/devices/components/devices-settings.tsx:655
 msgid "This computer is paired with another account."
 msgstr "Ten komputer jest sparowany z innym kontem."
 
-#: src/features/devices/components/devices-settings.tsx:625
+#: src/features/devices/components/devices-settings.tsx:631
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "Ten komputer jest sparowany. Wybierz w aplikacji desktopowej, które foldery udostępnić."
 
@@ -36322,7 +36322,7 @@ msgstr "Tego komputera można używać tylko w niektórych projektach i żaden z
 msgid "This computer may only be used in some projects. Choose the project to start the agent in."
 msgstr "Tego komputera można używać tylko w niektórych projektach. Wybierz projekt, w którym uruchomić agenta."
 
-#: src/features/projects/components/add-project-dialog.tsx:348
+#: src/features/projects/components/add-project-dialog.tsx:349
 msgid "This computer must be paired first."
 msgstr "Najpierw trzeba sparować ten komputer."
 
@@ -36422,7 +36422,7 @@ msgstr "Ten plik jest za duży ({0} KB), aby wyświetlić go lub edytować w prz
 msgid "This file is too large (~{0} tokens) and exceeds the model's context window. The model may not be able to process this file effectively."
 msgstr "Ten plik jest za duży (~{0} tokenów) i przekracza okno kontekstu modelu. Model może nie być w stanie skutecznie go przetworzyć."
 
-#: src/features/projects/components/add-project-dialog.tsx:144
+#: src/features/projects/components/add-project-dialog.tsx:145
 msgid "This folder cannot be read."
 msgstr "Nie można odczytać tego folderu."
 
@@ -36438,15 +36438,15 @@ msgstr "Ten host nie oferuje jeszcze skrzynki odbiorczej."
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr "Ten host nie oferuje jeszcze żadnego widoku dla {requestNoun}."
 
-#: src/features/projects/components/add-project-dialog.tsx:205
+#: src/features/projects/components/add-project-dialog.tsx:206
 msgid "This host has an invalid Port in ~/.ssh/config."
 msgstr "Ten host ma nieprawidłowy Port w ~/.ssh/config."
 
-#: src/features/projects/components/add-project-dialog.tsx:201
+#: src/features/projects/components/add-project-dialog.tsx:202
 msgid "This host is used by a Match rule in ~/.ssh/config, which Neore does not evaluate."
 msgstr "Ten host jest używany przez regułę Match w ~/.ssh/config, której Neore nie ocenia."
 
-#: src/features/projects/components/add-project-dialog.tsx:197
+#: src/features/projects/components/add-project-dialog.tsx:198
 msgid "This host uses {key} in ~/.ssh/config, which Neore does not support."
 msgstr "Ten host używa {key} w ~/.ssh/config, czego Neore nie obsługuje."
 
@@ -36529,7 +36529,7 @@ msgstr "Ten login został zmieniony w innym miejscu i został wczytany ponownie.
 msgid "This login was changed elsewhere. Reload the page to see it before saving again."
 msgstr "Ten login został zmieniony w innym miejscu. Odśwież stronę, aby go zobaczyć, zanim zapiszesz ponownie."
 
-#: src/features/projects/components/add-project-dialog.tsx:436
+#: src/features/projects/components/add-project-dialog.tsx:440
 msgid "This machine is not ready yet."
 msgstr "Ta maszyna nie jest jeszcze gotowa."
 
@@ -36703,7 +36703,7 @@ msgstr "Ten przebieg nie jest już dostępny."
 msgid "This selection is too large to import at once. Import fewer files at a time."
 msgstr "Ten wybór jest zbyt duży, aby zaimportować go naraz. Importuj mniej plików naraz."
 
-#: src/features/projects/components/add-project-dialog.tsx:160
+#: src/features/projects/components/add-project-dialog.tsx:161
 msgid "This server already has its maximum of shared folders. Share a parent folder or remove one in the desktop app."
 msgstr "Ten serwer ma już maksymalną liczbę udostępnionych folderów. Udostępnij folder nadrzędny lub usuń jeden w aplikacji desktopowej."
 
@@ -37592,11 +37592,11 @@ msgstr "Włączono wyzwalacz"
 msgid "Trigger name is required"
 msgstr "Nazwa wyzwalacza jest wymagana"
 
-#: src/features/notifications/lib/notification-labels.ts:76
+#: src/features/notifications/lib/notification-labels.ts:80
 msgid "Trigger run failed"
 msgstr "Uruchomienie wyzwalacza nie powiodło się"
 
-#: src/features/notifications/lib/notification-labels.ts:76
+#: src/features/notifications/lib/notification-labels.ts:80
 msgid "Trigger run finished"
 msgstr "Uruchomienie wyzwalacza zakończone"
 
@@ -38783,7 +38783,7 @@ msgstr "Używaj dozwolonych modeli organizacji"
 msgid "Use these keyboard shortcuts to navigate and interact with the data grid more efficiently."
 msgstr "Używaj tych skrótów klawiszowych, aby sprawniej poruszać się po siatce danych i z nią pracować."
 
-#: src/features/devices/components/devices-settings.tsx:659
+#: src/features/devices/components/devices-settings.tsx:665
 msgid "Use this computer for agent tools"
 msgstr "Używaj tego komputera do narzędzi agenta"
 
@@ -38823,7 +38823,7 @@ msgstr "użytkownik"
 #: src/features/auth/components/user-view.tsx:35
 #: src/features/auth/components/user-view.tsx:38
 #: src/features/auth/components/user-view.tsx:44
-#: src/features/devices/components/devices-settings.tsx:549
+#: src/features/devices/components/devices-settings.tsx:552
 #: src/features/layout/components/nav-user.tsx:373
 #: src/features/layout/components/nav-user.tsx:373
 #: src/features/layout/components/sidebar-shortcut.tsx:212
@@ -40080,7 +40080,7 @@ msgstr "Jak AI ma się do ciebie zwracać?"
 msgid "What should the guide pay attention to?"
 msgstr "Na co przewodnik powinien zwrócić uwagę?"
 
-#: src/features/devices/components/devices-settings.tsx:707
+#: src/features/devices/components/devices-settings.tsx:713
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "Co agent zlecał twoim urządzeniom w ciągu ostatnich 30 dni."
 
@@ -40220,7 +40220,7 @@ msgstr "Gdzie otwiera się podagent lub czat boczny"
 msgid "Where each run goes"
 msgstr "Dokąd trafia każde uruchomienie"
 
-#: src/features/projects/components/add-project-dialog.tsx:514
+#: src/features/projects/components/add-project-dialog.tsx:518
 msgid "Where is the project?"
 msgstr "Gdzie jest projekt?"
 
@@ -40336,7 +40336,7 @@ msgstr "Z e-mailem/hasłem"
 msgid "With this, it fires when the text starts to contain the phrase, not on every change."
 msgstr "Przy tym ustawieniu uruchamia się, gdy tekst zaczyna zawierać frazę, a nie przy każdej zmianie."
 
-#: src/features/devices/components/devices-settings.tsx:559
+#: src/features/devices/components/devices-settings.tsx:562
 msgid "Without one, your SSH agent and default keys are used. Passwords are not supported yet."
 msgstr "Bez niego używane są Twój agent SSH i domyślne klucze. Hasła nie są jeszcze obsługiwane."
 
@@ -40850,7 +40850,7 @@ msgstr "Po zalogowaniu wrócisz tutaj."
 msgid "You'll need an authenticator app like Google Authenticator or Authy to generate verification codes."
 msgstr "Do generowania kodów weryfikacyjnych potrzebujesz aplikacji uwierzytelniającej, takiej jak Google Authenticator lub Authy."
 
-#: src/features/notifications/components/notification-list.tsx:84
+#: src/features/notifications/components/notification-list.tsx:86
 msgid "You're all caught up."
 msgstr "Jesteś na bieżąco."
 
@@ -41030,7 +41030,7 @@ msgstr "Twoje rozmowy pozostają prywatne"
 msgid "Your current anonymous session will be converted to a permanent account."
 msgstr "Twoja obecna anonimowa sesja zostanie przekształcona w stałe konto."
 
-#: src/features/notifications/lib/notification-labels.ts:49
+#: src/features/notifications/lib/notification-labels.ts:50
 msgid "Your daily brief"
 msgstr "Twój Daily Brief"
 
@@ -41039,7 +41039,7 @@ msgstr "Twój Daily Brief"
 msgid "Your daily limit for AI requests is used up."
 msgstr "Wykorzystano dzienny limit żądań AI."
 
-#: src/features/notifications/lib/notification-labels.ts:52
+#: src/features/notifications/lib/notification-labels.ts:53
 msgid "Your data export is ready"
 msgstr "Twój eksport danych jest gotowy"
 
@@ -41242,7 +41242,7 @@ msgstr "Twoja recenzja jest przesyłana. Poczekaj na zakończenie."
 msgid "Your review is kept."
 msgstr "Twoja recenzja została zachowana."
 
-#: src/features/notifications/lib/notification-labels.ts:58
+#: src/features/notifications/lib/notification-labels.ts:62
 msgid "Your review was requested"
 msgstr "Poproszono o Twoją recenzję"
 

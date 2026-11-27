@@ -318,7 +318,7 @@ describe("resolveMemoryBotLabels", () => {
             },
         } as never;
 
-        const labels = await readBotLabels(
+        const { labels } = await readBotLabels(
             ctx,
             "user-1",
             botIds.map((botId) => row({ botId, memory: botId })),
@@ -327,5 +327,23 @@ describe("resolveMemoryBotLabels", () => {
         expect(calls).toBe(1);
         expect(labels.size).toBe(300);
         expect(labels.get(botIds[299] as string)).toStrictEqual({ kind: "named", name: "Bot 299" });
+    });
+
+    it("labels every bot 'a bot' when the label read passes the transaction's limit, and rethrows any other error", async () => {
+        const failing = (code: string) =>
+            ({
+                runQuery: async () => {
+                    throw Object.assign(new Error("read failed"), { code });
+                },
+            }) as never;
+        const rows = [row({ botId: "bot-a", memory: "a" }), row({ botId: "bot-b", memory: "b" })];
+
+        const cut = await readBotLabels(failing("TRANSACTION_LIMIT_EXCEEDED"), "user-1", rows);
+
+        expect(cut.labelsCut).toBe(true);
+        expect(formatMemoryMarkdown(rows, { bots: cut.labels, now: NOW, timeZone: "UTC", truncated: false })).toContain(
+            "a — last confirmed 2026-03-01 · learned in chat · a bot",
+        );
+        await expect(readBotLabels(failing("INTERNAL"), "user-1", rows)).rejects.toThrow("read failed");
     });
 });

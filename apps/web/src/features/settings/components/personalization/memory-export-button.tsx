@@ -8,6 +8,7 @@ import { DownloadIcon } from "lucide-react";
 import type { FC } from "react";
 import { useEffect, useId, useRef } from "react";
 
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
 
@@ -36,6 +37,9 @@ const MemoryExportButton: FC = () => {
     const { t } = useLingui();
     const errorId = useId();
     const { authClient } = useAuth();
+    // Until the session says who is signed in, a click could not tell whose file it saves: the button waits.
+    const { data: session } = useAuthSession();
+    const sessionKnown = session?.user.id !== undefined;
     // Cleared by the unmount cleanup: an answer that arrives after the button left the page saves nothing.
     const mounted = useRef(false);
 
@@ -77,7 +81,7 @@ const MemoryExportButton: FC = () => {
                 aria-busy={isPending}
                 aria-describedby={error ? errorId : undefined}
                 className="w-full"
-                disabled={isPending}
+                disabled={isPending || !sessionKnown}
                 // The button keeps focus while the file is prepared, so the keyboard is not sent back to the page.
                 focusableWhenDisabled
                 onClick={() => {

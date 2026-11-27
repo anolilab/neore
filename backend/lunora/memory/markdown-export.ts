@@ -155,17 +155,42 @@ export const readExportMemories = async (ctx: Pick<ActionCtx, "runQuery">, userI
     };
 };
 
-/** Every distinct bot of the rows, labelled in ONE call: the action's calls stay fixed however many bots there are. */
-export const readBotLabels = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, rows: ReadonlyArray<ExportMemoryRow>): Promise<Map<string, BotLabel>> => {
+/** The error Lunora throws when one transaction reads past its limit (`maxReadBytes`, 32 MiB). */
+const isTransactionLimit = (error: unknown): boolean => (error as { code?: unknown } | null)?.code === "TRANSACTION_LIMIT_EXCEEDED";
+
+/**
+ * Every distinct bot of the rows, labelled in ONE call: the action's calls stay fixed however many bots there are. A
+ * bot row can hold up to 2 MB of instructions, so a user with many large bots can pass the read limit: then every bot
+ * is labelled "a bot" (`labelsCut`), and the file is still made.
+ */
+export const readBotLabels = async (
+    ctx: Pick<ActionCtx, "runQuery">,
+    userId: string,
+    rows: ReadonlyArray<ExportMemoryRow>,
+): Promise<{ labels: Map<string, BotLabel>; labelsCut: boolean }> => {
     const botIds = [...new Set(rows.map((row) => row.botId).filter((id): id is string => id !== undefined))];
 
     if (botIds.length === 0) {
-        return new Map();
+        return { labels: new Map(), labelsCut: false };
     }
 
-    const labels = await ctx.runQuery(internal.memory.markdown_export.resolveMemoryBotLabels, { botIds, userId });
+    let labelsCut = false;
+    const labels = await ctx.runQuery(internal.memory.markdown_export.resolveMemoryBotLabels, { botIds, userId }).catch((error: unknown) => {
+        if (!isTransactionLimit(error)) {
+            throw error;
+        }
 
-    return new Map(labels.map(({ botId, kind, name }): [string, BotLabel] => [botId, kind === "named" ? { kind, name: name ?? "" } : { kind }]));
+        labelsCut = true;
+
+        return botIds.map((botId) => {
+            return { botId, kind: "unknown" as const, name: undefined };
+        });
+    });
+
+    return {
+        labels: new Map(labels.map(({ botId, kind, name }): [string, BotLabel] => [botId, kind === "named" ? { kind, name: name ?? "" } : { kind }])),
+        labelsCut,
+    };
 };
 
 /**
@@ -182,10 +207,10 @@ export const exportMemoriesMarkdown = authAction
             readExportMemories(ctx, userId),
             ctx.runQuery(internal.memory.functions.getUserTimeZone, { userId }),
         ]);
-        const bots = await readBotLabels(ctx, userId, rows);
+        const { labels: bots, labelsCut } = await readBotLabels(ctx, userId, rows);
         const now = Date.now();
 
-        ctx.log.event("memory.export_markdown", { count: rows.length, truncated, userId });
+        ctx.log.event("memory.export_markdown", { count: rows.length, labelsCut, truncated, userId });
 
         return {
             count: rows.length,
