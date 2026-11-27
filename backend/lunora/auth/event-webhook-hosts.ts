@@ -13,6 +13,12 @@ import { internalQuery } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { MAX_APPROVED_HOSTS, normalizeApprovedHost } from "../public-api/events-webhook";
 
+/**
+ * The most hosts the owner's list shows. An account may hold more than {@link MAX_APPROVED_HOSTS} after a merge of guests, each
+ * of whom approved up to that many, so the list reads past the add cap: the owner sees every host and can remove one back under it.
+ */
+const MAX_LISTED_APPROVED_HOSTS = 500;
+
 /** Whether `host` is on `userId`'s approved list. The only read the Events code makes of this table. */
 export const isHostApproved = async (ctx: Pick<QueryCtx, "db">, userId: string, host: string): Promise<boolean> => {
     const row = await ctx.db.eventWebhookHosts.findFirst({ where: { host, userId } });
@@ -32,7 +38,7 @@ export const listEventWebhookHosts = authQuery
     .input({})
     .output(v.object({ hosts: v.array(v.object({ createdAt: v.number(), host: v.string() })) }))
     .query(async ({ ctx }) => {
-        const { page } = await ctx.db.eventWebhookHosts.findMany({ limit: MAX_APPROVED_HOSTS, where: { userId: ctx.user.userId } });
+        const { page } = await ctx.db.eventWebhookHosts.findMany({ limit: MAX_LISTED_APPROVED_HOSTS, where: { userId: ctx.user.userId } });
 
         return {
             hosts: page.map((row) => {

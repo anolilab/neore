@@ -31,6 +31,27 @@ const signedIn = async (harness: ReturnType<typeof lunoraTest>) =>
     })) as { sessionId: string; userId: string };
 
 describe("the owner's approved callback hosts", () => {
+    it("lists every host a merge left the owner with, past the add cap", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const identity = await signedIn(harness);
+            const as = harness.withIdentity(identity as never);
+
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < 60; index += 1) {
+                    await context.db.insert("eventWebhookHosts", { createdAt: 0, host: `host-${index}.example.com`, userId: identity.userId });
+                }
+            });
+
+            const listed = (await as.query(listEventWebhookHosts as never, {} as never)) as { hosts: unknown[] };
+
+            expect(listed.hosts).toHaveLength(60);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("removes a host held in two rows, as a merge can leave one, so it is no longer approved", async () => {
         const harness = lunoraTest(schema as never);
 
