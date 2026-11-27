@@ -115,11 +115,15 @@ for (let p = 0; p < PERSONAS; p++) {
         });
     });
 
-    // Rows another version replaced, and rows past their end date: both keep their vectors, neither is a candidate.
-    const chained = have.slice(0, 8).map((t, k) => [t, [1, 2, 4, 5][k % 4]]);
+    // Topics the labelled queries ask about; the rest only carry rows that must not be mistaken for an answer.
+    const core = have.slice(0, -4);
+
+    // An older version of a fact: replaced (`supersededBy`), past its end date, or still active but confirmed longer ago.
+    // The first two keep their vectors and are never candidates; the third is, and only the newest is labelled.
+    const chained = core.slice(0, 8).map((t, k) => [t, [1, 2, 4, 5][k % 4]]);
 
     chained.forEach(([t, a], k) => {
-        const age = ageOf() + 120;
+        const age = memories.find((m) => m.id === `${pid}-${TOPICS[t][0]}-a${a}`).ageDays + 120 + r() * 60;
         const row = {
             ageDays: round(age, 1),
             createdDays: round(age + 5, 1),
@@ -129,7 +133,9 @@ for (let p = 0; p < PERSONAS; p++) {
             type: TYPES[a],
         };
 
-        add(k % 2 === 0 ? { ...row, supersededBy: `${pid}-${TOPICS[t][0]}-a${a}` } : { ...row, validUntil: dayString(NOW - (20 + k * 17) * 86400000) });
+        if (k % 3 === 0) add({ ...row, supersededBy: `${pid}-${TOPICS[t][0]}-a${a}` });
+        else if (k % 3 === 1) add({ ...row, validUntil: dayString(NOW - (20 + k * 17) * 86400000) });
+        else add(row);
     });
 
     for (const t of have) {
@@ -146,6 +152,21 @@ for (let p = 0; p < PERSONAS; p++) {
                 validUntil: dayString(NOW - (10 + Math.floor(r() * 200)) * 86400000),
             });
     }
+
+    // Facts with an end date still ahead (the last one ends today): in effect, so they are candidates.
+    have.slice(-4).forEach((t, k) => {
+        const a = (t + p) % 6;
+
+        add({
+            ageDays: ageOf(),
+            createdDays: ageOf() + 5,
+            id: `${pid}-${TOPICS[t][0]}-cur${a}`,
+            tags: tags(t, a),
+            text: TOPICS[t][2][a].replace("{d}", detail(t, 3)),
+            type: TYPES[a],
+            validUntil: dayString(NOW + k * 9 * 86400000),
+        });
+    });
 
     // Rows of two bots: bot-a joins this user's chats as that bot, bot-b never does.
     for (const [bot, shift, count] of [
@@ -196,14 +217,14 @@ for (let p = 0; p < PERSONAS; p++) {
     const bot = (k) => (k % 3 === 0 ? { asBot: "bot-a" } : {});
 
     for (let k = 0; k < 10; k++) {
-        const t = have[(k * 3 + p) % have.length];
+        const t = core[(k * 3 + p) % core.length];
         const a = (k + p) % 6;
 
         q("single", TOPICS[t][3][a], { [t]: 1, [ASPECT0 + a]: 0.6 }, [`${pid}-${TOPICS[t][0]}-a${a}`], bot(k));
     }
 
     for (let k = 0; k < 6; k++) {
-        const t = have[(k * 2 + p + 1) % have.length];
+        const t = core[(k * 2 + p + 1) % core.length];
         const [a, b] = [(k + p) % 3, 3 + ((k + p) % 3)];
 
         q(
@@ -225,9 +246,11 @@ for (let p = 0; p < PERSONAS; p++) {
         q("temporal", `what did I do about ${TOPICS[t][0]} in ${MONTHS[month]}`, { [t]: 1, [ASPECT0 + 3]: 0.6, [MONTH0 + month]: 0.6 }, [row.id], bot(k + 2));
     });
 
-    chained.slice(0, 4).forEach(([t, a], k) => {
-        q("update", TOPICS[t][3][a], { [t]: 1, [ASPECT0 + a]: 0.6 }, [`${pid}-${TOPICS[t][0]}-a${a}`], bot(k));
-    });
+    [0, 1, 2, 5]
+        .map((i) => chained[i])
+        .forEach(([t, a], k) => {
+            q("update", TOPICS[t][3][a], { [t]: 1, [ASPECT0 + a]: 0.6 }, [`${pid}-${TOPICS[t][0]}-a${a}`], bot(k));
+        });
 
     for (let k = 0; k < 4; k++) {
         if (k < 2) {

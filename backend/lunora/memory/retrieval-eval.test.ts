@@ -64,7 +64,7 @@ const unitVector = (tags: Tags): number[] => {
 const cosine = (a: number[], b: number[]): number => a.reduce((sum, x, i) => sum + x * b[i]!, 0);
 
 /** One query as retrieval runs it: the window, the vector hits (top K over all of the user's vectors), the ranking. */
-const injected = (query: FixtureQuery): string[] => {
+const run = (query: FixtureQuery): { ids: string[]; inWindow: Set<string> } => {
     const persona = fixture.personas.find((p) => p.id === query.persona)!;
     const rows = persona.memories.map((m) => {
         return {
@@ -94,13 +94,16 @@ const injected = (query: FixtureQuery): string[] => {
         { botId: query.asBot, includeUserWide: query.asBot !== undefined, limit: windowSize, today },
     );
 
-    return rankMemories({ candidates, keywordScores: keywordScoresFor(candidates, query.text), now, vectorScores }).map((m) => m.memoryId);
+    const ranked = rankMemories({ candidates, keywordScores: keywordScoresFor(candidates, query.text), now, vectorScores });
+
+    return { ids: ranked.map((m) => m.memoryId), inWindow: new Set(candidates.map((m) => m._id)) };
 };
 
 interface Totals {
     abstainEmpty: number;
     abstainQueries: number;
     injected: number;
+    inWindow: number;
     ndcg: number;
     offTopic: number;
     queries: number;
@@ -108,10 +111,10 @@ interface Totals {
 }
 
 const empty = (): Totals => {
-    return { abstainEmpty: 0, abstainQueries: 0, injected: 0, ndcg: 0, offTopic: 0, queries: 0, recall: 0 };
+    return { abstainEmpty: 0, abstainQueries: 0, injected: 0, inWindow: 0, ndcg: 0, offTopic: 0, queries: 0, recall: 0 };
 };
 
-const record = (totals: Totals, query: FixtureQuery, ids: string[]) => {
+const record = (totals: Totals, query: FixtureQuery, ids: string[], inWindow: Set<string>) => {
     const expected = new Set(query.expected);
 
     totals.injected += ids.length;
@@ -125,6 +128,7 @@ const record = (totals: Totals, query: FixtureQuery, ids: string[]) => {
     }
 
     totals.queries += 1;
+    totals.inWindow += query.expected.filter((id) => inWindow.has(id)).length / expected.size;
     totals.recall += ids.filter((id) => expected.has(id)).length / expected.size;
 
     const gain = ids.reduce((sum, id, rank) => sum + (expected.has(id) ? 1 / Math.log2(rank + 2) : 0), 0);
@@ -136,6 +140,7 @@ const record = (totals: Totals, query: FixtureQuery, ids: string[]) => {
 const summary = (totals: Totals) => {
     return {
         abstainPrecision: totals.abstainQueries === 0 ? undefined : totals.abstainEmpty / totals.abstainQueries,
+        inWindow: totals.queries === 0 ? undefined : totals.inWindow / totals.queries,
         meanInjected: totals.injected / (totals.queries + totals.abstainQueries),
         ndcgAt8: totals.queries === 0 ? undefined : totals.ndcg / totals.queries,
         offTopicRate: totals.injected === 0 ? 0 : totals.offTopic / totals.injected,
@@ -149,11 +154,11 @@ const summary = (totals: Totals) => {
  */
 const TOLERANCE = 0.02;
 const BASELINE = {
-    multi: { ndcgAt8: 0.588, recallAt8: 0.767 },
-    overall: { abstainPrecision: 0, ndcgAt8: 0.47, offTopicRate: 0.911, recallAt8: 0.646 },
-    single: { ndcgAt8: 0.574, recallAt8: 0.8 },
-    temporal: { ndcgAt8: 0.067, recallAt8: 0.067 },
-    update: { ndcgAt8: 0.636, recallAt8: 0.95 },
+    multi: { ndcgAt8: 0.657, recallAt8: 0.8 },
+    overall: { abstainPrecision: 0, ndcgAt8: 0.427, offTopicRate: 0.914, recallAt8: 0.608 },
+    single: { ndcgAt8: 0.475, recallAt8: 0.72 },
+    temporal: { ndcgAt8: 0, recallAt8: 0 },
+    update: { ndcgAt8: 0.601, recallAt8: 0.95 },
 };
 
 describe("memory retrieval eval", () => {
@@ -161,10 +166,10 @@ describe("memory retrieval eval", () => {
     const byCategory = new Map(CATEGORIES.map((c) => [c, empty()]));
 
     for (const query of fixture.queries) {
-        const ids = injected(query);
+        const { ids, inWindow } = run(query);
 
-        record(overall, query, ids);
-        record(byCategory.get(query.category)!, query, ids);
+        record(overall, query, ids, inWindow);
+        record(byCategory.get(query.category)!, query, ids, inWindow);
     }
 
     const results = { overall: summary(overall), ...Object.fromEntries(CATEGORIES.map((c) => [c, summary(byCategory.get(c)!)])) } as Record<
@@ -215,6 +220,7 @@ describe("memory retrieval eval", () => {
                     name,
                     {
                         "abstain precision": pct(s.abstainPrecision),
+                        "expected in window": pct(s.inWindow),
                         "mean injected": s.meanInjected.toFixed(2),
                         "NDCG@8": pct(s.ndcgAt8),
                         "off-topic rate": pct(s.offTopicRate),
