@@ -596,11 +596,11 @@ describe("observeWatched", () => {
             expect(row.watch.reviewId).toBe("50");
         });
 
-        it("does not wake for a review submitted at the same time as the seen one", async () => {
+        it("wakes for a review submitted in the same second as the seen one", async () => {
             const { row } = await run(listedAt([5000]), vi.fn().mockResolvedValue(5000));
 
-            expect(row.watchPending).toEqual([]);
-            expect(row.watch.reviewId).toBe("50");
+            expect(row.watchPending).toEqual(["review"]);
+            expect(row.watch.reviewId).toBe("400");
         });
 
         it("does not take a listed review with no submission time for newer", async () => {

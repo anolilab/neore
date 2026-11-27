@@ -481,6 +481,8 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     payment_sessions: "`@lunora/payment` store (Creem checkouts); system only",
     payment_subscriptions: "`@lunora/payment` store (Creem subscriptions); system only — the tier lands on `user` / `organization`",
     payment_usageEvents: "`@lunora/payment` usage metering; unused (Creem has none), system only",
+    pendingPinRestores:
+        "a refused pin write's owed route restore: written by the pin writer on the owner's shard, read by the restore, its cron and the erasure (internal); no client reads it",
     persistentChunks: "no owner column; read through HTTP actions keyed by a verified stream token",
     pinWriteLeases:
         "the in-flight pin-write lease of an account: renewed by pin writers before their move check, read by the move that waits for them; no client reads it",

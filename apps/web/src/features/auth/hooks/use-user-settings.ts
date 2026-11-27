@@ -122,6 +122,21 @@ export const useUpdateUserSettings = () => {
         retry: 0,
     });
 
+    // An exact write queued behind another must not re-apply its own value to the cache when its turn comes: that would put
+    // back a value a later tap has already replaced. `updateLatest` applied it when the write was made.
+    const exactMutation = useMutation({
+        ...writeOptions,
+        ...settingsHandlers,
+        onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey: queryOptions.queryKey });
+
+            return {
+                cacheEntry: queryClient.getQueryCache().find({ exact: true, queryKey: queryOptions.queryKey }),
+                previousSettings: queryClient.getQueryData<UserSettingsRow>(queryOptions.queryKey),
+            };
+        },
+    });
+
     type Patch = Parameters<typeof mutation.mutateAsync>[0];
 
     /**
@@ -133,7 +148,7 @@ export const useUpdateUserSettings = () => {
      * connection, even while earlier writes are queued: it is never sent ahead of them, and never waits for the
      * connection behind one that paused.
      */
-    const updateLatest = (build: (current: UserSettingsRow | undefined) => Patch, options?: { failFast?: boolean }): Promise<void> => {
+    const updateLatest = (build: (current: UserSettingsRow | undefined) => Patch, options?: { exact?: boolean; failFast?: boolean }): Promise<void> => {
         const failFast = options?.failFast === true;
 
         // Offline now: nothing is applied, and the caller reports the failed save at once.
@@ -147,6 +162,14 @@ export const useUpdateUserSettings = () => {
             return refused;
         }
 
+        const exact = options?.exact === true;
+        const pickWriter = () => {
+            if (failFast) {
+                return failFastMutation;
+            }
+
+            return exact ? exactMutation : mutation;
+        };
         const before = queryClient.getQueryData<UserSettingsRow>(queryOptions.queryKey);
         const patch = build(before);
         const fields = Object.keys(patch) as (keyof UserSettingsRow)[];
@@ -193,6 +216,8 @@ export const useUpdateUserSettings = () => {
               })
             : previous;
 
+        const writer = pickWriter();
+
         const run = turn.then(async () => {
             const entryNow = queryClient.getQueryCache().find({ exact: true, queryKey: queryOptions.queryKey });
             const rebuilt = cacheEntry !== undefined && entryNow !== cacheEntry;
@@ -208,12 +233,12 @@ export const useUpdateUserSettings = () => {
                 throw new Error("The signed-in account changed before this setting was saved.");
             }
 
-            // A rebuilt cache holds the server's row, which lacks this edit: send the edit itself.
-            const body = latest && !rebuilt ? Object.fromEntries(fields.map((field) => [field, latest[field]])) : patch;
+            // A rebuilt cache holds the server's row, which lacks this edit: send the edit itself. An exact write always does.
+            const body = latest && !rebuilt && !exact ? Object.fromEntries(fields.map((field) => [field, latest[field]])) : patch;
 
             // The mutation snapshots the cache after the edit above, so its own rollback restores the unsaved value. Put back
             // what this edit found, when no write is queued behind it and the cache is still this account's.
-            return (failFast ? failFastMutation : mutation).mutateAsync(body as Patch).catch((error: unknown) => {
+            return writer.mutateAsync(body as Patch).catch((error: unknown) => {
                 const sameEntry = queryClient.getQueryCache().find({ exact: true, queryKey: queryOptions.queryKey }) === cacheEntry;
 
                 if (before !== undefined && sameEntry && settingsWrites.pending <= 1) {
@@ -250,5 +275,12 @@ export const useUpdateUserSettings = () => {
         return outcome;
     };
 
-    return { ...mutation, updateLatest };
+    /**
+     * For a value that does not depend on the current one (a switch): queues behind the same writes as `updateLatest`,
+     * so the writes leave one at a time in the order made, but sends `patch` exactly as given. Rebuilt from the cache at
+     * its turn, a quick on then off would reach the server as two `false` writes and skip what a save of `true` does.
+     */
+    const updateExact = (patch: Patch): Promise<void> => updateLatest(() => patch, { exact: true });
+
+    return { ...mutation, updateExact, updateLatest };
 };

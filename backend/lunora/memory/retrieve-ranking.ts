@@ -1,0 +1,317 @@
+/**
+ * The pure parts of memory retrieval: which stored rows are candidates, and how a
+ * candidate's signals become a score. No I/O and no gateway calls, so the same code
+ * runs in `retrieve.ts` and in the offline retrieval eval (`retrieval-eval.test.ts`).
+ */
+
+import { tokenize } from "../knowledge/hybrid";
+import { factDatesOf } from "./dates";
+
+/**
+ * The signals' weights, which add up to 1. Relevance leads: among rows of one topic the cosines are close, so the
+ * semantic term must decide (eval NDCG@8: 0.600 at 0.45, 0.771 at 0.65, 0.879 at 0.75). 0.65 is the middle: the
+ * eval's confidence and ages are assumed, so the other signals keep a real share.
+ */
+export const WEIGHTS = {
+    confidence: 0.12, // How clearly the fact was stated (0-100)
+    importance: 0.08, // How useful for future conversations (0-100)
+    recency: 0.15, // Exponential decay with 30-day half-life
+    semantic: 0.65, // Vector cosine similarity (or keyword fallback)
+};
+
+export const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * What a memory needs to be injected on its own. Relevance first: under the relevance floor it is left out whatever
+ * its confidence, importance or recency, so a recent or pinned row unrelated to the search is not injected. Then a
+ * score of `AUTO_INJECT_THRESHOLD`, which only drops a row that is old, unsure and unimportant at once.
+ *
+ * Tuned on the retrieval eval (`__fixtures__/README.md`): relevant rows start at cosine 0.86 and unrelated ones end
+ * at 0.40, so 0.45 leaves a margin over the noise. The keyword floor applies to a memory with no vector, to one whose
+ * vector is new or the search did not fill its cut, and to every memory when no vector search ran; the eval's
+ * keyword-only run holds Recall@8 there (0.185 at 0.2, 0.165 before, 0.015 at 0.35).
+ */
+export const INJECT_MIN_RELEVANCE = 0.45;
+export const INJECT_MIN_KEYWORD_RELEVANCE = 0.2;
+export const AUTO_INJECT_THRESHOLD = 0.3;
+export const MAX_AUTO_INJECT = 8;
+
+/**
+ * What `search_memory` asks of a memory: a low relevance floor, so it is not noise, and no score threshold, so
+ * a relevant memory is found however old or unsure it is. Pinned memories need relevance here too.
+ */
+export const SEARCH_MIN_RELEVANCE = 0.35;
+export const SEARCH_MIN_KEYWORD_RELEVANCE = 0.15;
+export const SEARCH_THRESHOLD = 0;
+/** The most rows `search_memory` returns. */
+export const SEARCH_MAX_RESULTS = 10;
+
+/** Rows each scope contributes to the candidate window. */
+export const CANDIDATE_WINDOW_SIZE = 100;
+
+/** Vector hits that count per search: the best ones of the chat's own scopes, after the others are dropped. */
+export const VECTOR_TOP_K = 30;
+
+/**
+ * Hits asked of the index. It holds every bot's rows of the user and has no bot field to filter on, so other bots'
+ * (and superseded or expired) hits can fill the top `VECTOR_TOP_K`: it is asked for three times as many and cut
+ * to `VECTOR_TOP_K` after the scope check (`topScopedHits`).
+ */
+export const VECTOR_FETCH_K = VECTOR_TOP_K * 3;
+
+/** What scoring reads of a memory. */
+export interface RankCandidate {
+    _id: string;
+    confidence?: number | null;
+    /** Set when the memory has a vector in the index. */
+    embeddingId?: string | null;
+    eventEnd?: string | null;
+    eventStart?: string | null;
+    importance?: number | null;
+    lastConfirmedAt: number;
+    memory: string;
+    pinned?: boolean;
+    type: string;
+    validUntil?: string | null;
+}
+
+/** A memory the prompt may receive. */
+export interface RankedMemory {
+    /** The memory's type (`taxonomy.ts`). Named `category` for the prompt builder and `search_memory`, which predate the taxonomy. */
+    category: string;
+    confidence: number;
+    eventEnd?: string;
+    eventStart?: string;
+    /** When it was last confirmed or saved: a time, never a day, so a cached copy is dated in the timezone of the run that reads it. */
+    lastConfirmedAt: number;
+    memory: string;
+    /** Recorded on the reply for the "why was this used" view. */
+    memoryId: string;
+    score: number;
+    validUntil?: string;
+}
+
+// ============================================================================
+// Candidate window
+// ============================================================================
+
+/** A pinned fact stays past its end date: pinning is how the user keeps it. */
+export const isUsableOn = (memory: { pinned?: boolean | null; validUntil?: string | null }, today: string | undefined): boolean =>
+    today === undefined || memory.pinned === true || typeof memory.validUntil !== "string" || memory.validUntil >= today;
+
+/** The order `by_userId_botId_active` reads in, newest first: type descending, then creation time descending. */
+export const byIndexOrder = (a: { _creationTime: number; type: string }, b: { _creationTime: number; type: string }): number => {
+    if (a.type !== b.type) {
+        return a.type < b.type ? 1 : -1;
+    }
+
+    return b._creationTime - a._creationTime;
+};
+
+/** Newest first, whatever the type. */
+export const byNewest = (a: { _creationTime: number }, b: { _creationTime: number }): number => b._creationTime - a._creationTime;
+
+/** Whose rows a chat reads: the bot's own, plus the user's own when `includeUserWide`. No bot = the user's own only. */
+export interface MemoryScope {
+    botId?: string;
+    includeUserWide?: boolean;
+}
+
+/** The scopes a chat reads, as the `botId` each stores (`null` = the user's own rows). */
+export const scopesOf = (scope: MemoryScope): (string | null)[] =>
+    scope.botId !== undefined && scope.includeUserWide === true ? [scope.botId, null] : [scope.botId ?? null];
+
+/** Whether a row belongs to a scope a chat reads. A hit of another bot's row never does. */
+const inScope = (row: { botId?: string | null }, scope: MemoryScope): boolean => scopesOf(scope).includes(row.botId ?? null);
+
+/**
+ * The rows of every scope joined into one candidate window. Each scope keeps up to `limit` of its own, so a
+ * busy bot cannot push the user's memories out. Merged in `order` (the order each index yields, unless the
+ * caller reads by recency).
+ */
+export const mergeScopeWindows = <T extends { _creationTime: number; type: string }>(
+    perScope: T[][],
+    limit: number,
+    order: (a: T, b: T) => number = byIndexOrder,
+): T[] => perScope.flatMap((rows) => rows.slice(0, limit)).toSorted(order);
+
+/**
+ * The window the retrieval scores, from every active row of a user: each scope's newest rows, the ones still
+ * in effect on `today`, up to `limit` per scope, merged newest first. Newest regardless of type: the index
+ * sorts by type first, so reading it as it comes would fill the window with `preference` and `identity` rows
+ * and never reach an `activity` one. The database read takes the newest of each type and applies the same
+ * `isUsableOn` and `mergeScopeWindows`.
+ */
+export const selectCandidateWindow = <
+    T extends { _creationTime: number; botId?: string | null; pinned?: boolean | null; type: string; validUntil?: string | null },
+>(
+    activeRows: T[],
+    options: MemoryScope & { limit?: number; today?: string },
+): T[] => {
+    const limit = options.limit ?? CANDIDATE_WINDOW_SIZE;
+    const perScope = scopesOf(options).map((scope) =>
+        activeRows
+            .filter((row) => (row.botId ?? null) === scope)
+            .filter((row) => isUsableOn(row, options.today))
+            .toSorted(byNewest)
+            .slice(0, limit),
+    );
+
+    return mergeScopeWindows(perScope, limit, byNewest);
+};
+
+/** The best `limit` of the hits (best first) that are rows of a scope the chat reads; the rest are other bots' rows. */
+export const topScopedHits = <T extends { botId?: string | null }>(hits: T[], scope: MemoryScope, limit: number = VECTOR_TOP_K): T[] =>
+    hits.filter((row) => inScope(row, scope)).slice(0, limit);
+
+/**
+ * Whether the in-scope hits fill the cut. Only then is a row missing from them known to be less near than all of
+ * them; a short cut means other bots' rows took the slots or the index had no more, and says nothing of a row it lacks.
+ */
+export const vectorCutIsFull = (scopedHits: ReadonlyArray<unknown>): boolean => scopedHits.length >= VECTOR_TOP_K;
+
+/** How long after it was written or reworded a memory's vector may not be searchable yet (the index syncs after the write). */
+export const VECTOR_SYNC_WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * The candidates to score: the window, plus the vector hits that fall outside it. A hit of another scope (another
+ * bot's row) or of a fact past its end date is never added, and a row is a candidate once.
+ */
+export const withVectorHits = <T extends RankCandidate & { botId?: string | null; validUntil?: string | null }>(
+    window: T[],
+    hits: T[],
+    options: MemoryScope & { today?: string },
+): T[] => {
+    const seen = new Set(window.map((row) => row._id));
+    const added = hits.filter((row) => {
+        if (seen.has(row._id) || !inScope(row, options) || !isUsableOn(row, options.today)) {
+            return false;
+        }
+
+        seen.add(row._id);
+
+        return true;
+    });
+
+    return [...window, ...added];
+};
+
+// ============================================================================
+// Scoring
+// ============================================================================
+
+/** A pinned memory never ages; anything else ages from when it was last confirmed. */
+const recencyScore = (lastConfirmedAt: number, pinned: boolean, now: number): number => {
+    if (pinned) {
+        return 1;
+    }
+
+    const ageMs = now - lastConfirmedAt;
+
+    if (ageMs <= 0) {
+        return 1;
+    }
+
+    return 2 ** (-ageMs / THIRTY_DAYS_MS);
+};
+
+const computeScore = (memory: RankCandidate, semanticScore: number, now: number): number => {
+    const confidenceNorm = (memory.confidence ?? 70) / 100;
+    const importanceNorm = (memory.importance ?? 50) / 100;
+    const recency = recencyScore(memory.lastConfirmedAt, memory.pinned === true, now);
+
+    return WEIGHTS.semantic * semanticScore + WEIGHTS.confidence * confidenceNorm + WEIGHTS.importance * importanceNorm + WEIGHTS.recency * recency;
+};
+
+/**
+ * The words of a search text that count for the keyword fallback. Through the knowledge search's tokenizer (letters
+ * and numbers only, lowercased, no diacritics), so `peanuts?` and `peanuts` are the same word on both sides.
+ */
+export const searchWordsOf = (searchText: string): Set<string> => new Set(tokenize(searchText).filter((w) => w.length >= 2));
+
+/**
+ * Keyword-based semantic score (fallback when no embedding exists).
+ */
+export const keywordScore = (memoryText: string, searchWords: Set<string>): number => {
+    if (searchWords.size === 0) {
+        return 0;
+    }
+
+    const memoryWords = tokenize(memoryText);
+    const matchCount = memoryWords.filter((w) => searchWords.has(w)).length;
+
+    return memoryWords.length > 0 ? Math.min(matchCount / Math.max(searchWords.size, 1), 1) : 0;
+};
+
+/** The keyword score of every candidate, by id. */
+export const keywordScoresFor = (candidates: RankCandidate[], searchText: string): Map<string, number> => {
+    const searchWords = searchWordsOf(searchText);
+
+    return new Map(candidates.map((m) => [m._id, keywordScore(m.memory, searchWords)]));
+};
+
+/**
+ * Scores each candidate and keeps the ones to inject. Relevance is a vector hit's cosine similarity; a candidate
+ * without a hit falls back to its keyword score and the keyword floor, unless the vector search is decisive
+ * (`vectorSearched`: it ran, its hits resolved, and they fill the cut, `vectorCutIsFull`) and the memory has a
+ * vector that is not new: then it was not among the nearest to the search, and its keyword overlap (common words of
+ * a question) says nothing more, so it has no relevance. Absence is no evidence otherwise: a vector written or
+ * reworded within `VECTOR_SYNC_WINDOW_MS` may not be searchable yet, a short cut means other bots' rows took the
+ * slots, and a memory with no vector, or any memory when no vector search ran (the model refused, the index or the
+ * hit lookup failed), is found by keyword. Under the relevance floor, or under the score threshold, a candidate is
+ * left out; the rest is sorted best first and cut to `limit`. `now` is when scoring happens (recency counts from it).
+ */
+export const rankMemories = (input: {
+    candidates: RankCandidate[];
+    keywordScores: ReadonlyMap<string, number>;
+    limit?: number;
+    /** The least keyword overlap a candidate without a vector hit needs. */
+    minKeywordRelevance?: number;
+    /** The least cosine similarity a vector hit needs before the other terms count. */
+    minRelevance?: number;
+    now: number;
+    threshold?: number;
+    vectorScores: ReadonlyMap<string, number>;
+    /** A vector search ran, its hits resolved and filled the cut: an old embedded memory it lacks is not relevant. */
+    vectorSearched?: boolean;
+}): RankedMemory[] => {
+    const {
+        candidates,
+        keywordScores,
+        limit = MAX_AUTO_INJECT,
+        minKeywordRelevance = INJECT_MIN_KEYWORD_RELEVANCE,
+        minRelevance = INJECT_MIN_RELEVANCE,
+        now,
+        threshold = AUTO_INJECT_THRESHOLD,
+        vectorScores,
+        vectorSearched = false,
+    } = input;
+
+    return (
+        candidates
+            .map((m) => {
+                const hit = vectorScores.get(m._id);
+                // Embedded, not new, and absent from hits that filled the cut: not relevant, whatever words it shares.
+                const missed = hit === undefined && vectorSearched && Boolean(m.embeddingId) && now - m.lastConfirmedAt > VECTOR_SYNC_WINDOW_MS;
+                const semanticScore = hit ?? (missed ? 0 : (keywordScores.get(m._id) ?? 0));
+
+                return {
+                    category: m.type,
+                    confidence: m.confidence ?? 70,
+                    floor: hit === undefined && !missed ? minKeywordRelevance : minRelevance,
+                    lastConfirmedAt: m.lastConfirmedAt,
+                    memory: m.memory,
+                    memoryId: m._id,
+                    score: computeScore(m, semanticScore, now),
+                    semanticScore,
+                    ...factDatesOf(m),
+                };
+            })
+            // Confidence, importance and recency only order what is relevant: a fresh, pinned or confident row
+            // with no relevance never clears the bar on those terms alone.
+            .filter((m) => m.semanticScore >= m.floor && m.score >= threshold)
+            .toSorted((a, b) => b.score - a.score)
+            .slice(0, limit)
+            .map(({ floor: _floor, semanticScore: _semanticScore, ...ranked }) => ranked)
+    );
+};

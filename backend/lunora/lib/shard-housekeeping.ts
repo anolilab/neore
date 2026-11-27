@@ -116,6 +116,8 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "sweepThreadVectorArchived", ref: internal.agent.thread_vector_archived.sweepThreadVectorArchived },
     // A bot whose delete failed after its tombstone was written is labelled live again (`bots/owner.ts`).
     { name: "restoreLiveBotOwners", ref: internal.bots.owner.restoreLiveBotOwners },
+    // Once a day, queues the schedule-ideas job for a user who turned it on (`tasks/schedule-ideas.ts`); a no-op for everyone else.
+    { name: "dispatchScheduleIdeas", ref: internal.tasks.schedule_ideas.dispatchScheduleIdeas },
     // A guest merge whose queued job ran out of redeliveries is queued again from its saved progress (`lib/account-merge.ts`).
     { name: "resumeStalledGuestMerges", ref: internal.lib.account_merge.resumeStalledGuestMerges },
 ];

@@ -4,8 +4,7 @@
 
 - **User memory** — extraction runs as a background action after each AI
   response; retrieval runs before generation with multi-signal scoring
-  (semantic 0.45 / confidence 0.18 / importance 0.12 / recency 0.25, 30-day
-  half-life). Dedup threshold 0.85; conflicts go through belief revision
+  (semantic 0.65 / confidence 0.12 / importance 0.08 / recency 0.15, 30-day half-life) for a row that first clears a relevance floor (cosine 0.45; keyword overlap 0.2 for a row with no vector hit, unless a decisive vector search lacks it: it ran, its hits resolved and filled the 30 in-scope cut, and the row is embedded and older than 10 minutes, which is no relevance; then score 0.3); `search_memory` has its own (0.35 / 0.15, up to 10 rows). Candidates: the newest 100 usable rows per scope (the read pages past expired rows within one shared 1500-row budget; an empty window still searches vectors) plus in-scope vector hits (`withVectorHits`; 90 asked of the index, the best 30 in scope kept, `topScopedHits`). A hit lookup that throws leaves keyword ranking. Words are tokenised on letters and numbers (`knowledge/hybrid.ts#tokenize`), so `peanuts?` is `peanuts`. Pure in `retrieve-ranking.ts`, measured by `retrieval-eval.test.ts` (`__fixtures__/README.md`). Dedup threshold 0.85; conflicts go through belief revision
   (UPDATE/SUPERSEDE/IGNORE/ADD). **`memoryEnabled` on `userSettings` is OPT-IN —
   absent means off.** `isMemoryEnabled` is the authoritative gate; the settings
   read and the UI fallback must agree with it.
@@ -84,9 +83,10 @@
   statement. Like extraction it never matches, confirms or merges into an unpinned row past its end date (the action
   and the save, exact-text check included): the fact is saved beside it.
 - **Provenance** (`memory/evidence.ts`) — `memories.evidence` holds a quote of the user's own words, its thread and
-  message (the prompt's, or the steer's). A quote is kept only through `evidenceQuote` over the TYPED text
-  (`chat/lib/attached-text.ts`: no attachment, page capture or guest note; trigger, headless and outside-agent runs
-  pass none); it checks `containsSecret` and its own labels, and drops one naming a health condition. Merges take the
+  message (the prompt's, or the steer's). **Evidence gate:** it fails closed. With no `quotablePrompt` `extractMemories` returns before it reads, asks the model or stores anything (`memory.extraction_gate`, reason `no_quotable_text`), and so does an empty one (trimmed) with no typed steer left, before the gate, the classifier or the model; a headless run's own prompt schedules its job without one, so it stores nothing, and only the steers typed into a paused headless run are learned (its continuation passes `quotablePrompt: ""`); with a quotable text, a fact with no verbatim typed quote is dropped before any
+  save (`memory.evidence_gate`: counts, no text); the extractor reads no tool results; trigger runs pass `learn: false` (the job and the steers' extraction are then skipped). A quote must sit inside ONE typed segment (the prompt, or a single typed steer): `factEvidence` never reads text joined across a steer boundary or a removed steer, and dates and links the quote by that steer. A quote is kept only through `evidenceQuote` over the TYPED text
+  (`chat/lib/attached-text.ts`: no attachment, page capture or guest note; an outside-agent prompt
+  carries an empty one, a headless run's none; a prompt row with any part saved with a `notTyped` mark (a prompt link, an extension's relay, an admin acting as the owner) carries an empty one too (`promptCannotBeQuoted`, whole row, never per part: the extractor reads the whole prompt), at a normal finish and in recovery alike; a steer the owner did not type is flagged `notTyped` per steer, cut from what extraction reads, and blanked by `factEvidence`; with an empty `quotablePrompt` the prompt itself is cut the same way, not kept as context, so only the typed steers reach the gate, the classifier and the extractor (`typedTurnText`), and an outside prompt cannot supply a claim that a steer's words then back; the privacy marker 🔒 / `[private]` / `[no-memory]` is checked over the WHOLE turn first, a cut prompt or marked steer included, never over `typedTurnText`); it checks `containsSecret` and its own labels, and drops one naming a health condition. Merges take the
   newer quote, ranked by `evidence.at`: when the words were sent (`promptAt`, or the steer's own `sentAt`, stamped by
   `steerRun`), never when the job ran nor `updatedAt`; a belief-revision UPDATE (`reviseExtractedMemory`) takes its
   own quote; its `base` check leaves a row rewritten meanwhile alone. A reflection merge (`merge: true`) gives a

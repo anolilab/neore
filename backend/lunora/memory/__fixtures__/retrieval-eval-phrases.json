@@ -1,0 +1,352 @@
+{
+    "topics": [
+        [
+            "climbing",
+            "joined a bouldering competition at {d}",
+            [
+                "Has been a climber for years and trains at {d}",
+                "Prefers short bouldering problems over rope routes at {d}",
+                "Keeps shoes and a chalk bag in the car for sessions at {d}",
+                "Climbed at {d} twice last week",
+                "Took a bad fall on a lead route once and has been careful ever since at {d}",
+                "Plans to try outdoor routes once the season at {d} ends"
+            ],
+            [
+                "how long have I been scaling walls",
+                "do I like ropes or short problems",
+                "what gear is always in my car",
+                "did I go to the wall recently",
+                "have I ever been hurt on a wall",
+                "what do I want to try beyond the gym"
+            ],
+            ["Boulderhaus Nord", "the Granite Works", "Vertigo Hall", "Chalk and Co", "the Riverside Wall"]
+        ],
+        [
+            "baking",
+            "entered a bake sale with {d}",
+            [
+                "Is a home baker who makes {d} most weekends",
+                "Likes {d} with a very dark crust",
+                "Uses a cast iron pot and a proving basket for {d}",
+                "Baked {d} for a neighbour's birthday",
+                "Started baking {d} after a trip abroad and failed the first ten times",
+                "Wants to try a rye version of {d} soon"
+            ],
+            [
+                "what kind of baker am I",
+                "how do I like my loaves",
+                "which pot do I bake in",
+                "what did I bake for the neighbour",
+                "how did my bread hobby begin",
+                "what recipe am I eager to try next"
+            ],
+            ["sourdough", "focaccia", "seeded rye", "brioche", "ciabatta"]
+        ],
+        [
+            "running",
+            "ran the {d} race",
+            [
+                "Runs three mornings a week along {d}",
+                "Prefers trail routes to road running near {d}",
+                "Tracks every run on a watch and syncs it from {d}",
+                "Ran a long loop around {d} on Sunday",
+                "Finished a first half marathon after months of training around {d}",
+                "Is aiming for a faster 10k time on the {d} course"
+            ],
+            [
+                "how often do I jog",
+                "trail or tarmac for me",
+                "how do I log my workouts",
+                "what was my last long outing",
+                "how did I get into distance events",
+                "what time am I chasing"
+            ],
+            ["the canal path", "the old rail line", "Hillside Park", "the harbour front", "the forest loop"]
+        ],
+        [
+            "gardening",
+            "volunteered at a seed swap with {d}",
+            [
+                "Tends an allotment where {d} is the main crop",
+                "Likes organic methods and avoids sprays on {d}",
+                "Has raised beds and a rain barrel for the {d}",
+                "Planted out {d} seedlings over the weekend",
+                "Lost a whole crop of {d} to frost two springs ago",
+                "Wants to build a small greenhouse for {d}"
+            ],
+            [
+                "what do I grow on my plot",
+                "do I use chemicals on plants",
+                "what beds and water do I have",
+                "what did I put in the soil lately",
+                "have I lost a harvest before",
+                "what structure do I want to add"
+            ],
+            ["tomatoes", "runner beans", "courgettes", "dahlias", "potatoes"]
+        ],
+        [
+            "photography",
+            "exhibited prints of {d}",
+            [
+                "Shoots {d} as a serious hobby",
+                "Prefers natural light and a prime lens for {d}",
+                "Carries a mirrorless body and one spare battery for {d}",
+                "Edited a batch of {d} photos yesterday",
+                "Won a local contest with a picture of {d} years ago",
+                "Hopes to put together a small book of {d}"
+            ],
+            [
+                "what do I photograph",
+                "what light and lenses do I like",
+                "what camera kit do I haul around",
+                "what did I retouch lately",
+                "did I ever win anything with a camera",
+                "what project do I dream about for my pictures"
+            ],
+            ["street scenes", "birds", "architecture", "night skies", "family portraits"]
+        ],
+        [
+            "guitar",
+            "played a gig with {d}",
+            [
+                "Plays guitar and is learning {d} songs",
+                "Prefers fingerstyle to strumming for {d}",
+                "Owns an acoustic and a small amp kept next to {d}",
+                "Practised {d} for an hour this evening",
+                "Played in a school band that covered {d}",
+                "Plans to record a demo of {d}"
+            ],
+            [
+                "which instrument do I play",
+                "do I pick or strum",
+                "what do I own for playing",
+                "what did I rehearse today",
+                "was I ever in a band",
+                "what recording am I planning"
+            ],
+            ["blues", "folk ballads", "jazz standards", "indie rock", "country"]
+        ],
+        [
+            "cycling",
+            "rode a charity ride along {d}",
+            [
+                "Commutes by bike and rides {d} on weekends",
+                "Likes steady endurance rides on {d} more than sprints",
+                "Keeps a repair kit and lights in the pannier for {d}",
+                "Rode {d} in the rain on Thursday",
+                "Crashed on a wet corner of {d} once and now wears a brighter jacket",
+                "Wants to ride a multi-day tour starting at {d}"
+            ],
+            [
+                "how do I get around town",
+                "steady or fast for my rides",
+                "what do I carry on the bike",
+                "what was my last ride like",
+                "did I come off the bike once",
+                "what long trip do I fancy"
+            ],
+            ["the coast road", "the river trail", "the mountain pass", "the ring road", "the cycle highway"]
+        ],
+        [
+            "coffee",
+            "attended a tasting at {d}",
+            [
+                "Drinks a lot of coffee and buys beans from {d}",
+                "Likes a light roast brewed as pour-over from {d}",
+                "Has a hand grinder and a gooseneck kettle for beans from {d}",
+                "Tried a new bag from {d} this morning",
+                "Used to drink only instant until a friend served beans from {d}",
+                "Is saving for an espresso machine to use with {d}"
+            ],
+            [
+                "how much caffeine do I drink",
+                "what roast do I prefer",
+                "what brewing tools are in my kitchen",
+                "what did I try this morning",
+                "how did I come to enjoy the good stuff",
+                "what machine do I want to buy"
+            ],
+            ["a roastery in town", "a mail order club", "the farmers market", "a tiny cafe", "a subscription box"]
+        ],
+        [
+            "reading",
+            "went to a book signing at {d}",
+            [
+                "Reads a lot and joined {d}",
+                "Prefers paper books and long novels from {d}",
+                "Keeps a reading list in a notebook next to {d}",
+                "Finished a novel from {d} last night",
+                "Read the whole shelf of {d} as a teenager",
+                "Wants to read every title on the shortlist of {d}"
+            ],
+            [
+                "am I a big reader",
+                "paper or screen for me",
+                "where do I note down titles",
+                "what did I just finish",
+                "what did I read when young",
+                "what list am I working through"
+            ],
+            ["the library club", "a mystery shelf", "a prize shortlist", "a science fiction circle", "a poetry group"]
+        ],
+        [
+            "chess",
+            "played a rapid tournament at {d}",
+            [
+                "Plays chess online and at {d}",
+                "Likes the Sicilian and sharp tactical lines at {d}",
+                "Has a rating around 1500 and a board set up at {d}",
+                "Lost a close endgame at {d} on Tuesday",
+                "Learned the rules from a grandparent before joining {d}",
+                "Aims to reach a club rating of 1700 at {d}"
+            ],
+            [
+                "do I play board strategy games",
+                "what openings do I enjoy",
+                "what is my skill level",
+                "how did my last match go",
+                "who taught me the game",
+                "what rating am I after"
+            ],
+            ["the city club", "a pub league", "the library table", "an online server", "the university society"]
+        ],
+        [
+            "hiking",
+            "led a group walk to {d}",
+            [
+                "Hikes most weekends and knows {d} well",
+                "Prefers long ridge walks over crowded trails near {d}",
+                "Packs a stove, a map and a spare layer for {d}",
+                "Walked up to {d} in the fog on Saturday",
+                "Got lost near {d} once and now always carries a paper map",
+                "Wants to hike the full length of {d} next summer"
+            ],
+            [
+                "do I go walking outdoors",
+                "what terrain do I like",
+                "what is in my daypack",
+                "where did I walk lately",
+                "did I ever lose the path",
+                "what long route do I dream of"
+            ],
+            ["the ridge above town", "the national trail", "the lake circuit", "the coastal cliffs", "the old pilgrim way"]
+        ],
+        [
+            "aquarium",
+            "bought new plants for {d}",
+            [
+                "Keeps a freshwater tank with {d}",
+                "Prefers planted tanks and soft light for {d}",
+                "Runs a canister filter and a timer for {d}",
+                "Did a water change and fed {d} tonight",
+                "Lost several fish to disease early on while keeping {d}",
+                "Wants to set up a second tank for {d}"
+            ],
+            [
+                "do I keep any pets in water",
+                "what style of tank do I like",
+                "what equipment runs my tank",
+                "what did I do for the fish today",
+                "did I ever lose animals",
+                "what new setup do I want"
+            ],
+            ["neon tetras", "shrimp", "guppies", "a betta", "cichlids"]
+        ],
+        [
+            "woodworking",
+            "built a shelf from {d}",
+            [
+                "Does woodworking in a garage workshop with {d}",
+                "Prefers hand tools and joinery with {d}",
+                "Owns a bench, chisels and a small saw for {d}",
+                "Sanded and oiled a box made of {d}",
+                "Started the hobby by repairing a chair made of {d}",
+                "Hopes to build a dining table from {d}"
+            ],
+            [
+                "do I make things with my hands",
+                "hand tools or machines for me",
+                "what tools do I own",
+                "what did I finish this week",
+                "how did I begin making furniture",
+                "what big build do I plan"
+            ],
+            ["oak", "walnut", "pine offcuts", "ash", "cherry"]
+        ],
+        [
+            "spanish",
+            "spoke at a language meetup about {d}",
+            [
+                "Is studying Spanish with {d}",
+                "Likes spoken practice more than grammar drills with {d}",
+                "Uses flashcards and a weekly tutor alongside {d}",
+                "Did a lesson on the subjunctive from {d} today",
+                "Studied French at school and found Spanish easier thanks to {d}",
+                "Wants to pass the B2 exam using {d}"
+            ],
+            [
+                "which language am I learning",
+                "speaking or drills for me",
+                "what study aids do I use",
+                "what did I study today",
+                "what languages did I know before",
+                "which exam do I want to pass"
+            ],
+            ["an app", "a podcast series", "a textbook", "a conversation club", "a video course"]
+        ],
+        [
+            "boardgames",
+            "hosted a game night with {d}",
+            [
+                "Loves board games and owns {d}",
+                "Prefers cooperative games over cutthroat ones like {d}",
+                "Keeps the collection on a shelf in the living room beside {d}",
+                "Played {d} with friends on Friday",
+                "Got into the hobby after a holiday where {d} came out",
+                "Wants to buy the expansion for {d}"
+            ],
+            [
+                "do I enjoy tabletop games",
+                "cooperative or competitive",
+                "where do I store the games",
+                "what did we play on Friday",
+                "how did the hobby start",
+                "what do I want to add to the collection"
+            ],
+            ["Pandemic", "Catan", "Carcassonne", "Azul", "Ticket to Ride"]
+        ],
+        [
+            "printing",
+            "showed a print of {d} at a makerspace",
+            [
+                "Owns a 3D printer and prints {d}",
+                "Prefers PETG over PLA for {d}",
+                "Keeps spare nozzles and a dry box for {d}",
+                "Started a long print of {d} overnight",
+                "Had a printer jam on a first big job of {d}",
+                "Plans to upgrade to an enclosed printer for {d}"
+            ],
+            [
+                "do I have a fabrication machine",
+                "which filament do I favour",
+                "what spares do I keep",
+                "what is printing now",
+                "did a build ever go wrong",
+                "what upgrade am I eyeing"
+            ],
+            ["drone parts", "storage boxes", "miniatures", "cable clips", "plant pots"]
+        ]
+    ],
+    "unseen": [
+        ["what is my passport number", 0],
+        ["when does my driving licence expire", 1],
+        ["which bank do I use for savings", 2],
+        ["what is my shoe size", 3],
+        ["what medication do I take", 4],
+        ["who is my landlord", 5],
+        ["what car do I drive", 0],
+        ["when is my wedding anniversary", 1],
+        ["which airline miles card do I hold", 2],
+        ["what is my favourite football team", 3]
+    ]
+}

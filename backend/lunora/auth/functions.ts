@@ -368,8 +368,12 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
         await runAfterOnShard(context.scheduler, 0, internal.agent.thread_summaries.eraseUserThreadSummaries, { before: now, userId }, userId);
     }
 
-    // Schedule ideas are opt-in too: switching them off erases the suggestions waiting to be accepted (`tasks/suggestions.ts`).
-    if (tableName === "userSettings" && toStore.scheduleIdeasEnabled !== undefined && toStore.scheduleIdeasEnabled !== true) {
+    // Schedule ideas are opt-in too: switching them off, or memory off (the ideas need it), erases the suggestions waiting to be
+    // accepted (`tasks/suggestions.ts`), in the same save.
+    const ideasTurnedOff = toStore.scheduleIdeasEnabled !== undefined && toStore.scheduleIdeasEnabled !== true;
+    const memoryTurnedOff = toStore.memoryEnabled !== undefined && toStore.memoryEnabled !== true;
+
+    if (tableName === "userSettings" && (ideasTurnedOff || memoryTurnedOff)) {
         await runAfterOnShard(context.scheduler, 0, internal.tasks.suggestions.eraseUserTaskSuggestions, { before: now, userId }, userId);
     }
 };
