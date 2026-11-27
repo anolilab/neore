@@ -2,15 +2,15 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Badge } from "@neore/ui/components/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@neore/ui/components/table";
 import { formatNumber, formatTime } from "@neore/ui/utils/locale-format";
 import { createFileRoute } from "@tanstack/react-router";
-import { Activity, AlertCircle, CheckCircle2, Clock, DollarSign, Layers, TrendingUp, XCircle, Zap } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, DollarSign, TrendingUp, XCircle, Zap } from "lucide-react";
 import { useState } from "react";
 
+import { AdminBlock, AdminSection, AdminStatGrid } from "@/features/admin/components/admin-section";
 import { useGatewayAnalytics } from "@/features/admin/hooks/use-admin";
 
 const formatCost = (microdollars: number): string => {
@@ -38,10 +38,10 @@ const statusConfig: Record<string, { icon: React.ReactNode; label: MessageDescri
 };
 
 const tierColors: Record<string, string> = {
-    complex: "bg-orange-500/20 text-orange-700 dark:text-orange-400",
-    reasoning: "bg-red-500/20 text-red-700 dark:text-red-400",
-    simple: "bg-green-500/20 text-green-700 dark:text-green-400",
-    standard: "bg-blue-500/20 text-blue-700 dark:text-blue-400",
+    complex: "bg-attention/20 text-foreground",
+    reasoning: "bg-destructive/20 text-foreground",
+    simple: "bg-success/20 text-foreground",
+    standard: "bg-info/20 text-foreground",
 };
 
 const GatewayAnalyticsPage = () => {
@@ -60,7 +60,7 @@ const GatewayAnalyticsPage = () => {
                 return (
                     <div className="flex items-center gap-3 text-sm" key={day.date}>
                         <span className="text-muted-foreground w-20 shrink-0 text-xs">{day.date}</span>
-                        <div className="bg-muted relative flex-1 overflow-hidden rounded">
+                        <div className="bg-surface-well relative flex-1 overflow-hidden rounded">
                             <div className="bg-primary/60 h-6 transition-[width]" style={{ width: `${pct}%` }} />
                             <span className="absolute inset-0 flex items-center px-2 text-xs font-medium">{formatCost(day.costMicrodollars)}</span>
                         </div>
@@ -202,7 +202,7 @@ const GatewayAnalyticsPage = () => {
                                 {formatNumber(tier.count, i18n.locale)} ({pct.toFixed(0)}%)
                             </span>
                         </div>
-                        <div className="bg-muted h-2 w-full overflow-hidden rounded-full">
+                        <div className="bg-surface-well h-2 w-full overflow-hidden rounded-full">
                             <div className="h-full rounded-full bg-current opacity-60 transition-[width]" style={{ width: `${pct}%` }} />
                         </div>
                     </div>
@@ -216,14 +216,14 @@ const GatewayAnalyticsPage = () => {
     );
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-muted-foreground text-sm">
                     <Trans>Smart routing decisions, model usage, and provider health</Trans>
                 </p>
 
                 <Select onValueChange={(v) => v && setPeriod(v as "24h" | "7d")} value={period}>
-                    <SelectTrigger className="w-[120px]">
+                    <SelectTrigger aria-label={t`Period`} className="w-[120px]">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -238,74 +238,59 @@ const GatewayAnalyticsPage = () => {
             </div>
 
             {error && (
-                <Card className="border-destructive">
-                    <CardContent className="pt-4">
-                        <p className="text-destructive text-sm">
-                            <Trans>Failed to load analytics. Ensure the LLM Gateway is running and reachable.</Trans>
-                        </p>
-                    </CardContent>
-                </Card>
+                <div className="surface-raised ring-destructive/40 rounded-xl px-4 py-3.5 ring-1">
+                    <p className="text-destructive text-sm">
+                        <Trans>Failed to load analytics. Ensure the LLM Gateway is running and reachable.</Trans>
+                    </p>
+                </div>
             )}
 
             {/* Overview Stats */}
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
-                {[
-                    {
-                        icon: <TrendingUp className="size-4" />,
-                        id: "requests",
-                        label: t`Requests`,
-                        value: isPending ? null : totalRequests,
-                    },
-                    {
-                        icon: <DollarSign className="size-4" />,
-                        id: "total-cost",
-                        label: t`Total Cost`,
-                        value: isPending ? null : formatCost(data?.overview.totalCostMicrodollars ?? 0),
-                    },
-                    {
-                        icon: <Clock className="size-4" />,
-                        id: "avg-latency",
-                        label: t`Avg Latency`,
-                        value: isPending ? null : formatLatency(data?.overview.avgLatencyMs ?? 0),
-                    },
-                    {
-                        icon: <AlertCircle className="size-4" />,
-                        id: "error-rate",
-                        label: t`Error Rate`,
-                        value: isPending ? null : formatPercent(data?.overview.errorRate ?? 0),
-                    },
-                    {
-                        icon: <Zap className="size-4" />,
-                        id: "cache-hit-rate",
-                        label: t`Cache Hit Rate`,
-                        value: isPending ? null : formatPercent(data?.overview.cacheHitRate ?? 0),
-                    },
-                ].map((stat) => (
-                    <Card key={stat.id}>
-                        <CardContent className="pt-4">
-                            <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                                {stat.icon}
-                                {stat.label}
-                            </div>
-                            <div className="mt-1 text-2xl font-semibold">{stat.value === null ? <Skeleton className="h-7 w-20" /> : stat.value}</div>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
+            <AdminSection>
+                <AdminStatGrid
+                    columns="@3xl:grid-cols-5"
+                    stats={[
+                        {
+                            icon: <TrendingUp aria-hidden="true" className="size-3.5" />,
+                            id: "requests",
+                            label: t`Requests`,
+                            value: isPending ? <Skeleton className="h-7 w-20" /> : totalRequests,
+                        },
+                        {
+                            icon: <DollarSign aria-hidden="true" className="size-3.5" />,
+                            id: "total-cost",
+                            label: t`Total Cost`,
+                            value: isPending ? <Skeleton className="h-7 w-20" /> : formatCost(data?.overview.totalCostMicrodollars ?? 0),
+                        },
+                        {
+                            icon: <Clock aria-hidden="true" className="size-3.5" />,
+                            id: "avg-latency",
+                            label: t`Avg Latency`,
+                            value: isPending ? <Skeleton className="h-7 w-20" /> : formatLatency(data?.overview.avgLatencyMs ?? 0),
+                        },
+                        {
+                            icon: <AlertCircle aria-hidden="true" className="size-3.5" />,
+                            id: "error-rate",
+                            label: t`Error Rate`,
+                            value: isPending ? <Skeleton className="h-7 w-20" /> : formatPercent(data?.overview.errorRate ?? 0),
+                        },
+                        {
+                            icon: <Zap aria-hidden="true" className="size-3.5" />,
+                            id: "cache-hit-rate",
+                            label: t`Cache Hit Rate`,
+                            value: isPending ? <Skeleton className="h-7 w-20" /> : formatPercent(data?.overview.cacheHitRate ?? 0),
+                        },
+                    ]}
+                />
+            </AdminSection>
 
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
                 {/* Routing Tier Distribution */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-base">
-                            <Layers className="size-4" />
-                            <Trans>Routing Tier Distribution</Trans>
-                        </CardTitle>
-                        <CardDescription>
-                            <Trans>Query complexity tiers assigned by the routing engine</Trans>
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
+                <AdminSection
+                    description={<Trans>Query complexity tiers assigned by the routing engine</Trans>}
+                    title={<Trans>Routing Tier Distribution</Trans>}
+                >
+                    <AdminBlock>
                         {isPending ? (
                             <div className="space-y-2">
                                 {[1, 2, 3, 4].map((i) => (
@@ -315,23 +300,14 @@ const GatewayAnalyticsPage = () => {
                         ) : (
                             tierDistributionBody
                         )}
-                    </CardContent>
-                </Card>
+                    </AdminBlock>
+                </AdminSection>
 
                 {/* Provider Health */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-base">
-                            <Activity className="size-4" />
-                            <Trans>Provider Health</Trans>
-                        </CardTitle>
-                        <CardDescription>
-                            <Trans>Circuit breaker status from the last 5 minutes</Trans>
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
+                <AdminSection description={<Trans>Circuit breaker status from the last 5 minutes</Trans>} title={<Trans>Provider Health</Trans>}>
+                    <AdminBlock className="px-2">
                         {isPending ? (
-                            <div className="space-y-2">
+                            <div className="space-y-2 px-2">
                                 {[1, 2, 3].map((i) => (
                                     <Skeleton className="h-8 w-full" key={i} />
                                 ))}
@@ -339,24 +315,15 @@ const GatewayAnalyticsPage = () => {
                         ) : (
                             providerHealthBody
                         )}
-                    </CardContent>
-                </Card>
+                    </AdminBlock>
+                </AdminSection>
             </div>
 
             {/* Model Breakdown */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                        <TrendingUp className="size-4" />
-                        <Trans>Model Breakdown</Trans>
-                    </CardTitle>
-                    <CardDescription>
-                        <Trans>Request volume, cost, and error count per model</Trans>
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
+            <AdminSection description={<Trans>Request volume, cost, and error count per model</Trans>} title={<Trans>Model Breakdown</Trans>}>
+                <AdminBlock className="px-2">
                     {isPending ? (
-                        <div className="space-y-2">
+                        <div className="space-y-2 px-2">
                             {[1, 2, 3, 4, 5].map((i) => (
                                 <Skeleton className="h-10 w-full" key={i} />
                             ))}
@@ -364,21 +331,12 @@ const GatewayAnalyticsPage = () => {
                     ) : (
                         modelBreakdownBody
                     )}
-                </CardContent>
-            </Card>
+                </AdminBlock>
+            </AdminSection>
 
             {/* 7-day Cost Trend */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                        <DollarSign className="size-4" />
-                        <Trans>7-Day Cost Trend</Trans>
-                    </CardTitle>
-                    <CardDescription>
-                        <Trans>Daily LLM spend and request volume</Trans>
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
+            <AdminSection description={<Trans>Daily LLM spend and request volume</Trans>} title={<Trans>7-Day Cost Trend</Trans>}>
+                <AdminBlock>
                     {isPending ? (
                         <div className="flex gap-1">
                             {[1, 2, 3, 4, 5, 6, 7].map((i) => (
@@ -388,8 +346,8 @@ const GatewayAnalyticsPage = () => {
                     ) : (
                         costTrendBody
                     )}
-                </CardContent>
-            </Card>
+                </AdminBlock>
+            </AdminSection>
         </div>
     );
 };

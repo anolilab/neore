@@ -60,16 +60,16 @@ const UserCell = ({ classNames, hideActions, onUserUpdated, user }: UserCellProp
 
     return (
         <>
-            <div className={cn("flex items-center justify-between gap-4 py-2", classNames?.cell)}>
-                <div className="flex items-center gap-3">
-                    <Avatar className="size-10">
+            <div className={cn("flex items-center justify-between gap-4 py-3", classNames?.cell)}>
+                <div className="flex min-w-0 items-center gap-3">
+                    <Avatar className="size-9">
                         <AvatarImage alt={user.name || user.email} src={user.image || undefined} />
                         <AvatarFallback name={user.name || user.email}>{initials}</AvatarFallback>
                     </Avatar>
 
-                    <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                            <span className="font-medium">{user.name || t`No name`}</span>
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-medium">{user.name || t`No name`}</span>
                             {user.isAnonymous && (
                                 <Badge className="text-xs" variant="outline">
                                     <Ghost className="mr-1 size-3" />
@@ -89,18 +89,16 @@ const UserCell = ({ classNames, hideActions, onUserUpdated, user }: UserCellProp
                                 </Badge>
                             )}
                         </div>
-                        <span className="text-muted-foreground text-sm">{user.email}</span>
-                        <span className="text-muted-foreground text-xs">{t`Joined ${createdDate}`}</span>
+                        <span className="text-muted-foreground truncate text-xs">{user.email}</span>
+                        <span className="text-muted-foreground font-mono text-xs">{t`Joined ${createdDate}`}</span>
                     </div>
                 </div>
 
                 {!hideActions && (
                     <DropdownMenu>
-                        <DropdownMenuTrigger>
-                            <Button size="icon" variant="ghost">
-                                <MoreHorizontal className="size-4" />
-                                <span className="sr-only">{t`Open menu`}</span>
-                            </Button>
+                        <DropdownMenuTrigger render={<Button size="icon" variant="ghost" />}>
+                            <MoreHorizontal aria-hidden="true" className="size-4" />
+                            <span className="sr-only">{t`Open menu`}</span>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => setRoleDialogOpen(true)}>
@@ -132,7 +130,7 @@ const UserCell = ({ classNames, hideActions, onUserUpdated, user }: UserCellProp
                             <DropdownMenuSeparator />
 
                             {user.isBanned ? (
-                                <DropdownMenuItem className="text-green-600" onClick={() => setBanDialogOpen(true)}>
+                                <DropdownMenuItem className="text-success" onClick={() => setBanDialogOpen(true)}>
                                     <Unlock className="mr-2 size-4" />
                                     {t`Unban User`}
                                 </DropdownMenuItem>

@@ -420,7 +420,7 @@ msgstr "{0, plural, other {# 项必需或未知检查仍在运行}}"
 
 #. placeholder {0}: readings.compactable.largeToolRows
 #. placeholder {1}: formatBytes(readings.compactable.largeToolBytes, locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:185
+#: src/features/admin/components/admin-shard-footprint-row.tsx:190
 msgid "{0, plural, one {# result} other {# results}}, {1}"
 msgstr "{0, plural, other {# 个结果}}，{1}"
 
@@ -458,8 +458,8 @@ msgstr "{0, plural, other {# 个讨论串}}"
 #. placeholder {0}: readings.pinned.threads
 #. placeholder {1}: formatBytes(readings.other.approxBytes, locale)
 #. placeholder {1}: formatBytes(readings.pinned.approxBytes, locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:191
-#: src/features/admin/components/admin-shard-footprint-row.tsx:197
+#: src/features/admin/components/admin-shard-footprint-row.tsx:196
+#: src/features/admin/components/admin-shard-footprint-row.tsx:202
 msgid "{0, plural, one {# thread} other {# threads}}, {1}"
 msgstr "{0, plural, other {# 个对话}}，{1}"
 
@@ -474,7 +474,7 @@ msgid "{0, plural, one {# tool found} other {# tools found}}"
 msgstr "{0, plural, other {发现 # 个工具}}"
 
 #. placeholder {0}: day.count
-#: src/features/admin/components/admin-dashboard-stats.tsx:200
+#: src/features/admin/components/admin-dashboard-stats.tsx:167
 msgid "{0, plural, one {# user} other {# users}}"
 msgstr "{0, plural, other {# 位用户}}"
 
@@ -617,9 +617,9 @@ msgstr "{0} 个自定义请求头"
 
 #. placeholder {0}: formatNumber(row.sinceDays, locale)
 #. placeholder {0}: formatNumber(window, locale)
-#: src/features/admin/components/admin-provider-cache-row.tsx:80
-#: src/features/admin/components/admin-shard-footprint-row.tsx:150
-#: src/features/admin/components/admin-shard-footprint-row.tsx:170
+#: src/features/admin/components/admin-provider-cache-row.tsx:77
+#: src/features/admin/components/admin-shard-footprint-row.tsx:151
+#: src/features/admin/components/admin-shard-footprint-row.tsx:173
 msgid "{0} days"
 msgstr "{0} 天"
 
@@ -639,8 +639,8 @@ msgstr "已用 {0}"
 #. placeholder {1}: log.deletedCount
 #. placeholder {2}: lastResult.durationMs
 #. placeholder {2}: log.durationMs
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:234
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:338
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:247
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:356
 msgid "{0} eligible · {1} deleted · {2}ms"
 msgstr "{0} 个符合条件 · 已删除 {1} 个 · {2}ms"
 
@@ -1863,7 +1863,7 @@ msgstr "21:9（超宽屏）"
 msgid "235B parameter Mixture-of-Experts architecture"
 msgstr "2350 亿参数混合专家（MoE）架构"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:80
+#: src/features/admin/components/admin-provider-cache-row.tsx:77
 #: src/features/admin/components/ban-user-dialog.tsx:29
 msgid "24 hours"
 msgstr "24 小时"
@@ -1972,7 +1972,7 @@ msgstr "7 天"
 msgid "7 Days"
 msgstr "7 天"
 
-#: src/routes/admin/gateway/index.tsx:375
+#: src/routes/admin/gateway/index.tsx:338
 msgid "7-Day Cost Trend"
 msgstr "7 天费用趋势"
 
@@ -2555,7 +2555,7 @@ msgstr "活跃会话（{0}）"
 msgid "Active Threads"
 msgstr "活跃对话"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:159
+#: src/features/admin/components/admin-shard-footprint-row.tsx:162
 msgid "Active threads, by days since their last activity. Threads waiting on a person are included."
 msgstr "活跃对话，按距上次活动的天数分组。包括正在等待某人处理的对话。"
 
@@ -3039,7 +3039,7 @@ msgstr "调整"
 #: src/features/layout/lib/dashboard-page-names.ts:12
 #: src/routes/admin/route.tsx:57
 #: src/routes/admin/route.tsx:77
-#: src/routes/admin/route.tsx:88
+#: src/routes/admin/route.tsx:98
 msgid "Admin"
 msgstr "管理员"
 
@@ -3047,7 +3047,7 @@ msgstr "管理员"
 msgid "Admin Granted"
 msgstr "已授予管理员"
 
-#: src/features/admin/components/audit-log-card.tsx:146
+#: src/features/admin/components/audit-log-card.tsx:140
 msgid "Admin Grants"
 msgstr "管理员授权"
 
@@ -3055,7 +3055,7 @@ msgstr "管理员授权"
 msgid "Admin privileges have been removed"
 msgstr "已移除管理员权限"
 
-#: src/features/admin/components/audit-log-card.tsx:147
+#: src/features/admin/components/audit-log-card.tsx:141
 msgid "Admin Revocations"
 msgstr "管理员撤销"
 
@@ -3063,7 +3063,7 @@ msgstr "管理员撤销"
 msgid "Admin Revoked"
 msgstr "已撤销管理员"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:146
+#: src/features/admin/components/admin-dashboard-stats.tsx:115
 msgid "Administrators"
 msgstr "管理员"
 
@@ -3547,11 +3547,11 @@ msgstr "全部（{0}）"
 msgid "All {provider} models enabled"
 msgstr "已启用全部 {provider} 模型"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:123
+#: src/features/admin/components/admin-dashboard-stats.tsx:91
 msgid "All accounts"
 msgstr "所有账号"
 
-#: src/features/admin/components/audit-log-card.tsx:139
+#: src/features/admin/components/audit-log-card.tsx:133
 msgid "All Actions"
 msgstr "所有操作"
 
@@ -3610,7 +3610,7 @@ msgstr "所有图标"
 msgid "All installers"
 msgstr "所有安装包"
 
-#: src/features/admin/components/feedback-admin-page.tsx:168
+#: src/features/admin/components/feedback-admin-page.tsx:163
 msgid "All kinds"
 msgstr "所有类型"
 
@@ -3665,7 +3665,7 @@ msgstr "所有提示词"
 #. placeholder {0}: formatNumber(data.all.requests, locale)
 #. placeholder {1}: formatNumber(data.all.promptTokens, locale)
 #. placeholder {2}: shareText(data.all, locale)
-#: src/features/admin/components/admin-provider-cache-row.tsx:111
+#: src/features/admin/components/admin-provider-cache-row.tsx:112
 msgid "All provider traffic in the window, caching or not. Requests: {0}. Prompt tokens: {1}. Served from cache: {2}."
 msgstr "时间范围内所有提供商流量（无论是否使用缓存）。请求：{0}。提示词 token：{1}。来自缓存：{2}。"
 
@@ -3703,7 +3703,7 @@ msgstr "所有角色"
 msgid "All Servers"
 msgstr "所有服务器"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:234
+#: src/features/admin/components/admin-shard-footprint-row.tsx:244
 msgid "All shards measured."
 msgstr "所有分片均已测量。"
 
@@ -3723,7 +3723,7 @@ msgstr "所有类型"
 msgid "All use cases"
 msgstr "全部使用场景"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:180
+#: src/features/admin/components/admin-dashboard-stats.tsx:145
 msgid "All Users"
 msgstr "所有用户"
 
@@ -4006,18 +4006,18 @@ msgstr "按年"
 msgid "Annual billing"
 msgstr "按年计费"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:182
-#: src/features/admin/components/admin-dashboard-stats.tsx:250
+#: src/features/admin/components/admin-dashboard-stats.tsx:147
+#: src/features/admin/components/admin-dashboard-stats.tsx:212
 #: src/features/admin/components/user-cell.tsx:76
 #: src/features/admin/components/users-management-card.tsx:143
 msgid "Anonymous"
 msgstr "匿名"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:139
+#: src/features/admin/components/admin-dashboard-stats.tsx:108
 msgid "Anonymous Users"
 msgstr "匿名用户"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:106
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:103
 msgid "Anonymous users inactive for this many days become eligible for deletion."
 msgstr "不活跃超过此天数的匿名用户将可被删除。"
 
@@ -4130,7 +4130,7 @@ msgstr "任何其他独立任务。"
 msgid "Any string you choose; enter the same value as the webhook Verify token in the Meta app"
 msgstr "任意你选择的字符串；在 Meta 应用中填入相同的值作为 webhook 验证令牌"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:150
+#: src/features/admin/components/admin-shard-footprint-row.tsx:151
 msgid "Any time"
 msgstr "不限时长"
 
@@ -4360,9 +4360,9 @@ msgstr "已自动批准——低风险"
 msgid "Approving…"
 msgstr "正在批准…"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:133
-#: src/features/admin/components/admin-shard-footprint-row.tsx:144
-#: src/features/admin/components/admin-shard-footprint-row.tsx:164
+#: src/features/admin/components/admin-shard-footprint-row.tsx:132
+#: src/features/admin/components/admin-shard-footprint-row.tsx:145
+#: src/features/admin/components/admin-shard-footprint-row.tsx:167
 msgid "Approximate size"
 msgstr "大致大小"
 
@@ -4464,7 +4464,7 @@ msgstr "已归档"
 msgid "Archived chats stay searchable, and you can restore them from the archive."
 msgstr "已归档的对话仍可搜索，你可以从归档中恢复。"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:141
+#: src/features/admin/components/admin-shard-footprint-row.tsx:142
 msgid "Archived for at least"
 msgstr "已归档至少"
 
@@ -4472,7 +4472,7 @@ msgstr "已归档至少"
 msgid "Archived Threads"
 msgstr "已归档的对话"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:138
+#: src/features/admin/components/admin-shard-footprint-row.tsx:139
 msgid "Archived threads, by how long ago they were archived. Pinned threads are counted apart: they are never deleted."
 msgstr "已归档对话，按归档至今的时长分组。已置顶的对话单独统计：它们永远不会被删除。"
 
@@ -4821,7 +4821,7 @@ msgstr "音频波形空闲"
 msgid "audio-video"
 msgstr "音视频"
 
-#: src/features/admin/components/audit-log-card.tsx:130
+#: src/features/admin/components/audit-log-card.tsx:146
 #: src/features/layout/lib/dashboard-page-names.ts:18
 #: src/routes/admin/route.tsx:35
 #: src/routes/admin/route.tsx:58
@@ -4988,7 +4988,7 @@ msgstr "根据任务复杂度自动启用模块"
 msgid "Automatically include relevant images and videos alongside text responses when using search modes."
 msgstr "使用搜索模式时，在文字回复旁自动附上相关图片和视频。"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:149
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:169
 msgid "Automatically run cleanup based on configuration"
 msgstr "根据配置自动运行清理"
 
@@ -5213,7 +5213,7 @@ msgstr "禁止 {userName} 访问平台。在解封之前，对方将无法登录
 
 #: src/features/admin/components/ban-user-dialog.tsx:111
 #: src/features/admin/components/ban-user-dialog.tsx:150
-#: src/features/admin/components/user-cell.tsx:142
+#: src/features/admin/components/user-cell.tsx:140
 msgid "Ban User"
 msgstr "封禁用户"
 
@@ -5225,11 +5225,11 @@ msgstr "孟加拉国"
 msgid "Banned"
 msgstr "已封禁"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:154
+#: src/features/admin/components/admin-dashboard-stats.tsx:122
 msgid "Banned Users"
 msgstr "已封禁用户"
 
-#: src/features/admin/components/audit-log-card.tsx:141
+#: src/features/admin/components/audit-log-card.tsx:135
 msgid "Bans"
 msgstr "封禁"
 
@@ -5262,12 +5262,12 @@ msgstr "基础"
 msgid "batch generation"
 msgstr "批量生成"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:111
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:134
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:121
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:150
 msgid "Batch size"
 msgstr "批次大小"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:54
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:56
 msgid "Batch size must be between 1 and 1000"
 msgstr "批次大小必须在 1 到 1000 之间"
 
@@ -5939,25 +5939,25 @@ msgstr "来自 <0>{0}</0>"
 msgid "by a collaborator"
 msgstr "由协作者"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:115
+#: src/features/admin/components/admin-provider-cache-row.tsx:118
 msgid "By day, newest first."
 msgstr "按天，最新的在前。"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:137
+#: src/features/admin/components/admin-provider-cache-row.tsx:142
 msgid "By hour"
 msgstr "按小时"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:139
+#: src/features/admin/components/admin-provider-cache-row.tsx:144
 msgid "By hour, oldest first. A drop that starts at one hour across models points at a change in what is sent."
 msgstr "按小时，最早的在前。如果各模型在同一小时开始下降，说明发送的内容发生了变化。"
 
 #. placeholder {0}: formatNumber(models.length, locale)
 #. placeholder {1}: formatNumber(data.pairs, locale)
-#: src/features/admin/components/admin-provider-cache-row.tsx:174
+#: src/features/admin/components/admin-provider-cache-row.tsx:181
 msgid "By model, most prompt tokens first: the top {0} of {1} provider and model pairs."
 msgstr "按模型，提示词 token 最多的在前：{1} 个提供商与模型组合中的前 {0} 个。"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:175
+#: src/features/admin/components/admin-provider-cache-row.tsx:182
 msgid "By model, most prompt tokens first."
 msgstr "按模型，提示词 token 最多的在前。"
 
@@ -5965,7 +5965,7 @@ msgstr "按模型，提示词 token 最多的在前。"
 msgid "by you"
 msgstr "由你"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:342
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:360
 msgid "By:"
 msgstr "执行者："
 
@@ -6124,8 +6124,8 @@ msgstr "加拿大"
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:257
 #: src/components/delete-confirmation-dialog.tsx:59
 #: src/components/settings/session-freshness-dialog.tsx:113
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:121
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:282
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:128
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:296
 #: src/features/admin/components/ban-user-dialog.tsx:95
 #: src/features/admin/components/ban-user-dialog.tsx:146
 #: src/features/admin/components/impersonate-user-dialog.tsx:79
@@ -7033,7 +7033,7 @@ msgstr "电影级品质输出，动作表现优于 Ray 2"
 msgid "Circle"
 msgstr "圆形"
 
-#: src/routes/admin/gateway/index.tsx:329
+#: src/routes/admin/gateway/index.tsx:307
 msgid "Circuit breaker status from the last 5 minutes"
 msgstr "最近 5 分钟的熔断器状态"
 
@@ -7082,7 +7082,7 @@ msgstr "简洁标题页"
 msgid "Cleanup"
 msgstr "清理"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:231
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:245
 msgid "Cleanup complete"
 msgstr "清理完成"
 
@@ -7090,7 +7090,7 @@ msgstr "清理完成"
 msgid "Cleanup Configuration"
 msgstr "清理配置"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:184
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:203
 msgid "Cleanup failed"
 msgstr "清理失败"
 
@@ -8083,7 +8083,7 @@ msgstr "配置团队设置"
 msgid "Configure the billing contact and available AI models"
 msgstr "配置账单联系人和可用的 AI 模型"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:81
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:80
 msgid "Configure thresholds and batch limits for anonymous user cleanup"
 msgstr "配置匿名用户清理的阈值和批次限制"
 
@@ -8126,7 +8126,7 @@ msgstr "删除对话前确认"
 msgid "Confirm before unpinning a chat"
 msgstr "取消置顶对话前确认"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:273
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:287
 msgid "Confirm cleanup"
 msgstr "确认清理"
 
@@ -10090,7 +10090,7 @@ msgstr "当前等级："
 msgid "Current-generation photorealistic image generation with improved detail and better prompt following"
 msgstr "当前一代照片级图像生成，细节更丰富，提示词遵循更好"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:152
+#: src/features/admin/components/admin-dashboard-stats.tsx:119
 msgid "Currently restricted"
 msgstr "当前受限"
 
@@ -10276,7 +10276,7 @@ msgstr "每日费用趋势"
 msgid "Daily inbox summary"
 msgstr "每日收件箱摘要"
 
-#: src/routes/admin/gateway/index.tsx:378
+#: src/routes/admin/gateway/index.tsx:338
 msgid "Daily LLM spend and request volume"
 msgstr "每日 LLM 支出和请求量"
 
@@ -10381,12 +10381,12 @@ msgstr "日期"
 msgid "Date and time"
 msgstr "日期和时间"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:118
+#: src/features/admin/components/admin-provider-cache-row.tsx:121
 #: src/features/settings/components/chat/usage-settings.tsx:97
 msgid "Day"
 msgstr "日期"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:131
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:138
 msgid "days"
 msgstr "天"
 
@@ -10728,7 +10728,7 @@ msgid "Delete {0}"
 msgstr "删除 {0}"
 
 #. placeholder {0}: preview?.eligibleCount ?? 0
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:285
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:299
 msgid "Delete {0} users"
 msgstr "删除 {0} 个用户"
 
@@ -11006,7 +11006,7 @@ msgstr "删除 /drafts 中的 3 个文件"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:77
 #: src/components/delete-confirmation-dialog.tsx:68
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:285
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:299
 #: src/features/chat/thread-list/thread-node.tsx:644
 #: src/features/chat/thread-list/thread-node.tsx:650
 msgid "Deleting..."
@@ -11973,15 +11973,15 @@ msgstr "将你的文档和文件拖放到此处。<0/>每次最多 25 个文件�
 msgid "Drop-in replacement for the OpenAI SDK. Change one line and access every provider."
 msgstr "可直接替换 OpenAI SDK。只需改一行代码即可使用所有提供商。"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:329
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:347
 msgid "Dry run"
 msgstr "试运行"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:244
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:257
 msgid "Dry run (preview only — no deletions)"
 msgstr "试运行（仅预览——不删除）"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:231
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:245
 msgid "Dry run complete"
 msgstr "试运行完成"
 
@@ -12221,7 +12221,7 @@ msgstr "边缘检测"
 msgid "Edge-guided generation"
 msgstr "边缘引导生成"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:141
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:154
 #: src/features/canvas/canvas-panel.tsx:783
 #: src/features/chat/host/host-composer.tsx:1060
 #: src/features/chat/thread-list/group-header.tsx:178
@@ -12591,7 +12591,7 @@ msgstr "带出处的优雅引言"
 msgid "ELF executable"
 msgstr "ELF 可执行文件"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:215
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:232
 msgid "Eligible anonymous users"
 msgstr "符合条件的匿名用户"
 
@@ -13521,11 +13521,11 @@ msgstr "细节极其清晰锐利"
 msgid "Excluded tools"
 msgstr "排除的工具"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:329
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:347
 msgid "Execute"
 msgstr "执行"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:196
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:215
 msgid "Execute cleanup"
 msgstr "执行清理"
 
@@ -14291,7 +14291,7 @@ msgstr "安装技能失败"
 msgid "Failed to link account"
 msgstr "关联账号失败"
 
-#: src/routes/admin/gateway/index.tsx:244
+#: src/routes/admin/gateway/index.tsx:243
 msgid "Failed to load analytics. Ensure the LLM Gateway is running and reachable."
 msgstr "加载分析数据失败。请确保 LLM Gateway 正在运行且可访问。"
 
@@ -14456,7 +14456,7 @@ msgstr "保存 {toolId} API 密钥失败"
 msgid "Failed to save collection"
 msgstr "保存集合失败"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:64
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:66
 msgid "Failed to save configuration"
 msgstr "保存配置失败"
 
@@ -14596,7 +14596,7 @@ msgstr "无法更新备用模型"
 msgid "Failed to update browser click settings"
 msgstr "无法更新浏览器点击设置"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:73
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:75
 msgid "Failed to update configuration"
 msgstr "更新配置失败"
 
@@ -15123,7 +15123,7 @@ msgid "Feed image"
 msgstr "信息流图片"
 
 #: src/features/admin/components/feedback-admin-page.tsx:139
-#: src/features/admin/components/feedback-admin-page.tsx:154
+#: src/features/admin/components/feedback-admin-page.tsx:172
 #: src/routes/admin/route.tsx:40
 #: src/routes/admin/route.tsx:60
 msgid "Feedback"
@@ -15133,7 +15133,7 @@ msgstr "反馈"
 msgid "Feedback could not be loaded."
 msgstr "无法加载反馈。"
 
-#: src/features/admin/components/feedback-admin-page.tsx:181
+#: src/features/admin/components/feedback-admin-page.tsx:177
 msgid "Feedback pages"
 msgstr "反馈分页"
 
@@ -15330,12 +15330,13 @@ msgstr "借助参考图引导制作电影感剧照的电影人和摄像师"
 msgid "Filmmakers creating cinematic videos with a strong focus on visual narrative and storytelling quality"
 msgstr "专注视觉叙事和故事品质、制作电影感视频的电影人"
 
-#: src/features/admin/components/audit-log-card.tsx:136
+#: src/features/admin/components/audit-log-card.tsx:129
+#: src/features/admin/components/audit-log-card.tsx:130
 msgid "Filter by action"
 msgstr "按操作筛选"
 
-#: src/features/admin/components/feedback-admin-page.tsx:164
-#: src/features/admin/components/feedback-admin-page.tsx:165
+#: src/features/admin/components/feedback-admin-page.tsx:159
+#: src/features/admin/components/feedback-admin-page.tsx:160
 msgid "Filter by kind"
 msgstr "按类型筛选"
 
@@ -15347,6 +15348,7 @@ msgstr "按模式筛选"
 msgid "Filter by provider"
 msgstr "按提供商筛选"
 
+#: src/features/admin/components/users-management-card.tsx:126
 #: src/features/admin/components/users-management-card.tsx:127
 msgid "Filter by role"
 msgstr "按角色筛选"
@@ -15359,6 +15361,7 @@ msgstr "按角色筛选"
 #~ msgid "Filter by tag ({activeCount} selected)"
 #~ msgstr "按标签筛选（已选 {activeCount} 个）"
 
+#: src/features/admin/components/users-management-card.tsx:137
 #: src/features/admin/components/users-management-card.tsx:138
 msgid "Filter by type"
 msgstr "按类型筛选"
@@ -16144,7 +16147,7 @@ msgstr "伽马"
 msgid "Gateway"
 msgstr "网关"
 
-#: src/routes/admin/gateway.tsx:26
+#: src/routes/admin/gateway.tsx:27
 msgid "Gateway sections"
 msgstr "网关版块"
 
@@ -17051,7 +17054,7 @@ msgstr "访客"
 msgid "Guest Account"
 msgstr "访客账号"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:137
+#: src/features/admin/components/admin-dashboard-stats.tsx:105
 msgid "Guest accounts"
 msgstr "访客账号"
 
@@ -17574,7 +17577,7 @@ msgstr "托管方"
 msgid "hotkey"
 msgstr "热键"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:142
+#: src/features/admin/components/admin-provider-cache-row.tsx:147
 #: src/features/settings/components/chat/usage-settings.tsx:98
 msgid "Hour"
 msgstr "小时"
@@ -17740,7 +17743,7 @@ msgstr "从想法到成品，一个对话搞定"
 msgid "Ideal for simple classification and extraction"
 msgstr "非常适合简单的分类和提取任务"
 
-#: src/features/admin/components/feedback-admin-page.tsx:169
+#: src/features/admin/components/feedback-admin-page.tsx:164
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:71
 msgid "Ideas"
 msgstr "创意"
@@ -17755,7 +17758,7 @@ msgstr "身份"
 msgid "Idle"
 msgstr "空闲"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:162
+#: src/features/admin/components/admin-shard-footprint-row.tsx:165
 msgid "Idle for at least"
 msgstr "闲置至少"
 
@@ -17995,7 +17998,7 @@ msgstr "img2img"
 msgid "Img2Img"
 msgstr "Img2Img"
 
-#: src/features/admin/components/user-cell.tsx:128
+#: src/features/admin/components/user-cell.tsx:126
 msgid "Impersonate"
 msgstr "模拟登录"
 
@@ -18007,7 +18010,7 @@ msgstr "模拟登录用户"
 msgid "Impersonated"
 msgstr "模拟登录"
 
-#: src/features/admin/components/audit-log-card.tsx:144
+#: src/features/admin/components/audit-log-card.tsx:138
 msgid "Impersonation Start"
 msgstr "开始模拟登录"
 
@@ -18019,7 +18022,7 @@ msgstr "已开始模拟登录"
 msgid "Impersonation started. Click \"Stop Impersonating\" in the header to return to your account."
 msgstr "已开始模拟登录。点击页头的“停止模拟登录”即可返回你的账号。"
 
-#: src/features/admin/components/audit-log-card.tsx:145
+#: src/features/admin/components/audit-log-card.tsx:139
 msgid "Impersonation Stop"
 msgstr "停止模拟登录"
 
@@ -18357,15 +18360,15 @@ msgid "Inactive chats will be archived after {days} days"
 msgstr "不活跃的聊天将在 {days} 天后归档"
 
 #. placeholder {0}: preview.thresholdDays
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:217
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:231
 msgid "Inactive for more than {0} days"
 msgstr "超过 {0} 天未活跃"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:129
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:141
 msgid "Inactivity threshold"
 msgstr "不活跃阈值"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:96
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:105
 msgid "Inactivity threshold (days)"
 msgstr "不活跃阈值（天）"
 
@@ -19618,7 +19621,7 @@ msgstr "最新 Sonnet，具备透明推理，适合复杂分析任务"
 msgid "Latest updated Sonnet model from Anthropic"
 msgstr "Anthropic 最新更新的 Sonnet 模型"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:216
+#: src/features/admin/components/admin-dashboard-stats.tsx:180
 msgid "Latest users who joined the platform"
 msgstr "最近加入平台的用户"
 
@@ -20075,7 +20078,7 @@ msgstr "LLaMA、Mixtral、Gemma——最快推理"
 msgid "llm"
 msgstr "llm"
 
-#: src/routes/admin/gateway.tsx:19
+#: src/routes/admin/gateway.tsx:20
 msgid "LLM Gateway"
 msgstr "LLM Gateway"
 
@@ -20423,7 +20426,7 @@ msgid "Loading..."
 msgstr "正在加载..."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:383
-#: src/features/admin/components/admin-provider-cache-row.tsx:85
+#: src/features/admin/components/admin-provider-cache-row.tsx:82
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:478
@@ -20816,7 +20819,7 @@ msgstr "推理和指令遵循能力大幅提升"
 msgid "Make {name} the default repository"
 msgstr "将 {name} 设为默认仓库"
 
-#: src/features/admin/components/user-cell.tsx:115
+#: src/features/admin/components/user-cell.tsx:113
 msgid "Make Admin"
 msgstr "设为管理员"
 
@@ -21115,7 +21118,7 @@ msgstr "最大景深，锐利清晰"
 msgid "Maximum detail and sharpness"
 msgstr "极致细节与清晰度"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:113
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:119
 msgid "Maximum number of users to delete per cleanup run."
 msgstr "每次清理运行最多删除的用户数。"
 
@@ -21179,11 +21182,11 @@ msgstr "MCP 服务器"
 msgid "MCP tools"
 msgstr "MCP 工具"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:228
+#: src/features/admin/components/admin-shard-footprint-row.tsx:238
 msgid "Measure more shards"
 msgstr "测量更多分片"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:224
+#: src/features/admin/components/admin-shard-footprint-row.tsx:234
 msgid "Measuring…"
 msgstr "正在测量…"
 
@@ -21459,12 +21462,12 @@ msgstr "消息分支"
 msgid "Message input"
 msgstr "消息输入"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:129
-#: src/features/admin/components/admin-shard-footprint-row.tsx:143
+#: src/features/admin/components/admin-shard-footprint-row.tsx:128
+#: src/features/admin/components/admin-shard-footprint-row.tsx:144
 msgid "Message rows"
 msgstr "消息行"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:201
+#: src/features/admin/components/admin-shard-footprint-row.tsx:206
 msgid "Message rows of the largest threads"
 msgstr "最大对话的消息行数"
 
@@ -21825,7 +21828,7 @@ msgstr "模式 {0}，使用 {1}。创建时不会启动任何内容。"
 msgid "Mode:"
 msgstr "模式："
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:179
+#: src/features/admin/components/admin-provider-cache-row.tsx:186
 #: src/features/chat/host/host-options.tsx:146
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
@@ -21855,7 +21858,7 @@ msgstr "模型"
 msgid "Model already blocked"
 msgstr "模型已被屏蔽"
 
-#: src/routes/admin/gateway/index.tsx:351
+#: src/routes/admin/gateway/index.tsx:323
 msgid "Model Breakdown"
 msgstr "模型明细"
 
@@ -22999,7 +23002,7 @@ msgstr "新建临时聊天"
 msgid "New temporary thread"
 msgstr "新建临时对话"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:160
+#: src/features/admin/components/admin-dashboard-stats.tsx:127
 msgid "New this week"
 msgstr "本周新增"
 
@@ -23017,7 +23020,7 @@ msgstr "新建对话"
 msgid "New Trigger"
 msgstr "新建触发器"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:173
+#: src/features/admin/components/admin-dashboard-stats.tsx:151
 msgid "New user registrations per day"
 msgstr "每日新注册用户"
 
@@ -23025,7 +23028,7 @@ msgstr "每日新注册用户"
 msgid "New Workflow"
 msgstr "新建工作流"
 
-#: src/features/admin/components/feedback-admin-page.tsx:184
+#: src/features/admin/components/feedback-admin-page.tsx:180
 msgid "Newer"
 msgstr "较新"
 
@@ -23241,7 +23244,7 @@ msgstr "还没有对话，在上方开始一个吧。"
 msgid "No checks have run for this commit."
 msgstr "此提交尚未运行任何检查。"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:351
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:369
 msgid "No cleanup runs yet"
 msgstr "还没有清理记录"
 
@@ -23524,7 +23527,7 @@ msgstr "未找到模型。"
 msgid "No models installed yet."
 msgstr "还没有安装模型。"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:246
+#: src/features/admin/components/admin-dashboard-stats.tsx:208
 #: src/features/admin/components/feedback-admin-page.tsx:49
 #: src/features/admin/components/user-cell.tsx:72
 msgid "No name"
@@ -24187,7 +24190,7 @@ msgstr "新颖的基于扩散的语言模型架构"
 msgid "now"
 msgstr "刚刚"
 
-#: src/features/admin/components/nsfw-review-page.tsx:16
+#: src/features/admin/components/nsfw-review-page.tsx:18
 msgid "NSFW Content Review"
 msgstr "NSFW 内容审核"
 
@@ -24196,7 +24199,7 @@ msgstr "NSFW 内容审核"
 msgid "NSFW Review"
 msgstr "NSFW 审核"
 
-#: src/features/admin/components/nsfw-review-page.tsx:21
+#: src/features/admin/components/nsfw-review-page.tsx:23
 msgid "NSFW review backend is not yet implemented. This page will display flagged images for moderation once the backend functions are available."
 msgstr "NSFW 审核后端尚未实现。后端功能可用后，此页面将显示被标记的图片以供审核。"
 
@@ -24334,7 +24337,7 @@ msgid "old lines {text}"
 msgstr "旧版第 {text} 行"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:45
-#: src/features/admin/components/feedback-admin-page.tsx:196
+#: src/features/admin/components/feedback-admin-page.tsx:192
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:634
 msgid "Older"
 msgstr "更早"
@@ -24808,7 +24811,7 @@ msgstr "再次打开"
 msgid "Open links"
 msgstr "打开链接"
 
-#: src/features/admin/components/user-cell.tsx:102
+#: src/features/admin/components/user-cell.tsx:101
 msgid "Open menu"
 msgstr "打开菜单"
 
@@ -25559,7 +25562,7 @@ msgstr "原始系统提示词"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:171
 #: src/features/admin/components/feedback-admin-page.tsx:24
-#: src/features/admin/components/feedback-admin-page.tsx:171
+#: src/features/admin/components/feedback-admin-page.tsx:166
 #: src/features/feedback/components/send-feedback-dialog.tsx:30
 #: src/features/settings/components/chat/models-settings.tsx:515
 msgid "Other"
@@ -26024,7 +26027,7 @@ msgstr "已设置密码"
 msgid "Passwords do not match"
 msgstr "两次输入的密码不一致"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:358
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:373
 msgid "Past cleanup runs and their results"
 msgstr "过去的清理运行及其结果"
 
@@ -26215,6 +26218,7 @@ msgstr "性能审查员"
 
 #: src/features/settings/components/chat/usage-settings.tsx:248
 #: src/features/settings/components/chat/usage-settings.tsx:460
+#: src/routes/admin/gateway/index.tsx:226
 msgid "Period"
 msgstr "期间"
 
@@ -26482,7 +26486,7 @@ msgstr "已置顶的图像"
 msgid "Pinned project"
 msgstr "已置顶的项目"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:189
+#: src/features/admin/components/admin-shard-footprint-row.tsx:194
 msgid "Pinned threads"
 msgstr "已置顶的对话"
 
@@ -26993,7 +26997,7 @@ msgstr "预览"
 msgid "Preview {name}"
 msgstr "预览 {name}"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:204
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:221
 msgid "Preview & Execute"
 msgstr "预览并执行"
 
@@ -27009,7 +27013,7 @@ msgstr "抢先体验 Qwen 最先进的模型"
 msgid "Preview execution order (dry run)"
 msgstr "预览执行顺序（试运行）"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:205
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:221
 msgid "Preview how many users will be removed, then execute cleanup."
 msgstr "预览将删除多少用户，然后执行清理。"
 
@@ -27207,7 +27211,7 @@ msgstr "Pro 模型需要 Pro 套餐。免费套餐下，运行会在开始前停
 msgid "Problem"
 msgstr "问题"
 
-#: src/features/admin/components/feedback-admin-page.tsx:170
+#: src/features/admin/components/feedback-admin-page.tsx:165
 msgid "Problems"
 msgstr "问题"
 
@@ -27540,10 +27544,10 @@ msgstr "提示词搜索仍在准备中，请稍后再试。"
 msgid "Prompt to run on all models..."
 msgstr "要在所有模型上运行的提示词..."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:101
-#: src/features/admin/components/admin-provider-cache-row.tsx:120
-#: src/features/admin/components/admin-provider-cache-row.tsx:144
-#: src/features/admin/components/admin-provider-cache-row.tsx:182
+#: src/features/admin/components/admin-provider-cache-row.tsx:102
+#: src/features/admin/components/admin-provider-cache-row.tsx:123
+#: src/features/admin/components/admin-provider-cache-row.tsx:149
+#: src/features/admin/components/admin-provider-cache-row.tsx:189
 msgid "Prompt tokens"
 msgstr "提示词 token"
 
@@ -27612,7 +27616,7 @@ msgid "Proven reliability from previous generation"
 msgstr "上一代久经验证的可靠性"
 
 #: src/components/model-picker/model-picker.tsx:283
-#: src/features/admin/components/admin-provider-cache-row.tsx:180
+#: src/features/admin/components/admin-provider-cache-row.tsx:187
 #: src/features/settings/components/chat/native-providers-settings.tsx:467
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -27630,7 +27634,7 @@ msgstr "提供商账户"
 msgid "Provider added — its models are now in the model picker"
 msgstr "已添加提供商，其模型现已出现在模型选择器中"
 
-#: src/routes/admin/gateway/index.tsx:326
+#: src/routes/admin/gateway/index.tsx:307
 msgid "Provider Health"
 msgstr "提供商健康状况"
 
@@ -27803,7 +27807,7 @@ msgstr "在输入框中填入一条提示，在本地副本中将此复刻的分
 msgid "Quality"
 msgstr "质量"
 
-#: src/routes/admin/gateway/index.tsx:305
+#: src/routes/admin/gateway/index.tsx:290
 msgid "Query complexity tiers assigned by the routing engine"
 msgstr "路由引擎分配的查询复杂度等级"
 
@@ -28362,7 +28366,7 @@ msgstr "最近的对话"
 msgid "Recent messages"
 msgstr "最近的消息"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:215
+#: src/features/admin/components/admin-dashboard-stats.tsx:180
 msgid "Recent Registrations"
 msgstr "最近注册"
 
@@ -28580,8 +28584,8 @@ msgstr "改进版 GPT-5，指令遵循能力提升"
 msgid "Refining the draft…"
 msgstr "正在优化草稿…"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:221
-#: src/features/admin/components/feedback-admin-page.tsx:161
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:236
+#: src/features/admin/components/feedback-admin-page.tsx:156
 msgid "Refresh"
 msgstr "刷新"
 
@@ -28634,11 +28638,11 @@ msgstr "仅限受邀注册。请打开邀请中的链接；如果已有账户，
 msgid "Regressed"
 msgstr "已退步"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:181
+#: src/features/admin/components/admin-dashboard-stats.tsx:146
 msgid "Regular"
 msgstr "普通"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:132
+#: src/features/admin/components/admin-dashboard-stats.tsx:101
 #: src/features/admin/components/users-management-card.tsx:142
 msgid "Regular Users"
 msgstr "普通用户"
@@ -28850,7 +28854,7 @@ msgid "Remove {shown}"
 msgstr "移除 {shown}"
 
 #: src/features/admin/components/update-user-role-dialog.tsx:64
-#: src/features/admin/components/user-cell.tsx:110
+#: src/features/admin/components/user-cell.tsx:108
 msgid "Remove Admin"
 msgstr "移除管理员"
 
@@ -29232,7 +29236,7 @@ msgstr "请求超时"
 msgid "Request validation, content filtering, and HMAC-SHA256 authentication on every request."
 msgstr "每个请求均进行请求校验、内容过滤和 HMAC-SHA256 认证。"
 
-#: src/routes/admin/gateway/index.tsx:354
+#: src/routes/admin/gateway/index.tsx:323
 msgid "Request volume, cost, and error count per model"
 msgstr "每个模型的请求量、成本和错误数"
 
@@ -29249,10 +29253,10 @@ msgstr "正在请求..."
 msgid "Requesting…"
 msgstr "正在请求…"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:105
-#: src/features/admin/components/admin-provider-cache-row.tsx:119
-#: src/features/admin/components/admin-provider-cache-row.tsx:143
-#: src/features/admin/components/admin-provider-cache-row.tsx:181
+#: src/features/admin/components/admin-provider-cache-row.tsx:106
+#: src/features/admin/components/admin-provider-cache-row.tsx:122
+#: src/features/admin/components/admin-provider-cache-row.tsx:148
+#: src/features/admin/components/admin-provider-cache-row.tsx:188
 #: src/features/settings/components/chat/usage-settings.tsx:283
 #: src/features/settings/components/chat/usage-settings.tsx:325
 #: src/routes/admin/gateway/index.tsx:89
@@ -29648,7 +29652,7 @@ msgstr "审核"
 msgid "Review and add"
 msgstr "审阅并添加"
 
-#: src/features/admin/components/nsfw-review-page.tsx:18
+#: src/features/admin/components/nsfw-review-page.tsx:14
 msgid "Review and moderate flagged content across chat and vault."
 msgstr "审核并处理聊天和文件库中被标记的内容。"
 
@@ -29803,7 +29807,7 @@ msgstr "角色未改变"
 msgid "Role Updated"
 msgstr "角色已更新"
 
-#: src/features/admin/components/audit-log-card.tsx:140
+#: src/features/admin/components/audit-log-card.tsx:134
 msgid "Role Updates"
 msgstr "角色变更"
 
@@ -29906,7 +29910,7 @@ msgstr "Neore 中的例行任务：为智能体指定任务和重复计划。它
 msgid "Routines that run while you are away"
 msgstr "你不在时运行的例行任务"
 
-#: src/routes/admin/gateway/index.tsx:302
+#: src/routes/admin/gateway/index.tsx:291
 msgid "Routing Tier Distribution"
 msgstr "路由等级分布"
 
@@ -29968,7 +29972,7 @@ msgstr "以机器人身份运行（可选）"
 msgid "Run code in a sandboxed environment with shell access, file operations, and persistent sessions."
 msgstr "在沙盒环境中运行代码，支持 shell 访问、文件操作和持久会话。"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:191
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:210
 msgid "Run dry run"
 msgstr "执行试运行"
 
@@ -29981,7 +29985,7 @@ msgstr "{0} 的运行"
 msgid "Run history"
 msgstr "运行历史"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:357
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:373
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:214
 msgid "Run History"
 msgstr "运行历史"
@@ -30050,7 +30054,7 @@ msgid "Running on {device}…"
 msgstr "正在 {device} 上运行…"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:251
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:258
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:272
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
 msgid "Running..."
@@ -30184,7 +30188,7 @@ msgid "Saudi Arabia"
 msgstr "沙特阿拉伯"
 
 #: ../../packages/ui/src/components/inline-edit.tsx:119
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:118
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:125
 #: src/features/auth/components/organization/billing-settings-card.tsx:133
 #: src/features/auth/components/organization/billing-settings-card.tsx:280
 #: src/features/auth/components/organization/organization-name-card.tsx:100
@@ -30439,11 +30443,11 @@ msgstr "计划任务或 webhook"
 msgid "Scheduled"
 msgstr "计划中"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:148
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:170
 msgid "Scheduled cleanup"
 msgstr "定时清理"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:342
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:360
 msgid "Scheduled job"
 msgstr "定时任务"
 
@@ -31371,10 +31375,10 @@ msgstr "塞尔维亚语（塞尔维亚）"
 msgid "Serif"
 msgstr "衬线"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:97
-#: src/features/admin/components/admin-provider-cache-row.tsx:121
-#: src/features/admin/components/admin-provider-cache-row.tsx:145
-#: src/features/admin/components/admin-provider-cache-row.tsx:183
+#: src/features/admin/components/admin-provider-cache-row.tsx:98
+#: src/features/admin/components/admin-provider-cache-row.tsx:124
+#: src/features/admin/components/admin-provider-cache-row.tsx:150
+#: src/features/admin/components/admin-provider-cache-row.tsx:190
 msgid "Served from cache"
 msgstr "来自缓存"
 
@@ -31427,7 +31431,7 @@ msgstr "服务器"
 msgid "Servers over SSH"
 msgstr "SSH 服务器"
 
-#: src/features/admin/components/audit-log-card.tsx:143
+#: src/features/admin/components/audit-log-card.tsx:137
 msgid "Session Revocations"
 msgstr "会话撤销"
 
@@ -31548,17 +31552,17 @@ msgstr "形状"
 msgid "Shard footprint"
 msgstr "分片占用"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:121
+#: src/features/admin/components/admin-shard-footprint-row.tsx:120
 msgid "Shards"
 msgstr "分片"
 
 #. placeholder {0}: formatNumber(page.data.pendingShards, i18n.locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:215
+#: src/features/admin/components/admin-shard-footprint-row.tsx:222
 msgid "Shards still being measured: {0}. Measure more shards to finish them."
 msgstr "仍在测量的分片：{0}。测量更多分片以完成。"
 
 #. placeholder {0}: formatNumber(totals.abandonedShards, i18n.locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:219
+#: src/features/admin/components/admin-shard-footprint-row.tsx:228
 msgid "Shards that could not be measured are left out of the totals: {0}."
 msgstr "无法测量的分片未计入合计：{0}。"
 
@@ -32152,7 +32156,7 @@ msgstr "已达到大小上限"
 msgid "Size of the text in chat messages. The sidebar and the rest of the app keep their size."
 msgstr "聊天消息中文字的大小。侧边栏和应用的其余部分保持原有大小。"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:207
+#: src/features/admin/components/admin-shard-footprint-row.tsx:212
 msgid "Sizes of the largest shards"
 msgstr "最大分片的大小"
 
@@ -32394,7 +32398,7 @@ msgstr "智能路由会自动按复杂度（简单、标准、复杂、推理）
 msgid "Smart routing decisions, model usage, and provider health"
 msgstr "智能路由决策、模型用量和提供商健康状况"
 
-#: src/routes/admin/gateway.tsx:22
+#: src/routes/admin/gateway.tsx:23
 msgid "Smart routing, model usage, and provider health"
 msgstr "智能路由、模型用量和提供商状态"
 
@@ -33398,7 +33402,7 @@ msgstr "已停止。"
 msgid "Stopping…"
 msgstr "正在停止…"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:110
+#: src/features/admin/components/admin-shard-footprint-row.tsx:107
 msgid "Stored conversation data across user shards: threads, message rows and an estimate of their size, by thread group and age. Counts only; no thread or shard is listed."
 msgstr "跨用户分片存储的对话数据：对话、消息行及其大小估算，按对话分组和时长统计。仅显示计数，不列出任何对话或分片。"
 
@@ -35736,12 +35740,12 @@ msgstr "无法检查该提示词，请重试。"
 msgid "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
 msgstr "这些请求由提供商直接向你计费。如果我们知道模型的价格，将以积分收取自有密钥的常规平台费用。"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:91
+#: src/features/admin/components/admin-provider-cache-row.tsx:90
 msgid "The provider cache readings could not be loaded."
 msgstr "无法加载提供商缓存读数。"
 
 #. placeholder {0}: formatDateTime(readings.dataUpdatedAt, locale, { dateStyle: "short", timeStyle: "short", timeZone })
-#: src/features/admin/components/admin-provider-cache-row.tsx:92
+#: src/features/admin/components/admin-provider-cache-row.tsx:91
 msgid "The provider cache readings could not be refreshed. The figures below are from {0}."
 msgstr "无法刷新提供商缓存读数。以下数据来自 {0}。"
 
@@ -35854,11 +35858,11 @@ msgstr "搜索失败，请重试。"
 msgid "The server lists no models yet — pull or load one first"
 msgstr "服务器尚未列出任何模型——请先拉取或加载一个"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:116
+#: src/features/admin/components/admin-shard-footprint-row.tsx:113
 msgid "The shard footprint could not be measured."
 msgstr "无法测量分片占用。"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:62
+#: src/features/admin/components/admin-provider-cache-row.tsx:59
 msgid "The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Only chat calls count, and answers from the gateway's response cache are left out. Days and hours are in {timeZone}."
 msgstr "提供商从自身缓存中提供的提示词 token 所占比例。按天和按小时统计过去 30 天内使用过缓存的提供商与模型组合；模型表列出提示词 token 最多的前 50 个模型。仅统计聊天调用，不包括来自网关响应缓存的回答。日期和时间采用 {timeZone}。"
 
@@ -36814,7 +36818,7 @@ msgid "This will create a new version with this content"
 msgstr "这将使用此内容创建一个新版本"
 
 #. placeholder {0}: preview?.eligibleCount ?? 0
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:276
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:290
 msgid "This will permanently delete {0} anonymous user accounts and all their data. This action cannot be undone."
 msgstr "这将永久删除 {0} 个匿名用户账号及其所有数据。此操作无法撤销。"
 
@@ -36977,9 +36981,9 @@ msgid "Thread will auto-delete in {0}"
 msgstr "对话将在 {0} 后自动删除"
 
 #: src/components/command-palette.tsx:938
-#: src/features/admin/components/admin-shard-footprint-row.tsx:125
-#: src/features/admin/components/admin-shard-footprint-row.tsx:142
-#: src/features/admin/components/admin-shard-footprint-row.tsx:163
+#: src/features/admin/components/admin-shard-footprint-row.tsx:124
+#: src/features/admin/components/admin-shard-footprint-row.tsx:143
+#: src/features/admin/components/admin-shard-footprint-row.tsx:166
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:35
 #: src/features/chat/thread-list/thread-list-filter-menu.tsx:107
 msgid "Threads"
@@ -37002,7 +37006,7 @@ msgstr "在你自己的设备上使用编码智能体需要三个步骤。可跳
 msgid "Threshold"
 msgstr "阈值"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:48
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:50
 msgid "Threshold must be between 1 and 365 days"
 msgstr "阈值必须在 1 到 365 天之间"
 
@@ -37303,7 +37307,7 @@ msgstr "工具调用"
 msgid "Tool Calling"
 msgstr "工具调用"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:179
+#: src/features/admin/components/admin-shard-footprint-row.tsx:184
 msgid "Tool output's share of the stored size"
 msgstr "工具输出占存储大小的比例"
 
@@ -37317,7 +37321,7 @@ msgid "Tool Provider Keys"
 msgstr "工具提供商密钥"
 
 #. placeholder {0}: formatNumber(COMPACT_AFTER_DAYS, locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:183
+#: src/features/admin/components/admin-shard-footprint-row.tsx:188
 msgid "Tool results of 64 KB or more, in threads idle at least {0} days"
 msgstr "闲置至少 {0} 天的对话中 64 KB 及以上的工具结果"
 
@@ -37419,7 +37423,7 @@ msgstr "总成本"
 msgid "Total Cost"
 msgstr "总成本"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:125
+#: src/features/admin/components/admin-dashboard-stats.tsx:94
 msgid "Total Users"
 msgstr "用户总数"
 
@@ -37431,7 +37435,7 @@ msgstr "此对话中所有回复的总计，包括重新生成的备选回复。
 msgid "Totals per model"
 msgstr "每个模型的总计"
 
-#: src/features/admin/components/audit-log-card.tsx:131
+#: src/features/admin/components/audit-log-card.tsx:145
 msgid "Track all admin actions for accountability"
 msgstr "追踪所有管理员操作，便于问责"
 
@@ -37563,7 +37567,7 @@ msgstr "对视觉输入进行透明推理"
 msgid "Transparent thinking for legal, financial, and technical tasks"
 msgstr "面向法律、金融和技术任务的透明思考"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:195
+#: src/features/admin/components/admin-shard-footprint-row.tsx:200
 msgid "Trashed, temporary, being deleted or orphaned"
 msgstr "已移至回收站、临时、正在删除或孤立"
 
@@ -38013,11 +38017,11 @@ msgstr "不可用"
 
 #: src/features/admin/components/ban-user-dialog.tsx:89
 #: src/features/admin/components/ban-user-dialog.tsx:99
-#: src/features/admin/components/user-cell.tsx:137
+#: src/features/admin/components/user-cell.tsx:135
 msgid "Unban User"
 msgstr "解封用户"
 
-#: src/features/admin/components/audit-log-card.tsx:142
+#: src/features/admin/components/audit-log-card.tsx:136
 msgid "Unbans"
 msgstr "解封"
 
@@ -38843,7 +38847,8 @@ msgstr "已移除用户访问权限"
 msgid "User Banned"
 msgstr "用户已封禁"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:172
+#: src/features/admin/components/admin-dashboard-stats.tsx:141
+#: src/features/admin/components/admin-dashboard-stats.tsx:152
 msgid "User Growth (Last 7 Days)"
 msgstr "用户增长（过去 7 天）"
 
@@ -38924,7 +38929,7 @@ msgstr "用户名：@{platformUsername}"
 msgid "Users"
 msgstr "用户"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:136
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:147
 msgid "users / run"
 msgstr "用户 / 次"
 
@@ -39450,7 +39455,7 @@ msgstr "查看隐私政策"
 msgid "View pull request"
 msgstr "查看拉取请求"
 
-#: src/features/admin/components/user-cell.tsx:122
+#: src/features/admin/components/user-cell.tsx:120
 msgid "View Sessions"
 msgstr "查看会话"
 
@@ -39958,7 +39963,7 @@ msgstr "工作日 09:00 UTC"
 msgid "Weekdays at 8 AM"
 msgstr "工作日上午 8 点"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:162
+#: src/features/admin/components/admin-dashboard-stats.tsx:130
 msgid "Weekly Growth"
 msgstr "每周增长"
 
@@ -40114,7 +40119,7 @@ msgstr "要发送什么，以及如何区分好答案和坏答案。"
 msgid "What to watch"
 msgstr "监视内容"
 
-#: src/features/admin/components/feedback-admin-page.tsx:155
+#: src/features/admin/components/feedback-admin-page.tsx:171
 msgid "What users sent from the app, newest first"
 msgstr "用户从应用发送的内容，最新的在前"
 
@@ -40316,7 +40321,7 @@ msgstr "宽度"
 msgid "Will be saved as your {provider} API key"
 msgstr "将保存为你的 {provider} API 密钥"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:67
+#: src/features/admin/components/admin-provider-cache-row.tsx:64
 msgid "Window"
 msgstr "时间范围"
 
@@ -40324,11 +40329,11 @@ msgstr "时间范围"
 msgid "Windows"
 msgstr "Windows"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:144
+#: src/features/admin/components/admin-dashboard-stats.tsx:112
 msgid "With admin privileges"
 msgstr "拥有管理员权限"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:130
+#: src/features/admin/components/admin-dashboard-stats.tsx:98
 msgid "With email/password"
 msgstr "使用邮箱/密码"
 

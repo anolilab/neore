@@ -420,7 +420,7 @@ msgstr "{0, plural, one {# verificação obrigatória ou desconhecida ainda est�
 
 #. placeholder {0}: readings.compactable.largeToolRows
 #. placeholder {1}: formatBytes(readings.compactable.largeToolBytes, locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:185
+#: src/features/admin/components/admin-shard-footprint-row.tsx:190
 msgid "{0, plural, one {# result} other {# results}}, {1}"
 msgstr "{0, plural, one {# resultado} other {# resultados}}, {1}"
 
@@ -458,8 +458,8 @@ msgstr "{0, plural, one {# conversa} other {# conversas}}"
 #. placeholder {0}: readings.pinned.threads
 #. placeholder {1}: formatBytes(readings.other.approxBytes, locale)
 #. placeholder {1}: formatBytes(readings.pinned.approxBytes, locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:191
-#: src/features/admin/components/admin-shard-footprint-row.tsx:197
+#: src/features/admin/components/admin-shard-footprint-row.tsx:196
+#: src/features/admin/components/admin-shard-footprint-row.tsx:202
 msgid "{0, plural, one {# thread} other {# threads}}, {1}"
 msgstr "{0, plural, one {# conversa} other {# conversas}}, {1}"
 
@@ -474,7 +474,7 @@ msgid "{0, plural, one {# tool found} other {# tools found}}"
 msgstr "{0, plural, one {# ferramenta encontrada} other {# ferramentas encontradas}}"
 
 #. placeholder {0}: day.count
-#: src/features/admin/components/admin-dashboard-stats.tsx:200
+#: src/features/admin/components/admin-dashboard-stats.tsx:167
 msgid "{0, plural, one {# user} other {# users}}"
 msgstr "{0, plural, one {# usuário} other {# usuários}}"
 
@@ -617,9 +617,9 @@ msgstr "{0} cabeçalhos personalizados"
 
 #. placeholder {0}: formatNumber(row.sinceDays, locale)
 #. placeholder {0}: formatNumber(window, locale)
-#: src/features/admin/components/admin-provider-cache-row.tsx:80
-#: src/features/admin/components/admin-shard-footprint-row.tsx:150
-#: src/features/admin/components/admin-shard-footprint-row.tsx:170
+#: src/features/admin/components/admin-provider-cache-row.tsx:77
+#: src/features/admin/components/admin-shard-footprint-row.tsx:151
+#: src/features/admin/components/admin-shard-footprint-row.tsx:173
 msgid "{0} days"
 msgstr "{0} dias"
 
@@ -639,8 +639,8 @@ msgstr "{0} decorridos"
 #. placeholder {1}: log.deletedCount
 #. placeholder {2}: lastResult.durationMs
 #. placeholder {2}: log.durationMs
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:234
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:338
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:247
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:356
 msgid "{0} eligible · {1} deleted · {2}ms"
 msgstr "{0} elegíveis · {1} excluídos · {2}ms"
 
@@ -1863,7 +1863,7 @@ msgstr "21:9 (Ultrawide)"
 msgid "235B parameter Mixture-of-Experts architecture"
 msgstr "Arquitetura Mixture-of-Experts com 235B de parâmetros"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:80
+#: src/features/admin/components/admin-provider-cache-row.tsx:77
 #: src/features/admin/components/ban-user-dialog.tsx:29
 msgid "24 hours"
 msgstr "24 horas"
@@ -1972,7 +1972,7 @@ msgstr "7 dias"
 msgid "7 Days"
 msgstr "7 dias"
 
-#: src/routes/admin/gateway/index.tsx:375
+#: src/routes/admin/gateway/index.tsx:338
 msgid "7-Day Cost Trend"
 msgstr "Tendência de custo em 7 dias"
 
@@ -2555,7 +2555,7 @@ msgstr "Sessões ativas ({0})"
 msgid "Active Threads"
 msgstr "Conversas ativas"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:159
+#: src/features/admin/components/admin-shard-footprint-row.tsx:162
 msgid "Active threads, by days since their last activity. Threads waiting on a person are included."
 msgstr "Conversas ativas, por dias desde a última atividade. As que aguardam uma pessoa estão incluídas."
 
@@ -3039,7 +3039,7 @@ msgstr "Ajustar"
 #: src/features/layout/lib/dashboard-page-names.ts:12
 #: src/routes/admin/route.tsx:57
 #: src/routes/admin/route.tsx:77
-#: src/routes/admin/route.tsx:88
+#: src/routes/admin/route.tsx:98
 msgid "Admin"
 msgstr "Admin"
 
@@ -3047,7 +3047,7 @@ msgstr "Admin"
 msgid "Admin Granted"
 msgstr "Admin concedido"
 
-#: src/features/admin/components/audit-log-card.tsx:146
+#: src/features/admin/components/audit-log-card.tsx:140
 msgid "Admin Grants"
 msgstr "Concessões de admin"
 
@@ -3055,7 +3055,7 @@ msgstr "Concessões de admin"
 msgid "Admin privileges have been removed"
 msgstr "Os privilégios de admin foram removidos"
 
-#: src/features/admin/components/audit-log-card.tsx:147
+#: src/features/admin/components/audit-log-card.tsx:141
 msgid "Admin Revocations"
 msgstr "Revogações de admin"
 
@@ -3063,7 +3063,7 @@ msgstr "Revogações de admin"
 msgid "Admin Revoked"
 msgstr "Admin revogado"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:146
+#: src/features/admin/components/admin-dashboard-stats.tsx:115
 msgid "Administrators"
 msgstr "Administradores"
 
@@ -3547,11 +3547,11 @@ msgstr "Todas ({0})"
 msgid "All {provider} models enabled"
 msgstr "Todos os modelos de {provider} ativados"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:123
+#: src/features/admin/components/admin-dashboard-stats.tsx:91
 msgid "All accounts"
 msgstr "Todas as contas"
 
-#: src/features/admin/components/audit-log-card.tsx:139
+#: src/features/admin/components/audit-log-card.tsx:133
 msgid "All Actions"
 msgstr "Todas as ações"
 
@@ -3610,7 +3610,7 @@ msgstr "Todos os ícones"
 msgid "All installers"
 msgstr "Todos os instaladores"
 
-#: src/features/admin/components/feedback-admin-page.tsx:168
+#: src/features/admin/components/feedback-admin-page.tsx:163
 msgid "All kinds"
 msgstr "Todos os tipos"
 
@@ -3665,7 +3665,7 @@ msgstr "Todos os prompts"
 #. placeholder {0}: formatNumber(data.all.requests, locale)
 #. placeholder {1}: formatNumber(data.all.promptTokens, locale)
 #. placeholder {2}: shareText(data.all, locale)
-#: src/features/admin/components/admin-provider-cache-row.tsx:111
+#: src/features/admin/components/admin-provider-cache-row.tsx:112
 msgid "All provider traffic in the window, caching or not. Requests: {0}. Prompt tokens: {1}. Served from cache: {2}."
 msgstr "Todo o tráfego dos provedores no período, com ou sem cache. Solicitações: {0}. Tokens de prompt: {1}. Servido do cache: {2}."
 
@@ -3703,7 +3703,7 @@ msgstr "Todas as funções"
 msgid "All Servers"
 msgstr "Todos os servidores"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:234
+#: src/features/admin/components/admin-shard-footprint-row.tsx:244
 msgid "All shards measured."
 msgstr "Todos os shards medidos."
 
@@ -3723,7 +3723,7 @@ msgstr "Todos os tipos"
 msgid "All use cases"
 msgstr "Todos os casos de uso"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:180
+#: src/features/admin/components/admin-dashboard-stats.tsx:145
 msgid "All Users"
 msgstr "Todos os usuários"
 
@@ -4006,18 +4006,18 @@ msgstr "Anual"
 msgid "Annual billing"
 msgstr "Cobrança anual"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:182
-#: src/features/admin/components/admin-dashboard-stats.tsx:250
+#: src/features/admin/components/admin-dashboard-stats.tsx:147
+#: src/features/admin/components/admin-dashboard-stats.tsx:212
 #: src/features/admin/components/user-cell.tsx:76
 #: src/features/admin/components/users-management-card.tsx:143
 msgid "Anonymous"
 msgstr "Anônimo"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:139
+#: src/features/admin/components/admin-dashboard-stats.tsx:108
 msgid "Anonymous Users"
 msgstr "Usuários anônimos"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:106
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:103
 msgid "Anonymous users inactive for this many days become eligible for deletion."
 msgstr "Usuários anônimos inativos por esta quantidade de dias ficam elegíveis para exclusão."
 
@@ -4130,7 +4130,7 @@ msgstr "Qualquer outra tarefa independente."
 msgid "Any string you choose; enter the same value as the webhook Verify token in the Meta app"
 msgstr "Qualquer texto que você escolher; informe o mesmo valor como Verify token do webhook no app da Meta"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:150
+#: src/features/admin/components/admin-shard-footprint-row.tsx:151
 msgid "Any time"
 msgstr "Qualquer duração"
 
@@ -4360,9 +4360,9 @@ msgstr "Aprovado automaticamente — baixo risco"
 msgid "Approving…"
 msgstr "Aprovando…"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:133
-#: src/features/admin/components/admin-shard-footprint-row.tsx:144
-#: src/features/admin/components/admin-shard-footprint-row.tsx:164
+#: src/features/admin/components/admin-shard-footprint-row.tsx:132
+#: src/features/admin/components/admin-shard-footprint-row.tsx:145
+#: src/features/admin/components/admin-shard-footprint-row.tsx:167
 msgid "Approximate size"
 msgstr "Tamanho aproximado"
 
@@ -4464,7 +4464,7 @@ msgstr "Arquivado"
 msgid "Archived chats stay searchable, and you can restore them from the archive."
 msgstr "Os chats arquivados continuam pesquisáveis, e você pode restaurá-los a partir do arquivo."
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:141
+#: src/features/admin/components/admin-shard-footprint-row.tsx:142
 msgid "Archived for at least"
 msgstr "Arquivadas há pelo menos"
 
@@ -4472,7 +4472,7 @@ msgstr "Arquivadas há pelo menos"
 msgid "Archived Threads"
 msgstr "Conversas arquivadas"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:138
+#: src/features/admin/components/admin-shard-footprint-row.tsx:139
 msgid "Archived threads, by how long ago they were archived. Pinned threads are counted apart: they are never deleted."
 msgstr "Conversas arquivadas, por há quanto tempo foram arquivadas. As fixadas são contadas à parte: nunca são excluídas."
 
@@ -4821,7 +4821,7 @@ msgstr "Forma de onda de áudio inativa"
 msgid "audio-video"
 msgstr "áudio e vídeo"
 
-#: src/features/admin/components/audit-log-card.tsx:130
+#: src/features/admin/components/audit-log-card.tsx:146
 #: src/features/layout/lib/dashboard-page-names.ts:18
 #: src/routes/admin/route.tsx:35
 #: src/routes/admin/route.tsx:58
@@ -4988,7 +4988,7 @@ msgstr "Ativar módulos automaticamente conforme a complexidade da tarefa"
 msgid "Automatically include relevant images and videos alongside text responses when using search modes."
 msgstr "Inclui automaticamente imagens e vídeos relevantes junto às respostas em texto ao usar os modos de pesquisa."
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:149
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:169
 msgid "Automatically run cleanup based on configuration"
 msgstr "Executar a limpeza automaticamente com base na configuração"
 
@@ -5213,7 +5213,7 @@ msgstr "Banir {userName} da plataforma. Essa pessoa não poderá entrar até ser
 
 #: src/features/admin/components/ban-user-dialog.tsx:111
 #: src/features/admin/components/ban-user-dialog.tsx:150
-#: src/features/admin/components/user-cell.tsx:142
+#: src/features/admin/components/user-cell.tsx:140
 msgid "Ban User"
 msgstr "Banir usuário"
 
@@ -5225,11 +5225,11 @@ msgstr "Bangladesh"
 msgid "Banned"
 msgstr "Banido"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:154
+#: src/features/admin/components/admin-dashboard-stats.tsx:122
 msgid "Banned Users"
 msgstr "Usuários banidos"
 
-#: src/features/admin/components/audit-log-card.tsx:141
+#: src/features/admin/components/audit-log-card.tsx:135
 msgid "Bans"
 msgstr "Banimentos"
 
@@ -5262,12 +5262,12 @@ msgstr "Básico"
 msgid "batch generation"
 msgstr "geração em lote"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:111
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:134
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:121
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:150
 msgid "Batch size"
 msgstr "Tamanho do lote"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:54
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:56
 msgid "Batch size must be between 1 and 1000"
 msgstr "O tamanho do lote deve estar entre 1 e 1000"
 
@@ -5939,25 +5939,25 @@ msgstr "por <0>{0}</0>"
 msgid "by a collaborator"
 msgstr "por um colaborador"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:115
+#: src/features/admin/components/admin-provider-cache-row.tsx:118
 msgid "By day, newest first."
 msgstr "Por dia, os mais recentes primeiro."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:137
+#: src/features/admin/components/admin-provider-cache-row.tsx:142
 msgid "By hour"
 msgstr "Por hora"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:139
+#: src/features/admin/components/admin-provider-cache-row.tsx:144
 msgid "By hour, oldest first. A drop that starts at one hour across models points at a change in what is sent."
 msgstr "Por hora, as mais antigas primeiro. Uma queda que começa na mesma hora em todos os modelos indica uma mudança no que é enviado."
 
 #. placeholder {0}: formatNumber(models.length, locale)
 #. placeholder {1}: formatNumber(data.pairs, locale)
-#: src/features/admin/components/admin-provider-cache-row.tsx:174
+#: src/features/admin/components/admin-provider-cache-row.tsx:181
 msgid "By model, most prompt tokens first: the top {0} of {1} provider and model pairs."
 msgstr "Por modelo, os com mais tokens de prompt primeiro: os {0} primeiros de {1} pares de provedor e modelo."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:175
+#: src/features/admin/components/admin-provider-cache-row.tsx:182
 msgid "By model, most prompt tokens first."
 msgstr "Por modelo, os com mais tokens de prompt primeiro."
 
@@ -5965,7 +5965,7 @@ msgstr "Por modelo, os com mais tokens de prompt primeiro."
 msgid "by you"
 msgstr "por você"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:342
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:360
 msgid "By:"
 msgstr "Por:"
 
@@ -6124,8 +6124,8 @@ msgstr "Canadá"
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:257
 #: src/components/delete-confirmation-dialog.tsx:59
 #: src/components/settings/session-freshness-dialog.tsx:113
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:121
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:282
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:128
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:296
 #: src/features/admin/components/ban-user-dialog.tsx:95
 #: src/features/admin/components/ban-user-dialog.tsx:146
 #: src/features/admin/components/impersonate-user-dialog.tsx:79
@@ -7033,7 +7033,7 @@ msgstr "Resultado com qualidade de cinema e movimento aprimorado em relação ao
 msgid "Circle"
 msgstr "Círculo"
 
-#: src/routes/admin/gateway/index.tsx:329
+#: src/routes/admin/gateway/index.tsx:307
 msgid "Circuit breaker status from the last 5 minutes"
 msgstr "Status dos circuit breakers nos últimos 5 minutos"
 
@@ -7082,7 +7082,7 @@ msgstr "Slide de título limpo"
 msgid "Cleanup"
 msgstr "Limpeza"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:231
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:245
 msgid "Cleanup complete"
 msgstr "Limpeza concluída"
 
@@ -7090,7 +7090,7 @@ msgstr "Limpeza concluída"
 msgid "Cleanup Configuration"
 msgstr "Configuração da limpeza"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:184
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:203
 msgid "Cleanup failed"
 msgstr "Falha na limpeza"
 
@@ -8083,7 +8083,7 @@ msgstr "Configurar a equipe"
 msgid "Configure the billing contact and available AI models"
 msgstr "Configure o contato de cobrança e os modelos de IA disponíveis"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:81
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:80
 msgid "Configure thresholds and batch limits for anonymous user cleanup"
 msgstr "Configure os limites e os tamanhos de lote para a limpeza de usuários anônimos"
 
@@ -8126,7 +8126,7 @@ msgstr "Confirmar antes de excluir um chat"
 msgid "Confirm before unpinning a chat"
 msgstr "Confirmar antes de desafixar um chat"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:273
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:287
 msgid "Confirm cleanup"
 msgstr "Confirmar limpeza"
 
@@ -10090,7 +10090,7 @@ msgstr "Plano atual:"
 msgid "Current-generation photorealistic image generation with improved detail and better prompt following"
 msgstr "Geração de imagens fotorrealistas da geração atual, com mais detalhes e melhor seguimento de prompts"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:152
+#: src/features/admin/components/admin-dashboard-stats.tsx:119
 msgid "Currently restricted"
 msgstr "Atualmente restrito"
 
@@ -10276,7 +10276,7 @@ msgstr "Tendência de custo diário"
 msgid "Daily inbox summary"
 msgstr "Resumo diário da caixa de entrada"
 
-#: src/routes/admin/gateway/index.tsx:378
+#: src/routes/admin/gateway/index.tsx:338
 msgid "Daily LLM spend and request volume"
 msgstr "Gasto diário com LLMs e volume de requisições"
 
@@ -10381,12 +10381,12 @@ msgstr "Data"
 msgid "Date and time"
 msgstr "Data e hora"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:118
+#: src/features/admin/components/admin-provider-cache-row.tsx:121
 #: src/features/settings/components/chat/usage-settings.tsx:97
 msgid "Day"
 msgstr "Dia"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:131
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:138
 msgid "days"
 msgstr "dias"
 
@@ -10728,7 +10728,7 @@ msgid "Delete {0}"
 msgstr "Excluir {0}"
 
 #. placeholder {0}: preview?.eligibleCount ?? 0
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:285
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:299
 msgid "Delete {0} users"
 msgstr "Excluir {0} usuários"
 
@@ -11006,7 +11006,7 @@ msgstr "Exclui 3 arquivos em /drafts"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:77
 #: src/components/delete-confirmation-dialog.tsx:68
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:285
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:299
 #: src/features/chat/thread-list/thread-node.tsx:644
 #: src/features/chat/thread-list/thread-node.tsx:650
 msgid "Deleting..."
@@ -11973,15 +11973,15 @@ msgstr "Solte seus documentos e arquivos aqui. <0/>No máximo 25 arquivos por ve
 msgid "Drop-in replacement for the OpenAI SDK. Change one line and access every provider."
 msgstr "Substituto direto do SDK da OpenAI. Mude uma linha e acesse todos os provedores."
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:329
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:347
 msgid "Dry run"
 msgstr "Simulação"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:244
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:257
 msgid "Dry run (preview only — no deletions)"
 msgstr "Simulação (só pré-visualização — nada é excluído)"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:231
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:245
 msgid "Dry run complete"
 msgstr "Simulação concluída"
 
@@ -12221,7 +12221,7 @@ msgstr "Detecção de bordas"
 msgid "Edge-guided generation"
 msgstr "Geração guiada por bordas"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:141
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:154
 #: src/features/canvas/canvas-panel.tsx:783
 #: src/features/chat/host/host-composer.tsx:1060
 #: src/features/chat/thread-list/group-header.tsx:178
@@ -12591,7 +12591,7 @@ msgstr "Citação elegante com atribuição"
 msgid "ELF executable"
 msgstr "Executável ELF"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:215
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:232
 msgid "Eligible anonymous users"
 msgstr "Usuários anônimos elegíveis"
 
@@ -13521,11 +13521,11 @@ msgstr "Detalhes e nitidez excepcionais"
 msgid "Excluded tools"
 msgstr "Ferramentas excluídas"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:329
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:347
 msgid "Execute"
 msgstr "Executar"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:196
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:215
 msgid "Execute cleanup"
 msgstr "Executar limpeza"
 
@@ -14291,7 +14291,7 @@ msgstr "Falha ao instalar a habilidade"
 msgid "Failed to link account"
 msgstr "Falha ao vincular a conta"
 
-#: src/routes/admin/gateway/index.tsx:244
+#: src/routes/admin/gateway/index.tsx:243
 msgid "Failed to load analytics. Ensure the LLM Gateway is running and reachable."
 msgstr "Falha ao carregar as análises. Verifique se o LLM Gateway está em execução e acessível."
 
@@ -14456,7 +14456,7 @@ msgstr "Falha ao salvar a chave de API do {toolId}"
 msgid "Failed to save collection"
 msgstr "Falha ao salvar a coleção"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:64
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:66
 msgid "Failed to save configuration"
 msgstr "Falha ao salvar a configuração"
 
@@ -14596,7 +14596,7 @@ msgstr "Não foi possível atualizar os modelos de reserva"
 msgid "Failed to update browser click settings"
 msgstr "Falha ao atualizar as configurações de cliques do navegador"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:73
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:75
 msgid "Failed to update configuration"
 msgstr "Falha ao atualizar a configuração"
 
@@ -15123,7 +15123,7 @@ msgid "Feed image"
 msgstr "Imagem de feed"
 
 #: src/features/admin/components/feedback-admin-page.tsx:139
-#: src/features/admin/components/feedback-admin-page.tsx:154
+#: src/features/admin/components/feedback-admin-page.tsx:172
 #: src/routes/admin/route.tsx:40
 #: src/routes/admin/route.tsx:60
 msgid "Feedback"
@@ -15133,7 +15133,7 @@ msgstr "Feedback"
 msgid "Feedback could not be loaded."
 msgstr "Não foi possível carregar o feedback."
 
-#: src/features/admin/components/feedback-admin-page.tsx:181
+#: src/features/admin/components/feedback-admin-page.tsx:177
 msgid "Feedback pages"
 msgstr "Páginas de feedback"
 
@@ -15330,12 +15330,13 @@ msgstr "Cineastas e videomakers que criam imagens estáticas cinematográficas g
 msgid "Filmmakers creating cinematic videos with a strong focus on visual narrative and storytelling quality"
 msgstr "Cineastas que criam vídeos cinematográficos com forte foco em narrativa visual e qualidade de storytelling"
 
-#: src/features/admin/components/audit-log-card.tsx:136
+#: src/features/admin/components/audit-log-card.tsx:129
+#: src/features/admin/components/audit-log-card.tsx:130
 msgid "Filter by action"
 msgstr "Filtrar por ação"
 
-#: src/features/admin/components/feedback-admin-page.tsx:164
-#: src/features/admin/components/feedback-admin-page.tsx:165
+#: src/features/admin/components/feedback-admin-page.tsx:159
+#: src/features/admin/components/feedback-admin-page.tsx:160
 msgid "Filter by kind"
 msgstr "Filtrar por tipo"
 
@@ -15347,6 +15348,7 @@ msgstr "Filtrar por modo"
 msgid "Filter by provider"
 msgstr "Filtrar por provedor"
 
+#: src/features/admin/components/users-management-card.tsx:126
 #: src/features/admin/components/users-management-card.tsx:127
 msgid "Filter by role"
 msgstr "Filtrar por função"
@@ -15359,6 +15361,7 @@ msgstr "Filtrar por função"
 #~ msgid "Filter by tag ({activeCount} selected)"
 #~ msgstr "Filtrar por tag ({activeCount} selecionadas)"
 
+#: src/features/admin/components/users-management-card.tsx:137
 #: src/features/admin/components/users-management-card.tsx:138
 msgid "Filter by type"
 msgstr "Filtrar por tipo"
@@ -16144,7 +16147,7 @@ msgstr "Gama"
 msgid "Gateway"
 msgstr "Gateway"
 
-#: src/routes/admin/gateway.tsx:26
+#: src/routes/admin/gateway.tsx:27
 msgid "Gateway sections"
 msgstr "Seções do gateway"
 
@@ -17051,7 +17054,7 @@ msgstr "Visitante"
 msgid "Guest Account"
 msgstr "Conta de visitante"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:137
+#: src/features/admin/components/admin-dashboard-stats.tsx:105
 msgid "Guest accounts"
 msgstr "Contas de visitante"
 
@@ -17574,7 +17577,7 @@ msgstr "Hosts"
 msgid "hotkey"
 msgstr "tecla de atalho"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:142
+#: src/features/admin/components/admin-provider-cache-row.tsx:147
 #: src/features/settings/components/chat/usage-settings.tsx:98
 msgid "Hour"
 msgstr "Hora"
@@ -17740,7 +17743,7 @@ msgstr "Da ideia ao resultado final, em uma só conversa"
 msgid "Ideal for simple classification and extraction"
 msgstr "Ideal para classificação e extração simples"
 
-#: src/features/admin/components/feedback-admin-page.tsx:169
+#: src/features/admin/components/feedback-admin-page.tsx:164
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:71
 msgid "Ideas"
 msgstr "Ideias"
@@ -17755,7 +17758,7 @@ msgstr "Identidade"
 msgid "Idle"
 msgstr "Ocioso"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:162
+#: src/features/admin/components/admin-shard-footprint-row.tsx:165
 msgid "Idle for at least"
 msgstr "Inativas há pelo menos"
 
@@ -17995,7 +17998,7 @@ msgstr "img2img"
 msgid "Img2Img"
 msgstr "Img2Img"
 
-#: src/features/admin/components/user-cell.tsx:128
+#: src/features/admin/components/user-cell.tsx:126
 msgid "Impersonate"
 msgstr "Representar"
 
@@ -18007,7 +18010,7 @@ msgstr "Representar usuário"
 msgid "Impersonated"
 msgstr "Representado"
 
-#: src/features/admin/components/audit-log-card.tsx:144
+#: src/features/admin/components/audit-log-card.tsx:138
 msgid "Impersonation Start"
 msgstr "Início da representação"
 
@@ -18019,7 +18022,7 @@ msgstr "Representação iniciada"
 msgid "Impersonation started. Click \"Stop Impersonating\" in the header to return to your account."
 msgstr "Representação iniciada. Clique em \"Parar representação\" no cabeçalho para voltar à sua conta."
 
-#: src/features/admin/components/audit-log-card.tsx:145
+#: src/features/admin/components/audit-log-card.tsx:139
 msgid "Impersonation Stop"
 msgstr "Fim da representação"
 
@@ -18357,15 +18360,15 @@ msgid "Inactive chats will be archived after {days} days"
 msgstr "Chats inativos serão arquivados após {days} dias"
 
 #. placeholder {0}: preview.thresholdDays
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:217
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:231
 msgid "Inactive for more than {0} days"
 msgstr "Inativo há mais de {0} dias"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:129
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:141
 msgid "Inactivity threshold"
 msgstr "Limite de inatividade"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:96
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:105
 msgid "Inactivity threshold (days)"
 msgstr "Limite de inatividade (dias)"
 
@@ -19618,7 +19621,7 @@ msgstr "O Sonnet mais recente com raciocínio transparente para tarefas analíti
 msgid "Latest updated Sonnet model from Anthropic"
 msgstr "O mais recente modelo Sonnet atualizado da Anthropic"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:216
+#: src/features/admin/components/admin-dashboard-stats.tsx:180
 msgid "Latest users who joined the platform"
 msgstr "Usuários que entraram na plataforma recentemente"
 
@@ -20075,7 +20078,7 @@ msgstr "LLaMA, Mixtral, Gemma — inferência mais rápida"
 msgid "llm"
 msgstr "llm"
 
-#: src/routes/admin/gateway.tsx:19
+#: src/routes/admin/gateway.tsx:20
 msgid "LLM Gateway"
 msgstr "LLM Gateway"
 
@@ -20423,7 +20426,7 @@ msgid "Loading..."
 msgstr "Carregando..."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:383
-#: src/features/admin/components/admin-provider-cache-row.tsx:85
+#: src/features/admin/components/admin-provider-cache-row.tsx:82
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:478
@@ -20816,7 +20819,7 @@ msgstr "Grandes melhorias em raciocínio e seguimento de instruções"
 msgid "Make {name} the default repository"
 msgstr "Definir {name} como repositório padrão"
 
-#: src/features/admin/components/user-cell.tsx:115
+#: src/features/admin/components/user-cell.tsx:113
 msgid "Make Admin"
 msgstr "Tornar admin"
 
@@ -21115,7 +21118,7 @@ msgstr "Profundidade máxima, nitidez total"
 msgid "Maximum detail and sharpness"
 msgstr "Máximo de detalhe e nitidez"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:113
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:119
 msgid "Maximum number of users to delete per cleanup run."
 msgstr "Número máximo de usuários a excluir por execução de limpeza."
 
@@ -21179,11 +21182,11 @@ msgstr "Servidores MCP"
 msgid "MCP tools"
 msgstr "Ferramentas MCP"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:228
+#: src/features/admin/components/admin-shard-footprint-row.tsx:238
 msgid "Measure more shards"
 msgstr "Medir mais shards"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:224
+#: src/features/admin/components/admin-shard-footprint-row.tsx:234
 msgid "Measuring…"
 msgstr "Medindo…"
 
@@ -21459,12 +21462,12 @@ msgstr "Ramificação de mensagens"
 msgid "Message input"
 msgstr "Entrada de mensagem"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:129
-#: src/features/admin/components/admin-shard-footprint-row.tsx:143
+#: src/features/admin/components/admin-shard-footprint-row.tsx:128
+#: src/features/admin/components/admin-shard-footprint-row.tsx:144
 msgid "Message rows"
 msgstr "Linhas de mensagens"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:201
+#: src/features/admin/components/admin-shard-footprint-row.tsx:206
 msgid "Message rows of the largest threads"
 msgstr "Linhas de mensagens das maiores conversas"
 
@@ -21825,7 +21828,7 @@ msgstr "Modo {0}, em {1}. Nada começa quando é criado."
 msgid "Mode:"
 msgstr "Modo:"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:179
+#: src/features/admin/components/admin-provider-cache-row.tsx:186
 #: src/features/chat/host/host-options.tsx:146
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
@@ -21855,7 +21858,7 @@ msgstr "Modelo"
 msgid "Model already blocked"
 msgstr "Modelo já bloqueado"
 
-#: src/routes/admin/gateway/index.tsx:351
+#: src/routes/admin/gateway/index.tsx:323
 msgid "Model Breakdown"
 msgstr "Detalhamento por modelo"
 
@@ -22999,7 +23002,7 @@ msgstr "Novo chat temporário"
 msgid "New temporary thread"
 msgstr "Nova conversa temporária"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:160
+#: src/features/admin/components/admin-dashboard-stats.tsx:127
 msgid "New this week"
 msgstr "Novos nesta semana"
 
@@ -23017,7 +23020,7 @@ msgstr "Nova conversa"
 msgid "New Trigger"
 msgstr "Novo gatilho"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:173
+#: src/features/admin/components/admin-dashboard-stats.tsx:151
 msgid "New user registrations per day"
 msgstr "Novos cadastros de usuários por dia"
 
@@ -23025,7 +23028,7 @@ msgstr "Novos cadastros de usuários por dia"
 msgid "New Workflow"
 msgstr "Novo fluxo de trabalho"
 
-#: src/features/admin/components/feedback-admin-page.tsx:184
+#: src/features/admin/components/feedback-admin-page.tsx:180
 msgid "Newer"
 msgstr "Mais recentes"
 
@@ -23241,7 +23244,7 @@ msgstr "Nenhum chat ainda. Comece um acima."
 msgid "No checks have run for this commit."
 msgstr "Nenhuma verificação foi executada para este commit."
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:351
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:369
 msgid "No cleanup runs yet"
 msgstr "Nenhuma execução de limpeza ainda"
 
@@ -23524,7 +23527,7 @@ msgstr "Nenhum modelo encontrado."
 msgid "No models installed yet."
 msgstr "Nenhum modelo instalado ainda."
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:246
+#: src/features/admin/components/admin-dashboard-stats.tsx:208
 #: src/features/admin/components/feedback-admin-page.tsx:49
 #: src/features/admin/components/user-cell.tsx:72
 msgid "No name"
@@ -24187,7 +24190,7 @@ msgstr "Arquitetura inovadora de modelo de linguagem baseada em difusão"
 msgid "now"
 msgstr "agora"
 
-#: src/features/admin/components/nsfw-review-page.tsx:16
+#: src/features/admin/components/nsfw-review-page.tsx:18
 msgid "NSFW Content Review"
 msgstr "Revisão de conteúdo NSFW"
 
@@ -24196,7 +24199,7 @@ msgstr "Revisão de conteúdo NSFW"
 msgid "NSFW Review"
 msgstr "Revisão NSFW"
 
-#: src/features/admin/components/nsfw-review-page.tsx:21
+#: src/features/admin/components/nsfw-review-page.tsx:23
 msgid "NSFW review backend is not yet implemented. This page will display flagged images for moderation once the backend functions are available."
 msgstr "O backend de revisão NSFW ainda não foi implementado. Esta página vai exibir as imagens sinalizadas para moderação quando as funções do backend estiverem disponíveis."
 
@@ -24334,7 +24337,7 @@ msgid "old lines {text}"
 msgstr "linhas antigas {text}"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:45
-#: src/features/admin/components/feedback-admin-page.tsx:196
+#: src/features/admin/components/feedback-admin-page.tsx:192
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:634
 msgid "Older"
 msgstr "Mais antigas"
@@ -24808,7 +24811,7 @@ msgstr "Abrir novamente"
 msgid "Open links"
 msgstr "Abrir links"
 
-#: src/features/admin/components/user-cell.tsx:102
+#: src/features/admin/components/user-cell.tsx:101
 msgid "Open menu"
 msgstr "Abrir menu"
 
@@ -25559,7 +25562,7 @@ msgstr "Prompt de sistema original"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:171
 #: src/features/admin/components/feedback-admin-page.tsx:24
-#: src/features/admin/components/feedback-admin-page.tsx:171
+#: src/features/admin/components/feedback-admin-page.tsx:166
 #: src/features/feedback/components/send-feedback-dialog.tsx:30
 #: src/features/settings/components/chat/models-settings.tsx:515
 msgid "Other"
@@ -26024,7 +26027,7 @@ msgstr "Senha definida"
 msgid "Passwords do not match"
 msgstr "As senhas não coincidem"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:358
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:373
 msgid "Past cleanup runs and their results"
 msgstr "Execuções de limpeza anteriores e seus resultados"
 
@@ -26215,6 +26218,7 @@ msgstr "Revisor de desempenho"
 
 #: src/features/settings/components/chat/usage-settings.tsx:248
 #: src/features/settings/components/chat/usage-settings.tsx:460
+#: src/routes/admin/gateway/index.tsx:226
 msgid "Period"
 msgstr "Período"
 
@@ -26482,7 +26486,7 @@ msgstr "Imagem fixada"
 msgid "Pinned project"
 msgstr "Projeto fixado"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:189
+#: src/features/admin/components/admin-shard-footprint-row.tsx:194
 msgid "Pinned threads"
 msgstr "Conversas fixadas"
 
@@ -26993,7 +26997,7 @@ msgstr "Pré-visualização"
 msgid "Preview {name}"
 msgstr "Pré-visualização de {name}"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:204
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:221
 msgid "Preview & Execute"
 msgstr "Pré-visualizar e executar"
 
@@ -27009,7 +27013,7 @@ msgstr "Acesso antecipado ao modelo mais avançado do Qwen"
 msgid "Preview execution order (dry run)"
 msgstr "Pré-visualizar ordem de execução (simulação)"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:205
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:221
 msgid "Preview how many users will be removed, then execute cleanup."
 msgstr "Veja quantos usuários serão removidos e depois execute a limpeza."
 
@@ -27207,7 +27211,7 @@ msgstr "Os modelos Pro exigem um plano Pro. Em um plano gratuito, a execução �
 msgid "Problem"
 msgstr "Problema"
 
-#: src/features/admin/components/feedback-admin-page.tsx:170
+#: src/features/admin/components/feedback-admin-page.tsx:165
 msgid "Problems"
 msgstr "Problemas"
 
@@ -27540,10 +27544,10 @@ msgstr "A pesquisa de prompts ainda está sendo preparada. Tente novamente em in
 msgid "Prompt to run on all models..."
 msgstr "Prompt a executar em todos os modelos..."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:101
-#: src/features/admin/components/admin-provider-cache-row.tsx:120
-#: src/features/admin/components/admin-provider-cache-row.tsx:144
-#: src/features/admin/components/admin-provider-cache-row.tsx:182
+#: src/features/admin/components/admin-provider-cache-row.tsx:102
+#: src/features/admin/components/admin-provider-cache-row.tsx:123
+#: src/features/admin/components/admin-provider-cache-row.tsx:149
+#: src/features/admin/components/admin-provider-cache-row.tsx:189
 msgid "Prompt tokens"
 msgstr "Tokens de prompt"
 
@@ -27612,7 +27616,7 @@ msgid "Proven reliability from previous generation"
 msgstr "Confiabilidade comprovada da geração anterior"
 
 #: src/components/model-picker/model-picker.tsx:283
-#: src/features/admin/components/admin-provider-cache-row.tsx:180
+#: src/features/admin/components/admin-provider-cache-row.tsx:187
 #: src/features/settings/components/chat/native-providers-settings.tsx:467
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -27630,7 +27634,7 @@ msgstr "Contas de provedores"
 msgid "Provider added — its models are now in the model picker"
 msgstr "Provedor adicionado — os modelos dele já estão no seletor de modelos"
 
-#: src/routes/admin/gateway/index.tsx:326
+#: src/routes/admin/gateway/index.tsx:307
 msgid "Provider Health"
 msgstr "Saúde dos provedores"
 
@@ -27803,7 +27807,7 @@ msgstr "Coloca um prompt no compositor para fazer rebase do branch deste fork em
 msgid "Quality"
 msgstr "Qualidade"
 
-#: src/routes/admin/gateway/index.tsx:305
+#: src/routes/admin/gateway/index.tsx:290
 msgid "Query complexity tiers assigned by the routing engine"
 msgstr "Níveis de complexidade de consulta atribuídos pelo mecanismo de roteamento"
 
@@ -28362,7 +28366,7 @@ msgstr "Chats recentes"
 msgid "Recent messages"
 msgstr "Mensagens recentes"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:215
+#: src/features/admin/components/admin-dashboard-stats.tsx:180
 msgid "Recent Registrations"
 msgstr "Cadastros recentes"
 
@@ -28580,8 +28584,8 @@ msgstr "GPT-5 refinado com melhor seguimento de instruções"
 msgid "Refining the draft…"
 msgstr "Refinando o rascunho…"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:221
-#: src/features/admin/components/feedback-admin-page.tsx:161
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:236
+#: src/features/admin/components/feedback-admin-page.tsx:156
 msgid "Refresh"
 msgstr "Atualizar"
 
@@ -28634,11 +28638,11 @@ msgstr "O registo é apenas por convite. Abra o link do seu convite ou inicie se
 msgid "Regressed"
 msgstr "Piorou"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:181
+#: src/features/admin/components/admin-dashboard-stats.tsx:146
 msgid "Regular"
 msgstr "Comum"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:132
+#: src/features/admin/components/admin-dashboard-stats.tsx:101
 #: src/features/admin/components/users-management-card.tsx:142
 msgid "Regular Users"
 msgstr "Usuários comuns"
@@ -28850,7 +28854,7 @@ msgid "Remove {shown}"
 msgstr "Remover {shown}"
 
 #: src/features/admin/components/update-user-role-dialog.tsx:64
-#: src/features/admin/components/user-cell.tsx:110
+#: src/features/admin/components/user-cell.tsx:108
 msgid "Remove Admin"
 msgstr "Remover admin"
 
@@ -29232,7 +29236,7 @@ msgstr "A requisição expirou"
 msgid "Request validation, content filtering, and HMAC-SHA256 authentication on every request."
 msgstr "Validação de requisições, filtragem de conteúdo e autenticação HMAC-SHA256 em cada requisição."
 
-#: src/routes/admin/gateway/index.tsx:354
+#: src/routes/admin/gateway/index.tsx:323
 msgid "Request volume, cost, and error count per model"
 msgstr "Volume de requisições, custo e número de erros por modelo"
 
@@ -29249,10 +29253,10 @@ msgstr "Solicitando..."
 msgid "Requesting…"
 msgstr "Solicitando…"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:105
-#: src/features/admin/components/admin-provider-cache-row.tsx:119
-#: src/features/admin/components/admin-provider-cache-row.tsx:143
-#: src/features/admin/components/admin-provider-cache-row.tsx:181
+#: src/features/admin/components/admin-provider-cache-row.tsx:106
+#: src/features/admin/components/admin-provider-cache-row.tsx:122
+#: src/features/admin/components/admin-provider-cache-row.tsx:148
+#: src/features/admin/components/admin-provider-cache-row.tsx:188
 #: src/features/settings/components/chat/usage-settings.tsx:283
 #: src/features/settings/components/chat/usage-settings.tsx:325
 #: src/routes/admin/gateway/index.tsx:89
@@ -29648,7 +29652,7 @@ msgstr "Revisar"
 msgid "Review and add"
 msgstr "Revisar e adicionar"
 
-#: src/features/admin/components/nsfw-review-page.tsx:18
+#: src/features/admin/components/nsfw-review-page.tsx:14
 msgid "Review and moderate flagged content across chat and vault."
 msgstr "Revise e modere o conteúdo sinalizado no chat e no cofre."
 
@@ -29803,7 +29807,7 @@ msgstr "A função é a mesma"
 msgid "Role Updated"
 msgstr "Função atualizada"
 
-#: src/features/admin/components/audit-log-card.tsx:140
+#: src/features/admin/components/audit-log-card.tsx:134
 msgid "Role Updates"
 msgstr "Atualizações de função"
 
@@ -29906,7 +29910,7 @@ msgstr "Rotinas no Neore: dê ao agente uma tarefa e uma programação de repeti
 msgid "Routines that run while you are away"
 msgstr "Rotinas que rodam enquanto você está ausente"
 
-#: src/routes/admin/gateway/index.tsx:302
+#: src/routes/admin/gateway/index.tsx:291
 msgid "Routing Tier Distribution"
 msgstr "Distribuição por nível de roteamento"
 
@@ -29968,7 +29972,7 @@ msgstr "Executar como bot (opcional)"
 msgid "Run code in a sandboxed environment with shell access, file operations, and persistent sessions."
 msgstr "Execute código em um ambiente isolado com acesso ao shell, operações de arquivos e sessões persistentes."
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:191
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:210
 msgid "Run dry run"
 msgstr "Executar simulação"
 
@@ -29981,7 +29985,7 @@ msgstr "Execução de {0}"
 msgid "Run history"
 msgstr "Histórico de execuções"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:357
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:373
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:214
 msgid "Run History"
 msgstr "Histórico de execuções"
@@ -30050,7 +30054,7 @@ msgid "Running on {device}…"
 msgstr "Executando em {device}…"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:251
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:258
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:272
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
 msgid "Running..."
@@ -30184,7 +30188,7 @@ msgid "Saudi Arabia"
 msgstr "Arábia Saudita"
 
 #: ../../packages/ui/src/components/inline-edit.tsx:119
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:118
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:125
 #: src/features/auth/components/organization/billing-settings-card.tsx:133
 #: src/features/auth/components/organization/billing-settings-card.tsx:280
 #: src/features/auth/components/organization/organization-name-card.tsx:100
@@ -30439,11 +30443,11 @@ msgstr "Agendamento ou webhook"
 msgid "Scheduled"
 msgstr "Programado"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:148
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:170
 msgid "Scheduled cleanup"
 msgstr "Limpeza agendada"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:342
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:360
 msgid "Scheduled job"
 msgstr "Tarefa agendada"
 
@@ -31371,10 +31375,10 @@ msgstr "Sérvio (Sérvia)"
 msgid "Serif"
 msgstr "Serifada"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:97
-#: src/features/admin/components/admin-provider-cache-row.tsx:121
-#: src/features/admin/components/admin-provider-cache-row.tsx:145
-#: src/features/admin/components/admin-provider-cache-row.tsx:183
+#: src/features/admin/components/admin-provider-cache-row.tsx:98
+#: src/features/admin/components/admin-provider-cache-row.tsx:124
+#: src/features/admin/components/admin-provider-cache-row.tsx:150
+#: src/features/admin/components/admin-provider-cache-row.tsx:190
 msgid "Served from cache"
 msgstr "Servido do cache"
 
@@ -31427,7 +31431,7 @@ msgstr "servidores"
 msgid "Servers over SSH"
 msgstr "Servidores via SSH"
 
-#: src/features/admin/components/audit-log-card.tsx:143
+#: src/features/admin/components/audit-log-card.tsx:137
 msgid "Session Revocations"
 msgstr "Revogações de sessão"
 
@@ -31548,17 +31552,17 @@ msgstr "Formas"
 msgid "Shard footprint"
 msgstr "Ocupação do shard"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:121
+#: src/features/admin/components/admin-shard-footprint-row.tsx:120
 msgid "Shards"
 msgstr "Shards"
 
 #. placeholder {0}: formatNumber(page.data.pendingShards, i18n.locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:215
+#: src/features/admin/components/admin-shard-footprint-row.tsx:222
 msgid "Shards still being measured: {0}. Measure more shards to finish them."
 msgstr "Shards ainda sendo medidos: {0}. Meça mais shards para concluí-los."
 
 #. placeholder {0}: formatNumber(totals.abandonedShards, i18n.locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:219
+#: src/features/admin/components/admin-shard-footprint-row.tsx:228
 msgid "Shards that could not be measured are left out of the totals: {0}."
 msgstr "Shards que não puderam ser medidos ficam fora dos totais: {0}."
 
@@ -32152,7 +32156,7 @@ msgstr "limite de tamanho atingido"
 msgid "Size of the text in chat messages. The sidebar and the rest of the app keep their size."
 msgstr "Tamanho do texto nas mensagens do chat. A barra lateral e o restante do app mantêm o tamanho."
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:207
+#: src/features/admin/components/admin-shard-footprint-row.tsx:212
 msgid "Sizes of the largest shards"
 msgstr "Tamanhos dos maiores shards"
 
@@ -32394,7 +32398,7 @@ msgstr "O roteamento inteligente classifica automaticamente cada consulta por co
 msgid "Smart routing decisions, model usage, and provider health"
 msgstr "Decisões de roteamento inteligente, uso de modelos e saúde dos provedores"
 
-#: src/routes/admin/gateway.tsx:22
+#: src/routes/admin/gateway.tsx:23
 msgid "Smart routing, model usage, and provider health"
 msgstr "Roteamento inteligente, uso de modelos e status dos provedores"
 
@@ -33398,7 +33402,7 @@ msgstr "Interrompido."
 msgid "Stopping…"
 msgstr "Parando…"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:110
+#: src/features/admin/components/admin-shard-footprint-row.tsx:107
 msgid "Stored conversation data across user shards: threads, message rows and an estimate of their size, by thread group and age. Counts only; no thread or shard is listed."
 msgstr "Dados de conversas armazenados nos shards de usuários: conversas, linhas de mensagens e uma estimativa do tamanho, por grupo e idade. Apenas contagens; nenhuma conversa ou shard é listado."
 
@@ -35736,12 +35740,12 @@ msgstr "Não foi possível verificar o prompt. Tente novamente."
 msgid "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
 msgstr "O provedor cobra essas solicitações diretamente de você. Quando sabemos o preço do modelo, a taxa de plataforma habitual para chaves próprias é cobrada em créditos."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:91
+#: src/features/admin/components/admin-provider-cache-row.tsx:90
 msgid "The provider cache readings could not be loaded."
 msgstr "Não foi possível carregar as leituras do cache dos provedores."
 
 #. placeholder {0}: formatDateTime(readings.dataUpdatedAt, locale, { dateStyle: "short", timeStyle: "short", timeZone })
-#: src/features/admin/components/admin-provider-cache-row.tsx:92
+#: src/features/admin/components/admin-provider-cache-row.tsx:91
 msgid "The provider cache readings could not be refreshed. The figures below are from {0}."
 msgstr "Não foi possível atualizar as leituras do cache dos provedores. Os números abaixo são de {0}."
 
@@ -35854,11 +35858,11 @@ msgstr "A pesquisa falhou. Tente novamente."
 msgid "The server lists no models yet — pull or load one first"
 msgstr "O servidor ainda não lista nenhum modelo — baixe ou carregue um primeiro"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:116
+#: src/features/admin/components/admin-shard-footprint-row.tsx:113
 msgid "The shard footprint could not be measured."
 msgstr "Não foi possível medir a ocupação do shard."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:62
+#: src/features/admin/components/admin-provider-cache-row.tsx:59
 msgid "The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Only chat calls count, and answers from the gateway's response cache are left out. Days and hours are in {timeZone}."
 msgstr "A parcela dos tokens de prompt que os provedores serviram do próprio cache. Dias e horas contam os pares de provedor e modelo que usaram o cache nos últimos 30 dias; a tabela de modelos lista os 50 modelos com mais tokens de prompt. Só contam as chamadas de chat, e respostas do cache de respostas do gateway não são incluídas. Dias e horas em {timeZone}."
 
@@ -36814,7 +36818,7 @@ msgid "This will create a new version with this content"
 msgstr "Isso vai criar uma nova versão com este conteúdo"
 
 #. placeholder {0}: preview?.eligibleCount ?? 0
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:276
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:290
 msgid "This will permanently delete {0} anonymous user accounts and all their data. This action cannot be undone."
 msgstr "Isso vai excluir permanentemente {0} contas de usuários anônimos e todos os dados delas. Essa ação não pode ser desfeita."
 
@@ -36977,9 +36981,9 @@ msgid "Thread will auto-delete in {0}"
 msgstr "A conversa será excluída automaticamente em {0}"
 
 #: src/components/command-palette.tsx:938
-#: src/features/admin/components/admin-shard-footprint-row.tsx:125
-#: src/features/admin/components/admin-shard-footprint-row.tsx:142
-#: src/features/admin/components/admin-shard-footprint-row.tsx:163
+#: src/features/admin/components/admin-shard-footprint-row.tsx:124
+#: src/features/admin/components/admin-shard-footprint-row.tsx:143
+#: src/features/admin/components/admin-shard-footprint-row.tsx:166
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:35
 #: src/features/chat/thread-list/thread-list-filter-menu.tsx:107
 msgid "Threads"
@@ -37002,7 +37006,7 @@ msgstr "Três etapas para usar agentes de código nas suas próprias máquinas. 
 msgid "Threshold"
 msgstr "Limiar"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:48
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:50
 msgid "Threshold must be between 1 and 365 days"
 msgstr "O limite deve estar entre 1 e 365 dias"
 
@@ -37303,7 +37307,7 @@ msgstr "chamada de ferramentas"
 msgid "Tool Calling"
 msgstr "Chamada de ferramentas"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:179
+#: src/features/admin/components/admin-shard-footprint-row.tsx:184
 msgid "Tool output's share of the stored size"
 msgstr "Participação da saída de ferramentas no tamanho armazenado"
 
@@ -37317,7 +37321,7 @@ msgid "Tool Provider Keys"
 msgstr "Chaves de provedores de ferramentas"
 
 #. placeholder {0}: formatNumber(COMPACT_AFTER_DAYS, locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:183
+#: src/features/admin/components/admin-shard-footprint-row.tsx:188
 msgid "Tool results of 64 KB or more, in threads idle at least {0} days"
 msgstr "Resultados de ferramentas de 64 KB ou mais, em conversas inativas há pelo menos {0} dias"
 
@@ -37419,7 +37423,7 @@ msgstr "Custo total"
 msgid "Total Cost"
 msgstr "Custo total"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:125
+#: src/features/admin/components/admin-dashboard-stats.tsx:94
 msgid "Total Users"
 msgstr "Total de usuários"
 
@@ -37431,7 +37435,7 @@ msgstr "Totais de todas as respostas desta conversa, incluindo as alternativas r
 msgid "Totals per model"
 msgstr "Totais por modelo"
 
-#: src/features/admin/components/audit-log-card.tsx:131
+#: src/features/admin/components/audit-log-card.tsx:145
 msgid "Track all admin actions for accountability"
 msgstr "Acompanhe todas as ações de admin para fins de responsabilização"
 
@@ -37563,7 +37567,7 @@ msgstr "Raciocínio transparente sobre entradas visuais"
 msgid "Transparent thinking for legal, financial, and technical tasks"
 msgstr "Pensamento transparente para tarefas jurídicas, financeiras e técnicas"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:195
+#: src/features/admin/components/admin-shard-footprint-row.tsx:200
 msgid "Trashed, temporary, being deleted or orphaned"
 msgstr "Na lixeira, temporárias, em exclusão ou órfãs"
 
@@ -38013,11 +38017,11 @@ msgstr "Indisponível"
 
 #: src/features/admin/components/ban-user-dialog.tsx:89
 #: src/features/admin/components/ban-user-dialog.tsx:99
-#: src/features/admin/components/user-cell.tsx:137
+#: src/features/admin/components/user-cell.tsx:135
 msgid "Unban User"
 msgstr "Desbanir usuário"
 
-#: src/features/admin/components/audit-log-card.tsx:142
+#: src/features/admin/components/audit-log-card.tsx:136
 msgid "Unbans"
 msgstr "Desbanimentos"
 
@@ -38843,7 +38847,8 @@ msgstr "Acesso do usuário removido"
 msgid "User Banned"
 msgstr "Usuário banido"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:172
+#: src/features/admin/components/admin-dashboard-stats.tsx:141
+#: src/features/admin/components/admin-dashboard-stats.tsx:152
 msgid "User Growth (Last 7 Days)"
 msgstr "Crescimento de usuários (últimos 7 dias)"
 
@@ -38924,7 +38929,7 @@ msgstr "Nome de usuário: @{platformUsername}"
 msgid "Users"
 msgstr "Usuários"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:136
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:147
 msgid "users / run"
 msgstr "usuários / execução"
 
@@ -39450,7 +39455,7 @@ msgstr "Ver política de privacidade"
 msgid "View pull request"
 msgstr "Ver pull request"
 
-#: src/features/admin/components/user-cell.tsx:122
+#: src/features/admin/components/user-cell.tsx:120
 msgid "View Sessions"
 msgstr "Ver sessões"
 
@@ -39958,7 +39963,7 @@ msgstr "Dias úteis às 09:00 UTC"
 msgid "Weekdays at 8 AM"
 msgstr "Dias úteis às 8h"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:162
+#: src/features/admin/components/admin-dashboard-stats.tsx:130
 msgid "Weekly Growth"
 msgstr "Crescimento semanal"
 
@@ -40114,7 +40119,7 @@ msgstr "O que enviar e como distinguir uma resposta boa de uma ruim."
 msgid "What to watch"
 msgstr "O que monitorar"
 
-#: src/features/admin/components/feedback-admin-page.tsx:155
+#: src/features/admin/components/feedback-admin-page.tsx:171
 msgid "What users sent from the app, newest first"
 msgstr "O que os usuários enviaram pelo app, os mais recentes primeiro"
 
@@ -40316,7 +40321,7 @@ msgstr "Largura"
 msgid "Will be saved as your {provider} API key"
 msgstr "Será salvo como sua chave de API de {provider}"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:67
+#: src/features/admin/components/admin-provider-cache-row.tsx:64
 msgid "Window"
 msgstr "Período"
 
@@ -40324,11 +40329,11 @@ msgstr "Período"
 msgid "Windows"
 msgstr "Windows"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:144
+#: src/features/admin/components/admin-dashboard-stats.tsx:112
 msgid "With admin privileges"
 msgstr "Com privilégios de admin"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:130
+#: src/features/admin/components/admin-dashboard-stats.tsx:98
 msgid "With email/password"
 msgstr "Com e-mail/senha"
 
