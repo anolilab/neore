@@ -25263,6 +25263,14 @@
             "watchActive"
           ],
           "unique": false
+        },
+        "by_user_thread_and_wakeLease": {
+          "fields": [
+            "userId",
+            "threadId",
+            "watchWakeLeaseUntil"
+          ],
+          "unique": false
         }
       },
       "memory": false,

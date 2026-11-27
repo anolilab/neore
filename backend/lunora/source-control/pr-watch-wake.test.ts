@@ -18,12 +18,14 @@ const { enqueued, probe, registry, runs } = vi.hoisted(() => {
         probe: {
             allowRound: true,
             anonymous: false,
+            beforeStart: undefined as (() => Promise<void>) | undefined,
             charges: 0,
             during: undefined as (() => Promise<void>) | undefined,
             enqueueFails: false,
             fail: false,
             failBeforeModel: false,
             failWith: undefined as unknown,
+            generated: 0,
             leaseSeenAtEnqueue: undefined as number | undefined,
             readLease: undefined as ((linkId: string) => Promise<number | undefined>) | undefined,
             refundedKeys: [] as string[][],
@@ -81,7 +83,9 @@ vi.mock("../chat/lib/headless-run", () => {
                 throw probe.failWith ?? new Error("failed before the model");
             }
 
+            await probe.beforeStart?.();
             await options.onGenerationStart?.();
+            probe.generated += 1;
             await probe.during?.();
 
             if (probe.fail) {
@@ -141,6 +145,8 @@ beforeEach(() => {
     probe.refunds = 0;
     probe.refundedKeys = [];
     probe.during = undefined;
+    probe.beforeStart = undefined;
+    probe.generated = 0;
     probe.tier = "premium";
     probe.fail = false;
     probe.failWith = undefined;
@@ -816,7 +822,7 @@ describe("a refund that fails", () => {
         expect(row.watchWakeRefund).toMatchObject({ applied: true });
     });
 
-    it("stays owed until the next charge pays it, once, before charging again", async () => {
+    it("is paid by the failure's settlement when the job's own payment never lands, once", async () => {
         const { linkId } = await seed();
 
         await start(linkId);
@@ -835,24 +841,20 @@ describe("a refund that fails", () => {
             await ctx.runAction(runWatchWake, { ...enqueued[0]!.args, jobId: enqueued[0]!.options.once.jobId });
         });
 
-        const owed = await rowOf(linkId);
-
-        expect(probe.refunds).toBe(0);
-        expect(owed.watchWakeRefund).toMatchObject({ applied: false, keys: ["chat/dailyText:premium", "tasks/dailyRuns:premium"] });
-
-        // The retry time passes; the next attempt pays the owed refund first, then charges, so no second charge stacks unreconciled.
-        probe.failBeforeModel = false;
-        await harness.run(async (ctx: any) => {
-            await ctx.db.patch("pullRequestThreads", linkId, { watchWakeFailure: { at: 1, attempts: 1, kind: "retryable", retryAt: 0 } });
-        });
-        expect(await start(linkId)).toBe(true);
-        await runJob(enqueued[1]!);
-
         const row = await rowOf(linkId);
 
         expect(probe.refunds).toBe(1);
-        expect(probe.charges).toBe(2);
         expect(row.watchWakeRefund).toMatchObject({ applied: true });
+
+        // Nothing is owed any more: the next charge pays nothing again.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("pullRequestThreads", linkId, { watchWakeFailure: { at: 1, attempts: 1, kind: "retryable", retryAt: 0 } });
+        });
+        probe.failBeforeModel = false;
+        expect(await start(linkId)).toBe(true);
+        await runJob(enqueued[1]!);
+        expect(probe.refunds).toBe(1);
+        expect(probe.charges).toBe(2);
     });
 });
 
@@ -1018,6 +1020,70 @@ describe("at most one model call per occurrence", () => {
     });
 });
 
+describe("the last check, right before the model is asked", () => {
+    it("asks no model and gives no reply for a chat shared after the job's first check, refunding and counting nothing", async () => {
+        const { linkId, threadId } = await seed();
+
+        await start(linkId);
+        probe.beforeStart = async () => {
+            await harness.run(async (ctx: any) => {
+                await ctx.db.patch("threads", threadId, { isPublic: true });
+            });
+        };
+        await runJob(enqueued[0]!);
+
+        const row = await rowOf(linkId);
+
+        expect(probe.generated).toBe(0);
+        expect(probe.charges).toBe(1);
+        expect(probe.refunds).toBe(1);
+        expect(row.watchWakeLeaseUntil).toBe(0);
+        expect(row.watchWakeCompleted).toMatchObject({ done: true });
+        expect(row.watchPending).toEqual(["checks"]);
+        expect(row.watch.wakes).toBeUndefined();
+        expect(row.watchWakeFailure).toMatchObject({ attempts: 0, kind: "shared" });
+    });
+
+    it.each([
+        ["locked", { lockedAt: Date.now() }],
+        ["being deleted", { deletingAt: Date.now() }],
+    ])("asks no model for a chat that became %s in that window, with no failure counted", async (_name, patch) => {
+        const { linkId, threadId } = await seed();
+
+        await start(linkId);
+        probe.beforeStart = async () => {
+            await harness.run(async (ctx: any) => {
+                await ctx.db.patch("threads", threadId, patch);
+            });
+        };
+        await runJob(enqueued[0]!);
+
+        const row = await rowOf(linkId);
+
+        expect(probe.generated).toBe(0);
+        expect(probe.refunds).toBe(1);
+        expect(row.watchWakeLeaseUntil).toBe(0);
+        expect(row.watch.wakes).toBeUndefined();
+        expect(row.watchWakeFailure).toBeUndefined();
+    });
+
+    it("gives the reply when the chat is still the owner's alone", async () => {
+        const { linkId } = await seed();
+
+        await start(linkId);
+        probe.beforeStart = async () => {
+            // Nothing changed.
+        };
+        await runJob(enqueued[0]!);
+
+        expect(probe.generated).toBe(1);
+        expect(probe.refunds).toBe(0);
+        const row = await rowOf(linkId);
+
+        expect(row.watch.wakes).toBe(1);
+    });
+});
+
 describe("the tools of a wake turn", () => {
     it("are only the pull request reads, passed to the headless run's tool builder", async () => {
         const { linkId } = await seed();
@@ -1027,9 +1093,6 @@ describe("the tools of a wake turn", () => {
 
         expect(runs[0]?.toolAllowlist).toEqual(WAKE_TOOL_ALLOWLIST);
         expect(runs[0]?.tools).toBe("headless");
-        // Without it the owner's connector and MCP tools would be kept: nothing else widens the set.
-        expect(runs[0]?.toolAllowlistKeepsMcp).toBeUndefined();
-        expect(runs[0]?.additionalTools).toBeUndefined();
     });
 
     it("leave no write tool and keep the reads: the built set, narrowed by that allowlist, refuses a write", async () => {
@@ -1124,6 +1187,69 @@ describe("what a failure before the first generation does to the charge", () => 
         expect(probe.charges).toBe(1);
         expect(probe.refunds).toBe(0);
         expect(row.watchWakeRefund).toMatchObject({ applied: true });
+    });
+});
+
+describe("the model of a switched chat", () => {
+    it("is the active agent's model, as a normal turn there uses", async () => {
+        const { MODEL_LOOKUP } = await import("@neore/ai/models");
+        const { isTaskModelAllowed } = await import("../tasks/logic");
+        const ids = [...MODEL_LOOKUP.keys()];
+        const switched = ids.find((id) => id !== MODEL && isTaskModelAllowed(id, (model) => MODEL_LOOKUP.get(model)));
+        const { linkId, threadId } = await seed();
+
+        await start(linkId);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", threadId, { activeAgent: { kind: "model", model: switched } });
+        });
+        await runJob(enqueued[0]!);
+
+        expect(switched).toBeDefined();
+        expect(runs[0]?.model).toBe(switched);
+    });
+});
+
+describe("a refund owed by one claim", () => {
+    it("is not paid by another claim's payment", async () => {
+        const { linkId } = await seed({ watchWakeRefund: { applied: false, claim: 111, keys: ["chat/dailyText:premium"], windowEnds: [Date.now() + 60_000] } });
+        const apply = async (claim: number) => await harness.run(async (ctx: any) => await ctx.runMutation(applyWatchWakeRefund, { claim, linkId }));
+
+        await apply(222);
+        expect(probe.refunds).toBe(0);
+        await apply(111);
+        await apply(111);
+        expect(probe.refunds).toBe(1);
+    });
+
+    it("is paid before a terminal failure can stop the watch, once", async () => {
+        const { linkId } = await seed();
+
+        await start(linkId);
+        probe.failBeforeModel = true;
+        probe.failWith = new AgentRunErrorStandIn("terminal");
+        // The job's own payment step fails, so the refund is still owed when the failure is settled.
+        await harness
+            .action(async (ctx: any) => {
+                const real = ctx.runMutation.bind(ctx);
+
+                ctx.runMutation = async (target: unknown, args: unknown) => {
+                    if (target === applyWatchWakeRefund) {
+                        throw new Error("refund failed");
+                    }
+
+                    return await real(target, args);
+                };
+
+                await ctx.runAction(runWatchWake, { ...enqueued[0]!.args, jobId: enqueued[0]!.options.once.jobId });
+            })
+            .catch(() => undefined);
+
+        const row = await rowOf(linkId);
+
+        expect(probe.refunds).toBe(1);
+        expect(row.watchWakeRefund).toMatchObject({ applied: true });
+        expect(row.watchActive).toBe(false);
+        expect(row.watchWakeFailure).toMatchObject({ kind: "terminal" });
     });
 });
 

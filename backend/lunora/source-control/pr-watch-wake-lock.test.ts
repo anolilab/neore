@@ -168,6 +168,29 @@ describe("wakeLeaseHeld", () => {
         });
     });
 
+    it("lets a chat with 60 links and no live lease be locked and deleted, and refuses one with a live lease on the last of 60", async () => {
+        const free = await seed(undefined);
+
+        await addLinks(free.threadId, 60, 100);
+        expect(await held(free.threadId)).toBe(false);
+        await expect(harness.run(async (ctx: any) => await ctx.runMutation(softDeleteThread, { threadId: free.threadId }))).resolves.toBeDefined();
+
+        const locked = await seed(undefined, 7);
+
+        await addLinks(locked.threadId, 60, 200);
+        await expect(lock(locked.threadId)).resolves.toBeDefined();
+
+        const busy = await seed(undefined, 9);
+
+        // The live lease is on the 60th (last) link.
+        await addLinks(busy.threadId, 60, 300, 359);
+        expect(await held(busy.threadId)).toBe(true);
+        await expect(lock(busy.threadId)).rejects.toMatchObject({ message: expect.stringContaining("pull request watch") });
+        await expect(harness.run(async (ctx: any) => await ctx.runMutation(softDeleteThread, { threadId: busy.threadId }))).rejects.toMatchObject({
+            message: expect.stringContaining("pull request watch"),
+        });
+    });
+
     it("does not refuse a thread with many links and no held lease", async () => {
         const { threadId } = await seed(undefined);
 

@@ -218,10 +218,11 @@ const failedPatch = (link: Doc<"pullRequestThreads">, now: number, terminal: boo
 };
 
 /** Pays the refund owed on the link, once (the obligation is marked applied), and only for limits whose charged window has not ended. */
-const payOwedRefund = async (ctx: MutationCtx, link: Doc<"pullRequestThreads">): Promise<void> => {
+const payOwedRefund = async (ctx: MutationCtx, link: Doc<"pullRequestThreads">, claim?: number): Promise<void> => {
     const owed = link.watchWakeRefund;
 
-    if (owed === undefined || owed.applied) {
+    // With a claim named, only the refund that claim's charge owes is paid; with none, it is the recovery of an earlier one (`beginWatchWake`).
+    if (owed === undefined || owed.applied || (claim !== undefined && owed.claim !== claim)) {
         return;
     }
 
@@ -447,7 +448,9 @@ export const beginWatchWake = internalMutation
         // is no longer available is refused like any other ineligible state: nothing is charged or counted, the lease is released, and the
         // owner sees it once on `watchWakeFailure`.
         const wakeThread = await ctx.db.get("threads", link.threadId);
-        const model = wakeThread?.model || DEFAULT_CHAT_MODEL;
+        // A switched chat runs on the agent it was switched to (`threads.activeAgent`, the cache of the active path's agent), as a normal turn
+        // there does; otherwise the chat's own model.
+        const model = wakeThread?.activeAgent?.model || wakeThread?.model || DEFAULT_CHAT_MODEL;
 
         if (!isTaskModelAllowed(model, (id) => MODEL_LOOKUP.get(id))) {
             if (link.watchWakeFailure?.kind !== "unavailable") {
@@ -493,29 +496,59 @@ export const beginWatchWake = internalMutation
         return { charged, model, status: "run" as const };
     });
 
-/** The model was reached: the round stays charged, so the refund owed for it is closed without a payment. Called before the first generation. */
+/**
+ * Called by the run right before it asks the model (`onGenerationStart`): the last check, in the SAME transaction that keeps the charge.
+ * The turn goes ahead (`kept`) only if its lease is still its own, the watch is the one polled, and the chat can still take it: the
+ * owner's, not locked, deleted or being deleted, no reply streaming, and still the owner's alone. Otherwise (`refused`) the model is not
+ * asked: the round is refunded here, the occurrence is closed, the lease is released, the reasons stay pending and no failure is counted
+ * (a sharing pause is noted once, as at the claim). A chat changed after this transaction and before the provider has the request is not
+ * seen: no shared run reservation exists for a headless run to take, so that window is a stated residual.
+ */
 export const keepWatchWakeCharge = internalMutation
+    .input({ claim: v.number(), linkId: v.id("pullRequestThreads") })
+    .output(v.union(v.literal("kept"), v.literal("refused")))
+    .mutation(async ({ args, ctx }) => {
+        const link = await ctx.db.get("pullRequestThreads", args.linkId);
+
+        if (link === null || link.watchWakeLeaseUntil !== args.claim) {
+            return "refused" as const;
+        }
+
+        const record = link.watchWakeCompleted?.claim === args.claim ? link.watchWakeCompleted : undefined;
+        const stillRuns =
+            link.watchActive === true &&
+            link.watch !== undefined &&
+            link.watch.stoppedAt === undefined &&
+            ctx.now < args.claim &&
+            (await wakeableThread(ctx, link)) !== null &&
+            !(await pausedForSharing(ctx, link));
+
+        if (!stillRuns) {
+            await payOwedRefund(ctx, link);
+            await ctx.db.patch("pullRequestThreads", link._id, {
+                watchWakeLeaseUntil: 0,
+                ...(record !== undefined && { watchWakeCompleted: { ...record, done: true } }),
+            });
+
+            return "refused" as const;
+        }
+
+        if (link.watchWakeRefund !== undefined && link.watchWakeRefund.claim === args.claim && !link.watchWakeRefund.applied) {
+            await ctx.db.patch("pullRequestThreads", link._id, { watchWakeRefund: { ...link.watchWakeRefund, applied: true } });
+        }
+
+        return "kept" as const;
+    });
+
+/** Pays the refund owed on the link, once: the limits it names get one unit back each (while their window is current), then it is marked applied. */
+export const applyWatchWakeRefund = internalMutation
     .input({ claim: v.number(), linkId: v.id("pullRequestThreads") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const link = await ctx.db.get("pullRequestThreads", args.linkId);
 
-        if (link?.watchWakeRefund !== undefined && link.watchWakeRefund.claim === args.claim && !link.watchWakeRefund.applied) {
-            await ctx.db.patch("pullRequestThreads", link._id, { watchWakeRefund: { ...link.watchWakeRefund, applied: true } });
-        }
-
-        return null;
-    });
-
-/** Pays the refund owed on the link, once: the limits it names get one unit back each (while their window is current), then it is marked applied. */
-export const applyWatchWakeRefund = internalMutation
-    .input({ linkId: v.id("pullRequestThreads") })
-    .output(v.null())
-    .mutation(async ({ args, ctx }) => {
-        const link = await ctx.db.get("pullRequestThreads", args.linkId);
-
         if (link !== null) {
-            await payOwedRefund(ctx, link);
+            await payOwedRefund(ctx, link, args.claim);
         }
 
         return null;
@@ -572,6 +605,9 @@ export const finishWatchWake = internalMutation
 
                 return null;
             }
+
+            // The refund this claim's charge owes (the turn failed before the model) is paid BEFORE the failure can stop the watch.
+            await payOwedRefund(ctx, link, args.claim);
 
             // The turn failed: counted, spaced by the cooldown, and the watch stopped at the third in a row or at a terminal error.
             const terminal = args.terminal === true;
@@ -659,10 +695,10 @@ const retried = async (step: () => Promise<void>): Promise<void> => {
  * A round owed back for a turn that failed before the model: the obligation was written with the charge, so only the payment is tried
  * here, again if it fails. A payment that never lands stays owed, and the lapse handler or the next charge pays it, so it is refunded once.
  */
-const owedRefund = async (ctx: Pick<ActionCtx, "runMutation">, linkId: Id<"pullRequestThreads">): Promise<void> => {
+const owedRefund = async (ctx: Pick<ActionCtx, "runMutation">, linkId: Id<"pullRequestThreads">, claim: number): Promise<void> => {
     try {
         await retried(async () => {
-            await ctx.runMutation(internal.source_control.pr_watch_wake.applyWatchWakeRefund, { linkId });
+            await ctx.runMutation(internal.source_control.pr_watch_wake.applyWatchWakeRefund, { claim, linkId });
         });
     } catch (error) {
         console.warn("[pr-watch-wake] could not give the round back", { error, linkId });
@@ -700,6 +736,7 @@ export const runWatchWake = internalAction
         let terminal = false;
         // From the first generation on, a failure may have been billed; before it, the round is given back.
         let reachedModel = false;
+        let refused = false;
 
         try {
             await runHeadlessAgent(ctx, {
@@ -707,7 +744,15 @@ export const runWatchWake = internalAction
                 model: may.model,
                 // Recorded before the first generation: the round then stays charged, and a failure from here on is never refunded.
                 onGenerationStart: async () => {
-                    await ctx.runMutation(internal.source_control.pr_watch_wake.keepWatchWakeCharge, { claim: args.claim, linkId: args.linkId });
+                    const kept = await ctx.runMutation(internal.source_control.pr_watch_wake.keepWatchWakeCharge, { claim: args.claim, linkId: args.linkId });
+
+                    // The chat changed since the job's first check: the model is not asked (the run stops here), and nothing is counted.
+                    if (kept === "refused") {
+                        refused = true;
+
+                        throw new Error("The chat can no longer take the wake");
+                    }
+
                     reachedModel = true;
                 },
                 organizationId: args.organizationId,
@@ -725,10 +770,15 @@ export const runWatchWake = internalAction
             terminal = isTerminalWakeError(error);
 
             if (!reachedModel) {
-                await owedRefund(ctx, args.linkId);
+                await owedRefund(ctx, args.linkId, args.claim);
             }
 
             console.warn("[pr-watch-wake] the wake turn failed", { error, linkId: args.linkId, terminal });
+        }
+
+        // Refused at the last check: already refunded and released by it, no failure counted and nothing settled.
+        if (refused) {
+            return null;
         }
 
         // A turn that ran to its end is recorded durably BEFORE its settlement is tried, so a settlement that keeps failing is settled by a

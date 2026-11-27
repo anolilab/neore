@@ -2804,6 +2804,9 @@ export const schema = defineSchema({
         .index("by_user_and_repository_number", ["userId", "repository", "number"])
         .index("by_user_and_repository_number_threadId", ["userId", "repository", "number", "threadId"])
         .index("by_user_and_threadId", ["userId", "threadId"])
+        // The links of a thread that hold a wake lease (`source-control/pr-watch-wake-lease.ts`): read by lease time, so the check is bounded by
+        // the live leases and not by how many links the thread has.
+        .index("by_user_thread_and_wakeLease", ["userId", "threadId", "watchWakeLeaseUntil"])
         .index("by_user_and_watchActive", ["userId", "watchActive"]),
 
     // A phone's Expo push token (`notifications/native-push.ts`): one row per token, owned by the account signed in on
