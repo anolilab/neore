@@ -4,8 +4,8 @@ import { AccessibilityInfo, Image, Pressable, ScrollView, Text, TextInput, View 
 
 import { useAuth } from "@/auth/auth-state";
 import type { ControlSession, ControlState } from "@/browser/control-session";
-import type { ShownFrame } from "@/browser/use-browser-view";
 import { useBrowserView } from "@/browser/use-browser-view";
+import type { ShownFrame } from "@/browser/use-frame-reads";
 import { withFinally } from "@/lib/guarded";
 import { OfflineBanner } from "@/offline/offline-banner";
 import { useWriteControl } from "@/offline/offline-context";
