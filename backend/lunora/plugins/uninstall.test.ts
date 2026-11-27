@@ -628,4 +628,28 @@ describe("uninstall", () => {
             pluginMarker: "",
         });
     });
+
+    it("refuses a second claim made from the same read of the install, so two actions never both own it", async () => {
+        const { installId } = await installed();
+        const before = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
+
+        await run(async (context) => await uninstallRows(context, OWNER, SLUG));
+
+        // The second action read the install before the first one claimed it, and still holds that row.
+        const stale = async (context: any) => {
+            const installs = { findFirst: async () => before, findMany: context.db.pluginInstalls.findMany };
+            const db = new Proxy(context.db, { get: (target, key) => (key === "pluginInstalls" ? installs : Reflect.get(target, key)) });
+
+            return { ...context, db };
+        };
+
+        await expect(run(async (context) => await uninstallRows(await stale(context), OWNER, SLUG))).rejects.toThrow("STALE_LEASE");
+    });
+
+    it("does not finish an uninstall of an install that is no longer being uninstalled", async () => {
+        const { installId } = await installed();
+        const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
+
+        await expect(run(async (context) => await finishUninstallRows(context, installId, install.generation))).rejects.toThrow("STALE_LEASE");
+    });
 });

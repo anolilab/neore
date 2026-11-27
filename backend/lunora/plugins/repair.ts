@@ -21,7 +21,7 @@ import type { ChildKind } from "./logic";
 /** The id of the child that carries a marker, if it exists and belongs to the owner. */
 const childIdByMarker = async (ctx: MutationCtx, kind: ChildKind, marker: string, userId: string): Promise<string | undefined> => {
     if (kind === "skill") {
-        const skill = await ctx.db.skills.findFirst({ where: { pluginMarker: marker } });
+        const skill = await ctx.db.skills.findFirst({ consistency: "primary", where: { pluginMarker: marker } });
 
         return skill && skill.userId === userId ? (skill._id as string) : undefined;
     }

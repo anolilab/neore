@@ -10,6 +10,7 @@ import { v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internalQuery } from "../_generated/server";
 import { liveHashOf } from "./live-hash";
+import type { SkillKeyCache } from "./live-hash";
 import { isCompletePluginExport } from "./logic";
 
 /** An entry key whose part after the kind is a bare position: an install made before declared keys. */
@@ -49,7 +50,7 @@ export const pluginForSelection = internalQuery
         const installIds = new Set<string>();
 
         for (const id of args.skillIds) {
-            const row = await ctx.db.skills.findFirst({ where: { _id: id as Id<"skills"> } });
+            const row = await ctx.db.skills.findFirst({ consistency: "primary", where: { _id: id as Id<"skills"> } });
 
             if (!row || row.userId !== args.userId || !row.pluginInstallId) {
                 return null;
@@ -96,9 +97,10 @@ export const pluginForSelection = internalQuery
 
         const { page: links } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
         const children = [];
+        const skillKeys: SkillKeyCache = new Map();
 
         for (const link of links) {
-            const currentHash = await liveHashOf(ctx, installId, link);
+            const currentHash = await liveHashOf(ctx, installId, link, skillKeys);
 
             children.push({ contentHash: link.contentHash, currentHash, id: link.itemId ?? "", pendingHash: link.pendingHash, state: link.state });
         }

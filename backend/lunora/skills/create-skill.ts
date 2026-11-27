@@ -225,7 +225,9 @@ export const createPluginSkill = internalMutation
                     throw new LunoraError("CONFLICT", "That plugin skill belongs to another install");
                 }
 
-                // Completing the bookkeeping writes rows, so it is fenced like a create.
+                // Completing the bookkeeping writes rows, so it is fenced like a create: by the install, and by an erasure in progress.
+                await refuseWhileErasing(ctx, userId);
+
                 if (generation !== undefined) {
                     await heldInstallForShardWrite(ctx, pluginInstallId as Id<"pluginInstalls">, generation);
                 }

@@ -20,7 +20,7 @@ import { planFor } from "../skills/bundle";
 import { assertNoToolConfig, checkPluginFile } from "./install-action";
 import { childOps, importFailure } from "./install-ops";
 import { entryHash } from "./entry-hash";
-import { heldInstall } from "./held-install";
+import { heldInstall, patchInstallIf, STALE } from "./held-install";
 import { LEASE_MS } from "./logic";
 import { refuseWhileErasing, requireOwnerShard } from "./owner-shard";
 import { repairableNow, repairRows } from "./repair";
@@ -121,12 +121,14 @@ export const beginRepairRows = async (
     // repair or uninstall starts while this one creates children. The action ends it with `finishInstall` or `markNeedsRepair`.
     const generation = install.generation + 1;
 
-    await ctx.db.patch("pluginInstalls", install._id as Id<"pluginInstalls">, {
-        generation,
-        leaseUntil: ctx.now + LEASE_MS,
-        status: "installing",
-        updatedAt: ctx.now,
-    });
+    await patchInstallIf(
+        ctx,
+        install._id as Id<"pluginInstalls">,
+        install.generation,
+        { generation, leaseUntil: ctx.now + LEASE_MS, status: "installing", updatedAt: ctx.now },
+        STALE,
+        install.status,
+    );
 
     return { existing, generation, installId, linked: result.linked, missing, status: "needs-repair", unresolved };
 };

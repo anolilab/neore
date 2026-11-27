@@ -18,6 +18,7 @@ import { DEFAULT_GROUP_TITLE } from "../chat/group/functions";
 import { skillVisibility } from "../skills/access";
 import { requireOwnerShard } from "./owner-shard";
 import { skillRowHash } from "./entry-hash";
+import { patchInstallIf, STALE } from "./held-install";
 import { LEASE_MS, parseMarker } from "./logic";
 import { deleteSkillRows } from "../skills/functions";
 
@@ -76,7 +77,9 @@ export const uninstallRows = async (ctx: MutationCtx, userId: string, pluginSlug
 
     const installId = install._id as string;
     const links = await readAllPages(async (cursor) => await ctx.db.pluginItems.findMany({ consistency: "primary", cursor, where: { installId } }));
-    const skills = await readAllPages(async (cursor) => await ctx.db.skills.findMany({ cursor, where: { pluginInstallId: installId } }));
+    const skills = await readAllPages(
+        async (cursor) => await ctx.db.skills.findMany({ consistency: "primary", cursor, where: { pluginInstallId: installId } }),
+    );
     const skillIds = new Set(skills.map((skill) => skill._id as string));
 
     // The plugin's own group chats: any with messages refuses the uninstall; the empty ones go with it.
@@ -127,12 +130,16 @@ export const uninstallRows = async (ctx: MutationCtx, userId: string, pluginSlug
 
     const generation = install.generation + 1;
 
-    await ctx.db.patch("pluginInstalls", install._id as Id<"pluginInstalls">, {
-        generation,
-        leaseUntil: ctx.now + LEASE_MS,
-        status: "uninstalling",
-        updatedAt: ctx.now,
-    });
+    // The claim is conditional on the generation and status read above: a repair that claimed the same install in between wins, and
+    // this one is refused, so two actions never both believe they own it.
+    await patchInstallIf(
+        ctx,
+        install._id as Id<"pluginInstalls">,
+        install.generation,
+        { generation, leaseUntil: ctx.now + LEASE_MS, status: "uninstalling", updatedAt: ctx.now },
+        STALE,
+        install.status,
+    );
 
     let removed = 0;
     const kept: string[] = [];
@@ -186,7 +193,7 @@ export const detachKeptGroup = async (ctx: MutationCtx, threadId: string, instal
     const participants = group?.groupChat?.participants ?? [];
 
     for (const participant of participants) {
-        const skill = await ctx.db.skills.findFirst({ where: { _id: participant.skillId as Id<"skills"> } });
+        const skill = await ctx.db.skills.findFirst({ consistency: "primary", where: { _id: participant.skillId as Id<"skills"> } });
 
         if (skill?.pluginInstallId === installId) {
             await ctx.db.patch("skills", skill._id as Id<"skills">, { pluginInstallId: "", pluginMarker: "" });
@@ -260,7 +267,7 @@ export const finishUninstallRows = async (
 ): Promise<UninstallFinished> => {
     const install = await ctx.db.pluginInstalls.findFirst({ consistency: "primary", where: { _id: installId as Id<"pluginInstalls"> } });
 
-    if (!install || install.generation !== generation) {
+    if (!install || install.generation !== generation || install.status !== "uninstalling") {
         throw new LunoraError("CONFLICT", "STALE_LEASE: this uninstall was taken over by another action");
     }
 
@@ -293,7 +300,7 @@ export const finishUninstallRows = async (
             : [];
 
     for (const skillId of pendingSkills) {
-        const skill = await ctx.db.skills.findFirst({ where: { _id: skillId as Id<"skills"> } });
+        const skill = await ctx.db.skills.findFirst({ consistency: "primary", where: { _id: skillId as Id<"skills"> } });
 
         if (!skill) {
             continue;

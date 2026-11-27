@@ -102,7 +102,7 @@ export const updateSkillChild = internalMutation
             throw new LunoraError("CONFLICT", `The child "${args.entryKey}" is not a linked skill of this plugin`);
         }
 
-        const skill = await ctx.db.skills.findFirst({ where: { pluginMarker: markerFor(args.installId, args.entryKey) } });
+        const skill = await ctx.db.skills.findFirst({ consistency: "primary", where: { pluginMarker: markerFor(args.installId, args.entryKey) } });
 
         if (!skill || skill.userId !== args.userId) {
             throw new LunoraError("CONFLICT", `The skill for "${args.entryKey}" is missing`);
@@ -190,7 +190,7 @@ const childExists = async (ctx: Pick<MutationCtx, "db">, link: { entryKey: strin
     const marker = markerFor(installId, link.entryKey);
 
     if (link.kind === "skill") {
-        return (await ctx.db.skills.findFirst({ where: { pluginMarker: marker } })) !== null;
+        return (await ctx.db.skills.findFirst({ consistency: "primary", where: { pluginMarker: marker } })) !== null;
     }
 
     const table = link.kind === "trigger" ? "triggers" : "threads";
@@ -371,7 +371,7 @@ export const removeChild = internalMutation
         }
 
         if (link.kind === "skill") {
-            const skill = await ctx.db.skills.findFirst({ where: { pluginMarker: markerFor(args.installId, args.entryKey) } });
+            const skill = await ctx.db.skills.findFirst({ consistency: "primary", where: { pluginMarker: markerFor(args.installId, args.entryKey) } });
 
             if (skill && skill.userId === args.userId) {
                 if ((await skillRowHash(skill)) !== link.contentHash) {
@@ -433,7 +433,7 @@ export const detachChild = internalMutation
         const marker = markerFor(args.installId, args.entryKey);
 
         if (link.kind === "skill") {
-            const skill = await ctx.db.skills.findFirst({ where: { pluginMarker: marker } });
+            const skill = await ctx.db.skills.findFirst({ consistency: "primary", where: { pluginMarker: marker } });
 
             if (skill && skill.userId === args.userId) {
                 await ctx.db.patch("skills", skill._id as Id<"skills">, { pluginInstallId: "", pluginMarker: "" });

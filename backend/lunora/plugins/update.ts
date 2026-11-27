@@ -77,7 +77,7 @@ export const loadInstalledForUpdate = internalQuery
             children.push({ contentHash: link.contentHash, currentHash, entryKey: link.entryKey, kind: link.kind });
 
             if (link.kind === "skill") {
-                const skill = await ctx.db.skills.findFirst({ where: { pluginMarker: markerFor(installId, link.entryKey) } });
+                const skill = await ctx.db.skills.findFirst({ consistency: "primary", where: { pluginMarker: markerFor(installId, link.entryKey) } });
 
                 if (skill) {
                     ownSlugs.push({ entryKey: link.entryKey, slug: skill.slug });

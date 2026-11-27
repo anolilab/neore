@@ -8,11 +8,17 @@ import { groupRowHash, skillRowHash, triggerRowHash } from "./entry-hash";
 import { markerFor, parseMarker } from "./logic";
 import type { ChildKind } from "./logic";
 
-export const liveHashOf = async (ctx: QueryCtx, installId: string, link: { entryKey: string; kind: ChildKind }): Promise<string> => {
+/**
+ * `skillKeys` is an optional lookup shared by the calls of one pass over one install: a participant skill's entry key, read once however
+ * many group chats name it. Without it every group chat re-reads its participants, which adds up past a request's read budget.
+ */
+export type SkillKeyCache = Map<string, string | undefined>;
+
+export const liveHashOf = async (ctx: QueryCtx, installId: string, link: { entryKey: string; kind: ChildKind }, skillKeys?: SkillKeyCache): Promise<string> => {
     const marker = markerFor(installId, link.entryKey);
 
     if (link.kind === "skill") {
-        const skill = await ctx.db.skills.findFirst({ where: { pluginMarker: marker } });
+        const skill = await ctx.db.skills.findFirst({ consistency: "primary", where: { pluginMarker: marker } });
 
         return skill ? await skillRowHash(skill) : "missing";
     }
@@ -43,12 +49,21 @@ export const liveHashOf = async (ctx: QueryCtx, installId: string, link: { entry
     ];
 
     for (const skillId of participantIds) {
-        const skill = await ctx.db.skills.findFirst({ where: { _id: skillId as Id<"skills"> } });
-        const parsed = skill?.pluginMarker ? parseMarker(skill.pluginMarker) : null;
+        let key: string | undefined;
 
-        // Only this install's own skills map to an entry key: another plugin's skill under the same key is a replacement, and must change the hash.
-        if (parsed && parsed.installId === installId) {
-            keys.set(skillId, parsed.entryKey);
+        if (skillKeys?.has(skillId)) {
+            key = skillKeys.get(skillId);
+        } else {
+            const skill = await ctx.db.skills.findFirst({ consistency: "primary", where: { _id: skillId as Id<"skills"> } });
+            const parsed = skill?.pluginMarker ? parseMarker(skill.pluginMarker) : null;
+
+            // Only this install's own skills map to an entry key: another plugin's skill under the same key is a replacement, and must change the hash.
+            key = parsed && parsed.installId === installId ? parsed.entryKey : undefined;
+            skillKeys?.set(skillId, key);
+        }
+
+        if (key !== undefined) {
+            keys.set(skillId, key);
         }
     }
 

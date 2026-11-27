@@ -193,4 +193,11 @@ describe("plugin skills", () => {
         await expect(harness.run(async (context: any) => await context.runMutation(createPluginSkill, pluginInput))).rejects.toThrow("being deleted");
         expect(await rowsWithMarker()).toHaveLength(0);
     });
+
+    it("writes no bookkeeping rows for an existing skill while the account is being erased", async () => {
+        await harness.run(async (context: any) => await context.runMutation(createPluginSkill, pluginInput));
+        await harness.run(async (context: any) => await context.db.insert("accountMoves", { createdAt: Date.now(), kind: "erasing", userId: OWNER }));
+
+        await expect(harness.run(async (context: any) => await context.runMutation(createPluginSkill, pluginInput))).rejects.toThrow("being deleted");
+    });
 });
